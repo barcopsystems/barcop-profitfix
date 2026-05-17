@@ -125,9 +125,9 @@ S.Settings = {
         id:uid(), name:'House Margarita', mode:'single', category:'Cocktail',
         menu_price:10, target_cost_pct:20,
         ingredients:[
-          { product_id:tequilaId, quantity:1, cost_per_unit:bp[1].cost_per_pour, total_cost:bp[1].cost_per_pour },
-          { product_id:tripleSec, quantity:0.5, cost_per_unit:kp[4].cost_per_unit, total_cost:kp[4].cost_per_unit*0.5 },
-          { product_id:limeId,    quantity:0.25, cost_per_unit:kp[3].cost_per_unit, total_cost:kp[3].cost_per_unit*0.25 },
+          { product_id:tequilaId, quantity:1,    cost_per_unit:bp[1].cost_per_pour,      total_cost:bp[1].cost_per_pour },
+          { product_id:tripleSec, quantity:0.5,  cost_per_unit:kp[4].cost_per_unit/4,    total_cost:kp[4].cost_per_unit/4*0.5 },
+          { product_id:limeId,    quantity:0.25, cost_per_unit:kp[3].cost_per_unit/4,    total_cost:kp[3].cost_per_unit/4*0.25 },
         ],
       },
       {
