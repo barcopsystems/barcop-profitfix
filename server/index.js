@@ -623,6 +623,91 @@ Return ONLY valid JSON with these exact keys populated from submitted materials:
 }`;
 }
 
+// ── Stripe webhook ────────────────────────────────────────────────────────────
+// Must use express.raw() — Stripe signature verification requires the raw body
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { createClient } = require('@supabase/supabase-js');
+
+const supabaseAdmin = createClient(
+  'https://plpikfpintruksclkwyb.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const MODULE_SLOTS = {
+  'price_1TY9KKGow04S066UBHLhPLNK': 1,
+  'price_1TY9KgGow04S066Urrd6TwGP': 2,
+  'price_1TY9L4Gow04S066UnAxs4K8Q': 3,
+};
+
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig    = req.headers['stripe-signature'];
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, secret);
+  } catch (err) {
+    console.error('Webhook signature failed:', err.message);
+    return res.status(400).send('Webhook Error: ' + err.message);
+  }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session    = event.data.object;
+      const customerId = session.customer;
+      const userId     = session.metadata?.user_id;
+      const priceId    = session.metadata?.price_id;
+      const modules    = (session.metadata?.modules || '').split(',').filter(Boolean);
+      const slots      = MODULE_SLOTS[priceId] || 1;
+
+      if (userId) {
+        await supabaseAdmin.from('subscriptions').upsert({
+          user_id:             userId,
+          stripe_customer_id:  customerId,
+          subscription_status: 'active',
+          subscription_plan:   slots === 1 ? 'tier_1' : slots === 2 ? 'tier_2' : 'tier_3',
+          active_modules:      modules.length ? modules : ['profit'],
+          current_period_end:  null,
+          updated_at:          new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      }
+    }
+
+    if (event.type === 'customer.subscription.updated') {
+      const sub        = event.data.object;
+      const customerId = sub.customer;
+      const status     = sub.status;
+      const periodEnd  = new Date(sub.current_period_end * 1000).toISOString();
+
+      await supabaseAdmin.from('subscriptions')
+        .update({
+          subscription_status: status,
+          current_period_end:  periodEnd,
+          updated_at:          new Date().toISOString(),
+        })
+        .eq('stripe_customer_id', customerId);
+    }
+
+    if (event.type === 'customer.subscription.deleted') {
+      const sub        = event.data.object;
+      const customerId = sub.customer;
+
+      await supabaseAdmin.from('subscriptions')
+        .update({
+          subscription_status: 'canceled',
+          active_modules:      [],
+          updated_at:          new Date().toISOString(),
+        })
+        .eq('stripe_customer_id', customerId);
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Webhook handler error:', err);
+    res.status(500).json({ error: 'Webhook handler failed' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
