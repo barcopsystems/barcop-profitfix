@@ -35,7 +35,7 @@ S.RecipeLibrary={
       const rows=recipes.map(r=>{
         const tgt=r.target_cost_pct??22;const over=r.cost_pct!=null&&r.cost_pct>tgt;
         const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
-        return '<tr><td class="val">'+esc(r.name)+'<span class="badge badge-dim" style="margin-left:6px;font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span>'+(r.flagged?'<span class="badge badge-warn" style="margin-left:4px;">Above Target</span>':'')+'</td>'
+        return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td><td class="val">'+esc(r.name)+'<span class="badge badge-dim" style="margin-left:6px;font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span>'+(r.flagged?'<span class="badge badge-warn" style="margin-left:4px;">Above Target</span>':'')+'</td>'
           +'<td>'+esc(r.category||'—')+'</td><td>'+esc(yld)+'</td>'
           +'<td>'+App.fmtCurrency(r.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
           +'<td class="'+(over?'neg':r.cost_pct!=null?'pos':'')+'">'+App.fmtPct(r.cost_pct)+'</td>'
@@ -43,7 +43,8 @@ S.RecipeLibrary={
           +'<td><div class="row-actions"><button class="btn btn-ghost btn-sm rl-edit" data-id="'+r.id+'">Edit</button><button class="btn btn-danger btn-sm rl-del" data-id="'+r.id+'">Delete</button></div></td></tr>';
       }).join('');
       html=(flagged>0?'<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'+flagged+' recipe'+(flagged>1?'s are':' is')+' above target cost.</div></div>':'')
-        +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" id="rl-sel-all">Select All</button><button class="btn btn-danger btn-sm" id="rl-del-sel" style="display:none;">Delete Selected</button><span id="rl-sel-count" style="font-size:11px;color:var(--t3);"></span></div>'
+        +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th style="width:36px;"><input type="checkbox" id="rl-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     const rlModal='<div id="rl-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="rl-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this recipe?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-ghost" id="rl-del-cancel">Cancel</button><button class="btn btn-danger" id="rl-del-confirm">Delete</button></div></div></div>';
     this.container.innerHTML='<div class="screen">'+html+'<div id="rl-form"></div></div>'+rlModal;
@@ -61,6 +62,43 @@ S.RecipeLibrary={
       if(ev.target.closest('#rl-mode-food'))this.showForm('food');
       if(ev.target.closest('#rl-mode-cancel'))this.renderList();
     };
+
+    const updateSel=()=>{
+      const checked=this.container.querySelectorAll('.rl-chk:checked');
+      const btn=document.getElementById('rl-del-sel');
+      const cnt=document.getElementById('rl-sel-count');
+      if(btn)btn.style.display=checked.length>0?'':'none';
+      if(cnt)cnt.textContent=checked.length>0?checked.length+' selected':'';
+    };
+    document.getElementById('rl-chk-all')?.addEventListener('change',function(){
+      document.querySelectorAll('.rl-chk').forEach(c=>{c.checked=this.checked;});
+      updateSel();
+    });
+    this.container.addEventListener('change',ev=>{if(ev.target.classList.contains('rl-chk'))updateSel();});
+    document.getElementById('rl-sel-all')?.addEventListener('click',()=>{
+      const chks=document.querySelectorAll('.rl-chk');
+      const allChecked=[...chks].every(c=>c.checked);
+      chks.forEach(c=>{c.checked=!allChecked;});
+      const ca=document.getElementById('rl-chk-all');if(ca)ca.checked=!allChecked;
+      updateSel();
+    });
+    document.getElementById('rl-del-sel')?.addEventListener('click',()=>{
+      const ids=[...document.querySelectorAll('.rl-chk:checked')].map(c=>c.dataset.id);
+      if(!ids.length)return;
+      this._pendingDelIds=ids;
+      const modal=document.getElementById('rl-del-modal');
+      const msgEl=document.getElementById('rl-del-msg');
+      if(msgEl)msgEl.textContent='Delete '+ids.length+' recipe'+(ids.length>1?'s':'')+'?';
+      if(modal)modal.style.display='flex';
+      document.getElementById('rl-del-cancel').onclick=()=>{modal.style.display='none';this._pendingDelIds=null;};
+      document.getElementById('rl-del-confirm').onclick=()=>{
+        modal.style.display='none';
+        const ids=this._pendingDelIds||[];
+        App.data.recipes=(App.data.recipes||[]).filter(r=>!ids.includes(r.id));
+        App.saveKey('recipes').then(()=>this.renderList());
+        this._pendingDelIds=null;
+      };
+    });
     this.container.addEventListener('change',ev=>{
       if(ev.target.classList.contains('rl-ing-prod'))this.onProdChange(ev.target);
       if(['rl-menu-price','rl-target-pct','rl-batch-yield','rl-batch-yield-unit','rl-serving-size','rl-serving-size-unit','rl-plate-yield'].includes(ev.target.id))this.calc();
