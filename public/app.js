@@ -168,8 +168,9 @@ const App = {
       'reports':       ['Reports & History', ''],
       'settings':      ['Settings', ''],
       'help':          ['Help & FAQ', ''],
-      'audit-tracker': ['Audit Tracker', 'Profit Audit History & Progress'],
-      'resources':     ['Resources', 'Tools, Templates & Checklists']
+      'audit-tracker': ['Profit Audit', 'Monthly Audit History & Progress'],
+      'resources':     ['Resources', 'Tools, Templates & Checklists'],
+      'getting-started': ['Getting Started', '30-Day Setup Checklist']
     };
 
     const screens = {
@@ -186,7 +187,8 @@ const App = {
       'settings':      S.Settings,
       'help':          S.Help,
       'audit-tracker': S.AuditTracker,
-      'resources':     S.Resources
+      'resources':     S.Resources,
+      'getting-started': S.GettingStarted
     };
 
     const [title, sub] = titles[id] || [id, ''];
