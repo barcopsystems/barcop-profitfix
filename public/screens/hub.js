@@ -229,6 +229,11 @@ S.Hub = {
           <div style="font-size:13px;color:var(--t2);line-height:1.6;">${insightCopy}</div>
         </div>
 
+        <!-- Sign out -->
+        <div style="width:100%;max-width:920px;text-align:right;padding:4px 0 8px;">
+          <button id="hub-signout" style="background:none;border:none;color:var(--t3);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;padding:4px 0;">Sign Out</button>
+        </div>
+
         <!-- Upgrade modal -->
         <div id="hub-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:2000;align-items:center;justify-content:center;">
           <div style="background:var(--surface);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:32px;width:420px;max-width:90vw;position:relative;">
@@ -242,6 +247,10 @@ S.Hub = {
 
       </div>
     `;
+
+    document.getElementById('hub-signout')?.addEventListener('click', async () => {
+      await DB.signOut();
+    });
   },
 
   _enter(screen) {
