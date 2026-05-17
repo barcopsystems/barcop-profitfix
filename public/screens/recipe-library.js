@@ -36,15 +36,14 @@ S.RecipeLibrary={
         const tgt=r.target_cost_pct??22;const over=r.cost_pct!=null&&r.cost_pct>tgt;
         const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
         return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
-          +'<td><div class="val" style="margin-bottom:3px;">'+esc(r.name)+'</div><div style="font-size:10px;color:var(--t3);">'+esc(r.category||'—')+'</div></td>'
-          +'<td style="white-space:nowrap;"><span class="badge '+(r.flagged?'badge-warn':'badge-dim')+'" style="font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span></td>'
+          +'<td><div class="val" style="margin-bottom:4px;">'+esc(r.name)+'</div><span class="badge '+(r.flagged?'badge-warn':'badge-dim')+'" style="font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span></td>'
           +'<td>'+esc(yld)+'</td>'
           +'<td>'+App.fmtCurrency(r.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
           +'<td class="'+(over?'neg':r.cost_pct!=null?'pos':'')+'">'+App.fmtPct(r.cost_pct)+'</td>'
           +'<td>'+App.fmtPct(tgt)+'</td>'
           +'<td><div class="row-actions"><button class="btn btn-ghost btn-sm rl-edit" data-id="'+r.id+'">Edit</button><button class="btn btn-danger btn-sm rl-del" data-id="'+r.id+'">Delete</button></div></td></tr>';
       }).join('');
-      html=(flagged>0?'<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'+flagged+' recipe'+(flagged>1?'s are':' is')+' above target cost — highlighted red in the Type column.</div></div>':'')
+      html=(flagged>0?'<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'+flagged+' recipe'+(flagged>1?'s are':' is')+' above target cost — highlighted red in the Recipe column.</div></div>':'')
         +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" id="rl-sel-all">Select All</button><button class="btn btn-danger btn-sm" id="rl-del-sel" style="display:none;">Delete Selected</button><span id="rl-sel-count" style="font-size:11px;color:var(--t3);"></span></div>'
         +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th style="width:36px;"><input type="checkbox" id="rl-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
