@@ -1,6 +1,7 @@
 'use strict';
 S.GettingStarted = {
   TASKS: [
+    { week:1, id:'t00', label:'Request your first Profit Audit — upload your POS Beverages report to get your baseline score before making any changes', screen:'audit-tracker' },
     { week:1, id:'t01', label:'Complete bar setup — add all spirits, beer, and wine products', screen:'bar-products' },
     { week:1, id:'t02', label:'Add kitchen products — food ingredients and bar mixers', screen:'kitchen-products' },
     { week:1, id:'t03', label:'Set your cost targets in Settings (bar pour cost, food cost, prime cost)', screen:'settings' },
@@ -16,7 +17,7 @@ S.GettingStarted = {
     { week:4, id:'t13', label:'Review the 8-week trend chart on your Dashboard', screen:'dashboard' },
     { week:4, id:'t14', label:'Check Reports & History — run the annual cost calculator', screen:'reports' },
     { week:4, id:'t15', label:'Download and review the resources in the Resources section', screen:'resources' },
-    { week:4, id:'t16', label:'Upload your Bar Cop Profit Audit PDF in Audit Tracker', screen:'audit-tracker' },
+    { week:4, id:'t16', label:'Request your second Profit Audit — the app now includes all your 30-day tracked data for a deeper, more complete analysis', screen:'audit-tracker' },
   ],
 
   getProgress() {
