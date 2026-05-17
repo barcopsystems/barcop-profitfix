@@ -1,6 +1,6 @@
 'use strict';
 S.ShiftCheck = {
-  _calc: null, _entryId: null,
+  _calc: null, _entryId: null, _saving: false,
 
   render(container, actions) {
     this._entryId = App.uid();
@@ -13,12 +13,13 @@ S.ShiftCheck = {
     const log = (App.data.shifts||[]).slice(-30).reverse();
 
     const logRows = log.length === 0
-      ? '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--t4);">No shifts logged yet.</td></tr>'
+      ? '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--t4);">No shifts logged yet.</td></tr>'
       : log.map(s => {
           const cls = s.status==='ON TARGET'?'badge-ok':s.status?.startsWith('WATCH')?'badge-dim':'badge-warn';
           const pctCls = s.status==='ON TARGET'?'pos':s.status?.startsWith('WATCH')?'':'neg';
           return '<tr><td>'+s.date+'</td><td>'+esc(s.shift)+'</td><td>'+esc(s.bartender||'—')+'</td>'
             +'<td class="val">'+App.fmtCurrency(s.revenue)+'</td>'
+            +'<td>'+App.fmtCurrency(s.cogs)+'</td>'
             +'<td class="'+pctCls+'">'+App.fmtPct(s.pour_cost_pct)+'</td>'
             +'<td><span class="badge '+cls+'">'+esc(s.status||'—')+'</span></td></tr>';
         }).join('');
@@ -46,13 +47,13 @@ S.ShiftCheck = {
       + '</div></div></div>'
       + '<div class="sh">Shift Log — Last 30</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Bartender</th><th>Revenue</th><th>Pour Cost %</th><th>Status</th>'
+      + '<th>Date</th><th>Shift</th><th>Bartender</th><th>Revenue</th><th>COGS</th><th>Pour Cost %</th><th>Status</th>'
       + '</tr></thead><tbody id="sc-log">'+logRows+'</tbody></table></div>'
       + '</div>';
 
     document.getElementById('sc-rev')?.addEventListener('input', ()=>this.calc());
     document.getElementById('sc-cogs')?.addEventListener('input', ()=>this.calc());
-    document.getElementById('sc-submit')?.addEventListener('click', ()=>{this.calc();this.save();});
+    document.getElementById('sc-submit')?.addEventListener('click', ()=>{if(this._saving)return;this._saving=true;setTimeout(()=>{this._saving=false;},2000);this.calc();this.save();});
   },
 
   calc() {
@@ -87,7 +88,7 @@ S.ShiftCheck = {
       this._entryId=App.uid();
       const tbody=document.getElementById('sc-log');if(!tbody)return;
       const log=(App.data.shifts||[]).slice(-30).reverse();
-      tbody.innerHTML=log.map(s=>{const cls=s.status==='ON TARGET'?'badge-ok':s.status?.startsWith('WATCH')?'badge-dim':'badge-warn';const pCls=s.status==='ON TARGET'?'pos':s.status?.startsWith('WATCH')?'':'neg';return '<tr><td>'+s.date+'</td><td>'+esc(s.shift)+'</td><td>'+esc(s.bartender||'—')+'</td><td class="val">'+App.fmtCurrency(s.revenue)+'</td><td class="'+pCls+'">'+App.fmtPct(s.pour_cost_pct)+'</td><td><span class="badge '+cls+'">'+esc(s.status||'—')+'</span></td></tr>';}).join('');
+      tbody.innerHTML=log.map(s=>{const cls=s.status==='ON TARGET'?'badge-ok':s.status?.startsWith('WATCH')?'badge-dim':'badge-warn';const pCls=s.status==='ON TARGET'?'pos':s.status?.startsWith('WATCH')?'':'neg';return '<tr><td>'+s.date+'</td><td>'+esc(s.shift)+'</td><td>'+esc(s.bartender||'—')+'</td><td class="val">'+App.fmtCurrency(s.revenue)+'</td><td>'+App.fmtCurrency(s.cogs)+'</td><td class="'+pCls+'">'+App.fmtPct(s.pour_cost_pct)+'</td><td><span class="badge '+cls+'">'+esc(s.status||'—')+'</span></td></tr>';}).join('');
     });
   }
 };
