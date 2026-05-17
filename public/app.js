@@ -289,10 +289,8 @@ function esc(s) {
 /* ── Auth UI ── */
 function wireAuth() {
   const show = (id) => {
-    ['auth-login','auth-signup','auth-reset'].forEach(x => document.getElementById(x).style.display = x===id?'':'none');
+    ['auth-login','auth-reset'].forEach(x => document.getElementById(x).style.display = x===id?'':'none');
   };
-  document.getElementById('show-signup')?.addEventListener('click', () => show('auth-signup'));
-  document.getElementById('show-login')?.addEventListener('click',  () => show('auth-login'));
   document.getElementById('show-reset')?.addEventListener('click',  () => show('auth-reset'));
   document.getElementById('show-login2')?.addEventListener('click', () => show('auth-login'));
 
@@ -311,23 +309,6 @@ function wireAuth() {
 
   ['login-email','login-password'].forEach(id => {
     document.getElementById(id)?.addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-btn')?.click(); });
-  });
-
-  document.getElementById('signup-btn')?.addEventListener('click', async () => {
-    const email = document.getElementById('signup-email').value.trim();
-    const pass  = document.getElementById('signup-password').value;
-    const conf  = document.getElementById('signup-confirm').value;
-    const err   = document.getElementById('signup-error');
-    const ok    = document.getElementById('signup-ok');
-    const btn   = document.getElementById('signup-btn');
-    if (!email || !pass) { err.textContent='Enter email and password.'; err.style.display='block'; return; }
-    if (pass.length < 8) { err.textContent='Password must be at least 8 characters.'; err.style.display='block'; return; }
-    if (pass !== conf)   { err.textContent='Passwords do not match.'; err.style.display='block'; return; }
-    btn.textContent='Creating...'; btn.disabled=true;
-    const {error} = await DB.signUp(email, pass);
-    btn.textContent='Create Account'; btn.disabled=false;
-    if (error) { err.textContent=error.message; err.style.display='block'; ok.style.display='none'; }
-    else { err.style.display='none'; ok.textContent='Account created. Check your email to confirm, then sign in.'; ok.style.display='block'; }
   });
 
   document.getElementById('reset-btn')?.addEventListener('click', async () => {
