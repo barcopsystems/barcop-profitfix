@@ -2,6 +2,14 @@
 S.Dashboard = {
   _dismissed: false,
   render(container, actions) {
+    // Add Trend Insights button to topbar actions
+    actions.innerHTML = '';
+    const insBtn = document.createElement('button');
+    insBtn.className = 'btn btn-ghost btn-sm';
+    insBtn.id = 'db-insights-btn';
+    insBtn.textContent = 'Trend Insights';
+    insBtn.addEventListener('click', () => this.showInsights());
+    actions.appendChild(insBtn);
     const data = App.data;
     const weeks = data.weeks || [];
     const targets = data.settings.targets || {};
@@ -65,7 +73,7 @@ S.Dashboard = {
         alertHtml = '<div class="alert-bar" id="db-alert">'
           +'<div class="alert-text">Pour cost is '+diff.toFixed(1)+' points above target. '
           +App.fmtCurrency(wkImpact)+' this week — '+App.fmtCurrency(wkImpact*52)+' annualized.</div>'
-          +'<button class="alert-dismiss" id="db-dismiss">Dismiss</button>'
+          +'<button class="alert-dismiss" id="db-dismiss">Close</button>'
           +'</div>';
       }
     }
@@ -253,5 +261,47 @@ S.Dashboard = {
         ${xLabels}
       </svg>
     </div>`;
+  },
+
+  showInsights() {
+    const weeks=(App.data.weeks||[]).slice(-8);
+    const showModal=(html)=>{
+      const m=document.createElement('div');
+      m.className='ins-modal';
+      m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+      const box=document.createElement('div');
+      box.style.cssText='background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
+      box.innerHTML=html;
+      m.appendChild(box);
+      document.body.appendChild(m);
+      m.onclick=ev=>{if(ev.target===m)m.remove();};
+      box.querySelector('.ins-close')?.addEventListener('click',()=>m.remove());
+    };
+    if(weeks.length<2){
+      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      return;
+    }
+    const btn=document.getElementById('db-insights-btn');
+    if(btn){btn.disabled=true;btn.textContent='Analyzing...';}
+    const t=App.data.settings.targets||{};
+    const bT=t.bar_pour_cost_pct||22,fT=t.food_cost_pct||32,pT=t.prime_cost_pct||60;
+    const avg=arr=>{const v=arr.filter(x=>x!=null);return v.length?v.reduce((s,x)=>s+x,0)/v.length:0;};
+    const bP=weeks.map(w=>w.bar?.cost_pct).filter(v=>v!=null);
+    const fP=weeks.map(w=>w.food?.cost_pct).filter(v=>v!=null);
+    const pP=weeks.map(w=>w.prime_cost_pct).filter(v=>v!=null);
+    const bR=weeks.map(w=>w.bar?.revenue).filter(v=>v!=null);
+    const aB=avg(bP).toFixed(1),aF=avg(fP).toFixed(1),aP=avg(pP).toFixed(1),aR=avg(bR);
+    const gap=((parseFloat(aB)-bT)/100*aR).toFixed(0);
+    const trend=bP.length>=3?(bP[bP.length-1]-bP[0]>1?'trending higher (worsening)':bP[0]-bP[bP.length-1]>1?'trending lower (improving)':'holding steady'):'early data';
+    const lines=['Bar Pour Cost %: '+weeks.map(w=>(w.bar?.cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+bT+'% avg:'+aB+'%)','Food Cost %: '+weeks.map(w=>(w.food?.cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+fT+'% avg:'+aF+'%)','Prime Cost %: '+weeks.map(w=>(w.prime_cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+pT+'% avg:'+aP+'%)','Bar Revenue: '+weeks.map(w=>'$'+Math.round(w.bar?.revenue||0)).join(', '),'Weekly gap vs bar target: $'+Math.abs(gap)+' '+(parseFloat(gap)>0?'over':'under'),'Pour cost trend: '+trend];
+    const prompt='You are a bar operations analyst. Based on '+weeks.length+' weeks of data, write 3-4 plain-English insights (no headers, no bullets, one short paragraph each) a bar owner can act on today. Be specific with numbers.\n\n'+lines.join('\n')+'\n\nFocus on what is working, what needs attention, and the single most important action for this week.';
+    fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})})
+    .then(r=>r.json()).then(data=>{
+      if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
+      const text=data.content?.[0]?.text||'Unable to generate insights at this time.';
+      const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights — Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
+      const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
+      showModal(header+body);
+    }).catch(()=>{if(btn){btn.disabled=false;btn.textContent='Trend Insights';}});
   }
 };
