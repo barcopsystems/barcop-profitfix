@@ -760,9 +760,19 @@ const supabaseAdmin = createClient(
 );
 
 const MODULE_SLOTS = {
-  'price_1TY9KKGow04S066UBHLhPLNK': 1,
-  'price_1TY9KgGow04S066Urrd6TwGP': 2,
-  'price_1TY9L4Gow04S066UnAxs4K8Q': 3,
+  'price_1TY9KKGow04S066UBHLhPLNK': 1,  // legacy 1-module tier
+  'price_1TY9KgGow04S066Urrd6TwGP': 2,  // 2-module tier (in-app upgrade)
+  'price_1TY9L4Gow04S066UnAxs4K8Q': 3,  // 3-module tier (in-app upgrade)
+  'price_1TYCjBGow04S066UcsAPBGQj': 1,  // Profit Recovery
+  'price_1TYCjYGow04S066Uce9qofNi': 1,  // Revenue Recovery
+  'price_1TYCjnGow04S066UXTK6d9C6': 1,  // Traffic Recovery
+};
+
+// Maps individual module price IDs to their module name
+const PRICE_TO_MODULE = {
+  'price_1TYCjBGow04S066UcsAPBGQj': 'profit',
+  'price_1TYCjYGow04S066Uce9qofNi': 'revenue',
+  'price_1TYCjnGow04S066UXTK6d9C6': 'traffic',
 };
 
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -783,22 +793,37 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       const session    = event.data.object;
       const customerId = session.customer;
       const email      = session.customer_details?.email || session.customer_email;
-      const priceId    = session.metadata?.price_id || session.line_items?.data?.[0]?.price?.id;
-      const modules    = (session.metadata?.modules || '').split(',').filter(Boolean);
-      const slots      = MODULE_SLOTS[priceId] || 1;
-      const plan       = slots === 1 ? 'tier_1' : slots === 2 ? 'tier_2' : 'tier_3';
-      const activeModules = modules.length ? modules : ['profit'];
 
-      // Create Supabase user if they don't exist yet (new subscriber from Shopify/Stripe)
+      // Resolve price ID from line items (Payment Links don't put it in metadata)
+      const lineItems  = await require('stripe')(process.env.STRIPE_SECRET_KEY)
+        .checkout.sessions.listLineItems(session.id, { limit: 5 });
+      const priceId    = lineItems.data?.[0]?.price?.id || session.metadata?.price_id;
+
+      // Determine which module this purchase is for
+      const moduleFromPrice = PRICE_TO_MODULE[priceId] || null;
+      const modulesFromMeta = (session.metadata?.modules || '').split(',').filter(Boolean);
+      const newModule  = moduleFromPrice || modulesFromMeta[0] || 'profit';
+
+      const slots = MODULE_SLOTS[priceId] || 1;
+
+      // Create or find Supabase user
       let userId = session.metadata?.user_id || null;
+      let existingModules = [];
+
       if (!userId && email) {
-        // Check if user already exists
         const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
         const found = existing?.users?.find(u => u.email === email);
         if (found) {
           userId = found.id;
+          // Get their existing modules so we don't overwrite them
+          const { data: subData } = await supabaseAdmin
+            .from('subscriptions')
+            .select('active_modules')
+            .eq('user_id', found.id)
+            .single();
+          existingModules = subData?.active_modules || [];
         } else {
-          // Create new user — they will receive a password setup email
+          // Brand new subscriber — create account and send password setup email
           const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
             email,
             email_confirm: true,
@@ -808,25 +833,29 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             console.error('Failed to create Supabase user:', createErr.message);
           } else {
             userId = created.user.id;
-            // Send password setup email (uses Supabase "reset password" flow)
             await supabaseAdmin.auth.admin.generateLink({
               type: 'recovery',
               email,
-              options: {
-                redirectTo: 'https://barcop-profitfix-production.up.railway.app/',
-              },
+              options: { redirectTo: 'https://barcop-profitfix-production.up.railway.app/' },
             });
           }
         }
       }
 
       if (userId) {
+        // Merge new module with any existing modules
+        const mergedModules = existingModules.includes(newModule)
+          ? existingModules
+          : [...existingModules, newModule];
+        const totalSlots = mergedModules.length;
+        const plan = totalSlots === 1 ? 'tier_1' : totalSlots === 2 ? 'tier_2' : 'tier_3';
+
         await supabaseAdmin.from('subscriptions').upsert({
           user_id:             userId,
           stripe_customer_id:  customerId,
           subscription_status: 'active',
           subscription_plan:   plan,
-          active_modules:      activeModules,
+          active_modules:      mergedModules,
           current_period_end:  null,
           updated_at:          new Date().toISOString(),
         }, { onConflict: 'user_id' });
