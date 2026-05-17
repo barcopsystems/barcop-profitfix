@@ -85,9 +85,9 @@ S.AuditTracker = {
         + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
           + '<thead><tr>'
           + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
-          + '<th style="padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
-          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
-          + (prev ? '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
+          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
+          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
+          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
           + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
         + (actionItems ? '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Top Action Items by Impact</div>' + actionItems : '')
         + '</div>';
