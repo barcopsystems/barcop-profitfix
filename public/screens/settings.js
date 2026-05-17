@@ -3,13 +3,22 @@ S.Settings = {
   render(container, actions) {
     const s = App.data.settings;
     const t = s.targets || {};
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary btn-sm';
-    btn.textContent = 'Save';
-    btn.addEventListener('click', () => this.save());
-    actions.appendChild(btn);
+
+    // Save button only shown on Settings tab
+    const saveBtn = document.createElement('button');
+    saveBtn.id = 's-save-btn';
+    saveBtn.className = 'btn btn-primary btn-sm';
+    saveBtn.textContent = 'Save';
+    saveBtn.addEventListener('click', () => this.save());
+    actions.appendChild(saveBtn);
 
     container.innerHTML = '<div class="screen">'
+      + '<div class="s-tabs" style="display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:24px;">'
+      + '<button class="s-tab s-tab-active" data-tab="general" style="background:none;border:none;color:var(--gold);font-family:Barlow,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 20px;cursor:pointer;border-bottom:2px solid var(--gold);margin-bottom:-1px;">Settings</button>'
+      + '<button class="s-tab" data-tab="subscription" style="background:none;border:none;color:var(--t2);font-family:Barlow,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 20px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;">Subscription</button>'
+      + '</div>'
+      // ── General tab ──
+      + '<div id="s-tab-general">'
       + '<div class="settings-section"><div class="settings-title">Your Bar</div>'
       + '<div class="card"><div class="form-row">'
       + '<div class="f w-lg"><label>Bar Name</label><input type="text" id="s-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
@@ -45,11 +54,128 @@ S.Settings = {
       + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
       + '</div></div>'
       + '<div id="s-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;">Settings saved.</div>'
+      + '</div>'
+      // ── Subscription tab ──
+      + '<div id="s-tab-subscription" style="display:none;">'
+      + '<div id="s-sub-content"></div>'
+      + '</div>'
       + '</div>';
 
     document.getElementById('s-pw-btn')?.addEventListener('click', () => this.changePassword());
     document.getElementById('s-load-sample')?.addEventListener('click', () => this.loadSample());
     document.getElementById('s-clear-all')?.addEventListener('click',  () => this.clearAll());
+
+    // Tab switching
+    container.querySelectorAll('.s-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const which = tab.dataset.tab;
+        container.querySelectorAll('.s-tab').forEach(t2 => {
+          const active = t2.dataset.tab === which;
+          t2.style.color = active ? 'var(--gold)' : 'var(--t2)';
+          t2.style.borderBottomColor = active ? 'var(--gold)' : 'transparent';
+        });
+        document.getElementById('s-tab-general').style.display = which === 'general' ? '' : 'none';
+        document.getElementById('s-tab-subscription').style.display = which === 'subscription' ? '' : 'none';
+        document.getElementById('s-save-btn').style.display = which === 'general' ? '' : 'none';
+        if (which === 'subscription') this.renderSubscription();
+      });
+    });
+  },
+
+  renderSubscription() {
+    const el = document.getElementById('s-sub-content');
+    if (!el) return;
+    const sub = App.subscription || {};
+    const status = sub.status || 'inactive';
+    const plan = sub.plan || null;
+    const modules = sub.active_modules || [];
+    const periodEnd = sub.period_end ? new Date(sub.period_end) : null;
+
+    const planLabels = { tier_1: '1 Module', tier_2: '2 Modules', tier_3: '3 Modules (Full Access)' };
+    const moduleLabels = { profit: 'Profit Recovery', revenue: 'Revenue Recovery', traffic: 'Traffic Recovery' };
+    const statusColor = { active: 'var(--gold)', past_due: 'var(--red)', canceled: 'var(--red)', inactive: 'var(--t2)' };
+    const statusLabel = { active: 'Active', past_due: 'Past Due', canceled: 'Canceled', inactive: 'No Active Subscription' };
+    const allModules = ['profit', 'revenue', 'traffic'];
+    const hasAll = allModules.every(m => modules.includes(m));
+
+    let moduleRows = allModules.map(m => {
+      const on = modules.includes(m);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<div style="width:8px;height:8px;border-radius:50%;background:' + (on ? 'var(--gold)' : 'var(--t2)') + ';flex-shrink:0;"></div>'
+        + '<div style="font-size:13px;color:' + (on ? 'var(--t1)' : 'var(--t2)') + ';">' + moduleLabels[m] + '</div>'
+        + '<div style="margin-left:auto;font-size:11px;font-weight:700;letter-spacing:1px;color:' + (on ? 'var(--gold)' : 'var(--t2)') + ';">' + (on ? 'ACTIVE' : 'AVAILABLE') + '</div>'
+        + '</div>';
+    }).join('');
+
+    let billingLine = '';
+    if (periodEnd && status === 'active') {
+      billingLine = '<div style="font-size:12px;color:var(--t2);margin-top:4px;">Renews ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
+    } else if (periodEnd && status === 'canceled') {
+      billingLine = '<div style="font-size:12px;color:var(--red);margin-top:4px;">Access ends ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
+    }
+
+    let upgradeBlock = '';
+    if (status === 'active' && !hasAll) {
+      upgradeBlock = '<div class="card" style="margin-top:0;">'
+        + '<div class="settings-title" style="margin-bottom:12px;">Add More Modules</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Unlock Revenue Recovery or Traffic Recovery to get a full picture of where your bar is bleeding money.</div>'
+        + '<button class="btn btn-primary" id="s-upgrade-btn">View Upgrade Options</button>'
+        + '</div>';
+    }
+
+    let noSubBlock = '';
+    if (status === 'inactive' || status === 'canceled') {
+      noSubBlock = '<div class="card" style="margin-top:0;">'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">You do not have an active subscription. Return to the Recovery Hub to choose a plan.</div>'
+        + '<button class="btn btn-primary" id="s-go-hub-btn">Go to Recovery Hub</button>'
+        + '</div>';
+    }
+
+    el.innerHTML = '<div class="settings-section" style="display:flex;flex-direction:column;gap:16px;">'
+      + '<div class="card">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div>'
+      + '<div style="font-size:18px;font-weight:700;color:var(--t1);">' + (plan ? planLabels[plan] : 'No Plan') + '</div>'
+      + '<div style="font-size:12px;font-weight:700;letter-spacing:1px;color:' + (statusColor[status] || 'var(--t2)') + ';margin-top:4px;text-transform:uppercase;">' + (statusLabel[status] || status) + '</div>'
+      + billingLine
+      + '</div>'
+      + (status === 'active'
+        ? '<button class="btn btn-ghost" id="s-portal-btn" style="flex-shrink:0;">Manage Billing</button>'
+        : '')
+      + '</div>'
+      + '<div style="margin-top:20px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--t2);margin-bottom:8px;text-transform:uppercase;">Recovery Modules</div>'
+      + moduleRows
+      + '</div>'
+      + '</div>'
+      + upgradeBlock
+      + noSubBlock
+      + '</div>';
+
+    document.getElementById('s-portal-btn')?.addEventListener('click', () => this.openBillingPortal());
+    document.getElementById('s-upgrade-btn')?.addEventListener('click', () => App.showHub());
+    document.getElementById('s-go-hub-btn')?.addEventListener('click', () => App.showHub());
+  },
+
+  async openBillingPortal() {
+    const btn = document.getElementById('s-portal-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
+    try {
+      const userId = DB._sb?.auth?.getUser ? (await DB._sb.auth.getUser()).data?.user?.id : null;
+      if (!userId) throw new Error('Not logged in.');
+      const res = await fetch('/api/billing-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not open billing portal.');
+      window.open(data.url, '_blank');
+    } catch (e) {
+      alert('Could not open billing portal: ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Manage Billing'; }
+    }
   },
 
   save() {
