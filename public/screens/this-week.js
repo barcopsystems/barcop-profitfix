@@ -148,7 +148,7 @@ S.ThisWeek = {
         +'<td style="color:var(--t2);">'+App.fmtCurrency(p.cost_per_unit)+'</td>'
         +'<td id="cc-bar-'+p.id+'" style="color:var(--t2);">'+(cnt.total_cost!=null?App.fmtCurrency(cnt.total_cost):'—')+'</td></tr>';
     }).join('');
-    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Bar Inventory Count</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Import from CSV or Excel">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="margin-right:4px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import<input type="file" id="tw-imp-bar-count" accept=".csv,.xlsx,.xls" style="display:none;" onchange="S.ThisWeek.importCount(this,\'bar\')"/>'      +'</label></div></div>'      +'<div id="tw-imp-bar-count-msg" style="font-size:11px;margin-bottom:8px;display:none;"></div>'      +'<details style="margin-bottom:12px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'      +'<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'      +'<strong style="color:var(--t1);">Required:</strong> A spreadsheet with one row per product and a header row in the first row.<br><br>'      +'<strong style="color:var(--t1);">Column the app looks for:</strong><br>'      +'&bull; <strong>Product name</strong> — any column named Item, Name, Product, Description, or similar<br>'      +'&bull; <strong>Purchases</strong> — any column named Purchases, Received, Deliveries, Additions, In, or similar<br>'      +'&bull; <strong>Ending inventory</strong> — any column named Ending, End, Closing, On Hand, Count, Physical, or similar<br><br>'      +'<strong style="color:var(--t1);">You do not need all columns.</strong> Import just ending inventory if that is all you have — or just purchases. The app fills whatever columns it finds.<br><br>'      +'<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)<br><br>'      +'<strong style="color:var(--t1);">Name matching:</strong> Product names do not need to match exactly. The app strips size descriptors (750ml, 1.75L, 12oz) and compares the core name. "TITO\'S VODKA 750ML" will match "Tito\'s Handmade Vodka". Unmatched products are listed after import so you can fill them in manually.<br><br>'      +'<strong style="color:var(--t1);">Beginning inventory</strong> carries forward automatically from last week\'s ending count — you do not need that column.<br><br>'      +'<strong style="color:var(--t1);">Where to export this from your POS:</strong><br>'      +'&bull; Toast: Reports → Inventory → End of Day Inventory<br>'      +'&bull; Square: Items → Inventory History → Export<br>'      +'&bull; Lightspeed: Reports → Inventory → Stock Report<br>'      +'&bull; Any system: export your physical count sheet or inventory management export as CSV or Excel'      +'</div></details>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Bar Inventory Count</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<button class="btn btn-ghost btn-sm" onclick="S.ThisWeek.showImportPanel(\'bar-count\')" style="display:flex;align-items:center;gap:4px;">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import</button></div></div>'      +'<div id="tw-imp-bar-count-panel"></div>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       +'<th>Product</th>'
       +'<th>Beg Inv '+tt('inv-beg')+'</th>'
       +'<th>Purchases '+tt('inv-purchases')+'</th>'
@@ -198,7 +198,7 @@ S.ThisWeek = {
         +'<td id="vs-'+p.id+'"><span class="badge '+sc+'">'+(vr.status||'—')+'</span></td></tr>';
     }).join('');
     const totDol=this.draft.bar_variance.reduce((s,v)=>s+(v.variance_dollar||0),0);
-    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Bar Variance</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Import POS sales mix — fills Pours Sold column">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="margin-right:4px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import POS Sales<input type="file" id="tw-imp-variance" accept=".csv,.xlsx,.xls" style="display:none;" onchange="S.ThisWeek.importVariance(this)"/>'      +'</label></div></div>'      +'<div id="tw-imp-variance-msg" style="font-size:11px;margin-bottom:8px;display:none;"></div>'      +'<details style="margin-bottom:12px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'      +'<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'      +'<strong style="color:var(--t1);">This is your POS sales mix report</strong> — the report that shows how many of each item was sold during the week. It populates the Pours Sold column so the app can calculate your variance automatically.<br><br>'      +'<strong style="color:var(--t1);">Columns the app looks for:</strong><br>'      +'&bull; <strong>Product name</strong> — any column named Item, Name, Product, Description, Menu Item, or similar<br>'      +'&bull; <strong>Quantity sold</strong> — any column named Qty, Sold, Units, Pours, Shots, Count, Sales Qty, Net Qty, or similar<br><br>'      +'<strong style="color:var(--t1);">Important:</strong> The quantity column should be number of pours or drinks sold — not dollar amount. If your POS only exports dollar sales, you cannot use this import for variance.<br><br>'      +'<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)<br><br>'      +'<strong style="color:var(--t1);">Name matching:</strong> Works the same as inventory import — strips size descriptors and matches on core product name. Unmatched items are listed after import.<br><br>'      +'<strong style="color:var(--t1);">Where to export this from your POS:</strong><br>'      +'&bull; Toast: Reports → Menu → Item Selection Report or Sales Summary by Item<br>'      +'&bull; Square: Reports → Item Sales → Export<br>'      +'&bull; Aloha: Reports → Sales → Product Mix Report<br>'      +'&bull; Lightspeed: Reports → Sales → Sales by Item<br>'      +'&bull; Any system: look for Item Sales Report, Sales Mix, Menu Mix, or Product Mix — export as CSV or Excel'      +'</div></details>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Bar Variance</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<button class="btn btn-ghost btn-sm" onclick="S.ThisWeek.showImportPanel(\'variance\')" style="display:flex;align-items:center;gap:4px;">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import POS Sales</button></div></div>'      +'<div id="tw-imp-variance-panel"></div>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       +'<th>Product</th>'
       +'<th>Pours Made '+tt('pours-bottle')+'</th>'
       +'<th>Pours Sold '+tt('theoretical')+'</th>'
@@ -256,7 +256,7 @@ S.ThisWeek = {
         +'<td style="color:var(--t2);">'+App.fmtCurrency(p.cost_per_unit)+'</td>'
         +'<td id="cc-food-'+p.id+'" style="color:var(--t2);">'+(cnt.total_cost!=null?App.fmtCurrency(cnt.total_cost):'—')+'</td></tr>';
     }).join('');
-    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Food Inventory Count</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Import from CSV or Excel">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="margin-right:4px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import<input type="file" id="tw-imp-food-count" accept=".csv,.xlsx,.xls" style="display:none;" onchange="S.ThisWeek.importCount(this,\'food\')"/>'      +'</label></div></div>'      +'<div id="tw-imp-food-count-msg" style="font-size:11px;margin-bottom:8px;display:none;"></div>'      +'<details style="margin-bottom:12px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'      +'<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'      +'<strong style="color:var(--t1);">Required:</strong> A spreadsheet with one row per ingredient or product and a header row in the first row.<br><br>'      +'<strong style="color:var(--t1);">Columns the app looks for:</strong><br>'      +'&bull; <strong>Product name</strong> — any column named Item, Name, Product, Ingredient, Description, or similar<br>'      +'&bull; <strong>Purchases</strong> — any column named Purchases, Received, Deliveries, In, Additions, or similar<br>'      +'&bull; <strong>Ending inventory</strong> — any column named Ending, End, Closing, On Hand, Count, Physical, or similar<br><br>'      +'<strong style="color:var(--t1);">Units:</strong> Use whatever unit you count in — lbs, cases, each, quarts. As long as it matches the unit set on your kitchen product, the calculation will be correct.<br><br>'      +'<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)<br><br>'      +'<strong style="color:var(--t1);">Name matching:</strong> The app matches on core product name and ignores size and unit descriptors. "CHICKEN BREAST 40LB CASE" will match "Chicken Breast".<br><br>'      +'<strong style="color:var(--t1);">Where to export this from:</strong><br>'      +'&bull; Your inventory management system (BlueCart, Compeat, MarketMan, Craftable, etc.) — look for Physical Count or Inventory Count export<br>'      +'&bull; Your food distributor portal (Sysco, US Foods) often has downloadable order history that can serve as a purchases import<br>'      +'&bull; A manual spreadsheet you already maintain — save as CSV and import directly'      +'</div></details>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Food Inventory Count</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<button class="btn btn-ghost btn-sm" onclick="S.ThisWeek.showImportPanel(\'food-count\')" style="display:flex;align-items:center;gap:4px;">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import</button></div></div>'      +'<div id="tw-imp-food-count-panel"></div>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       +'<th>Product</th>'
       +'<th>Unit '+tt('kitchen-unit')+'</th>'
       +'<th>Beg Inv '+tt('inv-beg')+'</th>'
@@ -270,7 +270,247 @@ S.ThisWeek = {
   },
 
 
-  // ── Import helpers ─────────────────────────────────────────────────────────
+
+  showImportPanel(type) {
+    const panelId = type === 'bar-count' ? 'tw-imp-bar-count-panel'
+                  : type === 'variance'  ? 'tw-imp-variance-panel'
+                  : 'tw-imp-food-count-panel';
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+
+    const configs = {
+      'bar-count': {
+        title: 'Import Bar Inventory Count',
+        desc:  'Upload your physical bar count sheet. The app reads your columns, matches product names, and fills in Purchases and Ending Inventory automatically.',
+        guide: '<strong style="color:var(--t1);">Columns the app looks for:</strong><br>'
+          + '&bull; <strong>Product name</strong> — any column named Item, Name, Product, Description, or similar<br>'
+          + '&bull; <strong>Purchases / Received / Deliveries</strong> — bottles or units received this week<br>'
+          + '&bull; <strong>Ending / End / Closing / On Hand / Count</strong> — your physical closing count<br><br>'
+          + '<strong style="color:var(--t1);">You do not need all columns</strong> — import just ending inventory if that is all you have.<br><br>'
+          + '<strong style="color:var(--t1);">Beginning inventory</strong> carries forward from last week automatically.<br><br>'
+          + '<strong style="color:var(--t1);">Where to export:</strong><br>'
+          + '&bull; Toast: Reports → Inventory → End of Day Inventory<br>'
+          + '&bull; Square: Items → Inventory History → Export<br>'
+          + '&bull; Lightspeed: Reports → Inventory → Stock Report<br>'
+          + '&bull; Any inventory system: Physical Count or End of Period export as CSV or Excel',
+        fileId:   'tw-file-bar-count',
+        onChange: "S.ThisWeek._handleImportFile(this,'bar-count')",
+      },
+      'variance': {
+        title: 'Import POS Sales — Bar Variance',
+        desc:  'Upload your POS Item Sales or Sales Mix report for the week. The app matches product names and fills in Pours Sold automatically so variance calculates instantly.',
+        guide: '<strong style="color:var(--t1);">Columns the app looks for:</strong><br>'
+          + '&bull; <strong>Product name</strong> — any column named Item, Name, Product, Description, Menu Item, or similar<br>'
+          + '&bull; <strong>Quantity sold</strong> — any column named Qty, Sold, Units, Pours, Shots, Count, Net Qty, or similar<br><br>'
+          + '<strong style="color:var(--t1);">Important:</strong> The quantity column must be number of drinks sold — not dollar amount.<br><br>'
+          + '<strong style="color:var(--t1);">Where to export:</strong><br>'
+          + '&bull; Toast: Reports → Menu → Item Selection Report<br>'
+          + '&bull; Square: Reports → Item Sales → Export<br>'
+          + '&bull; Aloha: Reports → Sales → Product Mix Report<br>'
+          + '&bull; Lightspeed: Reports → Sales → Sales by Item<br>'
+          + '&bull; Any system: look for Item Sales Report, Sales Mix, Menu Mix, or Product Mix',
+        fileId:   'tw-file-variance',
+        onChange: "S.ThisWeek._handleImportFile(this,'variance')",
+      },
+      'food-count': {
+        title: 'Import Food Inventory Count',
+        desc:  'Upload your kitchen count sheet. The app matches product names and fills in Purchases and Ending Inventory automatically.',
+        guide: '<strong style="color:var(--t1);">Columns the app looks for:</strong><br>'
+          + '&bull; <strong>Product name</strong> — any column named Item, Name, Product, Ingredient, Description, or similar<br>'
+          + '&bull; <strong>Purchases / Received / Deliveries</strong> — units received this week<br>'
+          + '&bull; <strong>Ending / End / Closing / On Hand / Count</strong> — your physical closing count<br><br>'
+          + '<strong style="color:var(--t1);">Units:</strong> Use whatever unit you count in — lbs, cases, each, quarts.<br><br>'
+          + '<strong style="color:var(--t1);">Where to export:</strong><br>'
+          + '&bull; MarketMan, Craftable, BlueCart, Compeat: Physical Count or Inventory Count export<br>'
+          + '&bull; Sysco / US Foods / PFG portal: order history download works as a purchases import<br>'
+          + '&bull; A manual spreadsheet you already maintain: save as CSV and import directly',
+        fileId:   'tw-file-food-count',
+        onChange: "S.ThisWeek._handleImportFile(this,'food-count')",
+      }
+    };
+
+    const cfg = configs[type];
+    if (!cfg) return;
+
+    panel.innerHTML = '<div class="divider"></div><div class="card">'
+      + '<div class="card-title">' + cfg.title + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">' + cfg.desc + '</div>'
+      + '<details style="margin-bottom:16px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'
+      + '<strong style="color:var(--t1);">First row must be column headers.</strong> One row per product.<br><br>'
+      + cfg.guide
+      + '<br><br><strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)<br>'
+      + '<strong style="color:var(--t1);">Name matching:</strong> Strips size descriptors (750ml, 1.75L, 12oz, lb, case) and matches on core product name. Unmatched items are listed after import.'
+      + '</div></details>'
+      + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Accepted formats: CSV, XLSX, XLS</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f"><label>Select File</label>'
+      + '<input type="file" id="' + cfg.fileId + '" accept=".csv,.xlsx,.xls" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:8px;font-size:12px;cursor:pointer;width:100%;" onchange="' + cfg.onChange + '"/>'
+      + '</div></div>'
+      + '<div id="tw-imp-status-' + type + '" style="font-size:12px;margin-top:10px;display:none;"></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-ghost" onclick="S.ThisWeek._closeImportPanel(\'' + type + '\')">Cancel</button>'
+      + '</div></div>';
+
+    panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  },
+
+  _closeImportPanel(type) {
+    const panelId = type === 'bar-count' ? 'tw-imp-bar-count-panel'
+                  : type === 'variance'  ? 'tw-imp-variance-panel'
+                  : 'tw-imp-food-count-panel';
+    const panel = document.getElementById(panelId);
+    if (panel) panel.innerHTML = '';
+  },
+
+  _setImportStatus(type, msg, color) {
+    const el = document.getElementById('tw-imp-status-' + type);
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.color = color || 'var(--t2)';
+    el.textContent = msg;
+  },
+
+  _handleImportFile(input, type) {
+    const file = input.files?.[0];
+    if (!file) return;
+    this._setImportStatus(type, 'Reading file...', 'var(--t3)');
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    const apply = (headers, rows) => {
+      if (type === 'variance') {
+        this._applyVarianceImport(headers, rows, type);
+      } else {
+        this._applyCountImport(headers, rows, type === 'bar-count' ? 'bar' : 'food', type);
+      }
+    };
+
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const parsed = this._parseCSV(e.target.result);
+        if (!parsed) { this._setImportStatus(type, 'File appears empty.', 'var(--red)'); return; }
+        apply(parsed.headers, parsed.rows);
+      };
+      reader.readAsText(file);
+    } else {
+      const load = () => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const wb = XLSX.read(e.target.result, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          if (data.length < 2) { this._setImportStatus(type, 'File appears empty.', 'var(--red)'); return; }
+          const headers = data[0].map(h => String(h).trim());
+          const rows = data.slice(1).filter(r => r.some(v => v !== '')).map(r => r.map(v => String(v).trim()));
+          apply(headers, rows);
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      if (typeof XLSX === 'undefined') {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = load; s.onerror = () => this._setImportStatus(type, 'Could not load Excel reader. Try CSV.', 'var(--red)');
+        document.head.appendChild(s);
+      } else load();
+    }
+    input.value = '';
+  },
+
+  _applyCountImport(headers, rows, countType, panelType) {
+    const prods = countType === 'bar' ? (App.data.bar_products||[]) : (App.data.kitchen_products||[]);
+    const countArr = countType === 'bar' ? this.draft.bar_count : this.draft.food_count;
+    if (!countArr?.length) { this._setImportStatus(panelType, 'No products found — set up products first.', 'var(--red)'); return; }
+
+    const nameCol = this._detectNameCol(headers);
+    const purCol  = this._detectNumCol(headers, ['purchase','received','delivery','deliveries','receive','bought','order','in','additions','add']);
+    const endCol  = this._detectNumCol(headers, ['ending','end','close','closing','final','count','on hand','onhand','physical']);
+
+    if (!purCol && !endCol) {
+      this._setImportStatus(panelType, 'Could not detect Purchases or Ending Inventory columns. Check your file has column headers.', 'var(--red)');
+      return;
+    }
+
+    const colIdx = col => headers.indexOf(col);
+    const getVal = (row, col) => col ? (parseFloat((row[colIdx(col)]||'').replace(/[^0-9.-]/g,'')) || 0) : 0;
+
+    let matched = 0, unmatched = [];
+    rows.forEach(row => {
+      const itemName = (row[colIdx(nameCol)] || '').toString().trim();
+      if (!itemName) return;
+      let bestProd = null, bestScore = 0;
+      prods.forEach(p => { const s = this._fuzzyMatch(itemName, p.name); if (s > bestScore) { bestScore = s; bestProd = p; } });
+      if (!bestProd || bestScore < 0.45) { unmatched.push(itemName); return; }
+      const cnt = countArr.find(c => c.product_id === bestProd.id);
+      if (!cnt) return;
+      if (purCol) { const v = getVal(row, purCol); if (v > 0) cnt.purchases = v; }
+      if (endCol) { cnt.end_inv = getVal(row, endCol); }
+      matched++;
+    });
+
+    prods.forEach(p => {
+      const cnt = countArr.find(c => c.product_id === p.id);
+      if (!cnt) return;
+      const beg = parseFloat(cnt.beg_inv)||0, pur = parseFloat(cnt.purchases)||0, end = parseFloat(cnt.end_inv)||0;
+      cnt.units_used = beg + pur - end;
+      cnt.total_cost = cnt.units_used * (p.cost_per_unit||0);
+    });
+    this.saveDraft();
+
+    const msg = matched + ' product' + (matched!==1?'s':'') + ' updated'
+      + (unmatched.length ? '. Not matched: ' + unmatched.slice(0,4).join(', ') + (unmatched.length>4?'…':'') : '');
+    this._setImportStatus(panelType, msg, matched > 0 ? 'var(--gold)' : 'var(--red)');
+    setTimeout(() => { this._closeImportPanel(panelType); this.renderStep(this.step); }, 1800);
+  },
+
+  _applyVarianceImport(headers, rows, panelType) {
+    const prods  = App.data.bar_products || [];
+    const varArr = this.draft.bar_variance;
+    const cntArr = this.draft.bar_count;
+    if (!varArr?.length) { this._setImportStatus(panelType, 'Complete inventory count first.', 'var(--red)'); return; }
+
+    const nameCol = this._detectNameCol(headers);
+    const soldCol = this._detectNumCol(headers, ['sold','qty','quantity','count','units','pours','shots','drinks','sales','total','net qty','net sales','net quantity']);
+
+    if (!soldCol) {
+      this._setImportStatus(panelType, 'Could not detect a Qty Sold column. Column should be named Qty, Sold, Units, Pours, or similar.', 'var(--red)');
+      return;
+    }
+
+    const colIdx = col => headers.indexOf(col);
+    let matched = 0, unmatched = [];
+
+    rows.forEach(row => {
+      const itemName = (row[colIdx(nameCol)] || '').toString().trim();
+      if (!itemName) return;
+      let bestProd = null, bestScore = 0;
+      prods.forEach(p => { const s = this._fuzzyMatch(itemName, p.name); if (s > bestScore) { bestScore = s; bestProd = p; } });
+      if (!bestProd || bestScore < 0.45) { unmatched.push(itemName); return; }
+      const vr = varArr.find(v => v.product_id === bestProd.id);
+      const cnt = cntArr?.find(c => c.product_id === bestProd.id);
+      if (!vr) return;
+      const soldQty = parseFloat((row[colIdx(soldCol)]||'').toString().replace(/[^0-9.-]/g,'')) || 0;
+      vr.theoretical_units = soldQty;
+      const pourOz = bestProd.std_pour_oz||1, bottleOz = bestProd.bottle_size_oz||25.4;
+      const actualPours = (cnt?.units_used||0) * (bottleOz/pourOz);
+      vr.actual_units = actualPours;
+      const varU = actualPours - soldQty;
+      vr.variance_units = varU;
+      vr.variance_oz = varU * pourOz;
+      const cpp = bestProd.cost_per_pour||(bestProd.pours_per_bottle&&bestProd.cost_per_unit?bestProd.cost_per_unit/bestProd.pours_per_bottle:0);
+      vr.variance_dollar = varU * cpp;
+      vr.status = Math.abs(varU)<=2?'OK':varU>0?'Over — Investigate':'Short — Check Count';
+      matched++;
+    });
+
+    this.saveDraft();
+    const msg = matched + ' product' + (matched!==1?'s':'') + ' updated'
+      + (unmatched.length ? '. Not matched: ' + unmatched.slice(0,4).join(', ') + (unmatched.length>4?'…':'') : '');
+    this._setImportStatus(panelType, msg, matched > 0 ? 'var(--gold)' : 'var(--red)');
+    setTimeout(() => { this._closeImportPanel(panelType); this.renderStep(this.step); }, 1800);
+  },
+
+  // ── Shared import utilities ─────────────────────────────────────────────────
 
   // Fuzzy name match: returns 0-1 similarity score
   _fuzzyMatch(a, b) {
@@ -327,190 +567,6 @@ S.ThisWeek = {
     el.style.display = 'block';
     el.style.color = color || 'var(--t2)';
     el.textContent = msg;
-  },
-
-  // ── importCount: for Steps 4 (bar) and 6 (food) ─────────────────────────
-  importCount(input, type) {
-    const file = input.files?.[0];
-    if (!file) return;
-    const msgId = type === 'bar' ? 'tw-imp-bar-count-msg' : 'tw-imp-food-count-msg';
-    this._setImportMsg(msgId, 'Reading file...', 'var(--t3)');
-
-    const ext = file.name.split('.').pop().toLowerCase();
-    const apply = (headers, rows) => {
-      const prods = type === 'bar' ? (App.data.bar_products||[]) : (App.data.kitchen_products||[]);
-      const countArr = type === 'bar' ? this.draft.bar_count : this.draft.food_count;
-      if (!countArr?.length) { this._setImportMsg(msgId, 'Complete setup first — no products found.', 'var(--red)'); return; }
-
-      const nameCol = this._detectNameCol(headers);
-      const purCol  = this._detectNumCol(headers, ['purchase','received','delivery','deliveries','receive','bought','order','in','additions','add']);
-      const endCol  = this._detectNumCol(headers, ['ending','end','close','closing','final','count','on hand','onhand','physical']);
-
-      if (!purCol && !endCol) {
-        this._setImportMsg(msgId, 'Could not detect Purchases or Ending Inventory columns. Check your file has column headers.', 'var(--red)');
-        return;
-      }
-
-      const colIdx = col => headers.indexOf(col);
-      const getVal = (row, col) => col ? (parseFloat((row[colIdx(col)]||'').replace(/[^0-9.-]/g,'')) || 0) : 0;
-
-      let matched = 0, unmatched = [];
-      rows.forEach(row => {
-        const itemName = (row[colIdx(nameCol)] || '').toString().trim();
-        if (!itemName) return;
-        // Find best matching product
-        let bestProd = null, bestScore = 0;
-        prods.forEach(p => {
-          const score = this._fuzzyMatch(itemName, p.name);
-          if (score > bestScore) { bestScore = score; bestProd = p; }
-        });
-        if (!bestProd || bestScore < 0.45) { unmatched.push(itemName); return; }
-        const cnt = countArr.find(c => c.product_id === bestProd.id);
-        if (!cnt) return;
-        if (purCol) { const v = getVal(row, purCol); if (v > 0) cnt.purchases = v; }
-        if (endCol) { const v = getVal(row, endCol); cnt.end_inv = v; }
-        matched++;
-      });
-
-      // Recalculate all counts
-      prods.forEach(p => {
-        const cnt = countArr.find(c => c.product_id === p.id);
-        if (!cnt) return;
-        const pur = parseFloat(cnt.purchases) || 0;
-        const end = parseFloat(cnt.end_inv) || 0;
-        const beg = parseFloat(cnt.beg_inv) || 0;
-        cnt.units_used = beg + pur - end;
-        cnt.total_cost = cnt.units_used * (p.cost_per_unit || 0);
-      });
-      this.saveDraft();
-      const msg = matched + ' product' + (matched!==1?'s':'') + ' updated' +
-        (unmatched.length ? '. ' + unmatched.length + ' not matched: ' + unmatched.slice(0,3).join(', ') + (unmatched.length>3?'…':'') : '');
-      this._setImportMsg(msgId, msg, matched > 0 ? 'var(--gold)' : 'var(--red)');
-      this.renderStep(this.step); // refresh to show filled values
-    };
-
-    if (ext === 'csv') {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const parsed = this._parseCSV(e.target.result);
-        if (!parsed) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
-        apply(parsed.headers, parsed.rows);
-      };
-      reader.readAsText(file);
-    } else {
-      // Excel — load SheetJS if needed
-      const load = () => {
-        const reader = new FileReader();
-        reader.onload = e => {
-          const wb = XLSX.read(e.target.result, {type:'array'});
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-          if (data.length < 2) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
-          const headers = data[0].map(h => String(h).trim());
-          const rows = data.slice(1).filter(r => r.some(v => v !== '')).map(r => r.map(v => String(v).trim()));
-          apply(headers, rows);
-        };
-        reader.readAsArrayBuffer(file);
-      };
-      if (typeof XLSX === 'undefined') {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload = load; s.onerror = () => this._setImportMsg(msgId, 'Could not load Excel reader. Try CSV.', 'var(--red)');
-        document.head.appendChild(s);
-      } else load();
-    }
-    input.value = ''; // reset so same file can be re-imported
-  },
-
-  // ── importVariance: for Step 5 — fills Pours Sold from POS sales mix ──────
-  importVariance(input) {
-    const file = input.files?.[0];
-    if (!file) return;
-    const msgId = 'tw-imp-variance-msg';
-    this._setImportMsg(msgId, 'Reading file...', 'var(--t3)');
-
-    const apply = (headers, rows) => {
-      const prods = App.data.bar_products || [];
-      const varArr = this.draft.bar_variance;
-      const cntArr = this.draft.bar_count;
-      if (!varArr?.length) { this._setImportMsg(msgId, 'Complete inventory count first.', 'var(--red)'); return; }
-
-      const nameCol = this._detectNameCol(headers);
-      const soldCol = this._detectNumCol(headers, ['sold','qty','quantity','count','units','pours','shots','drinks','sales','total','net qty','net sales','net quantity']);
-
-      if (!soldCol) {
-        this._setImportMsg(msgId, 'Could not detect a Qty Sold column. Column should be named Qty, Sold, Units, Pours, or similar.', 'var(--red)');
-        return;
-      }
-
-      const colIdx = col => headers.indexOf(col);
-      let matched = 0, unmatched = [];
-
-      rows.forEach(row => {
-        const itemName = (row[colIdx(nameCol)] || '').toString().trim();
-        if (!itemName) return;
-        let bestProd = null, bestScore = 0;
-        prods.forEach(p => {
-          const score = this._fuzzyMatch(itemName, p.name);
-          if (score > bestScore) { bestScore = score; bestProd = p; }
-        });
-        if (!bestProd || bestScore < 0.45) { unmatched.push(itemName); return; }
-        const vr = varArr.find(v => v.product_id === bestProd.id);
-        const cnt = cntArr?.find(c => c.product_id === bestProd.id);
-        if (!vr) return;
-        const soldQty = parseFloat((row[colIdx(soldCol)]||'').toString().replace(/[^0-9.-]/g,'')) || 0;
-        vr.theoretical_units = soldQty;
-        // Recalculate variance
-        const pourOz = bestProd.std_pour_oz||1, bottleOz = bestProd.bottle_size_oz||25.4, ppb = bottleOz/pourOz;
-        const actualPours = (cnt?.units_used||0)*ppb;
-        vr.actual_units = actualPours;
-        const varU = actualPours - soldQty;
-        vr.variance_units = varU;
-        vr.variance_oz = varU * pourOz;
-        const cpp = bestProd.cost_per_pour||(bestProd.pours_per_bottle&&bestProd.cost_per_unit?bestProd.cost_per_unit/bestProd.pours_per_bottle:0);
-        vr.variance_dollar = varU * cpp;
-        vr.status = Math.abs(varU)<=2?'OK':varU>0?'Over — Investigate':'Short — Check Count';
-        matched++;
-      });
-
-      this.saveDraft();
-      const msg = matched + ' product' + (matched!==1?'s':'') + ' updated' +
-        (unmatched.length ? '. ' + unmatched.length + ' not matched: ' + unmatched.slice(0,3).join(', ') + (unmatched.length>3?'…':'') : '');
-      this._setImportMsg(msgId, msg, matched > 0 ? 'var(--gold)' : 'var(--red)');
-      this.renderStep(this.step);
-    };
-
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'csv') {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const parsed = this._parseCSV(e.target.result);
-        if (!parsed) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
-        apply(parsed.headers, parsed.rows);
-      };
-      reader.readAsText(file);
-    } else {
-      const load = () => {
-        const reader = new FileReader();
-        reader.onload = e => {
-          const wb = XLSX.read(e.target.result, {type:'array'});
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-          if (data.length < 2) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
-          const headers = data[0].map(h => String(h).trim());
-          const rows = data.slice(1).filter(r => r.some(v => v !== '')).map(r => r.map(v => String(v).trim()));
-          apply(headers, rows);
-        };
-        reader.readAsArrayBuffer(file);
-      };
-      if (typeof XLSX === 'undefined') {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload = load; s.onerror = () => this._setImportMsg(msgId, 'Could not load Excel reader. Try CSV.', 'var(--red)');
-        document.head.appendChild(s);
-      } else load();
-    }
-    input.value = '';
   },
 
   step7(){
