@@ -251,9 +251,9 @@ S.Settings = {
 
     // ── Vendor Log ──
     App.data.vendor_log = [
-      { id:uid(), date:dateStr(21), vendor:'Republic National', product_id:bp[0].id, product_name:"Tito's Handmade Vodka", product_type:'bar', old_price:13.99, new_price:14.99, change_dollar:1.00, change_pct:7.1, weekly_usage:4, annual_impact:208, saved_at:new Date().toISOString() },
-      { id:uid(), date:dateStr(14), vendor:'Sysco',             product_id:kp[0].id, product_name:'Chicken Breast',        product_type:'kitchen', old_price:2.95, new_price:3.20, change_dollar:0.25, change_pct:8.5, weekly_usage:20, annual_impact:260, saved_at:new Date().toISOString() },
-      { id:uid(), date:dateStr(7),  vendor:'Glazer\'s',         product_id:bp[6].id, product_name:'Modelo Especial',       product_type:'bar', old_price:1.20, new_price:1.35, change_dollar:0.15, change_pct:12.5, weekly_usage:48, annual_impact:374.4, saved_at:new Date().toISOString() },
+      { id:uid(), date:dateStr(21), vendor:'Republic National', product_id:bp[0].id, product_name:"Tito's Handmade Vodka", product_type:'bar', old_price:14.99, new_price:15.99, change_dollar:1.00, change_pct:6.7, weekly_usage:4, annual_impact:208, saved_at:new Date().toISOString() },
+      { id:uid(), date:dateStr(14), vendor:'Sysco',             product_id:kp[0].id, product_name:'Chicken Breast',        product_type:'kitchen', old_price:3.20, new_price:3.45, change_dollar:0.25, change_pct:7.8, weekly_usage:20, annual_impact:260, saved_at:new Date().toISOString() },
+      { id:uid(), date:dateStr(7),  vendor:'Glazer\'s',         product_id:bp[6].id, product_name:'Modelo Especial',       product_type:'bar', old_price:1.35, new_price:1.50, change_dollar:0.15, change_pct:11.1, weekly_usage:48, annual_impact:374.4, saved_at:new Date().toISOString() },
     ];
 
     // ── Theft Scores ──
