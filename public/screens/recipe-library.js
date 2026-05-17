@@ -35,8 +35,10 @@ S.RecipeLibrary={
       const rows=recipes.map(r=>{
         const tgt=r.target_cost_pct??22;const over=r.cost_pct!=null&&r.cost_pct>tgt;
         const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
-        return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td><td class="val">'+esc(r.name)+'</td><td style="white-space:nowrap;"><span class="badge '+(r.flagged?'badge-warn':'badge-dim')+'" style="font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span></td>'
-          +'<td>'+esc(r.category||'—')+'</td><td>'+esc(yld)+'</td>'
+        return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
+          +'<td><div class="val" style="margin-bottom:3px;">'+esc(r.name)+'</div><div style="font-size:10px;color:var(--t3);">'+esc(r.category||'—')+'</div></td>'
+          +'<td style="white-space:nowrap;"><span class="badge '+(r.flagged?'badge-warn':'badge-dim')+'" style="font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span></td>'
+          +'<td>'+esc(yld)+'</td>'
           +'<td>'+App.fmtCurrency(r.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
           +'<td class="'+(over?'neg':r.cost_pct!=null?'pos':'')+'">'+App.fmtPct(r.cost_pct)+'</td>'
           +'<td>'+App.fmtPct(tgt)+'</td>'
