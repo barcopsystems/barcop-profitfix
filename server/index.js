@@ -679,6 +679,41 @@ app.post('/api/create-checkout-session', async (req, res) => {
   }
 });
 
+// ── Stripe billing portal ─────────────────────────────────────────────────────
+app.post('/api/billing-portal', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const { createClient: mkClient } = require('@supabase/supabase-js');
+    const adminDb = mkClient(
+      'https://plpikfpintruksclkwyb.supabase.co',
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const { data, error } = await adminDb
+      .from('subscriptions')
+      .select('stripe_customer_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data?.stripe_customer_id) {
+      return res.status(404).json({ error: 'No Stripe customer found for this account.' });
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: data.stripe_customer_id,
+      return_url: 'https://barcop-profitfix-production.up.railway.app/'
+    });
+
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error('Billing portal error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // Must use express.raw() — Stripe signature verification requires the raw body
 const { createClient } = require('@supabase/supabase-js');
