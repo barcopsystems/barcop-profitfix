@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bar Cop — Profit Fix</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen" class="auth-screen" style="display:none;">
+  <div class="auth-panel">
+    <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+    <div id="auth-login">
+      <div class="auth-heading">Sign In</div>
+      <div class="auth-sub">Enter your email and password.</div>
+      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="login-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
+      <div class="f" style="margin-bottom:18px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/></div>
+      <button class="btn btn-primary" id="login-btn" style="width:100%;">Sign In</button>
+      <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--t3);">No account? <button class="auth-link" id="show-signup">Create one</button></div>
+      <div style="text-align:center;margin-top:6px;"><button class="auth-link" id="show-reset" style="font-size:11px;">Forgot password?</button></div>
+    </div>
+    <div id="auth-signup" style="display:none;">
+      <div class="auth-heading">Create Account</div>
+      <div class="auth-sub">Set up your Bar Cop account.</div>
+      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="signup-email" placeholder="you@yourbar.com"/></div>
+      <div class="f" style="margin-bottom:10px;"><label>Password</label><input type="password" id="signup-password" placeholder="At least 8 characters"/></div>
+      <div class="f" style="margin-bottom:18px;"><label>Confirm Password</label><input type="password" id="signup-confirm" placeholder="••••••••"/></div>
+      <button class="btn btn-primary" id="signup-btn" style="width:100%;">Create Account</button>
+      <div id="signup-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div id="signup-ok" style="color:var(--gold);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--t3);">Have an account? <button class="auth-link" id="show-login">Sign in</button></div>
+    </div>
+    <div id="auth-reset" style="display:none;">
+      <div class="auth-heading">Reset Password</div>
+      <div class="auth-sub">Enter your email for a reset link.</div>
+      <div class="f" style="margin-bottom:18px;"><label>Email</label><input type="email" id="reset-email" placeholder="you@yourbar.com"/></div>
+      <button class="btn btn-primary" id="reset-btn" style="width:100%;">Send Reset Link</button>
+      <div id="reset-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:14px;"><button class="auth-link" id="show-login2">Back to sign in</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="ob-overlay" class="ob-overlay hidden">
+  <div class="ob-panel">
+    <div class="ob-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:26px;"/></div>
+    <div id="ob-content"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
+      <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" data-screen="dashboard" id="nav-dashboard">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-section">Weekly</div>
+      <div class="nav-item" data-screen="this-week" id="nav-this-week">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">This Week</span>
+      </div>
+      <div class="nav-item" data-screen="shift-check" id="nav-shift-check">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Shift Check</span>
+      </div>
+      <div class="nav-section">Products</div>
+      <div class="nav-item" data-screen="bar-products" id="nav-bar-products">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6l1 4H4.5l1-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5v8h8v-8" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 10.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Bar Products</span>
+      </div>
+      <div class="nav-item" data-screen="kitchen-products" id="nav-kitchen-products">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2H3v-2z" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h12v6a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-6z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 10h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Kitchen Products</span>
+      </div>
+      <div class="nav-section">Costing</div>
+      <div class="nav-item" data-screen="recipe-library" id="nav-recipe-library">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Recipe Library</span>
+      </div>
+      <div class="nav-item" data-screen="vendor-watch" id="nav-vendor-watch">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5l6-2 6 2v5.5c0 3.5-6 5.5-6 5.5s-6-2-6-5.5v-5.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2 3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Vendor Watch</span>
+      </div>
+      <div class="nav-section">Controls</div>
+      <div class="nav-item" data-screen="theft-risk" id="nav-theft-risk">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Theft Risk</span>
+      </div>
+      <div class="nav-item" data-screen="cash-recon" id="nav-cash-recon">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Cash Reconciliation</span>
+      </div>
+      <div class="nav-section">History</div>
+      <div class="nav-item" data-screen="reports" id="nav-reports">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Reports &amp; History</span>
+      </div>
+      <div class="nav-section">Support</div>
+      <div class="nav-item" data-screen="audit-tracker" id="nav-audit-tracker">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Audit Tracker</span>
+      </div>
+      <div class="nav-item" data-screen="resources" id="nav-resources">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 7h6M5.5 10h4M5.5 13h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Resources</span>
+      </div>
+      <div class="nav-item" data-screen="help" id="nav-help">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
+        <span class="nav-label">Help &amp; FAQ</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="period-label">Current Period</div>
+      <div class="period-val" id="sidebar-period">—</div>
+      <button class="sidebar-btn" id="nav-settings" data-screen="settings">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="sidebar-btn-label">Settings</span>
+      </button>
+      <button class="sidebar-btn" id="signout-btn">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="sidebar-btn-label">Sign Out</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="topbar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
+        </button>
+        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+        <span class="topbar-sub" id="topbar-sub"></span>
+      </div>
+      <div class="topbar-right" id="topbar-actions"></div>
+    </header>
+    <main class="content" id="content-area"></main>
+  </div>
+</div>
+
+<!-- Tooltip box -->
+<div class="tt-box" id="tt-box">
+  <div class="tt-title" id="tt-title"></div>
+  <div class="tt-body" id="tt-body"></div>
+  <div class="tt-eg" id="tt-eg"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>const S = {};</script>
+<script src="screens/dashboard.js"></script>
+<script src="screens/this-week.js"></script>
+<script src="screens/shift-check.js"></script>
+<script src="screens/bar-products.js"></script>
+<script src="screens/kitchen-products.js"></script>
+<script src="screens/recipe-library.js"></script>
+<script src="screens/vendor-watch.js"></script>
+<script src="screens/theft-risk.js"></script>
+<script src="screens/cash-recon.js"></script>
+<script src="screens/audit-tracker.js"></script>
+<script src="screens/resources.js"></script>
+<script src="screens/reports.js"></script>
+<script src="screens/settings.js"></script>
+<script src="screens/help.js"></script>
+<script src="components/onboarding.js"></script>
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
