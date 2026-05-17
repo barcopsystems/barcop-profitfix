@@ -623,6 +623,37 @@ Return ONLY valid JSON with these exact keys populated from submitted materials:
 }`;
 }
 
+// ── Add module to existing subscription ──────────────────────────────────────
+app.post('/api/add-module', async (req, res) => {
+  const { userId, module } = req.body;
+  if (!userId || !module) return res.status(400).json({ error: 'Missing userId or module' });
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('subscriptions')
+      .select('active_modules')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return res.status(404).json({ error: 'Subscription not found' });
+
+    const current = data.active_modules || [];
+    if (current.includes(module)) return res.json({ ok: true, message: 'Already active' });
+
+    const updated = [...current, module];
+    const { error: updateErr } = await supabaseAdmin
+      .from('subscriptions')
+      .update({ active_modules: updated, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+
+    if (updateErr) throw updateErr;
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('add-module error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Stripe checkout session ───────────────────────────────────────────────────
 app.post('/api/create-checkout-session', async (req, res) => {
   const { priceId, userId, modules } = req.body;
