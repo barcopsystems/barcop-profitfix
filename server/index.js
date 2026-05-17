@@ -623,15 +623,24 @@ Return ONLY valid JSON with these exact keys populated from submitted materials:
 }`;
 }
 
-// ── Add module to existing subscription ──────────────────────────────────────
+// ── Add module — upgrades Stripe subscription + updates Supabase ──────────────
 app.post('/api/add-module', async (req, res) => {
   const { userId, module } = req.body;
   if (!userId || !module) return res.status(400).json({ error: 'Missing userId or module' });
 
+  const PRICE_BY_SLOTS = {
+    1: 'price_1TY9KKGow04S066UBHLhPLNK',
+    2: 'price_1TY9KgGow04S066Urrd6TwGP',
+    3: 'price_1TY9L4Gow04S066UnAxs4K8Q',
+  };
+  const PLAN_BY_SLOTS = { 1: 'tier_1', 2: 'tier_2', 3: 'tier_3' };
+
   try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
     const { data, error } = await supabaseAdmin
       .from('subscriptions')
-      .select('active_modules')
+      .select('active_modules, stripe_customer_id, subscription_plan')
       .eq('user_id', userId)
       .single();
 
@@ -641,9 +650,34 @@ app.post('/api/add-module', async (req, res) => {
     if (current.includes(module)) return res.json({ ok: true, message: 'Already active' });
 
     const updated = [...current, module];
+    const newSlots = updated.length;
+    const newPriceId = PRICE_BY_SLOTS[newSlots];
+
+    // Upgrade Stripe subscription if customer exists
+    if (data.stripe_customer_id && newPriceId) {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: data.stripe_customer_id,
+        status: 'active',
+        limit: 1,
+      });
+      const sub = subscriptions.data[0];
+      if (sub) {
+        const item = sub.items.data[0];
+        await stripe.subscriptions.update(sub.id, {
+          items: [{ id: item.id, price: newPriceId }],
+          proration_behavior: 'always_invoice',
+        });
+      }
+    }
+
+    // Update Supabase
     const { error: updateErr } = await supabaseAdmin
       .from('subscriptions')
-      .update({ active_modules: updated, updated_at: new Date().toISOString() })
+      .update({
+        active_modules: updated,
+        subscription_plan: PLAN_BY_SLOTS[newSlots] || data.subscription_plan,
+        updated_at: new Date().toISOString(),
+      })
       .eq('user_id', userId);
 
     if (updateErr) throw updateErr;
@@ -748,18 +782,51 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
     if (event.type === 'checkout.session.completed') {
       const session    = event.data.object;
       const customerId = session.customer;
-      const userId     = session.metadata?.user_id;
-      const priceId    = session.metadata?.price_id;
+      const email      = session.customer_details?.email || session.customer_email;
+      const priceId    = session.metadata?.price_id || session.line_items?.data?.[0]?.price?.id;
       const modules    = (session.metadata?.modules || '').split(',').filter(Boolean);
       const slots      = MODULE_SLOTS[priceId] || 1;
+      const plan       = slots === 1 ? 'tier_1' : slots === 2 ? 'tier_2' : 'tier_3';
+      const activeModules = modules.length ? modules : ['profit'];
+
+      // Create Supabase user if they don't exist yet (new subscriber from Shopify/Stripe)
+      let userId = session.metadata?.user_id || null;
+      if (!userId && email) {
+        // Check if user already exists
+        const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
+        const found = existing?.users?.find(u => u.email === email);
+        if (found) {
+          userId = found.id;
+        } else {
+          // Create new user — they will receive a password setup email
+          const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            email_confirm: true,
+            user_metadata: { created_via: 'stripe_checkout' },
+          });
+          if (createErr) {
+            console.error('Failed to create Supabase user:', createErr.message);
+          } else {
+            userId = created.user.id;
+            // Send password setup email (uses Supabase "reset password" flow)
+            await supabaseAdmin.auth.admin.generateLink({
+              type: 'recovery',
+              email,
+              options: {
+                redirectTo: 'https://barcop-profitfix-production.up.railway.app/',
+              },
+            });
+          }
+        }
+      }
 
       if (userId) {
         await supabaseAdmin.from('subscriptions').upsert({
           user_id:             userId,
           stripe_customer_id:  customerId,
           subscription_status: 'active',
-          subscription_plan:   slots === 1 ? 'tier_1' : slots === 2 ? 'tier_2' : 'tier_3',
-          active_modules:      modules.length ? modules : ['profit'],
+          subscription_plan:   plan,
+          active_modules:      activeModules,
           current_period_end:  null,
           updated_at:          new Date().toISOString(),
         }, { onConflict: 'user_id' });
