@@ -623,6 +623,31 @@ Return ONLY valid JSON with these exact keys populated from submitted materials:
 }`;
 }
 
+// ── Stripe checkout session ───────────────────────────────────────────────────
+app.post('/api/create-checkout-session', async (req, res) => {
+  const { priceId, userId, modules } = req.body;
+  if (!priceId || !userId) return res.status(400).json({ error: 'Missing priceId or userId' });
+
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: 'https://barcop-profitfix-production.up.railway.app/?checkout=success',
+      cancel_url:  'https://barcop-profitfix-production.up.railway.app/?checkout=cancelled',
+      metadata: {
+        user_id:  userId,
+        price_id: priceId,
+        modules:  (modules || []).join(',')
+      }
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error('Checkout session error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // Must use express.raw() — Stripe signature verification requires the raw body
 const { createClient } = require('@supabase/supabase-js');
