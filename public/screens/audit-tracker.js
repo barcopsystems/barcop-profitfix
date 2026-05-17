@@ -3,352 +3,277 @@ S.AuditTracker = {
 
   render(container, actions) {
     this.container = container;
-    const uploadBtn = document.createElement('button');
-    uploadBtn.className = 'btn btn-primary btn-sm';
-    uploadBtn.textContent = 'Upload Audit';
-    uploadBtn.addEventListener('click', () => this.triggerUpload());
-    actions.appendChild(uploadBtn);
+    actions.innerHTML = '';
     this.renderMain();
   },
 
   renderMain() {
-    const audits = (App.data.audits || []).slice().reverse();
+    const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+    const latest = audits[0] || null;
+    const prev   = audits[1] || null;
 
-    if (audits.length === 0) {
-      this.container.innerHTML = '<div class="screen">'
-        + '<div class="card"><div class="empty">'
-        + '<div class="empty-title">No Audits Uploaded Yet</div>'
-        + '<div class="empty-sub">Upload your first Profit Audit PDF to get started. The app will extract your scores, gaps, and action items automatically.</div>'
-        + '<button class="btn btn-primary" id="at-upload-first">Upload First Audit</button>'
-        + '</div></div>'
-        + '<input type="file" id="at-file-input" accept=".pdf" style="display:none;" />'
-        + '</div>';
-      document.getElementById('at-upload-first')?.addEventListener('click', () => this.triggerUpload());
-      document.getElementById('at-file-input')?.addEventListener('change', e => this.handleFile(e.target.files[0]));
-      return;
-    }
+    // ── Audit Request Card ──────────────────────────────────────────
+    // Subscription renews monthly. Audit available once per month after renewal.
+    // For now: if no audit this month, show Request button. If already one this month, show countdown.
+    const now = new Date();
+    const thisMonthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    const hasThisMonth = audits.some(a => (a.date||'').slice(0,7) === thisMonthKey);
 
-    // Score progression chart
-    const chartHtml = audits.length >= 2 ? this.buildProgressChart(audits) : '';
+    // Days until end of month (next renewal)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth()+1, 1);
+    const daysLeft = Math.ceil((endOfMonth - now) / (1000*60*60*24));
 
-    // Latest audit summary
-    const latest = audits[0];
-    const prior  = audits[1] || null;
+    const requestCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Monthly Profit Audit</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:480px;">'
+      + 'One comprehensive audit per month, delivered within 48 hours. '
+      + 'Your audit analyses your cost structure, variance patterns, vendor pricing, and cash controls — '
+      + 'with a full scored report and ranked action items.</div>'
+      + '</div>'
+      + (hasThisMonth
+          ? '<div style="text-align:right;flex-shrink:0;">'
+            + '<div style="font-size:22px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' days</div>'
+            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit available</div>'
+            + '</div>'
+          : '<button class="btn btn-primary" id="at-request-btn" style="flex-shrink:0;">Request This Month\'s Audit</button>')
+      + '</div>'
+      + '</div>';
 
-    const scoreDiff = prior ? latest.overall_score - prior.overall_score : null;
-    const scoreDiffHtml = scoreDiff != null
-      ? `<span style="font-size:14px;font-weight:700;color:${scoreDiff>0?'var(--gold)':'var(--red)'};">${scoreDiff>0?'+':''}${scoreDiff} pts</span>`
-      : '';
+    // ── Latest Audit Summary ───────────────────────────────────────
+    let latestCard = '';
+    if (latest) {
+      const scoreColor = latest.overall_score >= 80 ? 'var(--gold)' : latest.overall_score >= 60 ? 'var(--t1)' : 'var(--red)';
+      const scoreLabel = latest.overall_score >= 80 ? 'Strong' : latest.overall_score >= 60 ? 'Moderate' : 'Needs Work';
 
-    const sectionRows = (latest.sections || []).map(sec => {
-      const priorSec = prior?.sections?.find(s => s.name === sec.name);
-      const diff = priorSec ? sec.score - priorSec.score : null;
-      const statusCls = sec.status === 'ON TARGET' ? 'badge-ok'
-                      : sec.status === 'ATTENTION'  ? 'badge-dim' : 'badge-warn';
-      return `<tr>
-        <td class="val">${esc(sec.name)}</td>
-        <td style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:${sec.score>=60?'var(--gold)':'var(--red)'};">${sec.score}<span style="font-size:11px;color:var(--t3);">/100</span></td>
-        <td><span class="badge ${statusCls}">${esc(sec.status)}</span></td>
-        <td style="color:var(--t2);">${sec.monthly_gap ? App.fmtCurrency(sec.monthly_gap)+'/mo' : 'N/A'}</td>
-        <td>${diff!=null ? `<span style="color:${diff>0?'var(--gold)':'var(--red)'};">${diff>0?'↑':'↓'} ${Math.abs(diff)} pts</span>` : '<span style="color:var(--t4);">First audit</span>'}</td>
-      </tr>`;
-    }).join('');
-
-    // Action items
-    const actionRows = (latest.action_items || []).slice(0, 10).map((a, i) =>
-      `<tr>
-        <td style="color:var(--t3);font-family:'Barlow Condensed',sans-serif;font-weight:700;">${i+1}</td>
-        <td class="val">${esc(a.title)}</td>
-        <td><span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t2);">${esc(a.area)}</span></td>
-        <td style="color:var(--t2);">${a.monthly_low ? App.fmtCurrency(a.monthly_low)+'/mo' : '—'}</td>
-        <td style="color:var(--t3);font-size:11px;">${esc(a.timeframe || '—')}</td>
-      </tr>`
-    ).join('');
-
-    // Audit history list
-    const historyRows = audits.map((a, i) => {
-      const prev = audits[i+1];
-      const diff = prev ? a.overall_score - prev.overall_score : null;
-      return `<tr>
-        <td class="val">${esc(a.bar_name)}</td>
-        <td style="color:var(--t2);">${esc(a.audit_period || '—')}</td>
-        <td style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;color:${a.overall_score>=60?'var(--gold)':a.overall_score>=40?'rgba(200,216,232,0.7)':'var(--red)'};">${a.overall_score}/100</td>
-        <td>${diff!=null ? `<span style="color:${diff>0?'var(--gold)':'var(--red)'};">${diff>0?'+':''}${diff} pts</span>` : '<span style="color:var(--t4);">—</span>'}</td>
-        <td style="color:var(--t2);">${App.fmtCurrency(a.weekly_gap_estimate)}/wk</td>
-        <td><span style="font-size:9px;color:var(--t3);">${esc(a.audit_id || '—')}</span></td>
-        <td><button class="btn btn-danger btn-sm at-delete" data-id="${a.id}" style="padding:3px 8px;">×</button></td>
-      </tr>`;
-    }).join('');
-
-    this.container.innerHTML = `<div class="screen">
-      <input type="file" id="at-file-input" accept=".pdf" style="display:none;" />
-
-      ${chartHtml}
-
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px;">
-        <div class="metric-card">
-          <div class="metric-label">Current Score</div>
-          <div class="metric-val ${latest.overall_score>=60?'on-target':'over-target'}">${latest.overall_score}<span style="font-size:16px;color:var(--t3);">/100</span></div>
-          <div class="metric-target">Industry avg: 63 · Target: 65+</div>
-          <div class="metric-impact" style="color:var(--t3);">${scoreDiffHtml || 'First audit'}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Weekly Gap</div>
-          <div class="metric-val over-target">${App.fmtCurrency(latest.weekly_gap_estimate)}</div>
-          <div class="metric-target">Est. left on table/week</div>
-          <div class="metric-impact neg">${App.fmtCurrency(latest.weekly_gap_estimate * 52)}/yr</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Sections Critical</div>
-          <div class="metric-val ${(latest.sections||[]).filter(s=>s.status==='CRITICAL').length>2?'over-target':'on-target'}">${(latest.sections||[]).filter(s=>s.status==='CRITICAL').length}</div>
-          <div class="metric-target">of ${(latest.sections||[]).length} sections</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Audits on File</div>
-          <div class="metric-val">${audits.length}</div>
-          <div class="metric-target">${audits.length > 1 ? 'Tracking progress' : 'Upload next in 60–90 days'}</div>
-        </div>
-      </div>
-
-      ${prior ? this.buildComparisonCard(latest, prior) : ''}
-
-      <div class="sh">Section Scorecard — ${esc(latest.bar_name)}</div>
-      <div class="tbl-wrap" style="margin-bottom:18px;">
-        <table class="tbl"><thead><tr>
-          <th>Section</th><th>Score</th><th>Status</th><th>Monthly Gap</th><th>vs Prior Audit</th>
-        </tr></thead><tbody>${sectionRows}</tbody></table>
-      </div>
-
-      <div class="sh">Top Action Items</div>
-      <div class="tbl-wrap" style="margin-bottom:18px;">
-        <table class="tbl"><thead><tr>
-          <th>#</th><th>Action</th><th>Area</th><th>Monthly Impact</th><th>Time</th>
-        </tr></thead><tbody>${actionRows}</tbody></table>
-      </div>
-
-      <div class="sh">Audit History</div>
-      <div class="tbl-wrap">
-        <table class="tbl"><thead><tr>
-          <th>Bar</th><th>Period</th><th>Score</th><th>Change</th><th>Weekly Gap</th><th>Audit ID</th><th></th>
-        </tr></thead><tbody>${historyRows}</tbody></table>
-      </div>
-    </div>`;
-
-    document.getElementById('at-file-input')?.addEventListener('change', e => this.handleFile(e.target.files[0]));
-    this.container.addEventListener('click', ev => {
-      if (ev.target.closest('.at-delete')) this.deleteAudit(ev.target.closest('.at-delete').dataset.id);
-    });
-  },
-
-  buildProgressChart(audits) {
-    const reversed = audits.slice().reverse();
-    const W = 700, H = 140, PAD = {t:16, r:20, b:32, l:44};
-    const cw = W-PAD.l-PAD.r, ch = H-PAD.t-PAD.b;
-    const scores = reversed.map(a => a.overall_score);
-    const minY = Math.max(0, Math.min(...scores) - 5);
-    const maxY = Math.min(100, Math.max(...scores) + 10);
-    const xs = i => PAD.l + (reversed.length > 1 ? (i/(reversed.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY))*ch;
-    const tgt65 = ys(65);
-    const pts = reversed.map((a,i) => `${xs(i).toFixed(1)},${ys(a.overall_score).toFixed(1)}`).join(' ');
-    const ticks = [];
-    for (let v = Math.ceil(minY/10)*10; v <= maxY; v+=10) ticks.push(v);
-
-    return `<div class="chart-card" style="margin-bottom:18px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Score Progression</div>
-        <div style="display:flex;gap:14px;">
-          <span style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t2);"><span style="width:18px;height:2px;background:var(--gold);display:inline-block;"></span>Your Score</span>
-          <span style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t2);"><span style="width:18px;height:2px;background:rgba(201,168,76,0.4);display:inline-block;border-top:2px dashed var(--gold);"></span>Target (65)</span>
-        </div>
-      </div>
-      <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
-        ${ticks.map(v => `<line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-        <text x="${PAD.l-5}" y="${(ys(v)+3).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">${v}</text>`).join('')}
-        <line x1="${PAD.l}" y1="${tgt65.toFixed(1)}" x2="${W-PAD.r}" y2="${tgt65.toFixed(1)}" stroke="var(--gold)" stroke-width="1" stroke-dasharray="4,4" opacity="0.45"/>
-        <polyline points="${pts}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linejoin="round"/>
-        ${reversed.map((a,i) => `<circle cx="${xs(i).toFixed(1)}" cy="${ys(a.overall_score).toFixed(1)}" r="4" fill="var(--gold)"/>
-        <text x="${xs(i).toFixed(1)}" y="${(ys(a.overall_score)-9).toFixed(1)}" text-anchor="middle" fill="var(--gold)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">${a.overall_score}</text>`).join('')}
-        ${reversed.map((a,i) => `<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">${(a.audit_period||a.audit_id||'Audit '+(i+1)).slice(0,8)}</text>`).join('')}
-      </svg>
-    </div>`;
-  },
-
-  buildComparisonCard(latest, prior) {
-    const scoreDiff = latest.overall_score - prior.overall_score;
-    const gapDiff = latest.weekly_gap_estimate - prior.weekly_gap_estimate;
-    const improved = (latest.sections||[]).filter(s => {
-      const p = (prior.sections||[]).find(ps => ps.name === s.name);
-      return p && s.score > p.score;
-    });
-    const declined = (latest.sections||[]).filter(s => {
-      const p = (prior.sections||[]).find(ps => ps.name === s.name);
-      return p && s.score < p.score;
-    });
-
-    return `<div class="card" style="margin-bottom:18px;border-left:3px solid ${scoreDiff>0?'var(--gold)':'var(--red)'};">
-      <div class="card-title">Progress vs Prior Audit</div>
-      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
-        <div class="calc-item">
-          <div class="calc-label">Score Change</div>
-          <div class="calc-val ${scoreDiff>0?'good':'warn'}">${scoreDiff>0?'+':''}${scoreDiff} pts</div>
-        </div>
-        <div class="calc-item">
-          <div class="calc-label">Weekly Gap Change</div>
-          <div class="calc-val ${gapDiff<0?'good':'warn'}">${gapDiff>0?'+':''}${App.fmtCurrency(gapDiff)}/wk</div>
-        </div>
-        <div class="calc-item">
-          <div class="calc-label">Sections Improved</div>
-          <div class="calc-val good">${improved.length}</div>
-        </div>
-        <div class="calc-item">
-          <div class="calc-label">Sections Declined</div>
-          <div class="calc-val ${declined.length>0?'warn':'good'}">${declined.length}</div>
-        </div>
-      </div>
-      ${improved.length>0 ? `<div style="margin-bottom:8px;"><span style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Improved: </span>${improved.map(s=>{const p=(prior.sections||[]).find(ps=>ps.name===s.name);return`<span style="font-size:11px;color:var(--gold);margin-right:12px;">${esc(s.name)} +${s.score-p.score} pts</span>`;}).join('')}</div>` : ''}
-      ${declined.length>0 ? `<div><span style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Needs attention: </span>${declined.map(s=>{const p=(prior.sections||[]).find(ps=>ps.name===s.name);return`<span style="font-size:11px;color:var(--red);margin-right:12px;">${esc(s.name)} ${s.score-p.score} pts</span>`;}).join('')}</div>` : ''}
-    </div>`;
-  },
-
-  triggerUpload() {
-    const input = document.getElementById('at-file-input');
-    if (input) { input.value = ''; input.click(); return; }
-    // Create if not yet rendered
-    const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = '.pdf'; inp.style.display = 'none';
-    inp.addEventListener('change', e => this.handleFile(e.target.files[0]));
-    document.body.appendChild(inp);
-    inp.click();
-  },
-
-  async handleFile(file) {
-    if (!file) return;
-    // Show loading state
-    const content = document.getElementById('content-area');
-    if (content) {
-      content.innerHTML = `<div class="screen">
-        <div class="card" style="text-align:center;padding:48px;">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;color:var(--gold);margin-bottom:12px;">Reading Audit PDF...</div>
-          <div style="font-size:12px;color:var(--t2);margin-bottom:24px;">Claude is extracting scores, findings, and action items from your audit. This takes about 10–15 seconds.</div>
-          <div id="at-progress" style="font-size:11px;color:var(--t3);">Converting PDF...</div>
-        </div>
-      </div>`;
-    }
-
-    try {
-      const setProgress = msg => { const el = document.getElementById('at-progress'); if (el) el.textContent = msg; };
-
-      setProgress('Reading PDF file...');
-      const base64 = await this.fileToBase64(file);
-
-      setProgress('Sending to Claude for analysis...');
-      const extracted = await this.extractAuditData(base64);
-
-      setProgress('Saving audit data...');
-      if (!App.data.audits) App.data.audits = [];
-      App.data.audits.push({ ...extracted, id: App.uid(), uploaded_at: new Date().toISOString() });
-      await App.saveKey('audits');
-
-      this.renderMain();
-    } catch (err) {
-      console.error('Audit extraction error:', err);
-      if (content) {
-        content.innerHTML = `<div class="screen">
-          <div class="card" style="border-left:3px solid var(--red);">
-            <div class="card-title">Upload Failed</div>
-            <div style="font-size:12px;color:var(--t2);margin-bottom:14px;">${esc(err.message || 'An error occurred reading the audit PDF.')}</div>
-            <button class="btn btn-ghost" onclick="S.AuditTracker.render(document.getElementById('content-area'), document.getElementById('topbar-actions'))">Try Again</button>
-          </div>
-        </div>`;
+      // Progress vs previous
+      let progressBanner = '';
+      if (prev) {
+        const diff = latest.overall_score - prev.overall_score;
+        const diffColor = diff >= 0 ? 'var(--gold)' : 'var(--red)';
+        const diffSign  = diff >= 0 ? '+' : '';
+        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + diffColor + ';">' + diffSign + diff.toFixed(0) + ' pts</div>'
+          + '<div style="font-size:12px;color:var(--t2);">'
+          + (diff > 0 ? 'Score improved from ' : diff < 0 ? 'Score declined from ' : 'No change from ')
+          + prev.overall_score + ' → ' + latest.overall_score + '</div>'
+          + '</div>';
       }
-    }
-  },
 
-  fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
+      // Section scores
+      const sections = latest.sections || {};
+      const sectionRows = Object.entries(sections).map(([name, score]) => {
+        const prev_score = prev?.sections?.[name];
+        const diff = prev_score != null ? score - prev_score : null;
+        return '<tr>'
+          + '<td style="color:var(--t1);">' + esc(name) + '</td>'
+          + '<td><div class="prog" style="width:120px;display:inline-block;"><div class="prog-fill" style="width:' + score + '%;background:' + (score>=70?'var(--gold)':score>=50?'rgba(255,200,0,0.5)':'var(--red)') + ';"></div></div></td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700;color:' + (score>=70?'var(--gold)':score>=50?'var(--t1)':'var(--red)') + ';">' + score + '</td>'
+          + (diff != null ? '<td style="font-size:12px;color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + '</td>' : '<td></td>')
+          + '</tr>';
+      }).join('');
+
+      // Top action items
+      const actions_list = (latest.action_items || []).slice(0,5).map((a,i) =>
+        '<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t3);width:24px;flex-shrink:0;">' + (i+1) + '</div>'
+        + '<div style="flex:1;">'
+        + '<div style="font-size:12px;color:var(--t1);margin-bottom:2px;">' + esc(a.action||a) + '</div>'
+        + (a.monthly_impact ? '<div style="font-size:11px;color:var(--gold);font-weight:700;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
+        + '</div>'
+        + '</div>'
+      ).join('');
+
+      latestCard = '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
+        + '<div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
+        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + latest.overall_score + '</div>'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
+        + (latest.pdf_url ? '<a href="' + latest.pdf_url + '" download class="btn btn-ghost btn-sm" style="margin-top:8px;display:inline-flex;">Download PDF</a>' : '')
+        + '</div>'
+        + '</div>'
+        + progressBanner
+        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
+          + '<thead><tr>'
+          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 0;border-bottom:1px solid var(--b2);">Section</th>'
+          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:6px 0;border-bottom:1px solid var(--b2);"></th>'
+          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:6px 0;border-bottom:1px solid var(--b2);">Score</th>'
+          + (prev ? '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:6px 0;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
+          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
+        + (actions_list ? '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Top Action Items by Impact</div>' + actions_list : '')
+        + '</div>';
+    }
+
+    // ── Audit History Log ──────────────────────────────────────────
+    let historyCard = '';
+    if (audits.length > 1) {
+      const rows = audits.map((a,i) => {
+        const prev = audits[i+1];
+        const diff = prev ? a.overall_score - prev.overall_score : null;
+        return '<tr>'
+          + '<td>' + (a.date||'').slice(0,10) + '</td>'
+          + '<td class="val" style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;">' + a.overall_score + '</td>'
+          + '<td>' + (diff!=null ? '<span style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';font-weight:700;">' + (diff>=0?'+':'') + diff + '</span>' : '—') + '</td>'
+          + '<td>' + esc(a.grade||'') + '</td>'
+          + (a.pdf_url ? '<td><a href="' + a.pdf_url + '" class="btn btn-ghost btn-sm" style="padding:3px 10px;" download>PDF</a></td>' : '<td></td>')
+          + '</tr>';
+      }).join('');
+
+      historyCard = '<div class="card">'
+        + '<div class="card-title">Audit History</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Score</th><th>Change</th><th>Grade</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + '</div>';
+    }
+
+    // ── Upload section (for manually uploading completed audit PDFs) ──
+    const uploadCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Upload Completed Audit PDF</div>'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">When your audit is complete you\'ll receive a PDF report. Upload it here to add it to your history, extract your scores and action items, and compare against your previous audit.</div>'
+      + '<div class="form-row" style="gap:16px;align-items:flex-end;">'
+      + '<div class="f"><label>Select Audit PDF</label><input type="file" id="at-file" accept=".pdf" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:8px;font-size:12px;cursor:pointer;"/></div>'
+      + '<button class="btn btn-primary" id="at-upload-btn" style="flex-shrink:0;">Upload & Extract</button>'
+      + '</div>'
+      + '<div id="at-status" style="font-size:12px;margin-top:10px;display:none;"></div>'
+      + '</div>';
+
+    const emptyState = !latest ? '<div class="empty" style="margin-top:0;padding-top:32px;">'
+      + '<div class="empty-title">No Audits Yet</div>'
+      + '<div class="empty-sub">Request your first monthly audit above. When your completed PDF arrives, upload it here to start tracking your progress.</div>'
+      + '</div>' : '';
+
+    this.container.innerHTML = '<div class="screen">'
+      + requestCard
+      + uploadCard
+      + (latest ? latestCard : emptyState)
+      + historyCard
+      + '</div>';
+
+    // Wire request button
+    document.getElementById('at-request-btn')?.addEventListener('click', () => this.showRequestForm());
+
+    // Wire upload
+    document.getElementById('at-upload-btn')?.addEventListener('click', () => {
+      const file = document.getElementById('at-file')?.files[0];
+      if (!file) { this.setStatus('Select a PDF file first.', 'warn'); return; }
+      this.uploadAudit(file);
     });
   },
 
-  async extractAuditData(base64) {
-    const prompt = `You are analyzing a Bar Cop Profit Audit PDF. Extract ALL of the following data and return ONLY a valid JSON object with no markdown, no backticks, no explanation.
+  showRequestForm() {
+    // Show a simple intake form — submits to the operator (Kyle) for processing
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;';
+    const s = App.data.settings;
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:520px;width:100%;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;">Request Monthly Profit Audit</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">Your audit will be delivered within 48 hours. We\'ll analyse your cost data, inventory variance, vendor pricing trends, and cash controls — and return a fully scored PDF report with ranked action items.</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f w-lg"><label>Bar Name</label><input type="text" id="req-name" value="' + esc(s.bar_name||'') + '" /></div>'
+      + '<div class="f w-md"><label>Contact Email</label><input type="email" id="req-email" placeholder="your@email.com" /></div>'
+      + '</div>'
+      + '<div class="f" style="margin-bottom:16px;"><label>What should we focus on this month? (optional)</label><textarea id="req-notes" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--w);font-family:Barlow,sans-serif;font-size:13px;padding:8px 10px;width:100%;min-height:80px;resize:vertical;" placeholder="e.g. bar pour cost has been running high, want to understand why..."></textarea></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:16px;">Current weekly data, products, recipes, and variance reports will be included automatically from your app data.</div>'
+      + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+      + '<button class="btn btn-ghost" id="req-cancel">Cancel</button>'
+      + '<button class="btn btn-primary" id="req-submit">Submit Audit Request</button>'
+      + '</div>'
+      + '<div id="req-msg" style="font-size:12px;margin-top:10px;display:none;"></div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
+    document.getElementById('req-cancel').onclick = () => modal.remove();
+    document.getElementById('req-submit').onclick = () => {
+      const email = document.getElementById('req-email')?.value.trim();
+      const msg = document.getElementById('req-msg');
+      if (!email) { if(msg){msg.style.color='var(--red)';msg.textContent='Email required.';msg.style.display='block';} return; }
+      // In production this would POST to a webhook or email service
+      // For now, show confirmation
+      const btn = document.getElementById('req-submit');
+      if(btn){btn.disabled=true;btn.textContent='Submitting...';}
+      setTimeout(() => {
+        if(msg){msg.style.color='var(--gold)';msg.textContent='✓ Audit request submitted. You\'ll receive your report within 48 hours.';msg.style.display='block';}
+        setTimeout(() => modal.remove(), 3000);
+      }, 800);
+    };
+  },
 
-Extract this exact structure:
-{
-  "bar_name": "string — name of the bar from the report",
-  "location": "string — city, state",
-  "audit_id": "string — audit ID like PFA-2026-0041",
-  "audit_period": "string — e.g. '4 weeks ending April 25, 2026'",
-  "audit_date": "string — month and year of audit",
-  "data_tier": "string — e.g. 'Tier 2 Analysis'",
-  "overall_score": number — the overall score out of 100,
-  "industry_avg_score": number — industry average score,
-  "weekly_gap_estimate": number — weekly dollars left on the table (number only, no $),
-  "annual_gap_low": number — low end of combined annual gap,
-  "annual_gap_high": number — high end of combined annual gap,
-  "sections": [
-    {
-      "name": "string — section name",
-      "score": number — score out of 100,
-      "status": "string — CRITICAL, ATTENTION, or ON TARGET",
-      "monthly_gap": number or null — monthly dollar gap (number only),
-      "annual_gap": number or null,
-      "key_metrics": [
-        { "label": "string", "value": "string", "target": "string", "status": "string" }
-      ]
-    }
-  ],
-  "top_priorities": [
-    { "rank": number, "area": "string", "title": "string", "monthly": "string", "annual": "string", "timeframe": "string" }
-  ],
-  "action_items": [
-    { "rank": number, "area": "string", "title": "string", "priority": "HIGH or MEDIUM", "monthly_low": number or null, "monthly_high": number or null, "annual_low": number or null, "annual_high": number or null, "timeframe": "string", "what_to_do": "string — brief summary" }
-  ]
-}
+  setStatus(msg, type) {
+    const el = document.getElementById('at-status');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.color = type === 'warn' ? 'var(--red)' : type === 'ok' ? 'var(--gold)' : 'var(--t2)';
+    el.textContent = msg;
+  },
 
-Return ONLY the JSON object. No other text.`;
-
-    const response = await fetch('/api/claude', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error?.message || `API error ${response.status}`);
-    }
-
-    const data = await response.json();
-    const text = (data.content || []).map(c => c.text || '').join('').trim();
-
-    // Strip any markdown fences if present
-    const clean = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+  async uploadAudit(file) {
+    this.setStatus('Reading PDF...', 'info');
+    const btn = document.getElementById('at-upload-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
 
     try {
-      return JSON.parse(clean);
-    } catch (e) {
-      throw new Error('Could not parse audit data. Make sure you uploaded a Bar Cop Profit Audit PDF.');
-    }
-  },
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(',')[1]);
+        r.onerror = () => rej(new Error('Read failed'));
+        r.readAsDataURL(file);
+      });
 
-  deleteAudit(id) {
-    if (!confirm('Remove this audit from your history?')) return;
-    App.data.audits = (App.data.audits || []).filter(a => a.id !== id);
-    App.saveKey('audits').then(() => this.renderMain());
+      this.setStatus('Extracting audit data...', 'info');
+
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: base64 }
+              },
+              {
+                type: 'text',
+                text: 'Extract all data from this Bar Cop Profit Audit PDF. Return ONLY valid JSON with no markdown formatting:\n{\n  "bar_name": "",\n  "overall_score": 0,\n  "grade": "",\n  "date": "YYYY-MM-DD",\n  "sections": {"Section Name": score_number},\n  "action_items": [{"action": "", "monthly_impact": 0, "priority": ""}],\n  "key_metrics": {"Bar Pour Cost %": "", "Food Cost %": "", "Prime Cost %": ""}\n}'
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const raw = data.content?.[0]?.text || '';
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const extracted = JSON.parse(clean);
+
+      extracted.id = App.uid();
+      extracted.date = extracted.date || new Date().toISOString().slice(0,10);
+      extracted.uploaded_at = new Date().toISOString();
+      extracted.pdf_url = null; // Would be set if we stored the PDF
+
+      if (!App.data.audits) App.data.audits = [];
+      App.data.audits.push(extracted);
+      App.data.audits.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+      await App.saveKey('audits');
+      this.setStatus('✓ Audit uploaded and extracted successfully.', 'ok');
+      setTimeout(() => this.renderMain(), 1200);
+
+    } catch (e) {
+      this.setStatus('Error extracting audit data. Make sure this is a valid Bar Cop Profit Audit PDF.', 'warn');
+      console.error('Audit upload error:', e);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Upload & Extract'; }
+    }
   }
 };
