@@ -626,10 +626,12 @@ Return ONLY valid JSON with these exact keys populated from submitted materials:
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // Must use express.raw() — Stripe signature verification requires the raw body
 const { createClient } = require('@supabase/supabase-js');
+const ws = require('ws');
 
 const supabaseAdmin = createClient(
   'https://plpikfpintruksclkwyb.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { realtime: { transport: ws } }
 );
 
 const MODULE_SLOTS = {
