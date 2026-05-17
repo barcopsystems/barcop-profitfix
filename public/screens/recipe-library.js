@@ -17,7 +17,7 @@ S.RecipeLibrary={
     }
     return'<option value="">Select ingredient...</option>'+prods.map(p=>'<option value="'+p.id+'"'+(p.id===selId?' selected':'')+'>'+esc(p.name)+'</option>').join('');
   },
-  unitLabel(prod,mode){if(!prod)return'—';if(mode==='single')return'pours';if(mode==='batch')return prod._t==='kitchen'?(prod.unit||'each'):'bottles';return prod.unit||'units';},
+  unitLabel(prod,mode){if(!prod)return'—';if(mode==='single')return prod._t==='kitchen'?(prod.unit||'each'):'pours';if(mode==='batch')return prod._t==='kitchen'?(prod.unit||'each'):'bottles';return prod.unit||'units';},
   costBasis(prod,mode){if(!prod)return 0;if(mode==='single')return prod.cost_per_pour||0;return prod.cost_per_unit||0;},
 
   render(container,actions){
@@ -35,7 +35,7 @@ S.RecipeLibrary={
       const rows=recipes.map(r=>{
         const tgt=r.target_cost_pct??22;const over=r.cost_pct!=null&&r.cost_pct>tgt;
         const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
-        return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td><td class="val">'+esc(r.name)+'<span class="badge badge-dim" style="margin-left:6px;font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span>'+(r.flagged?'<span class="badge badge-warn" style="margin-left:4px;">Above Target</span>':'')+'</td>'
+        return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td><td class="val">'+esc(r.name)+'</td><td style="white-space:nowrap;"><span class="badge badge-dim" style="font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span>'+(r.flagged?' <span class="badge badge-warn">Above Target</span>':'')+'</td>'
           +'<td>'+esc(r.category||'—')+'</td><td>'+esc(yld)+'</td>'
           +'<td>'+App.fmtCurrency(r.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
           +'<td class="'+(over?'neg':r.cost_pct!=null?'pos':'')+'">'+App.fmtPct(r.cost_pct)+'</td>'
