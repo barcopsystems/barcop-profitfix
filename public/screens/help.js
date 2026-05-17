@@ -1,63 +1,84 @@
 'use strict';
-S.Help={
-  render(container){
-    const sections=[
-      {t:'Getting Started',qa:[
-        {q:'Where do I start?',a:'Set up your Bar Products first — spirits, beer, and wine with their container sizes, standard pours, unit costs, and menu prices. Every other feature pulls from that list. Once products are set up, enter your first week of data and the dashboard populates automatically.'},
-        {q:'What is Prime Cost and why does it matter?',a:'Prime Cost is your total cost of goods sold plus total labor, expressed as a percentage of total revenue. It is the single most important number in a bar operation. Target is 60% or below. Operations consistently above 65% are almost always losing money even when they feel busy.'},
-        {q:'Do I need to use every section?',a:'No. Start with Bar Products, then This Week. Everything else — recipes, vendor watch, theft risk, cash reconciliation — layers on top. Use what is useful now and add the rest when the core data is solid.'}
+S.Help = {
+  render(container) {
+    const sections = [
+      {t:'Getting Started', qa:[
+        {q:'Where do I start?', a:'Go to Getting Started in the sidebar — it walks you through the 4-week setup in order. The short version: set up your Bar Products first, enter your cost targets in Settings, then enter your first week of data in This Week. Once you have 4 weeks of data the dashboard and all calculations are fully populated.'},
+        {q:'What is the Profit Audit and when should I request it?', a:'The Profit Audit is a comprehensive scored analysis of your bar\'s profit systems. Request your first audit in Week 1 — it acts as your baseline before you start making changes. After 30 days of using the app, request a second audit and it will automatically include all your tracked data for a much deeper analysis. After that, one audit per month is included with your subscription.'},
+        {q:'Do I need to use every section?', a:'No. Start with Bar Products, Settings, and This Week. Add recipes, vendor watch, cash reconciliation, and shift check as you build the habit. The audit works with whatever data you have — more data submitted means more sections scored.'}
       ]},
-      {t:'This Week — Weekly Entry',qa:[
-        {q:'What is Bar Revenue?',a:'Total bar sales for the week from your POS system. Include all drink sales — spirits, beer, wine, and non-alcoholic. Pull this from your POS end-of-week summary report.'},
-        {q:'What is Bar COGS?',a:'Cost of Goods Sold — what you spent on bar product this week. This is your beverage invoices for the week, plus any product transferred in from storage, minus any product transferred out. Use invoice totals, not what you ordered.'},
-        {q:'What is Bar Labor?',a:'Total bar staff payroll for the week — bartenders, barbacks, and bar manager time. Do not include kitchen staff or floor servers unless you are tracking combined labor. The target for bar labor is 12% or below of bar revenue.'},
-        {q:'What is the inventory count for?',a:'The inventory count is how the app calculates actual product usage. Beginning inventory plus purchases minus ending inventory equals units used. That number is compared to what your POS says you sold to calculate variance. The count needs to be in the same unit throughout — bottles for spirits, units for beer.'},
-        {q:'What is Bar Variance and how does it work?',a:'Variance is the difference between how much product you actually used (calculated from your inventory count) and how much your POS says you sold. The app converts your actual bottle usage into pours automatically using the standard pour you set in Bar Products, then compares pours-to-pours with your POS sales. Enter the pours sold from your POS sales mix report for each product. If you used 3.4 bottles of a spirit with a 1 oz standard pour in a 25.4 oz bottle, that is 86.7 pours made. If your POS shows 85 shots sold, your variance is +1.7 pours — essentially zero. Variance above 2–3 pours per product per week is worth investigating.'},
-        {q:'What does Pours Made mean in the variance table?',a:'Pours Made is the number of standard pours calculated from your inventory count. The app takes bottles used from your count and multiplies by the pours-per-bottle for that product based on the standard pour you set in product setup.'},
-        {q:'What does Pours Sold mean?',a:'Pours Sold is what you enter manually from your POS sales mix report. It is the number of times that specific spirit was rung in during the week. Enter this as individual shots or pours, not bottles.'}
+      {t:'Bar Products', qa:[
+        {q:'What is Standard Pour?', a:'The amount you pour per drink in ounces. Spirits are typically 1.25–1.5 oz. Wine by the glass is typically 5 oz. Draft beer is typically 14–16 oz. This number drives pour cost %, cost per pour, and the weekly variance calculation.'},
+        {q:'What is Pour Cost %?', a:'Cost Per Pour divided by Menu Price. At 22% pour cost, every dollar of bar revenue costs 22 cents in product. Industry benchmark for spirits is 18–22%. If your blended pour cost consistently runs above 25%, investigate pour standards, recipe coverage, and inventory variance.'},
+        {q:'What does Incomplete mean on a product?', a:'The product is missing one or more required fields — container size, standard pour, unit cost, or menu price. Incomplete products can\'t calculate pour cost or contribute to variance. Click Edit to see which fields are highlighted in red.'},
+        {q:'Can I import products from my POS?', a:'Yes. Click Import on the Bar Products or Kitchen Products screen and upload a CSV or Excel file exported from your POS system. The app auto-detects your column names and lets you match them to the right fields. Products import instantly — any missing data shows as Incomplete and can be filled in afterwards.'}
       ]},
-      {t:'Bar Products',qa:[
-        {q:'What is Standard Pour?',a:'The amount you pour per drink, in ounces. Well and call spirits are typically 1.25 or 1.5 oz. Premium spirits are typically 1.5 oz. Wine by the glass is typically 5 oz. Draft beer is typically 14–16 oz. This number drives Cost Per Pour, Pour Cost %, and the variance calculation.'},
-        {q:'What is Pour Cost %?',a:'Cost Per Pour divided by Menu Price, expressed as a percentage. At 22% pour cost, every dollar of bar revenue costs you 22 cents in product. Industry benchmark for spirits is 18–22%. Beer and wine typically run lower. If your blended pour cost is consistently above 25%, it is worth investigating pour standards, recipe coverage, and inventory variance.'},
-        {q:'What is Cost Per Pour?',a:'Unit Cost divided by Pours Per Bottle. What it costs you in product to make one drink from that bottle. Calculated automatically from your inputs.'},
-        {q:'What is Pours Per Bottle?',a:'Container size in ounces divided by standard pour in ounces. Calculated automatically. A 750ml bottle (25.4 oz) with a 1.5 oz standard pour yields 16.9 pours per bottle.'}
+      {t:'This Week — Weekly Entry', qa:[
+        {q:'What is Bar Revenue?', a:'Total bar sales for the week from your POS — spirits, beer, wine, and non-alcoholic. Pull from your POS end-of-week summary report.'},
+        {q:'What is Bar COGS?', a:'Cost of Goods Sold — what you spent on bar product this week. Use your beverage invoice totals for the week, plus any product transferred in, minus any transferred out.'},
+        {q:'What is the inventory count for?', a:'The count calculates actual product usage. Beginning inventory plus purchases minus ending inventory equals units used. That number is compared to what your POS says you sold to calculate variance. Count in bottles for spirits, units for beer.'},
+        {q:'How does variance work?', a:'Variance is the difference between pours made from your inventory count and pours sold from your POS. The app converts bottles used into pours automatically using the standard pour you set in Bar Products. Enter pours sold from your POS sales mix report. Near zero variance means product and sales are aligned. Positive variance means more product left inventory than was rung in — investigate over-pouring or theft.'},
+        {q:'What is Pours Sold?', a:'What you enter manually from your POS sales mix report — the number of times that specific spirit was rung in during the week. Enter as individual shots or pours, not bottles.'}
       ]},
-      {t:'Shift Check',qa:[
-        {q:'What is Shift Check for?',a:'A fast daily spot-check that takes under 60 seconds. Enter shift revenue and COGS from your POS and you immediately see the shift pour cost and whether it is on target. Running this daily catches problems before they compound into a full week of loss.'},
-        {q:'What is Shift COGS?',a:'The product cost for that specific shift. If you track COGS by shift from your POS, use that number. If not, use weekly COGS divided by number of shifts as an estimate. The result tells you whether that shift ran hot or in line with target.'}
+      {t:'Shift Check', qa:[
+        {q:'What is Shift Check for?', a:'A fast daily spot-check that takes under 60 seconds. Enter shift revenue and COGS from your POS and you immediately see the shift pour cost and whether it is on target. Running this daily catches problems before they compound into a full week of loss.'},
+        {q:'What is Shift COGS?', a:'The bar product cost for that specific shift — spirits, beer, wine only. Do not include labor. Estimate from your weekly invoices divided by number of shifts, or use your POS cost report if available.'}
       ]},
-      {t:'Recipe Library',qa:[
-        {q:'What is the difference between Single Drink, Batch Cocktail, and Food Plate?',a:'Single Drink costs one cocktail made to order — enter pours of each spirit (1 = one standard pour, 0.5 = half pour). Batch Cocktail costs a large recipe made in advance — enter full bottles and mixer quantities, then set the total batch yield and serving size and the app calculates cost per drink. Food Plate costs a kitchen dish from your kitchen product list.'},
-        {q:'What is Recipe Cost %?',a:'Total ingredient cost divided by menu price. If a cocktail costs $1.40 to make and you charge $9, recipe cost is 15.6%. A recipe that crosses its target cost after a price change gets flagged on the dashboard automatically.'},
-        {q:'What is Batch Yield?',a:'The total amount the batch makes, in the unit you choose. A frozen margarita mix that makes 1 gallon is a yield of 1 gallon, which the app converts to 128 oz. Enter the serving size in the same unit category and the app calculates servings per batch.'}
+      {t:'Recipe Library', qa:[
+        {q:'What is the difference between Single Drink, Batch Cocktail, and Food Plate?', a:'Single Drink costs one cocktail made to order — enter pours of each spirit (1 = one standard pour, 0.5 = half pour). Batch Cocktail costs a large recipe made in advance — enter full bottles and mixer quantities, set yield and serving size, and the app calculates cost per drink. Food Plate costs a kitchen dish from your kitchen product list.'},
+        {q:'What is Recipe Cost %?', a:'Total ingredient cost divided by menu price. A recipe that crosses its target cost after a vendor price change gets flagged automatically. Flagged recipes show in red in the Recipe column.'},
+        {q:'What does the red alert bar mean?', a:'One or more recipes are above their target cost percentage. The type label under the recipe name turns red. Click Edit on any red recipe to see which ingredients are driving the cost over target.'}
       ]},
-      {t:'Vendor Watch',qa:[
-        {q:'How does Vendor Watch work?',a:'Select a product from your bar or kitchen product list. The vendor auto-fills from what you entered in product setup. Enter the new invoice price. Enter your weekly usage. The app calculates the cost change dollar amount, cost change percentage, and annual impact. When you save, the product cost updates everywhere — product setup, recipes that use that ingredient, and the flagged recipe check on the dashboard.'},
-        {q:'What is Annual Impact $?',a:'Cost change per unit multiplied by weekly usage multiplied by 52 weeks. At 4 bottles per week, a $1.25 per bottle price increase costs $260 per year. This makes small invoice changes visible in real terms.'}
+      {t:'Vendor Watch', qa:[
+        {q:'How does Vendor Watch work?', a:'Select a product from your bar or kitchen product list. The vendor auto-fills from product setup. Enter the new invoice price and your weekly usage. The app calculates the cost change, the change percentage, and the annual dollar impact. Saving updates the product cost everywhere — product setup, any recipes using that ingredient, and the recipe flag check.'},
+        {q:'What is Annual Impact?', a:'Cost change per unit multiplied by weekly usage multiplied by 52 weeks. A $1.25 per bottle increase at 4 bottles per week costs $260 per year. This makes small invoice changes visible in real terms.'},
+        {q:'The Was and Now columns show the same price — what does that mean?', a:'The product cost on file was already updated to the new price before the log entry was created. The log stores the prices at the time you logged the change. If you see identical values, reload sample data and check — or delete and re-enter the log entry with the correct prices.'}
       ]},
-      {t:'Theft Risk Scorecard',qa:[
-        {q:'How do I score the indicators?',a:'Rate each indicator from 1 to 5. A score of 1 means strong controls are in place for that item — daily cash counts, manager-approved voids, weekly inventory, etc. A score of 5 means no controls exist. Be honest. The scorecard is only useful if it reflects reality. Industry operations with consistent scores above 35 are at high risk of ongoing undetected theft.'},
-        {q:'What is the target score?',a:'20 or below indicates strong controls. 21–35 is moderate risk with specific gaps to address. Above 35 is high risk requiring immediate attention. Run the scorecard every 60–90 days to track whether your control environment is improving.'}
+      {t:'Theft Risk Scorecard', qa:[
+        {q:'How do I score the indicators?', a:'Rate each indicator from 1 to 5. A score of 1 means strong controls are in place. A score of 5 means no controls exist. Be honest — the scorecard is only useful if it reflects reality. Run it every 60–90 days to track whether your control environment is improving.'},
+        {q:'What is the target score?', a:'20 or below indicates strong controls. 21–35 is moderate risk with specific gaps to address. Above 35 is high risk requiring immediate attention.'}
       ]},
-      {t:'Cash Reconciliation',qa:[
-        {q:'How does the count work?',a:'Enter the quantity of each bill and coin denomination in the drawer. The app calculates the total. Enter the expected cash from your POS (cash sales for the shift) and the opening bank separately. The over/short is counted cash minus expected cash, not including the opening bank.'},
-        {q:'What is Opening Bank?',a:'The cash float placed in the drawer at the start of the shift. This is not revenue — it is the starting change fund. It should not be counted as part of cash sales for the shift.'},
-        {q:'What is the tolerance?',a:'The maximum dollar amount you consider acceptable for a drawer to be off. Set in Settings, defaults to $10. Drawers within tolerance show as OK. Drawers outside tolerance flag in the log. Consistent over/short patterns on the same employee are worth investigating regardless of the tolerance setting.'}
+      {t:'Cash Reconciliation', qa:[
+        {q:'How does the count work?', a:'Enter the quantity of each bill and coin denomination. The app calculates the total. Enter the expected cash from your POS for that shift and your opening bank separately. Over/short is counted cash minus expected cash — the opening bank is not included in that calculation.'},
+        {q:'What is Opening Bank?', a:'The cash float placed in the drawer at the start of the shift. Not revenue — the starting change fund. It should not be counted as part of cash sales for the shift.'},
+        {q:'What is the tolerance?', a:'The maximum dollar amount you consider acceptable for a drawer to be off. Set in Settings, defaults to $10. Within tolerance shows as OK in gold. Outside tolerance shows red. Consistent patterns on the same employee are worth investigating regardless of the tolerance setting.'}
       ]},
-      {t:'Audit Tracker',qa:[
-        {q:'How do I upload an audit?',a:'Click Upload Audit in the top right and select your Bar Cop Profit Audit PDF. The app reads the entire document automatically and extracts your overall score, all six section scores, key metrics, and every action item ranked by monthly dollar impact. This takes about 10–15 seconds.'},
-        {q:'What happens when I upload a second audit?',a:'The app automatically compares the two and shows score progression, which sections improved or declined, how the weekly gap changed, and a score progression chart. Upload a new audit every 60–90 days to track improvement over time.'}
+      {t:'Reports & History', qa:[
+        {q:'What does the weekly history show?', a:'Every week you have entered, sorted newest first. Click any week to see the full breakdown — bar and food revenue, COGS, labor, pour cost, food cost, prime cost, and variance by product.'},
+        {q:'What is the Annual Cost Calculator?', a:'Enter your annual revenue and current vs target cost percentages to see the annual dollar gap and what closing it is worth monthly and weekly. Pre-fills from your Settings data. Use it when presenting the business case for operational changes.'}
+      ]},
+      {t:'Profit Audit', qa:[
+        {q:'How does the audit work?', a:'You upload your POS reports and any other data files you have. The app reads all submitted documents and produces a full scored PDF audit report — no waiting, no manual work. The report scores up to 6 sections depending on what data you submit. More data submitted means more sections scored and more specific action items.'},
+        {q:'What is the minimum data needed for an audit?', a:'Your POS Beverages sales report for a minimum of 4 weeks. That alone produces a Tier 1 audit scoring the revenue and cost baseline sections. Every additional file you upload unlocks more scored sections — inventory sheets unlock actual pour cost and variance, payroll unlocks prime cost, exception reports unlock theft risk indicators.'},
+        {q:'When should I request my first audit?', a:'Request your first audit as soon as you sign up — before you change anything. This becomes your baseline score. It shows where you are starting from. After 30 days of using the app and entering data, request your second audit. The app automatically includes all your tracked weekly data, products, variance, and vendor logs in the second audit, making it significantly more detailed.'},
+        {q:'How often can I request an audit?', a:'One audit per month, available at the start of each billing cycle. The countdown on the Profit Audit screen shows how many days until your next audit is available.'},
+        {q:'How do I download my audit PDF?', a:'Click the Download PDF button on the Latest Audit card. The PDF generates directly in your browser — no email, no waiting. All past audits are also available for download in the Audit History table.'},
+        {q:'What does the score comparison show?', a:'When you have two or more audits, the tracker shows your score change from the previous audit — overall points gained or lost, and the change per section. This is how you track whether the improvements you made between audits are showing up in the numbers.'}
+      ]},
+      {t:'Settings', qa:[
+        {q:'What targets should I set?', a:'Bar Pour Cost: 22% is the standard industry target for full-service operations. Food Cost: 32% for full-service, lower for bar-heavy concepts. Prime Cost: 60% or below is the target for sustainable profitability. Labor targets depend heavily on your concept — 28–30% for bar labor is common. Adjust all targets to match your specific operation and ownership goals.'},
+        {q:'How do I change my password?', a:'Go to Settings, scroll to the Account section, enter your new password twice, and click Update Password. Password must be at least 8 characters.'},
+        {q:'What does Load Sample Data do?', a:'Populates every section of the app with realistic sample data — 10 bar products, 10 kitchen products, 7 recipes, 8 weeks of weekly data, 14 shift checks, 10 cash reconciliation entries, vendor log entries, theft scorecards, and two sample audit reports with downloadable PDFs. Use it to see every screen populated before entering your own data.'},
+        {q:'What does Clear All Data do?', a:'Wipes all your data and resets the app to empty, keeping only your settings and targets. Use this when you are done testing with sample data and ready to start entering your real operation\'s numbers.'}
+      ]},
+      {t:'Getting Started Checklist', qa:[
+        {q:'What is the Getting Started checklist?', a:'A 4-week guided setup that tells you exactly what to do in what order to get the full value of the app. Each task links directly to the relevant screen. Check off tasks as you complete them — progress is saved automatically.'},
+        {q:'Do I have to follow the checklist in order?', a:'No, but the order is intentional. Products and targets need to be set up before weekly data means anything. Weekly data needs to exist before the dashboard and variance are useful. The checklist reflects the dependency chain so each step builds on the one before it.'}
       ]}
     ];
 
-    const html=sections.map(sec=>'<div class="card" style="margin-bottom:12px;">'
-      +'<div class="card-title">'+esc(sec.t)+'</div>'
-      +sec.qa.map(item=>'<div style="margin-bottom:14px;">'
-        +'<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:5px;">'+esc(item.q)+'</div>'
-        +'<div style="font-size:12px;color:var(--t2);line-height:1.7;">'+esc(item.a)+'</div>'
-        +'</div>').join('')
-      +'</div>').join('');
+    const html = sections.map(sec =>
+      '<div class="card" style="margin-bottom:12px;">'
+      + '<div class="card-title">' + esc(sec.t) + '</div>'
+      + sec.qa.map(item =>
+        '<div style="margin-bottom:14px;">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:5px;">' + esc(item.q) + '</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">' + esc(item.a) + '</div>'
+        + '</div>'
+      ).join('')
+      + '</div>'
+    ).join('');
 
-    container.innerHTML='<div class="screen">'+html+'</div>';
+    container.innerHTML = '<div class="screen">' + html + '</div>';
   }
 };
