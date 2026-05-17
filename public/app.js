@@ -125,7 +125,7 @@ const App = {
       Onboarding.start();
     } else {
       this.showApp();
-      this.navigate('dashboard');
+      this.navigate('hub');
     }
   },
 
@@ -160,6 +160,7 @@ const App = {
     actions.innerHTML = '';
 
     const titles = {
+      'hub':           ['Recovery Hub', ''],
       'dashboard':     ['Dashboard', ''],
       'this-week':     ['This Week', 'Weekly Entry'],
       'shift-check':   ['Shift Check', ''],
@@ -178,6 +179,7 @@ const App = {
     };
 
     const screens = {
+      'hub':           S.Hub,
       'dashboard':     S.Dashboard,
       'this-week':     S.ThisWeek,
       'shift-check':   S.ShiftCheck,
