@@ -26,6 +26,15 @@ S.Settings = {
       + '<div class="f" style="width:130px;"><label>Prime Cost %</label><div class="fw"><input class="suf" type="number" id="s-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1" /><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Cash Tolerance</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-ct" value="' + (s.cash_tolerance ?? 10) + '" /></div></div>'
       + '</div></div></div>'
+      + '<div class="settings-section"><div class="settings-title">Account</div>'
+      + '<div class="card">'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>New Password</label><input type="password" id="s-pw1" placeholder="Enter new password" autocomplete="new-password" /></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Confirm Password</label><input type="password" id="s-pw2" placeholder="Confirm new password" autocomplete="new-password" /></div>'
+      + '<div style="display:flex;align-items:flex-end;padding-bottom:1px;"><button class="btn btn-ghost" id="s-pw-btn">Update Password</button></div>'
+      + '</div>'
+      + '<div id="s-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>'
+      + '</div></div>'
       + '<div class="settings-section"><div class="settings-title">Testing Tools</div>'
       + '<div class="card">'
       + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every section of the app to test calculations and screen layouts. Clear all data to wipe everything and start fresh with your real numbers.</div>'
@@ -38,6 +47,7 @@ S.Settings = {
       + '<div id="s-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;">Settings saved.</div>'
       + '</div>';
 
+    document.getElementById('s-pw-btn')?.addEventListener('click', () => this.changePassword());
     document.getElementById('s-load-sample')?.addEventListener('click', () => this.loadSample());
     document.getElementById('s-clear-all')?.addEventListener('click',  () => this.clearAll());
   },
@@ -61,6 +71,28 @@ S.Settings = {
       if (m) { m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500); }
       App.updatePeriod();
     });
+  },
+
+  async changePassword() {
+    const pw1=document.getElementById('s-pw1')?.value;
+    const pw2=document.getElementById('s-pw2')?.value;
+    const msg=document.getElementById('s-pw-msg');
+    if(!pw1||pw1.length<8){if(msg){msg.style.color='var(--red)';msg.textContent='Password must be at least 8 characters.';msg.style.display='block';}return;}
+    if(pw1!==pw2){if(msg){msg.style.color='var(--red)';msg.textContent='Passwords do not match.';msg.style.display='block';}return;}
+    const btn=document.getElementById('s-pw-btn');
+    if(btn){btn.disabled=true;btn.textContent='Updating...';}
+    try{
+      if(!DB._sb){throw new Error('Not connected to database.');}
+      const{error}=await DB._sb.auth.updateUser({password:pw1});
+      if(error)throw error;
+      if(msg){msg.style.color='var(--gold)';msg.textContent='Password updated successfully.';msg.style.display='block';}
+      document.getElementById('s-pw1').value='';
+      document.getElementById('s-pw2').value='';
+    }catch(e){
+      if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+(e.message||'Could not update password.');msg.style.display='block';}
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='Update Password';}
+    }
   },
 
   async loadSample() {
