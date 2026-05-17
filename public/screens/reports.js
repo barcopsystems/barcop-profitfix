@@ -29,15 +29,15 @@ S.Reports={
       const cur=(costPct/100)*rev,tgt=(target/100)*rev,savings=cur-tgt;
       return '<div class="card" style="margin-bottom:12px;"><div class="card-title">'+label+'</div>'
         +'<div class="form-row" style="gap:16px;">'
-        +'<div class="f" style="width:180px;flex-shrink:0;"><label>Annual Revenue</label><div class="fw"><input class="pre" type="number" value="'+Math.round(rev)+'" readonly style="opacity:0.7;" /><span class="pre">$</span></div></div>'
+        +'<div class="f" style="width:180px;flex-shrink:0;"><label>Annual Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" value="'+Math.round(rev)+'" readonly style="opacity:0.7;" /></div></div>'
         +'<div class="f" style="width:130px;flex-shrink:0;"><label>Current Cost %</label><div class="fw"><input class="suf" type="number" value="'+costPct.toFixed(1)+'" readonly style="opacity:0.7;" /><span class="suf">%</span></div></div>'
         +'<div class="f" style="width:130px;flex-shrink:0;"><label>Target Cost %</label><div class="fw"><input class="suf" type="number" value="'+target+'" readonly style="opacity:0.7;" /><span class="suf">%</span></div></div>'
         +'</div>'
         +'<div class="calc"><div class="calc-item"><div class="calc-label">Current Annual Cost</div><div class="calc-val">'+App.fmtCurrency(cur)+'</div></div>'
         +'<div class="calc-item"><div class="calc-label">Cost at Target</div><div class="calc-val good">'+App.fmtCurrency(tgt)+'</div></div>'
-        +'<div class="calc-item"><div class="calc-label">Annual Savings</div><div class="calc-val '+(savings>0?'good':'')+'">'+App.fmtCurrency(savings)+'</div></div>'
-        +'<div class="calc-item"><div class="calc-label">Monthly</div><div class="calc-val">'+App.fmtCurrency(savings/12)+'</div></div>'
-        +'<div class="calc-item"><div class="calc-label">Weekly</div><div class="calc-val">'+App.fmtCurrency(savings/52)+'</div></div>'
+        +'<div class="calc-item"><div class="calc-label">Annual Savings Potential</div><div class="calc-val '+(savings>0?'warn':'good')+'">'+App.fmtCurrency(savings)+'</div></div>'
+        +'<div class="calc-item"><div class="calc-label">Monthly Gap</div><div class="calc-val '+(savings>0?'warn':'good')+'">'+App.fmtCurrency(savings/12)+'</div></div>'
+        +'<div class="calc-item"><div class="calc-label">Weekly Gap</div><div class="calc-val '+(savings>0?'warn':'good')+'">'+App.fmtCurrency(savings/52)+'</div></div>'
         +'</div></div>';
     };
 
@@ -66,7 +66,7 @@ S.Reports={
       +'<tr><td>Bar Revenue</td><td class="val">'+App.fmtCurrency(w.bar?.revenue)+'</td></tr>'
       +'<tr><td>Bar COGS</td><td>'+App.fmtCurrency(w.bar?.cogs)+'</td></tr>'
       +'<tr><td>Bar Labor</td><td>'+App.fmtCurrency(w.bar?.labor)+'</td></tr>'
-      +'<tr><td>Bar Cost %</td><td class="val '+(w.bar?.cost_pct>22?'neg':'pos')+'">'+App.fmtPct(w.bar?.cost_pct)+'</td></tr>'
+      +'<tr><td>Bar Pour Cost %</td><td class="val '+(w.bar?.cost_pct>22?'neg':'pos')+'">'+App.fmtPct(w.bar?.cost_pct)+'</td></tr>'
       +'<tr><td>Food Revenue</td><td class="val">'+App.fmtCurrency(w.food?.revenue)+'</td></tr>'
       +'<tr><td>Food Cost %</td><td class="val '+(w.food?.cost_pct>32?'neg':'pos')+'">'+App.fmtPct(w.food?.cost_pct)+'</td></tr>'
       +'<tr class="total"><td>Total Revenue</td><td class="val">'+App.fmtCurrency(tRev)+'</td></tr>'
