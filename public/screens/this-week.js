@@ -148,8 +148,7 @@ S.ThisWeek = {
         +'<td style="color:var(--t2);">'+App.fmtCurrency(p.cost_per_unit)+'</td>'
         +'<td id="cc-bar-'+p.id+'" style="color:var(--t2);">'+(cnt.total_cost!=null?App.fmtCurrency(cnt.total_cost):'—')+'</td></tr>';
     }).join('');
-    return '<div class="card"><div class="card-title">Bar Inventory Count</div>'
-      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Bar Inventory Count</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Import from CSV or Excel">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="margin-right:4px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import<input type="file" id="tw-imp-bar-count" accept=".csv,.xlsx,.xls" style="display:none;" onchange="S.ThisWeek.importCount(this,\'bar\')"/>'      +'</label></div></div>'      +'<div id="tw-imp-bar-count-msg" style="font-size:11px;margin-bottom:8px;display:none;"></div>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       +'<th>Product</th>'
       +'<th>Beg Inv '+tt('inv-beg')+'</th>'
       +'<th>Purchases '+tt('inv-purchases')+'</th>'
@@ -199,8 +198,7 @@ S.ThisWeek = {
         +'<td id="vs-'+p.id+'"><span class="badge '+sc+'">'+(vr.status||'—')+'</span></td></tr>';
     }).join('');
     const totDol=this.draft.bar_variance.reduce((s,v)=>s+(v.variance_dollar||0),0);
-    return '<div class="card"><div class="card-title">Bar Variance</div>'
-      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Bar Variance</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Import POS sales mix — fills Pours Sold column">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="margin-right:4px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import POS Sales<input type="file" id="tw-imp-variance" accept=".csv,.xlsx,.xls" style="display:none;" onchange="S.ThisWeek.importVariance(this)"/>'      +'</label></div></div>'      +'<div id="tw-imp-variance-msg" style="font-size:11px;margin-bottom:8px;display:none;"></div>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       +'<th>Product</th>'
       +'<th>Pours Made '+tt('pours-bottle')+'</th>'
       +'<th>Pours Sold '+tt('theoretical')+'</th>'
@@ -258,8 +256,7 @@ S.ThisWeek = {
         +'<td style="color:var(--t2);">'+App.fmtCurrency(p.cost_per_unit)+'</td>'
         +'<td id="cc-food-'+p.id+'" style="color:var(--t2);">'+(cnt.total_cost!=null?App.fmtCurrency(cnt.total_cost):'—')+'</td></tr>';
     }).join('');
-    return '<div class="card"><div class="card-title">Food Inventory Count</div>'
-      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'      +'<div class="card-title" style="margin:0;padding:0;border:none;">Food Inventory Count</div>'      +'<div style="display:flex;align-items:center;gap:8px;">'      +'<label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Import from CSV or Excel">'      +'<svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="margin-right:4px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'      +'Import<input type="file" id="tw-imp-food-count" accept=".csv,.xlsx,.xls" style="display:none;" onchange="S.ThisWeek.importCount(this,\'food\')"/>'      +'</label></div></div>'      +'<div id="tw-imp-food-count-msg" style="font-size:11px;margin-bottom:8px;display:none;"></div>'      +'<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       +'<th>Product</th>'
       +'<th>Unit '+tt('kitchen-unit')+'</th>'
       +'<th>Beg Inv '+tt('inv-beg')+'</th>'
@@ -270,6 +267,250 @@ S.ThisWeek = {
       +'<th>Total Cost</th>'
       +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       +this.nav(true,true)+'</div>';
+  },
+
+
+  // ── Import helpers ─────────────────────────────────────────────────────────
+
+  // Fuzzy name match: returns 0-1 similarity score
+  _fuzzyMatch(a, b) {
+    const clean = s => s.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim()
+      .replace(/\b(ml|oz|liter|litre|750|1750|1000|375|200|50|12|16|keg|bottle|btl|case|pk|pack|ea|each|lb|lbs|kg|gallon|gal|qt|quart|pint|pt|cup)\b/g,'').replace(/\s+/g,' ').trim();
+    const ca = clean(a), cb = clean(b);
+    if (ca === cb) return 1;
+    if (ca.includes(cb) || cb.includes(ca)) return 0.85;
+    const wa = ca.split(' '), wb = cb.split(' ');
+    const common = wa.filter(w => w.length > 2 && wb.includes(w));
+    if (common.length === 0) return 0;
+    return common.length / Math.max(wa.length, wb.length);
+  },
+
+  // Parse CSV text into [headers, rows]
+  _parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return null;
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+    const rows = lines.slice(1).filter(l => l.trim()).map(line => {
+      const vals = []; let inQ = false, cur = '';
+      for (const ch of line) {
+        if (ch === '"') inQ = !inQ;
+        else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+        else cur += ch;
+      }
+      vals.push(cur.trim());
+      return vals;
+    });
+    return { headers, rows };
+  },
+
+  // Auto-detect which column likely contains item names
+  _detectNameCol(headers) {
+    const candidates = ['name','item','product','description','item name','product name','sku description','item description','menu item','ingredient'];
+    for (const h of headers) {
+      if (candidates.some(c => h.toLowerCase().includes(c))) return h;
+    }
+    return headers[0]; // fallback to first column
+  },
+
+  // Auto-detect numeric column by keyword list
+  _detectNumCol(headers, keywords) {
+    for (const h of headers) {
+      if (keywords.some(k => h.toLowerCase().includes(k))) return h;
+    }
+    return null;
+  },
+
+  // Show import status message
+  _setImportMsg(id, msg, color) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.color = color || 'var(--t2)';
+    el.textContent = msg;
+  },
+
+  // ── importCount: for Steps 4 (bar) and 6 (food) ─────────────────────────
+  importCount(input, type) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const msgId = type === 'bar' ? 'tw-imp-bar-count-msg' : 'tw-imp-food-count-msg';
+    this._setImportMsg(msgId, 'Reading file...', 'var(--t3)');
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    const apply = (headers, rows) => {
+      const prods = type === 'bar' ? (App.data.bar_products||[]) : (App.data.kitchen_products||[]);
+      const countArr = type === 'bar' ? this.draft.bar_count : this.draft.food_count;
+      if (!countArr?.length) { this._setImportMsg(msgId, 'Complete setup first — no products found.', 'var(--red)'); return; }
+
+      const nameCol = this._detectNameCol(headers);
+      const purCol  = this._detectNumCol(headers, ['purchase','received','delivery','deliveries','receive','bought','order','in','additions','add']);
+      const endCol  = this._detectNumCol(headers, ['ending','end','close','closing','final','count','on hand','onhand','physical']);
+
+      if (!purCol && !endCol) {
+        this._setImportMsg(msgId, 'Could not detect Purchases or Ending Inventory columns. Check your file has column headers.', 'var(--red)');
+        return;
+      }
+
+      const colIdx = col => headers.indexOf(col);
+      const getVal = (row, col) => col ? (parseFloat((row[colIdx(col)]||'').replace(/[^0-9.-]/g,'')) || 0) : 0;
+
+      let matched = 0, unmatched = [];
+      rows.forEach(row => {
+        const itemName = (row[colIdx(nameCol)] || '').toString().trim();
+        if (!itemName) return;
+        // Find best matching product
+        let bestProd = null, bestScore = 0;
+        prods.forEach(p => {
+          const score = this._fuzzyMatch(itemName, p.name);
+          if (score > bestScore) { bestScore = score; bestProd = p; }
+        });
+        if (!bestProd || bestScore < 0.45) { unmatched.push(itemName); return; }
+        const cnt = countArr.find(c => c.product_id === bestProd.id);
+        if (!cnt) return;
+        if (purCol) { const v = getVal(row, purCol); if (v > 0) cnt.purchases = v; }
+        if (endCol) { const v = getVal(row, endCol); cnt.end_inv = v; }
+        matched++;
+      });
+
+      // Recalculate all counts
+      prods.forEach(p => {
+        const cnt = countArr.find(c => c.product_id === p.id);
+        if (!cnt) return;
+        const pur = parseFloat(cnt.purchases) || 0;
+        const end = parseFloat(cnt.end_inv) || 0;
+        const beg = parseFloat(cnt.beg_inv) || 0;
+        cnt.units_used = beg + pur - end;
+        cnt.total_cost = cnt.units_used * (p.cost_per_unit || 0);
+      });
+      this.saveDraft();
+      const msg = matched + ' product' + (matched!==1?'s':'') + ' updated' +
+        (unmatched.length ? '. ' + unmatched.length + ' not matched: ' + unmatched.slice(0,3).join(', ') + (unmatched.length>3?'…':'') : '');
+      this._setImportMsg(msgId, msg, matched > 0 ? 'var(--gold)' : 'var(--red)');
+      this.renderStep(this.step); // refresh to show filled values
+    };
+
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const parsed = this._parseCSV(e.target.result);
+        if (!parsed) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
+        apply(parsed.headers, parsed.rows);
+      };
+      reader.readAsText(file);
+    } else {
+      // Excel — load SheetJS if needed
+      const load = () => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const wb = XLSX.read(e.target.result, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          if (data.length < 2) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
+          const headers = data[0].map(h => String(h).trim());
+          const rows = data.slice(1).filter(r => r.some(v => v !== '')).map(r => r.map(v => String(v).trim()));
+          apply(headers, rows);
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      if (typeof XLSX === 'undefined') {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = load; s.onerror = () => this._setImportMsg(msgId, 'Could not load Excel reader. Try CSV.', 'var(--red)');
+        document.head.appendChild(s);
+      } else load();
+    }
+    input.value = ''; // reset so same file can be re-imported
+  },
+
+  // ── importVariance: for Step 5 — fills Pours Sold from POS sales mix ──────
+  importVariance(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const msgId = 'tw-imp-variance-msg';
+    this._setImportMsg(msgId, 'Reading file...', 'var(--t3)');
+
+    const apply = (headers, rows) => {
+      const prods = App.data.bar_products || [];
+      const varArr = this.draft.bar_variance;
+      const cntArr = this.draft.bar_count;
+      if (!varArr?.length) { this._setImportMsg(msgId, 'Complete inventory count first.', 'var(--red)'); return; }
+
+      const nameCol = this._detectNameCol(headers);
+      const soldCol = this._detectNumCol(headers, ['sold','qty','quantity','count','units','pours','shots','drinks','sales','total','net qty','net sales','net quantity']);
+
+      if (!soldCol) {
+        this._setImportMsg(msgId, 'Could not detect a Qty Sold column. Column should be named Qty, Sold, Units, Pours, or similar.', 'var(--red)');
+        return;
+      }
+
+      const colIdx = col => headers.indexOf(col);
+      let matched = 0, unmatched = [];
+
+      rows.forEach(row => {
+        const itemName = (row[colIdx(nameCol)] || '').toString().trim();
+        if (!itemName) return;
+        let bestProd = null, bestScore = 0;
+        prods.forEach(p => {
+          const score = this._fuzzyMatch(itemName, p.name);
+          if (score > bestScore) { bestScore = score; bestProd = p; }
+        });
+        if (!bestProd || bestScore < 0.45) { unmatched.push(itemName); return; }
+        const vr = varArr.find(v => v.product_id === bestProd.id);
+        const cnt = cntArr?.find(c => c.product_id === bestProd.id);
+        if (!vr) return;
+        const soldQty = parseFloat((row[colIdx(soldCol)]||'').toString().replace(/[^0-9.-]/g,'')) || 0;
+        vr.theoretical_units = soldQty;
+        // Recalculate variance
+        const pourOz = bestProd.std_pour_oz||1, bottleOz = bestProd.bottle_size_oz||25.4, ppb = bottleOz/pourOz;
+        const actualPours = (cnt?.units_used||0)*ppb;
+        vr.actual_units = actualPours;
+        const varU = actualPours - soldQty;
+        vr.variance_units = varU;
+        vr.variance_oz = varU * pourOz;
+        const cpp = bestProd.cost_per_pour||(bestProd.pours_per_bottle&&bestProd.cost_per_unit?bestProd.cost_per_unit/bestProd.pours_per_bottle:0);
+        vr.variance_dollar = varU * cpp;
+        vr.status = Math.abs(varU)<=2?'OK':varU>0?'Over — Investigate':'Short — Check Count';
+        matched++;
+      });
+
+      this.saveDraft();
+      const msg = matched + ' product' + (matched!==1?'s':'') + ' updated' +
+        (unmatched.length ? '. ' + unmatched.length + ' not matched: ' + unmatched.slice(0,3).join(', ') + (unmatched.length>3?'…':'') : '');
+      this._setImportMsg(msgId, msg, matched > 0 ? 'var(--gold)' : 'var(--red)');
+      this.renderStep(this.step);
+    };
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const parsed = this._parseCSV(e.target.result);
+        if (!parsed) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
+        apply(parsed.headers, parsed.rows);
+      };
+      reader.readAsText(file);
+    } else {
+      const load = () => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const wb = XLSX.read(e.target.result, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          if (data.length < 2) { this._setImportMsg(msgId, 'File appears empty.', 'var(--red)'); return; }
+          const headers = data[0].map(h => String(h).trim());
+          const rows = data.slice(1).filter(r => r.some(v => v !== '')).map(r => r.map(v => String(v).trim()));
+          apply(headers, rows);
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      if (typeof XLSX === 'undefined') {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = load; s.onerror = () => this._setImportMsg(msgId, 'Could not load Excel reader. Try CSV.', 'var(--red)');
+        document.head.appendChild(s);
+      } else load();
+    }
+    input.value = '';
   },
 
   step7(){
