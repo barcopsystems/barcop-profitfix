@@ -99,7 +99,7 @@ S.Hub = {
         </div>
         <div style="margin-bottom:6px;">${trendPill(trendVal)}</div>
         <div style="flex:1;margin:16px 0 20px;">${stats}</div>
-        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;" onclick="S.Hub._enter('${enterScreen}')">
+        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._enter('${enterScreen}')">
           Enter ${title}
         </button>
       </div>`;
@@ -107,19 +107,19 @@ S.Hub = {
     // Build locked section card (smaller, dim)
     const lockedCard = (id, title, desc, upgradeBlurbs, module) => `
       <div style="background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:24px;display:flex;flex-direction:column;opacity:0.8;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+          <div style="flex:1;padding-right:12px;">
             <div style="display:flex;align-items:center;margin-bottom:6px;">
               ${statusDot(false)}
               <span style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">Available</span>
             </div>
-            <div style="font-size:15px;font-weight:700;color:var(--t2);margin-bottom:4px;">${title}</div>
-            <div style="font-size:12px;color:var(--t3);line-height:1.5;">${desc}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--t2);margin-bottom:6px;">${title}</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5;min-height:54px;">${desc}</div>
           </div>
           ${ring(null, 64)}
         </div>
         <div style="flex:1;margin-bottom:18px;">${upgradeBlurbs}</div>
-        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;" onclick="S.Hub._upgrade('${module}', '${title}')">
+        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._upgrade('${module}', '${title}')">
           Add ${title}
         </button>
       </div>`;
@@ -177,7 +177,7 @@ S.Hub = {
 
           <div>
             <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Recovery Coverage</div>
-            <div style="font-size:26px;font-weight:800;color:var(--gold);line-height:1;">${activeCount} <span style="font-size:13px;color:var(--t3);font-weight:400;">/ 3 Systems Active</span></div>
+            <div style="font-size:26px;font-weight:800;color:var(--t1);line-height:1;">${activeCount} <span style="font-size:13px;color:var(--t3);font-weight:400;">/ 3 Systems Active</span></div>
           </div>
 
           <div style="border-left:1px solid rgba(255,255,255,0.07);padding-left:20px;">
