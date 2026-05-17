@@ -124,21 +124,42 @@ const App = {
     if (!this.data.settings.onboarding_complete) {
       Onboarding.start();
     } else {
-      this.showApp();
-      this.navigate('hub');
+      this.showHub();
     }
+  },
+
+  showHub() {
+    // Full screen hub - hide the app shell, show a standalone container
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('ob-overlay').classList.add('hidden');
+    // Hide the sidebar/topbar shell, render hub directly into body
+    document.getElementById('app').classList.add('hidden');
+    let hubWrap = document.getElementById('hub-wrapper');
+    if (!hubWrap) {
+      hubWrap = document.createElement('div');
+      hubWrap.id = 'hub-wrapper';
+      hubWrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
+      document.body.appendChild(hubWrap);
+    }
+    hubWrap.style.display = 'block';
+    S.Hub.render(hubWrap);
   },
 
   showApp() {
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('ob-overlay').classList.add('hidden');
     document.getElementById('auth-screen').style.display = 'none';
+    // Hide hub wrapper when entering a module
+    const hw = document.getElementById('hub-wrapper');
+    if (hw) hw.style.display = 'none';
   },
 
   showAuth() {
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('app').classList.add('hidden');
     document.getElementById('ob-overlay').classList.add('hidden');
+    const hw = document.getElementById('hub-wrapper');
+    if (hw) hw.style.display = 'none';
   },
 
   async save() {
