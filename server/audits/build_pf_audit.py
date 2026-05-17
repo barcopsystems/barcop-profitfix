@@ -4051,47 +4051,7 @@ def page_close():
     s.append(det_tbl)
     s.append(sp(18))
 
-    # Single permitted Fix System mention
-    _fs_p = Paragraph(
-        "The Profit Fix system includes the operational tools and step-by-step processes "
-        "to address every gap identified in this report. "
-        "Learn more at barcop.com.",
-        ParagraphStyle("fs_callout", fontName=FONT_REG, fontSize=10, leading=15,
-        textColor=WHITE, alignment=TA_CENTER, leftIndent=0, firstLineIndent=0))
-    _fs_outer = Table([[_fs_p]], colWidths=[CONTENT_W])
-    _fs_outer.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,-1),NAVY),
-        ("TOPPADDING",(0,0),(-1,-1),16),("BOTTOMPADDING",(0,0),(-1,-1),16),
-        ("LEFTPADDING",(0,0),(-1,-1),16),("RIGHTPADDING",(0,0),(-1,-1),16),
-    ]))
-    s.append(_fs_outer)
-    s.append(sp(12))
 
-    # 8. AUDIT25 offer, centered STEEL box
-    s.append(sp(6))
-    audit_p = Paragraph(
-        "When you are ready for your next audit, use code AUDIT25 for 25% off.  Order at barcop.com",
-        ParagraphStyle("audit25", fontName=FONT_REG, fontSize=10, leading=15,
-        textColor=WHITE, alignment=TA_CENTER, leftIndent=0, firstLineIndent=0))
-    _audit_outer = Table([[audit_p]], colWidths=[CONTENT_W])
-    _audit_outer.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,-1),STEEL),
-        ("TOPPADDING",(0,0),(-1,-1),16),
-        ("BOTTOMPADDING",(0,0),(-1,-1),16),
-        ("LEFTPADDING",(0,0),(-1,-1),16),
-        ("RIGHTPADDING",(0,0),(-1,-1),16),
-    ]))
-    s.append(_audit_outer)
-    s.append(sp(18))
-
-    # 9. Bar Cop footer line
-    s.append(Paragraph(
-        'Bar Cop  |  <a href="https://www.barcop.com">'
-        '<font color="#4888A8">barcop.com</font></a>',
-        ParagraphStyle("close_footer", fontName=FONT_BOLD, fontSize=9, leading=13,
-        textColor=MID_GRAY, alignment=TA_CENTER, leftIndent=0, firstLineIndent=0)))
-
-    # Nothing after item 9.
     return s
 
 
