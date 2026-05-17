@@ -58,13 +58,13 @@ S.BarProducts = {
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     this.container.innerHTML='<div class="screen">'+html+'<div id="bp-form"></div></div>';
-    this.container.addEventListener('click',ev=>{
+    this.container.onclick=ev=>{
       if(ev.target.closest('.bp-edit'))this.showForm(ev.target.closest('.bp-edit').dataset.id);
       if(ev.target.closest('.bp-del'))this.del(ev.target.closest('.bp-del').dataset.id);
       if(ev.target.closest('#bp-add-first'))this.showForm();
       if(ev.target.closest('#bp-cancel'))this.renderList();
       if(ev.target.closest('#bp-save'))this.save();
-    });
+    };
   },
 
   showForm(id) {

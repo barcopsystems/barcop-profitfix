@@ -45,7 +45,7 @@ S.TheftRisk={
       +'<div id="tr-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;">Scorecard saved.</div>'
       +'</div>';
 
-    this.container.addEventListener('click',ev=>{
+    this.container.onclick=ev=>{
       const btn=ev.target.closest('.sc-btn');if(!btn)return;
       const i=parseInt(btn.dataset.i),v=parseInt(btn.dataset.v);
       this.scores[i]=v;
@@ -56,7 +56,7 @@ S.TheftRisk={
       const te=document.getElementById('tr-total');const re=document.getElementById('tr-rating');
       if(te){te.textContent=t;te.className='calc-val '+rc;}
       if(re){re.textContent=r;re.className='calc-val '+rc;}
-    });
+    };
   },
   saveScorecard(){
     const total=Object.values(this.scores).reduce((s,v)=>s+v,0);

@@ -15,13 +15,13 @@ S.KitchenProducts = {
       html='<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Name</th><th>Category</th><th>Unit</th><th>Unit Cost</th><th>Vendor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     this.container.innerHTML='<div class="screen">'+html+'<div id="kp-form"></div></div>';
-    this.container.addEventListener('click',ev=>{
+    this.container.onclick=ev=>{
       if(ev.target.closest('.kp-edit'))this.showForm(ev.target.closest('.kp-edit').dataset.id);
       if(ev.target.closest('.kp-del'))this.del(ev.target.closest('.kp-del').dataset.id);
       if(ev.target.closest('#kp-add-first'))this.showForm();
       if(ev.target.closest('#kp-cancel'))this.renderList();
       if(ev.target.closest('#kp-save'))this.save();
-    });
+    };
   },
   showForm(id) {
     this.editId=id||null;

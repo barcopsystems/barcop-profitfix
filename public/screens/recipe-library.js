@@ -46,7 +46,7 @@ S.RecipeLibrary={
         +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     this.container.innerHTML='<div class="screen">'+html+'<div id="rl-form"></div></div>';
-    this.container.addEventListener('click',ev=>{
+    this.container.onclick=ev=>{
       if(ev.target.closest('.rl-edit'))this.editRecipe(ev.target.closest('.rl-edit').dataset.id);
       if(ev.target.closest('.rl-del'))this.del(ev.target.closest('.rl-del').dataset.id);
       if(ev.target.closest('#rl-add-first'))this.showModeSelector();
@@ -59,7 +59,7 @@ S.RecipeLibrary={
       if(ev.target.closest('#rl-mode-batch'))this.showForm('batch');
       if(ev.target.closest('#rl-mode-food'))this.showForm('food');
       if(ev.target.closest('#rl-mode-cancel'))this.renderList();
-    });
+    };
     this.container.addEventListener('change',ev=>{
       if(ev.target.classList.contains('rl-ing-prod'))this.onProdChange(ev.target);
       if(['rl-menu-price','rl-target-pct','rl-batch-yield','rl-batch-yield-unit','rl-serving-size','rl-serving-size-unit','rl-plate-yield'].includes(ev.target.id))this.calc();

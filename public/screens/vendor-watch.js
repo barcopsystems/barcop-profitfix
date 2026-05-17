@@ -30,10 +30,10 @@ S.VendorWatch = {
       +'<th>Date</th><th>Vendor</th><th>Product</th><th>Previous Cost</th><th>New Invoice Cost</th><th>Cost Change %</th><th>Annual Impact $</th>'
       +'</tr></thead><tbody>'+logRows+'</tbody></table></div></div>';
 
-    this.container.addEventListener('click',ev=>{
+    this.container.onclick=ev=>{
       if(ev.target.closest('#vw-cancel'))this.renderMain();
       if(ev.target.closest('#vw-save'))this.saveEntry();
-    });
+    };
     this.container.addEventListener('change',ev=>{if(ev.target.id==='vw-prod')this.onProdSelect();});
     this.container.addEventListener('input',ev=>{if(['vw-new','vw-usage'].includes(ev.target.id))this.calcImpact();});
   },
