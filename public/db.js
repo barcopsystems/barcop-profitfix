@@ -58,6 +58,37 @@ const DB = {
     });
   },
 
+  // ── Subscription ─────────────────────────────────────────────────────────
+  async getSubscription() {
+    if (!this._sb || !this._user) {
+      return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+    }
+    try {
+      const { data, error } = await this._sb
+        .from('subscriptions')
+        .select('subscription_status, subscription_plan, active_modules, current_period_end')
+        .eq('user_id', this._user.id)
+        .single();
+
+      if (error || !data) {
+        return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+      }
+      return {
+        status:         data.subscription_status,
+        plan:           data.subscription_plan,
+        active_modules: data.active_modules || [],
+        period_end:     data.current_period_end
+      };
+    } catch (e) {
+      console.error('getSubscription error:', e);
+      return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+    }
+  },
+
+  hasModule(moduleName) {
+    return App.subscription?.active_modules?.includes(moduleName) || false;
+  },
+
   // ── Data ──────────────────────────────────────────────────────────────────
   async readData() {
     // Supabase mode
