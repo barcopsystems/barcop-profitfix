@@ -216,9 +216,10 @@ const App = {
     }
   },
 
-  fmtCurrency(n) {
+  fmtCurrency(n, decimals) {
     if (isNaN(n) || n == null) return '—';
-    return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+    const d = decimals !== undefined ? decimals : (Math.abs(n) < 10 ? 2 : 0);
+    return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
   },
 
   fmtPct(n, d=1) {
