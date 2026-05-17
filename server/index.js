@@ -11,7 +11,11 @@ const multiparty = require('multiparty');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '50mb' }));
+// Skip JSON parsing for the Stripe webhook route — it needs the raw body for signature verification
+app.use((req, res, next) => {
+  if (req.path === '/api/stripe-webhook') return next();
+  express.json({ limit: '50mb' })(req, res, next);
+});
 
 // No-cache headers for JS/CSS
 app.use((req, res, next) => {
