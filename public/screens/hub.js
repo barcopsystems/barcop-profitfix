@@ -211,8 +211,8 @@ S.Hub = {
             : lockedCard('profit', 'Profit Recovery', 'Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.', profitStats, 'profit')}
 
           ${hasR
-            ? activeCard('revenue', 'Revenue Recovery', 'Menu engineering, pricing strategy, server performance, labor efficiency and event revenue.', null, null, revenueStats, 'dashboard')
-            : lockedCard('revenue', 'Revenue Recovery', 'Menu engineering, pricing strategy, server performance, labor efficiency and event revenue.', revenueStats, 'revenue')}
+            ? activeCard('revenue', 'Revenue Recovery', 'Menu engineering, pricing strategy, server performance, labor efficiency and events.', null, null, revenueStats, 'dashboard')
+            : lockedCard('revenue', 'Revenue Recovery', 'Menu engineering, pricing strategy, server performance, labor efficiency and events.', revenueStats, 'revenue')}
 
           ${hasT
             ? activeCard('traffic', 'Traffic Recovery', 'Google presence, online menu, reviews, social media, delivery platforms and digital visibility.', null, null, trafficStats, 'dashboard')
