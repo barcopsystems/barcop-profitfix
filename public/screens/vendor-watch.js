@@ -15,7 +15,7 @@ S.VendorWatch = {
     const logRows=log.length===0
       ?'<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--t4);">No price changes logged yet.</td></tr>'
       :log.map(e=>'<tr><td>'+esc(e.date||'—')+'</td><td>'+esc(e.vendor||'—')+'</td><td class="val">'+esc(e.product_name||'—')+'</td>'
-        +'<td>'+App.fmtCurrency(e.old_price)+'</td><td>'+App.fmtCurrency(e.new_price)+'</td>'
+        +'<td>'+App.fmtCurrency(e.old_price,2)+'</td><td>'+App.fmtCurrency(e.new_price,2)+'</td>'
         +'<td class="'+(e.change_pct>0?'neg':'pos')+'">'+(e.change_pct>0?'+':'')+App.fmtPct(e.change_pct)+'</td>'
         +'<td class="'+(e.annual_impact>0?'neg':'pos')+'">'+(e.annual_impact>0?'+':'')+App.fmtCurrency(e.annual_impact)+'/yr</td></tr>').join('');
 
@@ -82,7 +82,7 @@ S.VendorWatch = {
     if(!nw){calc.style.display='none';return;}calc.style.display='';
     const cd=nw-old,cp=old>0?(cd/old*100):0,ai=cd*usage*52;
     const set=(id,val,cls)=>{const el=document.getElementById(id);if(!el)return;el.textContent=val;el.className='calc-val'+(cls?' '+cls:'');};
-    set('vw-cd',(cd>=0?'+':'')+App.fmtCurrency(cd),cd>0?'warn':cd<0?'good':'');
+    set('vw-cd',(cd>=0?'+':'')+App.fmtCurrency(cd,2),cd>0?'warn':cd<0?'good':'');
     set('vw-cp',(cp>=0?'+':'')+App.fmtPct(cp),cp>0?'warn':cp<0?'good':'');
     set('vw-ai',(ai>=0?'+':'')+App.fmtCurrency(ai)+'/yr'+(usage===0?' — enter weekly usage':''),ai>0?'warn':ai<0?'good':'');
   },
