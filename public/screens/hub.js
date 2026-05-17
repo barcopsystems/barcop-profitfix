@@ -207,16 +207,16 @@ S.Hub = {
         <div style="width:100%;max-width:920px;display:grid;grid-template-columns:${activeCount === 1 && hasP ? '1.45fr 1fr 1fr' : activeCount === 1 && hasR ? '1fr 1.45fr 1fr' : activeCount === 1 && hasT ? '1fr 1fr 1.45fr' : 'repeat(3,1fr)'};gap:16px;margin-bottom:24px;align-items:start;">
 
           ${hasP
-            ? activeCard('profit', 'Profit Recovery', 'Pour cost, food cost, variance, vendor pricing and cash control.', profitScore, profitTrend, profitStats, 'dashboard')
-            : lockedCard('profit', 'Profit Recovery', 'Pour cost, food cost, variance, vendor pricing and cash control.', profitStats, 'profit')}
+            ? activeCard('profit', 'Profit Recovery', 'Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.', profitScore, profitTrend, profitStats, 'dashboard')
+            : lockedCard('profit', 'Profit Recovery', 'Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.', profitStats, 'profit')}
 
           ${hasR
-            ? activeCard('revenue', 'Revenue Recovery', 'Menu engineering, server performance, labor efficiency and event revenue.', null, null, revenueStats, 'dashboard')
-            : lockedCard('revenue', 'Revenue Recovery', 'Menu engineering, server performance, labor efficiency and event revenue.', revenueStats, 'revenue')}
+            ? activeCard('revenue', 'Revenue Recovery', 'Menu engineering, pricing strategy, server performance, labor efficiency and event revenue.', null, null, revenueStats, 'dashboard')
+            : lockedCard('revenue', 'Revenue Recovery', 'Menu engineering, pricing strategy, server performance, labor efficiency and event revenue.', revenueStats, 'revenue')}
 
           ${hasT
-            ? activeCard('traffic', 'Traffic Recovery', 'Google presence, reviews, social media, delivery platforms and digital visibility.', null, null, trafficStats, 'dashboard')
-            : lockedCard('traffic', 'Traffic Recovery', 'Google presence, reviews, social media, delivery platforms and digital visibility.', trafficStats, 'traffic')}
+            ? activeCard('traffic', 'Traffic Recovery', 'Google presence, online menu, reviews, social media, delivery platforms and digital visibility.', null, null, trafficStats, 'dashboard')
+            : lockedCard('traffic', 'Traffic Recovery', 'Google presence, online menu, reviews, social media, delivery platforms and digital visibility.', trafficStats, 'traffic')}
 
         </div>
 
