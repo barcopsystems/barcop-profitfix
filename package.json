@@ -1,12 +1,13 @@
 {
   "name": "barcop-profitfix-web",
   "version": "1.0.0",
-  "description": "Bar Cop — Profit Fix Web App",
+  "description": "Bar Cop \u2014 Profit Fix Web App",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "multiparty": "^4.2.3"
   }
 }
