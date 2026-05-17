@@ -625,7 +625,6 @@ Return ONLY valid JSON with these exact keys populated from submitted materials:
 
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // Must use express.raw() — Stripe signature verification requires the raw body
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseAdmin = createClient(
@@ -640,6 +639,7 @@ const MODULE_SLOTS = {
 };
 
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
   const sig    = req.headers['stripe-signature'];
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
