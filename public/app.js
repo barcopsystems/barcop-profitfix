@@ -80,6 +80,7 @@ document.addEventListener('scroll', () => TT.hide(), true);
 /* ── App ── */
 const App = {
   data: null,
+  subscription: { status: 'inactive', plan: null, active_modules: [], period_end: null },
 
   async init() {
     await DB.init();
@@ -95,6 +96,7 @@ const App = {
     const session = await DB.getSession();
     if (session) {
       this.data = await DB.readData();
+      this.subscription = await DB.getSubscription();
       this.boot();
     } else {
       this.showAuth();
@@ -102,9 +104,11 @@ const App = {
     DB.onAuthChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
         this.data = await DB.readData();
+        this.subscription = await DB.getSubscription();
         this.boot();
       } else if (event === 'SIGNED_OUT') {
         this.data = null;
+        this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
         this.showAuth();
       }
     });
