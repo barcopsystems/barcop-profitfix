@@ -39,7 +39,11 @@ S.KitchenProducts = {
       +'</div>';
     document.getElementById('kp-name')?.focus();
   },
+  _saving:false,
   save(){
+    if(this._saving)return;
+    this._saving=true;
+    setTimeout(()=>{this._saving=false;},2000);
     const name=document.getElementById('kp-name')?.value.trim();
     const err=document.getElementById('kp-err');
     if(!name){if(err){err.textContent='Name required.';err.style.display='inline';}return;}
@@ -50,8 +54,7 @@ S.KitchenProducts = {
     App.saveKey('kitchen_products').then(()=>{this.editId=null;this.renderList();});
   },
   del(id){
-    if(!confirm('Delete this product?'))return;
-    App.data.kitchen_products=(App.data.kitchen_products||[]).filter(p=>p.id!==id);
+        App.data.kitchen_products=(App.data.kitchen_products||[]).filter(p=>p.id!==id);
     App.saveKey('kitchen_products').then(()=>this.renderList());
   }
 };
