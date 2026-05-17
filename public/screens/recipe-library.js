@@ -36,7 +36,7 @@ S.RecipeLibrary={
         const tgt=r.target_cost_pct??22;const over=r.cost_pct!=null&&r.cost_pct>tgt;
         const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
         return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
-          +'<td><div class="val" style="margin-bottom:4px;">'+esc(r.name)+'</div><span class="badge '+(r.flagged?'badge-warn':'badge-dim')+'" style="font-size:8px;">'+(mL[r.mode]||r.mode||'SINGLE').toUpperCase()+'</span></td>'
+          +'<td><div class="val" style="margin-bottom:4px;">'+esc(r.name)+'</div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:'+(r.flagged?'var(--red)':'var(--t3)')+';">'+(mL[r.mode]||r.mode||'SINGLE')+'</div></td>'
           +'<td>'+esc(yld)+'</td>'
           +'<td>'+App.fmtCurrency(r.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
           +'<td class="'+(over?'neg':r.cost_pct!=null?'pos':'')+'">'+App.fmtPct(r.cost_pct)+'</td>'
