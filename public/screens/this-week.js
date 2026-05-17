@@ -305,17 +305,17 @@ S.ThisWeek = {
   wireStep(step){
     if(step===2)setTimeout(()=>this.calcBar(),0);
     if(step===3)setTimeout(()=>this.calcFood(),0);
-    document.getElementById('tw-next')?.addEventListener('click',()=>{
+    const nxtBtn=document.getElementById('tw-next');if(nxtBtn)nxtBtn.onclick=()=>{
       if(step===1){this.draft.week_num=document.getElementById('tw-wk')?.value||this.draft.week_num;this.draft.period_end=document.getElementById('tw-end')?.value||this.draft.period_end;}
       if(step===2){this.draft.bar.revenue=document.getElementById('tw-br')?.value||'';this.draft.bar.cogs=document.getElementById('tw-bc')?.value||'';this.draft.bar.labor=document.getElementById('tw-bl')?.value||'';}
       if(step===3){this.draft.food.revenue=document.getElementById('tw-fr')?.value||'';this.draft.food.cogs=document.getElementById('tw-fc')?.value||'';this.draft.food.labor=document.getElementById('tw-fl')?.value||'';}
       this.saveDraft();this.renderStep(step+1);
-    });
-    document.getElementById('tw-prev')?.addEventListener('click',()=>{
+    };
+    const prvBtn=document.getElementById('tw-prev');if(prvBtn)prvBtn.onclick=()=>{
       if(step===7){this.draft.notes=document.getElementById('tw-notes')?.value||'';this.saveDraft();}
       this.renderStep(Math.max(1,step-1));
-    });
-    document.getElementById('tw-save-week')?.addEventListener('click',()=>this.saveWeek());
+    };
+    const swBtn=document.getElementById('tw-save-week');if(swBtn)swBtn.onclick=()=>this.saveWeek();
   },
 
   async saveWeek(){
