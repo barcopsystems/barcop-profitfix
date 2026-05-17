@@ -1,6 +1,6 @@
 'use strict';
 S.RecipeLibrary={
-  editId:null,rows:[],mode:null,
+  editId:null,rows:[],mode:null,_saving:false,_pendingDelIds:null,
   YUNITS:[{l:'oz',oz:1},{l:'ml',oz:0.033814},{l:'liters',oz:33.814},{l:'gallons',oz:128},{l:'quarts',oz:32},{l:'pints',oz:16},{l:'cups',oz:8}],
   yOpts(sel){return this.YUNITS.map(u=>'<option value="'+u.l+'"'+(u.l===(sel||'oz')?' selected':'')+'>'+u.l+'</option>').join('');},
   toOz(v,u){const m=this.YUNITS.find(x=>x.l===u);return v*(m?m.oz:1);},
@@ -45,7 +45,8 @@ S.RecipeLibrary={
       html=(flagged>0?'<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'+flagged+' recipe'+(flagged>1?'s are':' is')+' above target cost.</div></div>':'')
         +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
-    this.container.innerHTML='<div class="screen">'+html+'<div id="rl-form"></div></div>';
+    const rlModal='<div id="rl-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="rl-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this recipe?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-ghost" id="rl-del-cancel">Cancel</button><button class="btn btn-danger" id="rl-del-confirm">Delete</button></div></div></div>';
+    this.container.innerHTML='<div class="screen">'+html+'<div id="rl-form"></div></div>'+rlModal;
     this.container.onclick=ev=>{
       if(ev.target.closest('.rl-edit'))this.editRecipe(ev.target.closest('.rl-edit').dataset.id);
       if(ev.target.closest('.rl-del'))this.del(ev.target.closest('.rl-del').dataset.id);
@@ -196,6 +197,9 @@ S.RecipeLibrary={
     set('rl-tgt-d',App.fmtPct(tpct));
   },
   saveRecipe(){
+    if(this._saving)return;
+    this._saving=true;
+    setTimeout(()=>{this._saving=false;},2000);
     const name=document.getElementById('rl-name')?.value.trim();const err=document.getElementById('rl-err');
     if(!name){if(err){err.textContent='Recipe name required.';err.style.display='inline';}return;}
     const mode=this.mode,mp=parseFloat(document.getElementById('rl-menu-price')?.value)||0,tpct=parseFloat(document.getElementById('rl-target-pct')?.value)||22;
@@ -211,5 +215,5 @@ S.RecipeLibrary={
     else App.data.recipes.push(recipe);
     App.saveKey('recipes').then(()=>{this.editId=null;this.rows=[];this.mode=null;this.renderList();});
   },
-  del(id){if(!confirm('Delete this recipe?'))return;App.data.recipes=(App.data.recipes||[]).filter(r=>r.id!==id);App.saveKey('recipes').then(()=>this.renderList());}
+  del(id){this._pendingDelIds=[id];const modal=document.getElementById('rl-del-modal');const msgEl=document.getElementById('rl-del-msg');if(msgEl)msgEl.textContent='Delete this recipe?';if(modal)modal.style.display='flex';document.getElementById('rl-del-cancel').onclick=()=>{modal.style.display='none';this._pendingDelIds=null;};document.getElementById('rl-del-confirm').onclick=()=>{modal.style.display='none';const ids=this._pendingDelIds||[];App.data.recipes=(App.data.recipes||[]).filter(r=>!ids.includes(r.id));App.saveKey('recipes').then(()=>this.renderList());this._pendingDelIds=null;};}
 };
