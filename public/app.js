@@ -168,7 +168,7 @@ const App = {
       'reports':       ['Reports & History', ''],
       'settings':      ['Settings', ''],
       'help':          ['Help & FAQ', ''],
-      'audit-tracker': ['Profit Audit', 'Monthly Audit History & Progress'],
+      'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
       'resources':     ['Resources', 'Tools, Templates & Checklists'],
       'getting-started': ['Getting Started', '30-Day Setup Checklist']
     };
