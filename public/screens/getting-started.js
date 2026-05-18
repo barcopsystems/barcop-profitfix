@@ -1,3 +1,4 @@
+
 'use strict';
 S.GettingStarted = {
   TASKS: [
