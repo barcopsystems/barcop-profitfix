@@ -472,76 +472,214 @@ Fill every field with real values extracted from the documents or calculated fro
 }
 
 function getExtractionPrompt_Revenue(appData) {
-  const settings = appData.settings || {};
-  return `You are generating a Bar Cop Revenue Audit. Analyze all submitted documents and extract variables for a scored PDF audit report.
+  const settings    = appData.settings || {};
+  const revSettings = appData.revenue_settings || {};
+  const targets     = revSettings.targets || {};
+  const weeks       = appData.revenue_weeks || [];
+  const servers     = revSettings.servers || [];
+  const menuItems   = appData.revenue_menu_items || [];
+  const serverChecks = appData.revenue_server_checks || [];
 
-Bar: ${settings.bar_name || 'Customer'}, ${settings.city_state || ''}
+  // Calculate averages from app data
+  const recentWeeks = weeks.slice(-4);
+  const avgCheckAvg   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.check_avg||0),0)/recentWeeks.length : null;
+  const avgLaborPct   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.labor_pct_blended||0),0)/recentWeeks.length : null;
+  const avgRPLH       = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.rplh_blended||0),0)/recentWeeks.length : null;
+  const avgCovers     = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.covers||0),0)/recentWeeks.length : null;
+  const avgBarRev     = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.bar_revenue||0),0)/recentWeeks.length : null;
+  const avgFloorRev   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.floor_revenue||0),0)/recentWeeks.length : null;
 
-Return ONLY valid JSON with these exact keys populated from submitted documents:
+  return `You are generating a Bar Cop Revenue Audit. Analyze all submitted documents AND the app data provided below. Extract the exact variables needed to generate a professional scored PDF audit report.
+
+APP DATA (from customer's app usage):
+- Bar Name: ${settings.bar_name || 'Not provided'}
+- City/State: ${settings.city_state || 'Not provided'}
+- Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
+- Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
+- Check Average Target: $${targets.check_avg || 35}
+- Bar Labor Target: ${targets.bar_labor_pct || 28}%
+- Kitchen Labor Target: ${targets.kitchen_labor_pct || 30}%
+- Floor Labor Target: ${targets.floor_labor_pct || 32}%
+- Lunch RPLH Target: $${targets.rplh_lunch || 50}
+- Dinner RPLH Target: $${targets.rplh_dinner || 75}
+- Bar RPLH Target: $${targets.rplh_bar || 65}
+- Event Close Rate Target: ${targets.event_close_rate || 40}%
+- Servers on roster: ${servers.length}
+- Menu items set up: ${menuItems.length}
+- Weeks of revenue data: ${weeks.length}
+- Server check entries: ${serverChecks.length}
+- Recent 4-week avg check average: ${avgCheckAvg ? '$'+avgCheckAvg.toFixed(2) : 'Not available'}
+- Recent 4-week avg labor %: ${avgLaborPct ? avgLaborPct.toFixed(1)+'%' : 'Not available'}
+- Recent 4-week avg RPLH: ${avgRPLH ? '$'+avgRPLH.toFixed(2) : 'Not available'}
+- Recent 4-week avg weekly covers: ${avgCovers ? Math.round(avgCovers) : 'Not available'}
+- Recent 4-week avg bar revenue: ${avgBarRev ? '$'+Math.round(avgBarRev) : 'Not available'}
+- Recent 4-week avg floor revenue: ${avgFloorRev ? '$'+Math.round(avgFloorRev) : 'Not available'}
+
+Analyze all uploaded documents (POS revenue reports, labor schedules, server sales reports, menu sales mix, event records) and extract ALL of the following variables. Use uploaded file data where available, use app data to fill gaps, use industry benchmarks for anything not determinable.
+
+SCORING GUIDE:
+- S1 Menu Engineering and Pricing: max 100 pts. 25pts beverage%, 20pts category mix, 20pts price review, 20pts high-margin items, 15pts item data quality.
+- S2 Labor Cost and Scheduling: max 100 pts. 25pts labor%, 20pts forecast-to-actual, 25pts RPLH, 15pts dept breakdown, 15pts timeclock.
+- S3 Check Average and Upselling: max 100 pts. 25pts check avg vs target, 25pts server spread, 15pts servers above avg, 20pts app attach, 15pts dessert attach.
+- S4 Events and Private Dining: N/A if no event data submitted.
+- S5 Server Performance Management: max 100 pts. 20pts report submitted, 25pts spread width, 15pts majority above avg, 20pts coaching process, 20pts pre-shift.
+- S6 Revenue Management Intelligence: scored 0-100 based on signals from all submitted data.
+
+Return ONLY a valid JSON object with ALL these exact keys — no markdown, no explanation, just the JSON:
+
 {
   "BAR_NAME": "${settings.bar_name || 'Customer Bar'}",
-  "BAR_CITY_STATE": "${settings.city_state || ''}",
-  "REVENUE_TIER": "Revenue range based on data",
-  "AUDIT_DATE": "Current month year",
+  "BAR_CITY_STATE": "${settings.city_state || 'Unknown'}",
+  "REVENUE_TIER": "Based on revenue data submitted",
+  "AUDIT_DATE": "Current month and year",
   "AUDIT_ID": "RFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}",
-  "AUDIT_PERIOD": "Period from submitted data",
-  "DATA_TIER_LABEL": "Tier based on data submitted",
-  "WEEKLY_GAP_AMT": "Weekly revenue gap",
-  "GAP_SOURCES": "Revenue gap sources",
+  "AUDIT_PERIOD": "Period covered by submitted data",
+  "DATA_TIER_LABEL": "Tier 1/2/3 based on data submitted",
+  "WEEKLY_GAP_AMT": "Calculated weekly revenue gap dollar amount",
+  "GAP_SOURCES": "Primary sources of recoverable revenue gap",
   "INDUSTRY_AVG": 61,
   "TARGET_SCORE": 65,
   "OVERALL_SCORE": 0,
+
   "SECTIONS_WITH_DATA": 0,
   "SECTIONS_PARTIAL": 0,
   "SECTIONS_NA": 0,
   "SECTION_DATA": [],
-  "S1_TIER": 1, "S1_TOTAL_REV_PERIOD": 0, "S1_BEV_REV_PERIOD": 0, "S1_FOOD_REV_PERIOD": 0,
-  "S1_BEV_REV_PCT": 0, "S1_FOOD_REV_PCT": 0, "S1_BEV_TARGET_PCT": 60, "S1_FOOD_TARGET_PCT": 40,
-  "S1_CHECK_AVG_BLENDED": 0, "S1_COVERS_PERIOD": 0, "S1_COVERS_MONTHLY": 0,
-  "S1_ITEM_DATA_SUBMITTED": false, "S1_PRICE_LIST_SUBMITTED": false,
-  "S1_CATEGORY_MIX_NOTE": "From submitted data", "S1_REVENUE_CONCENTRATION": "From submitted data",
-  "S1_PTS_BEV_PCT": 0, "S1_PTS_CATEGORY_MIX": 0, "S1_PTS_PRICE_REVIEW": 0,
-  "S1_PTS_HIGH_MARGIN": 0, "S1_PTS_ITEM_DATA": 0, "S1_SCORE": 0,
-  "S1_MONTHLY_GAP": 0, "S1_ANNUAL_GAP": 0,
-  "S1_BEV_OVER_TARGET": 0, "S1_CHECK_AVG_TARGET": 42, "S1_CHECK_AVG_GAP": 0,
-  "S2_TIER": 1, "S2_TOTAL_REV_PERIOD": 0, "S2_LABOR_PERIOD": 0, "S2_LABOR_PCT": 0,
-  "S2_LABOR_TARGET_LOW": 28, "S2_LABOR_TARGET_HIGH": 32, "S2_LABOR_GAP_PTS": 0,
-  "S2_LABOR_GAP_MONTHLY": 0, "S2_LABOR_SOURCE": "From submitted data",
-  "S2_AVG_HOURLY_WAGE": 0, "S2_HOURS_SCHEDULED": 0, "S2_RPLH": 0, "S2_RPLH_TARGET": 65,
-  "S2_RPLH_GAP": 0, "S2_SCHEDULE_SUBMITTED": false, "S2_DEPT_BREAKDOWN": false,
-  "S2_TIMECLOCK_SUBMITTED": false, "S2_WEEKLY_VARIANCE_NOTE": "From submitted data",
-  "S2_MONTHLY_GAP": 0, "S2_ANNUAL_GAP": 0,
-  "S2_PTS_LABOR_PCT": 0, "S2_PTS_FORECAST": 0, "S2_PTS_RPLH": 0,
-  "S2_PTS_DEPT": 0, "S2_PTS_TIMECLOCK": 0, "S2_SCORE": 0,
-  "S3_TIER": 1, "S3_TOTAL_REV_PERIOD": 0, "S3_COVERS_PERIOD": 0, "S3_COVERS_MONTHLY": 0,
-  "S3_CHECK_AVG_BLENDED": 0, "S3_CHECK_AVG_TARGET": 42, "S3_CHECK_AVG_GAP": 0,
-  "S3_NUM_SERVERS": 0, "S3_SERVER_LABELS": [], "S3_SERVER_CHECK_AVGS": [],
-  "S3_SERVER_COVERS": [], "S3_TOP_SERVER_LABEL": "Server A", "S3_TOP_CHECK_AVG": 0,
-  "S3_BOTTOM_SERVER_LABEL": "Server Z", "S3_BOTTOM_CHECK_AVG": 0,
-  "S3_HOUSE_AVG": 0, "S3_SPREAD": 0, "S3_SPREAD_TARGET": 10,
-  "S3_SERVERS_ABOVE": 0, "S3_SERVERS_AT_AVG": 0, "S3_SERVERS_BELOW": 0,
-  "S3_APP_ATTACH_RATE": null, "S3_DESSERT_ATTACH_RATE": null,
-  "S3_UPSELL_STANDARD_EXISTS": false, "S3_MONTHLY_GAP": 0, "S3_ANNUAL_GAP": 0,
-  "S3_PTS_CHECK_AVG": 0, "S3_PTS_SPREAD": 0, "S3_PTS_SERVERS_ABOVE": 0,
-  "S3_PTS_APP_ATTACH": 0, "S3_PTS_DESSERT_ATTACH": 0, "S3_SCORE": 0,
-  "S4_TIER": 0, "S4_EVENT_COUNT_PERIOD": null, "S4_AVG_EVENT_REVENUE": null,
-  "S4_TOTAL_EVENT_REVENUE": null, "S4_EVENT_REV_PCT_OF_TOTAL": null,
-  "S4_MINIMUM_COMPLIANCE_RATE": null, "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
-  "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10, "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
-  "S4_ANNUAL_REV_ESTIMATE": 0, "S4_EVENT_REV_POTENTIAL_LOW": 0,
-  "S4_EVENT_REV_POTENTIAL_HIGH": 0, "S4_SCORE": null,
-  "S5_TIER": 1, "S5_SERVER_REPORT_SUBMITTED": false, "S5_NUM_SERVERS": 0,
-  "S5_SERVER_LABELS": [], "S5_SERVER_CHECK_AVGS": [], "S5_SERVER_COVERS": [],
-  "S5_TOP_SERVER_LABEL": "Server A", "S5_TOP_CHECK_AVG": 0,
-  "S5_BOTTOM_SERVER_LABEL": "Server Z", "S5_BOTTOM_CHECK_AVG": 0,
-  "S5_HOUSE_AVG": 0, "S5_SPREAD": 0, "S5_SPREAD_TARGET": 10,
-  "S5_SERVERS_ABOVE": 0, "S5_SERVERS_AT_OR_NEAR": 0, "S5_SERVERS_BELOW": 0,
-  "S5_COACHING_PROCESS_EVIDENT": false, "S5_PRESHIFT_CONSISTENT": false,
-  "S5_DAYPART_DATA_SUBMITTED": false, "S5_GAP_BOTTOM_TO_AVG": 0,
-  "S5_MONTHLY_GAP": 0, "S5_ANNUAL_GAP": 0,
-  "S5_PTS_REPORT_SUBMITTED": 0, "S5_PTS_SPREAD": 0, "S5_PTS_MAJORITY_ABOVE": 0,
-  "S5_PTS_COACHING": 0, "S5_PTS_PRESHIFT": 0, "S5_SCORE": 0
-}`;
+
+  "S1_TIER": 1,
+  "S1_TOTAL_REV_PERIOD": 0,
+  "S1_BEV_REV_PERIOD": 0,
+  "S1_FOOD_REV_PERIOD": 0,
+  "S1_BEV_REV_PCT": 0,
+  "S1_FOOD_REV_PCT": 0,
+  "S1_BEV_TARGET_PCT": 60,
+  "S1_FOOD_TARGET_PCT": 40,
+  "S1_CHECK_AVG_BLENDED": ${avgCheckAvg || 0},
+  "S1_COVERS_PERIOD": 0,
+  "S1_COVERS_MONTHLY": ${avgCovers ? Math.round(avgCovers * 4.33) : 0},
+  "S1_ITEM_DATA_SUBMITTED": false,
+  "S1_PRICE_LIST_SUBMITTED": false,
+  "S1_CATEGORY_MIX_NOTE": "From submitted data",
+  "S1_REVENUE_CONCENTRATION": "From submitted data",
+  "S1_PTS_BEV_PCT": 0,
+  "S1_PTS_CATEGORY_MIX": 0,
+  "S1_PTS_PRICE_REVIEW": 0,
+  "S1_PTS_HIGH_MARGIN": 0,
+  "S1_PTS_ITEM_DATA": 0,
+  "S1_SCORE": 0,
+  "S1_MONTHLY_GAP": 0,
+  "S1_ANNUAL_GAP": 0,
+  "S1_BEV_OVER_TARGET": 0,
+  "S1_CHECK_AVG_TARGET": ${targets.check_avg || 42},
+  "S1_CHECK_AVG_GAP": 0,
+
+  "S2_TIER": 1,
+  "S2_TOTAL_REV_PERIOD": 0,
+  "S2_LABOR_PERIOD": 0,
+  "S2_LABOR_PCT": ${avgLaborPct || 0},
+  "S2_LABOR_TARGET_LOW": ${targets.bar_labor_pct || 28},
+  "S2_LABOR_TARGET_HIGH": ${targets.floor_labor_pct || 32},
+  "S2_LABOR_GAP_PTS": 0,
+  "S2_LABOR_GAP_MONTHLY": 0,
+  "S2_LABOR_SOURCE": "From submitted data",
+  "S2_AVG_HOURLY_WAGE": ${revSettings.avg_hourly_wage?.bar || 0},
+  "S2_HOURS_SCHEDULED": 0,
+  "S2_RPLH": ${avgRPLH || 0},
+  "S2_RPLH_TARGET": ${targets.rplh_dinner || 65},
+  "S2_RPLH_GAP": 0,
+  "S2_SCHEDULE_SUBMITTED": false,
+  "S2_DEPT_BREAKDOWN": false,
+  "S2_TIMECLOCK_SUBMITTED": false,
+  "S2_WEEKLY_VARIANCE_NOTE": "From submitted data",
+  "S2_MONTHLY_GAP": 0,
+  "S2_ANNUAL_GAP": 0,
+  "S2_PTS_LABOR_PCT": 0,
+  "S2_PTS_FORECAST": 0,
+  "S2_PTS_RPLH": 0,
+  "S2_PTS_DEPT": 0,
+  "S2_PTS_TIMECLOCK": 0,
+  "S2_SCORE": 0,
+
+  "S3_TIER": 1,
+  "S3_TOTAL_REV_PERIOD": 0,
+  "S3_COVERS_PERIOD": 0,
+  "S3_COVERS_MONTHLY": 0,
+  "S3_CHECK_AVG_BLENDED": ${avgCheckAvg || 0},
+  "S3_CHECK_AVG_TARGET": ${targets.check_avg || 42},
+  "S3_CHECK_AVG_GAP": 0,
+  "S3_NUM_SERVERS": ${servers.length || 0},
+  "S3_SERVER_LABELS": [],
+  "S3_SERVER_CHECK_AVGS": [],
+  "S3_SERVER_COVERS": [],
+  "S3_TOP_SERVER_LABEL": "Server A",
+  "S3_TOP_CHECK_AVG": 0,
+  "S3_BOTTOM_SERVER_LABEL": "Server Z",
+  "S3_BOTTOM_CHECK_AVG": 0,
+  "S3_HOUSE_AVG": ${avgCheckAvg || 0},
+  "S3_SPREAD": 0,
+  "S3_SPREAD_TARGET": 10,
+  "S3_SERVERS_ABOVE": 0,
+  "S3_SERVERS_AT_AVG": 0,
+  "S3_SERVERS_BELOW": 0,
+  "S3_APP_ATTACH_RATE": null,
+  "S3_DESSERT_ATTACH_RATE": null,
+  "S3_UPSELL_STANDARD_EXISTS": false,
+  "S3_MONTHLY_GAP": 0,
+  "S3_ANNUAL_GAP": 0,
+  "S3_PTS_CHECK_AVG": 0,
+  "S3_PTS_SPREAD": 0,
+  "S3_PTS_SERVERS_ABOVE": 0,
+  "S3_PTS_APP_ATTACH": 0,
+  "S3_PTS_DESSERT_ATTACH": 0,
+  "S3_SCORE": 0,
+
+  "S4_TIER": 0,
+  "S4_EVENT_COUNT_PERIOD": null,
+  "S4_AVG_EVENT_REVENUE": null,
+  "S4_TOTAL_EVENT_REVENUE": null,
+  "S4_EVENT_REV_PCT_OF_TOTAL": null,
+  "S4_MINIMUM_COMPLIANCE_RATE": null,
+  "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
+  "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10,
+  "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
+  "S4_ANNUAL_REV_ESTIMATE": ${(settings.annual_bar_revenue || 0) + (settings.annual_food_revenue || 0)},
+  "S4_EVENT_REV_POTENTIAL_LOW": 0,
+  "S4_EVENT_REV_POTENTIAL_HIGH": 0,
+  "S4_SCORE": null,
+
+  "S5_TIER": 1,
+  "S5_SERVER_REPORT_SUBMITTED": false,
+  "S5_NUM_SERVERS": ${servers.length || 0},
+  "S5_SERVER_LABELS": [],
+  "S5_SERVER_CHECK_AVGS": [],
+  "S5_SERVER_COVERS": [],
+  "S5_TOP_SERVER_LABEL": "Server A",
+  "S5_TOP_CHECK_AVG": 0,
+  "S5_BOTTOM_SERVER_LABEL": "Server Z",
+  "S5_BOTTOM_CHECK_AVG": 0,
+  "S5_HOUSE_AVG": ${avgCheckAvg || 0},
+  "S5_SPREAD": 0,
+  "S5_SPREAD_TARGET": 10,
+  "S5_SERVERS_ABOVE": 0,
+  "S5_SERVERS_AT_OR_NEAR": 0,
+  "S5_SERVERS_BELOW": 0,
+  "S5_COACHING_PROCESS_EVIDENT": false,
+  "S5_PRESHIFT_CONSISTENT": false,
+  "S5_DAYPART_DATA_SUBMITTED": false,
+  "S5_GAP_BOTTOM_TO_AVG": 0,
+  "S5_MONTHLY_GAP": 0,
+  "S5_ANNUAL_GAP": 0,
+  "S5_PTS_REPORT_SUBMITTED": 0,
+  "S5_PTS_SPREAD": 0,
+  "S5_PTS_MAJORITY_ABOVE": 0,
+  "S5_PTS_COACHING": 0,
+  "S5_PTS_PRESHIFT": 0,
+  "S5_SCORE": 0,
+
+  "S6_SCORE": 50
+}
+
+Fill every field with real values extracted from the documents or calculated from app data. Use industry benchmarks where data is missing. For S3 and S5 server arrays, extract actual server names and check averages from the Server Sales Report if submitted. Make all gap calculations specific dollar amounts based on actual covers and revenue data.`;
 }
 
 function getExtractionPrompt_Traffic(appData) {
