@@ -108,8 +108,8 @@ S.BarProducts = {
       + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
       + '<div id="bp-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this product?</div>'
       + '<div style="display:flex;gap:10px;justify-content:center;">'
+      + '<button class="btn btn-primary" id="bp-del-confirm">Delete</button>'
       + '<button class="btn btn-ghost" id="bp-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="bp-del-confirm">Delete</button>'
       + '</div></div></div>';
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
