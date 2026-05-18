@@ -123,7 +123,7 @@ S.Dashboard = {
     let startHereHtml = '';
     if (!targetsSet) {
       const t = App.data.settings.targets || {};
-      startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid var(--gold);background:rgba(201,168,76,0.04);">'
+      startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Industry benchmarks are already filled in below. Adjust them to match your operation and hit Save. You can always update these later in Settings.</div>'
