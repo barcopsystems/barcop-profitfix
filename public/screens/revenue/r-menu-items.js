@@ -85,8 +85,6 @@ S.RevenueMenuItems = {
 
   renderList(container, actions) {
     const items = App.data.revenue_menu_items || [];
-    const cats  = ['All','Appetizers','Entrees','Desserts','Cocktails','Beer','Wine','NA Beverages','Specials','Other'];
-
     const incomplete = items.filter(i => !i.price || !i.cost).length;
 
     const rows = items.map((item, idx) => {
@@ -94,6 +92,7 @@ S.RevenueMenuItems = {
       const pct = item.price && item.cost ? (item.cost / item.price * 100).toFixed(1) : null;
       const ok  = item.price && item.cost;
       return '<tr class="' + (!ok ? 'row-incomplete' : '') + '">'
+        + '<td><input type="checkbox" class="ri-chk" data-id="' + item.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
         + '<td style="font-weight:600;color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + (!ok ? ' <span style="font-size:10px;font-weight:700;color:var(--red);">INCOMPLETE</span>' : '') + '</td>'
         + '<td>' + esc(item.category||'') + '</td>'
         + '<td>' + (item.price ? App.fmtCurrency(item.price) : ' ') + '</td>'
@@ -105,11 +104,17 @@ S.RevenueMenuItems = {
         + '<button class="btn btn-ghost btn-sm ri-edit" data-idx="' + idx + '" style="margin-right:4px;">Edit</button>'
         + '<button class="btn btn-danger btn-sm ri-del" data-idx="' + idx + '">Del</button>'
         + '</td></tr>';
-    }).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No menu items yet. Add your first item to get started.</td></tr>';
+    }).join('') || '<tr><td colspan="9" style="color:var(--t3);text-align:center;padding:14px;">No menu items yet. Add your first item to get started.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
       + (incomplete > 0 ? '<div class="alert-bar"><div class="alert-text">' + incomplete + ' item' + (incomplete > 1 ? 's' : '') + ' missing price or cost. Incomplete items cannot be used in Menu Engineering.</div></div>' : '')
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ri-sel-all">Select All</button>'
+      + '<button class="btn btn-danger btn-sm" id="ri-del-sel" style="display:none;">Delete Selected</button>'
+      + '<span id="ri-sel-count" style="font-size:11px;color:var(--t3);"></span>'
+      + '</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th style="width:36px;"><input type="checkbox" id="ri-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
       + '<th>Item Name</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost % ' + tt('r-cost-pct') + '</th><th>Contrib. Margin ' + tt('r-contrib-margin') + '</th><th>Wkly Covers ' + tt('r-wkly-covers') + '</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
@@ -124,6 +129,27 @@ S.RevenueMenuItems = {
         await App.saveKey('revenue_menu_items');
         this.render(container, actions);
       });
+    });
+
+    // Bulk delete
+    const updateSel = () => {
+      const checked = container.querySelectorAll('.ri-chk:checked');
+      const delBtn  = document.getElementById('ri-del-sel');
+      const count   = document.getElementById('ri-sel-count');
+      if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
+      if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
+    };
+    document.getElementById('ri-chk-all')?.addEventListener('change', e => {
+      container.querySelectorAll('.ri-chk').forEach(c => { c.checked = e.target.checked; });
+      updateSel();
+    });
+    container.addEventListener('change', e => { if(e.target.classList.contains('ri-chk')) updateSel(); });
+    document.getElementById('ri-del-sel')?.addEventListener('click', async () => {
+      const ids = [...container.querySelectorAll('.ri-chk:checked')].map(c => c.dataset.id);
+      if (!ids.length) return;
+      App.data.revenue_menu_items = (App.data.revenue_menu_items||[]).filter(i => !ids.includes(i.id));
+      await App.saveKey('revenue_menu_items');
+      this.render(container, actions);
     });
   },
 
