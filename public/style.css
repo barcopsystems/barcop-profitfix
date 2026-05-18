@@ -302,7 +302,7 @@ input,select,textarea{color-scheme:dark;}
 .sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
 
 .sum-tbl td{padding:8px 12px;text-align:left;color:var(--t2);border-bottom:1px solid rgba(255,255,255,0.03);}
-.lb-tbl td{padding:14px 12px;}
+.lb-tbl td{padding:14px 12px !important;}
 .sum-tbl td:first-child{text-align:left;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.38);}
 .sum-tbl .total td{color:var(--w);font-weight:600;border-top:1px solid var(--b1);}
 
