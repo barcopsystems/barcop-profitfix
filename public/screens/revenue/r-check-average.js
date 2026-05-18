@@ -33,14 +33,11 @@ S.RevenueCheckAverage = {
     const serverRows = serverStats.map((sv, i) => {
       const vs     = sv.checkAvg - targetCA;
       const vsTeam = teamAvg ? sv.checkAvg - teamAvg : null;
-      const annGap = sv.totalCovers > 0 && spread
-        ? (sv.checkAvg - (teamAvg||targetCA)) * (sv.totalCovers / (sv.weeks||1)) * 52
-        : null;
       return '<tr>'
         + '<td style="font-weight:700;color:var(--t1);">' + esc(sv.name) + '</td>'
         + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + (sv.checkAvg >= targetCA ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(sv.checkAvg) + '</td>'
         + '<td style="color:' + (vs >= 0 ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (vs >= 0 ? '+' : '') + App.fmtCurrency(vs) + '</td>'
-        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam != null ? (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) : ' ') + '</td>'
+        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam != null ? (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) : '&mdash;') + '</td>'
         + '<td>' + Math.round(sv.totalCovers) + '</td>'
         + '<td>' + sv.weeks + '</td>'
         + '</tr>';
@@ -57,26 +54,25 @@ S.RevenueCheckAverage = {
       + '<div id="rca-result"></div>'
       + '</div>';
 
-    // Weekly trend
+    // Weekly trend table
     const trendRows = weeks.slice().reverse().slice(0,12).map(w =>
       '<tr><td>Wk ' + w.week_num + '</td>'
       + '<td>' + (w.period_end||'').slice(0,10) + '</td>'
-      + '<td>' + (w.covers||' ') + '</td>'
-      + '<td class="' + (w.check_avg >= targetCA ? 'pos' : 'neg') + ' val">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : ' ') + '</td>'
-      + '<td style="color:' + ((w.check_avg||0) >= targetCA ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (w.check_avg ? ((w.check_avg - targetCA) >= 0 ? '+' : '') + App.fmtCurrency(w.check_avg - targetCA) : ' ') + '</td>'
+      + '<td>' + (w.covers||'&mdash;') + '</td>'
+      + '<td class="' + (w.check_avg >= targetCA ? 'pos' : 'neg') + ' val">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '&mdash;') + '</td>'
+      + '<td style="color:' + ((w.check_avg||0) >= targetCA ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (w.check_avg ? ((w.check_avg - targetCA) >= 0 ? '+' : '') + App.fmtCurrency(w.check_avg - targetCA) : '&mdash;') + '</td>'
       + '</tr>'
     ).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
-      // Summary cards
       + '<div class="metric-grid" style="margin-bottom:16px;">'
       + '<div class="metric-card"><div class="metric-label">Target Check Average</div><div class="metric-val">' + App.fmtCurrency(targetCA) + '</div><div class="metric-target">Your set target</div></div>'
-      + '<div class="metric-card"><div class="metric-label">Team Average</div><div class="metric-val ' + (teamAvg == null ? '' : teamAvg >= targetCA ? 'on-target' : 'over-target') + '">' + (teamAvg ? App.fmtCurrency(teamAvg) : ' ') + '</div><div class="metric-target">All servers</div></div>'
+      + '<div class="metric-card"><div class="metric-label">Team Average</div><div class="metric-val ' + (teamAvg == null ? '' : teamAvg >= targetCA ? 'on-target' : 'over-target') + '">' + (teamAvg ? App.fmtCurrency(teamAvg) : '&mdash;') + '</div><div class="metric-target">All servers</div></div>'
       + (spread != null ? '<div class="metric-card"><div class="metric-label">Performance Spread</div><div class="metric-val ' + (spread > 10 ? 'over-target' : 'on-target') + '">' + App.fmtCurrency(spread) + '</div><div class="metric-target">Top vs bottom</div></div>' : '')
       + (topServer ? '<div class="metric-card"><div class="metric-label">Top Server</div><div class="metric-val on-target">' + App.fmtCurrency(topServer.checkAvg) + '</div><div class="metric-target">' + esc(topServer.name) + '</div></div>' : '')
       + '</div>'
-      // Server table
-      + '<div class="sh">Server Check Average</div>'
+      + this.buildChart(weeks.slice(-8), targetCA)
+      + '<div class="sh" style="margin-top:16px;">Server Check Average</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Server</th><th>Check Avg ' + tt('r-check-avg') + '</th><th>vs Target</th><th>vs Team</th><th>Total Covers ' + tt('r-covers') + '</th><th>Weeks</th></tr></thead><tbody>' + serverRows + '</tbody></table></div>'
       + upsellCalc
       + '<div class="sh" style="margin-top:16px;">Weekly Check Average Trend</div>'
@@ -99,5 +95,83 @@ S.RevenueCheckAverage = {
     };
     ['rca-cur','rca-tgt','rca-cov'].forEach(id => document.getElementById(id)?.addEventListener('input', calcUpsell));
     calcUpsell();
+  },
+
+  buildChart(weeks, targetCA) {
+    if (weeks.length < 2) return '<div class="chart-card" style="padding:24px 24px 20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:32px;">8-Week Check Average Trend</div>'
+      + '<div style="text-align:center;padding:24px 0 8px;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see trend</div></div>';
+
+    const W=800, H=200, PAD={t:28,r:60,b:40,l:52};
+    const cw=W-PAD.l-PAD.r, ch=H-PAD.t-PAD.b;
+
+    const caS = weeks.map(w => w.check_avg ?? null);
+    const allV = caS.filter(v => v != null);
+    if (!allV.length) return '';
+
+    const minY = Math.max(0, Math.floor(Math.min(...allV, targetCA) - 3));
+    const maxY = Math.ceil(Math.max(...allV, targetCA) + 4);
+    const xs = i => PAD.l + (weeks.length > 1 ? (i / (weeks.length - 1)) * cw : cw / 2);
+    const ys = v => PAD.t + ch - ((v - minY) / (maxY - minY)) * ch;
+
+    const smoothPath = pts => {
+      const valid = pts.map((v,i) => v != null ? {x:xs(i), y:ys(v)} : null).filter(Boolean);
+      if (valid.length < 2) return valid.length === 1 ? 'M'+valid[0].x+','+valid[0].y : '';
+      let d = 'M'+valid[0].x.toFixed(1)+','+valid[0].y.toFixed(1);
+      for (let i=1; i<valid.length; i++) {
+        const cp = (valid[i].x - valid[i-1].x) * 0.35;
+        d += ' C'+(valid[i-1].x+cp).toFixed(1)+','+valid[i-1].y.toFixed(1)+' '+(valid[i].x-cp).toFixed(1)+','+valid[i].y.toFixed(1)+' '+valid[i].x.toFixed(1)+','+valid[i].y.toFixed(1);
+      }
+      return d;
+    };
+
+    const areaPath = pts => {
+      const valid = pts.map((v,i) => v != null ? {x:xs(i), y:ys(v)} : null).filter(Boolean);
+      if (valid.length < 2) return '';
+      let d = 'M'+valid[0].x.toFixed(1)+','+ys(minY).toFixed(1)+' L'+valid[0].x.toFixed(1)+','+valid[0].y.toFixed(1);
+      for (let i=1; i<valid.length; i++) {
+        const cp = (valid[i].x - valid[i-1].x) * 0.35;
+        d += ' C'+(valid[i-1].x+cp).toFixed(1)+','+valid[i-1].y.toFixed(1)+' '+(valid[i].x-cp).toFixed(1)+','+valid[i].y.toFixed(1)+' '+valid[i].x.toFixed(1)+','+valid[i].y.toFixed(1);
+      }
+      d += ' L'+valid[valid.length-1].x.toFixed(1)+','+ys(minY).toFixed(1)+' Z';
+      return d;
+    };
+
+    const range = maxY - minY, tickStep = range <= 10 ? 2 : range <= 20 ? 4 : 5;
+    const ticks = []; for (let v=Math.ceil(minY/tickStep)*tickStep; v<=maxY; v+=tickStep) ticks.push(v);
+    const yTicks = ticks.map(v =>
+      '<line x1="'+PAD.l+'" y1="'+ys(v).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(v).toFixed(1)+'" stroke="rgba(255,255,255,0.04)"/>'
+      + '<text x="'+(PAD.l-6)+'" y="'+(ys(v)+4).toFixed(1)+'" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">$'+v+'</text>'
+    ).join('');
+
+    const xLabels = weeks.map((w,i) =>
+      '<text x="'+xs(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'
+      + (w.period_end ? w.period_end.slice(5).replace('-','/') : 'Wk'+w.week_num) + '</text>'
+    ).join('');
+
+    const caLabels = caS.map((v,i) => {
+      if (v == null) return '';
+      const x = xs(i), y = ys(v);
+      const above = y > PAD.t + 16;
+      return '<text x="'+x.toFixed(1)+'" y="'+(above ? y-8 : y+16).toFixed(1)+'" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">$'+v.toFixed(0)+'</text>';
+    }).join('');
+
+    const uid = 'rca'+Math.random().toString(36).slice(2,6);
+
+    return '<div class="chart-card" style="padding:20px 24px 16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Check Average Trend</div>'
+      + '<div style="display:flex;gap:16px;">'
+      + '<span style="font-size:10px;color:var(--gold);font-weight:600;">-- Check Avg</span>'
+      + '<span style="font-size:10px;color:rgba(201,168,76,0.4);font-weight:600;">- - Target $' + targetCA + '</span>'
+      + '</div></div>'
+      + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
+      + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.22"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/></linearGradient></defs>'
+      + yTicks
+      + '<line x1="'+PAD.l+'" y1="'+ys(targetCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(targetCA).toFixed(1)+'" stroke="rgba(201,168,76,0.3)" stroke-width="1.5" stroke-dasharray="5,4"/>'
+      + (areaPath(caS) ? '<path d="'+areaPath(caS)+'" fill="url(#caGrad'+uid+')"/>' : '')
+      + '<path d="'+smoothPath(caS)+'" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + caLabels + xLabels
+      + '</svg></div>';
   }
 };
