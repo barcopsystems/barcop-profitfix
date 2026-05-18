@@ -80,7 +80,8 @@ S.RevenueThisWeek = {
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
       + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
-      + this.nav(false, true) + '</div></div>';
+      + '</div>'
+      + this.nav(false, true) + '</div>';
   },
 
   step2() {
@@ -231,8 +232,8 @@ S.RevenueThisWeek = {
       + (laborPct ? row('Blended Labor %', laborPct + '%', '') : '')
       + (rplh ? row('Blended RPLH', App.fmtCurrency(parseFloat(rplh)), '') : '')
       + (teamAvg ? row('Team Check Average', App.fmtCurrency(teamAvg), validServers.length + ' servers') : '')
-      + '</div>'
-      + this.nav(true, false, 'Save Week') ;
+      + this.nav(true, false, 'Save Week')
+      + '</div>';
   },
 
   wireStep(step) {
