@@ -22,6 +22,7 @@ S.RecipeLibrary={
 
   render(container,actions){
     this.container=container;
+    this.actions=actions;
     const btn=document.createElement('button');btn.className='btn btn-primary btn-sm';btn.textContent='New Recipe';
     btn.addEventListener('click',()=>this.showModeSelector());actions.appendChild(btn);
     this.renderList();
@@ -48,7 +49,7 @@ S.RecipeLibrary={
         +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th style="width:36px;"><input type="checkbox" id="rl-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     const rlModal='<div id="rl-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="rl-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this recipe?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-ghost" id="rl-del-cancel">Cancel</button><button class="btn btn-danger" id="rl-del-confirm">Delete</button></div></div></div>';
-    this.container.innerHTML='<div class="screen">'+html+'<div id="rl-form"></div></div>'+rlModal;
+    this.container.innerHTML='<div class="screen">'+html+'</div>'+rlModal;
     this.container.onclick=ev=>{
       if(ev.target.closest('.rl-edit'))this.editRecipe(ev.target.closest('.rl-edit').dataset.id);
       if(ev.target.closest('.rl-del'))this.del(ev.target.closest('.rl-del').dataset.id);
@@ -110,28 +111,33 @@ S.RecipeLibrary={
     });
   },
   showModeSelector(){
-    const fa=document.getElementById('rl-form');if(!fa)return;
     const card=(id,title,desc,eg)=>'<div class="rl-mode-card" id="'+id+'" style="cursor:pointer;background:var(--surface);border:1px solid var(--b1);border-radius:var(--r);padding:20px;transition:all 0.15s;flex:1;min-width:200px;display:flex;flex-direction:column;">'
       +'<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:8px;">'+title+'</div>'
       +'<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px;">'+desc+'</div>'
       +'<div style="font-size:11px;color:var(--t3);font-style:italic;">'+eg+'</div></div>';
-    fa.innerHTML='<div class="divider"></div><div class="sh">What are you costing out?</div>'
+    this.container.innerHTML='<div class="screen"><div class="sh">What are you costing out?</div>'
       +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:stretch;">'
       +card('rl-mode-single','Single Drink','Cost one cocktail made to order. Quantities in pours.','House Margarita, Old Fashioned, Espresso Martini')
       +card('rl-mode-batch','Batch Cocktail','Cost a large recipe made in advance. Spirits + mixers. Enter yield and serving size.','Frozen Margarita Mix (1 gal), Sangria Batch, Punch Bowl')
       +card('rl-mode-food','Food Plate','Cost a food dish from kitchen ingredients.','Chicken Wings, Burger, Nachos')
-      +'</div><button class="btn btn-ghost btn-sm" id="rl-mode-cancel">Cancel</button>';
-    fa.querySelectorAll('.rl-mode-card').forEach(card=>{
+      +'</div><button class="btn btn-ghost btn-sm" id="rl-mode-cancel">Cancel</button></div>';
+    this.container.querySelectorAll('.rl-mode-card').forEach(card=>{
       card.addEventListener('mouseenter',()=>{card.style.borderColor='var(--gold)';card.style.background='rgba(201,168,76,0.04)';});
       card.addEventListener('mouseleave',()=>{card.style.borderColor='var(--b1)';card.style.background='var(--surface)';});
+      card.addEventListener('click',()=>{
+        if(card.id==='rl-mode-single')this.showForm('single');
+        if(card.id==='rl-mode-batch')this.showForm('batch');
+        if(card.id==='rl-mode-food')this.showForm('food');
+      });
     });
+    document.getElementById('rl-mode-cancel')?.addEventListener('click',()=>this.render(this.container,this.actions));
   },
   editRecipe(id){const r=(App.data.recipes||[]).find(r=>r.id===id);if(r)this.showForm(r.mode||'single',id);},
   showForm(mode,id){
     this.mode=mode;this.editId=id||null;
     const r=id?(App.data.recipes||[]).find(r=>r.id===id):null;
     const target=App.data.settings.targets?.bar_pour_cost_pct??22;
-    const fa=document.getElementById('rl-form');if(!fa)return;
+
     this.rows=r?.ingredients?r.ingredients.map(i=>({...i})):[{product_id:'',quantity:'',cost_per_unit:0,total_cost:0}];
     const mL={single:'Single Drink',batch:'Batch Cocktail',food:'Food Plate'};
     const catOpts=(mode==='food'?['Food Plate','Appetizer','Entree','Dessert','Side','Other']:['Cocktail','Shot','Beer','Wine','Non-Alcoholic','Other']).map(c=>'<option'+(r?.category===c?' selected':'')+'>'+c+'</option>').join('');
@@ -151,7 +157,7 @@ S.RecipeLibrary={
       ? '<div class="f" style="width:120px;flex-shrink:0;"><label>Plates Per Batch '+tt('plate-yield')+'</label><input type="number" id="rl-plate-yield" value="'+(r?.plate_yield||1)+'" min="1" /></div>'
       : '';
 
-    fa.innerHTML='<div class="divider"></div>'
+    this.container.innerHTML='<div class="screen">'
       +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
       +'<div class="sh" style="margin-bottom:0;">'+(id?'Edit':'New')+' — '+mL[mode]+'</div>'
       +(!id?'<button class="btn btn-ghost btn-sm" id="rl-switch" style="padding:3px 8px;font-size:9px;">Change Type</button>':'')
