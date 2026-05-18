@@ -57,7 +57,7 @@ S.Hub = {
     // Identical padding/size for both active and locked cards
     const CARD_STYLE = `background:var(--surface);border-radius:10px;padding:24px;display:flex;flex-direction:column;height:380px;overflow:hidden;min-width:0;`;
 
-    const activeCard = (title, desc, scoreVal, trendVal, stats, enterScreen) => `
+    const activeCard = (title, desc, scoreVal, trendVal, stats, enterScreen, mod) => `
       <div style="${CARD_STYLE}border:1px solid rgba(201,168,76,0.4);box-shadow:0 0 24px rgba(201,168,76,0.05);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
           <div style="flex:1;padding-right:12px;">
@@ -69,7 +69,7 @@ S.Hub = {
         </div>
         <div style="height:22px;margin-bottom:10px;">${trendPill(trendVal)}</div>
         <div style="flex:1;margin:0 0 18px;">${stats}</div>
-        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._enter('${enterScreen}')">Enter ${title}</button>
+        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._enter('${enterScreen}', '${mod}')">Enter ${title}</button>
       </div>`;
 
     const lockedCard = (title, desc, stats, module) => `
@@ -144,9 +144,9 @@ S.Hub = {
         </div>
 
         <div style="width:100%;max-width:920px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
-          ${hasP?activeCard('Profit Recovery','Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.',profitScore,profitTrend,profitStats,'dashboard'):lockedCard('Profit Recovery','Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.',profitStats,'profit')}
-          ${hasR?activeCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',null,null,revenueStats,'dashboard'):lockedCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',revenueStats,'revenue')}
-          ${hasT?activeCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',null,null,trafficStats,'dashboard'):lockedCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',trafficStats,'traffic')}
+          ${hasP?activeCard('Profit Recovery','Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.',profitScore,profitTrend,profitStats,'dashboard','profit'):lockedCard('Profit Recovery','Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.',profitStats,'profit')}
+          ${hasR?activeCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',null,null,revenueStats,'r-dashboard','revenue'):lockedCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',revenueStats,'revenue')}
+          ${hasT?activeCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',null,null,trafficStats,'t-dashboard','traffic'):lockedCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',trafficStats,'traffic')}
         </div>
 
         ${fullPlatformStrip}
@@ -176,7 +176,7 @@ S.Hub = {
     document.getElementById('hub-signout')?.addEventListener('click', async () => { await DB.signOut(); });
   },
 
-  _enter(screen) { App.showApp(); App.navigate(screen); },
+  _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); },
 
   _upgrade(module, title, price) {
     const modal = document.getElementById('hub-modal');
