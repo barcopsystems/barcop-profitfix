@@ -236,6 +236,7 @@ const DB = {
         _targets_saved: false
       },
       revenue_weeks: [],
+      revenue_audits: [],
       revenue_server_checks: [],
       revenue_menu_items: [],
       revenue_price_log: [],
