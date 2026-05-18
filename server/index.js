@@ -827,7 +827,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             .single();
           existingModules = subData?.active_modules || [];
         } else {
-          // Brand new subscriber — create account and send password setup email
+          // Brand new subscriber — create account silently
+          // Customer uses Forgot Password on the login screen to set their password
           const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
             email,
             email_confirm: true,
@@ -837,12 +838,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             console.error('Failed to create Supabase user:', createErr.message);
           } else {
             userId = created.user.id;
-            // Send password setup email using admin client
-            const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-              redirectTo: 'https://barcop-profitfix-production.up.railway.app/',
-            });
-            if (resetErr) console.error('Failed to send password setup email:', resetErr.message);
-            else console.log('Password setup email sent to:', email);
+            console.log('Account created for new subscriber:', email);
           }
         }
       }
