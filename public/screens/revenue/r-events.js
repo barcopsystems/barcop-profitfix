@@ -94,11 +94,11 @@ S.RevenueEvents = {
     const rows = rc.map((r, i) =>
       '<tr><td style="font-weight:600;">' + esc(r.package_name||'') + '</td>'
       + '<td>' + esc(r.event_type||'') + '</td>'
-      + '<td>' + (r.min_covers||' ') + ' – ' + (r.max_covers||' ') + '</td>'
+      + '<td>' + (r.min_covers||' ') + ' - ' + (r.max_covers||' ') + '</td>'
       + '<td>' + (r.fb_minimum ? App.fmtCurrency(r.fb_minimum) : ' ') + '</td>'
       + '<td>' + (r.room_fee ? App.fmtCurrency(r.room_fee) : 'Included') + '</td>'
       + '<td>' + (r.per_head ? App.fmtCurrency(r.per_head) : ' ') + '</td>'
-      + '<td><button class="btn btn-danger btn-sm" onclick="S.RevenueEvents._delRC(' + i + ', this)">Del</button></td>'
+      + '<td><button class="btn btn-danger btn-sm" data-del-rc="' + i + '">Del</button></td>'
       + '</tr>'
     ).join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No rate cards yet.</td></tr>';
 
@@ -120,6 +120,15 @@ S.RevenueEvents = {
       + '<div class="tbl-wrap" style="margin-top:16px;"><table class="tbl"><thead><tr><th>Package</th><th>Type</th><th>Covers</th><th>F&B Min</th><th>Room Fee</th><th>Per Head</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
 
+    container.addEventListener('click', e => {
+      const btn = e.target.closest('[data-del-rc]');
+      if (!btn) return;
+      const i = parseInt(btn.dataset.delRc, 10);
+      if (!confirm('Delete this package?')) return;
+      App.data.revenue_rate_cards.splice(i, 1);
+      App.saveKey('revenue_rate_cards').then(() => this.render(container, actions));
+    }, { once: true });
+
     document.getElementById('rrc-add')?.addEventListener('click', async () => {
       const name = document.getElementById('rrc-name')?.value.trim();
       if (!name) return;
@@ -140,15 +149,7 @@ S.RevenueEvents = {
     });
   },
 
-  _delRC(i, btn) {
-    if (!confirm('Delete this package?')) return;
-    App.data.revenue_rate_cards.splice(i, 1);
-    App.saveKey('revenue_rate_cards').then(() => {
-      const c = document.getElementById('content-area');
-      const a = document.getElementById('topbar-actions');
-      S.RevenueEvents.render(c, a);
-    });
-  },
+
 
   renderCateringCalc(container, actions) {
     container.innerHTML = '<div class="screen"><div class="card">'
