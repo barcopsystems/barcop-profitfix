@@ -144,47 +144,46 @@ S.AuditTracker = {
     modal.id = 'at-intake-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;overflow-y:auto;display:flex;justify-content:center;padding:20px;';
 
-    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:32px;max-width:680px;width:100%;margin:auto;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--b2);">'
-      + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Profit Audit</div>'
-      + '<div style="font-size:16px;font-weight:700;color:var(--w);">Upload Your Data Files</div></div>'
-      + '<button id="at-intake-close" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">×</button>'
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;padding:32px;max-width:680px;width:100%;margin:auto;position:relative;">'
+      + '<button id="at-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Profit Audit</div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload your data files below. The POS Beverages report is required. Every additional file you submit unlocks more scored sections and more specific action items. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
+      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(s.city_state) + '</div>' : '')
       + '</div>'
 
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">'
-      + 'Upload your data files below. The minimum required is your POS Beverages sales report (4 weeks). '
-      + 'Every additional file you submit unlocks more scored sections and more specific action items in your audit. '
-      + '<strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong>'
-      + '</div>'
+      // Bar Data
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Bar Data</div>'
+      + this.renderFileSection('required', 'POS Sales Report — Beverages',        'at-f-pos-bev',   'Daily or weekly beverage sales by category. Export from your POS as Excel or CSV. Minimum 4 weeks. Repeat audit customers — send the full period since your last audit.',            'Unlocks: Revenue baseline, category split, estimated gap calculations')
+      + this.renderFileSection('optional', 'Bar Inventory Count Sheets',           'at-f-bar-inv',   'Opening count, purchases, and closing count per product. Excel, CSV, or PDF. Minimum 1 week. Best results: 4 weeks.',                                                              'Unlocks: Actual pour cost %, theoretical vs. actual variance by product')
+      + this.renderFileSection('optional', 'POS Exception Report — Voids and Comps','at-f-exception','Voids, comps, and no-sales by employee. Excel or CSV. Send the full audit period.',                                                                                              'Unlocks: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
+      + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',   'at-f-cash',      'Daily or weekly cash variance by shift. Excel or PDF. Send the full audit period.',                                                                                              'Unlocks: Cash handling gap analysis by shift')
+      + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv', 'All beverage deliveries for the audit period. PDF or Excel.',                                                                                                                    'Unlocks: Delivery accuracy rate, vendor short analysis')
+      + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices', 'at-f-vendor',    'Current pricing from your distributors, or most recent invoices. PDF or Excel. 4 weeks identifies recent changes. 12 weeks shows the full drift pattern.',                     'Unlocks: Price drift analysis, distributor negotiation data')
 
-      // Operator info
-      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:14px;margin-bottom:18px;">'
-      + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Confirming Audit For</div>'
-      + '<div style="font-size:13px;color:var(--w);font-weight:700;">' + esc(s.bar_name||'Your Bar') + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);">' + esc(s.city_state||'') + '</div>'
-      + '</div>'
+      // Kitchen Data
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Kitchen Data</div>'
+      + this.renderFileSection('optional', 'POS Sales Report — Food',              'at-f-pos-food',  'Daily or weekly food sales by category. Send the same period as your beverage POS report.',                                                                                      'Unlocks: Food cost benchmarking, category-level analysis')
+      + this.renderFileSection('optional', 'Kitchen Inventory Count Sheets',       'at-f-kit-inv',   'Opening count, purchases, and closing count by product. Excel, CSV, or PDF. Minimum 1 week.',                                                                                   'Unlocks: Actual food cost %, kitchen variance, spoilage rate')
+      + this.renderFileSection('optional', 'Food Invoices and Delivery Receipts',  'at-f-food-inv',  'All food deliveries during the audit period. PDF or Excel.',                                                                                                                    'Unlocks: Food delivery accuracy, produce par analysis')
+      + this.renderFileSection('highlight','Recipe Costing Sheet',                 'at-f-recipe',    'Your current recipe costs. Without it food cost analysis relies on category-level counts only. With it the audit calculates yield-corrected cost on every dish and ranks every repricing opportunity by annual dollar impact. Excel or PDF.',  'Unlocks: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
+      + this.renderFileSection('optional', 'Daily Prep Sheets or Production Logs', 'at-f-prep',      'Shows what was prepped vs. what was used by shift. Excel or PDF.',                                                                                                              'Unlocks: Production loss analysis, prep yield by station')
+      + this.renderFileSection('optional', 'Daily Waste Logs',                     'at-f-waste',     'Waste by category for the audit period. Excel or CSV.',                                                                                                                         'Unlocks: Weekly spoilage cost, waste pattern diagnosis')
 
-      // File upload sections
-      + this.renderFileSection('required', 'POS Sales Report — Beverages', 'at-f-pos-bev', 'Daily or weekly beverage sales by category. Export from your POS (Toast, Square, etc.) as Excel or CSV. Minimum 4 weeks.', true)
-      + this.renderFileSection('optional', 'Bar Inventory Count Sheets', 'at-f-bar-inv', 'Opening count, purchases, and closing count per product. Excel, CSV, or PDF. Unlocks: Actual pour cost %, variance by product.', false)
-      + this.renderFileSection('optional', 'POS Exception Report (Voids & Comps)', 'at-f-exception', 'Voids, comps, and no-sales by employee. Excel or CSV. Unlocks: Theft risk indicators, behavioral patterns.', false)
-      + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records', 'at-f-cash', 'Daily or weekly cash variance by shift. Excel or PDF. Unlocks: Cash handling gap analysis.', false)
-      + this.renderFileSection('optional', 'Beverage Invoices', 'at-f-bev-inv', 'All beverage deliveries for the audit period. PDF or Excel. Unlocks: Delivery accuracy, vendor overbilling rate.', false)
-      + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices', 'at-f-vendor', 'Current pricing from your distributors. PDF or Excel. Unlocks: Price drift analysis, negotiation data.', false)
-      + this.renderFileSection('optional', 'POS Sales Report — Food', 'at-f-pos-food', 'Food sales by category. Same period as beverage. Unlocks: Food cost benchmarking.', false)
-      + this.renderFileSection('optional', 'Kitchen Inventory Count Sheets', 'at-f-kit-inv', 'Food product opening/closing counts. Unlocks: Actual food cost %, spoilage rate.', false)
-      + this.renderFileSection('optional', 'Food Invoices', 'at-f-food-inv', 'Food deliveries for the audit period. Unlocks: Food delivery accuracy.', false)
-      + this.renderFileSection('highlight', 'Recipe Costing Sheet', 'at-f-recipe', 'Your current recipe costs. Highest value optional file. Unlocks: Yield-corrected cost per dish, repricing ranked by impact.', false)
-      + this.renderFileSection('optional', 'Payroll or Time Clock Data', 'at-f-payroll', 'Hours and cost by employee/department. Required for prime cost calculation. Unlocks: Verified prime cost, RPLH.', false)
+      // Labor Data
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Labor Data</div>'
+      + this.renderFileSection('required', 'Payroll or Time Clock Data',           'at-f-payroll',   'Hours by employee and shift for the audit period. Export from your payroll or time clock system. Weekly totals accepted if shift-level detail is not available. Excel or CSV.',  'Unlocks: Verified prime cost, labor by department, RPLH calculation')
 
-      // Notes
-      + '<div class="f" style="margin-bottom:18px;"><label>Additional Notes (optional)</label>'
-      + '<textarea id="at-notes" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--w);font-family:Barlow,sans-serif;font-size:13px;padding:10px;width:100%;min-height:80px;resize:vertical;margin-top:5px;" placeholder="Ownership changes, POS migration, seasonal factors, anything that might affect how the numbers look..."></textarea></div>'
+      + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+      + '<textarea id="at-notes" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;min-height:80px;resize:vertical;" placeholder="Recent ownership change, POS migration, seasonal operation, renovation period, staffing changes. Anything that might affect how the numbers look."></textarea></div>'
 
-      + '<div id="at-gen-status" style="font-size:12px;margin-bottom:12px;display:none;"></div>'
-      + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
-      + '<button class="btn btn-ghost" id="at-intake-cancel">Cancel</button>'
+      + '<div id="at-gen-status" style="font-size:12px;margin:14px 0;display:none;"></div>'
+      + '<div style="display:flex;gap:10px;margin-top:20px;">'
       + '<button class="btn btn-primary" id="at-gen-btn">Generate Audit</button>'
+      + '<button class="btn btn-ghost" id="at-intake-cancel">Cancel</button>'
       + '</div>'
       + '</div>';
 
@@ -195,18 +194,18 @@ S.AuditTracker = {
     document.getElementById('at-gen-btn').onclick = () => this.generateAudit(modal);
   },
 
-  renderFileSection(type, title, inputId, desc, required) {
+  renderFileSection(type, title, inputId, desc, unlocks) {
     const badge = type === 'required'
       ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
       : type === 'highlight'
       ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
       : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
-
     return '<div style="border:1px solid var(--b2);border-radius:4px;padding:14px;margin-bottom:10px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
       + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.5;">' + esc(desc) + '</div>'
-      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg" '
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;line-height:1.5;">' + esc(desc) + '</div>'
+      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:10px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:10px;"></div>')
+      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
       + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
       + '</div>';
   },
@@ -220,7 +219,7 @@ S.AuditTracker = {
 
     // Validate: require at least one file
     const fileInputIds = ['at-f-pos-bev','at-f-bar-inv','at-f-exception','at-f-cash','at-f-bev-inv',
-      'at-f-vendor','at-f-pos-food','at-f-kit-inv','at-f-food-inv','at-f-recipe','at-f-payroll'];
+      'at-f-vendor','at-f-pos-food','at-f-kit-inv','at-f-food-inv','at-f-recipe','at-f-prep','at-f-waste','at-f-payroll'];
     const allFiles = [];
     for (const id of fileInputIds) {
       const inp = document.getElementById(id);
