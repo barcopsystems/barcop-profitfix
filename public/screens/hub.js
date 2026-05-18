@@ -82,6 +82,7 @@ S.Hub = {
           </div>
           ${ring(null)}
         </div>
+        <div style="margin-bottom:10px;height:22px;"></div>
         <div style="flex:1;margin:12px 0 18px;">${stats}</div>
         <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._upgrade('${module}','${title}','${perModuleAdd}')">Activate ${title} &nbsp;<span style="font-weight:400;opacity:0.85;">${perModuleAdd}</span></button>
       </div>`;
