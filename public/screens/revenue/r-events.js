@@ -3,6 +3,7 @@ S.RevenueEvents = {
   activeTab: 'pipeline',
 
   render(container, actions) {
+    actions.innerHTML = '';
     const addBtn = document.createElement('button');
     addBtn.className = 'btn btn-primary btn-sm';
     addBtn.textContent = '+ Log Event';
@@ -54,7 +55,7 @@ S.RevenueEvents = {
       + '<div class="metric-card"><div class="metric-label">Projected Wins</div><div class="metric-val">' + App.fmtCurrency(projectedWin) + '</div><div class="metric-target">At ' + closeRate + '% close rate</div></div>'
       + '<div class="metric-card"><div class="metric-label">Total Events</div><div class="metric-val">' + events.length + '</div><div class="metric-target">' + events.filter(e=>e.status==='Completed').length + ' completed</div></div>'
       + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Event Name</th><th>Type</th><th>Covers</th><th>F&B Min</th><th>Revenue</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Event Name</th><th>Type</th><th>Covers ' + tt('r-covers') + '</th><th>F&B Min ' + tt('r-fb-minimum') + '</th><th>Revenue ' + tt('r-event-revenue') + '</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
   },
 
