@@ -67,17 +67,18 @@ S.Help = {
       ]}
     ];
 
-    const html = sections.map(sec =>
-      '<div class="card" style="margin-bottom:12px;">'
-      + '<div class="card-title">' + esc(sec.t) + '</div>'
-      + sec.qa.map(item =>
-        '<div style="margin-bottom:14px;">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:5px;">' + esc(item.q) + '</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">' + esc(item.a) + '</div>'
+    const html = sections.map(sec => {
+      const items = sec.qa.map(f =>
+        '<div style="border-bottom:1px solid var(--b2);padding:14px 0;">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">' + esc(f.q) + '</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;display:none;">' + esc(f.a) + '</div>'
         + '</div>'
-      ).join('')
-      + '</div>'
-    ).join('');
+      ).join('');
+      return '<div class="card" style="margin-bottom:14px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">' + esc(sec.t) + '</div>'
+        + items
+        + '</div>';
+    }).join('');
 
     container.innerHTML = '<div class="screen">' + html + '</div>';
   }
