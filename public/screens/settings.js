@@ -68,6 +68,7 @@ S.Settings = {
     document.getElementById('s-clear-all')?.addEventListener('click',  () => this.clearAll());
     document.getElementById('s-reset-ob')?.addEventListener('click', async () => {
       App.data.settings.onboarding_complete = false;
+      App.data.settings._targets_saved = false;
       await App.saveKey('settings');
       window.location.reload();
     });
