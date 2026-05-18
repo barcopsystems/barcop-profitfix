@@ -9,7 +9,7 @@ S.RevenueLaborBudget = {
 
     const depts = [
       { key:'bar',     label:'Bar',     target: t.bar_labor_pct || 28,     wage: wages.bar || 15,     projRev: last?.bar_revenue    || 0 },
-      { key:'kitchen', label:'Kitchen', target: t.kitchen_labor_pct || 30, wage: wages.kitchen || 14, projRev: last?.bar_revenue    || 0 },
+      { key:'kitchen', label:'Kitchen', target: t.kitchen_labor_pct || 30, wage: wages.kitchen || 14, projRev: (last?.bar_revenue||0) + (last?.floor_revenue||0) },
       { key:'floor',   label:'Floor',   target: t.floor_labor_pct || 32,   wage: wages.floor || 13,   projRev: last?.floor_revenue  || 0 },
     ];
 
@@ -29,18 +29,29 @@ S.RevenueLaborBudget = {
     const totalBudget = depts.reduce((s,d) => s + d.projRev * (d.target/100), 0);
     const totalHrs    = depts.reduce((s,d) => { const b = d.projRev*(d.target/100); return s + (d.wage > 0 ? b/d.wage : 0); }, 0);
 
+    // Schedule entry section - entered after schedule is written
+    const schedInputRows = depts.map(d => {
+      const budgetHours = d.wage > 0 ? (d.projRev * (d.target/100)) / d.wage : 0;
+      return '<tr>'
+        + '<td style="font-weight:600;">' + d.label + '</td>'
+        + '<td style="color:var(--gold);">' + Math.round(budgetHours) + ' hrs</td>'
+        + '<td><input type="number" class="sched-hrs" data-dept="' + d.key + '" data-budget="' + Math.round(budgetHours) + '" placeholder="0" style="width:80px;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:6px 8px;font-size:13px;"/></td>'
+        + '<td id="lb-gap-' + d.key + '" style="font-weight:700;">--</td>'
+        + '</tr>';
+    }).join('');
+
     // History table
     const histRows = weeks.slice().reverse().slice(0,12).map(w => {
       const totalRev  = (w.bar_revenue||0) + (w.floor_revenue||0);
       const totalLabor = w.total_labor_cost || 0;
-      const pct = totalRev > 0 ? (totalLabor/totalRev*100).toFixed(1) : ' ';
+      const pct = totalRev > 0 ? (totalLabor/totalRev*100).toFixed(1) : '&mdash;';
       const tgtPct = ((t.bar_labor_pct||28)+(t.kitchen_labor_pct||30)+(t.floor_labor_pct||32))/3;
       const gap = totalRev > 0 ? ((parseFloat(pct)||0) - tgtPct).toFixed(1) : null;
       return '<tr><td>Wk ' + w.week_num + '</td>'
         + '<td>' + App.fmtCurrency(totalRev) + '</td>'
         + '<td>' + App.fmtCurrency(totalLabor) + '</td>'
         + '<td class="' + (parseFloat(pct) > tgtPct ? 'neg' : 'pos') + ' val">' + pct + '%</td>'
-        + '<td style="color:' + (gap && parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';">' + (gap ? (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts' : ' ') + '</td>'
+        + '<td style="color:' + (gap && parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';">' + (gap ? (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts' : '&mdash;') + '</td>'
         + '</tr>';
     }).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
 
@@ -55,8 +66,47 @@ S.RevenueLaborBudget = {
       + '</table></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Avg wage and targets can be updated in Settings.</div>'
       + '</div>'
+      // Schedule Entry
+      + '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Schedule Entry</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">After writing the schedule, enter actual hours scheduled per department to see over/under vs budget.</div>'
+      + '<div class="tbl-wrap"><table class="sum-tbl"><thead><tr><th>Department</th><th>Budget Hours</th><th>Scheduled Hours</th><th>Over/Under</th></tr></thead>'
+      + '<tbody>' + schedInputRows + '</tbody>'
+      + '</table></div>'
+      + '<div id="lb-sched-total" style="margin-top:10px;font-size:12px;color:var(--t3);"></div>'
+      + '</div>'
       + '<div class="sh">Weekly Labor History</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Week</th><th>Revenue</th><th>Labor $</th><th>Labor %</th><th>vs Target</th></tr></thead><tbody>' + histRows + '</tbody></table></div>'
       + '</div>';
+
+    // Wire up schedule entry inputs
+    const updateGaps = () => {
+      let totalBudgetHrs = 0, totalSchedHrs = 0;
+      document.querySelectorAll('.sched-hrs').forEach(input => {
+        const dept = input.dataset.dept;
+        const budget = parseFloat(input.dataset.budget) || 0;
+        const sched  = parseFloat(input.value) || 0;
+        const gap    = sched - budget;
+        const el     = document.getElementById('lb-gap-' + dept);
+        if (el) {
+          if (!sched) {
+            el.textContent = '--';
+            el.style.color = 'var(--t3)';
+          } else {
+            el.textContent = (gap > 0 ? '+' : '') + gap.toFixed(0) + ' hrs';
+            el.style.color = gap > 0 ? 'var(--red)' : 'var(--gold)';
+          }
+        }
+        totalBudgetHrs += budget;
+        totalSchedHrs  += sched;
+      });
+      const totalEl = document.getElementById('lb-sched-total');
+      if (totalEl && totalSchedHrs > 0) {
+        const totalGap = totalSchedHrs - totalBudgetHrs;
+        totalEl.innerHTML = 'Total: <strong style="color:var(--t1);">' + Math.round(totalSchedHrs) + ' scheduled</strong> vs <strong style="color:var(--gold);">' + Math.round(totalBudgetHrs) + ' budgeted</strong> '
+          + '<strong style="color:' + (totalGap > 0 ? 'var(--red)' : 'var(--gold)') + ';">(' + (totalGap > 0 ? '+' : '') + Math.round(totalGap) + ' hrs)</strong>';
+      }
+    };
+    document.querySelectorAll('.sched-hrs').forEach(input => input.addEventListener('input', updateGaps));
   }
 };
