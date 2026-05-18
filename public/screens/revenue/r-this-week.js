@@ -80,7 +80,7 @@ S.RevenueThisWeek = {
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
       + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
-      + '</div></div>' + this.nav(false, true);
+      + this.nav(false, true) + '</div></div>';
   },
 
   step2() {
@@ -103,7 +103,7 @@ S.RevenueThisWeek = {
         + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Check Average</div><div style="font-size:18px;font-weight:700;color:' + (caGap >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(checkAvg) + '</div></div>'
         + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">vs Target $' + targetCA + '</div><div style="font-size:18px;font-weight:700;color:' + (caGap >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) + '</div></div>'
         + '</div>' : '')
-      + '</div>' + this.nav(true, true);
+      + this.nav(true, true) + '</div>';
   },
 
   step3() {
@@ -129,7 +129,7 @@ S.RevenueThisWeek = {
         + (pct ? '<div class="f" style="width:120px;"><label>Labor %</label><div style="font-size:18px;font-weight:700;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';padding-top:8px;">' + pct + '%<span style="font-size:11px;font-weight:400;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';margin-left:6px;">' + (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts</span></div></div>' : '')
         + '</div></div>';
     }).join('');
-    return '<div class="card"><div class="sh">Step 3   Labor by Department</div>' + rows + '</div>' + this.nav(true, true);
+    return '<div class="card"><div class="sh">Step 3   Labor by Department</div>' + rows + this.nav(true, true) + '</div>';
   },
 
   step4() {
@@ -153,7 +153,7 @@ S.RevenueThisWeek = {
         + '</div></div>';
     }).join('');
     return '<div class="card"><div class="sh">Step 4 : RPLH by Daypart</div>'
-      + rows + '</div>' + this.nav(true, true);
+      + rows + this.nav(true, true) + '</div>';
   },
 
   step5() {
@@ -190,7 +190,7 @@ S.RevenueThisWeek = {
 
     return '<div class="card"><div class="sh">Step 5 : Server Performance</div>'
       + (teamAvg ? '<div style="background:var(--input);border-radius:6px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--t2);">Team check average this week: <strong style="color:var(--t1);">' + App.fmtCurrency(teamAvg) + '</strong> vs target $' + targetCA + '</div>' : '')
-      + rows + '</div>' + this.nav(true, true);
+      + rows + this.nav(true, true) + '</div>';
   },
 
   step6() {
