@@ -108,16 +108,17 @@ S.RevenueThisWeek = {
 
   step3() {
     const t = App.data.revenue_settings?.targets || {};
-    const totalRev = (parseFloat(this.draft.bar_revenue)||0) + (parseFloat(this.draft.floor_revenue)||0);
+    const barRev   = parseFloat(this.draft.bar_revenue)   || 0;
+    const floorRev = parseFloat(this.draft.floor_revenue) || 0;
     const depts = [
-      { key: 'bar',     label: 'Bar',     revRef: this.draft.bar_revenue,   target: t.bar_labor_pct || 28 },
-      { key: 'kitchen', label: 'Kitchen', revRef: null,                     target: t.kitchen_labor_pct || 30 },
-      { key: 'floor',   label: 'Floor',   revRef: this.draft.floor_revenue, target: t.floor_labor_pct || 32 },
+      { key: 'bar',     label: 'Bar',     rev: barRev,              target: t.bar_labor_pct || 28,     revLabel: 'Bar revenue' },
+      { key: 'kitchen', label: 'Kitchen', rev: barRev + floorRev,   target: t.kitchen_labor_pct || 30, revLabel: 'Blended (bar + floor)' },
+      { key: 'floor',   label: 'Floor',   rev: floorRev,            target: t.floor_labor_pct || 32,   revLabel: 'Floor revenue' },
     ];
     let rows = depts.map(d => {
       const hrs  = parseFloat(this.draft[d.key + '_labor_hours']) || 0;
       const cost = parseFloat(this.draft[d.key + '_labor_cost'])  || 0;
-      const rev  = d.revRef ? parseFloat(d.revRef) || totalRev : totalRev;
+      const rev  = d.rev;
       const pct  = rev > 0 && cost > 0 ? (cost / rev * 100).toFixed(1) : null;
       const gap  = pct ? (parseFloat(pct) - d.target).toFixed(1) : null;
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
