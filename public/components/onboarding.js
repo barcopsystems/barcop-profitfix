@@ -33,20 +33,15 @@ const Onboarding = {
     const stateVal = cityParts[1] || '';
 
     document.getElementById('ob-content').innerHTML =
-      '<div style="text-align:center;margin-bottom:24px;">'
-      + '<img src="assets/logo.png" alt="Bar Cop" style="height:36px;opacity:0.93;"/>'
-      + '</div>'
-      + '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
+      '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
       + '<div class="ob-sub" style="text-align:center;margin-bottom:28px;">Enter your establishment name and we will get you straight into your Recovery Hub.</div>'
-      + '<div class="form-row" style="flex-direction:column;gap:14px;">'
-      + '<div class="f"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
-      + '<div style="display:flex;gap:14px;">'
-      + '<div class="f" style="flex:2;"><label>City</label><input type="text" id="ob-city" value="' + esc(cityVal) + '" placeholder="Austin" /></div>'
-      + '<div class="f" style="flex:1;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(stateVal) + '" placeholder="TX" /></div>'
+      + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
+      + '<div class="f" style="flex:2;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
+      + '<div class="f" style="flex:1.2;"><label>City</label><input type="text" id="ob-city" value="' + esc(cityVal) + '" placeholder="Austin" /></div>'
+      + '<div class="f" style="flex:0.8;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(stateVal) + '" placeholder="TX" /></div>'
       + '</div>'
-      + '</div>'
-      + '<div id="ob-err" style="color:var(--red);font-size:12px;margin-top:8px;margin-bottom:0;display:none;"></div>'
-      + '<div class="ob-actions" style="margin-top:24px;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Enter Recovery Hub</button></div>';
+      + '<div id="ob-err" style="color:var(--red);font-size:12px;margin-bottom:8px;display:none;"></div>'
+      + '<div class="ob-actions" style="margin-top:20px;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Enter Recovery Hub</button></div>';
 
     document.getElementById('ob-name')?.focus();
 
@@ -59,7 +54,7 @@ const Onboarding = {
         if (e) { e.textContent = 'Please enter your bar or restaurant name.'; e.style.display = 'block'; }
         return;
       }
-      App.data.settings.bar_name  = name;
+      App.data.settings.bar_name   = name;
       App.data.settings.city_state = city && state ? city + ', ' + state : city || state || '';
       App.data.settings.onboarding_complete = true;
       App.saveKey('settings').then(() => App.showHub());
