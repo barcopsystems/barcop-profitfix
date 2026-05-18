@@ -1,149 +1,279 @@
 'use strict';
 S.RevenueAudit = {
+
   render(container, actions) {
-    const audits = App.data.revenue_audits || [];
-    const latest = audits.length ? audits[audits.length - 1] : null;
-    const prev   = audits.length >= 2 ? audits[audits.length - 2] : null;
-
-    const scoreColor = s => s >= 65 ? 'var(--gold)' : s >= 45 ? '#4888A8' : 'var(--red)';
-
-    const ring = (score, size = 96) => {
-      if (score == null) return `<div style="width:${size}px;height:${size}px;border-radius:50%;border:3px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;"><span style="font-size:11px;color:var(--t3);">No Score</span></div>`;
-      const r = (size/2)-7, circ = 2*Math.PI*r, dash = (Math.min(score,100)/100)*circ;
-      const col = scoreColor(score);
-      return `<div style="position:relative;width:${size}px;height:${size}px;">
-        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);">
-          <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="5"/>
-          <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
-          <span style="font-size:22px;font-weight:800;color:${col};line-height:1;">${score}</span>
-        </div>
-      </div>`;
-    };
-
-    // Days until next audit (monthly cadence)
-    let daysUntil = 0;
-    if (latest?.date) {
-      const next = new Date(latest.date);
-      next.setDate(next.getDate() + 30);
-      daysUntil = Math.max(0, Math.ceil((next - new Date()) / 86400000));
-    }
-
-    const auditAvailable = !latest || daysUntil === 0;
-
-    const latestCard = latest ? `
-      <div class="card" style="margin-bottom:18px;">
-        <div style="display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;">
-          ${ring(latest.overall_score)}
-          <div style="flex:1;min-width:200px;">
-            <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Latest Revenue Audit</div>
-            <div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:4px;">${new Date(latest.date).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
-            ${prev ? `<div style="font-size:12px;color:${latest.overall_score>=prev.overall_score?'var(--gold)':'var(--red)'};">${latest.overall_score>=prev.overall_score?'+':''}${latest.overall_score-prev.overall_score} pts from prior audit</div>` : '<div style="font-size:12px;color:var(--t3);">First audit on record</div>'}
-            <div style="margin-top:14px;">
-              <button class="btn btn-primary" onclick="S.RevenueAudit.downloadPDF('${latest.id}')">Download PDF</button>
-            </div>
-          </div>
-          ${!auditAvailable ? `<div style="text-align:center;padding:12px 20px;background:var(--input);border-radius:8px;">
-            <div style="font-size:28px;font-weight:800;color:var(--t1);">${daysUntil}</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Days Until<br>Next Audit</div>
-          </div>` : ''}
-        </div>
-        ${latest.sections ? `<div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
-          ${Object.entries(latest.sections).map(([k,v]) => `
-            <div style="background:var(--input);border-radius:6px;padding:10px 12px;">
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">${k.replace(/_/g,' ')}</div>
-              <div style="font-size:18px;font-weight:800;color:${scoreColor(v)};">${v}</div>
-            </div>`).join('')}
-        </div>` : ''}
-      </div>` : `<div class="card" style="margin-bottom:18px;"><div class="empty"><div class="empty-title">No Revenue Audits Yet</div><div class="empty-sub">Request your first audit below. Upload your POS revenue reports and labor data to get your baseline score.</div></div></div>`;
-
-    const requestCard = auditAvailable ? `
-      <div class="card" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.3);">
-        <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">${latest ? 'New Audit Available' : 'Request Your First Audit'}</div>
-        <div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:8px;">${latest ? 'Your monthly Revenue Audit is ready.' : 'Get your Revenue Recovery baseline score.'}</div>
-        <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Upload your POS revenue report, labor summary, and server performance data. The audit scores your check average trends, labor efficiency, menu performance, and revenue gaps. More data submitted means more sections scored.</div>
-        <div id="r-audit-dropzone" style="border:2px dashed rgba(255,255,255,0.12);border-radius:8px;padding:28px;text-align:center;margin-bottom:16px;cursor:pointer;" onclick="document.getElementById('r-audit-files').click()">
-          <div style="font-size:13px;color:var(--t2);margin-bottom:6px;">Click to upload files or drag and drop</div>
-          <div style="font-size:11px;color:var(--t3);">POS revenue report, labor summary, server check data</div>
-          <input type="file" id="r-audit-files" multiple accept=".csv,.xlsx,.xls,.pdf" style="display:none"/>
-        </div>
-        <div id="r-audit-file-list" style="margin-bottom:16px;font-size:12px;color:var(--t2);"></div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <button class="btn btn-primary" id="r-audit-submit" style="flex-shrink:0;">Submit for Audit</button>
-          <div id="r-audit-status" style="font-size:12px;color:var(--t2);"></div>
-        </div>
-      </div>` : '';
-
-    const historyRows = audits.slice().reverse().map(a => `
-      <tr>
-        <td>${new Date(a.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
-        <td style="color:${scoreColor(a.overall_score)};font-weight:700;">${a.overall_score ?? '—'}</td>
-        <td>${a.tier || 'Tier 1'}</td>
-        <td><button class="btn btn-ghost btn-sm" onclick="S.RevenueAudit.downloadPDF('${a.id}')">PDF</button></td>
-      </tr>`).join('') || '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No audit history yet.</td></tr>';
-
-    container.innerHTML = `<div class="screen">
-      ${latestCard}
-      ${requestCard}
-      <div class="sh">Audit History</div>
-      <div class="tbl-wrap"><table class="sum-tbl">
-        <thead><tr><th>Date</th><th>Score</th><th>Tier</th><th></th></tr></thead>
-        <tbody>${historyRows}</tbody>
-      </table></div>
-    </div>`;
-
-    // File list display
-    document.getElementById('r-audit-files')?.addEventListener('change', e => {
-      const names = Array.from(e.target.files).map(f => f.name).join(', ');
-      const el = document.getElementById('r-audit-file-list');
-      if (el) el.textContent = names ? 'Files selected: ' + names : '';
-    });
-
-    document.getElementById('r-audit-submit')?.addEventListener('click', () => this.submitAudit());
+    this.container = container;
+    actions.innerHTML = '';
+    this.renderMain();
   },
 
-  async submitAudit() {
-    const btn = document.getElementById('r-audit-submit');
-    const status = document.getElementById('r-audit-status');
-    const files = document.getElementById('r-audit-files')?.files;
-    if (!files || !files.length) { if(status) { status.style.color='var(--red)'; status.textContent='Please upload at least one file before submitting.'; } return; }
-    if(btn) { btn.disabled=true; btn.textContent='Submitting...'; }
-    if(status) { status.style.color='var(--t2)'; status.textContent='Uploading files and generating audit...'; }
+  renderMain() {
+    const audits       = (App.data.revenue_audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    const latest       = audits[0] || null;
+    const prev         = audits[1] || null;
+    const now          = new Date();
+    const thisMonthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    const hasThisMonth = audits.some(a => (a.date||'').slice(0,7) === thisMonthKey);
+    const endOfMonth   = new Date(now.getFullYear(), now.getMonth()+1, 1);
+    const daysLeft     = Math.ceil((endOfMonth - now) / (1000*60*60*24));
+
+    // Request / Countdown Card
+    const requestCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div style="flex:1;min-width:200px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Monthly Revenue Audit</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive revenue audit per month. Upload your POS revenue reports, labor summaries, and server data. Your audit generates automatically and is ready to download within minutes.</div>'
+      + '</div>'
+      + (hasThisMonth
+          ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' days</div>'
+            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit available</div></div>'
+          : '<button class="btn btn-primary" id="ra-new-btn" style="flex-shrink:0;">Generate This Month\'s Audit</button>')
+      + '</div></div>';
+
+    // Latest Audit Card
+    let latestCard = '';
+    if (latest) {
+      const scoreColor = latest.overall_score >= 80 ? 'var(--gold)' : latest.overall_score >= 60 ? 'var(--t1)' : 'var(--red)';
+      const scoreLabel = latest.overall_score >= 80 ? 'Strong' : latest.overall_score >= 60 ? 'Moderate' : 'Needs Work';
+
+      let progressBanner = '';
+      if (prev) {
+        const diff = (latest.overall_score||0) - (prev.overall_score||0);
+        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</div>'
+          + '<div style="font-size:12px;color:var(--t2);">' + prev.overall_score + ' to ' + latest.overall_score + '</div>'
+          + '</div>';
+      }
+
+      const sections = latest.sections || {};
+      const sectionRows = Object.entries(sections).map(([name, score]) => {
+        const ps  = prev?.sections?.[name];
+        const diff = ps != null ? score - ps : null;
+        const bar  = Math.min(100, Math.max(0, score));
+        return '<tr>'
+          + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
+          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+bar+'%;background:'+(score>=70?'var(--gold)':score>=50?'rgba(255,200,0,0.6)':'var(--red)')+';border-radius:3px;"></div></div></td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:'+(score>=70?'var(--gold)':score>=50?'var(--t1)':'var(--red)')+';padding:8px 12px;">' + score + '</td>'
+          + (diff != null ? '<td style="font-size:12px;color:'+(diff>=0?'var(--gold)':'var(--red)')+';padding:8px 12px;">'+(diff>=0?'+':'')+diff+'</td>' : '<td></td>')
+          + '</tr>';
+      }).join('');
+
+      const actionItems = (latest.action_items || []).slice(0,5).map((a,i) =>
+        '<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:var(--t3);width:24px;flex-shrink:0;">' + (i+1) + '</div>'
+        + '<div style="flex:1;"><div style="font-size:12px;color:var(--t1);line-height:1.5;">' + esc(a.action||a) + '</div>'
+        + (a.monthly_impact ? '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:2px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
+        + '</div></div>'
+      ).join('');
+
+      latestCard = '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
+        + '<div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Revenue Audit</div>'
+        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? ' — ' + esc(latest.audit_period) : '') + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
+        + (latest.pdf_data ? '<button class="btn btn-ghost btn-sm" id="ra-dl-latest" style="margin-top:8px;">Download PDF</button>' : '')
+        + '</div>'
+        + '</div>'
+        + progressBanner
+        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
+          + '<thead><tr>'
+          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
+          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
+          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
+          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
+          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
+        + (actionItems ? '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Top Action Items by Impact</div>' + actionItems : '')
+        + '</div>';
+    }
+
+    // History
+    let historyCard = '';
+    if (audits.length > 1) {
+      const rows = audits.map((a,i) => {
+        const p    = audits[i+1];
+        const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
+        return '<tr>'
+          + '<td>' + (a.date||'').slice(0,10) + '</td>'
+          + '<td class="val" style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;">' + (a.overall_score||0) + '</td>'
+          + '<td>' + (diff!=null ? '<span style="color:'+(diff>=0?'var(--gold)':'var(--red)')+';font-weight:700;">'+(diff>=0?'+':'')+diff+'</span>' : '—') + '</td>'
+          + '<td>' + esc(a.grade||'') + '</td>'
+          + (a.pdf_data ? '<td><button class="btn btn-ghost btn-sm ra-dl-hist" data-idx="'+i+'" style="padding:3px 10px;">PDF</button></td>' : '<td></td>')
+          + '</tr>';
+      }).join('');
+      historyCard = '<div class="card"><div class="card-title">Audit History</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Score</th><th>Change</th><th>Grade</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    const emptyState = !latest
+      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
+        + '<div class="empty-sub">Generate your first monthly Revenue Audit above. Upload your POS revenue reports and the audit builds automatically.</div></div>'
+      : '';
+
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + historyCard + '</div>';
+
+    document.getElementById('ra-new-btn')?.addEventListener('click', () => this.showIntakeForm());
+    document.getElementById('ra-dl-latest')?.addEventListener('click', () => this.downloadPDF(audits[0]));
+    this.container.querySelectorAll('.ra-dl-hist').forEach(btn => {
+      btn.addEventListener('click', () => this.downloadPDF(audits[parseInt(btn.dataset.idx)]));
+    });
+  },
+
+  downloadPDF(audit) {
+    if (!audit?.pdf_data) return;
+    const bytes  = atob(audit.pdf_data);
+    const buffer = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) buffer[i] = bytes.charCodeAt(i);
+    const blob = new Blob([buffer], { type: 'application/pdf' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'revenue-audit-' + (audit.date||'').slice(0,10) + '.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  },
+
+  showIntakeForm() {
+    const barName  = App.data.settings.bar_name  || '';
+    const cityState = App.data.settings.city_state || '';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:3000;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;';
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;width:100%;max-width:680px;padding:32px;position:relative;">'
+      + '<button id="ra-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Revenue Audit</div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload your data files below. The minimum required is your POS revenue report (4 weeks). Every additional file you submit unlocks more scored sections. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
+      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(barName) + '</div>'
+      + (cityState ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(cityState) + '</div>' : '')
+      + '</div>'
+      + this.renderFileSection('required',   'POS Revenue Report',            'ra-f-pos-rev',   'Weekly or daily revenue by department (bar, floor, food). Export from your POS. Minimum 4 weeks.', true)
+      + this.renderFileSection('highlight',  'Labor Summary Report',          'ra-f-labor',     'Hours worked and labor cost by department and shift. Export from your POS or payroll system. Unlocks: Labor efficiency scoring, RPLH analysis.')
+      + this.renderFileSection('optional',   'Server Performance Report',     'ra-f-servers',   'Check average by server from your POS. Unlocks: Server check average scoring, upsell gap analysis.')
+      + this.renderFileSection('optional',   'Menu Sales Mix Report',         'ra-f-menu',      'Item-level sales counts for the period. Unlocks: Menu engineering scoring, top and bottom item analysis.')
+      + this.renderFileSection('optional',   'Event and Catering Records',    'ra-f-events',    'Event booking and revenue records for the period. Unlocks: Event close rate scoring, catering margin analysis.')
+      + this.renderFileSection('optional',   'POS Exception Report',          'ra-f-exception', 'Voids, comps, and discounts by server. Unlocks: Revenue loss indicators, discount pattern analysis.')
+      + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+      + '<textarea id="ra-notes" rows="3" placeholder="Any context about this period — special events, staffing changes, menu updates..." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
+      + '<div style="display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="ra-gen-btn">Generate Audit</button>'
+      + '<button class="btn btn-ghost" id="ra-intake-cancel">Cancel</button>'
+      + '<div id="ra-gen-status" style="font-size:12px;color:var(--t2);display:none;flex:1;"></div>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+    modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
+    document.getElementById('ra-intake-close').onclick  = () => modal.remove();
+    document.getElementById('ra-intake-cancel').onclick = () => modal.remove();
+    document.getElementById('ra-gen-btn').onclick = () => this.generateAudit(modal);
+  },
+
+  renderFileSection(type, title, inputId, desc) {
+    const badge = type === 'required'
+      ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
+      : type === 'highlight'
+      ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
+      : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
+    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:14px;margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
+      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.5;">' + esc(desc) + '</div>'
+      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg" '
+      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
+      + '</div>';
+  },
+
+  async generateAudit(modal) {
+    const btn    = document.getElementById('ra-gen-btn');
+    const status = document.getElementById('ra-gen-status');
+    const setStatus = (msg, color='var(--t2)') => {
+      if (status) { status.style.display='block'; status.style.color=color; status.textContent=msg; }
+    };
+
+    const posFiles = document.getElementById('ra-f-pos-rev')?.files;
+    if (!posFiles || posFiles.length === 0) {
+      setStatus('POS Revenue report is required. Please attach that file to continue.', 'var(--red)');
+      return;
+    }
+
+    if (btn) { btn.disabled=true; btn.textContent='Generating...'; }
+    setStatus('Reading your files and app data...', 'var(--t2)');
+
     try {
+      const fileInputIds = ['ra-f-pos-rev','ra-f-labor','ra-f-servers','ra-f-menu','ra-f-events','ra-f-exception'];
       const form = new FormData();
-      form.append('module', 'revenue');
-      form.append('bar_name', App.data.settings.bar_name || 'Unknown');
-      form.append('settings', JSON.stringify(App.data.revenue_settings || {}));
-      form.append('weeks', JSON.stringify(App.data.revenue_weeks || []));
-      Array.from(files).forEach(f => form.append('files', f));
+      form.append('auditType', 'revenue');
+      form.append('appData', JSON.stringify(App.data));
+      form.append('notes', document.getElementById('ra-notes')?.value || '');
+      for (const id of fileInputIds) {
+        const inp = document.getElementById(id);
+        if (inp?.files) for (const f of inp.files) form.append(id, f, f.name);
+      }
+
+      setStatus('Analyzing your data and building your audit... This takes 60-90 seconds.', 'var(--t2)');
+
       const res = await fetch('/api/generate-audit', { method:'POST', body:form });
-      if (!res.ok) throw new Error('Audit generation failed');
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({error:'Server error'}));
+        throw new Error(err.error || 'Generation failed');
+      }
+
+      setStatus('Finalizing your PDF report...', 'var(--gold)');
+      const data = await res.json();
+      if (!data.ok || !data.pdfBase64) throw new Error(data.error || 'No PDF returned');
+
       const auditRecord = {
-        id: Date.now().toString(),
-        date: new Date().toISOString(),
-        overall_score: null,
-        tier: 'Tier 1',
-        pdf_url: url
+        id:            App.uid(),
+        date:          new Date().toISOString().slice(0,10),
+        bar_name:      App.data.settings.bar_name,
+        overall_score: data.auditData?.OVERALL_SCORE || 0,
+        grade:         data.auditData?.DATA_TIER_LABEL || '',
+        audit_period:  data.auditData?.AUDIT_PERIOD || '',
+        sections:      this.extractSections(data.auditData || {}),
+        action_items:  this.extractActionItems(data.auditData || {}),
+        pdf_data:      data.pdfBase64,
+        generated_at:  new Date().toISOString()
       };
+
       if (!App.data.revenue_audits) App.data.revenue_audits = [];
       App.data.revenue_audits.push(auditRecord);
       await App.saveKey('revenue_audits');
-      const a = document.createElement('a');
-      a.href = url; a.download = 'revenue-audit.pdf'; a.click();
-      if(status) { status.style.color='var(--gold)'; status.textContent='Audit complete. PDF downloaded.'; }
+
+      modal.remove();
+      this.renderMain();
+      setTimeout(() => this.downloadPDF(auditRecord), 500);
+
     } catch(e) {
-      if(status) { status.style.color='var(--red)'; status.textContent='Error: ' + e.message; }
-    } finally {
-      if(btn) { btn.disabled=false; btn.textContent='Submit for Audit'; }
+      setStatus('Error: ' + (e.message||'Generation failed. Please try again.'), 'var(--red)');
+      if (btn) { btn.disabled=false; btn.textContent='Generate Audit'; }
     }
   },
 
-  downloadPDF(id) {
-    const audit = (App.data.revenue_audits || []).find(a => a.id === id);
-    if (audit?.pdf_url) { const a = document.createElement('a'); a.href = audit.pdf_url; a.download = 'revenue-audit.pdf'; a.click(); }
-    else alert('PDF not available for this audit.');
+  extractSections(d) {
+    const s = {};
+    if (d.S1_SCORE != null) s['Check Average'] = d.S1_SCORE;
+    if (d.S2_SCORE != null) s['Labor Efficiency'] = d.S2_SCORE;
+    if (d.S3_SCORE != null) s['Menu Performance'] = d.S3_SCORE;
+    if (d.S4_SCORE != null) s['Server Performance'] = d.S4_SCORE;
+    if (d.S5_SCORE != null) s['Revenue Gap Analysis'] = d.S5_SCORE;
+    return s;
+  },
+
+  extractActionItems(d) {
+    const items = [];
+    if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Close check average gap — $' + Math.round(d.S1_MONTHLY_GAP) + '/month at current cover count', monthly_impact: d.S1_MONTHLY_GAP });
+    if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce labor cost — $' + Math.round(d.S2_MONTHLY_GAP) + '/month over target', monthly_impact: d.S2_MONTHLY_GAP });
+    if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Improve menu mix — $' + Math.round(d.S3_MONTHLY_GAP) + '/month opportunity from repricing Dogs', monthly_impact: d.S3_MONTHLY_GAP });
+    return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
   }
 };
