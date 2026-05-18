@@ -48,7 +48,7 @@ S.RevenueServerCheck = {
       + '</div></div>'
       + '<div class="sh">Last 30 Shift Checks</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers</th><th>Check Avg</th><th>Status</th>'
+      + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers ' + tt('r-covers') + '</th><th>Check Avg ' + tt('r-check-avg') + '</th><th>Status</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
   },
@@ -69,8 +69,8 @@ S.RevenueServerCheck = {
       + '<div class="f w-md"><label>Server</label><select id="rsc-server" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;">' + (serverOpts || '<option>No servers — add in Settings</option>') + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Covers Served</label><input type="number" id="rsc-cov" placeholder="0"/></div>'
-      + '<div class="f w-md"><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Covers Served ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="0"/></div>'
+      + '<div class="f w-md"><label>Total Sales ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="0"/></div></div>'
       + '</div>'
       + '<div id="rsc-result" style="margin-bottom:16px;"></div>'
       + '<div style="display:flex;gap:10px;">'
