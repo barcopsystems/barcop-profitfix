@@ -54,7 +54,7 @@ const DB = {
   async resetPassword(email) {
     if (!this._sb) return { error: { message: 'Not connected' } };
     return await this._sb.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/reset'
+      redirectTo: 'https://app.barcop.com/'
     });
   },
 
