@@ -596,7 +596,8 @@ S.ThisWeek = {
       +'<button class="btn btn-ghost" id="tw-prev">← Back</button>'
       +'<button class="btn btn-primary btn-lg" id="tw-save-week">Save Week</button>'
       +'<span id="tw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      +'</div></div>';
+      +'</div></div>'
+      +'<div id="tw-alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="tw-alert-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;"></div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="tw-alert-ok">OK</button></div></div></div>';
   },
 
   wireStep(step){
@@ -620,7 +621,17 @@ S.ThisWeek = {
     d.notes=document.getElementById('tw-notes')?.value||'';
     const bRev=parseFloat(d.bar.revenue)||0,bCogs=parseFloat(d.bar.cogs)||0,bLab=parseFloat(d.bar.labor)||0;
     const fRev=parseFloat(d.food.revenue)||0,fCogs=parseFloat(d.food.cogs)||0,fLab=parseFloat(d.food.labor)||0;
-    const tRev=bRev+fRev,tCogs=bCogs+fCogs,tLab=bLab+fLab;
+    const tRev=bRev+fRev;
+
+    if(tRev===0){
+      const modal=document.getElementById('tw-alert-modal');
+      const msg=document.getElementById('tw-alert-msg');
+      if(msg) msg.textContent='Bar revenue and food revenue are both zero. Enter at least one revenue figure before saving.';
+      if(modal) modal.style.display='flex';
+      document.getElementById('tw-alert-ok').onclick=()=>{modal.style.display='none';};
+      return;
+    }
+    const tCogs=bCogs+fCogs,tLab=bLab+fLab;
     const bPct=bRev>0?(bCogs/bRev*100):0;
     const fPct=fRev>0?(fCogs/fRev*100):0;
     const pPct=tRev>0?((tCogs+tLab)/tRev*100):0;
