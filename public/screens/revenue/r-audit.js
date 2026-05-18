@@ -141,7 +141,7 @@ S.RevenueAudit = {
   },
 
   showIntakeForm() {
-    const barName  = App.data.settings.bar_name  || '';
+    const barName   = App.data.settings.bar_name   || '';
     const cityState = App.data.settings.city_state || '';
 
     const modal = document.createElement('div');
@@ -150,20 +150,39 @@ S.RevenueAudit = {
       + '<button id="ra-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Revenue Audit</div>'
       + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload your data files below. The minimum required is your POS revenue report (4 weeks). Every additional file you submit unlocks more scored sections. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload your data files below. The POS Daily Sales Summary is required. Every additional file unlocks more scored sections. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
       + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(barName) + '</div>'
       + (cityState ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(cityState) + '</div>' : '')
       + '</div>'
-      + this.renderFileSection('required',   'POS Revenue Report',            'ra-f-pos-rev',   'Weekly or daily revenue by department (bar, floor, food). Export from your POS. Minimum 4 weeks.', true)
-      + this.renderFileSection('highlight',  'Labor Summary Report',          'ra-f-labor',     'Hours worked and labor cost by department and shift. Export from your POS or payroll system. Unlocks: Labor efficiency scoring, RPLH analysis.')
-      + this.renderFileSection('optional',   'Server Performance Report',     'ra-f-servers',   'Check average by server from your POS. Unlocks: Server check average scoring, upsell gap analysis.')
-      + this.renderFileSection('optional',   'Menu Sales Mix Report',         'ra-f-menu',      'Item-level sales counts for the period. Unlocks: Menu engineering scoring, top and bottom item analysis.')
-      + this.renderFileSection('optional',   'Event and Catering Records',    'ra-f-events',    'Event booking and revenue records for the period. Unlocks: Event close rate scoring, catering margin analysis.')
-      + this.renderFileSection('optional',   'POS Exception Report',          'ra-f-exception', 'Voids, comps, and discounts by server. Unlocks: Revenue loss indicators, discount pattern analysis.')
+
+      // Section 2: Sales Data
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Sales Data</div>'
+      + this.renderFileSection('required',  'POS Daily Sales Summary',       'ra-f-pos-daily',  'Total revenue by day broken down by category: food, beverage, total. Minimum 4 weeks. Accepted: Excel, CSV.', 'Unlocks: Revenue trend, category split, blended check average')
+      + this.renderFileSection('optional',  'Menu Sales Mix Report',         'ra-f-menu-mix',   'Items sold and revenue by item or category. Item-level detail preferred. Accepted: Excel, CSV.', 'Unlocks: Category concentration, menu engineering signals')
+      + this.renderFileSection('optional',  'Menu Price List',               'ra-f-menu-prices','Current menu with item names and selling prices. Accepted: Excel, PDF, Word.', 'Unlocks: Pricing gap analysis, contribution margin assessment')
+
+      // Section 3: Server and Floor Data
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Server and Floor Data</div>'
+      + this.renderFileSection('highlight', 'Server Sales Report',           'ra-f-server-sales','Check average, covers served, and total sales by server for the audit period. Accepted: Excel, CSV.', 'Unlocks: Check average by server, performance spread, top and bottom server — two full audit sections')
+      + this.renderFileSection('optional',  'Server Upsell Tracking Report', 'ra-f-upsell',     'Appetizer captures, dessert captures, and add-on revenue by server per shift. Accepted: Excel, CSV.', 'Unlocks: Appetizer and dessert attach rates, upsell execution scoring by server')
+      + this.renderFileSection('optional',  'Pre-Shift Briefing Log',        'ra-f-preshift',   'Notes or records showing whether pre-shift briefings are running and what is covered. Any format.', 'Unlocks: Assessment of whether a server performance standard exists and is being communicated')
+
+      // Section 4: Labor Data
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Labor Data</div>'
+      + this.renderFileSection('required',  'Weekly Labor Schedule',         'ra-f-labor-sched','Scheduled hours by position and department with labor cost for each week. Accepted: Excel, PDF.', 'Unlocks: RPLH calculation, labor percentage, schedule efficiency analysis')
+      + this.renderFileSection('optional',  'Time Clock or Payroll Actuals', 'ra-f-timeclock',  'Actual hours worked by employee and shift for the audit period. Accepted: Excel, CSV.', 'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
+      + this.renderFileSection('optional',  'Labor Cost by Department',      'ra-f-labor-dept', 'Separate labor tracking for bar, kitchen, and floor. Accepted: Excel, CSV.', 'Unlocks: Department-level labor targeting, identifies which department is driving overage')
+
+      // Section 5: Events and Private Dining
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Events and Private Dining</div>'
+      + this.renderFileSection('optional',  'Private Dining and Event Revenue Records', 'ra-f-events',   'One record per event: date, covers, F&B minimum, actual spend. Minimum 3 months. Accepted: Excel, PDF.', 'Unlocks: Event frequency, average event revenue, minimum compliance, annual event revenue gap')
+      + this.renderFileSection('optional',  'Catering Revenue Records',      'ra-f-catering',   'One record per catering booking: date, guests, package type, total revenue. Accepted: Excel, PDF.', 'Unlocks: Catering revenue trend, package performance, repeat client rate')
+      + this.renderFileSection('optional',  'Private Dining Rate Card',      'ra-f-rate-card',  'Current pricing for private dining including room fees, F&B minimums, and per-head options. Accepted: PDF, Word.', 'Unlocks: Pricing position analysis, minimum structure assessment')
+
       + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-      + '<textarea id="ra-notes" rows="3" placeholder="Any context about this period — special events, staffing changes, menu updates..." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
+      + '<textarea id="ra-notes" rows="3" placeholder="Recent menu changes, staffing changes, seasonal factors, new event program, anything that affects how the numbers look..." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
       + '<div style="display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="ra-gen-btn">Generate Audit</button>'
       + '<button class="btn btn-ghost" id="ra-intake-cancel">Cancel</button>'
@@ -178,7 +197,7 @@ S.RevenueAudit = {
     document.getElementById('ra-gen-btn').onclick = () => this.generateAudit(modal);
   },
 
-  renderFileSection(type, title, inputId, desc) {
+  renderFileSection(type, title, inputId, desc, unlocks) {
     const badge = type === 'required'
       ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
       : type === 'highlight'
@@ -187,8 +206,9 @@ S.RevenueAudit = {
     return '<div style="border:1px solid var(--b2);border-radius:4px;padding:14px;margin-bottom:10px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
       + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.5;">' + esc(desc) + '</div>'
-      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg" '
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;line-height:1.5;">' + esc(desc) + '</div>'
+      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:10px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:10px;"></div>')
+      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
       + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
       + '</div>';
   },
@@ -200,9 +220,9 @@ S.RevenueAudit = {
       if (status) { status.style.display='block'; status.style.color=color; status.textContent=msg; }
     };
 
-    const posFiles = document.getElementById('ra-f-pos-rev')?.files;
+    const posFiles = document.getElementById('ra-f-pos-daily')?.files;
     if (!posFiles || posFiles.length === 0) {
-      setStatus('POS Revenue report is required. Please attach that file to continue.', 'var(--red)');
+      setStatus('POS Daily Sales Summary is required. Please attach that file to continue.', 'var(--red)');
       return;
     }
 
@@ -210,7 +230,12 @@ S.RevenueAudit = {
     setStatus('Reading your files and app data...', 'var(--t2)');
 
     try {
-      const fileInputIds = ['ra-f-pos-rev','ra-f-labor','ra-f-servers','ra-f-menu','ra-f-events','ra-f-exception'];
+      const fileInputIds = [
+        'ra-f-pos-daily','ra-f-menu-mix','ra-f-menu-prices',
+        'ra-f-server-sales','ra-f-upsell','ra-f-preshift',
+        'ra-f-labor-sched','ra-f-timeclock','ra-f-labor-dept',
+        'ra-f-events','ra-f-catering','ra-f-rate-card'
+      ];
       const form = new FormData();
       form.append('auditType', 'revenue');
       form.append('appData', JSON.stringify(App.data));
