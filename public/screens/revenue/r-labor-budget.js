@@ -58,7 +58,7 @@ S.RevenueLaborBudget = {
       + '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Labor Budget Calculator</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Enter your projected revenue for the week. Pre-filled from last saved week.</div>'
-      + '<div class="tbl-wrap"><table class="sum-tbl lb-tbl" style="--td-pad:14px 12px;"><thead><tr><th>Department</th><th>Projected Revenue</th><th>Target %</th><th>Budget $ ' + tt('r-labor-cost') + '</th><th>Budget Hours ' + tt('r-labor-hours') + '</th><th>Avg Wage</th></tr></thead>'
+      + '<div class="tbl-wrap"><table class="sum-tbl lb-tbl"><thead><tr><th>Department</th><th>Projected Revenue</th><th>Target %</th><th>Budget $ ' + tt('r-labor-cost') + '</th><th>Budget Hours ' + tt('r-labor-hours') + '</th><th>Avg Wage</th></tr></thead>'
       + '<tbody>' + deptRows + '</tbody>'
       + '<tfoot><tr style="font-weight:700;border-top:2px solid var(--b1);"><td>Total</td><td></td><td></td>'
       + '<td style="color:var(--gold);" id="lb-total-budget">' + (initTotalBudget ? App.fmtCurrency(initTotalBudget) : '&mdash;') + '</td>'
