@@ -84,7 +84,7 @@ S.Hub = {
         </div>
         <div style="height:22px;margin-bottom:10px;"></div>
         <div style="flex:1;margin:0 0 18px;">${stats}</div>
-        <button class="btn btn-primary" style="width:100%;font-size:12px;font-weight:700;padding:11px 16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" onclick="S.Hub._upgrade('${module}','${title}','${perModuleAdd}')">Activate ${title} &nbsp;<span style="font-weight:400;opacity:0.85;">${perModuleAdd}</span></button>
+        <button class="btn btn-primary" style="width:100%;font-size:12px;font-weight:700;padding:11px 16px;" onclick="S.Hub._upgrade('${module}','${title}','${perModuleAdd}')">Activate ${module.charAt(0).toUpperCase()+module.slice(1)} &nbsp;<span style="font-weight:400;opacity:0.85;">${perModuleAdd}</span></button>
       </div>`;
 
     const profitStats = hasP
