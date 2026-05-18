@@ -55,7 +55,7 @@ S.Hub = {
     const dot      = (on) => `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${on?'#C9A84C':'rgba(255,255,255,0.15)'};margin-right:6px;flex-shrink:0;"></span>`;
 
     // Identical padding/size for both active and locked cards
-    const CARD_STYLE = `background:var(--surface);border-radius:10px;padding:24px;display:flex;flex-direction:column;`;
+    const CARD_STYLE = `background:var(--surface);border-radius:10px;padding:24px;display:flex;flex-direction:column;min-height:340px;`;
 
     const activeCard = (title, desc, scoreVal, trendVal, stats, enterScreen) => `
       <div style="${CARD_STYLE}border:1px solid rgba(201,168,76,0.4);box-shadow:0 0 24px rgba(201,168,76,0.05);">
@@ -63,12 +63,12 @@ S.Hub = {
           <div style="flex:1;padding-right:12px;">
             <div style="display:flex;align-items:center;margin-bottom:6px;">${dot(true)}<span style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);">Active</span></div>
             <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:5px;">${title}</div>
-            <div style="font-size:12px;color:var(--t3);line-height:1.5;">${desc}</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5;min-height:54px;">${desc}</div>
           </div>
           ${ring(scoreVal)}
         </div>
-        <div style="margin-bottom:10px;">${trendPill(trendVal)}</div>
-        <div style="flex:1;margin:12px 0 18px;">${stats}</div>
+        <div style="height:22px;margin-bottom:10px;">${trendPill(trendVal)}</div>
+        <div style="flex:1;margin:0 0 18px;">${stats}</div>
         <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._enter('${enterScreen}')">Enter ${title}</button>
       </div>`;
 
@@ -78,12 +78,12 @@ S.Hub = {
           <div style="flex:1;padding-right:12px;">
             <div style="display:flex;align-items:center;margin-bottom:6px;">${dot(false)}<span style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">Available</span></div>
             <div style="font-size:15px;font-weight:700;color:var(--t2);margin-bottom:5px;">${title}</div>
-            <div style="font-size:12px;color:var(--t3);line-height:1.5;">${desc}</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5;min-height:54px;">${desc}</div>
           </div>
           ${ring(null)}
         </div>
-        <div style="margin-bottom:10px;height:22px;"></div>
-        <div style="flex:1;margin:12px 0 18px;">${stats}</div>
+        <div style="height:22px;margin-bottom:10px;"></div>
+        <div style="flex:1;margin:0 0 18px;">${stats}</div>
         <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._upgrade('${module}','${title}','${perModuleAdd}')">Activate ${title} &nbsp;<span style="font-weight:400;opacity:0.85;">${perModuleAdd}</span></button>
       </div>`;
 
