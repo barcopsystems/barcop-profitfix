@@ -10,6 +10,7 @@ S.KitchenProducts = {
 
   render(container, actions) {
     this.container = container;
+    this.actions = actions;
     actions.innerHTML = '';
     const addBtn = document.createElement('button');
     addBtn.className = 'btn btn-primary btn-sm';
@@ -82,7 +83,7 @@ S.KitchenProducts = {
       + '<button class="btn btn-danger" id="kp-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '<div id="kp-form"></div></div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
 
     this.container.onclick = ev => {
       const edit     = ev.target.closest('.kp-edit');
@@ -130,9 +131,7 @@ S.KitchenProducts = {
 
   // ── Import ──────────────────────────────────────────────────────────────
   showImport() {
-    const fa = document.getElementById('kp-form');
-    if (!fa) return;
-    fa.innerHTML = '<div class="divider"></div><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">Import Kitchen Products from File</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:16px;">'
       + 'Upload a CSV or Excel file from your POS, inventory system, or supplier. The app reads your columns and shows a mapping screen so you can match them to the right fields. Products import instantly — any missing data shows as Incomplete and can be filled in afterwards.</div>'      + '<details style="margin-bottom:16px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'      + '<strong style="color:var(--t1);">First row must be column headers.</strong> One row per product or ingredient.<br><br>'      + '<strong style="color:var(--t1);">Columns the app recognizes automatically:</strong><br>'      + '&bull; <strong>Name / Item / Product / Ingredient / Description</strong> — required<br>'      + '&bull; <strong>Category / Type / Group / Dept</strong> — optional<br>'      + '&bull; <strong>Vendor / Supplier / Distributor</strong> — optional<br>'      + '&bull; <strong>Unit / UOM / Unit of Measure / Measure / Pack</strong> — optional (lb, oz, each, case, qt, etc.)<br>'      + '&bull; <strong>Cost / Unit Cost / Price / Purchase Price / Item Cost</strong> — optional<br><br>'      + '<strong style="color:var(--t1);">Only Name is required.</strong> Import with just names if that is all you have — add costs and units afterwards. Incomplete products are flagged in red so you know what still needs to be entered.<br><br>'      + '<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)<br><br>'      + '<strong style="color:var(--t1);">Where to export from:</strong><br>'      + '&bull; <strong>Your inventory system</strong> (MarketMan, Craftable, BlueCart, Compeat) — look for Product List or Item Master export<br>'      + '&bull; <strong>Sysco / US Foods / PFG portal</strong> — your order guide is usually downloadable as Excel. Use it as your product list.<br>'      + '&bull; <strong>Your POS</strong> — Menu Items or Item Library export, filter by Food or Kitchen category<br>'      + '&bull; <strong>A spreadsheet you already maintain</strong> — save as CSV and import directly'      + '</div></details>'
@@ -143,6 +142,7 @@ S.KitchenProducts = {
       + '<div id="kp-imp-preview"></div>'
       + '<div class="card-actions"><button class="btn btn-ghost" id="kp-cancel">Cancel</button></div></div>';
 
+    document.getElementById('kp-cancel')?.addEventListener('click', () => this.render(this.container, this.actions));
     document.getElementById('kp-imp-file')?.addEventListener('change', ev => {
       const file = ev.target.files[0];
       if (file) this.readImportFile(file);
@@ -306,12 +306,10 @@ S.KitchenProducts = {
   showForm(id) {
     this.editId = id || null;
     const p = id ? (App.data.kitchen_products || []).find(p => p.id === id) : null;
-    const fa = document.getElementById('kp-form');
-    if (!fa) return;
     const missing = p ? { unit: !p.unit, cost_per_unit: !p.cost_per_unit } : {};
     const rb = f => missing[f] ? 'border-color:var(--red);' : '';
 
-    fa.innerHTML = '<div class="divider"></div><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Kitchen Product</div>'
       + (p && !this.isComplete(p) ? '<div style="font-size:11px;color:var(--red);margin-bottom:12px;font-weight:600;">Fields highlighted in red are required.</div>' : '')
       + '<div class="form-row">'
@@ -331,6 +329,8 @@ S.KitchenProducts = {
       + '<span id="kp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     document.getElementById('kp-name')?.focus();
+    document.getElementById('kp-cancel')?.addEventListener('click', () => this.render(this.container, this.actions));
+    document.getElementById('kp-save')?.addEventListener('click', () => this.save());
   },
 
   save() {
@@ -357,6 +357,6 @@ S.KitchenProducts = {
     }
     const btn = document.getElementById('kp-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    App.saveKey('kitchen_products').then(() => { this._saving = false; this.editId = null; this.renderList(); });
+    App.saveKey('kitchen_products').then(() => { this._saving = false; this.editId = null; this.render(this.container, this.actions); });
   }
 };
