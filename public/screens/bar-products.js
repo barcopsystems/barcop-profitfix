@@ -303,8 +303,8 @@ S.BarProducts = {
     html += '</div>'
       + '<div id="bp-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '<button class="btn btn-primary" id="bp-imp-run">Import ' + rows.length + ' Products</button>'
+      + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '</div></div>';
 
     preview.innerHTML = html;
@@ -412,7 +412,7 @@ S.BarProducts = {
     } : {};
     const rb = f => missing[f] ? 'border-color:var(--red);' : '';
 
-    fa.innerHTML = '<div class="divider"></div><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Bar Product</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f w-lg"><label>Product Name</label><input type="text" id="bp-name" value="' + esc(p?.name || '') + '" placeholder="Tito\'s Handmade Vodka" /></div>'
@@ -440,8 +440,8 @@ S.BarProducts = {
       + '<div class="calc-item"><div class="calc-label">Pour Cost % ' + tt('pour-cost-pct') + '</div><div class="calc-val" id="bp-pct">—</div></div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '<button class="btn btn-primary" id="bp-save">' + (id ? 'Update' : 'Save') + '</button>'
+      + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '<span id="bp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
