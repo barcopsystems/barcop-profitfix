@@ -68,7 +68,7 @@ S.RevenueThisWeek = {
   },
 
   nav(showBack, showNext, saveLabel) {
-    return '<div class="card-actions">'
+    return '<div class="card-actions" style="border-top:none;margin-top:8px;">'
       + (showBack ? '<button class="btn btn-ghost" id="rw-back">← Back</button>' : '')
       + (showNext && this.step < 6 ? '<button class="btn btn-primary" id="rw-next">Next →</button>' : '')
       + (saveLabel ? '<button class="btn btn-primary" id="rw-save">' + saveLabel + '</button>' : '')
