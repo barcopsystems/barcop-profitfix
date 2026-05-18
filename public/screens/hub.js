@@ -55,7 +55,7 @@ S.Hub = {
     const dot      = (on) => `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${on?'#C9A84C':'rgba(255,255,255,0.15)'};margin-right:6px;flex-shrink:0;"></span>`;
 
     // Identical padding/size for both active and locked cards
-    const CARD_STYLE = `background:var(--surface);border-radius:10px;padding:24px;display:flex;flex-direction:column;height:380px;`;
+    const CARD_STYLE = `background:var(--surface);border-radius:10px;padding:24px;display:flex;flex-direction:column;height:380px;overflow:hidden;min-width:0;`;
 
     const activeCard = (title, desc, scoreVal, trendVal, stats, enterScreen) => `
       <div style="${CARD_STYLE}border:1px solid rgba(201,168,76,0.4);box-shadow:0 0 24px rgba(201,168,76,0.05);">
@@ -84,7 +84,7 @@ S.Hub = {
         </div>
         <div style="height:22px;margin-bottom:10px;"></div>
         <div style="flex:1;margin:0 0 18px;">${stats}</div>
-        <button class="btn btn-primary" style="width:100%;font-size:13px;font-weight:700;padding:11px 16px;" onclick="S.Hub._upgrade('${module}','${title}','${perModuleAdd}')">Activate ${title} &nbsp;<span style="font-weight:400;opacity:0.85;">${perModuleAdd}</span></button>
+        <button class="btn btn-primary" style="width:100%;font-size:12px;font-weight:700;padding:11px 16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" onclick="S.Hub._upgrade('${module}','${title}','${perModuleAdd}')">Activate ${title} &nbsp;<span style="font-weight:400;opacity:0.85;">${perModuleAdd}</span></button>
       </div>`;
 
     const profitStats = hasP
