@@ -102,7 +102,19 @@ const App = {
       this.showAuth();
     }
     DB.onAuthChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Show password reset screen instead of booting into the app
+        document.getElementById('auth-screen').style.display = 'flex';
+        document.getElementById('app').classList.add('hidden');
+        document.getElementById('ob-overlay').classList.add('hidden');
+        const hw = document.getElementById('hub-wrapper');
+        if (hw) hw.style.display = 'none';
+        // Switch to the set-new-password panel
+        ['auth-login','auth-reset','auth-set-password'].forEach(x => {
+          const el = document.getElementById(x);
+          if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
+        });
+      } else if (event === 'SIGNED_IN' && session) {
         this.data = await DB.readData();
         this.subscription = await DB.getSubscription();
         this.boot();
@@ -160,6 +172,12 @@ const App = {
     document.getElementById('ob-overlay').classList.add('hidden');
     const hw = document.getElementById('hub-wrapper');
     if (hw) hw.style.display = 'none';
+    // Show success banner if landing from Stripe checkout
+    const params = new URLSearchParams(window.location.search);
+    const banner = document.getElementById('checkout-success-msg');
+    if (banner) banner.style.display = params.get('checkout') === 'success' ? 'block' : 'none';
+    // Clean up the URL
+    if (params.get('checkout')) window.history.replaceState({}, '', '/');
   },
 
   async save() {
@@ -322,6 +340,20 @@ function wireAuth() {
     msg.style.color = error ? 'var(--red)' : 'var(--gold)';
     msg.textContent = error ? error.message : 'Reset link sent. Check your email.';
     msg.style.display='block';
+  });
+
+  document.getElementById('set-pw-btn')?.addEventListener('click', async () => {
+    const pw1 = document.getElementById('set-pw1').value;
+    const pw2 = document.getElementById('set-pw2').value;
+    const msg = document.getElementById('set-pw-msg');
+    const btn = document.getElementById('set-pw-btn');
+    if (!pw1 || pw1.length < 8) { msg.style.color='var(--red)'; msg.textContent='Password must be at least 8 characters.'; msg.style.display='block'; return; }
+    if (pw1 !== pw2) { msg.style.color='var(--red)'; msg.textContent='Passwords do not match.'; msg.style.display='block'; return; }
+    btn.textContent='Saving...'; btn.disabled=true;
+    const { error } = await DB._sb.auth.updateUser({ password: pw1 });
+    btn.textContent='Set Password and Sign In'; btn.disabled=false;
+    if (error) { msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block'; }
+    else { msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block'; }
   });
 
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
