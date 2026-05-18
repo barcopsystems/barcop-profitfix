@@ -125,9 +125,9 @@ S.Dashboard = {
       const t = App.data.settings.targets || {};
       startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Industry benchmarks are already filled in below. Adjust them to match your operation and hit Save. You can always update these later in Settings.</div>'
-        + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets and Revenue</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Industry benchmarks are already filled in below. Adjust them to match your operation, enter your annual revenue estimates, and hit Save. You can always update these later in Settings.</div>'
+        + '<div class="form-row" style="gap:14px 20px;margin-bottom:16px;">'
         + '<div class="f" style="width:120px;"><label>Bar Pour Cost %</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
         + '<div class="f" style="width:120px;"><label>Food Cost %</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
         + '<div class="f" style="width:120px;"><label>Bar Labor %</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
@@ -135,7 +135,12 @@ S.Dashboard = {
         + '<div class="f" style="width:120px;"><label>Prime Cost %</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
         + '<div class="f" style="width:120px;"><label>Cash Tolerance</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
         + '</div>'
-        + '<button class="btn btn-primary" id="sh-save">Save Targets</button>'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Annual Revenue Estimates</div>'
+        + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
+        + '<div class="f" style="width:180px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-brev" value="' + (App.data.settings.annual_bar_revenue || '') + '" placeholder="0"/></div></div>'
+        + '<div class="f" style="width:180px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-frev" value="' + (App.data.settings.annual_food_revenue || '') + '" placeholder="0"/></div></div>'
+        + '</div>'
+        + '<button class="btn btn-primary" id="sh-save">Save and Continue</button>'
         + '</div>';
     }
 
@@ -177,7 +182,9 @@ S.Dashboard = {
         food_labor_cost_pct:parseFloat(document.getElementById('sh-fl')?.value)  || 30,
         prime_cost_pct:     parseFloat(document.getElementById('sh-pc')?.value)  || 60,
       };
-      App.data.settings.cash_tolerance = parseFloat(document.getElementById('sh-ct')?.value) || 10;
+      App.data.settings.cash_tolerance       = parseFloat(document.getElementById('sh-ct')?.value)   || 10;
+      App.data.settings.annual_bar_revenue   = parseFloat(document.getElementById('sh-brev')?.value) || 0;
+      App.data.settings.annual_food_revenue  = parseFloat(document.getElementById('sh-frev')?.value) || 0;
       App.data.settings._targets_saved = true;
       // Mark cost targets task complete in Getting Started
       const gs = App.data.getting_started_profit || {};
@@ -185,7 +192,6 @@ S.Dashboard = {
       App.data.getting_started_profit = gs;
       await App.saveKey('settings');
       await App.saveKey('getting_started_profit');
-      // Route to Getting Started so they see the checkmark and next steps
       App.navigate('getting-started');
     });
     document.getElementById('qa-week')?.addEventListener('click', ()=>App.navigate('this-week'));
