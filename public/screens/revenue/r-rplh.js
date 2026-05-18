@@ -20,21 +20,20 @@ S.RevenueRPLH = {
       const gap  = cur != null ? cur - d.target : null;
       return '<div class="metric-card">'
         + '<div class="metric-label">' + d.label + ' RPLH</div>'
-        + '<div class="metric-val ' + (cur == null ? '' : cur >= d.target ? 'on-target' : 'over-target') + '">' + (cur ? App.fmtCurrency(cur) : '—') + '</div>'
+        + '<div class="metric-val ' + (cur == null ? '' : cur >= d.target ? 'on-target' : 'over-target') + '">' + (cur ? App.fmtCurrency(cur) : ' ') + '</div>'
         + '<div class="metric-target">Target: ' + App.fmtCurrency(d.target) + '</div>'
-        + '<div class="metric-impact ' + (gap == null ? '' : gap >= 0 ? 'pos' : 'neg') + '">' + (gap != null ? (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + ' vs target' : '—') + '</div>'
-        + '<div class="metric-trend">' + (avg ? App.fmtCurrency(avg) + ' 4wk avg' : '—') + '</div>'
+        + '<div class="metric-impact ' + (gap == null ? '' : gap >= 0 ? 'pos' : 'neg') + '">' + (gap != null ? (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + ' vs target' : ' ') + '</div>'
+        + '<div class="metric-trend">' + (avg ? App.fmtCurrency(avg) + ' 4wk avg' : ' ') + '</div>'
         + '</div>';
     }).join('');
 
     // Optimal staffing calculator
     const calcHtml = '<div class="card" style="margin-top:16px;">'
       + '<div class="sh">Optimal Staffing Calculator</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Enter a revenue forecast and RPLH target to get the optimal hours for that shift.</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Revenue Forecast</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-rev" placeholder="0"/></div></div>'
-      + '<div class="f w-md"><label>RPLH Target</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-tgt" value="' + (t.rplh_dinner || 75) + '"/></div></div>'
-      + '<div class="f w-md"><label>Labor Cost Target %</label><div class="fw"><input class="suf" type="number" id="rplh-pct" value="' + (t.floor_labor_pct || 32) + '" step="0.5"/><span class="suf">%</span></div></div>'
+      + '<div class="f w-md"><label>Revenue Forecast ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-rev" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>RPLH Target ' + tt('r-rplh-target') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-tgt" value="' + (t.rplh_dinner || 75) + '"/></div></div>'
+      + '<div class="f w-md"><label>Labor Cost Target % ' + tt('r-labor-pct') + '</label><div class="fw"><input class="suf" type="number" id="rplh-pct" value="' + (t.floor_labor_pct || 32) + '" step="0.5"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div id="rplh-result"></div>'
       + '</div>';
@@ -61,7 +60,7 @@ S.RevenueRPLH = {
         chartHtml = '<div class="chart-card" style="margin-top:16px;">'
           + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">'
           + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week RPLH Trend</div>'
-          + cols.map((c,i) => '<span style="font-size:10px;color:'+c+';">— '+dayparts[i].label+'</span>').join('')
+          + cols.map((c,i) => '<span style="font-size:10px;color:'+c+';">  '+dayparts[i].label+'</span>').join('')
           + '</div>'
           + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;">'
           + lines + labels
@@ -71,10 +70,10 @@ S.RevenueRPLH = {
 
     const histRows = weeks.slice().reverse().slice(0,12).map(w =>
       '<tr><td>Wk ' + w.week_num + '</td>'
-      + '<td>' + (w.rplh_lunch  ? App.fmtCurrency(w.rplh_lunch)  : '—') + '</td>'
-      + '<td>' + (w.rplh_dinner ? App.fmtCurrency(w.rplh_dinner) : '—') + '</td>'
-      + '<td>' + (w.rplh_bar    ? App.fmtCurrency(w.rplh_bar)    : '—') + '</td>'
-      + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '—') + '</td>'
+      + '<td>' + (w.rplh_lunch  ? App.fmtCurrency(w.rplh_lunch)  : ' ') + '</td>'
+      + '<td>' + (w.rplh_dinner ? App.fmtCurrency(w.rplh_dinner) : ' ') + '</td>'
+      + '<td>' + (w.rplh_bar    ? App.fmtCurrency(w.rplh_bar)    : ' ') + '</td>'
+      + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : ' ') + '</td>'
       + '</tr>'
     ).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
 
@@ -95,8 +94,8 @@ S.RevenueRPLH = {
       const optHrs   = rev / tgt;
       const maxLabor = rev * (pct / 100);
       el.innerHTML = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">'
-        + '<div style="background:var(--input);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Optimal Hours</div><div style="font-size:20px;font-weight:800;color:var(--gold);">' + optHrs.toFixed(1) + ' hrs</div></div>'
-        + '<div style="background:var(--input);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Max Labor Budget</div><div style="font-size:20px;font-weight:800;color:var(--t1);">' + App.fmtCurrency(maxLabor) + '</div></div>'
+        + '<div style="background:var(--input);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Optimal Hours ' + tt('r-optimal-hrs') + '</div><div style="font-size:20px;font-weight:800;color:var(--gold);">' + optHrs.toFixed(1) + ' hrs</div></div>'
+        + '<div style="background:var(--input);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Max Labor Budget ' + tt('r-labor-budget-calc') + '</div><div style="font-size:20px;font-weight:800;color:var(--t1);">' + App.fmtCurrency(maxLabor) + '</div></div>'
         + '</div>';
     };
     ['rplh-rev','rplh-tgt','rplh-pct'].forEach(id => document.getElementById(id)?.addEventListener('input', calcResult));
