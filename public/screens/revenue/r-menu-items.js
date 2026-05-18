@@ -117,17 +117,15 @@ S.RevenueMenuItems = {
       + '<th style="width:36px;"><input type="checkbox" id="ri-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
       + '<th>Item Name</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost % ' + tt('r-cost-pct') + '</th><th>Contrib. Margin ' + tt('r-contrib-margin') + '</th><th>Wkly Covers ' + tt('r-wkly-covers') + '</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
+      + '</div>'
+      + '<div id="ri-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="ri-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this item?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="ri-del-confirm">Delete</button><button class="btn btn-ghost" id="ri-del-cancel">Cancel</button></div></div></div>';
 
     container.querySelectorAll('.ri-edit').forEach(btn => {
       btn.addEventListener('click', () => this.showForm(container, actions, parseInt(btn.dataset.idx)));
     });
     container.querySelectorAll('.ri-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Delete this item?')) return;
-        App.data.revenue_menu_items.splice(parseInt(btn.dataset.idx), 1);
-        await App.saveKey('revenue_menu_items');
-        this.render(container, actions);
+      btn.addEventListener('click', () => {
+        this.confirmDel(container, actions, [parseInt(btn.dataset.idx)], 'Delete this item?');
       });
     });
 
@@ -152,13 +150,26 @@ S.RevenueMenuItems = {
       updateSel();
     });
     container.addEventListener('change', e => { if(e.target.classList.contains('ri-chk')) updateSel(); });
-    document.getElementById('ri-del-sel')?.addEventListener('click', async () => {
-      const ids = [...container.querySelectorAll('.ri-chk:checked')].map(c => c.dataset.id);
-      if (!ids.length) return;
-      App.data.revenue_menu_items = (App.data.revenue_menu_items||[]).filter(i => !ids.includes(i.id));
+    document.getElementById('ri-del-sel')?.addEventListener('click', () => {
+      const idxs = [...container.querySelectorAll('.ri-chk:checked')].map(c => parseInt(c.dataset.idx));
+      if (!idxs.length) return;
+      this.confirmDel(container, actions, idxs, 'Delete ' + idxs.length + ' item' + (idxs.length > 1 ? 's' : '') + '?');
+    });
+  },
+
+  confirmDel(container, actions, idxs, msg) {
+    const modal = document.getElementById('ri-del-modal');
+    const msgEl = document.getElementById('ri-del-msg');
+    if (msgEl) msgEl.textContent = msg;
+    if (modal) modal.style.display = 'flex';
+    document.getElementById('ri-del-confirm').onclick = async () => {
+      modal.style.display = 'none';
+      const items = App.data.revenue_menu_items || [];
+      App.data.revenue_menu_items = items.filter((_, i) => !idxs.includes(i));
       await App.saveKey('revenue_menu_items');
       this.render(container, actions);
-    });
+    };
+    document.getElementById('ri-del-cancel').onclick = () => { modal.style.display = 'none'; };
   },
 
   showForm(container, actions, idx) {
