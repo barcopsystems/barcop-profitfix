@@ -7,8 +7,9 @@ S.RevenueDashboard = {
     const rs     = App.data.revenue_settings || {};
     const t      = rs.targets || {};
     const weeks  = App.data.revenue_weeks || [];
-    const latest = weeks.length ? weeks[weeks.length - 1] : null;
-    const prior4 = weeks.slice(-5, -1);
+    const validWeeks = weeks.filter(w => (w.bar_revenue||0) + (w.floor_revenue||0) > 0);
+    const latest = validWeeks.length ? validWeeks[validWeeks.length - 1] : null;
+    const prior4 = validWeeks.slice(-5, -1);
     const avg4   = fn => { const v = prior4.map(fn).filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
 
     const checkAvg   = latest?.check_avg ?? null;
@@ -64,10 +65,13 @@ S.RevenueDashboard = {
 
     const metCard = (label, val, target, impact, trendEl, cls) => {
       const impHtml = impact != null
-        ? '<div class="metric-impact ' + (impact>0?'neg':'pos') + '">' + (impact>0?'+':'') + App.fmtCurrency(impact) + ' vs target</div>'
-        : '<div class="metric-impact" style="color:var(--t4);"> </div>';
+        ? '<div class="metric-impact ' + (impact > 0 ? 'neg' : 'pos') + '">' + (impact > 0 ? '+' : '') + App.fmtCurrency(impact) + ' vs target</div>'
+        : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
+      const valHtml = val != null
+        ? '<div class="metric-val ' + cls + '">' + val + '</div>'
+        : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>';
       return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
-        + '<div class="metric-val ' + cls + '">' + (val||' ') + '</div>'
+        + valHtml
         + '<div class="metric-target">Target: ' + target + '</div>'
         + impHtml + trendEl + '</div>';
     };
@@ -109,9 +113,9 @@ S.RevenueDashboard = {
       + metCard('Check Average',    checkAvg!=null?App.fmtCurrency(checkAvg):null, App.fmtCurrency(targetCA), caImpact,   trendHtml(checkAvg,avg4(w=>w.check_avg)), caCls)
       + metCard('Labor Cost %',     laborPct!=null?App.fmtPct(laborPct):null,       App.fmtPct(targetLP),     labImpact,  trendHtml(laborPct,avg4(w=>w.labor_pct_blended),true), labCls)
       + metCard('RPLH',             rplh!=null?App.fmtCurrency(rplh):null,          App.fmtCurrency(targetRPLH), rplhImpact, trendHtml(rplh,avg4(w=>w.rplh_blended)), rplhCls)
-      + metCard('Weekly Revenue Gap', weeklyGap!=null?App.fmtCurrency(weeklyGap):null, App.fmtCurrency(0), weeklyGap, trendHtml(weeklyGap,avg4(w=>w.check_avg!=null&&w.covers?((w.check_avg-targetCA)*w.covers):null)), gapCls)
+      + metCard('Weekly Revenue Gap', weeklyGap!=null?App.fmtCurrency(Math.abs(weeklyGap)):null, '$0', weeklyGap!=null ? -weeklyGap : null, trendHtml(weeklyGap,avg4(w=>w.check_avg!=null&&w.covers?((w.check_avg-(t.check_avg||35))*w.covers):null)), gapCls)
       + '</div>'
-      + this.buildChart(weeks.slice(-8), t)
+      + this.buildChart(validWeeks.slice(-8), t)
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
       + '<div class="sh">Quick Actions</div>'
