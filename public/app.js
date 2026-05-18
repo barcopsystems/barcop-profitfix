@@ -5,7 +5,7 @@ const TT = {
   _cur: null,
   _box: document.getElementById('tt-box'),
   defs: {
-    'container-size': {t:'Container Size',b:'The total size of the bottle, can, or keg you purchase. Pick from the list — the app converts to ounces automatically.',e:'750ml bottle of vodka = 25.4 oz'},
+    'container-size': {t:'Container Size',b:'The total size of the bottle, can, or keg you purchase. Pick from the list   the app converts to ounces automatically.',e:'750ml bottle of vodka = 25.4 oz'},
     'std-pour':       {t:'Standard Pour',b:'How many ounces you pour per drink. Used to calculate Cost Per Pour and track inventory variance.',e:'Spirits: 1.5 oz · Wine: 5 oz · Draft: 16 oz'},
     'unit-cost':      {t:'Unit Cost',b:'What you pay per bottle, can, or keg. Use your invoice price.',e:'Case of Tito\'s 750ml costs $180 = $15/bottle'},
     'menu-price':     {t:'Menu Price',b:'What you charge the guest per drink or serving.',e:'$10 for a cocktail · $6 for a draft beer'},
@@ -16,18 +16,18 @@ const TT = {
     'kitchen-cost':   {t:'Unit Cost',b:'What you pay per unit of this product.',e:'Chicken: $3.20/lb · Lime carton: $4.50/each'},
     'recipe-pours':   {t:'Pours',b:'How many standard pours of this spirit go in this drink. 1 = one standard pour.',e:'1 pour rum + 0.5 pour triple sec'},
     'recipe-bottles': {t:'Bottles',b:'How many full bottles go into the batch. Use decimals for partial bottles.',e:'2 bottles tequila + 0.5 bottle triple sec'},
-    'batch-yield':    {t:'Batch Yield',b:'Total amount this batch makes. Pick the unit — app converts to oz to calculate servings.',e:'1 gallon frozen margarita mix = 128 oz'},
+    'batch-yield':    {t:'Batch Yield',b:'Total amount this batch makes. Pick the unit   app converts to oz to calculate servings.',e:'1 gallon frozen margarita mix = 128 oz'},
     'serving-size':   {t:'Serving Size',b:'How much goes in one drink. App divides yield by serving size to get servings per batch.',e:'5 oz per drink from 128 oz batch = 25.6 drinks'},
     'servings-batch': {t:'Servings Per Batch',b:'Batch Yield ÷ Serving Size. Calculated automatically. Verify this makes sense.',e:'128 oz ÷ 5 oz = 25.6 drinks'},
     'recipe-cost-pct':{t:'Recipe Cost %',b:'Total ingredient cost ÷ Menu Price.',e:'$1.20 cost ÷ $8 menu price = 15%'},
     'plate-yield':    {t:'Plates Per Batch',b:'How many plates this recipe produces. Most single-plate recipes are 1.',e:'A pot of chili serving 10 = plate yield of 10'},
     'bar-revenue':    {t:'Bar Revenue',b:'Total bar sales for the week from your POS. Include all drink sales.',e:'Your POS end-of-week bar department total'},
-    'bar-cogs':       {t:'COGS',b:'Cost of Goods Sold — what you spent on bar product. Invoices + transfers in − transfers out.',e:'Weekly liquor invoice total: $2,340'},
-    'bar-labor':      {t:'Labor',b:'Bar staff payroll — bartenders, barbacks, bar manager. Not kitchen or floor staff.',e:'Bartender hours × hourly rate'},
+    'bar-cogs':       {t:'COGS',b:'Cost of Goods Sold   what you spent on bar product. Invoices + transfers in − transfers out.',e:'Weekly liquor invoice total: $2,340'},
+    'bar-labor':      {t:'Labor',b:'Bar staff payroll   bartenders, barbacks, bar manager. Not kitchen or floor staff.',e:'Bartender hours × hourly rate'},
     'prime-cost':     {t:'Prime Cost %',b:'(Total Bar COGS + Total Food COGS + Total Labor) ÷ Total Revenue. The most important single number in your operation. Target: 60% or below. Above 65% is a warning sign.',e:'($4,200 bar COGS + $3,800 food COGS + $6,200 labor) ÷ $24,000 revenue = 60.0%'},
     'theoretical':    {t:'Pours Sold (POS)',b:'Number of pours/shots of this product rung in on your POS this week. Pull from your POS sales mix report. Enter as individual shots, not bottles.',e:'POS shows 85 shots of Tito\'s vodka sold this week = enter 85'},
     'variance-units': {t:'Variance (Pours)',b:'Pours Made minus Pours Sold. Near zero = controlled. Positive = more poured than sold (over-pouring or theft). Negative = more rung in than used (check POS entries).',e:'87 pours made, 85 sold = +2 variance (within normal range)'},
-    'prev-cost':      {t:'Previous Cost',b:'The Unit Cost currently on file — pulled automatically from product setup.',e:'Tito\'s was $14.50/bottle'},
+    'prev-cost':      {t:'Previous Cost',b:'The Unit Cost currently on file   pulled automatically from product setup.',e:'Tito\'s was $14.50/bottle'},
     'new-cost':       {t:'New Invoice Cost',b:'The price on your most recent invoice for this product.',e:'New invoice shows $15.75/bottle'},
     'weekly-usage':   {t:'Weekly Usage',b:'How many units you typically use per week. Used to calculate Annual Impact $.',e:'4 bottles of Tito\'s per week'},
     'annual-impact':  {t:'Annual Impact $',b:'Cost Change $ × Weekly Usage × 52 weeks.',e:'+$1.25/bottle × 4/week × 52 = +$260/year'},
@@ -35,8 +35,8 @@ const TT = {
     'inv-purchases':  {t:'Purchases',b:'Bottles/units received from deliveries during the week. Count what arrived on invoices, not what was ordered.',e:'Received 6 bottles from your weekly liquor order'},
     'inv-end':        {t:'Ending Inventory',b:'Physical count of bottles/units on hand right now. Count partial bottles as decimals.',e:'3.5 bottles remaining = 3 full + one half-full'},
     'inv-used':       {t:'Units Used',b:'Beginning + Purchases − Ending = actual consumption. Calculated automatically. In bottles for bar products.',e:'4.5 + 6 − 3.5 = 7 bottles used this week'},
-    'shift-cogs':     {t:'Shift COGS (Product Only)',b:'Bar product cost for this shift — spirits, beer, wine. Do not include labor. Estimate from your weekly invoices divided by number of shifts, or use your POS cost report if available.',e:'Weekly $2,400 bar COGS ÷ 6 shifts = $400/shift'},
-    'opening-bank':   {t:'Opening Bank',b:'Cash in the drawer at shift start. Your starting float — not counted as revenue.',e:'Standard opening bank: $200'},
+    'shift-cogs':     {t:'Shift COGS (Product Only)',b:'Bar product cost for this shift   spirits, beer, wine. Do not include labor. Estimate from your weekly invoices divided by number of shifts, or use your POS cost report if available.',e:'Weekly $2,400 bar COGS ÷ 6 shifts = $400/shift'},
+    'opening-bank':   {t:'Opening Bank',b:'Cash in the drawer at shift start. Your starting float   not counted as revenue.',e:'Standard opening bank: $200'},
     'expected-cash':  {t:'Expected Cash from POS',b:'Cash sales total from your POS for this shift.',e:'POS shows $840 in cash sales for the PM shift'},
     'cash-tolerance': {t:'Over/Short Tolerance',b:'Max dollar amount you consider acceptable for a drawer to be off.',e:'$10 tolerance: $9 over or short = OK. $11 = flagged'},
     // Revenue Recovery tooltips
@@ -54,7 +54,16 @@ const TT = {
     'r-cost-pct':       {t:'Cost %',b:'Item Cost ÷ Menu Price. How much of each sale goes to product. Lower is better. Target varies by category.',e:'$4.20 cost ÷ $14.00 price = 30% food cost'},
     'r-wkly-covers':    {t:'Weekly Covers',b:'How many times this item is sold in a typical week. Used in Menu Engineering to calculate volume ranking and total weekly contribution.',e:'House burger sells 85 times per week'},
     'r-fb-minimum':     {t:'F&B Minimum',b:'The minimum food and beverage spend required to book the private dining room or event space for that date and time.',e:'Saturday dinner buyout requires $3,500 F&B minimum'},
-    'r-event-revenue':  {t:'Event Revenue',b:'Actual total spent by the event party including food, beverages, and any room fee. Compare to the F&B minimum to track compliance.',e:'Party spent $4,200 vs $3,500 minimum — 20% above minimum'},
+    'r-event-revenue':  {t:'Event Revenue',b:'Actual total spent by the event party including food, beverages, and any room fee. Compare to the F&B minimum to track compliance.',e:'Party spent $4,200 vs $3,500 minimum   20% above minimum'},
+    'r-daypart-rev':    {t:'Daypart Revenue',b:'Total revenue generated during this specific daypart from your POS. Bar = all bar department sales. Lunch = all dining room sales during lunch service. Dinner = all dining room sales during dinner service.',e:'Dinner POS total for the week: $8,400'},
+    'r-daypart-hrs':    {t:'Daypart Labor Hours',b:'Total hours worked by all staff scheduled to this daypart. Pull from your scheduling system or time clock by job code or shift.',e:'6 servers x 5 hr lunch shift = 30 lunch labor hours'},
+    'r-upsell-calc':    {t:'Upsell Revenue Calculator',b:'Shows the weekly and annual revenue gap between your current team check average and your target. Use this number in pre-shift to make the gap visible to your team.',e:'$33 current avg vs $38 target x 400 covers = $2,000/week gap'},
+    'r-labor-budget-calc': {t:'Labor Budget Calculator',b:'Converts your revenue forecast and labor target percentage into a maximum schedulable hours number. Write the schedule to this number, not to what you think you need.',e:'$9,200 floor revenue x 30% target = $2,760 budget / $13.50 wage = 204 hours'},
+    'r-optimal-hrs':    {t:'Optimal Hours',b:'Revenue forecast divided by your RPLH target. This is the maximum labor hours you can schedule for this shift to hit your RPLH goal.',e:'$6,000 forecast / $75 RPLH target = 80 hours maximum'},
+    'r-price-new':      {t:'Proposed New Price',b:'The price you are considering for this item. The calculator shows you the margin impact and breakeven before you commit to the change.',e:'Current price $13.00, considering raising to $15.00'},
+    'r-vol-change':     {t:'Estimated Volume Change',b:'How much you expect covers to change as a percentage if you change the price. Negative means fewer covers. Use 0 if you expect no change.',e:'-10% means you expect to sell 10% fewer of this item at the new price'},
+    'r-contrib-margin-eng': {t:'Contribution Margin',b:'Menu price minus item cost. What each sale contributes to covering overhead and profit after product cost is deducted.',e:'$15 price - $4.50 cost = $10.50 contribution margin'},
+    'r-event-covers':   {t:'Event Covers',b:'Total guests at the event. Used with F&B minimum to calculate per-head minimum and track whether events are on pace.',e:'40-guest corporate dinner'},
   },
   show(icon) {
     const id = icon.dataset.tt;
@@ -113,7 +122,7 @@ const App = {
     const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
     const isRecovery = hashParams.get('type') === 'recovery';
     if (isRecovery) {
-      // Show set password screen immediately — onAuthChange will fire PASSWORD_RECOVERY
+      // Show set password screen immediately   onAuthChange will fire PASSWORD_RECOVERY
       this.showAuth();
       DB.onAuthChange(async (event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
@@ -364,20 +373,20 @@ const App = {
     const weeks = this.data?.weeks || [];
     if (weeks.length > 0) {
       const w = weeks[weeks.length - 1];
-      el.textContent = 'Week ' + w.week_num + ' — ' + (w.period_end || '');
+      el.textContent = 'Week ' + w.week_num + '   ' + (w.period_end || '');
     } else {
       el.textContent = 'No data yet';
     }
   },
 
   fmtCurrency(n, decimals) {
-    if (isNaN(n) || n == null) return '—';
+    if (isNaN(n) || n == null) return ' ';
     const d = decimals !== undefined ? decimals : (Math.abs(n) < 10 ? 2 : 0);
     return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
   },
 
   fmtPct(n, d=1) {
-    if (isNaN(n) || n == null) return '—';
+    if (isNaN(n) || n == null) return ' ';
     return Number(n).toFixed(d) + '%';
   },
 
@@ -478,7 +487,7 @@ function wireAuth() {
 
 /* ── Boot ── */
 document.addEventListener('DOMContentLoaded', () => {
-  // Nav items are injected dynamically — wired in App._renderNav()
+  // Nav items are injected dynamically   wired in App._renderNav()
   // Settings button routes to correct settings screen based on active module
   document.getElementById('nav-settings')?.addEventListener('click', () => {
     const screen = App._activeModule === 'revenue' ? 'r-settings' : 'settings';
