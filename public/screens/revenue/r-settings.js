@@ -435,7 +435,7 @@ S.RevenueSettings = {
         date: dateStr(35),
         bar_name: 'The Anchor Bar & Kitchen',
         overall_score: audit1Score,
-        grade: 'Tier 2 Analysis — Standard Data Submitted',
+        grade: 'Tier 2 Analysis   Standard Data Submitted',
         audit_period: '4 weeks ending ' + dateStr(42),
         sections: {
           'Menu Engineering and Pricing': 42,
@@ -445,9 +445,9 @@ S.RevenueSettings = {
           'Revenue Management Intelligence': 55,
         },
         action_items: [
-          { action: 'Close check average gap — $2,480/month at current cover count', monthly_impact: 2480 },
-          { action: 'Reduce labor cost — $1,840/month over target', monthly_impact: 1840 },
-          { action: 'Improve menu mix — $920/month opportunity from repricing Dogs', monthly_impact: 920 },
+          { action: 'Close check average gap   $2,480/month at current cover count', monthly_impact: 2480 },
+          { action: 'Reduce labor cost   $1,840/month over target', monthly_impact: 1840 },
+          { action: 'Improve menu mix   $920/month opportunity from repricing Dogs', monthly_impact: 920 },
         ],
         pdf_data: null,
         generated_at: dateStr(35)
@@ -457,7 +457,7 @@ S.RevenueSettings = {
         date: dateStr(5),
         bar_name: 'The Anchor Bar & Kitchen',
         overall_score: audit2Score,
-        grade: 'Tier 2 Analysis — Standard Data Submitted',
+        grade: 'Tier 2 Analysis   Standard Data Submitted',
         audit_period: '4 weeks ending ' + dateStr(12),
         sections: {
           'Menu Engineering and Pricing': 58,
@@ -467,8 +467,8 @@ S.RevenueSettings = {
           'Revenue Management Intelligence': 70,
         },
         action_items: [
-          { action: 'Close check average gap — $1,640/month at current cover count', monthly_impact: 1640 },
-          { action: 'Reduce labor cost — $980/month over target', monthly_impact: 980 },
+          { action: 'Close check average gap   $1,640/month at current cover count', monthly_impact: 1640 },
+          { action: 'Reduce labor cost   $980/month over target', monthly_impact: 980 },
         ],
         pdf_data: null,
         generated_at: dateStr(5)
