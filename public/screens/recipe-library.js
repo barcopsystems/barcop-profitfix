@@ -180,8 +180,8 @@ S.RecipeLibrary={
       +'<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim" id="rl-tgt-d">—</div></div>'
       +'</div>'
       +'<div class="card-actions">'
-      +'<button class="btn btn-ghost" id="rl-cancel">Cancel</button>'
       +'<button class="btn btn-primary" id="rl-save">'+(id?'Update':'Save')+'</button>'
+      +'<button class="btn btn-ghost" id="rl-cancel">Cancel</button>'
       +'<span id="rl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       +'</div></div>';
     this.renderRows();this.calc();document.getElementById('rl-name')?.focus();
