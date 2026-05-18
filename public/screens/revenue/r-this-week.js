@@ -76,7 +76,7 @@ S.RevenueThisWeek = {
   },
 
   step1() {
-    return '<div class="card"><div class="sh">Step 1 — Period Details</div>'
+    return '<div class="card"><div class="sh">Step 1   Period Details</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
       + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
@@ -92,7 +92,7 @@ S.RevenueThisWeek = {
     const totalRev = barRev + floorRev;
     const checkAvg = covers > 0 ? (totalRev / covers) : 0;
     const caGap = checkAvg > 0 ? checkAvg - targetCA : 0;
-    return '<div class="card"><div class="sh">Step 2 — Revenue by Department</div>'
+    return '<div class="card"><div class="sh">Step 2   Revenue by Department</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
       + '<div class="f w-md"><label>Bar Revenue ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-brev" value="' + (this.draft.bar_revenue||'') + '" placeholder="0"/></div></div>'
       + '<div class="f w-md"><label>Floor Revenue ' + tt('r-floor-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-frev" value="' + (this.draft.floor_revenue||'') + '" placeholder="0"/></div></div>'
@@ -121,14 +121,14 @@ S.RevenueThisWeek = {
       const pct  = rev > 0 && cost > 0 ? (cost / rev * 100).toFixed(1) : null;
       const gap  = pct ? (parseFloat(pct) - d.target).toFixed(1) : null;
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + ' — Target: ' + d.target + '%</div>'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + '   Target: ' + d.target + '%</div>'
         + '<div class="form-row" style="gap:16px;">'
         + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-labor-hours') + '</label><input type="number" id="rw-' + d.key + '-hrs" value="' + (this.draft[d.key + '_labor_hours']||'') + '" placeholder="0"/></div>'
         + '<div class="f w-md"><label>' + d.label + ' Labor Cost ' + tt('r-labor-cost') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-' + d.key + '-cost" value="' + (this.draft[d.key + '_labor_cost']||'') + '" placeholder="0"/></div></div>'
         + (pct ? '<div class="f" style="width:120px;"><label>Labor %</label><div style="font-size:18px;font-weight:700;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';padding-top:8px;">' + pct + '%<span style="font-size:11px;font-weight:400;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';margin-left:6px;">' + (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts</span></div></div>' : '')
         + '</div></div>';
     }).join('');
-    return '<div class="card"><div class="sh">Step 3 — Labor by Department</div>' + rows + '</div>' + this.nav(true, true);
+    return '<div class="card"><div class="sh">Step 3   Labor by Department</div>' + rows + '</div>' + this.nav(true, true);
   },
 
   step4() {
@@ -144,15 +144,14 @@ S.RevenueThisWeek = {
       const rplh = hrs > 0 && rev > 0 ? (rev / hrs) : null;
       const gap  = rplh ? rplh - d.target : null;
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + ' — Target: $' + d.target + ' RPLH</div>'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + ' : Target: $' + d.target + ' RPLH ' + tt('r-rplh-target') + '</div>'
         + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f w-md"><label>' + d.label + ' Revenue ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-rplh-' + d.key + '-rev" value="' + (this.draft['rplh_' + d.key + '_rev']||'') + '" placeholder="0"/></div></div>'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-labor-hours') + '</label><input type="number" id="rw-rplh-' + d.key + '-hrs" value="' + (this.draft['rplh_' + d.key + '_hrs']||'') + '" placeholder="0"/></div>'
-        + (rplh ? '<div class="f" style="width:140px;"><label>RPLH</label><div style="font-size:18px;font-weight:700;color:' + (gap >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding-top:8px;">' + App.fmtCurrency(rplh) + '<span style="font-size:11px;font-weight:400;margin-left:6px;">' + (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + '</span></div></div>' : '')
+        + '<div class="f w-md"><label>' + d.label + ' Revenue ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-rplh-' + d.key + '-rev" value="' + (this.draft['rplh_' + d.key + '_rev']||'') + '" placeholder="0"/></div></div>'
+        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-daypart-hrs') + '</label><input type="number" id="rw-rplh-' + d.key + '-hrs" value="' + (this.draft['rplh_' + d.key + '_hrs']||'') + '" placeholder="0"/></div>'
+        + (rplh ? '<div class="f" style="width:140px;"><label>RPLH ' + tt('r-rplh') + '</label><div style="font-size:18px;font-weight:700;color:' + (gap >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding-top:8px;">' + App.fmtCurrency(rplh) + '<span style="font-size:11px;font-weight:400;margin-left:6px;">' + (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + '</span></div></div>' : '')
         + '</div></div>';
     }).join('');
-    return '<div class="card"><div class="sh">Step 4 — RPLH by Daypart</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Revenue Per Labor Hour. Enter the revenue and hours worked for each daypart. RPLH calculates automatically.</div>'
+    return '<div class="card"><div class="sh">Step 4 : RPLH by Daypart</div>'
       + rows + '</div>' + this.nav(true, true);
   },
 
@@ -188,9 +187,8 @@ S.RevenueThisWeek = {
         + '</div>';
     }).join('');
 
-    return '<div class="card"><div class="sh">Step 5 — Server Performance</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Enter covers served and total sales for each server this week. Check average calculates automatically. Target: $' + targetCA + '.</div>'
-      + (teamAvg ? '<div style="background:var(--input);border-radius:6px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--t2);">Team average check average this week: <strong style="color:var(--t1);">' + App.fmtCurrency(teamAvg) + '</strong> vs target $' + targetCA + '</div>' : '')
+    return '<div class="card"><div class="sh">Step 5 : Server Performance</div>'
+      + (teamAvg ? '<div style="background:var(--input);border-radius:6px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--t2);">Team check average this week: <strong style="color:var(--t1);">' + App.fmtCurrency(teamAvg) + '</strong> vs target $' + targetCA + '</div>' : '')
       + rows + '</div>' + this.nav(true, false, null) + '<div style="text-align:right;margin-top:12px;"><button class="btn btn-primary" id="rw-next">Next →</button></div>';
   },
 
@@ -220,14 +218,14 @@ S.RevenueThisWeek = {
       + (sub ? '<div style="font-size:11px;color:var(--t3);">' + sub + '</div>' : '')
       + '</div></div>';
 
-    return '<div class="card"><div class="sh">Step 6 — Review and Save</div>'
+    return '<div class="card"><div class="sh">Step 6   Review and Save</div>'
       + row('Week', 'Week ' + d.week_num, d.period_end)
       + row('Bar Revenue', App.fmtCurrency(barRev), '')
       + row('Floor Revenue', App.fmtCurrency(floorRev), '')
       + row('Total Revenue', App.fmtCurrency(totalRev), '')
-      + row('Covers', covers || '—', '')
-      + row('Check Average', checkAvg ? App.fmtCurrency(checkAvg) : '—', 'Target $' + targetCA)
-      + (annualGap !== 0 ? row('Annual Check Avg Gap', App.fmtCurrency(Math.abs(annualGap)), annualGap >= 0 ? 'above target' : 'below target — recoverable') : '')
+      + row('Covers', covers || ' ', '')
+      + row('Check Average', checkAvg ? App.fmtCurrency(checkAvg) : ' ', 'Target $' + targetCA)
+      + (annualGap !== 0 ? row('Annual Check Avg Gap', App.fmtCurrency(Math.abs(annualGap)), annualGap >= 0 ? 'above target' : 'below target   recoverable') : '')
       + row('Total Labor Cost', App.fmtCurrency(totalLaborCost), '')
       + (laborPct ? row('Blended Labor %', laborPct + '%', '') : '')
       + (rplh ? row('Blended RPLH', App.fmtCurrency(parseFloat(rplh)), '') : '')
