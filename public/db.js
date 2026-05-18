@@ -192,6 +192,11 @@ const DB = {
         data.settings.targets = d.settings.targets;
       }
     }
+    if (data.revenue_settings) {
+      Object.keys(d.revenue_settings).forEach(k => {
+        if (!(k in data.revenue_settings)) data.revenue_settings[k] = d.revenue_settings[k];
+      });
+    }
     return data;
   },
 
@@ -213,7 +218,30 @@ const DB = {
       weeks: [], shifts: [], reconciliations: [],
       theft_scores: [], vendor_log: [], last_theft_score_date: null,
       audits: [],
-      getting_started_profit: {}
+      getting_started_profit: {},
+      // Revenue Recovery data
+      revenue_settings: {
+        targets: {
+          check_avg: 35,
+          bar_labor_pct: 28,
+          kitchen_labor_pct: 30,
+          floor_labor_pct: 32,
+          rplh_lunch: 50,
+          rplh_dinner: 75,
+          rplh_bar: 65,
+          event_close_rate: 40
+        },
+        avg_hourly_wage: { bar: 15, kitchen: 14, floor: 13 },
+        servers: [],
+        _targets_saved: false
+      },
+      revenue_weeks: [],
+      revenue_server_checks: [],
+      revenue_menu_items: [],
+      revenue_price_log: [],
+      revenue_events: [],
+      revenue_rate_cards: [],
+      getting_started_revenue: {}
     };
   }
 };
