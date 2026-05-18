@@ -307,6 +307,12 @@ S.RevenueThisWeek = {
     const floorRev     = parseFloat(d.floor_revenue)     || 0;
     const covers       = parseFloat(d.covers)            || 0;
     const totalRev     = barRev + floorRev;
+
+    if (totalRev === 0) {
+      alert('Bar revenue and floor revenue are both zero. Enter at least one revenue figure before saving.');
+      return;
+    }
+
     const checkAvg     = covers > 0 ? totalRev / covers : 0;
 
     const barLaborCost     = parseFloat(d.bar_labor_cost)     || 0;
