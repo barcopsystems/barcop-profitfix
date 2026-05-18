@@ -118,7 +118,29 @@ S.Dashboard = {
         +'<div class="empty-sub">Enter your first week to see your numbers here.</div></div></div>';
     }
 
+    // Start Here card — shows until cost targets have been saved by the user
+    const targetsSet = App.data.settings._targets_saved || false;
+    let startHereHtml = '';
+    if (!targetsSet) {
+      const t = App.data.settings.targets || {};
+      startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid var(--gold);background:rgba(201,168,76,0.04);">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Industry benchmarks are already filled in below. Adjust them to match your operation and hit Save. You can always update these later in Settings.</div>'
+        + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
+        + '<div class="f" style="width:120px;"><label>Bar Pour Cost %</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:120px;"><label>Food Cost %</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:120px;"><label>Bar Labor %</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:120px;"><label>Food Labor %</label><div class="fw"><input class="suf" type="number" id="sh-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:120px;"><label>Prime Cost %</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:120px;"><label>Cash Tolerance</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
+        + '</div>'
+        + '<button class="btn btn-primary" id="sh-save">Save Targets</button>'
+        + '</div>';
+    }
+
     container.innerHTML = '<div class="screen">'
+      + startHereHtml
       + alertHtml
       + '<div class="metric-grid">'
       + metricCard('Bar Pour Cost', barPct!=null?App.fmtPct(barPct):null, barTarget, barImpact, trendHtml(barPct,barAvg), barCls)
@@ -143,8 +165,28 @@ S.Dashboard = {
       +'</div>';
 
     document.getElementById('db-dismiss')?.addEventListener('click', () => {
-      this._dismissed=true;
+      this._dismissed = true;
       document.getElementById('db-alert')?.remove();
+    });
+
+    document.getElementById('sh-save')?.addEventListener('click', async () => {
+      App.data.settings.targets = {
+        bar_pour_cost_pct:  parseFloat(document.getElementById('sh-bpc')?.value) || 22,
+        food_cost_pct:      parseFloat(document.getElementById('sh-fc')?.value)  || 32,
+        bar_labor_cost_pct: parseFloat(document.getElementById('sh-bl')?.value)  || 28,
+        food_labor_cost_pct:parseFloat(document.getElementById('sh-fl')?.value)  || 30,
+        prime_cost_pct:     parseFloat(document.getElementById('sh-pc')?.value)  || 60,
+      };
+      App.data.settings.cash_tolerance = parseFloat(document.getElementById('sh-ct')?.value) || 10;
+      App.data.settings._targets_saved = true;
+      // Mark cost targets task complete in Getting Started
+      const gs = App.data.getting_started_profit || {};
+      gs['t_targets'] = new Date().toISOString();
+      App.data.getting_started_profit = gs;
+      await App.saveKey('settings');
+      await App.saveKey('getting_started_profit');
+      // Route to Getting Started so they see the checkmark and next steps
+      App.navigate('getting-started');
     });
     document.getElementById('qa-week')?.addEventListener('click', ()=>App.navigate('this-week'));
     document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('shift-check'));
