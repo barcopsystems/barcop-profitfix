@@ -83,7 +83,7 @@ S.RevenueRPLH = {
       + chartHtml
       + calcHtml
       + '<div class="sh" style="margin-top:16px;">RPLH History</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Week</th><th>Lunch</th><th>Dinner</th><th>Bar</th><th>Blended</th></tr></thead><tbody>' + histRows + '</tbody></table></div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Week</th><th>Lunch ' + tt('r-rplh') + '</th><th>Dinner ' + tt('r-rplh') + '</th><th>Bar ' + tt('r-rplh') + '</th><th>Blended ' + tt('r-rplh') + '</th></tr></thead><tbody>' + histRows + '</tbody></table></div>'
       + '</div>';
 
     const calcResult = () => {
