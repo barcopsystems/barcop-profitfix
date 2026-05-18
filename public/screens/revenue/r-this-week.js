@@ -68,8 +68,8 @@ S.RevenueThisWeek = {
   },
 
   nav(showBack, showNext, saveLabel) {
-    return '<div class="tw-nav">'
-      + (showBack ? '<button class="btn btn-ghost" id="rw-back">← Back</button>' : '<div></div>')
+    return '<div class="card-actions">'
+      + (showBack ? '<button class="btn btn-ghost" id="rw-back">← Back</button>' : '')
       + (showNext && this.step < 6 ? '<button class="btn btn-primary" id="rw-next">Next →</button>' : '')
       + (saveLabel ? '<button class="btn btn-primary" id="rw-save">' + saveLabel + '</button>' : '')
       + '</div>';
@@ -182,7 +182,7 @@ S.RevenueThisWeek = {
       return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
         + '<div style="width:130px;font-size:12px;font-weight:700;color:var(--t1);flex-shrink:0;">' + esc(e.name) + '</div>'
         + '<div class="f" style="width:100px;"><label style="font-size:10px;">Covers</label><input type="number" class="rsv-cov" data-idx="' + i + '" value="' + (e.covers||'') + '" placeholder="0" style="padding:6px 8px;font-size:12px;"/></div>'
-        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="0" style="padding:6px 8px;font-size:12px;"/></div></div>'
+        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="0" style="font-size:12px;"/></div></div>'
         + (ca ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">Check Avg</div><div style="font-size:14px;font-weight:700;color:' + (vsTgt >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(ca) + '</div></div>' : '')
         + (vsTeam != null ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">vs Team</div><div style="font-size:12px;color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</div></div>' : '')
         + '</div>';
