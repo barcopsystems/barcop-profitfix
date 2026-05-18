@@ -78,7 +78,7 @@ S.RevenueCheckAverage = {
       + '</div>'
       // Server table
       + '<div class="sh">Server Check Average</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Server</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Total Covers</th><th>Weeks</th></tr></thead><tbody>' + serverRows + '</tbody></table></div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Server</th><th>Check Avg ' + tt('r-check-avg') + '</th><th>vs Target</th><th>vs Team</th><th>Total Covers ' + tt('r-covers') + '</th><th>Weeks</th></tr></thead><tbody>' + serverRows + '</tbody></table></div>'
       + upsellCalc
       + '<div class="sh" style="margin-top:16px;">Weekly Check Average Trend</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Week</th><th>Period End</th><th>Covers</th><th>Check Avg</th><th>vs Target</th></tr></thead><tbody>' + trendRows + '</tbody></table></div>'
