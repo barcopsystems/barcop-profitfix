@@ -20,11 +20,10 @@ S.Settings = {
       // ── General tab ──
       + '<div id="s-tab-general">'
       + '<div class="settings-section"><div class="settings-title">Your Bar</div>'
-      + '<div class="card"><div class="form-row">'
-      + '<div class="f w-lg"><label>Bar Name</label><input type="text" id="s-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
-      + '<div class="f w-md"><label>City, State</label><input type="text" id="s-city" value="' + esc(s.city_state || '') + '" placeholder="Austin, TX" /></div>'
-      + '<div class="f w-md"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-brev" value="' + (s.annual_bar_revenue || '') + '" placeholder="0" /></div></div>'
-      + '<div class="f w-md"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-frev" value="' + (s.annual_food_revenue || '') + '" placeholder="0" /></div></div>'
+      + '<div class="card"><div class="form-row" style="gap:16px;">'
+      + '<div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="s-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
+      + '<div class="f" style="flex:1.2;min-width:130px;"><label>City</label><input type="text" id="s-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin" /></div>'
+      + '<div class="f" style="flex:0.8;min-width:100px;"><label>State / Province</label><input type="text" id="s-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX" /></div>'
       + '</div></div></div>'
       + '<div class="settings-section"><div class="settings-title">Cost Targets</div>'
       + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
@@ -67,7 +66,7 @@ S.Settings = {
     document.getElementById('s-clear-all')?.addEventListener('click',  () => this.clearAll());
     document.getElementById('s-reset-ob')?.addEventListener('click', async () => {
       App.data.settings.onboarding_complete = false;
-      await App.save();
+      await App.saveKey('settings');
       window.location.reload();
     });
 
@@ -186,10 +185,10 @@ S.Settings = {
 
   save() {
     const s = App.data.settings;
-    s.bar_name             = document.getElementById('s-name')?.value.trim();
-    s.city_state           = document.getElementById('s-city')?.value.trim();
-    s.annual_bar_revenue   = parseFloat(document.getElementById('s-brev')?.value) || 0;
-    s.annual_food_revenue  = parseFloat(document.getElementById('s-frev')?.value) || 0;
+    const city  = document.getElementById('s-city')?.value.trim() || '';
+    const state = document.getElementById('s-state')?.value.trim() || '';
+    s.bar_name   = document.getElementById('s-name')?.value.trim();
+    s.city_state = city && state ? city + ', ' + state : city || state || '';
     s.targets = {
       bar_pour_cost_pct:  parseFloat(document.getElementById('s-bpc')?.value)  || 22,
       food_cost_pct:      parseFloat(document.getElementById('s-fc')?.value)   || 32,
