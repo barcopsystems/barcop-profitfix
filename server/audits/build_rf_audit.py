@@ -3,7 +3,6 @@ BAR COP REVENUE FIX AUDIT - Build File
 Cover page only - checkpoint 1
 """
 
-import os
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -16,6 +15,7 @@ from reportlab.platypus import (
 from reportlab.platypus.flowables import Flowable
 import math
 
+import os
 OUT = os.environ.get("AUDIT_OUT_PATH", "/tmp/BarCop_Revenue_Audit_EXAMPLE.pdf")
 
 # ── COLORS ───────────────────────────────────────────────────────────────────
@@ -3678,6 +3678,12 @@ def page_close():
     s.append(_fs_outer)
     s.append(sp(12))
 
+    # 9. Bar Cop footer line
+    s.append(Paragraph(
+        'Bar Cop  |  <a href="https://www.barcop.com">'
+        '<font color="#4888A8">barcop.com</font></a>',
+        ParagraphStyle("close_footer", fontName=FONT_BOLD, fontSize=9, leading=13,
+        textColor=MID_GRAY, alignment=TA_CENTER, leftIndent=0, firstLineIndent=0)))
 
     return s
 
@@ -3712,8 +3718,8 @@ def build():
     print(f"Built: {OUT}")
 
 
-# ── REAL DATA INJECTION ──────────────────────────────────────────────────────
-# If DATA_JSON env var is set, override all sample data with real values.
+# ── REAL DATA INJECTION ───────────────────────────────────────────────────────
+# If AUDIT_DATA_JSON env var is set, override all sample data with real values.
 import os as _os, json as _json
 _data_path = _os.environ.get("AUDIT_DATA_JSON")
 if _data_path and _os.path.exists(_data_path):
@@ -3723,8 +3729,6 @@ if _data_path and _os.path.exists(_data_path):
     for _k, _v in _d.items():
         if _k in _g or _k.isupper():
             _g[_k] = _v
-    # Recalculate any derived values that depend on injected data
-    # (script-specific recalcs happen after this block in each file)
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
