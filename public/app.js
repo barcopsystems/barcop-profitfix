@@ -374,10 +374,17 @@ function wireAuth() {
     if (!pw1 || pw1.length < 8) { msg.style.color='var(--red)'; msg.textContent='Password must be at least 8 characters.'; msg.style.display='block'; return; }
     if (pw1 !== pw2) { msg.style.color='var(--red)'; msg.textContent='Passwords do not match.'; msg.style.display='block'; return; }
     btn.textContent='Saving...'; btn.disabled=true;
-    const { error } = await DB._sb.auth.updateUser({ password: pw1 });
-    btn.textContent='Set Password and Sign In'; btn.disabled=false;
-    if (error) { msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block'; }
-    else { msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block'; }
+    const { data: updateData, error } = await DB._sb.auth.updateUser({ password: pw1 });
+    if (error) {
+      btn.textContent='Set Password and Sign In'; btn.disabled=false;
+      msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block';
+    } else {
+      msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block';
+      // Manually boot since SIGNED_IN may not re-fire after updateUser
+      App.data = await DB.readData();
+      App.subscription = await DB.getSubscription();
+      App.boot();
+    }
   });
 
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
