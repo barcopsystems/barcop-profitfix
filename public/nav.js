@@ -71,7 +71,7 @@ const ProfitNav = {
       </div>
       <div class="nav-item" data-screen="help" id="nav-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
-        <span class="nav-label">Help &amp; FAQ</span>
+        <span class="nav-label">Help and FAQ</span>
       </div>
     `;
   }
