@@ -40,7 +40,7 @@ S.RevenueCheckAverage = {
         + '<td style="font-weight:700;color:var(--t1);">' + esc(sv.name) + '</td>'
         + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + (sv.checkAvg >= targetCA ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(sv.checkAvg) + '</td>'
         + '<td style="color:' + (vs >= 0 ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (vs >= 0 ? '+' : '') + App.fmtCurrency(vs) + '</td>'
-        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam != null ? (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) : '—') + '</td>'
+        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam != null ? (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) : ' ') + '</td>'
         + '<td>' + Math.round(sv.totalCovers) + '</td>'
         + '<td>' + sv.weeks + '</td>'
         + '</tr>';
@@ -48,8 +48,7 @@ S.RevenueCheckAverage = {
 
     // Upsell revenue calculator
     const upsellCalc = '<div class="card" style="margin-top:16px;">'
-      + '<div class="sh">Upsell Revenue Calculator</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.6;">See the annual revenue impact of closing your check average gap.</div>'
+      + '<div class="sh">Upsell Revenue Calculator ' + tt('r-upsell-calc') + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
       + '<div class="f w-md"><label>Current Team Check Average</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rca-cur" value="' + (teamAvg ? teamAvg.toFixed(2) : '') + '" step="0.01"/></div></div>'
       + '<div class="f w-md"><label>Target Check Average</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rca-tgt" value="' + targetCA + '" step="0.01"/></div></div>'
@@ -62,9 +61,9 @@ S.RevenueCheckAverage = {
     const trendRows = weeks.slice().reverse().slice(0,12).map(w =>
       '<tr><td>Wk ' + w.week_num + '</td>'
       + '<td>' + (w.period_end||'').slice(0,10) + '</td>'
-      + '<td>' + (w.covers||'—') + '</td>'
-      + '<td class="' + (w.check_avg >= targetCA ? 'pos' : 'neg') + ' val">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '—') + '</td>'
-      + '<td style="color:' + ((w.check_avg||0) >= targetCA ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (w.check_avg ? ((w.check_avg - targetCA) >= 0 ? '+' : '') + App.fmtCurrency(w.check_avg - targetCA) : '—') + '</td>'
+      + '<td>' + (w.covers||' ') + '</td>'
+      + '<td class="' + (w.check_avg >= targetCA ? 'pos' : 'neg') + ' val">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : ' ') + '</td>'
+      + '<td style="color:' + ((w.check_avg||0) >= targetCA ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (w.check_avg ? ((w.check_avg - targetCA) >= 0 ? '+' : '') + App.fmtCurrency(w.check_avg - targetCA) : ' ') + '</td>'
       + '</tr>'
     ).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
 
@@ -72,7 +71,7 @@ S.RevenueCheckAverage = {
       // Summary cards
       + '<div class="metric-grid" style="margin-bottom:16px;">'
       + '<div class="metric-card"><div class="metric-label">Target Check Average</div><div class="metric-val">' + App.fmtCurrency(targetCA) + '</div><div class="metric-target">Your set target</div></div>'
-      + '<div class="metric-card"><div class="metric-label">Team Average</div><div class="metric-val ' + (teamAvg == null ? '' : teamAvg >= targetCA ? 'on-target' : 'over-target') + '">' + (teamAvg ? App.fmtCurrency(teamAvg) : '—') + '</div><div class="metric-target">All servers</div></div>'
+      + '<div class="metric-card"><div class="metric-label">Team Average</div><div class="metric-val ' + (teamAvg == null ? '' : teamAvg >= targetCA ? 'on-target' : 'over-target') + '">' + (teamAvg ? App.fmtCurrency(teamAvg) : ' ') + '</div><div class="metric-target">All servers</div></div>'
       + (spread != null ? '<div class="metric-card"><div class="metric-label">Performance Spread</div><div class="metric-val ' + (spread > 10 ? 'over-target' : 'on-target') + '">' + App.fmtCurrency(spread) + '</div><div class="metric-target">Top vs bottom</div></div>' : '')
       + (topServer ? '<div class="metric-card"><div class="metric-label">Top Server</div><div class="metric-val on-target">' + App.fmtCurrency(topServer.checkAvg) + '</div><div class="metric-target">' + esc(topServer.name) + '</div></div>' : '')
       + '</div>'
