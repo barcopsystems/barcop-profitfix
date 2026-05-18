@@ -50,6 +50,7 @@ S.Settings = {
       + '<div style="display:flex;gap:10px;">'
       + '<button class="btn btn-ghost" id="s-load-sample">Load Sample Data</button>'
       + '<button class="btn btn-danger" id="s-clear-all">Clear All Data</button>'
+      + '<button class="btn btn-ghost" id="s-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
       + '</div>'
       + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
       + '</div></div>'
@@ -64,6 +65,11 @@ S.Settings = {
     document.getElementById('s-pw-btn')?.addEventListener('click', () => this.changePassword());
     document.getElementById('s-load-sample')?.addEventListener('click', () => this.loadSample());
     document.getElementById('s-clear-all')?.addEventListener('click',  () => this.clearAll());
+    document.getElementById('s-reset-ob')?.addEventListener('click', async () => {
+      App.data.settings.onboarding_complete = false;
+      await App.save();
+      window.location.reload();
+    });
 
     // Tab switching
     container.querySelectorAll('.s-tab').forEach(tab => {
