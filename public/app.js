@@ -247,6 +247,7 @@ const App = {
     if (this._activeModule === 'revenue') {
       const revTitles = {
         'hub':                    ['Recovery Hub', ''],
+        'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
         'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
         'r-this-week':            ['This Week', 'Weekly Entry'],
         'r-server-check':         ['Server Check', ''],
@@ -263,6 +264,7 @@ const App = {
         'r-settings':             ['Settings', 'Revenue Recovery'],
       };
       const revScreens = {
+        'r-audit':            S.RevenueAudit,
         'r-dashboard':        S.RevenueDashboard,
         'r-this-week':        S.RevenueThisWeek,
         'r-server-check':     S.RevenueServerCheck,
