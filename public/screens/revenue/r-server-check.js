@@ -1,120 +1,167 @@
 'use strict';
 S.RevenueServerCheck = {
+  _calc: null,
+  _entryId: null,
+  _saving: false,
+
   render(container, actions) {
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Log Shift Check';
-    addBtn.addEventListener('click', () => this.showForm(container, actions));
-    actions.appendChild(addBtn);
-    this.renderList(container, actions);
+    actions.innerHTML = '';
+    this._entryId = App.uid();
+    this._calc    = null;
+
+    const t        = App.data.revenue_settings?.targets || {};
+    const servers  = App.data.revenue_settings?.servers || [];
+    const targetCA = t.check_avg || 35;
+    const today    = new Date().toISOString().slice(0,10);
+    const h        = new Date().getHours();
+    const shift    = h < 14 ? 'Lunch' : h < 20 ? 'Dinner' : 'Bar';
+
+    const log = (App.data.revenue_server_checks||[]).slice(-30).reverse();
+
+    const logRows = !log.length
+      ? '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--t4);">No shift checks logged yet.</td></tr>'
+      : log.map(c => {
+          const ca  = c.covers > 0 ? c.sales / c.covers : 0;
+          const diff = ca - targetCA;
+          const cls  = diff >= 0 ? 'badge-ok' : diff >= -5 ? 'badge-dim' : 'badge-warn';
+          const status = diff >= 0 ? 'ON TARGET' : diff >= -5 ? 'WATCH' : 'BELOW STANDARD';
+          return '<tr>'
+            + '<td>' + (c.date||'').slice(0,10) + '</td>'
+            + '<td>' + esc(c.shift||'') + '</td>'
+            + '<td>' + esc(c.server_name||'') + '</td>'
+            + '<td class="val">' + App.fmtCurrency(ca) + '</td>'
+            + '<td style="color:' + (diff>=0?'var(--gold)':diff>=-5?'var(--t2)':'var(--red)') + ';">' + (diff>=0?'+':'') + App.fmtCurrency(diff) + '</td>'
+            + '<td><span class="badge ' + cls + '">' + status + '</span></td>'
+            + '</tr>';
+        }).join('');
+
+    const serverOpts = servers.map(s => '<option>' + esc(s.name) + '</option>').join('');
+
+    container.innerHTML = '<div class="screen">'
+      + '<div class="card">'
+      + '<div class="card-title">New Shift Check</div>'
+      + '<div class="form-row" style="flex-wrap:nowrap;gap:10px;align-items:flex-end;">'
+      + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input type="date" id="rsc-date" value="' + today + '" style="width:100%;"/></div>'
+      + '<div class="f" style="width:88px;flex-shrink:0;"><label>Shift</label><select id="rsc-shift" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;"><option' + (shift==='Lunch'?' selected':'') + '>Lunch</option><option' + (shift==='Dinner'?' selected':'') + '>Dinner</option><option' + (shift==='Bar'?' selected':'') + '>Bar</option></select></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Server</label><select id="rsc-server" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;">' + (serverOpts||'<option>No servers in roster</option>') + '</select></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Covers ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="0" style="width:100%;"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Total Sales ' + tt('r-check-avg') + '</label><div class="fw" style="width:100%;"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="0" style="width:100%;"/></div></div>'
+      + '<div class="f" style="flex-shrink:0;"><label style="opacity:0;">x</label><button class="btn btn-primary" id="rsc-submit" style="white-space:nowrap;">Submit</button></div>'
+      + '</div>'
+      + '<div id="rsc-result" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--b2);">'
+      + '<div style="display:flex;align-items:center;gap:40px;flex-wrap:wrap;">'
+      + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Check Average</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:600;letter-spacing:-1px;line-height:1;" id="rsc-ca"> </div></div>'
+      + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Target</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:600;letter-spacing:-1px;line-height:1;color:var(--t3);">$' + targetCA + '</div></div>'
+      + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">vs Target</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:600;letter-spacing:-1px;line-height:1;" id="rsc-var"> </div></div>'
+      + '<div style="margin-left:auto;"><div id="rsc-badge" style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:12px 18px;border-radius:4px;"></div></div>'
+      + '</div></div>'
+      + '</div>'
+      + '<div class="sh">Shift Log   Last 30</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="rsc-sel-all">Select All</button>'
+      + '<button class="btn btn-danger btn-sm" id="rsc-del-sel" style="display:none;">Delete Selected</button>'
+      + '<span id="rsc-sel-count" style="font-size:11px;color:var(--t3);"></span>'
+      + '</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th style="width:36px;"><input type="checkbox" id="rsc-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
+      + '<th>Date</th><th>Shift</th><th>Server</th><th>Check Avg ' + tt('r-check-avg') + '</th><th>vs Target</th><th>Status</th>'
+      + '</tr></thead><tbody id="rsc-log">' + this._buildRows(log, targetCA) + '</tbody></table></div>'
+      + '</div>';
+
+    document.getElementById('rsc-cov')?.addEventListener('input', () => this.calc());
+    document.getElementById('rsc-sales')?.addEventListener('input', () => this.calc());
+    document.getElementById('rsc-submit')?.addEventListener('click', () => {
+      if (this._saving) return; this._saving=true; setTimeout(()=>{this._saving=false;},2000);
+      this.calc(); this.save(container, actions);
+    });
+
+    // Bulk delete wiring
+    const updateSel = () => {
+      const checked = container.querySelectorAll('.rsc-chk:checked');
+      const delBtn  = document.getElementById('rsc-del-sel');
+      const count   = document.getElementById('rsc-sel-count');
+      if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
+      if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
+    };
+    document.getElementById('rsc-chk-all')?.addEventListener('change', e => {
+      container.querySelectorAll('.rsc-chk').forEach(c => { c.checked=e.target.checked; });
+      updateSel();
+    });
+    container.addEventListener('change', e => { if(e.target.classList.contains('rsc-chk')) updateSel(); });
+    document.getElementById('rsc-del-sel')?.addEventListener('click', async () => {
+      const ids = [...container.querySelectorAll('.rsc-chk:checked')].map(c=>c.dataset.id);
+      if (!ids.length) return;
+      App.data.revenue_server_checks = (App.data.revenue_server_checks||[]).filter(c=>!ids.includes(c.id));
+      await App.saveKey('revenue_server_checks');
+      this.render(container, actions);
+    });
   },
 
-  renderList(container, actions) {
-    const checks  = (App.data.revenue_server_checks || []).slice().reverse().slice(0, 30);
-    const servers  = App.data.revenue_settings?.servers || [];
-    const t        = App.data.revenue_settings?.targets || {};
-    const targetCA = t.check_avg || 35;
-    const weeks    = App.data.revenue_weeks || [];
-    // 4-week team average from saved weeks
-    const recent4 = weeks.slice(-4);
-    const teamAvg4 = recent4.length
-      ? recent4.reduce((s,w) => s + (w.check_avg||0), 0) / recent4.length
-      : null;
-
-    const statusBadge = (ca) => {
+  _buildRows(log, targetCA) {
+    if (!log.length) return '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--t4);">No shift checks logged yet.</td></tr>';
+    return log.map(c => {
+      const ca   = c.covers>0 ? c.sales/c.covers : 0;
       const diff = ca - targetCA;
-      if (diff >= 0)   return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:2px;background:rgba(201,168,76,0.15);color:var(--gold);">ON TARGET</span>';
-      if (diff >= -5)  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:2px;background:rgba(208,128,8,0.15);color:#D08008;">WATCH</span>';
-      return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:2px;background:rgba(192,56,40,0.15);color:var(--red);">BELOW STANDARD</span>';
-    };
-
-    const rows = checks.map(c => {
-      const ca = c.covers > 0 ? (c.sales / c.covers) : 0;
+      const cls  = diff>=0?'badge-ok':diff>=-5?'badge-dim':'badge-warn';
+      const status = diff>=0?'ON TARGET':diff>=-5?'WATCH':'BELOW STANDARD';
       return '<tr>'
+        + '<td><input type="checkbox" class="rsc-chk" data-id="' + c.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
         + '<td>' + (c.date||'').slice(0,10) + '</td>'
         + '<td>' + esc(c.shift||'') + '</td>'
         + '<td>' + esc(c.server_name||'') + '</td>'
-        + '<td>' + (c.covers||' ') + '</td>'
-        + '<td class="val">' + (ca > 0 ? App.fmtCurrency(ca) : ' ') + '</td>'
-        + '<td>' + statusBadge(ca) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(ca) + '</td>'
+        + '<td style="color:' + (diff>=0?'var(--gold)':diff>=-5?'var(--t2)':'var(--red)') + ';">' + (diff>=0?'+':'') + App.fmtCurrency(diff) + '</td>'
+        + '<td><span class="badge ' + cls + '">' + status + '</span></td>'
         + '</tr>';
-    }).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No shift checks logged yet.</td></tr>';
-
-    container.innerHTML = '<div class="screen">'
-      + '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;gap:24px;flex-wrap:wrap;">'
-      + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Check Avg Target</div><div style="font-size:22px;font-weight:800;color:var(--t1);">$' + targetCA + '</div></div>'
-      + (teamAvg4 ? '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">4-Week Team Avg</div><div style="font-size:22px;font-weight:800;color:' + (teamAvg4 >= targetCA ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(teamAvg4) + '</div></div>' : '')
-      + '</div></div>'
-      + '<div class="sh">Last 30 Shift Checks</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers ' + tt('r-covers') + '</th><th>Check Avg ' + tt('r-check-avg') + '</th><th>Status</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
+    }).join('');
   },
 
-  showForm(container, actions) {
-    const servers  = App.data.revenue_settings?.servers || [];
-    const t        = App.data.revenue_settings?.targets || {};
-    const targetCA = t.check_avg || 35;
-    const serverOpts = servers.map(s => '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>').join('');
+  calc() {
+    const cov    = parseFloat(document.getElementById('rsc-cov')?.value)   || 0;
+    const sales  = parseFloat(document.getElementById('rsc-sales')?.value) || 0;
+    const target = App.data.revenue_settings?.targets?.check_avg || 35;
+    const res    = document.getElementById('rsc-result');
+    if (!res||cov===0) { if(res) res.style.display='none'; return; }
+    res.style.display='block';
+    const ca   = sales / cov;
+    const diff = ca - target;
+    let status, sBg, sColor, cColor;
+    if (diff>=0)      { status='ON TARGET';          sBg='rgba(201,168,76,0.12)'; sColor='#C9A84C'; cColor='#C9A84C'; }
+    else if (diff>=-5){ status='WATCH';              sBg='rgba(255,255,255,0.08)'; sColor='rgba(255,255,255,0.8)'; cColor='#fff'; }
+    else              { status='BELOW STANDARD';     sBg='rgba(192,56,40,0.15)'; sColor='#C03828'; cColor='#C03828'; }
+    const caEl=document.getElementById('rsc-ca'), vEl=document.getElementById('rsc-var'), bEl=document.getElementById('rsc-badge');
+    if(caEl){caEl.textContent=App.fmtCurrency(ca);caEl.style.color=cColor;}
+    if(vEl) {vEl.textContent=(diff>=0?'+':'')+App.fmtCurrency(diff);vEl.style.color=diff>=0?'#C9A84C':'#C03828';}
+    if(bEl) {bEl.textContent=status;bEl.style.background=sBg;bEl.style.color=sColor;}
+    this._calc={ca,diff,status};
+  },
 
-    const today = new Date().toISOString().slice(0,10);
-
-    container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="sh">Log Shift Check</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Date</label><input type="date" id="rsc-date" value="' + today + '"/></div>'
-      + '<div class="f w-md"><label>Shift</label><select id="rsc-shift" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;"><option>Lunch</option><option>Dinner</option><option>Bar</option></select></div>'
-      + '<div class="f w-md"><label>Server</label><select id="rsc-server" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;">' + (serverOpts || '<option>No servers   add in Settings</option>') + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Covers Served ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="0"/></div>'
-      + '<div class="f w-md"><label>Total Sales ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="0"/></div></div>'
-      + '</div>'
-      + '<div id="rsc-result" style="margin-bottom:16px;"></div>'
-      + '<div style="display:flex;gap:10px;">'
-      + '<button class="btn btn-primary" id="rsc-save">Save Shift Check</button>'
-      + '<button class="btn btn-ghost" id="rsc-cancel">Cancel</button>'
-      + '</div>'
-      + '</div></div>';
-
-    const calc = () => {
-      const cov   = parseFloat(document.getElementById('rsc-cov')?.value)   || 0;
-      const sales = parseFloat(document.getElementById('rsc-sales')?.value) || 0;
-      const ca    = cov > 0 && sales > 0 ? sales / cov : 0;
-      const el    = document.getElementById('rsc-result');
-      if (!el || !ca) return;
-      const diff  = ca - targetCA;
-      const status = diff >= 0 ? 'ON TARGET' : diff >= -5 ? 'WATCH' : 'BELOW STANDARD';
-      const col    = diff >= 0 ? 'var(--gold)' : diff >= -5 ? '#D08008' : 'var(--red)';
-      el.innerHTML = '<div style="background:var(--input);border-radius:6px;padding:12px 16px;display:flex;gap:20px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:10px;color:var(--t3);">Check Average</div><div style="font-size:20px;font-weight:800;color:' + col + ';">' + App.fmtCurrency(ca) + '</div></div>'
-        + '<div><div style="font-size:10px;color:var(--t3);">vs Target</div><div style="font-size:16px;font-weight:700;color:' + col + ';">' + (diff >= 0 ? '+' : '') + App.fmtCurrency(diff) + '</div></div>'
-        + '<div><div style="font-size:10px;color:var(--t3);">Status</div><div style="font-size:13px;font-weight:700;color:' + col + ';">' + status + '</div></div>'
-        + '</div>';
+  save(container, actions) {
+    if (!this._calc) return;
+    const cov    = parseFloat(document.getElementById('rsc-cov')?.value)   || 0;
+    const sales  = parseFloat(document.getElementById('rsc-sales')?.value) || 0;
+    if (!cov||!sales) return;
+    const entry = {
+      id:          this._entryId,
+      date:        document.getElementById('rsc-date')?.value||'',
+      shift:       document.getElementById('rsc-shift')?.value||'',
+      server_name: document.getElementById('rsc-server')?.value||'',
+      covers:      cov, sales,
+      saved_at:    new Date().toISOString()
     };
-
-    ['rsc-cov','rsc-sales'].forEach(id => document.getElementById(id)?.addEventListener('input', calc));
-
-    document.getElementById('rsc-cancel')?.addEventListener('click', () => this.render(container, actions));
-    document.getElementById('rsc-save')?.addEventListener('click', async () => {
-      const cov   = parseFloat(document.getElementById('rsc-cov')?.value)   || 0;
-      const sales = parseFloat(document.getElementById('rsc-sales')?.value) || 0;
-      if (!cov || !sales) return;
-      const entry = {
-        id:          App.uid(),
-        date:        document.getElementById('rsc-date')?.value,
-        shift:       document.getElementById('rsc-shift')?.value,
-        server_name: document.getElementById('rsc-server')?.value,
-        covers:      cov,
-        sales:       sales,
-        saved_at:    new Date().toISOString()
-      };
-      if (!App.data.revenue_server_checks) App.data.revenue_server_checks = [];
-      App.data.revenue_server_checks.push(entry);
-      await App.saveKey('revenue_server_checks');
-      this.render(container, actions);
+    if (!App.data.revenue_server_checks) App.data.revenue_server_checks=[];
+    const idx = App.data.revenue_server_checks.findIndex(c=>c.id===entry.id);
+    if (idx>-1) App.data.revenue_server_checks[idx]=entry;
+    else App.data.revenue_server_checks.push(entry);
+    App.saveKey('revenue_server_checks').then(() => {
+      this._entryId = App.uid();
+      const targetCA = App.data.revenue_settings?.targets?.check_avg||35;
+      const log = (App.data.revenue_server_checks||[]).slice(-30).reverse();
+      const tbody = document.getElementById('rsc-log');
+      if (tbody) tbody.innerHTML = this._buildRows(log, targetCA);
     });
   }
 };
