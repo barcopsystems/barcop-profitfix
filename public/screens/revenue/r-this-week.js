@@ -190,7 +190,7 @@ S.RevenueThisWeek = {
 
     return '<div class="card"><div class="sh">Step 5 : Server Performance</div>'
       + (teamAvg ? '<div style="background:var(--input);border-radius:6px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--t2);">Team check average this week: <strong style="color:var(--t1);">' + App.fmtCurrency(teamAvg) + '</strong> vs target $' + targetCA + '</div>' : '')
-      + rows + '</div>' + this.nav(true, false, null) + '<div style="text-align:right;margin-top:12px;"><button class="btn btn-primary" id="rw-next">Next →</button></div>';
+      + rows + '</div>' + this.nav(true, true);
   },
 
   step6() {
