@@ -118,15 +118,21 @@ S.RevenueEvents = {
       + '<button class="btn btn-ghost" id="rrc-add">Add Package</button>'
       + '</div>'
       + '<div class="tbl-wrap" style="margin-top:16px;"><table class="tbl"><thead><tr><th>Package</th><th>Type</th><th>Covers</th><th>F&B Min</th><th>Room Fee</th><th>Per Head</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
+      + '</div>'
+      + '<div id="rrc-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this package?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="rrc-del-confirm">Delete</button><button class="btn btn-ghost" id="rrc-del-cancel">Cancel</button></div></div></div>';
 
     container.addEventListener('click', e => {
       const btn = e.target.closest('[data-del-rc]');
       if (!btn) return;
       const i = parseInt(btn.dataset.delRc, 10);
-      if (!confirm('Delete this package?')) return;
-      App.data.revenue_rate_cards.splice(i, 1);
-      App.saveKey('revenue_rate_cards').then(() => this.render(container, actions));
+      const modal = document.getElementById('rrc-del-modal');
+      if (modal) modal.style.display = 'flex';
+      document.getElementById('rrc-del-confirm').onclick = () => {
+        modal.style.display = 'none';
+        App.data.revenue_rate_cards.splice(i, 1);
+        App.saveKey('revenue_rate_cards').then(() => this.render(container, actions));
+      };
+      document.getElementById('rrc-del-cancel').onclick = () => { modal.style.display = 'none'; };
     }, { once: true });
 
     document.getElementById('rrc-add')?.addEventListener('click', async () => {
