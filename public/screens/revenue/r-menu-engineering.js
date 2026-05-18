@@ -77,7 +77,7 @@ S.RevenueMenuEngineering = {
       return '<div class="card" style="margin-bottom:14px;border-left:4px solid ' + colors_map[q] + ';">'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + colors_map[q] + ';margin-bottom:4px;">' + q + 's</div>'
         + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;">' + esc(actions_map[q]) + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Cost % ' + tt('r-cost-pct') + '</th><th>Margin ' + tt('r-contrib-margin-eng') + '</th><th>Wkly Covers ' + tt('r-wkly-covers') + '</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + '</div>';
     }).join('');
 
@@ -116,15 +116,14 @@ S.RevenueMenuEngineering = {
 
   renderPriceSensitivity(container) {
     const items = (App.data.revenue_menu_items || []).filter(i => i.price && i.cost);
-    const itemOpts = items.map((i,idx) => '<option value="' + idx + '">' + esc(i.name) + ' — $' + i.price + '</option>').join('');
+    const itemOpts = items.map((i,idx) => '<option value="' + idx + '">' + esc(i.name) + '   $' + i.price + '</option>').join('');
 
     container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="sh">Price Sensitivity Calculator</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Select a menu item, enter a proposed new price, and see the revenue and margin impact.</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
       + '<div class="f w-lg"><label>Menu Item</label><select id="rps-item" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;"><option value="">Select item...</option>' + itemOpts + '</select></div>'
-      + '<div class="f w-md"><label>Proposed New Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rps-newprice" step="0.25" placeholder="0.00"/></div></div>'
-      + '<div class="f w-md"><label>Est. Volume Change %</label><div class="fw"><input class="suf" type="number" id="rps-vol" step="1" placeholder="0"/><span class="suf">%</span></div></div>'
+      + '<div class="f w-md"><label>Proposed New Price ' + tt('r-price-new') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rps-newprice" step="0.25" placeholder="0.00"/></div></div>'
+      + '<div class="f w-md"><label>Est. Volume Change % ' + tt('r-vol-change') + '</label><div class="fw"><input class="suf" type="number" id="rps-vol" step="1" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div id="rps-result" style="margin-bottom:18px;"></div>'
       + '<div id="rps-log-wrap" style="display:none;">'
