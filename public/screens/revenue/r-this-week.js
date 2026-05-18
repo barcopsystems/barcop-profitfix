@@ -233,7 +233,8 @@ S.RevenueThisWeek = {
       + (rplh ? row('Blended RPLH', App.fmtCurrency(parseFloat(rplh)), '') : '')
       + (teamAvg ? row('Team Check Average', App.fmtCurrency(teamAvg), validServers.length + ' servers') : '')
       + this.nav(true, false, 'Save Week')
-      + '</div>';
+      + '</div>'
+      + '<div id="rw-alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Bar revenue and floor revenue are both zero. Enter at least one revenue figure before saving.</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="rw-alert-ok">OK</button></div></div></div>';
   },
 
   wireStep(step) {
@@ -310,7 +311,9 @@ S.RevenueThisWeek = {
     const totalRev     = barRev + floorRev;
 
     if (totalRev === 0) {
-      alert('Bar revenue and floor revenue are both zero. Enter at least one revenue figure before saving.');
+      const modal = document.getElementById('rw-alert-modal');
+      if (modal) modal.style.display = 'flex';
+      document.getElementById('rw-alert-ok').onclick = () => { modal.style.display = 'none'; };
       return;
     }
 
