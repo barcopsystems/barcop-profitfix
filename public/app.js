@@ -181,13 +181,34 @@ const App = {
     S.Hub.render(hubWrap);
   },
 
-  showApp() {
+  showApp(module) {
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('ob-overlay').classList.add('hidden');
     document.getElementById('auth-screen').style.display = 'none';
-    // Hide hub wrapper when entering a module
     const hw = document.getElementById('hub-wrapper');
     if (hw) hw.style.display = 'none';
+    // Swap sidebar nav based on module
+    this._activeModule = module || this._activeModule || 'profit';
+    this._renderNav(this._activeModule);
+  },
+
+  _activeModule: 'profit',
+
+  _renderNav(module) {
+    const nav = document.getElementById('sidebar-nav');
+    if (!nav) return;
+    if (module === 'revenue') {
+      nav.innerHTML = Revenue.navHTML();
+    } else {
+      nav.innerHTML = ProfitNav.html();
+    }
+    // Rewire nav click handlers
+    nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
+      el.addEventListener('click', () => App.navigate(el.dataset.screen));
+    });
+    nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
+      el.addEventListener('click', () => App.showHub());
+    });
   },
 
   showAuth() {
@@ -221,6 +242,50 @@ const App = {
     const content = document.getElementById('content-area');
     const actions = document.getElementById('topbar-actions');
     actions.innerHTML = '';
+
+    // Revenue module screens
+    if (this._activeModule === 'revenue') {
+      const revTitles = {
+        'hub':                    ['Recovery Hub', ''],
+        'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
+        'r-this-week':            ['This Week', 'Weekly Entry'],
+        'r-server-check':         ['Server Check', ''],
+        'r-menu-items':           ['Menu Items', ''],
+        'r-menu-engineering':     ['Menu Engineering', ''],
+        'r-labor-budget':         ['Labor Budget', ''],
+        'r-rplh':                 ['RPLH Tracker', ''],
+        'r-check-average':        ['Check Average', ''],
+        'r-events':               ['Events and Catering', ''],
+        'r-reports':              ['Reports and History', ''],
+        'r-getting-started':      ['Getting Started', '30-Day Setup'],
+        'r-resources':            ['Resources', ''],
+        'r-help':                 ['Help and FAQ', ''],
+        'r-settings':             ['Settings', 'Revenue Recovery'],
+      };
+      const revScreens = {
+        'r-dashboard':        S.RevenueDashboard,
+        'r-this-week':        S.RevenueThisWeek,
+        'r-server-check':     S.RevenueServerCheck,
+        'r-menu-items':       S.RevenueMenuItems,
+        'r-menu-engineering': S.RevenueMenuEngineering,
+        'r-labor-budget':     S.RevenueLaborBudget,
+        'r-rplh':             S.RevenueRPLH,
+        'r-check-average':    S.RevenueCheckAverage,
+        'r-events':           S.RevenueEvents,
+        'r-reports':          S.RevenueReports,
+        'r-getting-started':  S.RevenueGettingStarted,
+        'r-resources':        S.RevenueResources,
+        'r-help':             S.RevenueHelp,
+        'r-settings':         S.RevenueSettings,
+      };
+      const [title, sub] = revTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = title;
+      document.getElementById('topbar-sub').textContent = sub;
+      const screen = revScreens[id];
+      if (screen) screen.render(content, actions);
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
 
     const titles = {
       'hub':           ['Recovery Hub', ''],
@@ -395,10 +460,12 @@ function wireAuth() {
 
 /* ── Boot ── */
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.nav-item[data-screen]').forEach(el => {
-    el.addEventListener('click', () => App.navigate(el.dataset.screen));
+  // Nav items are injected dynamically — wired in App._renderNav()
+  // Settings button routes to correct settings screen based on active module
+  document.getElementById('nav-settings')?.addEventListener('click', () => {
+    const screen = App._activeModule === 'revenue' ? 'r-settings' : 'settings';
+    App.navigate(screen);
   });
-  document.getElementById('nav-settings')?.addEventListener('click', () => App.navigate('settings'));
   wireAuth();
   App.init();
 });
