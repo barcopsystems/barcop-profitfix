@@ -324,8 +324,8 @@ S.KitchenProducts = {
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="kp-cost" value="' + (p?.cost_per_unit || '') + '" step="0.01" placeholder="0.00" style="' + rb('cost_per_unit') + '"/></div></div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-ghost" id="kp-cancel">Cancel</button>'
       + '<button class="btn btn-primary" id="kp-save">' + (id ? 'Update' : 'Save') + '</button>'
+      + '<button class="btn btn-ghost" id="kp-cancel">Cancel</button>'
       + '<span id="kp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     document.getElementById('kp-name')?.focus();
