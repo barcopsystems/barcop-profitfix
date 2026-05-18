@@ -90,6 +90,11 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Dashboard</span>
       </div>
+      <div class="nav-section">Audit</div>
+      <div class="nav-item" data-screen="r-audit" id="nav-r-audit">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Revenue Audit</span>
+      </div>
       <div class="nav-section">Weekly</div>
       <div class="nav-item" data-screen="r-this-week" id="nav-r-this-week">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -128,7 +133,7 @@ const Revenue = {
       </div>
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="r-reports" id="nav-r-reports">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 7h6M5.5 10h4M5.5 13h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Reports and History</span>
       </div>
       <div class="nav-section">Support</div>
@@ -136,6 +141,7 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Getting Started</span>
       </div>
+      <div class="nav-section">Resources</div>
       <div class="nav-item" data-screen="r-resources" id="nav-r-resources">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 7h6M5.5 10h4M5.5 13h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Resources</span>
