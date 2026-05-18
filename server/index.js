@@ -837,13 +837,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             console.error('Failed to create Supabase user:', createErr.message);
           } else {
             userId = created.user.id;
-            // Send password setup email using the anon client so Supabase delivers it
-            const { createClient: anonClient } = require('@supabase/supabase-js');
-            const anonSb = anonClient(
-              'https://plpikfpintruksclkwyb.supabase.co',
-              'sb_publishable_2tv02ZIL_HKQitRV1ST-rQ_9a8Gjw_u'
-            );
-            const { error: resetErr } = await anonSb.auth.resetPasswordForEmail(email, {
+            // Send password setup email using admin client
+            const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
               redirectTo: 'https://barcop-profitfix-production.up.railway.app/',
             });
             if (resetErr) console.error('Failed to send password setup email:', resetErr.message);
