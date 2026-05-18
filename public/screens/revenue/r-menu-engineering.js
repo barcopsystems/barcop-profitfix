@@ -3,6 +3,7 @@ S.RevenueMenuEngineering = {
   activeTab: 'matrix',
 
   render(container, actions) {
+    actions.innerHTML = '';
     const tabs = document.createElement('div');
     tabs.style.cssText = 'display:flex;gap:8px;';
     ['Matrix','Price Sensitivity','Pricing Log'].forEach(t => {
