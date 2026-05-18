@@ -702,8 +702,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: 'https://barcop-profitfix-production.up.railway.app/?checkout=success',
-      cancel_url:  'https://barcop-profitfix-production.up.railway.app/?checkout=cancelled',
+      success_url: 'https://app.barcop.com/?checkout=success',
+      cancel_url:  'https://app.barcop.com/?checkout=cancelled',
       metadata: {
         user_id:  userId,
         price_id: priceId,
@@ -742,7 +742,7 @@ app.post('/api/billing-portal', async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: data.stripe_customer_id,
-      return_url: 'https://barcop-profitfix-production.up.railway.app/'
+      return_url: 'https://app.barcop.com/'
     });
 
     res.json({ url: session.url });
