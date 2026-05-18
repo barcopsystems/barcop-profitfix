@@ -93,6 +93,30 @@ const App = {
       this.boot();
       return;
     }
+    // Check if this is a password recovery link before checking session
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const isRecovery = hashParams.get('type') === 'recovery';
+    if (isRecovery) {
+      // Show set password screen immediately — onAuthChange will fire PASSWORD_RECOVERY
+      this.showAuth();
+      DB.onAuthChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          ['auth-login','auth-reset','auth-set-password'].forEach(x => {
+            const el = document.getElementById(x);
+            if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
+          });
+        } else if (event === 'SIGNED_IN' && session) {
+          this.data = await DB.readData();
+          this.subscription = await DB.getSubscription();
+          this.boot();
+        } else if (event === 'SIGNED_OUT') {
+          this.data = null;
+          this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
+          this.showAuth();
+        }
+      });
+      return;
+    }
     const session = await DB.getSession();
     if (session) {
       this.data = await DB.readData();
