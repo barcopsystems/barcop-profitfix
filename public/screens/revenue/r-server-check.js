@@ -34,8 +34,8 @@ S.RevenueServerCheck = {
         + '<td>' + (c.date||'').slice(0,10) + '</td>'
         + '<td>' + esc(c.shift||'') + '</td>'
         + '<td>' + esc(c.server_name||'') + '</td>'
-        + '<td>' + (c.covers||'—') + '</td>'
-        + '<td class="val">' + (ca > 0 ? App.fmtCurrency(ca) : '—') + '</td>'
+        + '<td>' + (c.covers||' ') + '</td>'
+        + '<td class="val">' + (ca > 0 ? App.fmtCurrency(ca) : ' ') + '</td>'
         + '<td>' + statusBadge(ca) + '</td>'
         + '</tr>';
     }).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No shift checks logged yet.</td></tr>';
@@ -66,7 +66,7 @@ S.RevenueServerCheck = {
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
       + '<div class="f w-md"><label>Date</label><input type="date" id="rsc-date" value="' + today + '"/></div>'
       + '<div class="f w-md"><label>Shift</label><select id="rsc-shift" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;"><option>Lunch</option><option>Dinner</option><option>Bar</option></select></div>'
-      + '<div class="f w-md"><label>Server</label><select id="rsc-server" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;">' + (serverOpts || '<option>No servers — add in Settings</option>') + '</select></div>'
+      + '<div class="f w-md"><label>Server</label><select id="rsc-server" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;">' + (serverOpts || '<option>No servers   add in Settings</option>') + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
       + '<div class="f w-md"><label>Covers Served ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="0"/></div>'
