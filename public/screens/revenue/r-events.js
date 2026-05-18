@@ -37,8 +37,10 @@ S.RevenueEvents = {
 
     const statusColor = s => ({ 'Completed':'var(--gold)', 'Confirmed':'#4888A8', 'Proposal Sent':'#D08008', 'Inquiry':'var(--t3)', 'Lost':'var(--red)' }[s] || 'var(--t2)');
 
-    const rows = events.slice().reverse().map((e, i) =>
-      '<tr><td>' + (e.date||'').slice(0,10) + '</td>'
+    const rows = events.slice().reverse().map((e) =>
+      '<tr>'
+      + '<td><input type="checkbox" class="rev-chk" data-id="' + e.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
+      + '<td>' + (e.date||'').slice(0,10) + '</td>'
       + '<td style="font-weight:600;">' + esc(e.event_name||'') + '</td>'
       + '<td>' + esc(e.event_type||'') + '</td>'
       + '<td>' + (e.covers||' ') + '</td>'
@@ -46,7 +48,7 @@ S.RevenueEvents = {
       + '<td>' + (e.actual_revenue ? App.fmtCurrency(e.actual_revenue) : e.estimated_revenue ? App.fmtCurrency(e.estimated_revenue) + ' (est)' : ' ') + '</td>'
       + '<td style="color:' + statusColor(e.status) + ';font-weight:700;">' + esc(e.status||'') + '</td>'
       + '</tr>'
-    ).join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No events logged yet.</td></tr>';
+    ).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No events logged yet.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid" style="margin-bottom:16px;">'
@@ -55,8 +57,36 @@ S.RevenueEvents = {
       + '<div class="metric-card"><div class="metric-label">Projected Wins</div><div class="metric-val">' + App.fmtCurrency(projectedWin) + '</div><div class="metric-target">At ' + closeRate + '% close rate</div></div>'
       + '<div class="metric-card"><div class="metric-label">Total Events</div><div class="metric-val">' + events.length + '</div><div class="metric-target">' + events.filter(e=>e.status==='Completed').length + ' completed</div></div>'
       + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Event Name</th><th>Type</th><th>Covers ' + tt('r-covers') + '</th><th>F&B Min ' + tt('r-fb-minimum') + '</th><th>Revenue ' + tt('r-event-revenue') + '</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="rev-sel-all">Select All</button>'
+      + '<button class="btn btn-danger btn-sm" id="rev-del-sel" style="display:none;">Delete Selected</button>'
+      + '<span id="rev-sel-count" style="font-size:11px;color:var(--t3);"></span>'
+      + '</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th style="width:36px;"><input type="checkbox" id="rev-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
+      + '<th>Date</th><th>Event Name</th><th>Type</th><th>Covers ' + tt('r-covers') + '</th><th>F&B Min ' + tt('r-fb-minimum') + '</th><th>Revenue ' + tt('r-event-revenue') + '</th><th>Status</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
+
+    const updateSel = () => {
+      const checked = container.querySelectorAll('.rev-chk:checked');
+      const delBtn  = document.getElementById('rev-del-sel');
+      const count   = document.getElementById('rev-sel-count');
+      if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
+      if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
+    };
+    document.getElementById('rev-chk-all')?.addEventListener('change', e => {
+      container.querySelectorAll('.rev-chk').forEach(c => { c.checked=e.target.checked; });
+      updateSel();
+    });
+    container.addEventListener('change', e => { if(e.target.classList.contains('rev-chk')) updateSel(); });
+    document.getElementById('rev-del-sel')?.addEventListener('click', async () => {
+      const ids = [...container.querySelectorAll('.rev-chk:checked')].map(c=>c.dataset.id);
+      if (!ids.length) return;
+      App.data.revenue_events = (App.data.revenue_events||[]).filter(e=>!ids.includes(e.id));
+      await App.saveKey('revenue_events');
+      this.render(container, actions);
+    });
   },
 
   renderRateCard(container, actions) {
