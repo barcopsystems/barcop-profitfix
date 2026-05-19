@@ -24,8 +24,8 @@ S.TrafficSettings = {
         <div class="settings-section"><div class="settings-title">Your Bar</div>
           <div class="card"><div class="form-row" style="gap:16px;">
             <div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="ts-name" value="${esc(s.bar_name||'')}" placeholder="The Rusty Nail"/></div>
-            <div class="f" style="flex:1.2;min-width:130px;"><label>City</label><input type="text" id="ts-city" value="${esc((s.city_state||'').split(',')[0]?.trim()||'')}" placeholder="Austin"/></div>
-            <div class="f" style="flex:0.8;min-width:100px;"><label>State / Province</label><input type="text" id="ts-state" value="${esc((s.city_state||'').split(',')[1]?.trim()||'')}" placeholder="TX"/></div>
+            <div class="f" style="width:160px;"><label>City</label><input type="text" id="ts-city" value="${esc((s.city_state||'').split(',')[0]?.trim()||'')}" placeholder="Austin"/></div>
+            <div class="f" style="width:80px;"><label>State</label><input type="text" id="ts-state" value="${esc((s.city_state||'').split(',')[1]?.trim()||'')}" placeholder="TX"/></div>
           </div></div>
         </div>
         <div class="settings-section"><div class="settings-title">Traffic Targets</div>
@@ -40,8 +40,8 @@ S.TrafficSettings = {
         <div class="settings-section"><div class="settings-title">Account</div>
           <div class="card">
             <div class="form-row" style="gap:16px;">
-              <div class="f" style="width:220px;"><label>New Password</label><input type="password" id="ts-pw1" placeholder="Enter new password" autocomplete="new-password"/></div>
-              <div class="f" style="width:220px;"><label>Confirm Password</label><input type="password" id="ts-pw2" placeholder="Confirm new password" autocomplete="new-password"/></div>
+              <div class="f" style="width:220px;"><label>New Password</label><div class="fw"><input class="suf" type="password" id="ts-pw1" placeholder="Enter new password" autocomplete="new-password" style="border-right:none;border-radius:var(--r2) 0 0 var(--r2);"/><button type="button" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-left:none;border-radius:0 var(--r2) var(--r2) 0;padding:0 10px;cursor:pointer;color:var(--t3);display:flex;align-items:center;" id="ts-pw1-eye" onclick="const i=document.getElementById('ts-pw1');const e=document.getElementById('ts-pw1-eye');i.type=i.type==='password'?'text':'password';e.style.color=i.type==='text'?'var(--gold)':'var(--t3)';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button></div></div>
+              <div class="f" style="width:220px;"><label>Confirm Password</label><div class="fw"><input class="suf" type="password" id="ts-pw2" placeholder="Confirm new password" autocomplete="new-password" style="border-right:none;border-radius:var(--r2) 0 0 var(--r2);"/><button type="button" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-left:none;border-radius:0 var(--r2) var(--r2) 0;padding:0 10px;cursor:pointer;color:var(--t3);display:flex;align-items:center;" id="ts-pw2-eye" onclick="const i=document.getElementById('ts-pw2');const e=document.getElementById('ts-pw2-eye');i.type=i.type==='password'?'text':'password';e.style.color=i.type==='text'?'var(--gold)':'var(--t3)';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button></div></div>
               <div style="display:flex;align-items:flex-end;"><button class="btn btn-ghost" id="ts-pw-btn">Update Password</button></div>
             </div>
             <div id="ts-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
@@ -136,28 +136,95 @@ S.TrafficSettings = {
     const el = document.getElementById('ts-sub-content');
     if (!el) return;
     const sub = App.subscription || {};
+    const status = sub.status || 'inactive';
+    const plan = sub.plan || null;
     const modules = sub.active_modules || [];
-    el.innerHTML = '<div class="card">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Subscription</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">Active Modules: ' + (modules.join(', ') || 'None') + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">Status: ' + esc(sub.status||'inactive') + '</div>'
-      + '<button class="btn btn-ghost" id="ts-portal-btn">Manage Billing</button>'
-      + '<div id="ts-portal-msg" style="font-size:12px;color:var(--gold);margin-top:8px;display:none;"></div>'
+    const periodEnd = sub.period_end ? new Date(sub.period_end) : null;
+
+    const planLabels = { tier_1: '1 Module', tier_2: '2 Modules', tier_3: '3 Modules (Full Access)' };
+    const moduleLabels = { profit: 'Profit Recovery', revenue: 'Revenue Recovery', traffic: 'Traffic Recovery' };
+    const statusColor = { active: 'var(--gold)', past_due: 'var(--red)', canceled: 'var(--red)', inactive: 'var(--t2)' };
+    const statusLabel = { active: 'Active', past_due: 'Past Due', canceled: 'Canceled', inactive: 'No Active Subscription' };
+    const allModules = ['profit', 'revenue', 'traffic'];
+    const hasAll = allModules.every(m => modules.includes(m));
+
+    let moduleRows = allModules.map(m => {
+      const on = modules.includes(m);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<div style="width:8px;height:8px;border-radius:50%;background:' + (on ? 'var(--gold)' : 'var(--t2)') + ';flex-shrink:0;"></div>'
+        + '<div style="font-size:13px;color:' + (on ? 'var(--t1)' : 'var(--t2)') + ';">' + moduleLabels[m] + '</div>'
+        + '<div style="margin-left:auto;font-size:11px;font-weight:700;letter-spacing:1px;color:' + (on ? 'var(--gold)' : 'var(--t2)') + ';">' + (on ? 'ACTIVE' : 'AVAILABLE') + '</div>'
+        + '</div>';
+    }).join('');
+
+    let billingLine = '';
+    if (periodEnd && status === 'active') {
+      billingLine = '<div style="font-size:12px;color:var(--t2);margin-top:4px;">Renews ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
+    } else if (periodEnd && status === 'canceled') {
+      billingLine = '<div style="font-size:12px;color:var(--red);margin-top:4px;">Access ends ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
+    }
+
+    let upgradeBlock = '';
+    if (status === 'active' && !hasAll) {
+      upgradeBlock = '<div class="card" style="margin-top:0;">'
+        + '<div class="settings-title" style="margin-bottom:12px;">Add More Modules</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Unlock Profit Recovery or Revenue Recovery to get a full picture of where your bar is bleeding money.</div>'
+        + '<button class="btn btn-primary" id="ts-upgrade-btn">View Upgrade Options</button>'
+        + '</div>';
+    }
+
+    let noSubBlock = '';
+    if (status === 'inactive' || status === 'canceled') {
+      noSubBlock = '<div class="card" style="margin-top:0;">'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">You do not have an active subscription. Return to the Recovery Hub to choose a plan.</div>'
+        + '<button class="btn btn-primary" id="ts-go-hub-btn">Go to Recovery Hub</button>'
+        + '</div>';
+    }
+
+    el.innerHTML = '<div class="settings-section" style="display:flex;flex-direction:column;gap:16px;">'
+      + '<div class="card">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div>'
+      + '<div style="font-size:18px;font-weight:700;color:var(--t1);">' + (plan ? planLabels[plan] : 'No Plan') + '</div>'
+      + '<div style="font-size:12px;font-weight:700;letter-spacing:1px;color:' + (statusColor[status] || 'var(--t2)') + ';margin-top:4px;text-transform:uppercase;">' + (statusLabel[status] || status) + '</div>'
+      + billingLine
+      + '</div>'
+      + (status === 'active'
+        ? '<button class="btn btn-ghost" id="ts-portal-btn" style="flex-shrink:0;">Manage Billing</button>'
+        : '')
+      + '</div>'
+      + '<div style="margin-top:20px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--t2);margin-bottom:8px;text-transform:uppercase;">Recovery Modules</div>'
+      + moduleRows
+      + '</div>'
+      + '</div>'
+      + upgradeBlock
+      + noSubBlock
       + '</div>';
-    document.getElementById('ts-portal-btn')?.addEventListener('click', async () => {
-      const pmsg = document.getElementById('ts-portal-msg');
-      if (pmsg) { pmsg.textContent='Opening billing portal...'; pmsg.style.display='block'; }
-      try {
-        const { data: { session } } = await DB._sb.auth.getSession();
-        const res = await fetch('/api/billing-portal', {
-          method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':'Bearer '+(session?.access_token||'')},
-          body: JSON.stringify({ userId: session?.user?.id })
-        });
-        const d = await res.json();
-        if (d.url) window.open(d.url,'_blank');
-        else if (pmsg) { pmsg.style.color='var(--red)'; pmsg.textContent=d.error||'Error opening portal.'; }
-      } catch(e) { if (pmsg) { pmsg.style.color='var(--red)'; pmsg.textContent='Error: '+e.message; } }
-    });
+
+    document.getElementById('ts-portal-btn')?.addEventListener('click', () => this.openBillingPortal());
+    document.getElementById('ts-upgrade-btn')?.addEventListener('click', () => App.showHub());
+    document.getElementById('ts-go-hub-btn')?.addEventListener('click', () => App.showHub());
+  },
+
+  async openBillingPortal() {
+    const btn = document.getElementById('ts-portal-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
+    try {
+      const userId = DB._sb?.auth?.getUser ? (await DB._sb.auth.getUser()).data?.user?.id : null;
+      if (!userId) throw new Error('Not logged in.');
+      const res = await fetch('/api/billing-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not open billing portal.');
+      window.open(data.url, '_blank');
+    } catch (e) {
+      alert('Could not open billing portal: ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Manage Billing'; }
+    }
   }
 };
