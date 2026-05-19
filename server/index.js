@@ -76,6 +76,39 @@ app.post('/api/claude', (req, res) => {
   proxyReq.end();
 });
 
+// ── Profit audit — JSON only, no PDF ──────────────────────────────────────────
+app.post('/api/generate-profit-audit', (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
+  form.parse(req, async (err, fields, files) => {
+    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
+
+    const appDataStr = fields.appData?.[0] || '{}';
+    const notes      = fields.notes?.[0]   || '';
+    let appData = {};
+    try { appData = JSON.parse(appDataStr); } catch(e) {}
+
+    const uploadedFiles = [];
+    for (const [key, fileArr] of Object.entries(files)) {
+      for (const f of fileArr) {
+        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
+      }
+    }
+
+    try {
+      const auditData = await extractAuditData(apiKey, 'profit', uploadedFiles, appData, notes);
+      res.json({ ok: true, auditData });
+    } catch(e) {
+      console.error('Profit audit error:', e);
+      res.status(500).json({ error: e.message || 'Audit generation failed' });
+    } finally {
+      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
+    }
+  });
+});
+
 // ── Traffic audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-traffic-audit', (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
