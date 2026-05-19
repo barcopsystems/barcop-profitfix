@@ -17,7 +17,7 @@ S.RevenueLaborBudget = {
     const deptRows = depts.map(d =>
       '<tr style="height:52px;">'
       + '<td style="font-weight:600;padding:14px 12px;">' + d.label + '</td>'
-      + '<td><div class="fw" style="width:120px;"><span class="pre">$</span><input class="pre lb-rev" type="number" data-dept="' + d.key + '" data-wage="' + d.wage + '" data-target="' + d.target + '" value="' + (d.defaultRev || '') + '" placeholder="0" style="width:100%;"/></div></td>'
+      + '<td><div class="fw" style="width:120px;"><span class="pre">$</span><input class="pre lb-rev" type="number" data-dept="' + d.key + '" data-wage="' + d.wage + '" data-target="' + d.target + '" value="' + (d.defaultRev || '') + '" placeholder="" style="width:100%;"/></div></td>'
       + '<td>' + d.target + '%</td>'
       + '<td style="color:var(--gold);font-weight:700;" id="lb-budget-' + d.key + '">' + (d.defaultRev ? App.fmtCurrency(d.defaultRev * d.target / 100) : '&mdash;') + '</td>'
       + '<td style="color:var(--gold);font-weight:700;" id="lb-hrs-' + d.key + '">' + (d.defaultRev && d.wage > 0 ? Math.round(d.defaultRev * d.target / 100 / d.wage) + ' hrs' : '&mdash;') + '</td>'
@@ -34,7 +34,7 @@ S.RevenueLaborBudget = {
       return '<tr style="height:52px;">'
         + '<td style="font-weight:600;padding:14px 12px;">' + d.label + '</td>'
         + '<td style="color:var(--gold);" id="lb-sched-budget-' + d.key + '">' + (budgetHrs || '&mdash;') + ' hrs</td>'
-        + '<td><input type="number" class="sched-hrs" data-dept="' + d.key + '" placeholder="0" style="width:80px;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:6px 8px;font-size:13px;"/></td>'
+        + '<td><input type="number" class="sched-hrs" data-dept="' + d.key + '" placeholder="" style="width:80px;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:6px 8px;font-size:13px;"/></td>'
         + '<td id="lb-gap-' + d.key + '" style="font-weight:700;color:var(--t3);">--</td>'
         + '</tr>';
     }).join('');
