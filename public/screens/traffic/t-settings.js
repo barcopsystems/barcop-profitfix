@@ -30,11 +30,11 @@ S.TrafficSettings = {
         </div>
         <div class="settings-section"><div class="settings-title">Traffic Targets</div>
           <div class="card"><div class="form-row" style="gap:16px 20px;">
-            <div class="f" style="width:180px;"><label>Google Rating Target ${tt('t-google-rating')}</label><div class="fw"><input class="suf" type="number" id="ts-gr" value="${t.google_rating??4.3}" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>
-            <div class="f" style="width:180px;"><label>Monthly New Reviews ${tt('t-review-vel')}</label><div class="fw"><input class="suf" type="number" id="ts-rv" value="${t.review_velocity??8}" step="1"/><span class="suf">/mo</span></div></div>
-            <div class="f" style="width:180px;"><label>Response Rate ${tt('t-response-rate')}</label><div class="fw"><input class="suf" type="number" id="ts-rr" value="${t.response_rate??75}" step="1"/><span class="suf">%</span></div></div>
-            <div class="f" style="width:180px;"><label>Monthly Sessions ${tt('t-monthly-sessions')}</label><div class="fw"><input class="suf" type="number" id="ts-ms" value="${t.monthly_sessions??2000}" step="100"/><span class="suf">/mo</span></div></div>
-            <div class="f" style="width:180px;"><label>Social Posts/Month ${tt('t-social-posts')}</label><div class="fw"><input class="suf" type="number" id="ts-sp" value="${t.social_posts_month??12}" step="1"/><span class="suf">posts</span></div></div>
+            <div class="f" style="width:130px;min-width:120px;"><label>Google Rating ${tt('t-google-rating')}</label><div class="fw"><input class="suf" type="number" id="ts-gr" value="${t.google_rating??4.3}" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>
+            <div class="f" style="width:130px;min-width:120px;"><label>New Reviews/Mo ${tt('t-review-vel')}</label><div class="fw"><input class="suf" type="number" id="ts-rv" value="${t.review_velocity??8}" step="1"/><span class="suf">/mo</span></div></div>
+            <div class="f" style="width:130px;min-width:120px;"><label>Response Rate ${tt('t-response-rate')}</label><div class="fw"><input class="suf" type="number" id="ts-rr" value="${t.response_rate??75}" step="1"/><span class="suf">%</span></div></div>
+            <div class="f" style="width:130px;min-width:120px;"><label>Monthly Sessions ${tt('t-monthly-sessions')}</label><div class="fw"><input class="suf" type="number" id="ts-ms" value="${t.monthly_sessions??2000}" step="100"/><span class="suf">/mo</span></div></div>
+            <div class="f" style="width:130px;min-width:120px;"><label>Social Posts/Mo ${tt('t-social-posts')}</label><div class="fw"><input class="suf" type="number" id="ts-sp" value="${t.social_posts_month??12}" step="1"/><span class="suf">posts</span></div></div>
           </div></div>
         </div>
         <div class="settings-section"><div class="settings-title">Account</div>
