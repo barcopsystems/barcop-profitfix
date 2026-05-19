@@ -322,6 +322,8 @@ function getExtractionPrompt_Profit(appData) {
 APP DATA (from customer's 30 days of usage):
 - Bar Name: ${settings.bar_name || 'Not provided'}
 - City/State: ${settings.city_state || 'Not provided'}
+- Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
+- Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
 - Bar Pour Cost Target: ${settings.targets?.bar_pour_cost_pct || 22}%
 - Food Cost Target: ${settings.targets?.food_cost_pct || 32}%
 - Prime Cost Target: ${settings.targets?.prime_cost_pct || 60}%
@@ -538,6 +540,8 @@ function getExtractionPrompt_Revenue(appData) {
 APP DATA (from customer's app usage):
 - Bar Name: ${settings.bar_name || 'Not provided'}
 - City/State: ${settings.city_state || 'Not provided'}
+- Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
+- Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
 - Check Average Target: $${targets.check_avg || 35}
 - Bar Labor Target: ${targets.bar_labor_pct || 28}%
 - Kitchen Labor Target: ${targets.kitchen_labor_pct || 30}%
@@ -684,7 +688,7 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
   "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10,
   "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
-  "S4_ANNUAL_REV_ESTIMATE": ${avgBarRev && avgFloorRev ? Math.round((avgBarRev + avgFloorRev) * 52) : 0},
+  "S4_ANNUAL_REV_ESTIMATE": ${(settings.annual_bar_revenue || 0) + (settings.annual_food_revenue || 0) || (avgBarRev && avgFloorRev ? Math.round((avgBarRev + avgFloorRev) * 52) : 0)},
   "S4_EVENT_REV_POTENTIAL_LOW": 0,
   "S4_EVENT_REV_POTENTIAL_HIGH": 0,
   "S4_SCORE": null,
