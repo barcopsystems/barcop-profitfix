@@ -3727,8 +3727,7 @@ if _data_path and _os.path.exists(_data_path):
         _d = _json.load(_f)
     _g = globals()
     for _k, _v in _d.items():
-        if _k in _g or _k.isupper():
-            _g[_k] = _v
+        _g[_k] = _v  # inject all keys unconditionally
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
