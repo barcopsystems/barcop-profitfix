@@ -37,11 +37,13 @@ S.TrafficDashboard = {
       startHere = '<div class="card" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Traffic Targets</div>'
-        + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
-        + '<div class="f" style="width:160px;"><label>Google Rating Target ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="tsh-gr" value="' + targetRating + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
-        + '<div class="f" style="width:160px;"><label>Monthly New Reviews ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rv" value="' + targetVel + '" step="1"/><span class="suf">/mo</span></div></div>'
-        + '<div class="f" style="width:160px;"><label>Response Rate Target ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rr" value="' + targetResp + '" step="1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:180px;"><label>Monthly Sessions Target ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="tsh-ms" value="' + targetSessions + '" step="100"/><span class="suf">/mo</span></div></div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Numbers below are industry benchmarks. Adjust any target to match your operation. Click the info icon on each field to see what it means and when to change it.</div>'
+        + '<div class="form-row" style="gap:12px 16px;margin-bottom:18px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="tsh-gr" value="' + targetRating + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>New Reviews/Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rv" value="' + targetVel + '" step="1"/><span class="suf">/mo</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rr" value="' + targetResp + '" step="1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="tsh-ms" value="' + targetSessions + '" step="100"/><span class="suf">/mo</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Social Posts/Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="tsh-sp" value="' + (t.social_posts_month??12) + '" step="1"/><span class="suf">posts</span></div></div>'
         + '</div>'
         + '<button class="btn btn-primary" id="tsh-save">Save and Continue</button>'
         + '</div>';
@@ -98,11 +100,39 @@ S.TrafficDashboard = {
     insBtn.addEventListener('click', () => this.showInsights());
     actions.appendChild(insBtn);
 
+    // This Week Summary
+    const prev = weeks.length > 1 ? weeks[weeks.length-2] : null;
+    let summaryHtml = '';
+    if (latest) {
+      const row = (label, tw, lw, av) => '<tr><td>' + label + '</td><td class="val">' + (tw||' ') + '</td><td>' + (lw||' ') + '</td><td>' + (av||' ') + '</td></tr>';
+      const a4 = fn => { const v = prior4.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+      const p = v => v != null ? v.toFixed(1)+'%' : ' ';
+      const r = v => v != null ? v.toFixed(1)+'★' : ' ';
+      summaryHtml = '<div class="tbl-wrap" style="margin-bottom:18px;"><table class="sum-tbl">'
+        + '<thead><tr><th></th><th>This Week</th><th>Last Week</th><th>4-Week Avg</th></tr></thead><tbody>'
+        + row('Google Rating',   r(latest.google_rating),  prev?.google_rating?r(prev.google_rating):' ',  a4(w=>w.google_rating)?a4(w=>w.google_rating).toFixed(2)+'★':' ')
+        + row('New Reviews',     latest.new_reviews??'  ', prev?.new_reviews??'  ',                         a4(w=>w.new_reviews)?Math.round(a4(w=>w.new_reviews))+'':' ')
+        + row('Response Rate',   p(latest.response_rate),  prev?.response_rate?p(prev.response_rate):' ',  a4(w=>w.response_rate)?p(a4(w=>w.response_rate)):' ')
+        + row('Sessions',        latest.monthly_sessions?latest.monthly_sessions.toLocaleString():' ', prev?.monthly_sessions?prev.monthly_sessions.toLocaleString():' ', a4(w=>w.monthly_sessions)?Math.round(a4(w=>w.monthly_sessions)).toLocaleString():' ')
+        + row('IG Followers',    latest.ig_followers??' ',  prev?.ig_followers??' ',                        a4(w=>w.ig_followers)?Math.round(a4(w=>w.ig_followers))+'':' ')
+        + '</tbody></table></div>';
+    } else {
+      summaryHtml = '<div class="card"><div class="empty"><div class="empty-title">No weeks saved yet</div><div class="empty-sub">Enter your first week to see your numbers here.</div></div></div>';
+    }
+
     container.innerHTML = '<div class="screen">'
       + alertHtml
       + startHere
       + metrics
       + chartHtml
+      + '<div class="sh">This Week Summary</div>'
+      + summaryHtml
+      + '<div class="sh">Quick Actions</div>'
+      + '<div class="qa">'
+      + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
+      + '<button class="btn btn-ghost" id="t-qa-audit">Traffic Audit</button>'
+      + '<button class="btn btn-ghost" id="t-qa-reports">View Reports</button>'
+      + '</div>'
       + '</div>';
 
     document.getElementById('t-dismiss')?.addEventListener('click', () => {
@@ -118,7 +148,7 @@ S.TrafficDashboard = {
         review_velocity:     parseInt(document.getElementById('tsh-rv')?.value)   || 8,
         response_rate:       parseFloat(document.getElementById('tsh-rr')?.value) || 75,
         monthly_sessions:    parseInt(document.getElementById('tsh-ms')?.value)   || 2000,
-        social_posts_month:  ts2.targets?.social_posts_month || 12,
+        social_posts_month:  parseInt(document.getElementById('tsh-sp')?.value)   || 12,
       };
       ts2._targets_saved = true;
       const gs = App.data.getting_started_traffic || {};
@@ -129,6 +159,9 @@ S.TrafficDashboard = {
       App.navigate('t-getting-started');
     });
 
+    document.getElementById('t-qa-week')?.addEventListener('click',    () => App.navigate('t-this-week'));
+    document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
+    document.getElementById('t-qa-reports')?.addEventListener('click', () => App.navigate('t-reports'));
   },
 
 
