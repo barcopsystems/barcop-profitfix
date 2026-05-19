@@ -197,6 +197,11 @@ const DB = {
         if (!(k in data.revenue_settings)) data.revenue_settings[k] = d.revenue_settings[k];
       });
     }
+    if (data.traffic_settings) {
+      Object.keys(d.traffic_settings).forEach(k => {
+        if (!(k in data.traffic_settings)) data.traffic_settings[k] = d.traffic_settings[k];
+      });
+    }
     return data;
   },
 
@@ -242,7 +247,21 @@ const DB = {
       revenue_price_log: [],
       revenue_events: [],
       revenue_rate_cards: [],
-      getting_started_revenue: {}
+      getting_started_revenue: {},
+      // Traffic Recovery data
+      traffic_settings: {
+        targets: {
+          google_rating:      4.3,
+          review_velocity:    8,
+          response_rate:      75,
+          monthly_sessions:   2000,
+          social_posts_month: 12
+        },
+        _targets_saved: false
+      },
+      traffic_weeks:   [],
+      traffic_audits:  [],
+      getting_started_traffic: {}
     };
   }
 };
