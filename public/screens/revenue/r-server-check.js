@@ -86,6 +86,12 @@ S.RevenueServerCheck = {
       if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
       if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
     };
+    document.getElementById('rsc-sel-all')?.addEventListener('click', () => {
+      const all = container.querySelectorAll('.rsc-chk');
+      const anyUnchecked = [...all].some(c => !c.checked);
+      all.forEach(c => { c.checked = anyUnchecked; });
+      updateSel();
+    });
     document.getElementById('rsc-chk-all')?.addEventListener('change', e => {
       container.querySelectorAll('.rsc-chk').forEach(c => { c.checked=e.target.checked; });
       updateSel();
