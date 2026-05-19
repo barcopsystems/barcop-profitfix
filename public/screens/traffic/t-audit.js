@@ -111,55 +111,130 @@ S.TrafficAudit = {
 
     this.container.innerHTML = '<div class="screen">' + requestCard + latestCard + historyCard + '</div>';
 
-    this.container.querySelector('#ta-new-btn')?.addEventListener('click', () => this.showUploadForm());
+    this.container.querySelector('#ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelector('#ta-dl-latest')?.addEventListener('click', () => this.downloadPDF(latest));
     this.container.querySelectorAll('.ta-dl-hist').forEach(btn => {
       btn.addEventListener('click', () => this.downloadPDF(audits[parseInt(btn.dataset.idx)]));
     });
   },
 
-  showUploadForm() {
-    const c = this.container;
-    c.innerHTML = '<div class="screen"><div class="card">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Generate Traffic Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;margin-bottom:18px;">Upload screenshots and reports from your Google Business Profile, website analytics, social media pages, and delivery platforms. Submit whatever you have. Partial submissions generate real scores with real action items.</div>'
-      + '<div style="margin-bottom:16px;">'
-      + '<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;">What to upload for the best results:</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.8;">• Google Business Profile overview screenshot (reviews, rating, photo count)<br>• Google Search Console or analytics screenshot (sessions, traffic sources)<br>• Instagram and Facebook profile screenshots (followers, recent posts)<br>• DoorDash, UberEats, or Grubhub listing screenshot (rating, menu status)<br>• Any review screenshots showing recent activity</div>'
+  showIntakeForm() {
+    const s = App.data.settings;
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:3000;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;';
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;width:100%;max-width:680px;padding:32px;position:relative;">'
+      + '<button id="ta-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Traffic Audit</div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload screenshots and reports from your Google Business Profile, website analytics, social media pages, and delivery platforms. Submit whatever you have. Partial submissions generate real scores with real action items. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
+      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(s.city_state) + '</div>' : '')
       + '</div>'
-      + '<div class="f" style="margin-bottom:14px;"><label>Upload Files (screenshots, PDFs, reports)</label><input type="file" id="ta-files" multiple accept="image/*,.pdf" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;"/></div>'
-      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="ta-submit-btn">Generate Audit</button>'
-      + '<button class="btn btn-ghost" id="ta-cancel-btn">Cancel</button>'
-      + '<div id="ta-status" style="font-size:12px;color:var(--gold);display:none;"></div>'
-      + '</div>'
-      + '</div></div>';
 
-    c.querySelector('#ta-cancel-btn')?.addEventListener('click', () => this.renderMain());
-    c.querySelector('#ta-submit-btn')?.addEventListener('click', () => this.submitAudit());
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Google Business Profile</div>'
+      + this.renderFileSection('required', 'GBP Screenshot — Full Profile View',    'ta-f-gbp-profile',  'A screenshot of your Google Business Profile as it appears in Google Maps or Search. Capture the full listing including name, address, phone, hours, website link, category, and the photo and review summary. Phone screenshots are fine. Accepted: PNG, JPG, PDF.',      'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
+      + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',     'ta-f-gbp-insights', 'Monthly impressions, search queries, direction requests, and phone calls. In Google Business Profile dashboard go to Performance. Screenshot of the dashboard is accepted. Accepted: PDF, PNG, JPG.',                                                                     'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
+
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Website Data</div>'
+      + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot','ta-f-analytics',    'Monthly sessions, bounce rate, top pages by sessions, and menu page performance. Export from Google Analytics, Squarespace, Wix, or any analytics platform. A screenshot of the overview dashboard is accepted. Accepted: Excel, CSV, PDF, PNG, JPG.',                 'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
+      + this.renderFileSection('optional', 'Website Screenshot — Homepage on Mobile','ta-f-mobile-site',  'A screenshot of your homepage as it appears on a phone. Shows whether your phone number, address, and call-to-action are visible without scrolling. Accepted: PNG, JPG.',                                                                                              'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Review Platform Data</div>'
+      + this.renderFileSection('required', 'Google Review Page Screenshot',         'ta-f-google-reviews','Screenshot of your Google listing showing your star rating, total review count, and the most recent 5 to 10 reviews. In Google Maps click your listing and scroll to Reviews. Accepted: PNG, JPG.',                                                                    'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
+      + this.renderFileSection('optional', 'Yelp Listing Screenshot',               'ta-f-yelp',          'Screenshot of your Yelp business page showing star rating, review count, and recent reviews. Submit if you have a Yelp listing. Accepted: PNG, JPG.',                                                                                                               'Unlocks: Cross-platform reputation comparison')
+
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Search Visibility</div>'
+      + this.renderFileSection('optional', 'Search Results Screenshots',            'ta-f-search',        'Open an incognito browser window. Search for "[your bar type] [your city]" and "[your neighborhood] bar" and screenshot the full results page including the Google Maps pack. Submit screenshots for at least two searches. Accepted: PNG, JPG.',                      'Unlocks: Maps pack presence confirmed, primary search visibility signal')
+
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Social Media</div>'
+      + this.renderFileSection('required', 'Instagram Profile Screenshot',          'ta-f-instagram',     'Screenshot of your Instagram profile showing follower count, post count, bio, and the most recent 9 to 12 posts in grid view. Required if Instagram is your primary platform. Phone screenshot is fine. Accepted: PNG, JPG.',                                         'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
+      + this.renderFileSection('optional', 'Facebook Page Screenshot',              'ta-f-facebook',      'Screenshot of your Facebook business page showing follower count and recent posts. Accepted: PNG, JPG.',                                                                                                                                                              'Unlocks: Cross-platform social presence analysis')
+      + this.renderFileSection('optional', 'Instagram Analytics Screenshot',        'ta-f-ig-analytics',  'Screenshot from Instagram Insights showing reach, impressions, and engagement for the last 30 days. In Instagram go to Professional Dashboard and select Insights. Accepted: PNG, JPG.',                                                                             'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
+
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Delivery Platforms</div>'
+      + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot','ta-f-delivery',      'Screenshot of your merchant dashboard on DoorDash, Uber Eats, or Grubhub showing your current rating, photo count, and menu status. Log into the merchant portal for each platform and screenshot the overview page. Submit one per platform. Accepted: PNG, JPG.',  'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
+
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Email and Loyalty</div>'
+      + this.renderFileSection('optional', 'Email Platform Screenshot',             'ta-f-email',         'Screenshot of your email platform dashboard showing list size, last send date, and any campaign performance visible on the overview screen. Works with Mailchimp, Klaviyo, Constant Contact, or any email platform. Accepted: PNG, JPG, PDF.',                       'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
+      + this.renderFileSection('optional', 'Email Analytics Export',                'ta-f-email-analytics','Campaign performance history showing open rate, click rate, and unsubscribe rate for the last 6 to 12 months. Export from your email platform. Accepted: PDF, CSV.',                                                                                               'Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
+
+      + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+      + '<textarea id="ta-notes" rows="3" placeholder="Recent website redesign, ownership change, seasonal operation, reduced social posting due to staffing, a new delivery platform just launched. Anything that might affect how the numbers look." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
+      + '<div style="display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="ta-gen-btn">Generate Audit</button>'
+      + '<button class="btn btn-ghost" id="ta-intake-cancel">Cancel</button>'
+      + '<div id="ta-gen-status" style="font-size:12px;color:var(--t2);display:none;flex:1;"></div>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+    modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
+    document.getElementById('ta-intake-close').onclick  = () => modal.remove();
+    document.getElementById('ta-intake-cancel').onclick = () => modal.remove();
+    document.getElementById('ta-gen-btn').onclick = () => this.generateAudit(modal);
   },
 
-  async submitAudit() {
-    const files     = document.getElementById('ta-files')?.files;
-    const statusEl  = document.getElementById('ta-status');
-    const submitBtn = document.getElementById('ta-submit-btn');
-    if (!statusEl || !submitBtn) return;
+  renderFileSection(type, title, inputId, desc, unlocks) {
+    const badge = type === 'required'
+      ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
+      : type === 'highlight'
+      ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
+      : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
+    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:14px;margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
+      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;line-height:1.5;">' + esc(desc) + '</div>'
+      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:10px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:10px;"></div>')
+      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
+      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
+      + '</div>';
+  },
 
-    submitBtn.disabled = true;
-    statusEl.style.display = 'block';
-    statusEl.textContent   = 'Uploading and analyzing...';
+  async generateAudit(modal) {
+    const btn    = document.getElementById('ta-gen-btn');
+    const status = document.getElementById('ta-gen-status');
+    const setStatus = (msg, color='var(--t2)') => {
+      if (status) { status.style.display='block'; status.style.color=color; status.textContent=msg; }
+    };
+
+    const gbpFiles = document.getElementById('ta-f-gbp-profile')?.files;
+    const reviewFiles = document.getElementById('ta-f-google-reviews')?.files;
+    if ((!gbpFiles || gbpFiles.length === 0) && (!reviewFiles || reviewFiles.length === 0)) {
+      setStatus('At least one Required file is needed. Attach the GBP Profile Screenshot or the Google Review Screenshot to continue.', 'var(--red)');
+      return;
+    }
+
+    if (btn) { btn.disabled=true; btn.textContent='Generating...'; }
+    setStatus('Reading your files and app data...', 'var(--t2)');
 
     const form = new FormData();
     form.append('auditType', 'traffic');
     form.append('appData', JSON.stringify(App.data));
-    if (files) { for (const f of files) form.append('file', f); }
+
+    const fileInputIds = [
+      'ta-f-gbp-profile','ta-f-gbp-insights','ta-f-analytics','ta-f-mobile-site',
+      'ta-f-google-reviews','ta-f-yelp','ta-f-search',
+      'ta-f-instagram','ta-f-facebook','ta-f-ig-analytics',
+      'ta-f-delivery','ta-f-email','ta-f-email-analytics'
+    ];
+    fileInputIds.forEach(id => {
+      const inp = document.getElementById(id);
+      if (inp?.files) { for (const f of inp.files) form.append('file', f); }
+    });
+
+    const notes = document.getElementById('ta-notes')?.value || '';
+    if (notes) form.append('notes', notes);
+
+    setStatus('Uploading files and generating audit...', 'var(--t2)');
 
     try {
       const res  = await fetch('/api/generate-audit', { method:'POST', body: form });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Server error');
 
-      statusEl.textContent = 'Saving audit...';
+      setStatus('Saving audit...', 'var(--t2)');
       const auditData = data.auditData || {};
       const newAudit  = {
         date:          new Date().toISOString().slice(0,10),
@@ -185,14 +260,16 @@ S.TrafficAudit = {
       App.data.traffic_audits.push(newAudit);
       await App.saveKey('traffic_audits');
 
+      if (modal) modal.remove();
       if (data.pdfBase64) this.downloadPDF(newAudit);
       this.renderMain();
     } catch(e) {
-      statusEl.style.color = 'var(--red)';
-      statusEl.textContent = 'Error: ' + (e.message || 'Audit generation failed.');
-      submitBtn.disabled   = false;
+      setStatus('Error: ' + (e.message || 'Audit generation failed. Try again.'), 'var(--red)');
+      if (btn) { btn.disabled=false; btn.textContent='Generate Audit'; }
     }
   },
+
+
 
   downloadPDF(audit) {
     if (!audit?.pdf_data) return;
