@@ -187,11 +187,11 @@ S.TrafficAudit = {
       : type === 'highlight'
       ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
       : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
-    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:14px;margin-bottom:10px;">'
+    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
       + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;line-height:1.5;">' + esc(desc) + '</div>'
-      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:10px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:10px;"></div>')
+      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:8px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:8px;"></div>')
       + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
       + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
       + '</div>';
