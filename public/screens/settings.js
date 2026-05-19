@@ -497,11 +497,25 @@ S.Settings = {
 
     const s = App.data.settings;
     App.data = {
-      settings: { ...s, onboarding_complete:true },
+      settings: { ...s, onboarding_complete:true, _targets_saved:false },
       bar_products:[], kitchen_products:[], recipes:[],
       weeks:[], shifts:[], reconciliations:[],
       theft_scores:[], vendor_log:[], last_theft_score_date:null,
-      audits:[]
+      audits:[],
+      getting_started_profit:{},
+      revenue_settings: App.data.revenue_settings,
+      revenue_weeks: App.data.revenue_weeks || [],
+      revenue_audits: App.data.revenue_audits || [],
+      revenue_server_checks: App.data.revenue_server_checks || [],
+      revenue_menu_items: App.data.revenue_menu_items || [],
+      revenue_price_log: App.data.revenue_price_log || [],
+      revenue_events: App.data.revenue_events || [],
+      revenue_rate_cards: App.data.revenue_rate_cards || [],
+      getting_started_revenue: App.data.getting_started_revenue || {},
+      traffic_settings: App.data.traffic_settings,
+      traffic_weeks: App.data.traffic_weeks || [],
+      traffic_audits: App.data.traffic_audits || [],
+      getting_started_traffic: App.data.getting_started_traffic || {}
     };
     await App.save();
     App.updatePeriod();
