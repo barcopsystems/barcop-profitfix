@@ -103,7 +103,10 @@ S.TrafficAudit = {
           + '</tr>';
       }).join('');
       historyCard = '<div class="card">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit History</div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
+        + '<div style="font-size:11px;color:var(--t3);">2 most recent audits stored. Download to keep permanently.</div>'
+        + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Audit ID</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
         + '</div>';
@@ -248,6 +251,7 @@ S.TrafficAudit = {
         bar_name:      auditData.BAR_NAME       || App.data.settings?.bar_name || '',
         audit_id:      auditData.AUDIT_ID       || '',
         audit_period:  auditData.AUDIT_PERIOD   || '',
+        grade:         auditData.DATA_TIER_LABEL || '',
         sections: {
           'Google Business Profile': auditData.S1_SCORE || 0,
           'Website':                 auditData.S2_SCORE || 0,
@@ -257,13 +261,19 @@ S.TrafficAudit = {
           'Delivery Platforms':      auditData.S6_SCORE || 0,
           'Email and Loyalty':       auditData.S7_SCORE || 0,
         },
-        action_items:  auditData.action_items || [],
+        // Normalize action_items — handle array of strings or array of objects
+        action_items: (Array.isArray(auditData.action_items) ? auditData.action_items : []).map(a =>
+          typeof a === 'string' ? { action: a, monthly_impact: 0 } : a
+        ),
         pdf_data:      data.pdfBase64 || null,
-        raw:           auditData
       };
 
       App.data.traffic_audits = App.data.traffic_audits || [];
       App.data.traffic_audits.push(newAudit);
+      // Keep only the 2 most recent audits to manage storage
+      if (App.data.traffic_audits.length > 2) {
+        App.data.traffic_audits = App.data.traffic_audits.slice(-2);
+      }
       await App.saveKey('traffic_audits');
 
       if (modal) modal.remove();
