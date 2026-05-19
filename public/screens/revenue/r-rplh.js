@@ -31,7 +31,7 @@ S.RevenueRPLH = {
     const calcHtml = '<div class="card" style="margin-top:16px;">'
       + '<div class="sh">Optimal Staffing Calculator</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Revenue Forecast ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-rev" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Revenue Forecast ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-rev" placeholder=""/></div></div>'
       + '<div class="f w-md"><label>RPLH Target ' + tt('r-rplh-target') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-tgt" value="' + (t.rplh_dinner || 75) + '"/></div></div>'
       + '<div class="f w-md"><label>Labor Cost Target % ' + tt('r-labor-pct') + '</label><div class="fw"><input class="suf" type="number" id="rplh-pct" value="' + (t.floor_labor_pct || 32) + '" step="0.5"/><span class="suf">%</span></div></div>'
       + '</div>'
