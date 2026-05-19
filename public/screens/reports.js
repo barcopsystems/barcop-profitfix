@@ -9,14 +9,20 @@ S.Reports={
     const allW=App.data.weeks||[];
     const avg=fn=>{const v=allW.map(fn).filter(x=>x!=null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
     const avgB=avg(w=>w.bar?.cost_pct);const avgF=avg(w=>w.food?.cost_pct);const avgP=avg(w=>w.prime_cost_pct);
-    const annBarRev=App.data.settings.annual_bar_revenue||(avg(w=>w.bar?.revenue)*52);
-    const annFoodRev=App.data.settings.annual_food_revenue||(avg(w=>w.food?.revenue)*52);
+
+    // Use saved values or fall back to weekly average * 52
+    const savedBarRev  = App.data.settings.annual_bar_revenue  || 0;
+    const savedFoodRev = App.data.settings.annual_food_revenue || 0;
+    const calcBarRev   = avg(w=>w.bar?.revenue)*52;
+    const calcFoodRev  = avg(w=>w.food?.revenue)*52;
+    const annBarRev    = savedBarRev  || calcBarRev  || 0;
+    const annFoodRev   = savedFoodRev || calcFoodRev || 0;
 
     const histRows=weeks.length===0?'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--t4);">No weeks saved yet.</td></tr>'
       :weeks.map(w=>{
         const tRev=(w.bar?.revenue||0)+(w.food?.revenue||0);
         const bT=t.bar_pour_cost_pct??22,pT=t.prime_cost_pct??60;
-        return '<tr style="cursor:pointer;" onclick="S.Reports.viewWeek(\''+w.id+'\')"><td>'+esc(w.period_end||'—')+'</td><td class="val">Week '+w.week_num+'</td>'
+        return '<tr style="cursor:pointer;" onclick="S.Reports.viewWeek(\''+w.id+'\')"><td>'+esc(w.period_end||'')+'</td><td class="val">Week '+w.week_num+'</td>'
           +'<td>'+App.fmtCurrency(w.bar?.revenue)+'</td>'
           +'<td class="'+(w.bar?.cost_pct>bT?'neg':'pos')+'">'+App.fmtPct(w.bar?.cost_pct)+'</td>'
           +'<td>'+App.fmtCurrency(w.food?.revenue)+'</td>'
@@ -25,15 +31,21 @@ S.Reports={
           +'<td>'+App.fmtCurrency((w.bar_variance||[]).reduce((s,r)=>s+(r.variance_dollar||0),0))+'</td></tr>';
       }).join('');
 
-    const calcBlock=(label,rev,costPct,target)=>{
+    const calcBlock=(label,revId,rev,costPct,target)=>{
       const cur=(costPct/100)*rev,tgt=(target/100)*rev,savings=cur-tgt;
+      const isPrime = revId === null;
+      const revInput = isPrime
+        ? '<div class="f" style="width:200px;flex-shrink:0;"><label>Annual Total Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rc-prime-rev" value="'+Math.round(rev)+'" readonly style="opacity:0.6;"/></div></div>'
+        : '<div class="f" style="width:200px;flex-shrink:0;"><label>Annual Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="'+revId+'" value="'+Math.round(rev)+'" placeholder="Enter annual revenue"/></div></div>';
       return '<div class="card" style="margin-bottom:12px;"><div class="card-title">'+label+'</div>'
         +'<div class="form-row" style="gap:16px;">'
-        +'<div class="f" style="width:180px;flex-shrink:0;"><label>Annual Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" value="'+Math.round(rev)+'" readonly style="opacity:0.7;" /></div></div>'
-        +'<div class="f" style="width:130px;flex-shrink:0;"><label>Current Cost %</label><div class="fw"><input class="suf" type="number" value="'+costPct.toFixed(1)+'" readonly style="opacity:0.7;" /><span class="suf">%</span></div></div>'
-        +'<div class="f" style="width:130px;flex-shrink:0;"><label>Target Cost %</label><div class="fw"><input class="suf" type="number" value="'+target+'" readonly style="opacity:0.7;" /><span class="suf">%</span></div></div>'
+        +revInput
+        +'<div class="f" style="width:140px;flex-shrink:0;"><label>Current Cost %</label><div class="fw"><input class="suf" type="number" value="'+costPct.toFixed(1)+'" readonly style="opacity:0.6;"/><span class="suf">%</span></div></div>'
+        +'<div class="f" style="width:140px;flex-shrink:0;"><label>Target Cost %</label><div class="fw"><input class="suf" type="number" value="'+target+'" readonly style="opacity:0.6;"/><span class="suf">%</span></div></div>'
+        +(isPrime ? '' : '<div style="display:flex;align-items:flex-end;"><button class="btn btn-ghost rc-recalc" data-id="'+revId+'">Recalculate</button></div>')
         +'</div>'
-        +'<div class="calc"><div class="calc-item"><div class="calc-label">Current Annual Cost</div><div class="calc-val">'+App.fmtCurrency(cur)+'</div></div>'
+        +'<div class="calc" id="calc-results-'+label.replace(/\s/g,'-').toLowerCase()+'">'
+        +'<div class="calc-item"><div class="calc-label">Current Annual Cost</div><div class="calc-val">'+App.fmtCurrency(cur)+'</div></div>'
         +'<div class="calc-item"><div class="calc-label">Cost at Target</div><div class="calc-val good">'+App.fmtCurrency(tgt)+'</div></div>'
         +'<div class="calc-item"><div class="calc-label">Annual Savings Potential</div><div class="calc-val '+(savings>0?'warn':'good')+'">'+App.fmtCurrency(savings)+'</div></div>'
         +'<div class="calc-item"><div class="calc-label">Monthly Gap</div><div class="calc-val '+(savings>0?'warn':'good')+'">'+App.fmtCurrency(savings/12)+'</div></div>'
@@ -43,15 +55,33 @@ S.Reports={
 
     this.container.innerHTML='<div class="screen">'
       +'<div class="sh">Annual Calculator</div>'
-      +calcBlock('Bar',annBarRev,avgB,t.bar_pour_cost_pct??22)
-      +calcBlock('Food',annFoodRev,avgF,t.food_cost_pct??32)
-      +calcBlock('Prime Cost',annBarRev+annFoodRev,avgP,t.prime_cost_pct??60)
+      +'<div style="font-size:12px;color:var(--t3);margin-bottom:14px;margin-top:-4px;">Enter your annual bar and food revenue below. The calculator uses your average cost percentages from weekly history to show savings potential at your targets.</div>'
+      +calcBlock('Bar','rc-bar-rev',annBarRev,avgB,t.bar_pour_cost_pct??22)
+      +calcBlock('Food','rc-food-rev',annFoodRev,avgF,t.food_cost_pct??32)
+      +calcBlock('Prime Cost',null,annBarRev+annFoodRev,avgP,t.prime_cost_pct??60)
       +'<div class="sh" style="margin-top:24px;">Weekly History</div>'
       +'<div class="tbl-wrap" style="overflow-x:auto;margin-bottom:24px;"><table class="tbl"><thead><tr>'
       +'<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Bar Cost %</th><th>Food Rev</th><th>Food Cost %</th><th>Prime %</th><th>Variance $</th>'
       +'</tr></thead><tbody>'+histRows+'</tbody></table></div>'
       +'<div id="week-detail"></div>'
       +'</div>';
+
+    // Recalculate buttons
+    this.container.querySelectorAll('.rc-recalc').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id  = btn.dataset.id;
+        const inp = document.getElementById(id);
+        if (!inp) return;
+        const val = parseFloat(inp.value) || 0;
+        if (id === 'rc-bar-rev') {
+          App.data.settings.annual_bar_revenue = val;
+        } else {
+          App.data.settings.annual_food_revenue = val;
+        }
+        await App.saveKey('settings');
+        this.renderMain();
+      });
+    });
   },
   viewWeek(id){
     const w=(App.data.weeks||[]).find(w=>w.id===id);if(!w)return;
@@ -59,7 +89,7 @@ S.Reports={
     const tRev=(w.bar?.revenue||0)+(w.food?.revenue||0);
     det.innerHTML='<div class="divider"></div>'
       +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">'
-      +'<div class="sh" style="margin-bottom:0;">Week '+w.week_num+' — '+(w.period_end||'')+'</div>'
+      +'<div class="sh" style="margin-bottom:0;">Week '+w.week_num+' - '+(w.period_end||'')+'</div>'
       +'<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'week-detail\').innerHTML=\'\'">Close</button>'
       +'</div>'
       +'<div class="card"><div class="tbl-wrap"><table class="sum-tbl"><thead><tr><th></th><th>Amount</th></tr></thead><tbody>'
