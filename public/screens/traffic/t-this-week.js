@@ -114,7 +114,7 @@ S.TrafficThisWeek = {
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:160px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-gr" value="' + esc(this.draft.google_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">★</span></div></div>'
       + '<div class="f" style="width:160px;"><label>Total Google Reviews</label><div class="fw"><input class="suf" type="number" id="ttw-gt" value="' + esc(this.draft.google_total) + '" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">total</span></div></div>'
-      + '<div class="f" style="width:160px;"><label>New Reviews This Month ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="ttw-nr" value="' + esc(this.draft.new_reviews) + '" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>New Reviews/Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="ttw-nr" value="' + esc(this.draft.new_reviews) + '" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">/mo</span></div></div>'
       + '<div class="f" style="width:160px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="ttw-rr" value="' + esc(this.draft.response_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div class="calc">'
@@ -149,7 +149,7 @@ S.TrafficThisWeek = {
 
     return '<div class="card"><div class="card-title">Website</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="ttw-ss" value="' + esc(this.draft.monthly_sessions) + '" oninput="S.TrafficThisWeek.calcWeb()"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:200px;"><label>Sessions/Mo ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="ttw-ss" value="' + esc(this.draft.monthly_sessions) + '" oninput="S.TrafficThisWeek.calcWeb()"/><span class="suf">/mo</span></div></div>'
       + '<div class="f" style="width:180px;"><label>Bounce Rate ' + tt('t-bounce-rate') + '</label><div class="fw"><input class="suf" type="number" id="ttw-br" value="' + esc(this.draft.bounce_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcWeb()"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div class="calc">'
@@ -180,7 +180,7 @@ S.TrafficThisWeek = {
     return '<div class="card"><div class="card-title">Social Media</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:180px;"><label>Instagram Followers ' + tt('t-ig-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igf" value="' + esc(this.draft.ig_followers) + '"/><span class="suf">followers</span></div></div>'
-      + '<div class="f" style="width:180px;"><label>IG Posts This Month ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igp" value="' + esc(this.draft.ig_posts_month) + '" oninput="S.TrafficThisWeek.calcSocial()"/><span class="suf">posts</span></div></div>'
+      + '<div class="f" style="width:180px;"><label>IG Posts/Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igp" value="' + esc(this.draft.ig_posts_month) + '" oninput="S.TrafficThisWeek.calcSocial()"/><span class="suf">posts</span></div></div>'
       + '<div class="f" style="width:180px;"><label>Facebook Followers ' + tt('t-fb-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-fbf" value="' + esc(this.draft.fb_followers) + '"/><span class="suf">followers</span></div></div>'
       + '</div>'
       + '<div class="calc">'
@@ -228,7 +228,7 @@ S.TrafficThisWeek = {
       + row('Total Reviews',    d.google_total || '',                            '',           true)
       + row('New Reviews/Mo',   rv != null ? rv + ' reviews' : '',              tRV + '/mo',  rv != null && rv >= tRV)
       + row('Response Rate',    rr != null ? rr.toFixed(0) + '%' : '',          tRR + '%',    rr != null && rr >= tRR)
-      + row('Monthly Sessions', ss != null ? ss.toLocaleString() : '',          tSS.toLocaleString() + '/mo', ss != null && ss >= tSS)
+      + row('Sessions/Mo', ss != null ? ss.toLocaleString() : '',          tSS.toLocaleString() + '/mo', ss != null && ss >= tSS)
       + row('Bounce Rate',      br != null ? br.toFixed(0) + '%' : '',          'Under 60%',  br != null && br <= 60)
       + row('IG Followers',     d.ig_followers || '',                            '',           true)
       + row('IG Posts/Mo',      igp != null ? igp + ' posts' : '',              tSP + '/mo',  igp != null && igp >= tSP)
