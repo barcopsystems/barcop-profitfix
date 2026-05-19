@@ -139,6 +139,12 @@ S.RevenueMenuItems = {
       if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
       if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
     };
+    document.getElementById('ri-sel-all')?.addEventListener('click', () => {
+      const all = container.querySelectorAll('.ri-chk');
+      const anyUnchecked = [...all].some(c => !c.checked);
+      all.forEach(c => { c.checked = anyUnchecked; });
+      updateSel();
+    });
     document.getElementById('ri-chk-all')?.addEventListener('change', e => {
       container.querySelectorAll('.ri-chk').forEach(c => { c.checked = e.target.checked; });
       updateSel();
