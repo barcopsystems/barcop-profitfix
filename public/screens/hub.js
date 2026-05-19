@@ -91,12 +91,39 @@ S.Hub = {
       ? stat('Latest Audit', lastAuditDate||'No audits yet') + stat('Bar Pour Cost', barCostPct!=null?App.fmtPct(barCostPct):'No data') + stat('Prime Cost', primePct!=null?App.fmtPct(primePct):'No data') + stat('Monthly Opportunity', opportunity?App.fmtCurrency(opportunity,0):'No data')
       : blurStat('Latest Audit','Mar 15, 2026') + blurStat('Bar Pour Cost','28.4%') + blurStat('Prime Cost','67.2%') + blurStat('Monthly Opportunity','$4,280');
 
+    const rAudits      = data.revenue_audits || [];
+    const rWeeks       = (data.revenue_weeks || []).filter(w => (w.bar_revenue||0)+(w.floor_revenue||0) > 0);
+    const rLatestAudit = rAudits.length ? rAudits[rAudits.length - 1] : null;
+    const rLatestWeek  = rWeeks.length  ? rWeeks[rWeeks.length - 1]   : null;
+    const rAuditScore  = rLatestAudit?.overall_score ?? null;
+    const rAuditDate   = rLatestAudit ? new Date(rLatestAudit.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : null;
+    const rCheckAvg    = rLatestWeek?.check_avg    ?? null;
+    const rLaborPct    = rLatestWeek?.labor_pct_blended ?? null;
+    const rTarget      = data.revenue_settings?.targets?.check_avg ?? 35;
+    const rCovers      = rLatestWeek?.covers ?? 0;
+    const rGap         = rCheckAvg && rCovers ? (rCheckAvg - rTarget) * rCovers * 52 : null;
+
     const revenueStats = hasR
-      ? stat('Latest Audit','No audits yet') + stat('Check Average','No data') + stat('Labor Cost','No data') + stat('Revenue Gap','No data')
+      ? stat('Latest Audit', rAuditScore != null ? rAuditScore + ' / 100' : 'No audits yet')
+        + stat('Check Average', rCheckAvg ? App.fmtCurrency(rCheckAvg) : 'No data')
+        + stat('Labor Cost', rLaborPct ? rLaborPct.toFixed(1) + '%' : 'No data')
+        + stat('Annual Rev Gap', rGap != null ? App.fmtCurrency(Math.abs(rGap)) : 'No data')
       : blurStat('Latest Audit','Mar 15, 2026') + blurStat('Check Average','$38.40') + blurStat('Labor Cost','34.1%') + blurStat('Revenue Gap','$6,100');
 
+    const tAudits      = data.traffic_audits || [];
+    const tWeeks       = data.traffic_weeks  || [];
+    const tLatestAudit = tAudits.length ? tAudits[tAudits.length - 1] : null;
+    const tLatestWeek  = tWeeks.length  ? tWeeks[tWeeks.length - 1]   : null;
+    const tAuditScore  = tLatestAudit?.overall_score ?? null;
+    const tRating      = tLatestWeek?.google_rating  ?? null;
+    const tReviews     = tLatestWeek?.new_reviews     ?? null;
+    const tRank        = tLatestWeek?.avg_rank        ?? null;
+
     const trafficStats = hasT
-      ? stat('Latest Audit','No audits yet') + stat('Google Rating','No data') + stat('Review Velocity','No data') + stat('Digital Score','No data')
+      ? stat('Latest Audit',    tAuditScore != null ? tAuditScore + ' / 100' : 'No audits yet')
+        + stat('Google Rating', tRating  != null ? tRating.toFixed(1) + ' / 5.0' : 'No data')
+        + stat('New Reviews',   tReviews != null ? tReviews + ' this week'        : 'No data')
+        + stat('Avg Rank',      tRank    != null ? '#' + tRank + ' search pos'    : 'No data')
       : blurStat('Latest Audit','Mar 15, 2026') + blurStat('Google Rating','3.9 / 5.0') + blurStat('Review Velocity','2 / month') + blurStat('Digital Score','41 / 100');
 
     const insightCopy = activeCount===3
