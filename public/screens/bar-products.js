@@ -32,6 +32,7 @@ S.BarProducts = {
 
   render(container, actions) {
     this.container = container;
+    this.actions = actions;
     actions.innerHTML = '';
     const addBtn = document.createElement('button');
     addBtn.className = 'btn btn-primary btn-sm';
@@ -111,7 +112,7 @@ S.BarProducts = {
       + '<button class="btn btn-danger" id="bp-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '<div id="bp-form"></div></div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
 
     this.container.onclick = ev => {
       const edit     = ev.target.closest('.bp-edit');
@@ -159,9 +160,7 @@ S.BarProducts = {
 
   // ── Import ──────────────────────────────────────────────────────────────
   showImport() {
-    const fa = document.getElementById('bp-form');
-    if (!fa) return;
-    fa.innerHTML = '<div class="divider"></div><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">Import Bar Products from File</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">'      + 'Upload a CSV or Excel file exported from your POS system or a spreadsheet you already maintain. '      + 'The app reads your columns and shows a mapping screen so you can match them to the right fields. '      + 'Products import instantly — any missing data shows as Incomplete and can be filled in afterwards.</div>'      + '<details style="margin-bottom:16px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'      + '<strong style="color:var(--t1);">First row must be column headers.</strong> One row per product.<br><br>'      + '<strong style="color:var(--t1);">Columns the app recognizes automatically:</strong><br>'      + '&bull; <strong>Name / Item / Product / Description</strong> — required<br>'      + '&bull; <strong>Category / Type / Group / Dept</strong> — optional<br>'      + '&bull; <strong>Vendor / Supplier / Distributor</strong> — optional<br>'      + '&bull; <strong>Size / Bottle Size / Container / Volume / Oz</strong> — optional, in ounces<br>'      + '&bull; <strong>Pour / Pour Size / Standard Pour / Std Pour</strong> — optional, in ounces<br>'      + '&bull; <strong>Cost / Unit Cost / COGS / Item Cost / Wholesale / Price Paid</strong> — optional<br>'      + '&bull; <strong>Price / Menu Price / Sell Price / Retail / Selling Price</strong> — optional<br><br>'      + '<strong style="color:var(--t1);">Only Name is truly required.</strong> Import with just names and categories if that is all you have — then fill in costs and pour sizes afterwards. The app flags incomplete products so you know exactly what still needs to be entered.<br><br>'      + '<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)<br><br>'      + '<strong style="color:var(--t1);">Where to export from your POS:</strong><br>'      + '&bull; Toast: Menu → Menu Items → Export<br>'      + '&bull; Square: Items → Item Library → Export CSV<br>'      + '&bull; Lightspeed: Menu → Products → Export<br>'      + '&bull; Aloha: Maintenance → Menu → Items → Export<br>'      + '&bull; Any system: look for Menu Items, Item List, or Product List export. Your distributor may also provide a product/price list in Excel.'      + '</div></details>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Accepted formats: CSV, XLSX, XLS</div>'
@@ -173,6 +172,7 @@ S.BarProducts = {
       + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '</div></div>';
 
+    document.getElementById('bp-imp-cancel')?.addEventListener('click', () => this.render(this.container, this.actions));
     document.getElementById('bp-imp-file')?.addEventListener('change', ev => {
       const file = ev.target.files[0];
       if (file) this.readImportFile(file);
@@ -402,8 +402,6 @@ S.BarProducts = {
   showForm(id) {
     this.editId = id || null;
     const p = id ? (App.data.bar_products || []).find(p => p.id === id) : null;
-    const fa = document.getElementById('bp-form');
-    if (!fa) return;
     const isCustom = p?.bottle_size_oz != null && !this.SIZES.find(s => s.oz === p.bottle_size_oz);
     const missing = p ? {
       bottle_size_oz: !p.bottle_size_oz,
@@ -413,7 +411,7 @@ S.BarProducts = {
     } : {};
     const rb = f => missing[f] ? 'border-color:var(--red);' : '';
 
-    fa.innerHTML = '<div class="divider"></div><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Bar Product</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f w-lg"><label>Product Name</label><input type="text" id="bp-name" value="' + esc(p?.name || '') + '" placeholder="Tito\'s Handmade Vodka" /></div>'
@@ -441,8 +439,8 @@ S.BarProducts = {
       + '<div class="calc-item"><div class="calc-label">Pour Cost % ' + tt('pour-cost-pct') + '</div><div class="calc-val" id="bp-pct">—</div></div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '<button class="btn btn-primary" id="bp-save">' + (id ? 'Update' : 'Save') + '</button>'
+      + '<button class="btn btn-ghost" id="bp-cancel">Cancel</button>'
       + '<span id="bp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
@@ -455,6 +453,8 @@ S.BarProducts = {
     );
     if (p) this.calcProduct();
     document.getElementById('bp-name')?.focus();
+    document.getElementById('bp-cancel')?.addEventListener('click', () => this.render(this.container, this.actions));
+    document.getElementById('bp-save')?.addEventListener('click', () => this.save());
   },
 
   getOz() {
@@ -525,7 +525,7 @@ S.BarProducts = {
     App.saveKey('bar_products').then(() => {
       this._saving = false;
       this.editId  = null;
-      this.renderList();
+      this.render(this.container, this.actions);
     });
   }
 };
