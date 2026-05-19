@@ -163,7 +163,7 @@ S.RevenueThisWeek = {
     const targetCA = t.check_avg || 35;
     if (!servers.length) {
       return '<div class="card"><div class="empty"><div class="empty-title">No Servers on Roster</div>'
-        + '<div class="empty-sub">Add servers in Settings first, then return to enter their performance data.</div>'
+        + '<div class="empty-sub">Add servers in Settings, then return to enter their performance data.</div>'
         + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'r-settings\')">Go to Settings</button></div>'
         + '</div></div>' + this.nav(true, true);
     }
