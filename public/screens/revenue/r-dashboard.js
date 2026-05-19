@@ -129,7 +129,7 @@ S.RevenueDashboard = {
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="r-qa-week">Enter This Week</button>'
-      + '<button class="btn btn-ghost" id="r-qa-server">Server Check</button>'
+      + '<button class="btn btn-ghost" id="r-qa-server">Revenue Audit</button>'
       + '<button class="btn btn-ghost" id="r-qa-reports">View Reports</button>'
       + '</div>'
       + '</div>';
