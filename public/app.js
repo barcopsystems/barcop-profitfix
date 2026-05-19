@@ -327,7 +327,7 @@ const App = {
       'cash-recon':    ['Cash Reconciliation', ''],
       'reports':       ['Reports & History', ''],
       'settings':      ['Settings', ''],
-      'help':          ['Help & FAQ', ''],
+      'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
       'resources':     ['Resources', 'Tools, Templates & Checklists'],
       'getting-started': ['Getting Started', '30-Day Setup Checklist']
