@@ -4,6 +4,12 @@ S.RevenueDashboard = {
 
   render(container, actions) {
     actions.innerHTML = '';
+    const insBtn = document.createElement('button');
+    insBtn.className = 'btn btn-ghost btn-sm';
+    insBtn.id = 'r-insights-btn';
+    insBtn.textContent = 'Trend Insights';
+    insBtn.addEventListener('click', () => this.showInsights());
+    actions.appendChild(insBtn);
     const rs     = App.data.revenue_settings || {};
     const t      = rs.targets || {};
     const weeks  = App.data.revenue_weeks || [];
@@ -217,5 +223,62 @@ S.RevenueDashboard = {
       + '<path d="'+smoothPath(rplhS)+'" fill="none" stroke="#4888A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
       + caLabels + xLabels
       + '</svg></div>';
+  },
+
+  showInsights() {
+    const weeks = (App.data.revenue_weeks||[]).filter(w=>(w.bar_revenue||0)+(w.floor_revenue||0)>0).slice(-8);
+    const showModal = (html) => {
+      const m = document.createElement('div');
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
+      box.innerHTML = html;
+      m.appendChild(box);
+      document.body.appendChild(m);
+      m.onclick = ev => { if(ev.target===m) m.remove(); };
+      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
+    };
+    if (weeks.length < 2) {
+      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      return;
+    }
+    const btn = document.getElementById('r-insights-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
+    const t  = App.data.revenue_settings?.targets || {};
+    const avg = arr => { const v = arr.filter(x=>x!=null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
+    const caT = t.check_avg || 35;
+    const lpT = ((t.bar_labor_pct||28)+(t.kitchen_labor_pct||30)+(t.floor_labor_pct||32))/3;
+    const caVals  = weeks.map(w=>w.check_avg).filter(v=>v!=null);
+    const lpVals  = weeks.map(w=>w.labor_pct_blended).filter(v=>v!=null);
+    const revVals = weeks.map(w=>(w.bar_revenue||0)+(w.floor_revenue||0));
+    const covVals = weeks.map(w=>w.covers).filter(v=>v!=null);
+    const aCA = avg(caVals).toFixed(2);
+    const aLP = avg(lpVals).toFixed(1);
+    const aRev = avg(revVals).toFixed(0);
+    const aCov = avg(covVals).toFixed(0);
+    const caTrend = caVals.length>=3 ? (caVals[caVals.length-1]-caVals[0]>1 ? 'trending up (improving)' : caVals[0]-caVals[caVals.length-1]>1 ? 'trending down (worsening)' : 'holding steady') : 'early data';
+    const lines = [
+      'Check Average: '+weeks.map(w=>w.check_avg?'$'+w.check_avg.toFixed(2):'n/a').join(', ')+' (target:$'+caT+' avg:$'+aCA+')',
+      'Check average trend: '+caTrend,
+      'Labor %: '+weeks.map(w=>w.labor_pct_blended?w.labor_pct_blended.toFixed(1)+'%':'n/a').join(', ')+' (target:'+lpT.toFixed(1)+'% avg:'+aLP+'%)',
+      'Avg weekly revenue: $'+aRev,
+      'Avg covers/week: '+aCov,
+      'Weekly check avg gap vs target: $'+Math.abs((parseFloat(aCA)-caT)*parseFloat(aCov)).toFixed(0)+' '+(parseFloat(aCA)<caT?'below target':'above target'),
+    ];
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the revenue and labor data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n'+lines.join('\n')+'\n\nLead with check average performance, then labor efficiency, then the single action that will move revenue most this week.';
+    fetch('/api/claude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:'claude-sonnet-4-5', max_tokens:600, messages:[{role:'user', content:prompt}]})})
+    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data => {
+      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
+      if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: '+data.error.message+'</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+      const text = data.content?.[0]?.text;
+      if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+      const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
+      const body   = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
+      showModal(header+body);
+    }).catch(err => {
+      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
+      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: '+err.message+'. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+    });
   }
 };
