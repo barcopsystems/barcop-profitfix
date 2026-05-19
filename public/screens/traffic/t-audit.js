@@ -139,31 +139,31 @@ S.TrafficAudit = {
       + '</div>'
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Google Business Profile</div>'
-      + this.renderFileSection('required', 'GBP Screenshot — Full Profile View',    'ta-f-gbp-profile',  'A screenshot of your Google Business Profile as it appears in Google Maps or Search. Capture the full listing including name, address, phone, hours, website link, category, and the photo and review summary. Phone screenshots are fine. Accepted: PNG, JPG, PDF.',      'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
-      + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',     'ta-f-gbp-insights', 'Monthly impressions, search queries, direction requests, and phone calls. In Google Business Profile dashboard go to Performance. Screenshot of the dashboard is accepted. Accepted: PDF, PNG, JPG.',                                                                     'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
+      + this.renderFileSection('required', 'GBP Screenshot — Full Profile View',    'ta-f-gbp-profile',  'ta-gbp-profile',      'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
+      + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',     'ta-f-gbp-insights', 'ta-gbp-insights',                                                                     'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Website Data</div>'
-      + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot','ta-f-analytics',    'Monthly sessions, bounce rate, top pages by sessions, and menu page performance. Export from Google Analytics, Squarespace, Wix, or any analytics platform. A screenshot of the overview dashboard is accepted. Accepted: Excel, CSV, PDF, PNG, JPG.',                 'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
-      + this.renderFileSection('optional', 'Website Screenshot — Homepage on Mobile','ta-f-mobile-site',  'A screenshot of your homepage as it appears on a phone. Shows whether your phone number, address, and call-to-action are visible without scrolling. Accepted: PNG, JPG.',                                                                                              'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+      + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot','ta-f-analytics',    'ta-analytics',                 'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
+      + this.renderFileSection('optional', 'Website Screenshot — Homepage on Mobile','ta-f-mobile-site',  'ta-mobile-site',                                                                                              'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Review Platform Data</div>'
-      + this.renderFileSection('required', 'Google Review Page Screenshot',         'ta-f-google-reviews','Screenshot of your Google listing showing your star rating, total review count, and the most recent 5 to 10 reviews. In Google Maps click your listing and scroll to Reviews. Accepted: PNG, JPG.',                                                                    'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
-      + this.renderFileSection('optional', 'Yelp Listing Screenshot',               'ta-f-yelp',          'Screenshot of your Yelp business page showing star rating, review count, and recent reviews. Submit if you have a Yelp listing. Accepted: PNG, JPG.',                                                                                                               'Unlocks: Cross-platform reputation comparison')
+      + this.renderFileSection('required', 'Google Review Page Screenshot',         'ta-f-google-reviews','ta-google-reviews',                                                                    'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
+      + this.renderFileSection('optional', 'Yelp Listing Screenshot',               'ta-f-yelp',          'ta-yelp',                                                                                                               'Unlocks: Cross-platform reputation comparison')
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Search Visibility</div>'
-      + this.renderFileSection('optional', 'Search Results Screenshots',            'ta-f-search',        'Open an incognito browser window. Search for "[your bar type] [your city]" and "[your neighborhood] bar" and screenshot the full results page including the Google Maps pack. Submit screenshots for at least two searches. Accepted: PNG, JPG.',                      'Unlocks: Maps pack presence confirmed, primary search visibility signal')
+      + this.renderFileSection('optional', 'Search Results Screenshots',            'ta-f-search',        'ta-search',                      'Unlocks: Maps pack presence confirmed, primary search visibility signal')
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Social Media</div>'
-      + this.renderFileSection('required', 'Instagram Profile Screenshot',          'ta-f-instagram',     'Screenshot of your Instagram profile showing follower count, post count, bio, and the most recent 9 to 12 posts in grid view. Required if Instagram is your primary platform. Phone screenshot is fine. Accepted: PNG, JPG.',                                         'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
-      + this.renderFileSection('optional', 'Facebook Page Screenshot',              'ta-f-facebook',      'Screenshot of your Facebook business page showing follower count and recent posts. Accepted: PNG, JPG.',                                                                                                                                                              'Unlocks: Cross-platform social presence analysis')
-      + this.renderFileSection('optional', 'Instagram Analytics Screenshot',        'ta-f-ig-analytics',  'Screenshot from Instagram Insights showing reach, impressions, and engagement for the last 30 days. In Instagram go to Professional Dashboard and select Insights. Accepted: PNG, JPG.',                                                                             'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
+      + this.renderFileSection('required', 'Instagram Profile Screenshot',          'ta-f-instagram',     'ta-instagram',                                         'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
+      + this.renderFileSection('optional', 'Facebook Page Screenshot',              'ta-f-facebook',      'ta-facebook',                                                                                                                                                              'Unlocks: Cross-platform social presence analysis')
+      + this.renderFileSection('optional', 'Instagram Analytics Screenshot',        'ta-f-ig-analytics',  'ta-ig-analytics',                                                                             'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Delivery Platforms</div>'
-      + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot','ta-f-delivery',      'Screenshot of your merchant dashboard on DoorDash, Uber Eats, or Grubhub showing your current rating, photo count, and menu status. Log into the merchant portal for each platform and screenshot the overview page. Submit one per platform. Accepted: PNG, JPG.',  'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
+      + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot','ta-f-delivery',      'ta-delivery',  'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
 
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Email and Loyalty</div>'
-      + this.renderFileSection('optional', 'Email Platform Screenshot',             'ta-f-email',         'Screenshot of your email platform dashboard showing list size, last send date, and any campaign performance visible on the overview screen. Works with Mailchimp, Klaviyo, Constant Contact, or any email platform. Accepted: PNG, JPG, PDF.',                       'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
-      + this.renderFileSection('optional', 'Email Analytics Export',                'ta-f-email-analytics','Campaign performance history showing open rate, click rate, and unsubscribe rate for the last 6 to 12 months. Export from your email platform. Accepted: PDF, CSV.',                                                                                               'Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
+      + this.renderFileSection('optional', 'Email Platform Screenshot',             'ta-f-email',         'ta-email',                       'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
+      + this.renderFileSection('optional', 'Email Analytics Export',                'ta-f-email-analytics','ta-email-analytics',                                                                                               'Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
 
       + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
       + '<textarea id="ta-notes" rows="3" placeholder="Recent website redesign, ownership change, seasonal operation, reduced social posting due to staffing, a new delivery platform just launched. Anything that might affect how the numbers look." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
@@ -181,7 +181,7 @@ S.TrafficAudit = {
     document.getElementById('ta-gen-btn').onclick = () => this.generateAudit(modal);
   },
 
-  renderFileSection(type, title, inputId, desc, unlocks) {
+  renderFileSection(type, title, inputId, ttId, unlocks) {
     const badge = type === 'required'
       ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
       : type === 'highlight'
@@ -189,8 +189,9 @@ S.TrafficAudit = {
       : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
     return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
-      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;line-height:1.5;">' + esc(desc) + '</div>'
+      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
+      + (ttId ? tt(ttId) : '')
+      + '</div>'
       + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:8px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:8px;"></div>')
       + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
       + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
