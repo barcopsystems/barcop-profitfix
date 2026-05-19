@@ -48,9 +48,9 @@ S.RevenueSettings = {
         </div>
         <div class="settings-section"><div class="settings-title">Average Hourly Wages</div>
           <div class="card"><div class="form-row" style="gap:16px;">
-            <div class="f" style="width:140px;"><label>Bar Staff</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-wb" value="${wages.bar||15}" step="0.25"/><span style="font-size:11px;color:var(--t3);margin-left:6px;">/hr</span></div></div>
-            <div class="f" style="width:140px;"><label>Kitchen Staff</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-wk" value="${wages.kitchen||14}" step="0.25"/><span style="font-size:11px;color:var(--t3);margin-left:6px;">/hr</span></div></div>
-            <div class="f" style="width:140px;"><label>Floor Staff</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-wf" value="${wages.floor||13}" step="0.25"/><span style="font-size:11px;color:var(--t3);margin-left:6px;">/hr</span></div></div>
+            <div class="f" style="width:140px;"><label>Bar Staff ${tt('r-wage-bar')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-wb" value="${wages.bar||15}" step="0.25"/><span style="font-size:11px;color:var(--t3);margin-left:6px;">/hr</span></div></div>
+            <div class="f" style="width:140px;"><label>Kitchen Staff ${tt('r-wage-kitchen')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-wk" value="${wages.kitchen||14}" step="0.25"/><span style="font-size:11px;color:var(--t3);margin-left:6px;">/hr</span></div></div>
+            <div class="f" style="width:140px;"><label>Floor Staff ${tt('r-wage-floor')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-wf" value="${wages.floor||13}" step="0.25"/><span style="font-size:11px;color:var(--t3);margin-left:6px;">/hr</span></div></div>
           </div></div>
         </div>
         <div class="settings-section"><div class="settings-title">Server Roster</div>
