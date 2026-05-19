@@ -153,3 +153,79 @@ const Revenue = {
     `;
   }
 };
+
+/* ── Traffic Recovery Nav ── */
+const Traffic = {
+  navHTML() {
+    return `
+      <div class="nav-section">Overview</div>
+      <div class="nav-item" id="nav-hub" data-nav="hub">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 8.5L8.5 2 15 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 7v6.5a.5.5 0 0 0 .5.5H7v-4h3v4h2.5a.5.5 0 0 0 .5-.5V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Recovery Hub</span>
+      </div>
+      <div class="nav-item" data-screen="t-dashboard" id="nav-t-dashboard">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-section">Audit</div>
+      <div class="nav-item" data-screen="t-audit" id="nav-t-audit">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Traffic Audit</span>
+      </div>
+      <div class="nav-section">Weekly</div>
+      <div class="nav-item" data-screen="t-this-week" id="nav-t-this-week">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">This Week</span>
+      </div>
+      <div class="nav-section">Digital Presence</div>
+      <div class="nav-item" data-screen="t-gbp" id="nav-t-gbp">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="7" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1M8.5 12v3M2 7h1M14 7h1M4.1 3.6l.7.7M12.2 11.7l.7.7M4.1 10.4l.7-.7M12.2 5.3l.7-.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Google Business Profile</span>
+      </div>
+      <div class="nav-item" data-screen="t-reviews" id="nav-t-reviews">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l1.8 3.6L14.5 6.2l-3 2.9.7 4.1L8.5 11.2 5.8 13.2l.7-4.1-3-2.9 4.2-.6L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Review Tracker</span>
+      </div>
+      <div class="nav-item" data-screen="t-search" id="nav-t-search">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Search &amp; SEO</span>
+      </div>
+      <div class="nav-item" data-screen="t-website" id="nav-t-website">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3" width="14" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 7h14" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="5" r="0.7" fill="currentColor"/><circle cx="6.5" cy="5" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Website Scorecard</span>
+      </div>
+      <div class="nav-section">Social &amp; Delivery</div>
+      <div class="nav-item" data-screen="t-social" id="nav-t-social">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="4.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="4" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="13" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M6.4 7.6l4.2-2.1M6.4 9.4l4.2 2.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Social Media</span>
+      </div>
+      <div class="nav-item" data-screen="t-delivery" id="nav-t-delivery">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="5.5" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M11.5 8h2l2 2.5v3h-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13.5" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="13" cy="13.5" r="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.5V3.5a2 2 0 0 1 2-2h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Delivery Platforms</span>
+      </div>
+      <div class="nav-item" data-screen="t-email" id="nav-t-email">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3.5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 6.5l7 4.5 7-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Email &amp; Loyalty</span>
+      </div>
+      <div class="nav-section">History</div>
+      <div class="nav-item" data-screen="t-reports" id="nav-t-reports">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Reports and History</span>
+      </div>
+      <div class="nav-section">Support</div>
+      <div class="nav-item" data-screen="t-getting-started" id="nav-t-getting-started">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Getting Started</span>
+      </div>
+      <div class="nav-section">Resources</div>
+      <div class="nav-item" data-screen="t-resources" id="nav-t-resources">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 7h6M5.5 10h4M5.5 13h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Resources</span>
+      </div>
+      <div class="nav-item" data-screen="t-help" id="nav-t-help">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
+        <span class="nav-label">Help and FAQ</span>
+      </div>
+    `;
+  }
+};
