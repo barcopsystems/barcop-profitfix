@@ -109,10 +109,15 @@ S.TrafficAudit = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + requestCard + latestCard + historyCard + '</div>';
+    const emptyState = !latest
+      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
+        + '<div class="empty-sub">Generate your first monthly Traffic Audit above. Upload your screenshots and the audit builds automatically.</div></div>'
+      : '';
 
-    this.container.querySelector('#ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
-    this.container.querySelector('#ta-dl-latest')?.addEventListener('click', () => this.downloadPDF(latest));
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + historyCard + '</div>';
+
+    document.getElementById('ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
+    document.getElementById('ta-dl-latest')?.addEventListener('click', () => this.downloadPDF(latest));
     this.container.querySelectorAll('.ta-dl-hist').forEach(btn => {
       btn.addEventListener('click', () => this.downloadPDF(audits[parseInt(btn.dataset.idx)]));
     });
