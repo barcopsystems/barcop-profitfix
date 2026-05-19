@@ -88,8 +88,9 @@ app.post('/api/generate-audit', (req, res) => {
   form.parse(req, async (err, fields, files) => {
     if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
 
-    const auditType = fields.auditType?.[0] || 'profit';
-    const appDataStr = fields.appData?.[0] || '{}';
+    const auditType  = fields.auditType?.[0] || 'profit';
+    const appDataStr = fields.appData?.[0]   || '{}';
+    const notes      = fields.notes?.[0]     || '';
     let appData = {};
     try { appData = JSON.parse(appDataStr); } catch(e) {}
 
@@ -104,7 +105,7 @@ app.post('/api/generate-audit', (req, res) => {
 
     try {
       // Step 1: Extract data from uploaded files via Claude
-      const extractedData = await extractAuditData(apiKey, auditType, uploadedFiles, appData);
+      const extractedData = await extractAuditData(apiKey, auditType, uploadedFiles, appData, notes);
 
       // Step 2: Generate PDF
       const pdfBuffer = await generateAuditPDF(auditType, extractedData);
@@ -159,7 +160,7 @@ function parseSpreadsheetToText(filePath, fileName) {
 }
 
 // ── Extract audit data from uploaded files ────────────────────────────────────
-async function extractAuditData(apiKey, auditType, files, appData) {
+async function extractAuditData(apiKey, auditType, files, appData, notes='') {
   const prompts = {
     profit:  getExtractionPrompt_Profit(appData),
     revenue: getExtractionPrompt_Revenue(appData),
@@ -203,11 +204,15 @@ async function extractAuditData(apiKey, auditType, files, appData) {
     });
   }
 
-  content.push({ type: 'text', text: prompt });
+  // Append operator notes to prompt if provided
+  const fullPrompt = notes
+    ? prompt + '\n\nOPERATOR NOTES (read carefully — these may affect how you interpret the data):\n' + notes
+    : prompt;
+  content.push({ type: 'text', text: fullPrompt });
 
   const body = JSON.stringify({
     model: 'claude-sonnet-4-5',
-    max_tokens: 4000,
+    max_tokens: 8000,
     messages: [{ role: 'user', content }]
   });
 
@@ -1088,6 +1093,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('\n  Bar Cop Fix System\n  http://localhost:' + PORT + '\n');
 });
+// Allow 5 minutes for audit generation (Claude API + Python PDF build)
+server.timeout = 300000;
+server.headersTimeout = 310000;
