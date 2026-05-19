@@ -8,7 +8,7 @@ S.TrafficGettingStarted = {
     { week:2, id:'tgs_week1',    label:'Enter your first week of digital metrics in This Week. Google rating, new reviews, response rate, and any sessions data you have.', screen:'t-this-week' },
     { week:2, id:'tgs_search',   label:'Complete the Search and SEO section. Confirm your NAP consistency and identify your primary local search keyword.', screen:'t-search' },
     { week:2, id:'tgs_social',   label:'Log your social media baseline in Social Media. Instagram followers, post frequency, and Facebook page status.', screen:'t-social' },
-    { week:2, id:'tgs_respond',  label:'Respond to every unanswered Google review — positive and negative. Set a goal to respond within 48 hours going forward.', screen:'t-reviews' },
+    { week:2, id:'tgs_respond',  label:'Respond to every unanswered Google review, positive and negative. Set a goal to respond within 48 hours going forward.', screen:'t-reviews' },
     { week:3, id:'tgs_delivery', label:'Audit your delivery platform presence in Delivery Platforms. Confirm photos, menu completeness, and rating on each active platform.', screen:'t-delivery' },
     { week:3, id:'tgs_email',    label:'Log your email list status in Email and Loyalty. List size, last send date, and current open rate if available.', screen:'t-email' },
     { week:3, id:'tgs_week2',    label:'Enter Week 2 data in This Week.', screen:'t-this-week' },
@@ -25,7 +25,7 @@ S.TrafficGettingStarted = {
   render(container) {
     const progress = this.getProgress();
     const weeks = [1,2,3,4];
-    const weekLabels = { 1:'Week 1 — Foundation', 2:'Week 2 — Baseline and Gaps', 3:'Week 3 — Platform Audit', 4:'Week 4 — Full System Running' };
+    const weekLabels = { 1:'Week 1 - Foundation', 2:'Week 2 - Baseline and Gaps', 3:'Week 3 - Platform Audit', 4:'Week 4 - Full System Running' };
     const total = this.TASKS.length;
     const done  = this.TASKS.filter(t => progress[t.id]).length;
     const pct   = Math.round(done / total * 100);
