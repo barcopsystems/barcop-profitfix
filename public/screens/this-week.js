@@ -55,8 +55,8 @@ S.ThisWeek = {
   step1(){
     return '<div class="card"><div class="card-title">Period Details</div>'
       +'<div class="form-row">'
-      +'<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="tw-wk" value="'+this.draft.week_num+'" min="1" /></div>'
-      +'<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="tw-end" value="'+this.draft.period_end+'" /></div>'
+      +'<div class="f" style="width:100px;"><label>Week # '+tt('tw-week-num')+'</label><input type="number" id="tw-wk" value="'+this.draft.week_num+'" min="1" /></div>'
+      +'<div class="f" style="width:160px;"><label>Period End Date '+tt('tw-period-end')+'</label><input type="date" id="tw-end" value="'+this.draft.period_end+'" /></div>'
       +'</div>'+this.nav(false,true)+'</div>';
   },
 
@@ -240,7 +240,11 @@ S.ThisWeek = {
   step6(){
     const prods=App.data.kitchen_products||[];
     if(prods.length===0)return '<div class="card"><div class="card-title">Food Inventory Count</div>'
-      +'<div class="empty"><div class="empty-title">No kitchen products set up</div><div class="empty-sub">You can skip this step.</div></div>'+this.nav(true,true)+'</div>';
+      +'<div class="empty"><div class="empty-title">No kitchen products set up</div><div class="empty-sub">You can skip this step if you do not sell food. If you do sell food, add your kitchen products first and then return here to complete the count.</div>'
+      +'<div style="display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;">'
+      +'<button class="btn btn-ghost" onclick="App.navigate(\'kitchen-products\')">Go to Kitchen Products</button>'
+      +'</div></div>'
+      +this.nav(true,true)+'</div>';
     if(!this.draft.food_count||!this.draft.food_count.length){
       const prev=App.data.weeks.length>0?App.data.weeks[App.data.weeks.length-1]:null;
       this.draft.food_count=prods.map(p=>{const pc=prev?.food_count?.find(c=>c.product_id===p.id);return{product_id:p.id,beg_inv:pc?.end_inv??0,purchases:'',end_inv:'',units_used:null,total_cost:null};});
