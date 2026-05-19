@@ -434,6 +434,10 @@ const App = {
     document.querySelectorAll('.nav-item, .sidebar-btn').forEach(el => el.classList.remove('active'));
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.add('active');
+    // Settings gear button should stay active for all three settings screens
+    if (id === 'r-settings' || id === 't-settings') {
+      document.getElementById('nav-settings')?.classList.add('active');
+    }
   },
 
   updatePeriod() {
