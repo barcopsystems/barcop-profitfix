@@ -76,7 +76,40 @@ app.post('/api/claude', (req, res) => {
   proxyReq.end();
 });
 
-// ── Audit generation endpoint ─────────────────────────────────────────────────
+// ── Traffic audit — JSON only, no PDF ─────────────────────────────────────────
+app.post('/api/generate-traffic-audit', (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
+  form.parse(req, async (err, fields, files) => {
+    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
+
+    const appDataStr = fields.appData?.[0] || '{}';
+    const notes      = fields.notes?.[0]   || '';
+    let appData = {};
+    try { appData = JSON.parse(appDataStr); } catch(e) {}
+
+    const uploadedFiles = [];
+    for (const [key, fileArr] of Object.entries(files)) {
+      for (const f of fileArr) {
+        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
+      }
+    }
+
+    try {
+      const auditData = await extractAuditData(apiKey, 'traffic', uploadedFiles, appData, notes);
+      res.json({ ok: true, auditData });
+    } catch(e) {
+      console.error('Traffic audit error:', e);
+      res.status(500).json({ error: e.message || 'Audit generation failed' });
+    } finally {
+      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
+    }
+  });
+});
+
+
 // POST /api/generate-audit
 // Accepts multipart form: auditType, appData (JSON string), files...
 // Returns: { pdfBase64, auditData }
@@ -734,12 +767,42 @@ Fill every field with real values extracted from the documents or calculated fro
 }
 
 function getExtractionPrompt_Traffic(appData) {
-  const settings = appData.settings || {};
-  return `You are generating a Bar Cop Traffic Audit. Analyze all submitted screenshots, documents, and questionnaire answers to extract variables for a scored PDF audit report.
+  const settings      = appData.settings || {};
+  const ts            = appData.traffic_settings || {};
+  const targets       = ts.targets || {};
+  const weeks         = appData.traffic_weeks || [];
+  const recentWeeks   = weeks.slice(-4);
+  const avg = (fn) => { const v = recentWeeks.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+  const avgGR  = avg(w=>w.google_rating);
+  const avgRV  = avg(w=>w.new_reviews);
+  const avgRR  = avg(w=>w.response_rate);
+  const avgSS  = avg(w=>w.monthly_sessions);
+  const avgBR  = avg(w=>w.bounce_rate);
+  const avgIGF = avg(w=>w.ig_followers);
+  const avgIGP = avg(w=>w.ig_posts_month);
+
+  return `You are generating a Bar Cop Traffic Audit. Analyze all submitted screenshots, documents, and questionnaire answers to extract variables for a scored audit report.
+
+APP DATA (from customer's weekly tracking in the app):
+- Bar Name: ${settings.bar_name || 'Not provided'}
+- City/State: ${settings.city_state || 'Not provided'}
+- Google Rating Target: ${targets.google_rating || 4.3}★
+- Review Velocity Target: ${targets.review_velocity || 8}/month
+- Response Rate Target: ${targets.response_rate || 75}%
+- Monthly Sessions Target: ${targets.monthly_sessions || 2000}
+- Social Posts/Month Target: ${targets.social_posts_month || 12}
+- Weeks of tracking data: ${weeks.length}
+- Recent 4-week avg Google Rating: ${avgGR ? avgGR.toFixed(2)+'★' : 'Not tracked'}
+- Recent 4-week avg New Reviews/Mo: ${avgRV ? avgRV.toFixed(1) : 'Not tracked'}
+- Recent 4-week avg Response Rate: ${avgRR ? avgRR.toFixed(1)+'%' : 'Not tracked'}
+- Recent 4-week avg Monthly Sessions: ${avgSS ? Math.round(avgSS) : 'Not tracked'}
+- Recent 4-week avg Bounce Rate: ${avgBR ? avgBR.toFixed(1)+'%' : 'Not tracked'}
+- Recent 4-week avg Instagram Followers: ${avgIGF ? Math.round(avgIGF) : 'Not tracked'}
+- Recent 4-week avg IG Posts/Month: ${avgIGP ? avgIGP.toFixed(1) : 'Not tracked'}
 
 Bar: ${settings.bar_name || 'Customer'}, ${settings.city_state || ''}
 
-Return ONLY valid JSON with these exact keys populated from submitted materials:
+Return ONLY valid JSON with these exact keys populated from submitted materials and app data:
 {
   "BAR_NAME": "${settings.bar_name || 'Customer Bar'}",
   "BAR_CITY_STATE": "${settings.city_state || ''}",
