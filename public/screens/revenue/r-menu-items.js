@@ -174,7 +174,7 @@ S.RevenueMenuItems = {
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
       + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price||'') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f w-md"><label>Food / Pour Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + (item?.cost||'') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers||'') + '" placeholder="0"/></div>'
+      + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers||'') + '" placeholder=""/></div>'
       + '</div>'
       + '<div id="ri-calc" style="margin-bottom:16px;"></div>'
       + '<div class="f" style="margin-bottom:16px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes||'') + '" placeholder="Optional"/></div>'
