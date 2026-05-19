@@ -40,7 +40,7 @@ S.Dashboard = {
     const varAvg = avg4(w=>(w.bar_variance||[]).reduce((s,r)=>s+(r.variance_dollar||0),0));
 
     const trendHtml = (cur, avg, lowerBetter=true) => {
-      if (avg==null || cur==null) return '<div class="metric-trend">—</div>';
+      if (avg==null || cur==null) return '<div class="metric-trend"> </div>';
       const diff = cur - avg;
       if (Math.abs(diff) < 0.15) return '<div class="metric-trend">→ flat</div>';
       const improving = lowerBetter ? diff < 0 : diff > 0;
@@ -50,10 +50,10 @@ S.Dashboard = {
     const metricCard = (label, val, target, impact, trendEl, cls) => {
       const impactHtml = impact!=null
         ? '<div class="metric-impact ' + (impact>0?'neg':'pos') + '">'+(impact>0?'+':'')+App.fmtCurrency(impact)+' vs target</div>'
-        : '<div class="metric-impact" style="color:var(--t4);">—</div>';
+        : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
       return '<div class="metric-card">'
         +'<div class="metric-label">'+label+'</div>'
-        +'<div class="metric-val '+cls+'">'+(val||'—')+'</div>'
+        +'<div class="metric-val '+cls+'">'+(val||'No data')+'</div>'
         +'<div class="metric-target">Target: '+App.fmtPct(target)+'</div>'
         + impactHtml + trendEl
         +'</div>';
@@ -72,7 +72,7 @@ S.Dashboard = {
         const wkImpact = (diff/100)*barRev;
         alertHtml = '<div class="alert-bar" id="db-alert">'
           +'<div class="alert-text">Pour cost is '+diff.toFixed(1)+' points above target. '
-          +App.fmtCurrency(wkImpact)+' this week — '+App.fmtCurrency(wkImpact*52)+' annualized.</div>'
+          +App.fmtCurrency(wkImpact)+' this week, '+App.fmtCurrency(wkImpact*52)+' annualized.</div>'
           +'<button class="alert-dismiss" id="db-dismiss">Close</button>'
           +'</div>';
       }
@@ -97,21 +97,21 @@ S.Dashboard = {
         const fmt = isCurrency ? App.fmtCurrency : App.fmtPct;
         const twCls = !isCurrency && tw!=null ? (tw>(isCurrency?0:barTarget)?'neg':'pos') : '';
         return '<tr><td>'+label+'</td>'
-          +'<td class="val '+twCls+'">'+(tw!=null?fmt(tw):'—')+'</td>'
-          +'<td>'+(lw!=null?fmt(lw):'—')+'</td>'
-          +'<td>'+(av!=null?fmt(av):'—')+'</td></tr>';
+          +'<td class="val '+twCls+'">'+(tw!=null?fmt(tw):'No data')+'</td>'
+          +'<td>'+(lw!=null?fmt(lw):'No data')+'</td>'
+          +'<td>'+(av!=null?fmt(av):'No data')+'</td></tr>';
       };
       summaryHtml = '<div class="tbl-wrap" style="margin-bottom:18px;"><table class="sum-tbl">'
         +'<thead><tr><th></th><th>This Week</th><th>Last Week</th><th>4-Week Avg</th></tr></thead>'
         +'<tbody>'
-        +'<tr><td>Bar Revenue</td><td class="val">'+App.fmtCurrency(latest.bar?.revenue)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.revenue):'—')+'</td><td>'+(avg4full(w=>w.bar?.revenue)!=null?App.fmtCurrency(avg4full(w=>w.bar?.revenue)):'—')+'</td></tr>'
-        +'<tr><td>Bar COGS</td><td>'+App.fmtCurrency(latest.bar?.cogs)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.cogs):'—')+'</td><td>'+(avg4full(w=>w.bar?.cogs)!=null?App.fmtCurrency(avg4full(w=>w.bar?.cogs)):'—')+'</td></tr>'
-        +'<tr><td>Bar Labor</td><td>'+App.fmtCurrency(latest.bar?.labor)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.labor):'—')+'</td><td>'+(avg4full(w=>w.bar?.labor)!=null?App.fmtCurrency(avg4full(w=>w.bar?.labor)):'—')+'</td></tr>'
-        +'<tr><td>Bar Pour Cost %</td><td class="'+(barPct>barTarget?'neg':'pos')+' val">'+App.fmtPct(barPct)+'</td><td>'+(prev?App.fmtPct(prev.bar?.cost_pct):'—')+'</td><td>'+(avg4full(w=>w.bar?.cost_pct)!=null?App.fmtPct(avg4full(w=>w.bar?.cost_pct)):'—')+'</td></tr>'
-        +'<tr><td>Food Revenue</td><td class="val">'+App.fmtCurrency(latest.food?.revenue)+'</td><td>'+(prev?App.fmtCurrency(prev.food?.revenue):'—')+'</td><td>'+(avg4full(w=>w.food?.revenue)!=null?App.fmtCurrency(avg4full(w=>w.food?.revenue)):'—')+'</td></tr>'
-        +'<tr><td>Food Cost %</td><td class="'+(foodPct>foodTarget?'neg':'pos')+' val">'+App.fmtPct(foodPct)+'</td><td class="'+(prev?.food?.cost_pct>foodTarget?'neg':'pos')+'">'+App.fmtPct(prev?.food?.cost_pct)+'</td><td>'+(avg4full(w=>w.food?.cost_pct)!=null?App.fmtPct(avg4full(w=>w.food?.cost_pct)):'—')+'</td></tr>'
-        +'<tr class="total"><td>Total Revenue</td><td class="val">'+App.fmtCurrency((latest.bar?.revenue||0)+(latest.food?.revenue||0))+'</td><td>'+(prev?App.fmtCurrency((prev.bar?.revenue||0)+(prev.food?.revenue||0)):'—')+'</td><td>—</td></tr>'
-        +'<tr class="total"><td>Prime Cost %</td><td class="val '+(primePct>primeTarget?'neg':'pos')+'">'+App.fmtPct(primePct)+'</td><td>'+(prev?App.fmtPct(prev.prime_cost_pct):'—')+'</td><td>'+(avg4full(w=>w.prime_cost_pct)!=null?App.fmtPct(avg4full(w=>w.prime_cost_pct)):'—')+'</td></tr>'
+        +'<tr><td>Bar Revenue</td><td class="val">'+App.fmtCurrency(latest.bar?.revenue)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.revenue):'No data')+'</td><td>'+(avg4full(w=>w.bar?.revenue)!=null?App.fmtCurrency(avg4full(w=>w.bar?.revenue)):'No data')+'</td></tr>'
+        +'<tr><td>Bar COGS</td><td>'+App.fmtCurrency(latest.bar?.cogs)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.cogs):'No data')+'</td><td>'+(avg4full(w=>w.bar?.cogs)!=null?App.fmtCurrency(avg4full(w=>w.bar?.cogs)):'No data')+'</td></tr>'
+        +'<tr><td>Bar Labor</td><td>'+App.fmtCurrency(latest.bar?.labor)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.labor):'No data')+'</td><td>'+(avg4full(w=>w.bar?.labor)!=null?App.fmtCurrency(avg4full(w=>w.bar?.labor)):'No data')+'</td></tr>'
+        +'<tr><td>Bar Pour Cost %</td><td class="'+(barPct>barTarget?'neg':'pos')+' val">'+App.fmtPct(barPct)+'</td><td>'+(prev?App.fmtPct(prev.bar?.cost_pct):'No data')+'</td><td>'+(avg4full(w=>w.bar?.cost_pct)!=null?App.fmtPct(avg4full(w=>w.bar?.cost_pct)):'No data')+'</td></tr>'
+        +'<tr><td>Food Revenue</td><td class="val">'+App.fmtCurrency(latest.food?.revenue)+'</td><td>'+(prev?App.fmtCurrency(prev.food?.revenue):'No data')+'</td><td>'+(avg4full(w=>w.food?.revenue)!=null?App.fmtCurrency(avg4full(w=>w.food?.revenue)):'No data')+'</td></tr>'
+        +'<tr><td>Food Cost %</td><td class="'+(foodPct>foodTarget?'neg':'pos')+' val">'+App.fmtPct(foodPct)+'</td><td class="'+(prev?.food?.cost_pct>foodTarget?'neg':'pos')+'">'+App.fmtPct(prev?.food?.cost_pct)+'</td><td>'+(avg4full(w=>w.food?.cost_pct)!=null?App.fmtPct(avg4full(w=>w.food?.cost_pct)):'No data')+'</td></tr>'
+        +'<tr class="total"><td>Total Revenue</td><td class="val">'+App.fmtCurrency((latest.bar?.revenue||0)+(latest.food?.revenue||0))+'</td><td>'+(prev?App.fmtCurrency((prev.bar?.revenue||0)+(prev.food?.revenue||0)):'No data')+'</td><td>No data</td></tr>'
+        +'<tr class="total"><td>Prime Cost %</td><td class="val '+(primePct>primeTarget?'neg':'pos')+'">'+App.fmtPct(primePct)+'</td><td>'+(prev?App.fmtPct(prev.prime_cost_pct):'No data')+'</td><td>'+(avg4full(w=>w.prime_cost_pct)!=null?App.fmtPct(avg4full(w=>w.prime_cost_pct)):'No data')+'</td></tr>'
         +'</tbody></table></div>';
     } else {
       summaryHtml = '<div class="card"><div class="empty"><div class="empty-title">No weeks saved yet</div>'
@@ -125,20 +125,14 @@ S.Dashboard = {
       const t = App.data.settings.targets || {};
       startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets and Revenue</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Industry benchmarks are already filled in below. Adjust them to match your operation, enter your annual revenue estimates, and hit Save. You can always update these later in Settings.</div>'
-        + '<div class="form-row" style="gap:14px 20px;margin-bottom:16px;">'
-        + '<div class="f" style="width:120px;"><label>Bar Pour Cost %</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:120px;"><label>Food Cost %</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:120px;"><label>Bar Labor %</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:120px;"><label>Food Labor %</label><div class="fw"><input class="suf" type="number" id="sh-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:120px;"><label>Prime Cost %</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:120px;"><label>Cash Tolerance</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
-        + '</div>'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Annual Revenue Estimates</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:16px;">Set Your Cost Targets</div>'
         + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
-        + '<div class="f" style="width:180px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-brev" value="' + (App.data.settings.annual_bar_revenue || '') + '" placeholder=""/></div></div>'
-        + '<div class="f" style="width:180px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-frev" value="' + (App.data.settings.annual_food_revenue || '') + '" placeholder=""/></div></div>'
+        + '<div class="f" style="width:140px;"><label>Bar Pour Cost % ' + tt('pour-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:140px;"><label>Food Cost % ' + tt('food-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:140px;"><label>Bar Labor % ' + tt('bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:140px;"><label>Food Labor % ' + tt('food-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:140px;"><label>Prime Cost % ' + tt('prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:140px;"><label>Cash Tolerance ' + tt('cash-tolerance') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
         + '</div>'
         + '<button class="btn btn-primary" id="sh-save">Save and Continue</button>'
         + '</div>';
@@ -152,7 +146,7 @@ S.Dashboard = {
       + metricCard('Food Cost', foodPct!=null?App.fmtPct(foodPct):null, foodTarget, foodImpact, trendHtml(foodPct,foodAvg), foodCls)
       + metricCard('Prime Cost', primePct!=null?App.fmtPct(primePct):null, primeTarget, null, trendHtml(primePct,primeAvg), primeCls)
       + '<div class="metric-card"><div class="metric-label">Weekly Variance</div>'
-      +'<div class="metric-val '+(weekVar==null?'':weekVar>0?'over-target':'on-target')+'">'+(weekVar!=null?App.fmtCurrency(weekVar):'—')+'</div>'
+      +'<div class="metric-val '+(weekVar==null?'':weekVar>0?'over-target':'on-target')+'">'+(weekVar!=null?App.fmtCurrency(weekVar):'No data')+'</div>'
       +'<div class="metric-target">Target: $0</div>'
       +'<div class="metric-impact" style="color:var(--t4);">From inventory count</div>'
       +trendHtml(weekVar,varAvg,true)+'</div>'
@@ -183,8 +177,6 @@ S.Dashboard = {
         prime_cost_pct:     parseFloat(document.getElementById('sh-pc')?.value)  || 60,
       };
       App.data.settings.cash_tolerance       = parseFloat(document.getElementById('sh-ct')?.value)   || 10;
-      App.data.settings.annual_bar_revenue   = parseFloat(document.getElementById('sh-brev')?.value) || 0;
-      App.data.settings.annual_food_revenue  = parseFloat(document.getElementById('sh-frev')?.value) || 0;
       App.data.settings._targets_saved = true;
       // Mark cost targets task complete in Getting Started
       const gs = App.data.getting_started_profit || {};
@@ -347,7 +339,7 @@ S.Dashboard = {
     .then(r=>r.json()).then(data=>{
       if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
       const text=data.content?.[0]?.text||'Unable to generate insights at this time.';
-      const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights — Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
+      const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
       const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
       showModal(header+body);
     }).catch(()=>{if(btn){btn.disabled=false;btn.textContent='Trend Insights';}});
