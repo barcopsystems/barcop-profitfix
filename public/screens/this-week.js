@@ -240,7 +240,7 @@ S.ThisWeek = {
   step6(){
     const prods=App.data.kitchen_products||[];
     if(prods.length===0)return '<div class="card"><div class="card-title">Food Inventory Count</div>'
-      +'<div class="empty"><div class="empty-title">No kitchen products set up</div><div class="empty-sub">You can skip this step if you do not sell food. If you do sell food, add your kitchen products first and then return here to complete the count.</div>'
+      +'<div class="empty"><div class="empty-title">No kitchen products set up</div><div class="empty-sub">Skip this step if you do not sell food. If you do, add kitchen products first and return here.</div>'
       +'<div style="display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;">'
       +'<button class="btn btn-ghost" onclick="App.navigate(\'kitchen-products\')">Go to Kitchen Products</button>'
       +'</div></div>'
