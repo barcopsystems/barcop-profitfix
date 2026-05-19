@@ -78,8 +78,8 @@ S.RevenueThisWeek = {
   step1() {
     return '<div class="card"><div class="sh">Step 1   Period Details</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
-      + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
+      + '<div class="f" style="width:100px;"><label>Week # ' + tt('tw-week-num') + '</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
+      + '<div class="f" style="width:160px;"><label>Period End Date ' + tt('tw-period-end') + '</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
       + '</div>'
       + this.nav(false, true) + '</div>';
   },
@@ -182,8 +182,8 @@ S.RevenueThisWeek = {
       const vsTgt  = ca ? ca - targetCA : null;
       return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
         + '<div style="width:130px;font-size:12px;font-weight:700;color:var(--t1);flex-shrink:0;">' + esc(e.name) + '</div>'
-        + '<div class="f" style="width:100px;"><label style="font-size:10px;">Covers</label><input type="number" class="rsv-cov" data-idx="' + i + '" value="' + (e.covers||'') + '" placeholder="" style="padding:6px 8px;font-size:12px;"/></div>'
-        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="" style="font-size:12px;"/></div></div>'
+        + '<div class="f" style="width:100px;"><label style="font-size:10px;">Covers ' + tt('r-sv-covers') + '</label><input type="number" class="rsv-cov" data-idx="' + i + '" value="' + (e.covers||'') + '" placeholder="" style="padding:6px 8px;font-size:12px;"/></div>'
+        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales ' + tt('r-sv-sales') + '</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="" style="font-size:12px;"/></div></div>'
         + (ca ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">Check Avg</div><div style="font-size:14px;font-weight:700;color:' + (vsTgt >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(ca) + '</div></div>' : '')
         + (vsTeam != null ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">vs Team</div><div style="font-size:12px;color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</div></div>' : '')
         + '</div>';
@@ -232,6 +232,7 @@ S.RevenueThisWeek = {
       + (laborPct ? row('Blended Labor %', laborPct + '%', '') : '')
       + (rplh ? row('Blended RPLH', App.fmtCurrency(parseFloat(rplh)), '') : '')
       + (teamAvg ? row('Team Check Average', App.fmtCurrency(teamAvg), validServers.length + ' servers') : '')
+      + '<div class="f" style="margin-top:14px;margin-bottom:4px;"><label>Notes (optional)</label><textarea id="rw-notes" rows="2">' + esc(d.notes || '') + '</textarea></div>'
       + this.nav(true, false, 'Save Week')
       + '</div>'
       + '<div id="rw-alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Bar revenue and floor revenue are both zero. Enter at least one revenue figure before saving.</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="rw-alert-ok">OK</button></div></div></div>';
@@ -299,6 +300,9 @@ S.RevenueThisWeek = {
         this.draft['rplh_' + k + '_rev'] = g('rw-rplh-' + k + '-rev');
         this.draft['rplh_' + k + '_hrs'] = g('rw-rplh-' + k + '-hrs');
       });
+    }
+    if (step === 6) {
+      this.draft.notes = g('rw-notes');
     }
     this.saveDraft();
   },
