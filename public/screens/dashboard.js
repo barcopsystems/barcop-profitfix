@@ -340,16 +340,19 @@ S.Dashboard = {
     const trend=bP.length>=3?(bP[bP.length-1]-bP[0]>1?'trending higher (worsening)':bP[0]-bP[bP.length-1]>1?'trending lower (improving)':'holding steady'):'early data';
     const lines=['Bar Pour Cost %: '+weeks.map(w=>(w.bar?.cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+bT+'% avg:'+aB+'%)','Food Cost %: '+weeks.map(w=>(w.food?.cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+fT+'% avg:'+aF+'%)','Prime Cost %: '+weeks.map(w=>(w.prime_cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+pT+'% avg:'+aP+'%)','Bar Revenue: '+weeks.map(w=>'$'+Math.round(w.bar?.revenue||0)).join(', '),'Weekly gap vs bar target: $'+Math.abs(gap)+' '+(parseFloat(gap)>0?'over':'under'),'Pour cost trend: '+trend];
     const prompt='You are a bar operations analyst. Based on '+weeks.length+' weeks of data, write 3-4 plain-English insights (no headers, no bullets, one short paragraph each) a bar owner can act on today. Be specific with numbers.\n\n'+lines.join('\n')+'\n\nFocus on what is working, what needs attention, and the single most important action for this week.';
-    fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})})
-    .then(r=>r.json()).then(data=>{
+    fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(data=>{
       if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
-      const text=data.content?.[0]?.text||'Unable to generate insights at this time.';
+      if(data.error){showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: '+data.error.message+'</div><button class="btn btn-ghost ins-close">OK</button></div>');return;}
+      const text=data.content?.[0]?.text;
+      if(!text){showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');return;}
       const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
       const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
       showModal(header+body);
-    }).catch(()=>{
+    }).catch(err=>{
       if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
-      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Could not connect to the analysis service. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: '+err.message+'. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
     });
   }
 };
