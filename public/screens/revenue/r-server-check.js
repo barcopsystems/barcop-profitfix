@@ -44,8 +44,8 @@ S.RevenueServerCheck = {
       + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input type="date" id="rsc-date" value="' + today + '" style="width:100%;"/></div>'
       + '<div class="f" style="width:88px;flex-shrink:0;"><label>Shift</label><select id="rsc-shift" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;"><option' + (shift==='Lunch'?' selected':'') + '>Lunch</option><option' + (shift==='Dinner'?' selected':'') + '>Dinner</option><option' + (shift==='Bar'?' selected':'') + '>Bar</option></select></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Server</label><select id="rsc-server" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;">' + (serverOpts||'<option>No servers in roster</option>') + '</select></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Covers ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="" style="width:100%;"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Total Sales ' + tt('r-check-avg') + '</label><div class="fw" style="width:100%;"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="" style="width:100%;"/></div></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Covers ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="0" style="width:100%;"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Total Sales ' + tt('r-check-avg') + '</label><div class="fw" style="width:100%;"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="0" style="width:100%;"/></div></div>'
       + '<div class="f" style="flex-shrink:0;"><label style="opacity:0;">x</label><button class="btn btn-primary" id="rsc-submit" style="white-space:nowrap;">Submit</button></div>'
       + '</div>'
       + '<div id="rsc-result" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--b2);">'
@@ -66,7 +66,7 @@ S.RevenueServerCheck = {
       + '<span id="rsc-sel-count" style="font-size:11px;color:var(--t3);"></span>'
       + '</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th style="width:36px;"><input type="checkbox" id="rsc-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
+      + '<th style="width:36px;"></th>'
       + '<th>Date</th><th>Shift</th><th>Server</th><th>Check Avg ' + tt('r-check-avg') + '</th><th>vs Target</th><th>Status</th>'
       + '</tr></thead><tbody id="rsc-log">' + this._buildRows(log, targetCA) + '</tbody></table></div>'
       + '</div>';
@@ -86,14 +86,6 @@ S.RevenueServerCheck = {
       if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
       if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
     };
-    document.getElementById('rsc-sel-all')?.addEventListener('click', () => {
-      const all = container.querySelectorAll('.rsc-chk');
-      const anyUnchecked = [...all].some(c => !c.checked);
-      all.forEach(c => { c.checked = anyUnchecked; });
-      const hdr = document.getElementById('rsc-chk-all');
-      if (hdr) hdr.checked = anyUnchecked;
-      updateSel();
-    });
     document.getElementById('rsc-chk-all')?.addEventListener('change', e => {
       container.querySelectorAll('.rsc-chk').forEach(c => { c.checked=e.target.checked; });
       updateSel();
