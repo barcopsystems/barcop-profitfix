@@ -75,6 +75,12 @@ S.RevenueEvents = {
       if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
       if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
     };
+    document.getElementById('rev-sel-all')?.addEventListener('click', () => {
+      const all = container.querySelectorAll('.rev-chk');
+      const anyUnchecked = [...all].some(c => !c.checked);
+      all.forEach(c => { c.checked = anyUnchecked; });
+      updateSel();
+    });
     document.getElementById('rev-chk-all')?.addEventListener('change', e => {
       container.querySelectorAll('.rev-chk').forEach(c => { c.checked=e.target.checked; });
       updateSel();
