@@ -76,7 +76,7 @@ S.TrafficResources = {
           + `<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:3px 6px;border-radius:3px;background:${isPdf?'rgba(192,56,40,0.12)':'rgba(201,168,76,0.10)'};color:${typeColor};">${item.type}</span>`
           + `</div>`
           + `<div style="flex:1;min-width:0;">`
-          + `<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:3px;">Doc ${item.num} — ${esc(item.title)}</div>`
+          + `<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:3px;">Doc ${item.num}: ${esc(item.title)}</div>`
           + `<div style="font-size:11px;color:var(--t3);line-height:1.5;">${esc(item.desc)}</div>`
           + `</div>`
           + `<a href="assets/resources/traffic/${encodeURIComponent(item.file)}" download="${item.file}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--b1);border-radius:3px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 10px;text-decoration:none;white-space:nowrap;transition:all 0.1s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.28)';this.style.color='#fff'" onmouseout="this.style.borderColor='var(--b1)';this.style.color='var(--t2)'">`
