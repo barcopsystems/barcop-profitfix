@@ -24,8 +24,6 @@ S.Settings = {
       + '<div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="s-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
       + '<div class="f" style="min-width:130px;flex:1;"><label>City</label><input type="text" id="s-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin" /></div>'
       + '<div class="f" style="min-width:100px;flex:0.7;"><label>State / Province</label><input type="text" id="s-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX" /></div>'
-      + '<div class="f w-md"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-brev" value="' + (s.annual_bar_revenue || '') + '" placeholder="" /></div></div>'
-      + '<div class="f w-md"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-frev" value="' + (s.annual_food_revenue || '') + '" placeholder="" /></div></div>'
       + '</div></div></div>'
       + '<div class="settings-section"><div class="settings-title">Cost Targets</div>'
       + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
@@ -192,8 +190,6 @@ S.Settings = {
     const state = document.getElementById('s-state')?.value.trim() || '';
     s.bar_name            = document.getElementById('s-name')?.value.trim();
     s.city_state          = city && state ? city + ', ' + state : city || state || '';
-    s.annual_bar_revenue  = parseFloat(document.getElementById('s-brev')?.value) || 0;
-    s.annual_food_revenue = parseFloat(document.getElementById('s-frev')?.value) || 0;
     s.targets = {
       bar_pour_cost_pct:  parseFloat(document.getElementById('s-bpc')?.value)  || 22,
       food_cost_pct:      parseFloat(document.getElementById('s-fc')?.value)   || 32,
