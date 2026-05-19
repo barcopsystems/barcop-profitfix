@@ -100,11 +100,15 @@ S.TrafficAudit = {
       const rows = audits.map((a,i) => {
         const p    = audits[i+1];
         const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
+        const tier = a.grade || '';
+        const tierBadge = tier
+          ? '<span style="background:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'var(--gold)':tier.includes('2')||tier.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;">' + esc(tier) + '</span>'
+          : '';
         return '<tr>'
           + '<td>' + (a.date||'').slice(0,10) + '</td>'
           + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + ((a.overall_score||0)>=70?'var(--gold)':(a.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (a.overall_score||0) + '</td>'
           + (diff != null ? '<td style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</td>' : '<td></td>')
-          + '<td style="color:var(--t3);font-size:11px;">' + esc(a.audit_id||'') + '</td>'
+          + '<td>' + tierBadge + '</td>'
           + '<td><button class="btn btn-ghost btn-sm ta-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
           + '</tr>';
       }).join('');
@@ -113,7 +117,7 @@ S.TrafficAudit = {
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
         + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
         + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Audit ID</th><th></th></tr></thead>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
         + '</div>';
     }
@@ -123,12 +127,187 @@ S.TrafficAudit = {
         + '<div class="empty-sub">Generate your first monthly Traffic Audit above. Upload your screenshots and the audit appears on screen immediately.</div></div>'
       : '';
 
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + historyCard + '</div>';
+    // Gap Calculator tile
+    let gapTile = '';
+    if (latest && latest.action_items && latest.action_items.length) {
+      const totalMonthly = (latest.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
+      if (totalMonthly > 0) {
+        const gapRows = (latest.action_items||[]).filter(a => (a.monthly_impact||0) > 0).map(a =>
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--b2);">'
+          + '<div style="font-size:12px;color:var(--t2);">' + esc(a.action||a) + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);white-space:nowrap;margin-left:16px;">+' + App.fmtCurrency(a.monthly_impact) + '/mo</div>'
+          + '</div>'
+        ).join('');
+        gapTile = '<div class="card" style="margin-bottom:16px;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Traffic Recovery Gap Calculator</div>'
+          + '<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px;">'
+          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Total Recoverable Per Month</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:48px;font-weight:700;color:var(--gold);line-height:1;">' + App.fmtCurrency(totalMonthly) + '</div></div>'
+          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Annualized</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:48px;font-weight:700;color:var(--gold);line-height:1;">' + App.fmtCurrency(totalMonthly*12) + '</div></div>'
+          + '</div>'
+          + gapRows
+          + '</div>';
+      }
+    }
+
+    let scoreChart = '';
+    if (audits.length >= 2) scoreChart = this.renderScoreChart(audits, 'ta');
+
+    let comparison = '';
+    if (audits.length >= 2) comparison = this.renderComparison(audits[0], audits[1]);
+
+    let sparklines = '';
+    if (audits.length >= 3) sparklines = this.renderSparklines(audits);
+
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + gapTile + scoreChart + comparison + sparklines + historyCard + '</div>';
 
     document.getElementById('ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.ta-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
+  },
+
+  renderScoreChart(audits, prefix) {
+    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
+    const W=700, H=180, PAD={t:24,r:20,b:36,l:40};
+    const cw = W-PAD.l-PAD.r, ch = H-PAD.t-PAD.b;
+    const scores = sorted.map(a => a.overall_score||0);
+    const minY = Math.max(0, Math.min(...scores) - 10);
+    const maxY = Math.min(100, Math.max(...scores) + 10);
+    const xs = i => PAD.l + (sorted.length > 1 ? (i/(sorted.length-1))*cw : cw/2);
+    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
+    const smoothPath = pts => {
+      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
+      if (valid.length < 2) return valid.length===1 ? `M${valid[0].x},${valid[0].y}` : '';
+      let d = `M${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
+      for (let i=1; i<valid.length; i++) {
+        const cp = (valid[i].x - valid[i-1].x) * 0.35;
+        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
+      }
+      return d;
+    };
+    const areaPath = pts => {
+      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
+      if (valid.length < 2) return '';
+      let d = `M${valid[0].x.toFixed(1)},${ys(minY).toFixed(1)} L${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
+      for (let i=1; i<valid.length; i++) {
+        const cp = (valid[i].x - valid[i-1].x) * 0.35;
+        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
+      }
+      d += ` L${valid[valid.length-1].x.toFixed(1)},${ys(minY).toFixed(1)} Z`;
+      return d;
+    };
+    const ticks = [minY, Math.round((minY+maxY)/2), maxY].filter((v,i,a) => a.indexOf(v)===i);
+    const uid = prefix + 'sc' + Math.random().toString(36).slice(2,6);
+    const linePath = smoothPath(scores);
+    const fillPath = areaPath(scores);
+    const xLabels  = sorted.map((a,i) =>
+      `<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${(a.date||'').slice(0,7)}</text>`
+    ).join('');
+    const dots = sorted.map((a,i) => {
+      const v = a.overall_score||0;
+      const col = v>=80?'#C9A84C':v>=60?'rgba(255,255,255,0.8)':'#c0392b';
+      return `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="5" fill="#0A1520" stroke="${col}" stroke-width="2.5"/>
+        <text x="${xs(i).toFixed(1)}" y="${(ys(v)-10).toFixed(1)}" text-anchor="middle" fill="${col}" font-family="'Barlow Condensed',sans-serif" font-size="13" font-weight="700">${v}</text>`;
+    }).join('');
+    return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Traffic Score History</div>'
+      + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">`
+      + `<defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0.01"/></linearGradient></defs>`
+      + ticks.map(v => `<line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${PAD.l-6}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${Math.round(v)}</text>`).join('')
+      + (fillPath ? `<path d="${fillPath}" fill="url(#${uid})"/>` : '')
+      + (linePath ? `<path d="${linePath}" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')
+      + dots + xLabels
+      + '</svg></div>';
+  },
+
+  renderComparison(curr, prev) {
+    const cs = curr.sections || {};
+    const ps = prev.sections || {};
+    const allNames = [...new Set([...Object.keys(cs), ...Object.keys(ps)])];
+    const rows = allNames.map(name => {
+      const cv = cs[name] ?? null;
+      const pv = ps[name] ?? null;
+      const diff = (cv != null && pv != null) ? cv - pv : null;
+      const arrow = diff == null ? '' : diff > 0
+        ? '<span style="color:var(--gold);font-weight:700;">&#9650; +' + diff + '</span>'
+        : diff < 0
+        ? '<span style="color:var(--red);font-weight:700;">&#9660; ' + diff + '</span>'
+        : '<span style="color:var(--t3);">&#8212;</span>';
+      const col = (v) => v==null?'':v>=70?'var(--gold)':v>=50?'var(--t1)':'var(--red)';
+      return '<tr>'
+        + '<td style="padding:9px 12px;font-size:12px;color:var(--t2);">' + esc(name) + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(pv) + ';">' + (pv??'--') + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(cv) + ';">' + (cv??'--') + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-size:13px;">' + arrow + '</td>'
+        + '</tr>';
+    }).join('');
+    const overallDiff = (curr.overall_score||0) - (prev.overall_score||0);
+    return '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
+      + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
+      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + ((prev.overall_score||0)>=70?'var(--gold)':(prev.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (prev.overall_score||0) + '</div></div>'
+      + '<div style="display:flex;align-items:center;padding:0 8px;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + (overallDiff>=0?'var(--gold)':'var(--red)') + ';">' + (overallDiff>=0?'+':'') + overallDiff + ' pts</div></div>'
+      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((curr.date||'').slice(0,7)) + (curr.grade?' &nbsp;&middot;&nbsp;' + esc(curr.grade):'') + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + ((curr.overall_score||0)>=70?'var(--gold)':(curr.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (curr.overall_score||0) + '</div></div>'
+      + '</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th style="text-align:left;">Section</th><th style="text-align:center;">' + esc((prev.date||'').slice(0,7)) + '</th><th style="text-align:center;">' + esc((curr.date||'').slice(0,7)) + '</th><th style="text-align:center;">Change</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '</div>';
+  },
+
+  renderSparklines(audits) {
+    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-6);
+    const latest = sorted[sorted.length-1];
+    const allNames = Object.keys(latest.sections||{});
+    if (!allNames.length) return '';
+    const W=120, H=40, PAD=4;
+    const spark = (values) => {
+      const valid = values.filter(v => v != null);
+      if (valid.length < 2) return '';
+      const minV = Math.min(...valid), maxV = Math.max(...valid);
+      const range = maxV - minV || 1;
+      const pts = values.map((v,i) => {
+        if (v == null) return null;
+        const x = PAD + (i/(values.length-1))*(W-PAD*2);
+        const y = H - PAD - ((v-minV)/range)*(H-PAD*2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).filter(Boolean);
+      return pts.length >= 2 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+    };
+    const tiles = allNames.map(name => {
+      const values = sorted.map(a => (a.sections||{})[name] ?? null);
+      const curr   = values[values.length-1] ?? 0;
+      const prev   = values.slice(0,-1).reverse().find(v => v != null) ?? null;
+      const diff   = prev != null ? curr - prev : null;
+      const col    = curr>=70?'var(--gold)':curr>=50?'var(--t1)':'var(--red)';
+      return '<div style="flex:1;min-width:140px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:10px 12px;">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:4px;letter-spacing:0.5px;">' + esc(name) + '</div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + col + ';line-height:1;">' + curr + '</div>'
+        + (diff != null ? '<div style="font-size:11px;font-weight:700;color:' + (diff>0?'var(--gold)':diff<0?'var(--red)':'var(--t3)') + ';">' + (diff>0?'+':'') + diff + '</div>' : '')
+        + '</div>'
+        + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">`
+        + `<line x1="4" y1="${(H/2).toFixed(1)}" x2="${W-4}" y2="${(H/2).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`
+        + spark(values)
+        + (values[values.length-1] != null ? (() => {
+            const valid = values.filter(v=>v!=null);
+            const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
+            const lx = PAD + ((values.length-1)/(values.length-1))*(W-PAD*2);
+            const ly = H - PAD - ((values[values.length-1]-minV)/range)*(H-PAD*2);
+            return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#0A1520" stroke="#C9A84C" stroke-width="2"/>`;
+          })() : '')
+        + '</svg>'
+        + '</div>';
+    }).join('');
+    return '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Section Trends  <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;color:var(--t3);">Last ' + sorted.length + ' audits</span></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:10px;">' + tiles + '</div>'
+      + '</div>';
   },
 
   viewAudit(idx) {
@@ -254,7 +433,6 @@ S.TrafficAudit = {
     ).join('');
 
     this.container.innerHTML = '<div class="screen" id="ta-audit-view">'
-      // Header
       + '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div>'
@@ -264,6 +442,7 @@ S.TrafficAudit = {
         + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '')
         + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '')
         + '</div>'
+      + (audit.grade ? '<div style="margin-top:8px;"><span style="background:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'var(--gold)':audit.grade.includes('2')||audit.grade.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:2px;">' + esc(audit.grade) + '</span></div>' : '')
       + '</div>'
       + '<div style="text-align:right;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Digital Presence Score</div>'
@@ -273,13 +452,67 @@ S.TrafficAudit = {
       + '</div>'
       + (d.WEEKLY_GAP_AMT ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);font-size:13px;color:var(--t2);">Estimated Weekly Gap: <strong style="color:var(--gold);">' + esc(String(d.WEEKLY_GAP_AMT)) + '</strong></div>' : '')
       + '</div>'
-      // Action Items
+      + '<div style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:16px;">'
+      + '<button id="ta-tab-scores" style="background:none;border:none;border-bottom:2px solid var(--gold);color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Scores</button>'
+      + '<button id="ta-tab-narrative" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--t3);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Findings</button>'
+      + '</div>'
+      + '<div id="ta-tab-scores-content">'
       + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items — Ranked by Impact</div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items -- Ranked by Impact</div>'
         + actionItems + '</div>' : '')
-      // Sections
       + sections
+      + '</div>'
+      + '<div id="ta-tab-narrative-content" style="display:none;">'
+      + this.renderNarrative(d)
+      + '</div>'
       + '</div>';
+
+    document.getElementById('ta-tab-scores')?.addEventListener('click', () => {
+      document.getElementById('ta-tab-scores-content').style.display = '';
+      document.getElementById('ta-tab-narrative-content').style.display = 'none';
+      document.getElementById('ta-tab-scores').style.borderBottomColor = 'var(--gold)';
+      document.getElementById('ta-tab-scores').style.color = 'var(--t1)';
+      document.getElementById('ta-tab-narrative').style.borderBottomColor = 'transparent';
+      document.getElementById('ta-tab-narrative').style.color = 'var(--t3)';
+    });
+    document.getElementById('ta-tab-narrative')?.addEventListener('click', () => {
+      document.getElementById('ta-tab-scores-content').style.display = 'none';
+      document.getElementById('ta-tab-narrative-content').style.display = '';
+      document.getElementById('ta-tab-narrative').style.borderBottomColor = 'var(--gold)';
+      document.getElementById('ta-tab-narrative').style.color = 'var(--t1)';
+      document.getElementById('ta-tab-scores').style.borderBottomColor = 'transparent';
+      document.getElementById('ta-tab-scores').style.color = 'var(--t3)';
+    });
+  },
+
+  renderNarrative(d) {
+    const sections = [
+      { num:1, name:'Google Business Profile', fields: ['S1_EVIDENCE','S1_GAP','S1_TOOL','S1_NARRATIVE','S1_FINDING'] },
+      { num:2, name:'Website',                 fields: ['S2_EVIDENCE','S2_GAP','S2_TOOL','S2_NARRATIVE','S2_FINDING'] },
+      { num:3, name:'Reviews',                 fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
+      { num:4, name:'Search and SEO',          fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
+      { num:5, name:'Social Media',            fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
+      { num:6, name:'Delivery Platforms',      fields: ['S6_EVIDENCE','S6_GAP','S6_TOOL','S6_NARRATIVE','S6_FINDING'] },
+      { num:7, name:'Email and Loyalty',       fields: ['S7_EVIDENCE','S7_GAP','S7_TOOL','S7_NARRATIVE','S7_FINDING'] },
+    ];
+    const cards = sections.map(s => {
+      const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
+      if (!texts.length) return '';
+      const score = d['S'+s.num+'_SCORE'];
+      const col = score!=null ? (score>=70?'var(--gold)':score>=50?'var(--t1)':'var(--red)') : 'var(--t3)';
+      return '<div class="card" style="margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--b2);">'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Section ' + s.num + '</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + s.name + '</div></div>'
+        + (score!=null ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + col + ';">' + score + '</div>' : '')
+        + '</div>'
+        + texts.map(t => '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
+        + '</div>';
+    }).filter(Boolean).join('');
+    if (!cards) {
+      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. Include your website analytics export and GBP insights with your next submission to unlock section narratives.</div>';
+    }
+    return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
 
   showIntakeForm() {
