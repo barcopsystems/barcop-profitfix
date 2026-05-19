@@ -141,7 +141,7 @@ S.TrafficDashboard = {
     const ts     = App.data.traffic_settings || {};
     const bar    = App.data.settings?.bar_name || 'This operation';
 
-    const prompt = `You are a digital marketing analyst for bars and restaurants. Analyze these weekly traffic metrics for ${bar} and give 3 specific, actionable insights in plain English. No headers, no bullet points — write it as a short paragraph for each insight.\n\nTargets: Google Rating ${ts.targets?.google_rating??4.3}★, ${ts.targets?.review_velocity??8} new reviews/mo, ${ts.targets?.response_rate??75}% response rate, ${ts.targets?.monthly_sessions??2000} monthly sessions.\n\nRecent weeks (newest first):\n${JSON.stringify(recent.slice().reverse(), null, 2)}\n\nFocus on what is moving in the wrong direction and what specific action will fix it fastest.`;
+    const prompt = `You are a digital marketing analyst for bars and restaurants. Analyze these weekly traffic metrics for ${bar} and give 3 specific, actionable insights in plain English. No headers, no bullet points. Write it as a short paragraph for each insight.\n\nTargets: Google Rating ${ts.targets?.google_rating??4.3}★, ${ts.targets?.review_velocity??8} new reviews/mo, ${ts.targets?.response_rate??75}% response rate, ${ts.targets?.monthly_sessions??2000} monthly sessions.\n\nRecent weeks (newest first):\n${JSON.stringify(recent.slice().reverse(), null, 2)}\n\nFocus on what is moving in the wrong direction and what specific action will fix it fastest.`;
 
     try {
       const res  = await fetch('/api/claude', {
