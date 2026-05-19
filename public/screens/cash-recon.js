@@ -13,8 +13,8 @@ S.CashRecon={
   renderMain(){
     const tol=App.data.settings.cash_tolerance||10;
     const log=(App.data.reconciliations||[]).slice(-30).reverse();
-    const bRows=this.BILLS.map(b=>'<tr><td style="color:var(--t1);font-weight:600;padding:9px 12px;">$'+b+'</td><td style="padding:5px 10px;"><input class="form-input" type="number" min="0" data-d="'+b+'" style="width:84px;" placeholder="0" /></td><td style="color:var(--t2);text-align:right;padding:9px 12px;" id="ca-'+b+'">$0</td></tr>').join('');
-    const cRows=this.COINS.map(c=>'<tr><td style="color:var(--t1);padding:9px 12px;">'+c.l+'</td><td style="padding:5px 10px;"><input class="form-input" type="number" min="0" data-d="'+c.v+'" style="width:84px;" placeholder="0" /></td><td style="color:var(--t2);text-align:right;padding:9px 12px;" id="ca-'+c.v+'">$0</td></tr>').join('');
+    const bRows=this.BILLS.map(b=>'<tr><td style="color:var(--t1);font-weight:600;padding:9px 12px;">$'+b+'</td><td style="padding:5px 10px;"><input class="form-input" type="number" min="0" data-d="'+b+'" style="width:84px;" placeholder="" /></td><td style="color:var(--t2);text-align:right;padding:9px 12px;" id="ca-'+b+'">$0</td></tr>').join('');
+    const cRows=this.COINS.map(c=>'<tr><td style="color:var(--t1);padding:9px 12px;">'+c.l+'</td><td style="padding:5px 10px;"><input class="form-input" type="number" min="0" data-d="'+c.v+'" style="width:84px;" placeholder="" /></td><td style="color:var(--t2);text-align:right;padding:9px 12px;" id="ca-'+c.v+'">$0</td></tr>').join('');
     const logRows=log.length===0?'<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--t4);">No entries yet.</td></tr>'
       :log.map(r=>{const os=r.over_short||0;const ok=Math.abs(os)<=r.tolerance;return '<tr><td>'+esc(r.date||'—')+'</td><td>'+esc(r.shift||'—')+'</td><td>'+esc(r.cashier||'—')+'</td><td>'+App.fmtCurrency(r.expected_cash)+'</td><td>'+App.fmtCurrency(r.counted_cash)+'</td><td class="'+(ok?'pos':(os>0?'pos':'neg'))+'">'+(os>=0?'+':'')+App.fmtCurrency(os)+'</td><td><span class="badge '+(ok?'badge-ok':'badge-warn')+'">'+(ok?'OK':os>0?'Over':'Short')+'</span></td></tr>';}).join('');
 
@@ -36,8 +36,8 @@ S.CashRecon={
       +'<div>'
       +'<div class="card" style="margin-bottom:12px;"><div class="card-title">POS Entry</div>'
       +'<div class="form-row">'
-      +'<div class="f w-grow"><label>Expected Cash from POS '+tt('expected-cash')+'</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rc-exp" placeholder="0" /></div></div>'
-      +'<div class="f w-grow"><label>Credit / Debit Total</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rc-credit" placeholder="0" /></div></div>'
+      +'<div class="f w-grow"><label>Expected Cash from POS '+tt('expected-cash')+'</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rc-exp" placeholder="" /></div></div>'
+      +'<div class="f w-grow"><label>Credit / Debit Total</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rc-credit" placeholder="" /></div></div>'
       +'</div></div>'
       +'<div class="calc"><div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val" id="rc-cnt-d">—</div></div>'
       +'<div class="calc-item"><div class="calc-label">Expected</div><div class="calc-val" id="rc-exp-d">—</div></div>'
