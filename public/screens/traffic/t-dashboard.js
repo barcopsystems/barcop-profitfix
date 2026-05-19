@@ -1,0 +1,242 @@
+'use strict';
+S.TrafficDashboard = {
+  _dismissed: false,
+
+  render(container, actions) {
+    actions.innerHTML = '';
+    const ts     = App.data.traffic_settings || {};
+    const t      = ts.targets || {};
+    const weeks  = App.data.traffic_weeks || [];
+    const latest = weeks.length ? weeks[weeks.length - 1] : null;
+    const prior4 = weeks.slice(-5, -1);
+    const avg4   = fn => { const v = prior4.map(fn).filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+
+    const googleRating  = latest?.google_rating  ?? null;
+    const reviewVel     = latest?.new_reviews     ?? null;
+    const responseRate  = latest?.response_rate   ?? null;
+    const sessions      = latest?.monthly_sessions ?? null;
+    const targetRating  = t.google_rating      ?? 4.3;
+    const targetVel     = t.review_velocity    ?? 8;
+    const targetResp    = t.response_rate      ?? 75;
+    const targetSessions= t.monthly_sessions   ?? 2000;
+
+    // Alert
+    let alertHtml = '';
+    if (latest && !this._dismissed) {
+      if (googleRating != null && googleRating < 4.0) {
+        alertHtml = '<div class="alert-bar" id="t-alert"><div class="alert-text">Google rating is ' + googleRating.toFixed(1) + '. Ratings below 4.0 cause guests to filter you out of search results. Review recovery is the first priority.</div><button class="alert-dismiss" id="t-dismiss">Close</button></div>';
+      } else if (responseRate != null && responseRate < 50) {
+        alertHtml = '<div class="alert-bar" id="t-alert"><div class="alert-text">Review response rate is ' + responseRate.toFixed(0) + '%. Target is 75%. Responding to reviews is a direct Google ranking signal.</div><button class="alert-dismiss" id="t-dismiss">Close</button></div>';
+      }
+    }
+
+    // Start Here card
+    const targetsSet = ts._targets_saved || false;
+    let startHere = '';
+    if (!targetsSet) {
+      startHere = '<div class="card" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Traffic Targets</div>'
+        + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
+        + '<div class="f" style="width:160px;"><label>Google Rating Target ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="tsh-gr" value="' + targetRating + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
+        + '<div class="f" style="width:160px;"><label>Monthly New Reviews ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rv" value="' + targetVel + '" step="1"/><span class="suf">/mo</span></div></div>'
+        + '<div class="f" style="width:160px;"><label>Response Rate Target ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rr" value="' + targetResp + '" step="1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:180px;"><label>Monthly Sessions Target ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="tsh-ms" value="' + targetSessions + '" step="100"/><span class="suf">/mo</span></div></div>'
+        + '</div>'
+        + '<button class="btn btn-primary" id="tsh-save">Save and Continue</button>'
+        + '</div>';
+    }
+
+    // Metric cards
+    const trendHtml = (cur, avg, lowerBetter=false) => {
+      if (avg==null||cur==null) return '<div class="metric-trend"> </div>';
+      const diff = cur - avg;
+      if (Math.abs(diff) < 0.05) return '<div class="metric-trend">flat</div>';
+      const improving = lowerBetter ? diff < 0 : diff > 0;
+      return '<div class="metric-trend ' + (improving?'trend-up':'trend-dn') + '">' + (diff>0?'↑':'↓') + ' vs 4wk avg</div>';
+    };
+
+    const metCard = (label, val, target, impact, trendEl, cls) => {
+      const impHtml = impact != null
+        ? '<div class="metric-impact ' + (impact > 0 ? 'neg' : 'pos') + '">' + (impact > 0 ? '+' : '') + impact + '</div>'
+        : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
+      const valHtml = val != null
+        ? '<div class="metric-val ' + cls + '">' + val + '</div>'
+        : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>';
+      return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
+        + valHtml
+        + '<div class="metric-target">Target: ' + target + '</div>'
+        + impHtml + trendEl + '</div>';
+    };
+
+    const grCls  = googleRating==null?'':googleRating>=targetRating?'on-target':'over-target';
+    const rvCls  = reviewVel==null?'':reviewVel>=targetVel?'on-target':'over-target';
+    const rrCls  = responseRate==null?'':responseRate>=targetResp?'on-target':'over-target';
+    const ssCls  = sessions==null?'':sessions>=targetSessions?'on-target':'over-target';
+
+    const avgGR  = avg4(w=>w.google_rating);
+    const avgRV  = avg4(w=>w.new_reviews);
+
+    const grImpact  = googleRating != null && googleRating < targetRating ? +(targetRating - googleRating).toFixed(1) : null;
+    const rvImpact  = reviewVel != null && reviewVel < targetVel ? +(targetVel - reviewVel) : null;
+
+    const metrics = '<div class="metric-grid">'
+      + metCard('Google Rating',   googleRating!=null?googleRating.toFixed(1)+'★':null,   targetRating+'★',   grImpact!=null?grImpact+' stars below':null,  trendHtml(googleRating,avgGR), grCls)
+      + metCard('New Reviews/Mo',  reviewVel!=null?reviewVel+' reviews':null,              targetVel+'/mo',    rvImpact!=null?rvImpact+' below target':null, trendHtml(reviewVel,avgRV),    rvCls)
+      + metCard('Response Rate',   responseRate!=null?responseRate.toFixed(0)+'%':null,    targetResp+'%',     null,                                          trendHtml(responseRate,avg4(w=>w.response_rate)), rrCls)
+      + metCard('Monthly Sessions',sessions!=null?sessions.toLocaleString():null,          targetSessions.toLocaleString()+'/mo', null,                      trendHtml(sessions,avg4(w=>w.monthly_sessions)), ssCls)
+      + '</div>';
+
+    // Chart
+    const chartHtml = this.buildChart(weeks, t);
+
+    // Trend Insights button
+    const insightsBtn = weeks.length >= 2
+      ? '<button class="btn btn-ghost" id="t-insights-btn" style="font-size:12px;padding:7px 16px;">Digital Presence Insights</button>'
+      : '';
+    if (insightsBtn) actions.innerHTML = insightsBtn;
+
+    container.innerHTML = '<div class="screen">'
+      + alertHtml
+      + startHere
+      + metrics
+      + chartHtml
+      + '</div>';
+
+    document.getElementById('t-dismiss')?.addEventListener('click', () => {
+      this._dismissed = true;
+      document.getElementById('t-alert')?.remove();
+    });
+
+    document.getElementById('tsh-save')?.addEventListener('click', async () => {
+      const ts2 = App.data.traffic_settings || {};
+      ts2.targets = {
+        ...(ts2.targets || {}),
+        google_rating:       parseFloat(document.getElementById('tsh-gr')?.value) || 4.3,
+        review_velocity:     parseInt(document.getElementById('tsh-rv')?.value)   || 8,
+        response_rate:       parseFloat(document.getElementById('tsh-rr')?.value) || 75,
+        monthly_sessions:    parseInt(document.getElementById('tsh-ms')?.value)   || 2000,
+        social_posts_month:  ts2.targets?.social_posts_month || 12,
+      };
+      ts2._targets_saved = true;
+      const gs = App.data.getting_started_traffic || {};
+      gs['tgs_targets'] = new Date().toISOString();
+      App.data.getting_started_traffic = gs;
+      await App.saveKey('traffic_settings');
+      await App.saveKey('getting_started_traffic');
+      App.navigate('t-getting-started');
+    });
+
+    document.getElementById('t-insights-btn')?.addEventListener('click', () => this.getInsights());
+  },
+
+  async getInsights() {
+    const btn = document.getElementById('t-insights-btn');
+    if (!btn) return;
+    btn.textContent = 'Analyzing...';
+    btn.disabled = true;
+
+    const weeks  = App.data.traffic_weeks || [];
+    const recent = weeks.slice(-4);
+    const ts     = App.data.traffic_settings || {};
+    const bar    = App.data.settings?.bar_name || 'This operation';
+
+    const prompt = `You are a digital marketing analyst for bars and restaurants. Analyze these weekly traffic metrics for ${bar} and give 3 specific, actionable insights in plain English. No headers, no bullet points — write it as a short paragraph for each insight.\n\nTargets: Google Rating ${ts.targets?.google_rating??4.3}★, ${ts.targets?.review_velocity??8} new reviews/mo, ${ts.targets?.response_rate??75}% response rate, ${ts.targets?.monthly_sessions??2000} monthly sessions.\n\nRecent weeks (newest first):\n${JSON.stringify(recent.slice().reverse(), null, 2)}\n\nFocus on what is moving in the wrong direction and what specific action will fix it fastest.`;
+
+    try {
+      const res  = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 600,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await res.json();
+      const text = data.content?.[0]?.text || 'Unable to generate insights.';
+
+      const existing = document.getElementById('t-insights-panel');
+      if (existing) existing.remove();
+      const panel = document.createElement('div');
+      panel.id = 't-insights-panel';
+      panel.className = 'card';
+      panel.style.cssText = 'margin-top:16px;border:1px solid rgba(201,168,76,0.3);';
+      panel.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Digital Presence Insights</div>'
+        + '<div style="font-size:13px;color:var(--t1);line-height:1.7;">' + esc(text) + '</div>';
+      document.querySelector('#content-area .screen')?.appendChild(panel);
+    } catch(e) {
+      console.error('Insights error:', e);
+    }
+
+    btn.textContent = 'Digital Presence Insights';
+    btn.disabled = false;
+  },
+
+  buildChart(weeks, t) {
+    if (weeks.length < 2) return '<div class="chart-card" style="padding:24px 24px 20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:32px;">8-Week Trend</div>'
+      + '<div style="text-align:center;padding:24px 0 8px;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see trend</div></div>';
+
+    const W=800, H=220, PAD={t:28,r:60,b:40,l:48};
+    const cw=W-PAD.l-PAD.r, ch=H-PAD.t-PAD.b;
+    const last8 = weeks.slice(-8);
+
+    const grS   = last8.map(w=>w.google_rating??null);
+    const rvS   = last8.map(w=>w.new_reviews??null);
+    const rrS   = last8.map(w=>w.response_rate!=null?w.response_rate/10:null); // scale /10 to plot alongside rating
+    const allV  = [...grS,...rvS,...rrS].filter(v=>v!=null);
+    if (!allV.length) return '';
+
+    const minY = Math.max(0, Math.floor(Math.min(...allV)-1));
+    const maxY = Math.ceil(Math.max(...allV)+2);
+    const xs = i => PAD.l + (last8.length>1 ? (i/(last8.length-1))*cw : cw/2);
+    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY))*ch;
+
+    const smoothPath = pts => {
+      const valid = pts.map((v,i)=>v!=null?{x:xs(i),y:ys(v)}:null).filter(Boolean);
+      if (valid.length<2) return valid.length===1?'M'+valid[0].x+','+valid[0].y:'';
+      let d='M'+valid[0].x.toFixed(1)+','+valid[0].y.toFixed(1);
+      for(let i=1;i<valid.length;i++){const cp=(valid[i].x-valid[i-1].x)*0.35;d+=' C'+(valid[i-1].x+cp).toFixed(1)+','+valid[i-1].y.toFixed(1)+' '+(valid[i].x-cp).toFixed(1)+','+valid[i].y.toFixed(1)+' '+valid[i].x.toFixed(1)+','+valid[i].y.toFixed(1);}
+      return d;
+    };
+
+    const areaPath = pts => {
+      const valid = pts.map((v,i)=>v!=null?{x:xs(i),y:ys(v)}:null).filter(Boolean);
+      if (valid.length<2) return '';
+      let d='M'+valid[0].x.toFixed(1)+','+ys(minY).toFixed(1)+' L'+valid[0].x.toFixed(1)+','+valid[0].y.toFixed(1);
+      for(let i=1;i<valid.length;i++){const cp=(valid[i].x-valid[i-1].x)*0.35;d+=' C'+(valid[i-1].x+cp).toFixed(1)+','+valid[i-1].y.toFixed(1)+' '+(valid[i].x-cp).toFixed(1)+','+valid[i].y.toFixed(1)+' '+valid[i].x.toFixed(1)+','+valid[i].y.toFixed(1);}
+      d+=' L'+valid[valid.length-1].x.toFixed(1)+','+ys(minY).toFixed(1)+' Z';
+      return d;
+    };
+
+    const range=maxY-minY, tickStep=range<=6?1:range<=12?2:range<=24?4:8;
+    const ticks=[]; for(let v=Math.ceil(minY/tickStep)*tickStep;v<=maxY;v+=tickStep)ticks.push(v);
+    const yTicks=ticks.map(v=>'<line x1="'+PAD.l+'" y1="'+ys(v).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(v).toFixed(1)+'" stroke="rgba(255,255,255,0.04)"/><text x="'+(PAD.l-6)+'" y="'+(ys(v)+4).toFixed(1)+'" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">'+v+'</text>').join('');
+    const xLabels=last8.map((w,i)=>'<text x="'+xs(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'+(w.period_end?w.period_end.slice(5).replace('-','/'):'Wk'+w.week_num)+'</text>').join('');
+
+    const grLabels=grS.map((v,i)=>{if(v==null)return '';const x=xs(i),y=ys(v);const above=y>PAD.t+16;return '<text x="'+x.toFixed(1)+'" y="'+(above?y-10:y+18).toFixed(1)+'" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">'+v.toFixed(1)+'★</text>';}).join('');
+
+    const tGR  = (t.google_rating||4.3);
+    const uid  = 'tg'+Math.random().toString(36).slice(2,6);
+
+    return '<div class="chart-card" style="padding:20px 24px 16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
+      + '<div style="display:flex;gap:16px;">'
+      + '<span style="font-size:10px;color:var(--gold);font-weight:600;">  Google Rating</span>'
+      + '<span style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:600;">  Reviews/mo (÷10)</span>'
+      + '<span style="font-size:10px;color:#4888A8;font-weight:600;">  Response % (÷10)</span>'
+      + '</div></div>'
+      + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
+      + '<defs><linearGradient id="grGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/></linearGradient></defs>'
+      + yTicks
+      + '<line x1="'+PAD.l+'" y1="'+ys(tGR).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tGR).toFixed(1)+'" stroke="rgba(201,168,76,0.25)" stroke-width="1" stroke-dasharray="4,4"/>'
+      + (areaPath(grS)?'<path d="'+areaPath(grS)+'" fill="url(#grGrad'+uid+')"/>':'')
+      + '<path d="'+smoothPath(grS)+'" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(rvS)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(rrS)+'" fill="none" stroke="#4888A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + grLabels + xLabels
+      + '</svg></div>';
+  }
+};
