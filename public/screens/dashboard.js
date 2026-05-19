@@ -192,7 +192,7 @@ S.Dashboard = {
       App.navigate('getting-started');
     });
     document.getElementById('qa-week')?.addEventListener('click', ()=>App.navigate('this-week'));
-    document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('shift-check'));
+    document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
     document.getElementById('qa-recipes')?.addEventListener('click', ()=>App.navigate('recipe-library'));
   },
