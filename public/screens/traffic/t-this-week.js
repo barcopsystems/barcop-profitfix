@@ -85,8 +85,8 @@ S.TrafficThisWeek = {
   step1() {
     return '<div class="card"><div class="card-title">Period Details</div>'
       + '<div class="form-row">'
-      + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="ttw-wk" value="' + esc(this.draft.week_num) + '" min="1"/></div>'
-      + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="ttw-end" value="' + esc(this.draft.period_end) + '"/></div>'
+      + '<div class="f" style="width:100px;"><label>Week # ' + tt('tw-week-num') + '</label><input type="number" id="ttw-wk" value="' + esc(this.draft.week_num) + '" min="1"/></div>'
+      + '<div class="f" style="width:160px;"><label>Period End Date ' + tt('tw-period-end') + '</label><input type="date" id="ttw-end" value="' + esc(this.draft.period_end) + '"/></div>'
       + '</div>'
       + this.nav(false, true) + '</div>';
   },
@@ -179,9 +179,9 @@ S.TrafficThisWeek = {
 
     return '<div class="card"><div class="card-title">Social Media</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:180px;"><label>Instagram Followers</label><div class="fw"><input class="suf" type="number" id="ttw-igf" value="' + esc(this.draft.ig_followers) + '"/><span class="suf">followers</span></div></div>'
+      + '<div class="f" style="width:180px;"><label>Instagram Followers ' + tt('t-ig-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igf" value="' + esc(this.draft.ig_followers) + '"/><span class="suf">followers</span></div></div>'
       + '<div class="f" style="width:180px;"><label>IG Posts This Month ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igp" value="' + esc(this.draft.ig_posts_month) + '" oninput="S.TrafficThisWeek.calcSocial()"/><span class="suf">posts</span></div></div>'
-      + '<div class="f" style="width:180px;"><label>Facebook Followers</label><div class="fw"><input class="suf" type="number" id="ttw-fbf" value="' + esc(this.draft.fb_followers) + '"/><span class="suf">followers</span></div></div>'
+      + '<div class="f" style="width:180px;"><label>Facebook Followers ' + tt('t-fb-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-fbf" value="' + esc(this.draft.fb_followers) + '"/><span class="suf">followers</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Posts vs Target</div><div id="ttw-sp-status">' + (spStatus || '<span class="calc-val">Enter post count</span>') + '</div></div>'
