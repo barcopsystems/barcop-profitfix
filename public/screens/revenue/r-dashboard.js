@@ -136,7 +136,7 @@ S.RevenueDashboard = {
 
     document.getElementById('r-dismiss')?.addEventListener('click', () => { this._dismissed=true; document.getElementById('r-alert')?.remove(); });
     document.getElementById('r-qa-week')?.addEventListener('click', () => App.navigate('r-this-week'));
-    document.getElementById('r-qa-server')?.addEventListener('click', () => App.navigate('r-server-check'));
+    document.getElementById('r-qa-server')?.addEventListener('click', () => App.navigate('r-audit'));
     document.getElementById('r-qa-reports')?.addEventListener('click', () => App.navigate('r-reports'));
 
     document.getElementById('rsh-save')?.addEventListener('click', async () => {
