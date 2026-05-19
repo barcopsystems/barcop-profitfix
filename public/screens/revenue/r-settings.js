@@ -32,8 +32,6 @@ S.RevenueSettings = {
             <div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="rs-name" value="${esc(s.bar_name||'')}" placeholder="The Rusty Nail"/></div>
             <div class="f" style="flex:1.2;min-width:130px;"><label>City</label><input type="text" id="rs-city" value="${esc((s.city_state||'').split(',')[0]?.trim()||'')}" placeholder="Austin"/></div>
             <div class="f" style="flex:0.8;min-width:100px;"><label>State / Province</label><input type="text" id="rs-state" value="${esc((s.city_state||'').split(',')[1]?.trim()||'')}" placeholder="TX"/></div>
-            <div class="f w-md"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-brev" value="${s.annual_bar_revenue||''}" placeholder=""/></div></div>
-            <div class="f w-md"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-frev" value="${s.annual_food_revenue||''}" placeholder=""/></div></div>
           </div></div>
         </div>
         <div class="settings-section"><div class="settings-title">Revenue Targets</div>
@@ -226,8 +224,6 @@ S.RevenueSettings = {
     const state = document.getElementById('rs-state')?.value.trim() || '';
     s.bar_name            = document.getElementById('rs-name')?.value.trim();
     s.city_state          = city && state ? city + ', ' + state : city || state || '';
-    s.annual_bar_revenue  = parseFloat(document.getElementById('rs-brev')?.value) || 0;
-    s.annual_food_revenue = parseFloat(document.getElementById('rs-frev')?.value) || 0;
     const rs = App.data.revenue_settings;
     rs.targets = {
       check_avg:         parseFloat(document.getElementById('rs-ca')?.value) || 35,
