@@ -53,7 +53,9 @@ S.Dashboard = {
         : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
       return '<div class="metric-card">'
         +'<div class="metric-label">'+label+'</div>'
-        +'<div class="metric-val '+cls+'">'+(val||'No data')+'</div>'
+        +(val != null
+          ? '<div class="metric-val '+cls+'">'+val+'</div>'
+          : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>')
         +'<div class="metric-target">Target: '+App.fmtPct(target)+'</div>'
         + impactHtml + trendEl
         +'</div>';
@@ -125,14 +127,15 @@ S.Dashboard = {
       const t = App.data.settings.targets || {};
       startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:16px;">Set Your Cost Targets</div>'
-        + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
-        + '<div class="f" style="width:140px;"><label>Bar Pour Cost % ' + tt('pour-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:140px;"><label>Food Cost % ' + tt('food-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:140px;"><label>Bar Labor % ' + tt('bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:140px;"><label>Food Labor % ' + tt('food-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:140px;"><label>Prime Cost % ' + tt('prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:140px;"><label>Cash Tolerance ' + tt('cash-tolerance') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Numbers below are industry benchmarks. Adjust any target to match your operation. Click the info icon on each field to see what it means and when to change it.</div>'
+        + '<div class="form-row" style="gap:12px 16px;margin-bottom:18px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
+        + '<div class="f" style="width:130px;min-width:120px;"><label>Cash Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
         + '</div>'
         + '<button class="btn btn-primary" id="sh-save">Save and Continue</button>'
         + '</div>';
@@ -146,7 +149,9 @@ S.Dashboard = {
       + metricCard('Food Cost', foodPct!=null?App.fmtPct(foodPct):null, foodTarget, foodImpact, trendHtml(foodPct,foodAvg), foodCls)
       + metricCard('Prime Cost', primePct!=null?App.fmtPct(primePct):null, primeTarget, null, trendHtml(primePct,primeAvg), primeCls)
       + '<div class="metric-card"><div class="metric-label">Weekly Variance</div>'
-      +'<div class="metric-val '+(weekVar==null?'':weekVar>0?'over-target':'on-target')+'">'+(weekVar!=null?App.fmtCurrency(weekVar):'No data')+'</div>'
+      +(weekVar!=null
+        ? '<div class="metric-val '+(weekVar>0?'over-target':'on-target')+'">'+App.fmtCurrency(weekVar)+'</div>'
+        : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>')
       +'<div class="metric-target">Target: $0</div>'
       +'<div class="metric-impact" style="color:var(--t4);">From inventory count</div>'
       +trendHtml(weekVar,varAvg,true)+'</div>'
@@ -342,6 +347,9 @@ S.Dashboard = {
       const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
       const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
       showModal(header+body);
-    }).catch(()=>{if(btn){btn.disabled=false;btn.textContent='Trend Insights';}});
+    }).catch(()=>{
+      if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
+      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Could not connect to the analysis service. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+    });
   }
 };
