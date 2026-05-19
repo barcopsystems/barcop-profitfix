@@ -122,7 +122,7 @@ S.TrafficAudit = {
     const c = this.container;
     c.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Generate Traffic Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;margin-bottom:18px;">Upload screenshots and reports from your Google Business Profile, website analytics, social media pages, and delivery platforms. Submit whatever you have — partial submissions generate real scores with real action items.</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;margin-bottom:18px;">Upload screenshots and reports from your Google Business Profile, website analytics, social media pages, and delivery platforms. Submit whatever you have. Partial submissions generate real scores with real action items.</div>'
       + '<div style="margin-bottom:16px;">'
       + '<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;">What to upload for the best results:</div>'
       + '<div style="font-size:11px;color:var(--t3);line-height:1.8;">• Google Business Profile overview screenshot (reviews, rating, photo count)<br>• Google Search Console or analytics screenshot (sessions, traffic sources)<br>• Instagram and Facebook profile screenshots (followers, recent posts)<br>• DoorDash, UberEats, or Grubhub listing screenshot (rating, menu status)<br>• Any review screenshots showing recent activity</div>'
