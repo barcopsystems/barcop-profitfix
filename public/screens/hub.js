@@ -104,7 +104,7 @@ S.Hub = {
     const rGap         = rCheckAvg && rCovers ? (rCheckAvg - rTarget) * rCovers * 52 : null;
 
     const revenueStats = hasR
-      ? stat('Latest Audit', rAuditScore != null ? rAuditScore + ' / 100' : 'No audits yet')
+      ? stat('Latest Audit', rAuditDate ?? 'No audits yet')
         + stat('Check Average', rCheckAvg ? App.fmtCurrency(rCheckAvg) : 'No data')
         + stat('Labor Cost', rLaborPct ? rLaborPct.toFixed(1) + '%' : 'No data')
         + stat('Annual Rev Gap', rGap != null ? App.fmtCurrency(Math.abs(rGap)) : 'No data')
@@ -120,7 +120,7 @@ S.Hub = {
     const tRank        = tLatestWeek?.avg_rank        ?? null;
 
     const trafficStats = hasT
-      ? stat('Latest Audit',    tAuditScore != null ? tAuditScore + ' / 100' : 'No audits yet')
+      ? stat('Latest Audit', tLatestAudit ? new Date(tLatestAudit.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'No audits yet')
         + stat('Google Rating', tRating  != null ? tRating.toFixed(1) + ' / 5.0' : 'No data')
         + stat('New Reviews',   tReviews != null ? tReviews + ' this week'        : 'No data')
         + stat('Avg Rank',      tRank    != null ? '#' + tRank + ' search pos'    : 'No data')
@@ -172,8 +172,8 @@ S.Hub = {
 
         <div style="width:100%;max-width:920px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
           ${hasP?activeCard('Profit Recovery','Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.',profitScore,profitTrend,profitStats,'dashboard','profit'):lockedCard('Profit Recovery','Pour cost, food cost, theft, inventory variance, vendor pricing and cash control.',profitStats,'profit')}
-          ${hasR?activeCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',null,null,revenueStats,'r-dashboard','revenue'):lockedCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',revenueStats,'revenue')}
-          ${hasT?activeCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',null,null,trafficStats,'t-dashboard','traffic'):lockedCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',trafficStats,'traffic')}
+          ${hasR?activeCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',rAuditScore,null,revenueStats,'r-dashboard','revenue'):lockedCard('Revenue Recovery','Menu engineering, pricing strategy, server performance, labor efficiency and events.',revenueStats,'revenue')}
+          ${hasT?activeCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',tAuditScore,null,trafficStats,'t-dashboard','traffic'):lockedCard('Traffic Recovery','Google presence, online menu, reviews, social media, delivery platforms and digital visibility.',trafficStats,'traffic')}
         </div>
 
         ${fullPlatformStrip}
