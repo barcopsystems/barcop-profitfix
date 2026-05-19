@@ -106,7 +106,7 @@ S.RevenueAudit = {
           + (a.pdf_data ? '<td><button class="btn btn-ghost btn-sm ra-dl-hist" data-idx="'+i+'" style="padding:3px 10px;">PDF</button></td>' : '<td></td>')
           + '</tr>';
       }).join('');
-      historyCard = '<div class="card"><div class="card-title">Audit History</div>'
+      historyCard = '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><div class="card-title" style="margin-bottom:0;">Audit History</div><div style="font-size:11px;color:var(--t3);">2 most recent audits stored. Download to keep permanently.</div></div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Score</th><th>Change</th><th>Grade</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -291,6 +291,10 @@ S.RevenueAudit = {
 
       if (!App.data.revenue_audits) App.data.revenue_audits = [];
       App.data.revenue_audits.push(auditRecord);
+      // Keep only the 2 most recent audits to manage storage
+      if (App.data.revenue_audits.length > 2) {
+        App.data.revenue_audits = App.data.revenue_audits.slice(-2);
+      }
       await App.saveKey('revenue_audits');
 
       modal.remove();
