@@ -91,10 +91,12 @@ S.TrafficDashboard = {
     const chartHtml = this.buildChart(weeks, t);
 
     // Trend Insights button
-    const insightsBtn = weeks.length >= 2
-      ? '<button class="btn btn-ghost" id="t-insights-btn" style="font-size:12px;padding:7px 16px;">Digital Presence Insights</button>'
-      : '';
-    if (insightsBtn) actions.innerHTML = insightsBtn;
+    const insBtn = document.createElement('button');
+    insBtn.className = 'btn btn-ghost btn-sm';
+    insBtn.id = 't-insights-btn';
+    insBtn.textContent = 'Trend Insights';
+    insBtn.addEventListener('click', () => this.showInsights());
+    actions.appendChild(insBtn);
 
     container.innerHTML = '<div class="screen">'
       + alertHtml
@@ -127,50 +129,62 @@ S.TrafficDashboard = {
       App.navigate('t-getting-started');
     });
 
-    document.getElementById('t-insights-btn')?.addEventListener('click', () => this.getInsights());
   },
 
-  async getInsights() {
-    const btn = document.getElementById('t-insights-btn');
-    if (!btn) return;
-    btn.textContent = 'Analyzing...';
-    btn.disabled = true;
 
-    const weeks  = App.data.traffic_weeks || [];
-    const recent = weeks.slice(-4);
-    const ts     = App.data.traffic_settings || {};
-    const bar    = App.data.settings?.bar_name || 'This operation';
-
-    const prompt = `You are a digital marketing analyst for bars and restaurants. Analyze these weekly traffic metrics for ${bar} and give 3 specific, actionable insights in plain English. No headers, no bullet points. Write it as a short paragraph for each insight.\n\nTargets: Google Rating ${ts.targets?.google_rating??4.3}★, ${ts.targets?.review_velocity??8} new reviews/mo, ${ts.targets?.response_rate??75}% response rate, ${ts.targets?.monthly_sessions??2000} monthly sessions.\n\nRecent weeks (newest first):\n${JSON.stringify(recent.slice().reverse(), null, 2)}\n\nFocus on what is moving in the wrong direction and what specific action will fix it fastest.`;
-
-    try {
-      const res  = await fetch('/api/claude', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-opus-4-5',
-          max_tokens: 600,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      const data = await res.json();
-      const text = data.content?.[0]?.text || 'Unable to generate insights.';
-
-      const existing = document.getElementById('t-insights-panel');
-      if (existing) existing.remove();
-      const panel = document.createElement('div');
-      panel.id = 't-insights-panel';
-      panel.className = 'card';
-      panel.style.cssText = 'margin-top:16px;border:1px solid rgba(201,168,76,0.3);';
-      panel.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Digital Presence Insights</div>'
-        + '<div style="font-size:13px;color:var(--t1);line-height:1.7;">' + esc(text) + '</div>';
-      document.querySelector('#content-area .screen')?.appendChild(panel);
-    } catch(e) {
-      console.error('Insights error:', e);
+  showInsights() {
+    const weeks = App.data.traffic_weeks || [];
+    const showModal = (html) => {
+      const m = document.createElement('div');
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
+      box.innerHTML = html;
+      m.appendChild(box);
+      document.body.appendChild(m);
+      m.onclick = ev => { if(ev.target===m) m.remove(); };
+      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
+    };
+    if (weeks.length < 2) {
+      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      return;
     }
-
-    btn.textContent = 'Digital Presence Insights';
-    btn.disabled = false;
+    const btn = document.getElementById('t-insights-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
+    const ts  = App.data.traffic_settings?.targets || {};
+    const avg = arr => { const v = arr.filter(x=>x!=null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
+    const recent = weeks.slice(-8);
+    const grVals = recent.map(w=>w.google_rating).filter(v=>v!=null);
+    const rvVals = recent.map(w=>w.new_reviews).filter(v=>v!=null);
+    const rrVals = recent.map(w=>w.response_rate).filter(v=>v!=null);
+    const ssVals = recent.map(w=>w.monthly_sessions).filter(v=>v!=null);
+    const aGR = avg(grVals).toFixed(2);
+    const aRV = avg(rvVals).toFixed(1);
+    const aRR = avg(rrVals).toFixed(1);
+    const aSS = Math.round(avg(ssVals));
+    const grTrend = grVals.length>=3 ? (grVals[grVals.length-1]-grVals[0]>0.1?'trending up':grVals[0]-grVals[grVals.length-1]>0.1?'trending down':'holding steady') : 'early data';
+    const lines = [
+      'Google Rating: '+recent.map(w=>w.google_rating?w.google_rating.toFixed(1)+'\u2605':'n/a').join(', ')+' (target:'+ts.google_rating+'\u2605 avg:'+aGR+'\u2605)',
+      'Rating trend: '+grTrend,
+      'New reviews/mo: '+recent.map(w=>w.new_reviews??'n/a').join(', ')+' (target:'+ts.review_velocity+'/mo avg:'+aRV+')',
+      'Response rate: '+recent.map(w=>w.response_rate?w.response_rate.toFixed(0)+'%':'n/a').join(', ')+' (target:'+ts.response_rate+'% avg:'+aRR+'%)',
+      'Monthly sessions: '+recent.map(w=>w.monthly_sessions??'n/a').join(', ')+' (target:'+ts.monthly_sessions+' avg:'+aSS+')',
+    ];
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner about their digital presence. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n'+lines.join('\n')+'\n\nLead with Google rating and review velocity, then website traffic, then the single action that will have the most impact on local digital visibility this week.';
+    fetch('/api/claude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:'claude-sonnet-4-5', max_tokens:600, messages:[{role:'user', content:prompt}]})})
+    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data => {
+      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
+      if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: '+data.error.message+'</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+      const text = data.content?.[0]?.text;
+      if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+      const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+recent.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
+      const body   = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
+      showModal(header+body);
+    }).catch(err => {
+      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
+      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: '+err.message+'. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+    });
   },
 
   buildChart(weeks, t) {
