@@ -114,18 +114,20 @@ S.RevenueMenuItems = {
       + '<span id="ri-sel-count" style="font-size:11px;color:var(--t3);"></span>'
       + '</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th style="width:36px;"><input type="checkbox" id="ri-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
+      + '<th style="width:36px;"></th>'
       + '<th>Item Name</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost % ' + tt('r-cost-pct') + '</th><th>Contrib. Margin ' + tt('r-contrib-margin') + '</th><th>Wkly Covers ' + tt('r-wkly-covers') + '</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>'
-      + '<div id="ri-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="ri-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this item?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="ri-del-confirm">Delete</button><button class="btn btn-ghost" id="ri-del-cancel">Cancel</button></div></div></div>';
+      + '</div>';
 
     container.querySelectorAll('.ri-edit').forEach(btn => {
       btn.addEventListener('click', () => this.showForm(container, actions, parseInt(btn.dataset.idx)));
     });
     container.querySelectorAll('.ri-del').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.confirmDel(container, actions, [parseInt(btn.dataset.idx)], 'Delete this item?');
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this item?')) return;
+        App.data.revenue_menu_items.splice(parseInt(btn.dataset.idx), 1);
+        await App.saveKey('revenue_menu_items');
+        this.render(container, actions);
       });
     });
 
@@ -137,39 +139,18 @@ S.RevenueMenuItems = {
       if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
       if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
     };
-    document.getElementById('ri-sel-all')?.addEventListener('click', () => {
-      const all = container.querySelectorAll('.ri-chk');
-      const anyUnchecked = [...all].some(c => !c.checked);
-      all.forEach(c => { c.checked = anyUnchecked; });
-      const hdr = document.getElementById('ri-chk-all');
-      if (hdr) hdr.checked = anyUnchecked;
-      updateSel();
-    });
     document.getElementById('ri-chk-all')?.addEventListener('change', e => {
       container.querySelectorAll('.ri-chk').forEach(c => { c.checked = e.target.checked; });
       updateSel();
     });
     container.addEventListener('change', e => { if(e.target.classList.contains('ri-chk')) updateSel(); });
-    document.getElementById('ri-del-sel')?.addEventListener('click', () => {
-      const idxs = [...container.querySelectorAll('.ri-chk:checked')].map(c => parseInt(c.dataset.idx));
-      if (!idxs.length) return;
-      this.confirmDel(container, actions, idxs, 'Delete ' + idxs.length + ' item' + (idxs.length > 1 ? 's' : '') + '?');
-    });
-  },
-
-  confirmDel(container, actions, idxs, msg) {
-    const modal = document.getElementById('ri-del-modal');
-    const msgEl = document.getElementById('ri-del-msg');
-    if (msgEl) msgEl.textContent = msg;
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('ri-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const items = App.data.revenue_menu_items || [];
-      App.data.revenue_menu_items = items.filter((_, i) => !idxs.includes(i));
+    document.getElementById('ri-del-sel')?.addEventListener('click', async () => {
+      const ids = [...container.querySelectorAll('.ri-chk:checked')].map(c => c.dataset.id);
+      if (!ids.length) return;
+      App.data.revenue_menu_items = (App.data.revenue_menu_items||[]).filter(i => !ids.includes(i.id));
       await App.saveKey('revenue_menu_items');
       this.render(container, actions);
-    };
-    document.getElementById('ri-del-cancel').onclick = () => { modal.style.display = 'none'; };
+    });
   },
 
   showForm(container, actions, idx) {
@@ -187,7 +168,7 @@ S.RevenueMenuItems = {
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
       + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price||'') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f w-md"><label>Food / Pour Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + (item?.cost||'') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers||'') + '" placeholder=""/></div>'
+      + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers||'') + '" placeholder="0"/></div>'
       + '</div>'
       + '<div id="ri-calc" style="margin-bottom:16px;"></div>'
       + '<div class="f" style="margin-bottom:16px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes||'') + '" placeholder="Optional"/></div>'
