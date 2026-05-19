@@ -95,9 +95,9 @@ S.RevenueThisWeek = {
     const caGap = checkAvg > 0 ? checkAvg - targetCA : 0;
     return '<div class="card"><div class="sh">Step 2   Revenue by Department</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Bar Revenue ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-brev" value="' + (this.draft.bar_revenue||'') + '" placeholder="0"/></div></div>'
-      + '<div class="f w-md"><label>Floor Revenue ' + tt('r-floor-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-frev" value="' + (this.draft.floor_revenue||'') + '" placeholder="0"/></div></div>'
-      + '<div class="f w-md"><label>Total Covers ' + tt('r-covers') + '</label><input type="number" id="rw-cov" value="' + (this.draft.covers||'') + '" placeholder="0"/></div>'
+      + '<div class="f w-md"><label>Bar Revenue ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-brev" value="' + (this.draft.bar_revenue||'') + '" placeholder=""/></div></div>'
+      + '<div class="f w-md"><label>Floor Revenue ' + tt('r-floor-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-frev" value="' + (this.draft.floor_revenue||'') + '" placeholder=""/></div></div>'
+      + '<div class="f w-md"><label>Total Covers ' + tt('r-covers') + '</label><input type="number" id="rw-cov" value="' + (this.draft.covers||'') + '" placeholder=""/></div>'
       + '</div>'
       + (totalRev > 0 && covers > 0 ? '<div style="background:var(--input);border-radius:6px;padding:12px 16px;display:flex;gap:24px;flex-wrap:wrap;">'
         + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Total Revenue</div><div style="font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(totalRev) + '</div></div>'
@@ -125,8 +125,8 @@ S.RevenueThisWeek = {
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + '   Target: ' + d.target + '%</div>'
         + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-labor-hours') + '</label><input type="number" id="rw-' + d.key + '-hrs" value="' + (this.draft[d.key + '_labor_hours']||'') + '" placeholder="0"/></div>'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Cost ' + tt('r-labor-cost') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-' + d.key + '-cost" value="' + (this.draft[d.key + '_labor_cost']||'') + '" placeholder="0"/></div></div>'
+        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-labor-hours') + '</label><input type="number" id="rw-' + d.key + '-hrs" value="' + (this.draft[d.key + '_labor_hours']||'') + '" placeholder=""/></div>'
+        + '<div class="f w-md"><label>' + d.label + ' Labor Cost ' + tt('r-labor-cost') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-' + d.key + '-cost" value="' + (this.draft[d.key + '_labor_cost']||'') + '" placeholder=""/></div></div>'
         + (pct ? '<div class="f" style="width:120px;"><label>Labor %</label><div style="font-size:18px;font-weight:700;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';padding-top:8px;">' + pct + '%<span style="font-size:11px;font-weight:400;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';margin-left:6px;">' + (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts</span></div></div>' : '')
         + '</div></div>';
     }).join('');
@@ -148,8 +148,8 @@ S.RevenueThisWeek = {
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + ' : Target: $' + d.target + ' RPLH ' + tt('r-rplh-target') + '</div>'
         + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f w-md"><label>' + d.label + ' Revenue ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-rplh-' + d.key + '-rev" value="' + (this.draft['rplh_' + d.key + '_rev']||'') + '" placeholder="0"/></div></div>'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-daypart-hrs') + '</label><input type="number" id="rw-rplh-' + d.key + '-hrs" value="' + (this.draft['rplh_' + d.key + '_hrs']||'') + '" placeholder="0"/></div>'
+        + '<div class="f w-md"><label>' + d.label + ' Revenue ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-rplh-' + d.key + '-rev" value="' + (this.draft['rplh_' + d.key + '_rev']||'') + '" placeholder=""/></div></div>'
+        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-daypart-hrs') + '</label><input type="number" id="rw-rplh-' + d.key + '-hrs" value="' + (this.draft['rplh_' + d.key + '_hrs']||'') + '" placeholder=""/></div>'
         + (rplh ? '<div class="f" style="width:140px;"><label>RPLH ' + tt('r-rplh') + '</label><div style="font-size:18px;font-weight:700;color:' + (gap >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding-top:8px;">' + App.fmtCurrency(rplh) + '<span style="font-size:11px;font-weight:400;margin-left:6px;">' + (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + '</span></div></div>' : '')
         + '</div></div>';
     }).join('');
@@ -182,8 +182,8 @@ S.RevenueThisWeek = {
       const vsTgt  = ca ? ca - targetCA : null;
       return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
         + '<div style="width:130px;font-size:12px;font-weight:700;color:var(--t1);flex-shrink:0;">' + esc(e.name) + '</div>'
-        + '<div class="f" style="width:100px;"><label style="font-size:10px;">Covers</label><input type="number" class="rsv-cov" data-idx="' + i + '" value="' + (e.covers||'') + '" placeholder="0" style="padding:6px 8px;font-size:12px;"/></div>'
-        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="0" style="font-size:12px;"/></div></div>'
+        + '<div class="f" style="width:100px;"><label style="font-size:10px;">Covers</label><input type="number" class="rsv-cov" data-idx="' + i + '" value="' + (e.covers||'') + '" placeholder="" style="padding:6px 8px;font-size:12px;"/></div>'
+        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="" style="font-size:12px;"/></div></div>'
         + (ca ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">Check Avg</div><div style="font-size:14px;font-weight:700;color:' + (vsTgt >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(ca) + '</div></div>' : '')
         + (vsTeam != null ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">vs Team</div><div style="font-size:12px;color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</div></div>' : '')
         + '</div>';
