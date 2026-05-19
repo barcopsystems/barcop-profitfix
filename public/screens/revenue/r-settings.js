@@ -36,14 +36,14 @@ S.RevenueSettings = {
         </div>
         <div class="settings-section"><div class="settings-title">Revenue Targets</div>
           <div class="card"><div class="form-row" style="gap:16px 20px;">
-            <div class="f" style="width:140px;"><label>Check Avg Target ${tt('r-check-avg')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-ca" value="${t.check_avg??35}" step="0.5"/></div></div>
-            <div class="f" style="width:120px;"><label>Bar Labor % ${tt('r-labor-pct')}</label><div class="fw"><input class="suf" type="number" id="rs-bl" value="${t.bar_labor_pct??28}" step="0.1"/><span class="suf">%</span></div></div>
-            <div class="f" style="width:120px;"><label>Kitchen Labor %</label><div class="fw"><input class="suf" type="number" id="rs-kl" value="${t.kitchen_labor_pct??30}" step="0.1"/><span class="suf">%</span></div></div>
-            <div class="f" style="width:120px;"><label>Floor Labor %</label><div class="fw"><input class="suf" type="number" id="rs-fl" value="${t.floor_labor_pct??32}" step="0.1"/><span class="suf">%</span></div></div>
-            <div class="f" style="width:120px;"><label>Lunch RPLH ${tt('r-rplh-target')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-rl" value="${t.rplh_lunch??50}"/></div></div>
-            <div class="f" style="width:120px;"><label>Dinner RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-rd" value="${t.rplh_dinner??75}"/></div></div>
-            <div class="f" style="width:120px;"><label>Bar RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-rb" value="${t.rplh_bar??65}"/></div></div>
-            <div class="f" style="width:120px;"><label>Event Close Rate</label><div class="fw"><input class="suf" type="number" id="rs-ec" value="${t.event_close_rate??40}" step="1"/><span class="suf">%</span></div></div>
+            <div class="f" style="width:140px;"><label>Check Average ${tt('r-check-avg')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-ca" value="${t.check_avg??35}" step="0.5"/></div></div>
+            <div class="f" style="width:120px;"><label>Bar Labor % ${tt('r-bar-labor')}</label><div class="fw"><input class="suf" type="number" id="rs-bl" value="${t.bar_labor_pct??28}" step="0.1"/><span class="suf">%</span></div></div>
+            <div class="f" style="width:120px;"><label>Kitchen Labor % ${tt('r-kitchen-labor')}</label><div class="fw"><input class="suf" type="number" id="rs-kl" value="${t.kitchen_labor_pct??30}" step="0.1"/><span class="suf">%</span></div></div>
+            <div class="f" style="width:120px;"><label>Floor Labor % ${tt('r-floor-labor')}</label><div class="fw"><input class="suf" type="number" id="rs-fl" value="${t.floor_labor_pct??32}" step="0.1"/><span class="suf">%</span></div></div>
+            <div class="f" style="width:120px;"><label>Lunch RPLH ${tt('r-lunch-rplh')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-rl" value="${t.rplh_lunch??50}"/></div></div>
+            <div class="f" style="width:120px;"><label>Dinner RPLH ${tt('r-dinner-rplh')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-rd" value="${t.rplh_dinner??75}"/></div></div>
+            <div class="f" style="width:120px;"><label>Bar RPLH ${tt('r-bar-rplh')}</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rs-rb" value="${t.rplh_bar??65}"/></div></div>
+            <div class="f" style="width:120px;"><label>Event Close Rate ${tt('r-event-close')}</label><div class="fw"><input class="suf" type="number" id="rs-ec" value="${t.event_close_rate??40}" step="1"/><span class="suf">%</span></div></div>
           </div></div>
         </div>
         <div class="settings-section"><div class="settings-title">Average Hourly Wages</div>
