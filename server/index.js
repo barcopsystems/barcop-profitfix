@@ -7,6 +7,8 @@ const fs       = require('fs');
 const os       = require('os');
 const { execSync, spawn } = require('child_process');
 const multiparty = require('multiparty');
+let XLSX;
+try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -123,6 +125,39 @@ app.post('/api/generate-audit', (req, res) => {
   });
 });
 
+// ── Parse spreadsheet/CSV file into readable text for Claude ──────────────────
+function parseSpreadsheetToText(filePath, fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  try {
+    if (ext === '.csv') {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const lines = raw.trim().split('\n').slice(0, 200); // cap at 200 rows
+      return `FILE: ${fileName}\n${lines.join('\n')}`;
+    }
+    if (['.xlsx', '.xls'].includes(ext)) {
+      if (!XLSX) return `FILE: ${fileName}\n[Excel parser not available — install xlsx package]`;
+      const wb    = XLSX.readFile(filePath);
+      const parts = [];
+      for (const sheetName of wb.SheetNames.slice(0, 5)) { // max 5 sheets
+        const ws   = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
+        const lines = rows.trim().split('\n').slice(0, 200);
+        if (lines.length > 1) {
+          parts.push(`FILE: ${fileName} | SHEET: ${sheetName}\n${lines.join('\n')}`);
+        }
+      }
+      return parts.join('\n\n') || `FILE: ${fileName}\n[Empty spreadsheet]`;
+    }
+    if (ext === '.docx' || ext === '.doc') {
+      // Word docs — return filename only, Claude can't read binary Word
+      return `FILE: ${fileName}\n[Word document submitted — operator should convert to PDF for best results]`;
+    }
+  } catch(e) {
+    return `FILE: ${fileName}\n[Parse error: ${e.message}]`;
+  }
+  return null;
+}
+
 // ── Extract audit data from uploaded files ────────────────────────────────────
 async function extractAuditData(apiKey, auditType, files, appData) {
   const prompts = {
@@ -135,46 +170,55 @@ async function extractAuditData(apiKey, auditType, files, appData) {
 
   // Build message content with all files
   const content = [];
+  const spreadsheetTexts = [];
 
-  // Add each uploaded file as a document
   for (const f of files) {
     const ext = path.extname(f.name).toLowerCase();
-    const fileBytes = fs.readFileSync(f.path);
-    const b64 = fileBytes.toString('base64');
 
     if (ext === '.pdf') {
+      const b64 = fs.readFileSync(f.path).toString('base64');
       content.push({
         type: 'document',
         source: { type: 'base64', media_type: 'application/pdf', data: b64 }
       });
-    } else if (['.png','.jpg','.jpeg'].includes(ext)) {
-      const mt = ext === '.png' ? 'image/png' : 'image/jpeg';
+    } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
+      const mt  = ext === '.png' ? 'image/png' : 'image/jpeg';
+      const b64 = fs.readFileSync(f.path).toString('base64');
       content.push({
         type: 'image',
         source: { type: 'base64', media_type: mt, data: b64 }
       });
+    } else if (['.xlsx', '.xls', '.csv', '.doc', '.docx'].includes(ext)) {
+      const text = parseSpreadsheetToText(f.path, f.name);
+      if (text) spreadsheetTexts.push(text);
     }
-    // For xlsx/csv we send as text after extracting key numbers
-    // (handled via prompt instruction to use app data)
+  }
+
+  // Add all spreadsheet/CSV data as a single text block before the prompt
+  if (spreadsheetTexts.length > 0) {
+    content.push({
+      type: 'text',
+      text: 'SUBMITTED DATA FILES — Read all data carefully and use it to score each section:\n\n'
+        + spreadsheetTexts.join('\n\n---\n\n')
+    });
   }
 
   content.push({ type: 'text', text: prompt });
 
-  // Call Claude
   const body = JSON.stringify({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 4000,
     messages: [{ role: 'user', content }]
   });
 
   const responseData = await callClaude(apiKey, body);
-  const text = responseData.content?.[0]?.text || '';
+  const text  = responseData.content?.[0]?.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
-  
+
   try {
     return JSON.parse(clean);
   } catch(e) {
-    throw new Error('Failed to parse extracted audit data: ' + text.slice(0,200));
+    throw new Error('Failed to parse extracted audit data: ' + text.slice(0, 200));
   }
 }
 
@@ -494,8 +538,6 @@ function getExtractionPrompt_Revenue(appData) {
 APP DATA (from customer's app usage):
 - Bar Name: ${settings.bar_name || 'Not provided'}
 - City/State: ${settings.city_state || 'Not provided'}
-- Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
-- Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
 - Check Average Target: $${targets.check_avg || 35}
 - Bar Labor Target: ${targets.bar_labor_pct || 28}%
 - Kitchen Labor Target: ${targets.kitchen_labor_pct || 30}%
@@ -642,7 +684,7 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
   "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10,
   "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
-  "S4_ANNUAL_REV_ESTIMATE": ${(settings.annual_bar_revenue || 0) + (settings.annual_food_revenue || 0)},
+  "S4_ANNUAL_REV_ESTIMATE": ${avgBarRev && avgFloorRev ? Math.round((avgBarRev + avgFloorRev) * 52) : 0},
   "S4_EVENT_REV_POTENTIAL_LOW": 0,
   "S4_EVENT_REV_POTENTIAL_HIGH": 0,
   "S4_SCORE": null,
