@@ -127,7 +127,7 @@ S.RevenueMenuEngineering = {
       + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
       + '<div class="f w-lg"><label>Menu Item</label><select id="rps-item" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;width:100%;"><option value="">Select item...</option>' + itemOpts + '</select></div>'
       + '<div class="f w-md"><label>Proposed New Price ' + tt('r-price-new') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rps-newprice" step="0.25" placeholder="0.00"/></div></div>'
-      + '<div class="f w-md"><label>Est. Volume Change % ' + tt('r-vol-change') + '</label><div class="fw"><input class="suf" type="number" id="rps-vol" step="1" placeholder="0"/><span class="suf">%</span></div></div>'
+      + '<div class="f w-md"><label>Est. Volume Change % ' + tt('r-vol-change') + '</label><div class="fw"><input class="suf" type="number" id="rps-vol" step="1" placeholder=""/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div id="rps-result" style="margin-bottom:18px;"></div>'
       + '<div id="rps-log-wrap" style="display:none;">'
