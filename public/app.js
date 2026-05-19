@@ -64,6 +64,14 @@ const TT = {
     'r-vol-change':     {t:'Estimated Volume Change',b:'How much you expect covers to change as a percentage if you change the price. Negative means fewer covers. Use 0 if you expect no change.',e:'-10% means you expect to sell 10% fewer of this item at the new price'},
     'r-contrib-margin-eng': {t:'Contribution Margin',b:'Menu price minus item cost. What each sale contributes to covering overhead and profit after product cost is deducted.',e:'$15 price - $4.50 cost = $10.50 contribution margin'},
     'r-event-covers':   {t:'Event Covers',b:'Total guests at the event. Used with F&B minimum to calculate per-head minimum and track whether events are on pace.',e:'40-guest corporate dinner'},
+    // Traffic Recovery tooltips
+    't-google-rating':  {t:'Google Rating',b:'Your current star rating on Google. The industry benchmark is 4.3 or higher. Below 4.0 is a direct revenue impact — guests filter by rating before choosing a venue.',e:'4.6 stars from 312 reviews'},
+    't-review-vel':     {t:'Review Velocity',b:'New reviews received per month. Consistent new reviews signal to Google that your business is active and relevant. Target 8 or more per month.',e:'12 new reviews this month'},
+    't-response-rate':  {t:'Response Rate',b:'Percentage of reviews you have responded to. Industry benchmark is 75 percent or higher. Responding to every review — positive and negative — is a direct ranking signal.',e:'Responded to 38 of 50 reviews = 76%'},
+    't-monthly-sessions':{t:'Monthly Website Sessions',b:'Total visits to your website per month. Benchmark is 2,000 or more for a typical bar or restaurant. Under 500 means your digital presence is not driving meaningful discovery traffic.',e:'1,840 sessions last month'},
+    't-bounce-rate':    {t:'Bounce Rate',b:'Percentage of visitors who leave without viewing a second page. Above 70 percent means your homepage is not converting visitors to menu, reservations, or contact.',e:'62% bounce rate'},
+    't-social-posts':   {t:'Monthly Posts',b:'Total posts across Instagram and Facebook combined for the month. Benchmark is 12 or more. Consistency matters more than volume — posting 3 times per week beats a burst of daily posts followed by silence.',e:'14 posts last month (10 IG, 4 FB)'},
+    't-digital-score':  {t:'Digital Presence Score',b:'Composite score across all 7 traffic categories: Google Business Profile, website, reviews, search and SEO, social media, delivery platforms, and email. Industry average is 58. Target is 65 or higher.',e:'Score of 71 puts you in the top 30% of operators in your market'},
   },
   show(icon) {
     const id = icon.dataset.tt;
@@ -224,6 +232,8 @@ const App = {
     if (!nav) return;
     if (module === 'revenue') {
       nav.innerHTML = Revenue.navHTML();
+    } else if (module === 'traffic') {
+      nav.innerHTML = Traffic.navHTML();
     } else {
       nav.innerHTML = ProfitNav.html();
     }
@@ -309,6 +319,52 @@ const App = {
       document.getElementById('topbar-title').textContent = title;
       document.getElementById('topbar-sub').textContent = sub;
       const screen = revScreens[id];
+      if (screen) screen.render(content, actions);
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Traffic module screens
+    if (this._activeModule === 'traffic') {
+      const trafficTitles = {
+        'hub':              ['Recovery Hub', ''],
+        't-dashboard':      ['Dashboard', 'Traffic Recovery'],
+        't-audit':          ['Traffic Audit', 'Monthly Score and Progress'],
+        't-this-week':      ['This Week', 'Weekly Entry'],
+        't-gbp':            ['Google Business Profile', ''],
+        't-reviews':        ['Review Tracker', ''],
+        't-search':         ['Search and SEO', ''],
+        't-website':        ['Website Scorecard', ''],
+        't-social':         ['Social Media', ''],
+        't-delivery':       ['Delivery Platforms', ''],
+        't-email':          ['Email and Loyalty', ''],
+        't-reports':        ['Reports and History', ''],
+        't-getting-started':['Getting Started', '30-Day Setup'],
+        't-resources':      ['Resources', ''],
+        't-help':           ['Help and FAQ', ''],
+        't-settings':       ['Settings', 'Traffic Recovery'],
+      };
+      const trafficScreens = {
+        't-dashboard':      S.TrafficDashboard,
+        't-audit':          S.TrafficAudit,
+        't-this-week':      S.TrafficThisWeek,
+        't-gbp':            S.TrafficGBP,
+        't-reviews':        S.TrafficReviews,
+        't-search':         S.TrafficSearch,
+        't-website':        S.TrafficWebsite,
+        't-social':         S.TrafficSocial,
+        't-delivery':       S.TrafficDelivery,
+        't-email':          S.TrafficEmail,
+        't-reports':        S.TrafficReports,
+        't-getting-started':S.TrafficGettingStarted,
+        't-resources':      S.TrafficResources,
+        't-help':           S.TrafficHelp,
+        't-settings':       S.TrafficSettings,
+      };
+      const [title, sub] = trafficTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = title;
+      document.getElementById('topbar-sub').textContent = sub;
+      const screen = trafficScreens[id];
       if (screen) screen.render(content, actions);
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
@@ -490,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Nav items are injected dynamically   wired in App._renderNav()
   // Settings button routes to correct settings screen based on active module
   document.getElementById('nav-settings')?.addEventListener('click', () => {
-    const screen = App._activeModule === 'revenue' ? 'r-settings' : 'settings';
+    const screen = App._activeModule === 'revenue' ? 'r-settings' : App._activeModule === 'traffic' ? 't-settings' : 'settings';
     App.navigate(screen);
   });
   wireAuth();
