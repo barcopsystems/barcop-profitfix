@@ -162,7 +162,7 @@ S.Dashboard = {
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       +'<button class="btn btn-primary" id="qa-week">Enter This Week</button>'
-      +'<button class="btn btn-ghost" id="qa-shift">Run Shift Check</button>'
+      +'<button class="btn btn-ghost" id="qa-shift">Profit Audit</button>'
       +'<button class="btn btn-ghost" id="qa-reports">View Reports</button>'
       +(flagged>0?'<button class="btn btn-danger" id="qa-recipes">'+flagged+' Recipe'+(flagged>1?'s':'')+' Above Target</button>':'')
       +'</div>'
