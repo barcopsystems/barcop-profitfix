@@ -42,14 +42,14 @@ S.Reports={
     };
 
     this.container.innerHTML='<div class="screen">'
-      +'<div class="sh">Weekly History</div>'
-      +'<div class="tbl-wrap" style="overflow-x:auto;margin-bottom:24px;"><table class="tbl"><thead><tr>'
-      +'<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Bar Cost %</th><th>Food Rev</th><th>Food Cost %</th><th>Prime %</th><th>Variance $</th>'
-      +'</tr></thead><tbody>'+histRows+'</tbody></table></div>'
       +'<div class="sh">Annual Calculator</div>'
       +calcBlock('Bar',annBarRev,avgB,t.bar_pour_cost_pct??22)
       +calcBlock('Food',annFoodRev,avgF,t.food_cost_pct??32)
       +calcBlock('Prime Cost',annBarRev+annFoodRev,avgP,t.prime_cost_pct??60)
+      +'<div class="sh" style="margin-top:24px;">Weekly History</div>'
+      +'<div class="tbl-wrap" style="overflow-x:auto;margin-bottom:24px;"><table class="tbl"><thead><tr>'
+      +'<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Bar Cost %</th><th>Food Rev</th><th>Food Cost %</th><th>Prime %</th><th>Variance $</th>'
+      +'</tr></thead><tbody>'+histRows+'</tbody></table></div>'
       +'<div id="week-detail"></div>'
       +'</div>';
   },
