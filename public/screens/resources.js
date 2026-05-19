@@ -6,10 +6,10 @@ S.Resources = {
       icon: '📋',
       desc: 'Use these every shift. Print and post at each station.',
       items: [
-        { num: 24, type: 'PDF', title: 'Opening Bar Checklist', desc: 'Bottle counts, station setup, pour standard verification, cleanliness sign-off.', file: 'PDF24_Opening_Bar_Checklist.pdf' },
-        { num: 25, type: 'PDF', title: 'Closing Bar Checklist', desc: 'End-of-shift bottle counts, lockup, waste documentation, bar breakdown.', file: 'PDF25_Closing_Bar_Checklist.pdf' },
-        { num: 26, type: 'PDF', title: 'Shift Audit Form', desc: 'Till count, comp and void review, manager observation log. Run at least once per week.', file: 'PDF26_Shift_Audit_Form.pdf' },
-        { num: 28, type: 'PDF', title: 'Daily Food Waste Tracking Sheet', desc: 'Log every spill, drop, spoilage, and overproduction with reason codes and dollar values.', file: 'PDF28_Daily_Food_Waste_Tracking.pdf' },
+        { num: '01', type: 'PDF', title: 'Opening Bar Checklist', desc: 'Bottle counts, station setup, pour standard verification, cleanliness sign-off.', file: 'PDF24_Opening_Bar_Checklist.pdf' },
+        { num: '02', type: 'PDF', title: 'Closing Bar Checklist', desc: 'End-of-shift bottle counts, lockup, waste documentation, bar breakdown.', file: 'PDF25_Closing_Bar_Checklist.pdf' },
+        { num: '03', type: 'PDF', title: 'Shift Audit Form', desc: 'Till count, comp and void review, manager observation log. Run at least once per week.', file: 'PDF26_Shift_Audit_Form.pdf' },
+        { num: '04', type: 'PDF', title: 'Daily Food Waste Tracking Sheet', desc: 'Log every spill, drop, spoilage, and overproduction with reason codes and dollar values.', file: 'PDF28_Daily_Food_Waste_Tracking.pdf' },
       ]
     },
     {
@@ -17,10 +17,10 @@ S.Resources = {
       icon: '📦',
       desc: 'Receiving, inspection, and discrepancy tracking.',
       items: [
-        { num: 27, type: 'PDF', title: 'Vendor Delivery Inspection Form', desc: 'Item-by-item delivery count, price verification, condition check, receiving sign-off.', file: 'PDF27_Vendor_Delivery_Inspection.pdf' },
-        { num: 30, type: 'PDF', title: 'Vendor Delivery Discrepancy Report', desc: 'Document short shipments, price disputes, wrong items, damaged goods.', file: 'PDF30_Vendor_Delivery_Discrepancy.pdf' },
-        { num: 29, type: 'PDF', title: 'Portion Control Audit Form', desc: 'Unannounced spot-check of actual vs. standard portions by station. Pass = within 10%.', file: 'PDF29_Portion_Control_Audit.pdf' },
-        { num: 38, type: 'DOC', title: 'Vendor Agreement Terms Checklist', desc: 'Pricing, substitution policy, delivery standards, credit memos, annual review. Use at every vendor onboarding.', file: 'WordDoc38_Vendor_Agreement_Terms_Checklist.docx' },
+        { num: '05', type: 'PDF', title: 'Vendor Delivery Inspection Form', desc: 'Item-by-item delivery count, price verification, condition check, receiving sign-off.', file: 'PDF27_Vendor_Delivery_Inspection.pdf' },
+        { num: '06', type: 'PDF', title: 'Vendor Delivery Discrepancy Report', desc: 'Document short shipments, price disputes, wrong items, damaged goods.', file: 'PDF30_Vendor_Delivery_Discrepancy.pdf' },
+        { num: '07', type: 'PDF', title: 'Portion Control Audit Form', desc: 'Unannounced spot-check of actual vs. standard portions by station. Pass = within 10%.', file: 'PDF29_Portion_Control_Audit.pdf' },
+        { num: '08', type: 'DOC', title: 'Vendor Agreement Terms Checklist', desc: 'Pricing, substitution policy, delivery standards, credit memos, annual review. Use at every vendor onboarding.', file: 'WordDoc38_Vendor_Agreement_Terms_Checklist.docx' },
       ]
     },
     {
@@ -28,10 +28,10 @@ S.Resources = {
       icon: '📊',
       desc: 'Track your numbers week over week.',
       items: [
-        { num: 31, type: 'PDF', title: 'Weekly P&L Snapshot Form', desc: 'Sales, COGS, labor, prime cost. Complete every Monday morning from last week\'s POS data.', file: 'PDF31_Weekly_PL_Snapshot.pdf' },
-        { num: 32, type: 'PDF', title: '30-Day Implementation Review Form', desc: 'Week-by-week checkpoint for the first 30 days. Documents wins, gaps, and blockers.', file: 'PDF32_30Day_Implementation_Review.pdf' },
-        { num: 39, type: 'DOC', title: 'Monthly Cost Control Review Agenda', desc: 'Four-week prime cost review, section-by-section findings, action items with owners and due dates.', file: 'WordDoc39_Monthly_Cost_Control_Review_Agenda.docx' },
-        { num: 40, type: 'DOC', title: '90-Day Cost Control Roadmap', desc: '30/60/90-day milestones, quarterly review structure, and annual planning template.', file: 'WordDoc40_90Day_Cost_Control_Roadmap.docx' },
+        { num: '09', type: 'PDF', title: 'Weekly P&L Snapshot Form', desc: 'Sales, COGS, labor, prime cost. Complete every Monday morning from last week\'s POS data.', file: 'PDF31_Weekly_PL_Snapshot.pdf' },
+        { num: '10', type: 'PDF', title: '30-Day Implementation Review Form', desc: 'Week-by-week checkpoint for the first 30 days. Documents wins, gaps, and blockers.', file: 'PDF32_30Day_Implementation_Review.pdf' },
+        { num: '11', type: 'DOC', title: 'Monthly Cost Control Review Agenda', desc: 'Four-week prime cost review, section-by-section findings, action items with owners and due dates.', file: 'WordDoc39_Monthly_Cost_Control_Review_Agenda.docx' },
+        { num: '12', type: 'DOC', title: '90-Day Cost Control Roadmap', desc: '30/60/90-day milestones, quarterly review structure, and annual planning template.', file: 'WordDoc40_90Day_Cost_Control_Roadmap.docx' },
       ]
     },
     {
@@ -39,11 +39,11 @@ S.Resources = {
       icon: '📄',
       desc: 'Print, customize, sign. File a copy in every employee record.',
       items: [
-        { num: 33, type: 'DOC', title: 'Measured Pour Standards Policy', desc: 'Pour standards by spirit category, free-pour prohibition, calibration test requirements, enforcement and consequences.', file: 'WordDoc33_Measured_Pour_Standards_Policy.docx' },
-        { num: 34, type: 'DOC', title: 'Bar Inventory Procedures Manual', desc: 'Who counts, when, how, variance thresholds, investigation process, sign-off requirements.', file: 'WordDoc34_Bar_Inventory_Procedures_Manual.docx' },
-        { num: 35, type: 'DOC', title: 'Theft & Loss Prevention Policy', desc: 'Defined violations, documentation requirements, investigation process, disciplinary procedures, termination language.', file: 'WordDoc35_Theft_Loss_Prevention_Policy.docx' },
-        { num: 36, type: 'DOC', title: 'Employee Corrective Action Template', desc: 'Written warning form for cost control violations. Includes violation type, incident description, corrective action, and signatures.', file: 'WordDoc36_Employee_Corrective_Action_Template.docx' },
-        { num: 37, type: 'DOC', title: 'Food Handling & Portion Standards Guide', desc: 'Portioning standards table, prep standards by station, temperature requirements, waste documentation, staff sign-off.', file: 'WordDoc37_Food_Handling_Portion_Standards.docx' },
+        { num: '13', type: 'DOC', title: 'Measured Pour Standards Policy', desc: 'Pour standards by spirit category, free-pour prohibition, calibration test requirements, enforcement and consequences.', file: 'WordDoc33_Measured_Pour_Standards_Policy.docx' },
+        { num: '14', type: 'DOC', title: 'Bar Inventory Procedures Manual', desc: 'Who counts, when, how, variance thresholds, investigation process, sign-off requirements.', file: 'WordDoc34_Bar_Inventory_Procedures_Manual.docx' },
+        { num: '15', type: 'DOC', title: 'Theft & Loss Prevention Policy', desc: 'Defined violations, documentation requirements, investigation process, disciplinary procedures, termination language.', file: 'WordDoc35_Theft_Loss_Prevention_Policy.docx' },
+        { num: '16', type: 'DOC', title: 'Employee Corrective Action Template', desc: 'Written warning form for cost control violations. Includes violation type, incident description, corrective action, and signatures.', file: 'WordDoc36_Employee_Corrective_Action_Template.docx' },
+        { num: '17', type: 'DOC', title: 'Food Handling & Portion Standards Guide', desc: 'Portioning standards table, prep standards by station, temperature requirements, waste documentation, staff sign-off.', file: 'WordDoc37_Food_Handling_Portion_Standards.docx' },
       ]
     }
   ],
