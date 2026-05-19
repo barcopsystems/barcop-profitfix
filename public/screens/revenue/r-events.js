@@ -63,7 +63,7 @@ S.RevenueEvents = {
       + '<span id="rev-sel-count" style="font-size:11px;color:var(--t3);"></span>'
       + '</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th style="width:36px;"><input type="checkbox" id="rev-chk-all" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></th>'
+      + '<th style="width:36px;"></th>'
       + '<th>Date</th><th>Event Name</th><th>Type</th><th>Covers ' + tt('r-covers') + '</th><th>F&B Min ' + tt('r-fb-minimum') + '</th><th>Revenue ' + tt('r-event-revenue') + '</th><th>Status</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
@@ -94,11 +94,11 @@ S.RevenueEvents = {
     const rows = rc.map((r, i) =>
       '<tr><td style="font-weight:600;">' + esc(r.package_name||'') + '</td>'
       + '<td>' + esc(r.event_type||'') + '</td>'
-      + '<td>' + (r.min_covers||' ') + ' - ' + (r.max_covers||' ') + '</td>'
+      + '<td>' + (r.min_covers||' ') + ' – ' + (r.max_covers||' ') + '</td>'
       + '<td>' + (r.fb_minimum ? App.fmtCurrency(r.fb_minimum) : ' ') + '</td>'
       + '<td>' + (r.room_fee ? App.fmtCurrency(r.room_fee) : 'Included') + '</td>'
       + '<td>' + (r.per_head ? App.fmtCurrency(r.per_head) : ' ') + '</td>'
-      + '<td><button class="btn btn-danger btn-sm" data-del-rc="' + i + '">Del</button></td>'
+      + '<td><button class="btn btn-danger btn-sm" onclick="S.RevenueEvents._delRC(' + i + ', this)">Del</button></td>'
       + '</tr>'
     ).join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No rate cards yet.</td></tr>';
 
@@ -111,29 +111,14 @@ S.RevenueEvents = {
       + '<div class="form-row" style="gap:14px;margin-bottom:16px;">'
       + '<div class="f w-md"><label>Min Covers ' + tt('r-event-covers') + '</label><input type="number" id="rrc-minc" placeholder="20"/></div>'
       + '<div class="f w-md"><label>Max Covers</label><input type="number" id="rrc-maxc" placeholder="60"/></div>'
-      + '<div class="f w-md"><label>F&B Minimum ' + tt('r-fb-minimum') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rrc-fbmin" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>Room Fee</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rrc-room" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rrc-perhead" placeholder=""/></div></div>'
+      + '<div class="f w-md"><label>F&B Minimum ' + tt('r-fb-minimum') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rrc-fbmin" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Room Fee</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rrc-room" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rrc-perhead" placeholder="0"/></div></div>'
       + '</div>'
       + '<button class="btn btn-ghost" id="rrc-add">Add Package</button>'
       + '</div>'
       + '<div class="tbl-wrap" style="margin-top:16px;"><table class="tbl"><thead><tr><th>Package</th><th>Type</th><th>Covers</th><th>F&B Min</th><th>Room Fee</th><th>Per Head</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>'
-      + '<div id="rrc-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this package?</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="rrc-del-confirm">Delete</button><button class="btn btn-ghost" id="rrc-del-cancel">Cancel</button></div></div></div>';
-
-    container.addEventListener('click', e => {
-      const btn = e.target.closest('[data-del-rc]');
-      if (!btn) return;
-      const i = parseInt(btn.dataset.delRc, 10);
-      const modal = document.getElementById('rrc-del-modal');
-      if (modal) modal.style.display = 'flex';
-      document.getElementById('rrc-del-confirm').onclick = () => {
-        modal.style.display = 'none';
-        App.data.revenue_rate_cards.splice(i, 1);
-        App.saveKey('revenue_rate_cards').then(() => this.render(container, actions));
-      };
-      document.getElementById('rrc-del-cancel').onclick = () => { modal.style.display = 'none'; };
-    }, { once: true });
+      + '</div>';
 
     document.getElementById('rrc-add')?.addEventListener('click', async () => {
       const name = document.getElementById('rrc-name')?.value.trim();
@@ -155,7 +140,15 @@ S.RevenueEvents = {
     });
   },
 
-
+  _delRC(i, btn) {
+    if (!confirm('Delete this package?')) return;
+    App.data.revenue_rate_cards.splice(i, 1);
+    App.saveKey('revenue_rate_cards').then(() => {
+      const c = document.getElementById('content-area');
+      const a = document.getElementById('topbar-actions');
+      S.RevenueEvents.render(c, a);
+    });
+  },
 
   renderCateringCalc(container, actions) {
     container.innerHTML = '<div class="screen"><div class="card">'
@@ -164,9 +157,9 @@ S.RevenueEvents = {
       + '<div class="f w-md"><label>Guest Count</label><input type="number" id="rcc-guests" placeholder="50"/></div>'
       + '<div class="f w-md"><label>Food Cost Per Head</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-food" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f w-md"><label>Bar Cost Per Head</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-bar" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f w-md"><label>Staff Hours</label><input type="number" id="rcc-hrs" placeholder=""/></div>'
+      + '<div class="f w-md"><label>Staff Hours</label><input type="number" id="rcc-hrs" placeholder="0"/></div>'
       + '<div class="f w-md"><label>Avg Staff Wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-wage" value="' + (App.data.revenue_settings?.avg_hourly_wage?.floor || 13) + '"/></div></div>'
-      + '<div class="f w-md"><label>Other Costs</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-other" placeholder=""/></div></div>'
+      + '<div class="f w-md"><label>Other Costs</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-other" placeholder="0"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:16px;">'
       + '<div class="f w-md"><label>Target Food Cost %</label><div class="fw"><input class="suf" type="number" id="rcc-tgt" value="28" step="1"/><span class="suf">%</span></div></div>'
@@ -214,10 +207,10 @@ S.RevenueEvents = {
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:14px;">'
       + '<div class="f w-md"><label>Date</label><input type="date" id="rev-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>'
-      + '<div class="f w-md"><label>Covers ' + tt('r-event-covers') + '</label><input type="number" id="rev-cov" placeholder=""/></div>'
-      + '<div class="f w-md"><label>F&B Minimum ' + tt('r-fb-minimum') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rev-fbmin" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>Actual Revenue ' + tt('r-event-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rev-actual" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>Estimated Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rev-est" placeholder=""/></div></div>'
+      + '<div class="f w-md"><label>Covers ' + tt('r-event-covers') + '</label><input type="number" id="rev-cov" placeholder="0"/></div>'
+      + '<div class="f w-md"><label>F&B Minimum ' + tt('r-fb-minimum') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rev-fbmin" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Actual Revenue ' + tt('r-event-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rev-actual" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Estimated Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rev-est" placeholder="0"/></div></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:16px;"><label>Notes</label><input type="text" id="rev-notes" placeholder="Optional"/></div>'
       + '<div style="display:flex;gap:10px;">'
