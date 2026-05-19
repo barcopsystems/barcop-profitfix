@@ -137,8 +137,8 @@ S.Dashboard = {
         + '</div>'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Annual Revenue Estimates</div>'
         + '<div class="form-row" style="gap:14px 20px;margin-bottom:18px;">'
-        + '<div class="f" style="width:180px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-brev" value="' + (App.data.settings.annual_bar_revenue || '') + '" placeholder="0"/></div></div>'
-        + '<div class="f" style="width:180px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-frev" value="' + (App.data.settings.annual_food_revenue || '') + '" placeholder="0"/></div></div>'
+        + '<div class="f" style="width:180px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-brev" value="' + (App.data.settings.annual_bar_revenue || '') + '" placeholder=""/></div></div>'
+        + '<div class="f" style="width:180px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-frev" value="' + (App.data.settings.annual_food_revenue || '') + '" placeholder=""/></div></div>'
         + '</div>'
         + '<button class="btn btn-primary" id="sh-save">Save and Continue</button>'
         + '</div>';
