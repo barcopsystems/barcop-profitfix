@@ -252,10 +252,12 @@ const App = {
   boot() {
     document.getElementById('auth-screen').style.display = 'none';
     this.updatePeriod();
-    // Sidebar toggle
-    document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
+    // Sidebar toggle — assign (not addEventListener) so repeated boot() calls
+    // don't stack handlers and cancel each other out
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
-    });
+    };
     if (!this.data.settings.onboarding_complete) {
       Onboarding.start();
     } else {
