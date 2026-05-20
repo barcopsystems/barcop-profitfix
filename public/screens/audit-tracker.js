@@ -312,11 +312,7 @@ S.AuditTracker = {
     backBtn.style.marginRight = '8px';
     backBtn.onclick = () => this.renderMain();
     this.actions.appendChild(backBtn);
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print / Save PDF';
-    printBtn.onclick = () => window.print();
-    this.actions.appendChild(printBtn);
+
 
     const d = audit.raw || audit;
     const scoreColor = (audit.overall_score||0) >= 80 ? '#C9A84C' : (audit.overall_score||0) >= 60 ? '#fff' : '#c0392b';
