@@ -519,6 +519,10 @@ S.TrafficAudit = {
   _intakeStep: 1,
   _intakeDraft: null,
 
+  // ── Stepped intake wizard ─────────────────────────────────────────────────
+  _intakeStep: 1,
+  _intakeDraft: null,
+
   showIntakeForm() {
     this._intakeStep = 1;
     this._intakeDraft = {};
@@ -539,7 +543,7 @@ S.TrafficAudit = {
   renderIntakeStep() {
     const s    = App.data.settings;
     const step = this._intakeStep;
-    const total = 4;
+    const total = 6;
     document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
 
     const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Traffic Audit</div>';
@@ -550,49 +554,60 @@ S.TrafficAudit = {
       + '</div>';
 
     const nav = (showPrev, showNext, isSubmit) =>
-      '<div class="card-actions">'
+      '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
       + (showPrev ? '<button class="btn btn-ghost" id="ta-iz-prev">&#8592; Back</button>' : '')
-      + (isSubmit ? '<button class="btn btn-primary" id="ta-iz-submit">Generate Audit</button>' : '')
       + (showNext ? '<button class="btn btn-primary" id="ta-iz-next">Next &#8594;</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="ta-iz-submit">Generate Audit</button>' : '')
+      + '<div style="flex:1;"></div>'
       + '<button class="btn btn-ghost" id="ta-iz-cancel">Cancel</button>'
-      + '<div id="ta-iz-status" style="font-size:12px;color:var(--t2);display:none;flex:1;margin-left:8px;"></div>'
+      + '<div id="ta-iz-status" style="font-size:12px;color:var(--t2);display:none;margin-left:8px;"></div>'
       + '</div>';
 
     let stepHtml = '';
     if (step === 1) {
       stepHtml = '<div class="card">' + header + barInfo
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile and Website</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile and website analytics. The GBP profile screenshot or Google review screenshot is required. Submit whatever you have. Your app data is included automatically.</div>'
-        + this.renderFileSection('required', 'GBP Screenshot — Full Profile View',     'ta-f-gbp-profile',  'ta-gbp-profile',    'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
-        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',      'ta-f-gbp-insights', 'ta-gbp-insights',   'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
-        + this.renderFileSection('highlight','Website Analytics Export or Screenshot', 'ta-f-analytics',    'ta-analytics',      'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
-        + this.renderFileSection('optional', 'Website Screenshot — Homepage on Mobile','ta-f-mobile-site',  'ta-mobile-site',    'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile. The full profile view is required. GBP Insights unlocks Tier 3 scoring. Your app data is included automatically.</div>'
+        + this.renderFileSection('required', 'GBP Screenshot — Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
+        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
         + nav(false, true, false) + '</div>';
     } else if (step === 2) {
       stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Reviews and Search</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Google review screenshot unlocks the full reviews section. Yelp and search screenshots are optional but add cross-platform scoring.</div>'
-        + this.renderFileSection('required', 'Google Review Page Screenshot',          'ta-f-google-reviews','ta-google-reviews', 'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
-        + this.renderFileSection('optional', 'Yelp Listing Screenshot',                'ta-f-yelp',          'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
-        + this.renderFileSection('optional', 'Search Results Screenshots',             'ta-f-search',        'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Website Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Website analytics is the highest-value file in this section. Mobile screenshot adds conversion assessment.</div>'
+        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
+        + this.renderFileSection('optional',  'Website Screenshot — Homepage on Mobile','ta-f-mobile-site', 'ta-mobile-site', 'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Social Media and Delivery</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot unlocks the full social section. Delivery platform screenshots unlock Section 6 scoring.</div>'
-        + this.renderFileSection('required', 'Instagram Profile Screenshot',           'ta-f-instagram',     'ta-instagram',      'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
-        + this.renderFileSection('optional', 'Facebook Page Screenshot',               'ta-f-facebook',      'ta-facebook',       'Unlocks: Cross-platform social presence analysis')
-        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',         'ta-f-ig-analytics',  'ta-ig-analytics',   'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
-        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',      'ta-delivery',       'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Reviews and Search Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Google review screenshot unlocks the full reviews section. Yelp and search screenshots add cross-platform scoring.</div>'
+        + this.renderFileSection('required', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
+        + this.renderFileSection('optional', 'Yelp Listing Screenshot',       'ta-f-yelp',           'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
+        + this.renderFileSection('optional', 'Search Results Screenshots',    'ta-f-search',         'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
         + nav(true, true, false) + '</div>';
     } else if (step === 4) {
       stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Email, Loyalty and Submit</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Email platform screenshots unlock Section 7 scoring. Add any notes about recent changes, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
-        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',         'ta-email',          'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
-        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics','Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
-        + '<div style="margin-top:16px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-        + '<textarea id="ta-iz-notes" rows="3" placeholder="Recent website redesign, ownership change, seasonal operation, reduced social posting due to staffing, new delivery platform just launched. Anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea></div>'
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Social Media Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot unlocks the full social section. Analytics unlock Tier 3 engagement scoring.</div>'
+        + this.renderFileSection('required', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
+        + this.renderFileSection('optional', 'Facebook Page Screenshot',        'ta-f-facebook',     'ta-facebook',     'Unlocks: Cross-platform social presence analysis')
+        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',  'ta-f-ig-analytics', 'ta-ig-analytics', 'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 5) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Delivery, Email and Guest Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Each file unlocks additional section scoring for delivery platforms and email and loyalty programs.</div>'
+        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',       'ta-delivery',       'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
+        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',          'ta-email',          'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
+        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics', 'Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 6) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
+        + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+        + '<textarea id="ta-iz-notes" rows="4" placeholder="Recent changes, seasonal factors, staffing changes, anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
         + nav(true, false, true) + '</div>';
     }
 
@@ -609,18 +624,10 @@ S.TrafficAudit = {
     });
     document.getElementById('ta-iz-next')?.addEventListener('click', () => {
       if (step === 1) {
-        const gbp  = document.getElementById('ta-f-gbp-profile')?.files;
-        const rev  = document.getElementById('ta-f-google-reviews')?.files;
-        // GBP check deferred — they may upload reviews on step 2 instead
-      }
-      if (step === 2) {
-        const gbp      = document.getElementById('ta-f-gbp-profile')?.files;
-        const reviews  = document.getElementById('ta-f-google-reviews')?.files;
-        const hasGBP   = gbp && gbp.length > 0;
-        const hasReviews = reviews && reviews.length > 0;
-        if (!hasGBP && !hasReviews) {
+        const gbpFiles = document.getElementById('ta-f-gbp-profile')?.files;
+        if (!gbpFiles || gbpFiles.length === 0) {
           const st = document.getElementById('ta-iz-status');
-          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Attach the GBP Profile Screenshot (Step 1) or Google Review Screenshot to continue.'; }
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='GBP Profile Screenshot is required to continue.'; }
           return;
         }
       }
