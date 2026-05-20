@@ -95,28 +95,6 @@ S.RevenueAudit = {
         + '</div>';
     }
 
-    let historyCard = '';
-    if (audits.length > 1) {
-      const rows = audits.map((a,i) => {
-        const p    = audits[i+1];
-        const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
-        return '<tr>'
-          + '<td>' + (a.date||'').slice(0,10) + '</td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + ((a.overall_score||0)>=70?'var(--gold)':(a.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (a.overall_score||0) + '</td>'
-          + (diff != null ? '<td style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</td>' : '<td></td>')
-          + '<td style="color:var(--t3);font-size:11px;">' + esc(a.grade||a.audit_id||'') + '</td>'
-          + '<td><button class="btn btn-ghost btn-sm ra-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
-          + '</tr>';
-      }).join('');
-      historyCard = '<div class="card">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
-        + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Grade</th><th></th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>'
-        + '</div>';
-    }
 
     const emptyState = !latest
       ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
