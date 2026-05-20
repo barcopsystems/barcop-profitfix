@@ -558,9 +558,9 @@ S.TrafficAudit = {
       + (showPrev ? '<button class="btn btn-ghost" id="ta-iz-prev">&#8592; Back</button>' : '')
       + (showNext ? '<button class="btn btn-primary" id="ta-iz-next">Next &#8594;</button>' : '')
       + (isSubmit ? '<button class="btn btn-primary" id="ta-iz-submit">Generate Audit</button>' : '')
+      + '<div id="ta-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
       + '<div style="flex:1;"></div>'
       + '<button class="btn btn-ghost" id="ta-iz-cancel">Cancel</button>'
-      + '<div id="ta-iz-status" style="font-size:12px;color:var(--t2);display:none;margin-left:8px;"></div>'
       + '</div>';
 
     let stepHtml = '';
@@ -582,7 +582,7 @@ S.TrafficAudit = {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Reviews and Search Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Google review screenshot unlocks the full reviews section. Yelp and search screenshots add cross-platform scoring.</div>'
-        + this.renderFileSection('required', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
+        + this.renderFileSection('optional', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Unlocks: Required for Section 3 full scoring — confirmed rating, review count, response rate, recency analysis')
         + this.renderFileSection('optional', 'Yelp Listing Screenshot',       'ta-f-yelp',           'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
         + this.renderFileSection('optional', 'Search Results Screenshots',    'ta-f-search',         'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
         + nav(true, true, false) + '</div>';
@@ -590,7 +590,7 @@ S.TrafficAudit = {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Social Media Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot unlocks the full social section. Analytics unlock Tier 3 engagement scoring.</div>'
-        + this.renderFileSection('required', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
+        + this.renderFileSection('optional', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Unlocks: Required for Section 5 full scoring — follower count, post frequency, engagement estimate, content audit')
         + this.renderFileSection('optional', 'Facebook Page Screenshot',        'ta-f-facebook',     'ta-facebook',     'Unlocks: Cross-platform social presence analysis')
         + this.renderFileSection('optional', 'Instagram Analytics Screenshot',  'ta-f-ig-analytics', 'ta-ig-analytics', 'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
         + nav(true, true, false) + '</div>';
@@ -628,6 +628,14 @@ S.TrafficAudit = {
         if (!gbpFiles || gbpFiles.length === 0) {
           const st = document.getElementById('ta-iz-status');
           if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='GBP Profile Screenshot is required to continue.'; }
+          return;
+        }
+      }
+      if (step === 3) {
+        const reviewFiles = document.getElementById('ta-f-google-reviews')?.files;
+        if (!reviewFiles || reviewFiles.length === 0) {
+          const st = document.getElementById('ta-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Google Review Page Screenshot is required to continue.'; }
           return;
         }
       }
