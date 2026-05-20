@@ -599,12 +599,13 @@ S.AuditTracker = {
       + '</div>';
 
     const nav = (showPrev, showNext, isSubmit) =>
-      '<div class="card-actions">'
+      '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
       + (showPrev ? '<button class="btn btn-ghost" id="at-iz-prev">&#8592; Back</button>' : '')
-      + (isSubmit ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>' : '')
       + (showNext ? '<button class="btn btn-primary" id="at-iz-next">Next &#8594;</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>' : '')
+      + '<div style="flex:1;"></div>'
       + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button>'
-      + '<div id="at-iz-status" style="font-size:12px;color:var(--t2);display:none;flex:1;margin-left:8px;"></div>'
+      + '<div id="at-iz-status" style="font-size:12px;color:var(--t2);display:none;margin-left:8px;"></div>'
       + '</div>';
 
     let stepHtml = '';
@@ -650,7 +651,7 @@ S.AuditTracker = {
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
         + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-        + '<textarea id="at-iz-notes" rows="4" placeholder="Recent ownership change, POS migration, seasonal operation, renovation period, staffing changes. Anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
+        + '<textarea id="at-iz-notes" rows="4" placeholder="Recent changes, seasonal factors, staffing changes, anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
         + nav(true, false, true) + '</div>';
     }
 
@@ -702,6 +703,23 @@ S.AuditTracker = {
     if (document.getElementById('at-iz-notes'))    this._intakeDraft.notes   = document.getElementById('at-iz-notes').value;
   },
 
+
+  renderFileSection(type, title, inputId, ttId, unlocks) {
+    const badge = type === 'required'
+      ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
+      : type === 'highlight'
+      ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
+      : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
+    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
+      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
+      + (ttId ? tt(ttId) : '')
+      + '</div>'
+      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:8px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:8px;"></div>')
+      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
+      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
+      + '</div>';
+  },
 
   async generateAudit() {
     // Show generating state in the current container
