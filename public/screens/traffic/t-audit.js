@@ -515,63 +515,129 @@ S.TrafficAudit = {
     return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
 
+  // ── Stepped intake wizard ─────────────────────────────────────────────────
+  _intakeStep: 1,
+  _intakeDraft: null,
+
   showIntakeForm() {
-    const s = App.data.settings;
-    const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:3000;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;';
-    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;width:100%;max-width:680px;padding:32px;position:relative;">'
-      + '<button id="ta-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Traffic Audit</div>'
-      + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload screenshots and reports from your Google Business Profile, website analytics, social media pages, and delivery platforms. Submit whatever you have. Partial submissions generate real scores with real action items. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
-      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
-      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
-      + (s.city_state ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(s.city_state) + '</div>' : '')
-      + '</div>'
+    this._intakeStep = 1;
+    this._intakeDraft = {};
+    this.actions.innerHTML = '';
+    this.renderIntakeStep();
+  },
 
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Google Business Profile</div>'
-      + this.renderFileSection('required', 'GBP Screenshot — Full Profile View',    'ta-f-gbp-profile',   'ta-gbp-profile',    'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
-      + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',     'ta-f-gbp-insights',  'ta-gbp-insights',   'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
+  intakeStepsHtml(total) {
+    let h = '<div class="steps">';
+    for (let i = 1; i <= total; i++) {
+      const cls = i < this._intakeStep ? 'done' : i === this._intakeStep ? 'active' : '';
+      h += (i > 1 ? '<div class="step-line' + (i-1 < this._intakeStep ? ' done' : '') + '"></div>' : '')
+        + '<div class="step-dot ' + cls + '">' + (i < this._intakeStep ? '&#10003;' : i) + '</div>';
+    }
+    return h + '</div>';
+  },
 
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Website Data</div>'
-      + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot','ta-f-analytics',    'ta-analytics',      'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
-      + this.renderFileSection('optional', 'Website Screenshot — Homepage on Mobile','ta-f-mobile-site',  'ta-mobile-site',    'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+  renderIntakeStep() {
+    const s    = App.data.settings;
+    const step = this._intakeStep;
+    const total = 4;
+    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
 
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Review Platform Data</div>'
-      + this.renderFileSection('required', 'Google Review Page Screenshot',         'ta-f-google-reviews','ta-google-reviews',  'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
-      + this.renderFileSection('optional', 'Yelp Listing Screenshot',               'ta-f-yelp',          'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Search Visibility</div>'
-      + this.renderFileSection('optional', 'Search Results Screenshots',            'ta-f-search',        'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Social Media</div>'
-      + this.renderFileSection('required', 'Instagram Profile Screenshot',          'ta-f-instagram',     'ta-instagram',      'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
-      + this.renderFileSection('optional', 'Facebook Page Screenshot',              'ta-f-facebook',      'ta-facebook',       'Unlocks: Cross-platform social presence analysis')
-      + this.renderFileSection('optional', 'Instagram Analytics Screenshot',        'ta-f-ig-analytics',  'ta-ig-analytics',   'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Delivery Platforms</div>'
-      + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot','ta-f-delivery',      'ta-delivery',       'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Email and Loyalty</div>'
-      + this.renderFileSection('optional', 'Email Platform Screenshot',             'ta-f-email',         'ta-email',          'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
-      + this.renderFileSection('optional', 'Email Analytics Export',                'ta-f-email-analytics','ta-email-analytics','Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
-
-      + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-      + '<textarea id="ta-notes" rows="3" placeholder="Recent website redesign, ownership change, seasonal operation, reduced social posting due to staffing, new delivery platform just launched. Anything that might affect how the numbers look." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
-      + '<div style="display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="ta-gen-btn">Generate Audit</button>'
-      + '<button class="btn btn-ghost" id="ta-intake-cancel">Cancel</button>'
-      + '<div id="ta-gen-status" style="font-size:12px;color:var(--t2);display:none;flex:1;"></div>'
-      + '</div>'
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Traffic Audit</div>';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
       + '</div>';
 
-    document.body.appendChild(modal);
-    modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
-    document.getElementById('ta-intake-close').onclick  = () => modal.remove();
-    document.getElementById('ta-intake-cancel').onclick = () => modal.remove();
-    document.getElementById('ta-gen-btn').onclick = () => this.generateAudit(modal);
+    const nav = (showPrev, showNext, isSubmit) =>
+      '<div class="card-actions">'
+      + (showPrev ? '<button class="btn btn-ghost" id="ta-iz-prev">&#8592; Back</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="ta-iz-submit">Generate Audit</button>' : '')
+      + (showNext ? '<button class="btn btn-primary" id="ta-iz-next">Next &#8594;</button>' : '')
+      + '<button class="btn btn-ghost" id="ta-iz-cancel">Cancel</button>'
+      + '<div id="ta-iz-status" style="font-size:12px;color:var(--t2);display:none;flex:1;margin-left:8px;"></div>'
+      + '</div>';
+
+    let stepHtml = '';
+    if (step === 1) {
+      stepHtml = '<div class="card">' + header + barInfo
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile and Website</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile and website analytics. The GBP profile screenshot or Google review screenshot is required. Submit whatever you have. Your app data is included automatically.</div>'
+        + this.renderFileSection('required', 'GBP Screenshot — Full Profile View',     'ta-f-gbp-profile',  'ta-gbp-profile',    'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
+        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',      'ta-f-gbp-insights', 'ta-gbp-insights',   'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
+        + this.renderFileSection('highlight','Website Analytics Export or Screenshot', 'ta-f-analytics',    'ta-analytics',      'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
+        + this.renderFileSection('optional', 'Website Screenshot — Homepage on Mobile','ta-f-mobile-site',  'ta-mobile-site',    'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+        + nav(false, true, false) + '</div>';
+    } else if (step === 2) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Reviews and Search</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Google review screenshot unlocks the full reviews section. Yelp and search screenshots are optional but add cross-platform scoring.</div>'
+        + this.renderFileSection('required', 'Google Review Page Screenshot',          'ta-f-google-reviews','ta-google-reviews', 'Unlocks: Section 3 full — confirmed rating, review count, response rate, recency analysis')
+        + this.renderFileSection('optional', 'Yelp Listing Screenshot',                'ta-f-yelp',          'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
+        + this.renderFileSection('optional', 'Search Results Screenshots',             'ta-f-search',        'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 3) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Social Media and Delivery</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot unlocks the full social section. Delivery platform screenshots unlock Section 6 scoring.</div>'
+        + this.renderFileSection('required', 'Instagram Profile Screenshot',           'ta-f-instagram',     'ta-instagram',      'Unlocks: Section 5 full — follower count, post frequency, engagement estimate, content audit')
+        + this.renderFileSection('optional', 'Facebook Page Screenshot',               'ta-f-facebook',      'ta-facebook',       'Unlocks: Cross-platform social presence analysis')
+        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',         'ta-f-ig-analytics',  'ta-ig-analytics',   'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
+        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',      'ta-delivery',       'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 4) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Email, Loyalty and Submit</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Email platform screenshots unlock Section 7 scoring. Add any notes about recent changes, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
+        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',         'ta-email',          'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
+        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics','Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
+        + '<div style="margin-top:16px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+        + '<textarea id="ta-iz-notes" rows="3" placeholder="Recent website redesign, ownership change, seasonal operation, reduced social posting due to staffing, new delivery platform just launched. Anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea></div>'
+        + nav(true, false, true) + '</div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + stepHtml + '</div>';
+
+    document.getElementById('ta-iz-cancel')?.addEventListener('click', () => {
+      document.getElementById('topbar-sub').textContent = '';
+      this.renderMain();
+    });
+    document.getElementById('ta-iz-prev')?.addEventListener('click', () => {
+      this._saveIntakeStep();
+      this._intakeStep--;
+      this.renderIntakeStep();
+    });
+    document.getElementById('ta-iz-next')?.addEventListener('click', () => {
+      if (step === 1) {
+        const gbp  = document.getElementById('ta-f-gbp-profile')?.files;
+        const rev  = document.getElementById('ta-f-google-reviews')?.files;
+        // GBP check deferred — they may upload reviews on step 2 instead
+      }
+      if (step === 2) {
+        const gbp      = document.getElementById('ta-f-gbp-profile')?.files;
+        const reviews  = document.getElementById('ta-f-google-reviews')?.files;
+        const hasGBP   = gbp && gbp.length > 0;
+        const hasReviews = reviews && reviews.length > 0;
+        if (!hasGBP && !hasReviews) {
+          const st = document.getElementById('ta-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Attach the GBP Profile Screenshot (Step 1) or Google Review Screenshot to continue.'; }
+          return;
+        }
+      }
+      this._saveIntakeStep();
+      this._intakeStep++;
+      this.renderIntakeStep();
+    });
+    document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
+      this._intakeDraft.notes = document.getElementById('ta-iz-notes')?.value || '';
+      this.generateAudit();
+    });
   },
+
+  _saveIntakeStep() {
+    if (document.getElementById('ta-iz-notes')) this._intakeDraft.notes = document.getElementById('ta-iz-notes').value;
+  },
+
 
   renderFileSection(type, title, inputId, ttId, unlocks) {
     const badge = type === 'required'
@@ -590,25 +656,17 @@ S.TrafficAudit = {
       + '</div>';
   },
 
-  async generateAudit(modal) {
-    const btn    = document.getElementById('ta-gen-btn');
-    const status = document.getElementById('ta-gen-status');
+  async generateAudit() {
+    const submitBtn = document.getElementById('ta-iz-submit');
+    const statusEl  = document.getElementById('ta-iz-status');
     const setStatus = (msg, color='var(--t2)') => {
-      if (status) { status.style.display='block'; status.style.color=color; status.textContent=msg; }
+      if (statusEl) { statusEl.style.display='block'; statusEl.style.color=color; statusEl.textContent=msg; }
     };
-
-    const gbpFiles    = document.getElementById('ta-f-gbp-profile')?.files;
-    const reviewFiles = document.getElementById('ta-f-google-reviews')?.files;
-    if ((!gbpFiles || gbpFiles.length === 0) && (!reviewFiles || reviewFiles.length === 0)) {
-      setStatus('At least one Required file is needed. Attach the GBP Profile Screenshot or the Google Review Screenshot to continue.', 'var(--red)');
-      return;
-    }
-
-    if (btn) { btn.disabled=true; btn.textContent='Analyzing...'; }
-    setStatus('Reading your files and app data...', 'var(--t2)');
+    if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
     const form = new FormData();
     form.append('appData', JSON.stringify(App.data));
+    form.append('notes', this._intakeDraft?.notes || '');
 
     const fileInputIds = [
       'ta-f-gbp-profile','ta-f-gbp-insights','ta-f-analytics','ta-f-mobile-site',
@@ -620,9 +678,6 @@ S.TrafficAudit = {
       const inp = document.getElementById(id);
       if (inp?.files) { for (const f of inp.files) form.append('file', f); }
     });
-
-    const notes = document.getElementById('ta-notes')?.value || '';
-    if (notes) form.append('notes', notes);
 
     setStatus('Uploading files and generating audit...', 'var(--t2)');
 
@@ -657,19 +712,18 @@ S.TrafficAudit = {
 
       App.data.traffic_audits = App.data.traffic_audits || [];
       App.data.traffic_audits.push(newAudit);
-      // Keep last 12 months (12 audits)
       if (App.data.traffic_audits.length > 12) {
         App.data.traffic_audits = App.data.traffic_audits.slice(-12);
       }
       await App.saveKey('traffic_audits');
 
-      if (modal) modal.remove();
+      document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
-      // Auto-open the new audit
       setTimeout(() => this.viewAudit(0), 100);
     } catch(e) {
       setStatus('Error: ' + (e.message || 'Audit generation failed. Try again.'), 'var(--red)');
-      if (btn) { btn.disabled=false; btn.textContent='Generate Audit'; }
+      if (submitBtn) { submitBtn.disabled=false; submitBtn.textContent='Generate Audit'; }
     }
   }
+
 };
