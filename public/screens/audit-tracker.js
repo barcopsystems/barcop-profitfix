@@ -603,9 +603,9 @@ S.AuditTracker = {
       + (showPrev ? '<button class="btn btn-ghost" id="at-iz-prev">&#8592; Back</button>' : '')
       + (showNext ? '<button class="btn btn-primary" id="at-iz-next">Next &#8594;</button>' : '')
       + (isSubmit ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>' : '')
+      + '<div id="at-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
       + '<div style="flex:1;"></div>'
       + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button>'
-      + '<div id="at-iz-status" style="font-size:12px;color:var(--t2);display:none;margin-left:8px;"></div>'
       + '</div>';
 
     let stepHtml = '';
@@ -644,7 +644,7 @@ S.AuditTracker = {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Payroll or time clock data is required to calculate verified prime cost and RPLH.</div>'
-        + this.renderFileSection('required', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Unlocks: Verified prime cost, labor by department, RPLH calculation')
+        + this.renderFileSection('optional', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Unlocks: Required for prime cost calculation, labor by department, RPLH calculation')
         + nav(true, true, false) + '</div>';
     } else if (step === 5) {
       stepHtml = '<div class="card">' + header
