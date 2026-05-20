@@ -4,8 +4,7 @@ const path     = require('path');
 const https    = require('https');
 const http     = require('http');
 const fs       = require('fs');
-const os       = require('os');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
@@ -30,21 +29,6 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
-
-// ── Ensure logo exists ────────────────────────────────────────────────────────
-const LOGO_PATH = path.join(__dirname, 'audits', 'logo.png');
-function ensureLogo() {
-  if (fs.existsSync(LOGO_PATH)) return Promise.resolve();
-  return new Promise((resolve) => {
-    const url = 'https://cdn.shopify.com/s/files/1/1507/5436/files/AUDIT_LOGO_KEEP.png?v=1779028817';
-    const file = fs.createWriteStream(LOGO_PATH);
-    https.get(url, res => {
-      res.pipe(file);
-      file.on('finish', () => { file.close(); resolve(); });
-    }).on('error', () => { fs.unlink(LOGO_PATH, () => {}); resolve(); });
-  });
-}
-ensureLogo();
 
 // ── Claude API proxy ──────────────────────────────────────────────────────────
 app.post('/api/claude', (req, res) => {
@@ -176,55 +160,6 @@ app.post('/api/generate-revenue-audit', (req, res) => {
   });
 });
 
-// POST /api/generate-audit
-// Accepts multipart form: auditType, appData (JSON string), files...
-// Returns: { pdfBase64, auditData }
-app.post('/api/generate-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const auditType  = fields.auditType?.[0] || 'profit';
-    const appDataStr = fields.appData?.[0]   || '{}';
-    const notes      = fields.notes?.[0]     || '';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) {
-          uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-        }
-      }
-    }
-
-    try {
-      // Step 1: Extract data from uploaded files via Claude
-      const extractedData = await extractAuditData(apiKey, auditType, uploadedFiles, appData, notes);
-
-      // Step 2: Generate PDF
-      const pdfBuffer = await generateAuditPDF(auditType, extractedData);
-
-      // Step 3: Return PDF as base64
-      const pdfBase64 = pdfBuffer.toString('base64');
-      res.json({ ok: true, pdfBase64, auditData: extractedData });
-
-    } catch(e) {
-      console.error('Audit generation error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      // Clean up temp files
-      for (const f of uploadedFiles) {
-        fs.unlink(f.path, () => {});
-      }
-    }
-  });
-});
-
 // ── Parse spreadsheet/CSV file into readable text for Claude ──────────────────
 function parseSpreadsheetToText(filePath, fileName) {
   const ext = path.extname(fileName).toLowerCase();
@@ -326,56 +261,13 @@ async function extractAuditData(apiKey, auditType, files, appData, notes='') {
   }
 }
 
-// ── Generate PDF from data ─────────────────────────────────────────────────────
-async function generateAuditPDF(auditType, data) {
-  const scripts = {
-    profit:  path.join(__dirname, 'audits', 'build_pf_audit.py'),
-    revenue: path.join(__dirname, 'audits', 'build_rf_audit.py'),
-    traffic: path.join(__dirname, 'audits', 'build_tf_audit.py'),
-  };
-
-  const scriptPath = scripts[auditType];
-  if (!scriptPath || !fs.existsSync(scriptPath)) {
-    throw new Error(`Audit build script not found for type: ${auditType}`);
-  }
-
-  // Write data to temp JSON file
-  const tmpDir   = os.tmpdir();
-  const dataPath = path.join(tmpDir, `audit_data_${Date.now()}.json`);
-  const outPath  = path.join(tmpDir, `audit_${Date.now()}.pdf`);
-
-  fs.writeFileSync(dataPath, JSON.stringify(data));
-
-  return new Promise((resolve, reject) => {
-    const env = {
-      ...process.env,
-      AUDIT_DATA_JSON: dataPath,
-      AUDIT_OUT_PATH:  outPath,
-      AUDIT_LOGO_PATH: LOGO_PATH,
-    };
-
-    const py = spawn('python3', [scriptPath], { env });
-    let stderr = '';
-    py.stderr.on('data', d => { stderr += d.toString(); });
-    py.on('close', code => {
-      fs.unlink(dataPath, () => {});
-      if (code !== 0) {
-        reject(new Error('PDF generation failed: ' + stderr.slice(-500)));
-        return;
-      }
-      if (!fs.existsSync(outPath)) {
-        reject(new Error('PDF file not created'));
-        return;
-      }
-      const buf = fs.readFileSync(outPath);
-      fs.unlink(outPath, () => {});
-      resolve(buf);
-    });
-  });
-}
-
-// ── Claude HTTP helper ─────────────────────────────────────────────────────────
-function callClaude(apiKey, body) {
+// ── Claude HTTP helper — streaming to survive DO 60s timeout ──────────────────
+// Uses server-sent events streaming so the TCP connection stays active during
+// long Claude responses. Accumulates the full text before resolving.
+function callClaude(apiKey, bodyObj) {
+  // Accept either a string or object
+  const parsed = typeof bodyObj === 'string' ? JSON.parse(bodyObj) : bodyObj;
+  const streamBody = JSON.stringify({ ...parsed, stream: true });
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.anthropic.com',
@@ -385,19 +277,40 @@ function callClaude(apiKey, body) {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
         'anthropic-version': '2023-06-01',
-        'Content-Length':    Buffer.byteLength(body)
+        'Content-Length':    Buffer.byteLength(streamBody)
       }
     };
-    let raw = '';
+    let partial = '';
+    let fullText = '';
     const req = https.request(options, res => {
-      res.on('data', d => { raw += d; });
+      res.on('data', chunk => {
+        partial += chunk.toString();
+        const lines = partial.split('\n');
+        partial = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const evt = JSON.parse(data);
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+              fullText += evt.delta.text || '';
+            }
+          } catch(e) { /* skip malformed SSE lines */ }
+        }
+      });
       res.on('end', () => {
-        try { resolve(JSON.parse(raw)); }
-        catch(e) { reject(new Error('Claude response parse error')); }
+        if (fullText) {
+          resolve({ content: [{ type: 'text', text: fullText }] });
+        } else {
+          try { resolve(JSON.parse(partial)); }
+          catch(e) { reject(new Error('Claude response parse error: ' + partial.slice(0, 200))); }
+        }
       });
     });
     req.on('error', reject);
-    req.write(body);
+    req.setTimeout(180000, () => { req.destroy(new Error('Claude request timed out after 3 minutes')); });
+    req.write(streamBody);
     req.end();
   });
 }
