@@ -126,7 +126,6 @@ app.post('/api/generate-traffic-audit', (req, res) => {
   });
 });
 
-
 // ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-revenue-audit', (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -166,14 +165,14 @@ function parseSpreadsheetToText(filePath, fileName) {
   try {
     if (ext === '.csv') {
       const raw = fs.readFileSync(filePath, 'utf8');
-      const lines = raw.trim().split('\n').slice(0, 200); // cap at 200 rows
+      const lines = raw.trim().split('\n').slice(0, 200);
       return `FILE: ${fileName}\n${lines.join('\n')}`;
     }
     if (['.xlsx', '.xls'].includes(ext)) {
       if (!XLSX) return `FILE: ${fileName}\n[Excel parser not available — install xlsx package]`;
       const wb    = XLSX.readFile(filePath);
       const parts = [];
-      for (const sheetName of wb.SheetNames.slice(0, 5)) { // max 5 sheets
+      for (const sheetName of wb.SheetNames.slice(0, 5)) {
         const ws   = wb.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
         const lines = rows.trim().split('\n').slice(0, 200);
@@ -184,7 +183,6 @@ function parseSpreadsheetToText(filePath, fileName) {
       return parts.join('\n\n') || `FILE: ${fileName}\n[Empty spreadsheet]`;
     }
     if (ext === '.docx' || ext === '.doc') {
-      // Word docs — return filename only, Claude can't read binary Word
       return `FILE: ${fileName}\n[Word document submitted — operator should convert to PDF for best results]`;
     }
   } catch(e) {
@@ -203,7 +201,6 @@ async function extractAuditData(apiKey, auditType, files, appData, notes='') {
 
   const prompt = prompts[auditType] || prompts.profit;
 
-  // Build message content with all files
   const content = [];
   const spreadsheetTexts = [];
 
@@ -229,7 +226,6 @@ async function extractAuditData(apiKey, auditType, files, appData, notes='') {
     }
   }
 
-  // Add all spreadsheet/CSV data as a single text block before the prompt
   if (spreadsheetTexts.length > 0) {
     content.push({
       type: 'text',
@@ -238,7 +234,6 @@ async function extractAuditData(apiKey, auditType, files, appData, notes='') {
     });
   }
 
-  // Append operator notes to prompt if provided
   const fullPrompt = notes
     ? prompt + '\n\nOPERATOR NOTES (read carefully — these may affect how you interpret the data):\n' + notes
     : prompt;
@@ -262,10 +257,7 @@ async function extractAuditData(apiKey, auditType, files, appData, notes='') {
 }
 
 // ── Claude HTTP helper — streaming to survive DO 60s timeout ──────────────────
-// Uses server-sent events streaming so the TCP connection stays active during
-// long Claude responses. Accumulates the full text before resolving.
 function callClaude(apiKey, bodyObj) {
-  // Accept either a string or object
   const parsed = typeof bodyObj === 'string' ? JSON.parse(bodyObj) : bodyObj;
   const streamBody = JSON.stringify({ ...parsed, stream: true });
   return new Promise((resolve, reject) => {
@@ -327,7 +319,6 @@ function getExtractionPrompt_Profit(appData) {
   const kitchen  = appData.kitchen_products || [];
   const recipes  = appData.recipes || [];
 
-  // Calculate averages from app data
   const recentWeeks = weeks.slice(-4);
   const avgBarCost  = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.bar?.cost_pct||0),0)/recentWeeks.length : null;
   const avgFoodCost = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.food?.cost_pct||0),0)/recentWeeks.length : null;
@@ -375,12 +366,10 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "INDUSTRY_AVG": 63,
   "TARGET_SCORE": 65,
   "OVERALL_SCORE": 0,
-  
   "SECTIONS_WITH_DATA": 0,
   "SECTIONS_PARTIAL": 0,
   "SECTIONS_NA": 0,
   "SECTION_DATA": [],
-  
   "S1_TIER": 1,
   "S1_BAR_COST_PCT": 0,
   "S1_BAR_REV_MONTHLY": 0,
@@ -402,7 +391,6 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S1_PTS_VAR_FREQ": 0,
   "S1_PTS_VAR_SKU": 0,
   "S1_SCORE": 0,
-  
   "S2_TIER": 1,
   "S2_BEV_REV_MONTHLY": 0,
   "S2_VOIDS_AMT": 0,
@@ -429,7 +417,6 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S2_PTS_BOTTLE": 0,
   "S2_PTS_SPILLAGE": 0,
   "S2_SCORE": 0,
-  
   "S3_TIER": 1,
   "S3_FOOD_COST_PCT": 0,
   "S3_FOOD_REV_MONTHLY": 0,
@@ -451,7 +438,6 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S3_PTS_INV": 0,
   "S3_PTS_WASTE": 0,
   "S3_SCORE": 0,
-  
   "S4_TIER": 1,
   "S4_BEV_INVOICE_COUNT": 0,
   "S4_FOOD_INVOICE_COUNT": 0,
@@ -476,7 +462,6 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S4_PTS_BIDS": 0,
   "S4_PTS_PAYMENT": 0,
   "S4_SCORE": 0,
-  
   "S5_TIER": 1,
   "S5_BEV_REV_PERIOD": 0,
   "S5_FOOD_REV_PERIOD": 0,
@@ -508,7 +493,6 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S5_PTS_SCHEDULE": 0,
   "S5_PTS_RPLH": 0,
   "S5_SCORE": 0,
-  
   "S6_SIG1_SCORE": "MEDIUM",
   "S6_SIG1_LABEL": "Inventory Counting Frequency",
   "S6_SIG1_EVIDENCE": "Based on submitted data",
@@ -531,7 +515,7 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "S6_SIG4_TOOL": "Action step"
 }
 
-Fill every field with real values extracted from the documents or calculated from app data. Use industry benchmarks where data is missing. Make the narrative fields (EVIDENCE, GAP, TOOL) specific and actionable based on the actual data submitted.`;
+Fill every field with real values extracted from the documents or calculated from app data. Use industry benchmarks where data is missing. Make the narrative fields specific and actionable based on the actual data submitted.`;
 }
 
 function getExtractionPrompt_Revenue(appData) {
@@ -543,7 +527,6 @@ function getExtractionPrompt_Revenue(appData) {
   const menuItems   = appData.revenue_menu_items || [];
   const serverChecks = appData.revenue_server_checks || [];
 
-  // Calculate averages from app data
   const recentWeeks = weeks.slice(-4);
   const avgCheckAvg   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.check_avg||0),0)/recentWeeks.length : null;
   const avgLaborPct   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.labor_pct_blended||0),0)/recentWeeks.length : null;
@@ -552,7 +535,7 @@ function getExtractionPrompt_Revenue(appData) {
   const avgBarRev     = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.bar_revenue||0),0)/recentWeeks.length : null;
   const avgFloorRev   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.floor_revenue||0),0)/recentWeeks.length : null;
 
-  return `You are generating a Bar Cop Revenue Audit. Analyze all submitted documents AND the app data provided below. Extract the exact variables needed to generate a professional scored PDF audit report.
+  return `You are generating a Bar Cop Revenue Audit. Analyze all submitted documents AND the app data provided below. Extract the exact variables needed to generate a professional scored audit report.
 
 APP DATA (from customer's app usage):
 - Bar Name: ${settings.bar_name || 'Not provided'}
@@ -578,17 +561,7 @@ APP DATA (from customer's app usage):
 - Recent 4-week avg bar revenue: ${avgBarRev ? '$'+Math.round(avgBarRev) : 'Not available'}
 - Recent 4-week avg floor revenue: ${avgFloorRev ? '$'+Math.round(avgFloorRev) : 'Not available'}
 
-Analyze all uploaded documents (POS revenue reports, labor schedules, server sales reports, menu sales mix, event records) and extract ALL of the following variables. Use uploaded file data where available, use app data to fill gaps, use industry benchmarks for anything not determinable.
-
-SCORING GUIDE:
-- S1 Menu Engineering and Pricing: max 100 pts. 25pts beverage%, 20pts category mix, 20pts price review, 20pts high-margin items, 15pts item data quality.
-- S2 Labor Cost and Scheduling: max 100 pts. 25pts labor%, 20pts forecast-to-actual, 25pts RPLH, 15pts dept breakdown, 15pts timeclock.
-- S3 Check Average and Upselling: max 100 pts. 25pts check avg vs target, 25pts server spread, 15pts servers above avg, 20pts app attach, 15pts dessert attach.
-- S4 Events and Private Dining: N/A if no event data submitted.
-- S5 Server Performance Management: max 100 pts. 20pts report submitted, 25pts spread width, 15pts majority above avg, 20pts coaching process, 20pts pre-shift.
-- S6 Revenue Management Intelligence: scored 0-100 based on signals from all submitted data.
-
-Return ONLY a valid JSON object with ALL these exact keys — no markdown, no explanation, just the JSON:
+Analyze all uploaded documents and extract ALL variables. Return ONLY valid JSON — no markdown, no explanation:
 
 {
   "BAR_NAME": "${settings.bar_name || 'Customer Bar'}",
@@ -603,146 +576,62 @@ Return ONLY a valid JSON object with ALL these exact keys — no markdown, no ex
   "INDUSTRY_AVG": 61,
   "TARGET_SCORE": 65,
   "OVERALL_SCORE": 0,
-
   "SECTIONS_WITH_DATA": 0,
   "SECTIONS_PARTIAL": 0,
   "SECTIONS_NA": 0,
   "SECTION_DATA": [],
-
-  "S1_TIER": 1,
-  "S1_TOTAL_REV_PERIOD": 0,
-  "S1_BEV_REV_PERIOD": 0,
-  "S1_FOOD_REV_PERIOD": 0,
-  "S1_BEV_REV_PCT": 0,
-  "S1_FOOD_REV_PCT": 0,
-  "S1_BEV_TARGET_PCT": 60,
-  "S1_FOOD_TARGET_PCT": 40,
-  "S1_CHECK_AVG_BLENDED": ${avgCheckAvg || 0},
-  "S1_COVERS_PERIOD": 0,
+  "S1_TIER": 1, "S1_TOTAL_REV_PERIOD": 0, "S1_BEV_REV_PERIOD": 0, "S1_FOOD_REV_PERIOD": 0,
+  "S1_BEV_REV_PCT": 0, "S1_FOOD_REV_PCT": 0, "S1_BEV_TARGET_PCT": 60, "S1_FOOD_TARGET_PCT": 40,
+  "S1_CHECK_AVG_BLENDED": ${avgCheckAvg || 0}, "S1_COVERS_PERIOD": 0,
   "S1_COVERS_MONTHLY": ${avgCovers ? Math.round(avgCovers * 4.33) : 0},
-  "S1_ITEM_DATA_SUBMITTED": false,
-  "S1_PRICE_LIST_SUBMITTED": false,
-  "S1_CATEGORY_MIX_NOTE": "From submitted data",
-  "S1_REVENUE_CONCENTRATION": "From submitted data",
-  "S1_PTS_BEV_PCT": 0,
-  "S1_PTS_CATEGORY_MIX": 0,
-  "S1_PTS_PRICE_REVIEW": 0,
-  "S1_PTS_HIGH_MARGIN": 0,
-  "S1_PTS_ITEM_DATA": 0,
-  "S1_SCORE": 0,
-  "S1_MONTHLY_GAP": 0,
-  "S1_ANNUAL_GAP": 0,
-  "S1_BEV_OVER_TARGET": 0,
-  "S1_CHECK_AVG_TARGET": ${targets.check_avg || 42},
-  "S1_CHECK_AVG_GAP": 0,
-
-  "S2_TIER": 1,
-  "S2_TOTAL_REV_PERIOD": 0,
-  "S2_LABOR_PERIOD": 0,
-  "S2_LABOR_PCT": ${avgLaborPct || 0},
-  "S2_LABOR_TARGET_LOW": ${targets.bar_labor_pct || 28},
-  "S2_LABOR_TARGET_HIGH": ${targets.floor_labor_pct || 32},
-  "S2_LABOR_GAP_PTS": 0,
-  "S2_LABOR_GAP_MONTHLY": 0,
-  "S2_LABOR_SOURCE": "From submitted data",
-  "S2_AVG_HOURLY_WAGE": ${revSettings.avg_hourly_wage?.bar || 0},
-  "S2_HOURS_SCHEDULED": 0,
-  "S2_RPLH": ${avgRPLH || 0},
-  "S2_RPLH_TARGET": ${targets.rplh_dinner || 65},
-  "S2_RPLH_GAP": 0,
-  "S2_SCHEDULE_SUBMITTED": false,
-  "S2_DEPT_BREAKDOWN": false,
-  "S2_TIMECLOCK_SUBMITTED": false,
-  "S2_WEEKLY_VARIANCE_NOTE": "From submitted data",
-  "S2_MONTHLY_GAP": 0,
-  "S2_ANNUAL_GAP": 0,
-  "S2_PTS_LABOR_PCT": 0,
-  "S2_PTS_FORECAST": 0,
-  "S2_PTS_RPLH": 0,
-  "S2_PTS_DEPT": 0,
-  "S2_PTS_TIMECLOCK": 0,
-  "S2_SCORE": 0,
-
-  "S3_TIER": 1,
-  "S3_TOTAL_REV_PERIOD": 0,
-  "S3_COVERS_PERIOD": 0,
-  "S3_COVERS_MONTHLY": 0,
-  "S3_CHECK_AVG_BLENDED": ${avgCheckAvg || 0},
-  "S3_CHECK_AVG_TARGET": ${targets.check_avg || 42},
-  "S3_CHECK_AVG_GAP": 0,
-  "S3_NUM_SERVERS": ${servers.length || 0},
-  "S3_SERVER_LABELS": [],
-  "S3_SERVER_CHECK_AVGS": [],
-  "S3_SERVER_COVERS": [],
-  "S3_TOP_SERVER_LABEL": "Server A",
-  "S3_TOP_CHECK_AVG": 0,
-  "S3_BOTTOM_SERVER_LABEL": "Server Z",
-  "S3_BOTTOM_CHECK_AVG": 0,
-  "S3_HOUSE_AVG": ${avgCheckAvg || 0},
-  "S3_SPREAD": 0,
-  "S3_SPREAD_TARGET": 10,
-  "S3_SERVERS_ABOVE": 0,
-  "S3_SERVERS_AT_AVG": 0,
-  "S3_SERVERS_BELOW": 0,
-  "S3_APP_ATTACH_RATE": null,
-  "S3_DESSERT_ATTACH_RATE": null,
-  "S3_UPSELL_STANDARD_EXISTS": false,
-  "S3_MONTHLY_GAP": 0,
-  "S3_ANNUAL_GAP": 0,
-  "S3_PTS_CHECK_AVG": 0,
-  "S3_PTS_SPREAD": 0,
-  "S3_PTS_SERVERS_ABOVE": 0,
-  "S3_PTS_APP_ATTACH": 0,
-  "S3_PTS_DESSERT_ATTACH": 0,
-  "S3_SCORE": 0,
-
-  "S4_TIER": 0,
-  "S4_EVENT_COUNT_PERIOD": null,
-  "S4_AVG_EVENT_REVENUE": null,
-  "S4_TOTAL_EVENT_REVENUE": null,
-  "S4_EVENT_REV_PCT_OF_TOTAL": null,
-  "S4_MINIMUM_COMPLIANCE_RATE": null,
-  "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
-  "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10,
-  "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
-  "S4_ANNUAL_REV_ESTIMATE": ${(settings.annual_bar_revenue || 0) + (settings.annual_food_revenue || 0) || (avgBarRev && avgFloorRev ? Math.round((avgBarRev + avgFloorRev) * 52) : 0)},
-  "S4_EVENT_REV_POTENTIAL_LOW": 0,
-  "S4_EVENT_REV_POTENTIAL_HIGH": 0,
-  "S4_SCORE": null,
-
-  "S5_TIER": 1,
-  "S5_SERVER_REPORT_SUBMITTED": false,
-  "S5_NUM_SERVERS": ${servers.length || 0},
-  "S5_SERVER_LABELS": [],
-  "S5_SERVER_CHECK_AVGS": [],
-  "S5_SERVER_COVERS": [],
-  "S5_TOP_SERVER_LABEL": "Server A",
-  "S5_TOP_CHECK_AVG": 0,
-  "S5_BOTTOM_SERVER_LABEL": "Server Z",
-  "S5_BOTTOM_CHECK_AVG": 0,
-  "S5_HOUSE_AVG": ${avgCheckAvg || 0},
-  "S5_SPREAD": 0,
-  "S5_SPREAD_TARGET": 10,
-  "S5_SERVERS_ABOVE": 0,
-  "S5_SERVERS_AT_OR_NEAR": 0,
-  "S5_SERVERS_BELOW": 0,
-  "S5_COACHING_PROCESS_EVIDENT": false,
-  "S5_PRESHIFT_CONSISTENT": false,
-  "S5_DAYPART_DATA_SUBMITTED": false,
-  "S5_GAP_BOTTOM_TO_AVG": 0,
-  "S5_MONTHLY_GAP": 0,
-  "S5_ANNUAL_GAP": 0,
-  "S5_PTS_REPORT_SUBMITTED": 0,
-  "S5_PTS_SPREAD": 0,
-  "S5_PTS_MAJORITY_ABOVE": 0,
-  "S5_PTS_COACHING": 0,
-  "S5_PTS_PRESHIFT": 0,
-  "S5_SCORE": 0,
-
+  "S1_ITEM_DATA_SUBMITTED": false, "S1_PRICE_LIST_SUBMITTED": false,
+  "S1_CATEGORY_MIX_NOTE": "From submitted data", "S1_REVENUE_CONCENTRATION": "From submitted data",
+  "S1_PTS_BEV_PCT": 0, "S1_PTS_CATEGORY_MIX": 0, "S1_PTS_PRICE_REVIEW": 0,
+  "S1_PTS_HIGH_MARGIN": 0, "S1_PTS_ITEM_DATA": 0, "S1_SCORE": 0,
+  "S1_MONTHLY_GAP": 0, "S1_ANNUAL_GAP": 0, "S1_BEV_OVER_TARGET": 0,
+  "S1_CHECK_AVG_TARGET": ${targets.check_avg || 42}, "S1_CHECK_AVG_GAP": 0,
+  "S2_TIER": 1, "S2_TOTAL_REV_PERIOD": 0, "S2_LABOR_PERIOD": 0,
+  "S2_LABOR_PCT": ${avgLaborPct || 0}, "S2_LABOR_TARGET_LOW": ${targets.bar_labor_pct || 28},
+  "S2_LABOR_TARGET_HIGH": ${targets.floor_labor_pct || 32}, "S2_LABOR_GAP_PTS": 0,
+  "S2_LABOR_GAP_MONTHLY": 0, "S2_LABOR_SOURCE": "From submitted data",
+  "S2_AVG_HOURLY_WAGE": ${revSettings.avg_hourly_wage?.bar || 0}, "S2_HOURS_SCHEDULED": 0,
+  "S2_RPLH": ${avgRPLH || 0}, "S2_RPLH_TARGET": ${targets.rplh_dinner || 65},
+  "S2_RPLH_GAP": 0, "S2_SCHEDULE_SUBMITTED": false, "S2_DEPT_BREAKDOWN": false,
+  "S2_TIMECLOCK_SUBMITTED": false, "S2_WEEKLY_VARIANCE_NOTE": "From submitted data",
+  "S2_MONTHLY_GAP": 0, "S2_ANNUAL_GAP": 0,
+  "S2_PTS_LABOR_PCT": 0, "S2_PTS_FORECAST": 0, "S2_PTS_RPLH": 0,
+  "S2_PTS_DEPT": 0, "S2_PTS_TIMECLOCK": 0, "S2_SCORE": 0,
+  "S3_TIER": 1, "S3_TOTAL_REV_PERIOD": 0, "S3_COVERS_PERIOD": 0, "S3_COVERS_MONTHLY": 0,
+  "S3_CHECK_AVG_BLENDED": ${avgCheckAvg || 0}, "S3_CHECK_AVG_TARGET": ${targets.check_avg || 42},
+  "S3_CHECK_AVG_GAP": 0, "S3_NUM_SERVERS": ${servers.length || 0},
+  "S3_SERVER_LABELS": [], "S3_SERVER_CHECK_AVGS": [], "S3_SERVER_COVERS": [],
+  "S3_TOP_SERVER_LABEL": "Server A", "S3_TOP_CHECK_AVG": 0,
+  "S3_BOTTOM_SERVER_LABEL": "Server Z", "S3_BOTTOM_CHECK_AVG": 0,
+  "S3_HOUSE_AVG": ${avgCheckAvg || 0}, "S3_SPREAD": 0, "S3_SPREAD_TARGET": 10,
+  "S3_SERVERS_ABOVE": 0, "S3_SERVERS_AT_AVG": 0, "S3_SERVERS_BELOW": 0,
+  "S3_APP_ATTACH_RATE": null, "S3_DESSERT_ATTACH_RATE": null, "S3_UPSELL_STANDARD_EXISTS": false,
+  "S3_MONTHLY_GAP": 0, "S3_ANNUAL_GAP": 0,
+  "S3_PTS_CHECK_AVG": 0, "S3_PTS_SPREAD": 0, "S3_PTS_SERVERS_ABOVE": 0,
+  "S3_PTS_APP_ATTACH": 0, "S3_PTS_DESSERT_ATTACH": 0, "S3_SCORE": 0,
+  "S4_TIER": 0, "S4_EVENT_COUNT_PERIOD": null, "S4_AVG_EVENT_REVENUE": null,
+  "S4_TOTAL_EVENT_REVENUE": null, "S4_EVENT_REV_PCT_OF_TOTAL": null,
+  "S4_MINIMUM_COMPLIANCE_RATE": null, "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
+  "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10, "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
+  "S4_ANNUAL_REV_ESTIMATE": ${(settings.annual_bar_revenue || 0) + (settings.annual_food_revenue || 0)},
+  "S4_EVENT_REV_POTENTIAL_LOW": 0, "S4_EVENT_REV_POTENTIAL_HIGH": 0, "S4_SCORE": null,
+  "S5_TIER": 1, "S5_SERVER_REPORT_SUBMITTED": false, "S5_NUM_SERVERS": ${servers.length || 0},
+  "S5_SERVER_LABELS": [], "S5_SERVER_CHECK_AVGS": [], "S5_SERVER_COVERS": [],
+  "S5_TOP_SERVER_LABEL": "Server A", "S5_TOP_CHECK_AVG": 0,
+  "S5_BOTTOM_SERVER_LABEL": "Server Z", "S5_BOTTOM_CHECK_AVG": 0,
+  "S5_HOUSE_AVG": ${avgCheckAvg || 0}, "S5_SPREAD": 0, "S5_SPREAD_TARGET": 10,
+  "S5_SERVERS_ABOVE": 0, "S5_SERVERS_AT_OR_NEAR": 0, "S5_SERVERS_BELOW": 0,
+  "S5_COACHING_PROCESS_EVIDENT": false, "S5_PRESHIFT_CONSISTENT": false,
+  "S5_DAYPART_DATA_SUBMITTED": false, "S5_GAP_BOTTOM_TO_AVG": 0,
+  "S5_MONTHLY_GAP": 0, "S5_ANNUAL_GAP": 0,
+  "S5_PTS_REPORT_SUBMITTED": 0, "S5_PTS_SPREAD": 0, "S5_PTS_MAJORITY_ABOVE": 0,
+  "S5_PTS_COACHING": 0, "S5_PTS_PRESHIFT": 0, "S5_SCORE": 0,
   "S6_SCORE": 50
-}
-
-Fill every field with real values extracted from the documents or calculated from app data. Use industry benchmarks where data is missing. For S3 and S5 server arrays, extract actual server names and check averages from the Server Sales Report if submitted. Make all gap calculations specific dollar amounts based on actual covers and revenue data.`;
+}`;
 }
 
 function getExtractionPrompt_Traffic(appData) {
@@ -762,16 +651,16 @@ function getExtractionPrompt_Traffic(appData) {
 
   return `You are generating a Bar Cop Traffic Audit. Analyze all submitted screenshots, documents, and questionnaire answers to extract variables for a scored audit report.
 
-APP DATA (from customer's weekly tracking in the app):
+APP DATA:
 - Bar Name: ${settings.bar_name || 'Not provided'}
 - City/State: ${settings.city_state || 'Not provided'}
-- Google Rating Target: ${targets.google_rating || 4.3}★
+- Google Rating Target: ${targets.google_rating || 4.3}
 - Review Velocity Target: ${targets.review_velocity || 8}/month
 - Response Rate Target: ${targets.response_rate || 75}%
 - Monthly Sessions Target: ${targets.monthly_sessions || 2000}
 - Social Posts/Month Target: ${targets.social_posts_month || 12}
 - Weeks of tracking data: ${weeks.length}
-- Recent 4-week avg Google Rating: ${avgGR ? avgGR.toFixed(2)+'★' : 'Not tracked'}
+- Recent 4-week avg Google Rating: ${avgGR ? avgGR.toFixed(2) : 'Not tracked'}
 - Recent 4-week avg New Reviews/Mo: ${avgRV ? avgRV.toFixed(1) : 'Not tracked'}
 - Recent 4-week avg Response Rate: ${avgRR ? avgRR.toFixed(1)+'%' : 'Not tracked'}
 - Recent 4-week avg Monthly Sessions: ${avgSS ? Math.round(avgSS) : 'Not tracked'}
@@ -779,9 +668,7 @@ APP DATA (from customer's weekly tracking in the app):
 - Recent 4-week avg Instagram Followers: ${avgIGF ? Math.round(avgIGF) : 'Not tracked'}
 - Recent 4-week avg IG Posts/Month: ${avgIGP ? avgIGP.toFixed(1) : 'Not tracked'}
 
-Bar: ${settings.bar_name || 'Customer'}, ${settings.city_state || ''}
-
-Return ONLY valid JSON with these exact keys populated from submitted materials and app data:
+Return ONLY valid JSON with these exact keys:
 {
   "BAR_NAME": "${settings.bar_name || 'Customer Bar'}",
   "BAR_CITY_STATE": "${settings.city_state || ''}",
@@ -792,13 +679,8 @@ Return ONLY valid JSON with these exact keys populated from submitted materials 
   "DATA_TIER_LABEL": "Tier based on screenshots submitted",
   "WEEKLY_GAP_AMT": "Estimated weekly traffic gap value",
   "GAP_SOURCES": "Traffic gap sources",
-  "INDUSTRY_AVG": 58,
-  "TARGET_SCORE": 65,
-  "OVERALL_SCORE": 0,
-  "SECTIONS_WITH_DATA": 0,
-  "SECTIONS_PARTIAL": 0,
-  "SECTIONS_NA": 0,
-  "SECTION_DATA": [],
+  "INDUSTRY_AVG": 58, "TARGET_SCORE": 65, "OVERALL_SCORE": 0,
+  "SECTIONS_WITH_DATA": 0, "SECTIONS_PARTIAL": 0, "SECTIONS_NA": 0, "SECTION_DATA": [],
   "S1_TIER": 1, "S1_LISTING_CLAIMED": false, "S1_LISTING_VERIFIED": false,
   "S1_HOURS_COMPLETE": false, "S1_PHONE_PRESENT": false, "S1_WEBSITE_LINKED": false,
   "S1_MENU_LINK_ACTIVE": false, "S1_CATEGORY_SET": false, "S1_ATTRIBUTES_COMPLETE": false,
@@ -824,8 +706,7 @@ Return ONLY valid JSON with these exact keys populated from submitted materials 
   "S3_RECENCY_BENCHMARK": 7, "S3_NEGATIVE_PATTERN": "None identified",
   "S3_MONTHLY_GAP": 0, "S3_ANNUAL_GAP": 0,
   "S3_PTS_RATING": 0, "S3_PTS_COUNT": 0, "S3_PTS_RESPONSE": 0,
-  "S3_PTS_YELP": 0, "S3_PTS_RECENCY": 0, "S3_SCORE": 0,
-  "S3_UNANSWERED": 0,
+  "S3_PTS_YELP": 0, "S3_PTS_RECENCY": 0, "S3_SCORE": 0, "S3_UNANSWERED": 0,
   "S4_TIER": 1, "S4_MAPS_PACK_CONFIRMED": false, "S4_RANKING_REPORT_SUBMITTED": false,
   "S4_NAP_CONSISTENT": false, "S4_NAP_BUSINESS_NAME": "",
   "S4_NAP_ADDRESS": "Not verified", "S4_NAP_PHONE": "Not verified",
@@ -858,88 +739,22 @@ Return ONLY valid JSON with these exact keys populated from submitted materials 
 }`;
 }
 
-// ── Add module — upgrades Stripe subscription + updates Supabase ──────────────
-app.post('/api/add-module', async (req, res) => {
-  const { userId, module } = req.body;
-  if (!userId || !module) return res.status(400).json({ error: 'Missing userId or module' });
-
-  const PRICE_BY_SLOTS = {
-    1: 'price_1TY9KKGow04S066UBHLhPLNK',
-    2: 'price_1TY9KgGow04S066Urrd6TwGP',
-    3: 'price_1TY9L4Gow04S066UnAxs4K8Q',
-  };
-  const PLAN_BY_SLOTS = { 1: 'tier_1', 2: 'tier_2', 3: 'tier_3' };
-
-  try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-    const { data, error } = await supabaseAdmin
-      .from('subscriptions')
-      .select('active_modules, stripe_customer_id, subscription_plan')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !data) return res.status(404).json({ error: 'Subscription not found' });
-
-    const current = data.active_modules || [];
-    if (current.includes(module)) return res.json({ ok: true, message: 'Already active' });
-
-    const updated = [...current, module];
-    const newSlots = updated.length;
-    const newPriceId = PRICE_BY_SLOTS[newSlots];
-
-    // Upgrade Stripe subscription if customer exists
-    if (data.stripe_customer_id && newPriceId) {
-      const subscriptions = await stripe.subscriptions.list({
-        customer: data.stripe_customer_id,
-        status: 'active',
-        limit: 1,
-      });
-      const sub = subscriptions.data[0];
-      if (sub) {
-        const item = sub.items.data[0];
-        await stripe.subscriptions.update(sub.id, {
-          items: [{ id: item.id, price: newPriceId }],
-          proration_behavior: 'always_invoice',
-        });
-      }
-    }
-
-    // Update Supabase
-    const { error: updateErr } = await supabaseAdmin
-      .from('subscriptions')
-      .update({
-        active_modules: updated,
-        subscription_plan: PLAN_BY_SLOTS[newSlots] || data.subscription_plan,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId);
-
-    if (updateErr) throw updateErr;
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('add-module error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // ── Stripe checkout session ───────────────────────────────────────────────────
+const BARCOP_PRICE_ID = 'price_1TZA54Gow04S066UjWZIRAlL';
+const ALL_MODULES     = ['profit', 'revenue', 'traffic'];
+
 app.post('/api/create-checkout-session', async (req, res) => {
-  const { priceId, userId, modules } = req.body;
-  if (!priceId || !userId) return res.status(400).json({ error: 'Missing priceId or userId' });
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
   try {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: BARCOP_PRICE_ID, quantity: 1 }],
       success_url: 'https://app.barcop.com/?checkout=success',
       cancel_url:  'https://app.barcop.com/?checkout=cancelled',
-      metadata: {
-        user_id:  userId,
-        price_id: priceId,
-        modules:  (modules || []).join(',')
-      }
+      metadata: { user_id: userId }
     });
     res.json({ url: session.url });
   } catch (e) {
@@ -984,7 +799,6 @@ app.post('/api/billing-portal', async (req, res) => {
 });
 
 // ── Stripe webhook ────────────────────────────────────────────────────────────
-// Must use express.raw() — Stripe signature verification requires the raw body
 const { createClient } = require('@supabase/supabase-js');
 const ws = require('ws');
 
@@ -993,22 +807,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { realtime: { transport: ws } }
 );
-
-const MODULE_SLOTS = {
-  'price_1TY9KKGow04S066UBHLhPLNK': 1,  // legacy 1-module tier
-  'price_1TY9KgGow04S066Urrd6TwGP': 2,  // 2-module tier (in-app upgrade)
-  'price_1TY9L4Gow04S066UnAxs4K8Q': 3,  // 3-module tier (in-app upgrade)
-  'price_1TYCjBGow04S066UcsAPBGQj': 1,  // Profit Recovery
-  'price_1TYCjYGow04S066Uce9qofNi': 1,  // Revenue Recovery
-  'price_1TYCjnGow04S066UXTK6d9C6': 1,  // Traffic Recovery
-};
-
-// Maps individual module price IDs to their module name
-const PRICE_TO_MODULE = {
-  'price_1TYCjBGow04S066UcsAPBGQj': 'profit',
-  'price_1TYCjYGow04S066Uce9qofNi': 'revenue',
-  'price_1TYCjnGow04S066UXTK6d9C6': 'traffic',
-};
 
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -1029,37 +827,14 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       const customerId = session.customer;
       const email      = session.customer_details?.email || session.customer_email;
 
-      // Resolve price ID from line items (Payment Links don't put it in metadata)
-      const lineItems  = await require('stripe')(process.env.STRIPE_SECRET_KEY)
-        .checkout.sessions.listLineItems(session.id, { limit: 5 });
-      const priceId    = lineItems.data?.[0]?.price?.id || session.metadata?.price_id;
-
-      // Determine which module this purchase is for
-      const moduleFromPrice = PRICE_TO_MODULE[priceId] || null;
-      const modulesFromMeta = (session.metadata?.modules || '').split(',').filter(Boolean);
-      const newModule  = moduleFromPrice || modulesFromMeta[0] || 'profit';
-
-      const slots = MODULE_SLOTS[priceId] || 1;
-
-      // Create or find Supabase user
       let userId = session.metadata?.user_id || null;
-      let existingModules = [];
 
       if (!userId && email) {
         const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
         const found = existing?.users?.find(u => u.email === email);
         if (found) {
           userId = found.id;
-          // Get their existing modules so we don't overwrite them
-          const { data: subData } = await supabaseAdmin
-            .from('subscriptions')
-            .select('active_modules')
-            .eq('user_id', found.id)
-            .single();
-          existingModules = subData?.active_modules || [];
         } else {
-          // Brand new subscriber — create account silently
-          // Customer uses Forgot Password on the login screen to set their password
           const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
             email,
             email_confirm: true,
@@ -1075,19 +850,12 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       }
 
       if (userId) {
-        // Merge new module with any existing modules
-        const mergedModules = existingModules.includes(newModule)
-          ? existingModules
-          : [...existingModules, newModule];
-        const totalSlots = mergedModules.length;
-        const plan = totalSlots === 1 ? 'tier_1' : totalSlots === 2 ? 'tier_2' : 'tier_3';
-
         await supabaseAdmin.from('subscriptions').upsert({
           user_id:             userId,
           stripe_customer_id:  customerId,
           subscription_status: 'active',
-          subscription_plan:   plan,
-          active_modules:      mergedModules,
+          subscription_plan:   'full_access',
+          active_modules:      ALL_MODULES,
           current_period_end:  null,
           updated_at:          new Date().toISOString(),
         }, { onConflict: 'user_id' });
@@ -1136,8 +904,7 @@ app.get('*', (req, res) => {
 });
 
 const server = app.listen(PORT, () => {
-  console.log('\n  Bar Cop Fix System\n  http://localhost:' + PORT + '\n');
+  console.log('\n  Bar Cop Recovery\n  http://localhost:' + PORT + '\n');
 });
-// Allow 5 minutes for audit generation (Claude API + Python PDF build)
 server.timeout = 300000;
 server.headersTimeout = 310000;
