@@ -325,29 +325,59 @@ function getExtractionPrompt_Profit(appData) {
   const avgBarRev   = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.bar?.revenue||0),0)/recentWeeks.length : null;
   const avgFoodRev  = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.food?.revenue||0),0)/recentWeeks.length : null;
 
-  return `You are generating a Bar Cop Profit Audit. Analyze all submitted documents AND the app data provided below. Extract the exact variables needed to generate a professional scored PDF audit report.
+  // Build weekly data summary for prompt
+  const weeklySummary = recentWeeks.length
+    ? recentWeeks.map((w,i) => {
+        const parts = [`Week ${i+1}`];
+        if (w.week_end) parts.push(w.week_end);
+        if (w.bar && w.bar.revenue) parts.push('Bar rev $'+w.bar.revenue);
+        if (w.bar && w.bar.cost_pct) parts.push('Bar cost '+w.bar.cost_pct+'%');
+        if (w.food && w.food.revenue) parts.push('Food rev $'+w.food.revenue);
+        if (w.food && w.food.cost_pct) parts.push('Food cost '+w.food.cost_pct+'%');
+        if (w.labor_pct) parts.push('Labor '+w.labor_pct+'%');
+        return '  ' + parts.join(' | ');
+      }).join('\n')
+    : '  No weekly data entered yet';
 
-APP DATA (from customer's 30 days of usage):
-- Bar Name: ${settings.bar_name || 'Not provided'}
-- City/State: ${settings.city_state || 'Not provided'}
-- Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
-- Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
-- Bar Pour Cost Target: ${settings.targets?.bar_pour_cost_pct || 22}%
-- Food Cost Target: ${settings.targets?.food_cost_pct || 32}%
-- Prime Cost Target: ${settings.targets?.prime_cost_pct || 60}%
-- Recent 4-week avg bar pour cost: ${avgBarCost ? avgBarCost.toFixed(1)+'%' : 'Not available'}
-- Recent 4-week avg food cost: ${avgFoodCost ? avgFoodCost.toFixed(1)+'%' : 'Not available'}
-- Recent 4-week avg bar revenue: ${avgBarRev ? '$'+Math.round(avgBarRev) : 'Not available'}
-- Recent 4-week avg food revenue: ${avgFoodRev ? '$'+Math.round(avgFoodRev) : 'Not available'}
-- Bar products set up: ${products.length}
-- Kitchen products set up: ${kitchen.length}
-- Recipes costed: ${recipes.length}
-- Weeks of data: ${weeks.length}
-- Shift check entries: ${shifts.length}
-- Cash reconciliation entries: ${recons.length}
-- Vendor price changes logged: ${vendor.length}
-- Latest theft risk score: ${theft.length ? theft[theft.length-1]?.total : 'Not scored'}
-- Weekly variance data: ${weeks.filter(w => w.bar_variance?.length > 0).length} weeks with variance
+  const barProductsSummary = products.length
+    ? products.slice(0,15).map(p => '  ' + (p.name||'Product') + ' | Cost: $' + (p.cost||0) + ' | Category: ' + (p.category||'')).join('\n')
+    : '  No bar products entered';
+
+  const reconSummary = recons.length
+    ? recons.slice(-4).map(r => '  ' + (r.date||'') + ' | Expected: $' + (r.expected||0) + ' | Actual: $' + (r.actual||0) + ' | Variance: $' + ((r.actual||0)-(r.expected||0)).toFixed(2)).join('\n')
+    : '  No cash reconciliation entries';
+
+  return `You are generating a Bar Cop Profit Audit. Analyze all submitted documents AND the app data provided below. Use every data point from both sources to score and populate the audit.
+
+APP DATA (live data from the customer's app — use this to fill fields where no uploaded file covers the topic):
+Bar Name: ${settings.bar_name || 'Not provided'}
+City/State: ${settings.city_state || 'Not provided'}
+Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
+Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
+Bar Pour Cost Target: ${settings.targets && settings.targets.bar_pour_cost_pct || 22}%
+Food Cost Target: ${settings.targets && settings.targets.food_cost_pct || 32}%
+Prime Cost Target: ${settings.targets && settings.targets.prime_cost_pct || 60}%
+Recent 4-week avg bar pour cost: ${avgBarCost ? avgBarCost.toFixed(1)+'%' : 'Not tracked'}
+Recent 4-week avg food cost: ${avgFoodCost ? avgFoodCost.toFixed(1)+'%' : 'Not tracked'}
+Recent 4-week avg bar revenue/week: ${avgBarRev ? '$'+Math.round(avgBarRev) : 'Not tracked'}
+Recent 4-week avg food revenue/week: ${avgFoodRev ? '$'+Math.round(avgFoodRev) : 'Not tracked'}
+Bar products set up: ${products.length}
+Kitchen products set up: ${kitchen.length}
+Recipes costed: ${recipes.length}
+Weeks of data entered: ${weeks.length}
+Shift check entries: ${shifts.length}
+Cash reconciliation entries: ${recons.length}
+Vendor price changes logged: ${vendor.length}
+Latest theft risk score: ${theft.length ? theft[theft.length-1] && theft[theft.length-1].total : 'Not scored'}
+
+WEEKLY DATA (last 4 weeks entered in app):
+${weeklySummary}
+
+BAR PRODUCTS (sample):
+${barProductsSummary}
+
+CASH RECONCILIATION (last 4 entries):
+${reconSummary}
 
 Analyze all uploaded documents (POS reports, inventory sheets, invoices, exception reports, payroll) and extract ALL of the following variables. Use uploaded file data where available, use app data to fill gaps, use industry benchmarks for anything not determinable.
 
@@ -519,49 +549,91 @@ Fill every field with real values extracted from the documents or calculated fro
 }
 
 function getExtractionPrompt_Revenue(appData) {
-  const settings    = appData.settings || {};
-  const revSettings = appData.revenue_settings || {};
-  const targets     = revSettings.targets || {};
-  const weeks       = appData.revenue_weeks || [];
-  const servers     = revSettings.servers || [];
-  const menuItems   = appData.revenue_menu_items || [];
-  const serverChecks = appData.revenue_server_checks || [];
+  const settings     = appData.settings || {};
+  const targets      = settings.targets || {};
+  const weeks        = appData.revenue_weeks || [];
+  const servers      = appData.revenue_servers || [];
+  const menuItems    = appData.revenue_menu_items || [];
 
-  const recentWeeks = weeks.slice(-4);
-  const avgCheckAvg   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.check_avg||0),0)/recentWeeks.length : null;
-  const avgLaborPct   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.labor_pct_blended||0),0)/recentWeeks.length : null;
-  const avgRPLH       = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.rplh_blended||0),0)/recentWeeks.length : null;
-  const avgCovers     = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.covers||0),0)/recentWeeks.length : null;
-  const avgBarRev     = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.bar_revenue||0),0)/recentWeeks.length : null;
-  const avgFloorRev   = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.floor_revenue||0),0)/recentWeeks.length : null;
+  const recentWeeks  = weeks.slice(-4);
+  const avgCheckAvg  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.check_avg||0),0)/recentWeeks.length : null;
+  const avgLaborPct  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.labor_pct_blended||0),0)/recentWeeks.length : null;
+  const avgRPLH      = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.rplh_blended||0),0)/recentWeeks.length : null;
+  const avgCovers    = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.covers||0),0)/recentWeeks.length : null;
+  const avgBarRev    = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.bar_revenue||0),0)/recentWeeks.length : null;
+  const avgFloorRev  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.floor_revenue||0),0)/recentWeeks.length : null;
+  const totalAnnual  = (settings.annual_bar_revenue||0) + (settings.annual_food_revenue||0);
 
-  return `You are generating a Bar Cop Revenue Audit. Analyze all submitted documents AND the app data provided below. Extract the exact variables needed to generate a professional scored audit report.
+  // Build a compact server roster string for the prompt
+  const serverRoster = servers.length
+    ? servers.slice(0,20).map((sv,i) => `  ${i+1}. ${sv.name||('Server '+(i+1))}${sv.role?' ('+sv.role+')':''}${sv.wage?' $'+sv.wage+'/hr':''}`).join('\n')
+    : '  None on roster';
 
-APP DATA (from customer's app usage):
-- Bar Name: ${settings.bar_name || 'Not provided'}
-- City/State: ${settings.city_state || 'Not provided'}
-- Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
-- Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
-- Check Average Target: $${targets.check_avg || 35}
-- Bar Labor Target: ${targets.bar_labor_pct || 28}%
-- Kitchen Labor Target: ${targets.kitchen_labor_pct || 30}%
-- Floor Labor Target: ${targets.floor_labor_pct || 32}%
-- Lunch RPLH Target: $${targets.rplh_lunch || 50}
-- Dinner RPLH Target: $${targets.rplh_dinner || 75}
-- Bar RPLH Target: $${targets.rplh_bar || 65}
-- Event Close Rate Target: ${targets.event_close_rate || 40}%
-- Servers on roster: ${servers.length}
-- Menu items set up: ${menuItems.length}
-- Weeks of revenue data: ${weeks.length}
-- Server check entries: ${serverChecks.length}
-- Recent 4-week avg check average: ${avgCheckAvg ? '$'+avgCheckAvg.toFixed(2) : 'Not available'}
-- Recent 4-week avg labor %: ${avgLaborPct ? avgLaborPct.toFixed(1)+'%' : 'Not available'}
-- Recent 4-week avg RPLH: ${avgRPLH ? '$'+avgRPLH.toFixed(2) : 'Not available'}
-- Recent 4-week avg weekly covers: ${avgCovers ? Math.round(avgCovers) : 'Not available'}
-- Recent 4-week avg bar revenue: ${avgBarRev ? '$'+Math.round(avgBarRev) : 'Not available'}
-- Recent 4-week avg floor revenue: ${avgFloorRev ? '$'+Math.round(avgFloorRev) : 'Not available'}
+  // Build recent weekly data summary
+  const weeklySummary = recentWeeks.length
+    ? recentWeeks.map((w,i) => {
+        const parts = [`Week ${i+1}`];
+        if (w.week_end) parts.push(w.week_end);
+        if (w.total_revenue) parts.push('Rev $'+w.total_revenue);
+        if (w.check_avg) parts.push('Check avg $'+w.check_avg);
+        if (w.covers) parts.push('Covers '+w.covers);
+        if (w.labor_pct_blended) parts.push('Labor '+w.labor_pct_blended+'%');
+        if (w.rplh_blended) parts.push('RPLH $'+w.rplh_blended);
+        return '  ' + parts.join(' | ');
+      }).join('\n')
+    : '  No weekly data entered yet';
 
-Analyze all uploaded documents and extract ALL variables. Return ONLY valid JSON — no markdown, no explanation:
+  // Build menu items summary
+  const menuSummary = menuItems.length
+    ? menuItems.slice(0,30).map(m => `  ${m.name||'Item'} | ${m.category||''} | Price: $${m.price||0} | Cost: $${m.cost||0}`).join('\n')
+    : '  No menu items entered yet';
+
+  return `You are generating a Bar Cop Revenue Audit. Analyze all submitted documents AND the app data provided below. Use every data point from both sources to score and populate the audit.
+
+APP DATA (live data from the customer's app — use this to fill fields where no uploaded file covers the topic):
+Bar Name: ${settings.bar_name || 'Not provided'}
+City/State: ${settings.city_state || 'Not provided'}
+Annual Bar Revenue: ${settings.annual_bar_revenue ? '$'+settings.annual_bar_revenue.toLocaleString() : 'Not provided'}
+Annual Food Revenue: ${settings.annual_food_revenue ? '$'+settings.annual_food_revenue.toLocaleString() : 'Not provided'}
+Total Annual Revenue: ${totalAnnual ? '$'+totalAnnual.toLocaleString() : 'Not provided'}
+Check Average Target: $${targets.check_avg || 35}
+Bar Labor Target: ${targets.bar_labor_pct || 28}%
+Kitchen Labor Target: ${targets.kitchen_labor_pct || 30}%
+Floor Labor Target: ${targets.floor_labor_pct || 32}%
+Lunch RPLH Target: $${targets.rplh_lunch || 50}
+Dinner RPLH Target: $${targets.rplh_dinner || 75}
+Bar RPLH Target: $${targets.rplh_bar || 65}
+Servers on roster: ${servers.length}
+Menu items entered: ${menuItems.length}
+Weeks of revenue data entered: ${weeks.length}
+
+RECENT 4-WEEK APP DATA AVERAGES:
+Check Average: ${avgCheckAvg ? '$'+avgCheckAvg.toFixed(2) : 'Not tracked'}
+Labor %: ${avgLaborPct ? avgLaborPct.toFixed(1)+'%' : 'Not tracked'}
+RPLH: ${avgRPLH ? '$'+avgRPLH.toFixed(2) : 'Not tracked'}
+Weekly Covers: ${avgCovers ? Math.round(avgCovers) : 'Not tracked'}
+Bar Revenue/week: ${avgBarRev ? '$'+Math.round(avgBarRev) : 'Not tracked'}
+Floor Revenue/week: ${avgFloorRev ? '$'+Math.round(avgFloorRev) : 'Not tracked'}
+
+WEEKLY DATA (last 4 weeks entered in app):
+${weeklySummary}
+
+SERVER ROSTER:
+${serverRoster}
+
+MENU ITEMS:
+${menuSummary}
+
+SECTIONS IN THIS AUDIT (match these exactly — do not rename or reorder):
+Section 1: Check Average and Revenue
+Section 2: Labor Efficiency
+Section 3: Menu Performance
+Section 4: Server Performance
+Section 5: Events and Private Dining
+
+Use app data heavily. If a field can be derived from the app data above, calculate it and fill it in. Only mark something "Not available" if neither uploaded files nor app data contain enough information to estimate it.
+
+Return ONLY valid JSON with these exact keys — no markdown, no explanation:
 
 {
   "BAR_NAME": "${settings.bar_name || 'Customer Bar'}",
@@ -580,64 +652,57 @@ Analyze all uploaded documents and extract ALL variables. Return ONLY valid JSON
   "SECTIONS_PARTIAL": 0,
   "SECTIONS_NA": 0,
   "SECTION_DATA": [],
-  "S1_TIER": 1, "S1_TOTAL_REV_PERIOD": 0, "S1_BEV_REV_PERIOD": 0, "S1_FOOD_REV_PERIOD": 0,
-  "S1_BEV_REV_PCT": 0, "S1_FOOD_REV_PCT": 0, "S1_BEV_TARGET_PCT": 60, "S1_FOOD_TARGET_PCT": 40,
-  "S1_CHECK_AVG_BLENDED": ${avgCheckAvg || 0}, "S1_COVERS_PERIOD": 0,
-  "S1_COVERS_MONTHLY": ${avgCovers ? Math.round(avgCovers * 4.33) : 0},
-  "S1_ITEM_DATA_SUBMITTED": false, "S1_PRICE_LIST_SUBMITTED": false,
-  "S1_CATEGORY_MIX_NOTE": "From submitted data", "S1_REVENUE_CONCENTRATION": "From submitted data",
-  "S1_PTS_BEV_PCT": 0, "S1_PTS_CATEGORY_MIX": 0, "S1_PTS_PRICE_REVIEW": 0,
-  "S1_PTS_HIGH_MARGIN": 0, "S1_PTS_ITEM_DATA": 0, "S1_SCORE": 0,
-  "S1_MONTHLY_GAP": 0, "S1_ANNUAL_GAP": 0, "S1_BEV_OVER_TARGET": 0,
-  "S1_CHECK_AVG_TARGET": ${targets.check_avg || 42}, "S1_CHECK_AVG_GAP": 0,
-  "S2_TIER": 1, "S2_TOTAL_REV_PERIOD": 0, "S2_LABOR_PERIOD": 0,
-  "S2_LABOR_PCT": ${avgLaborPct || 0}, "S2_LABOR_TARGET_LOW": ${targets.bar_labor_pct || 28},
-  "S2_LABOR_TARGET_HIGH": ${targets.floor_labor_pct || 32}, "S2_LABOR_GAP_PTS": 0,
-  "S2_LABOR_GAP_MONTHLY": 0, "S2_LABOR_SOURCE": "From submitted data",
-  "S2_AVG_HOURLY_WAGE": ${revSettings.avg_hourly_wage?.bar || 0}, "S2_HOURS_SCHEDULED": 0,
-  "S2_RPLH": ${avgRPLH || 0}, "S2_RPLH_TARGET": ${targets.rplh_dinner || 65},
-  "S2_RPLH_GAP": 0, "S2_SCHEDULE_SUBMITTED": false, "S2_DEPT_BREAKDOWN": false,
-  "S2_TIMECLOCK_SUBMITTED": false, "S2_WEEKLY_VARIANCE_NOTE": "From submitted data",
-  "S2_MONTHLY_GAP": 0, "S2_ANNUAL_GAP": 0,
-  "S2_PTS_LABOR_PCT": 0, "S2_PTS_FORECAST": 0, "S2_PTS_RPLH": 0,
-  "S2_PTS_DEPT": 0, "S2_PTS_TIMECLOCK": 0, "S2_SCORE": 0,
-  "S3_TIER": 1, "S3_TOTAL_REV_PERIOD": 0, "S3_COVERS_PERIOD": 0, "S3_COVERS_MONTHLY": 0,
-  "S3_CHECK_AVG_BLENDED": ${avgCheckAvg || 0}, "S3_CHECK_AVG_TARGET": ${targets.check_avg || 42},
-  "S3_CHECK_AVG_GAP": 0, "S3_NUM_SERVERS": ${servers.length || 0},
-  "S3_SERVER_LABELS": [], "S3_SERVER_CHECK_AVGS": [], "S3_SERVER_COVERS": [],
-  "S3_TOP_SERVER_LABEL": "Server A", "S3_TOP_CHECK_AVG": 0,
-  "S3_BOTTOM_SERVER_LABEL": "Server Z", "S3_BOTTOM_CHECK_AVG": 0,
-  "S3_HOUSE_AVG": ${avgCheckAvg || 0}, "S3_SPREAD": 0, "S3_SPREAD_TARGET": 10,
-  "S3_SERVERS_ABOVE": 0, "S3_SERVERS_AT_AVG": 0, "S3_SERVERS_BELOW": 0,
-  "S3_APP_ATTACH_RATE": null, "S3_DESSERT_ATTACH_RATE": null, "S3_UPSELL_STANDARD_EXISTS": false,
-  "S3_MONTHLY_GAP": 0, "S3_ANNUAL_GAP": 0,
-  "S3_PTS_CHECK_AVG": 0, "S3_PTS_SPREAD": 0, "S3_PTS_SERVERS_ABOVE": 0,
-  "S3_PTS_APP_ATTACH": 0, "S3_PTS_DESSERT_ATTACH": 0, "S3_SCORE": 0,
-  "S4_TIER": 0, "S4_EVENT_COUNT_PERIOD": null, "S4_AVG_EVENT_REVENUE": null,
-  "S4_TOTAL_EVENT_REVENUE": null, "S4_EVENT_REV_PCT_OF_TOTAL": null,
-  "S4_MINIMUM_COMPLIANCE_RATE": null, "S4_EVENTS_PER_MONTH_BENCHMARK": "6-8",
-  "S4_INDUSTRY_EVENT_REV_PCT_LOW": 10, "S4_INDUSTRY_EVENT_REV_PCT_HIGH": 20,
-  "S4_ANNUAL_REV_ESTIMATE": ${(settings.annual_bar_revenue || 0) + (settings.annual_food_revenue || 0)},
-  "S4_EVENT_REV_POTENTIAL_LOW": 0, "S4_EVENT_REV_POTENTIAL_HIGH": 0, "S4_SCORE": null,
-  "S5_TIER": 1, "S5_SERVER_REPORT_SUBMITTED": false, "S5_NUM_SERVERS": ${servers.length || 0},
-  "S5_SERVER_LABELS": [], "S5_SERVER_CHECK_AVGS": [], "S5_SERVER_COVERS": [],
-  "S5_TOP_SERVER_LABEL": "Server A", "S5_TOP_CHECK_AVG": 0,
-  "S5_BOTTOM_SERVER_LABEL": "Server Z", "S5_BOTTOM_CHECK_AVG": 0,
-  "S5_HOUSE_AVG": ${avgCheckAvg || 0}, "S5_SPREAD": 0, "S5_SPREAD_TARGET": 10,
-  "S5_SERVERS_ABOVE": 0, "S5_SERVERS_AT_OR_NEAR": 0, "S5_SERVERS_BELOW": 0,
-  "S5_COACHING_PROCESS_EVIDENT": false, "S5_PRESHIFT_CONSISTENT": false,
-  "S5_DAYPART_DATA_SUBMITTED": false, "S5_GAP_BOTTOM_TO_AVG": 0,
-  "S5_MONTHLY_GAP": 0, "S5_ANNUAL_GAP": 0,
-  "S5_PTS_REPORT_SUBMITTED": 0, "S5_PTS_SPREAD": 0, "S5_PTS_MAJORITY_ABOVE": 0,
-  "S5_PTS_COACHING": 0, "S5_PTS_PRESHIFT": 0, "S5_SCORE": 0,
-  "S6_SCORE": 50
+  "S1_SCORE": 0,
+  "S1_CHECK_AVG": ${avgCheckAvg || 0},
+  "S1_CHECK_AVG_TARGET": ${targets.check_avg || 35},
+  "S1_BAR_CHECK_AVG": ${avgBarRev && avgCovers ? (avgBarRev/avgCovers).toFixed(2) : 0},
+  "S1_FOOD_CHECK_AVG": ${avgFloorRev && avgCovers ? (avgFloorRev/avgCovers).toFixed(2) : 0},
+  "S1_COVER_COUNT": ${avgCovers ? Math.round(avgCovers * 4.33) : 0},
+  "S1_MONTHLY_REVENUE": ${avgBarRev && avgFloorRev ? Math.round((avgBarRev + avgFloorRev) * 4.33) : 0},
+  "S1_MONTHLY_GAP": 0,
+  "S1_ANNUAL_GAP": 0,
+  "S2_SCORE": 0,
+  "S2_LABOR_PCT": ${avgLaborPct || 0},
+  "S2_LABOR_TARGET_PCT": ${targets.floor_labor_pct || 32},
+  "S2_RPLH": ${avgRPLH || 0},
+  "S2_RPLH_TARGET": ${targets.rplh_dinner || 75},
+  "S2_LABOR_PERIOD": 0,
+  "S2_SCHED_VS_ACTUAL": "Not submitted",
+  "S2_OVERTIME_HRS": null,
+  "S2_MONTHLY_GAP": 0,
+  "S2_ANNUAL_GAP": 0,
+  "S3_SCORE": 0,
+  "S3_STARS_COUNT": 0,
+  "S3_PLOWHORSES_COUNT": 0,
+  "S3_DOGS_COUNT": 0,
+  "S3_PUZZLES_COUNT": 0,
+  "S3_TOP_CATEGORY": "Not submitted",
+  "S3_MONTHLY_GAP": 0,
+  "S3_PRICING_OPPORTUNITY": 0,
+  "S4_SCORE": 0,
+  "S4_SERVER_COUNT": ${servers.length || 0},
+  "S4_TOP_CHECK_AVG": 0,
+  "S4_BOTTOM_CHECK_AVG": 0,
+  "S4_PERFORMANCE_SPREAD": 0,
+  "S4_APP_ATTACH_RATE": null,
+  "S4_DESSERT_ATTACH_RATE": null,
+  "S4_PRESHIFT_BRIEFING": "Not submitted",
+  "S4_MONTHLY_GAP": 0,
+  "S4_ANNUAL_GAP": 0,
+  "S5_SCORE": 50,
+  "S5_EVENT_REV_PERIOD": null,
+  "S5_EVENTS_PER_MONTH": null,
+  "S5_AVG_EVENT_REVENUE": null,
+  "S5_MINIMUM_MET": null,
+  "S5_CATERING_REV_PERIOD": null,
+  "S5_ANNUAL_EVENT_GAP": null,
+  "S5_MONTHLY_GAP": null
 }`;
 }
 
 function getExtractionPrompt_Traffic(appData) {
   const settings      = appData.settings || {};
-  const ts            = appData.traffic_settings || {};
-  const targets       = ts.targets || {};
+  const targets       = (appData.traffic_settings && appData.traffic_settings.targets) || {};
   const weeks         = appData.traffic_weeks || [];
   const recentWeeks   = weeks.slice(-4);
   const avg = (fn) => { const v = recentWeeks.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
@@ -649,24 +714,42 @@ function getExtractionPrompt_Traffic(appData) {
   const avgIGF = avg(w=>w.ig_followers);
   const avgIGP = avg(w=>w.ig_posts_month);
 
-  return `You are generating a Bar Cop Traffic Audit. Analyze all submitted screenshots, documents, and questionnaire answers to extract variables for a scored audit report.
+  // Build weekly data summary
+  const weeklySummary = recentWeeks.length
+    ? recentWeeks.map((w,i) => {
+        const parts = ['Week ' + (i+1)];
+        if (w.week_end) parts.push(w.week_end);
+        if (w.google_rating) parts.push('Google ' + w.google_rating + 'star');
+        if (w.new_reviews) parts.push('New reviews: ' + w.new_reviews);
+        if (w.response_rate) parts.push('Response rate: ' + w.response_rate + '%');
+        if (w.monthly_sessions) parts.push('Sessions: ' + w.monthly_sessions);
+        if (w.ig_followers) parts.push('IG followers: ' + w.ig_followers);
+        if (w.ig_posts_month) parts.push('IG posts: ' + w.ig_posts_month);
+        return '  ' + parts.join(' | ');
+      }).join('\n')
+    : '  No weekly traffic data entered yet';
 
-APP DATA:
-- Bar Name: ${settings.bar_name || 'Not provided'}
-- City/State: ${settings.city_state || 'Not provided'}
-- Google Rating Target: ${targets.google_rating || 4.3}
-- Review Velocity Target: ${targets.review_velocity || 8}/month
-- Response Rate Target: ${targets.response_rate || 75}%
-- Monthly Sessions Target: ${targets.monthly_sessions || 2000}
-- Social Posts/Month Target: ${targets.social_posts_month || 12}
-- Weeks of tracking data: ${weeks.length}
-- Recent 4-week avg Google Rating: ${avgGR ? avgGR.toFixed(2) : 'Not tracked'}
-- Recent 4-week avg New Reviews/Mo: ${avgRV ? avgRV.toFixed(1) : 'Not tracked'}
-- Recent 4-week avg Response Rate: ${avgRR ? avgRR.toFixed(1)+'%' : 'Not tracked'}
-- Recent 4-week avg Monthly Sessions: ${avgSS ? Math.round(avgSS) : 'Not tracked'}
-- Recent 4-week avg Bounce Rate: ${avgBR ? avgBR.toFixed(1)+'%' : 'Not tracked'}
-- Recent 4-week avg Instagram Followers: ${avgIGF ? Math.round(avgIGF) : 'Not tracked'}
-- Recent 4-week avg IG Posts/Month: ${avgIGP ? avgIGP.toFixed(1) : 'Not tracked'}
+  return `You are generating a Bar Cop Traffic Audit. Analyze all submitted screenshots, documents, and questionnaire answers AND the app data below to score and populate the audit.
+
+APP DATA (live data from the customer's app — use this to fill fields where screenshots do not cover the topic):
+Bar Name: ${settings.bar_name || 'Not provided'}
+City/State: ${settings.city_state || 'Not provided'}
+Google Rating Target: ${targets.google_rating || 4.3}
+Review Velocity Target: ${targets.review_velocity || 8}/month
+Response Rate Target: ${targets.response_rate || 75}%
+Monthly Sessions Target: ${targets.monthly_sessions || 2000}
+Social Posts/Month Target: ${targets.social_posts_month || 12}
+Weeks of tracking data entered: ${weeks.length}
+Recent 4-week avg Google Rating: ${avgGR ? avgGR.toFixed(2) : 'Not tracked'}
+Recent 4-week avg New Reviews/Mo: ${avgRV ? avgRV.toFixed(1) : 'Not tracked'}
+Recent 4-week avg Response Rate: ${avgRR ? avgRR.toFixed(1)+'%' : 'Not tracked'}
+Recent 4-week avg Monthly Sessions: ${avgSS ? Math.round(avgSS) : 'Not tracked'}
+Recent 4-week avg Bounce Rate: ${avgBR ? avgBR.toFixed(1)+'%' : 'Not tracked'}
+Recent 4-week avg Instagram Followers: ${avgIGF ? Math.round(avgIGF) : 'Not tracked'}
+Recent 4-week avg IG Posts/Month: ${avgIGP ? avgIGP.toFixed(1) : 'Not tracked'}
+
+WEEKLY DATA (last 4 weeks entered in app):
+${weeklySummary}
 
 Return ONLY valid JSON with these exact keys:
 {
