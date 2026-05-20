@@ -562,9 +562,9 @@ S.RevenueAudit = {
       + (showPrev ? '<button class="btn btn-ghost" id="ra-iz-prev">&#8592; Back</button>' : '')
       + (showNext ? '<button class="btn btn-primary" id="ra-iz-next">Next &#8594;</button>' : '')
       + (isSubmit ? '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>' : '')
+      + '<div id="ra-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
       + '<div style="flex:1;"></div>'
       + '<button class="btn btn-ghost" id="ra-iz-cancel">Cancel</button>'
-      + '<div id="ra-iz-status" style="font-size:12px;color:var(--t2);display:none;margin-left:8px;"></div>'
       + '</div>';
 
     let stepHtml = '';
@@ -597,7 +597,7 @@ S.RevenueAudit = {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Labor schedule is required for RPLH and prime cost calculations. Payroll actuals unlock deeper variance analysis.</div>'
-        + this.renderFileSection('required', 'Weekly Labor Schedule',       'ra-f-labor-sched', 'ra-labor-sched', 'Unlocks: RPLH calculation, labor percentage, schedule efficiency analysis')
+        + this.renderFileSection('optional', 'Weekly Labor Schedule',       'ra-f-labor-sched', 'ra-labor-sched', 'Unlocks: Required for RPLH calculation, labor percentage, schedule efficiency analysis')
         + this.renderFileSection('optional', 'Time Clock or Payroll Actuals','ra-f-timeclock',   'ra-timeclock',   'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
         + this.renderFileSection('optional', 'Labor Cost by Department',    'ra-f-labor-dept',  'ra-labor-dept',  'Unlocks: Department-level labor targeting, identifies which department is driving overage')
         + nav(true, true, false) + '</div>';
