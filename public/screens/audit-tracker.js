@@ -564,88 +564,153 @@ S.AuditTracker = {
     return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
 
+  // ── Stepped intake wizard ─────────────────────────────────────────────────
+  _intakeStep: 1,
+  _intakeDraft: null,
+
   showIntakeForm() {
-    const s = App.data.settings;
-    const modal = document.createElement('div');
-    modal.id = 'at-intake-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;overflow-y:auto;display:flex;justify-content:center;padding:20px;';
-
-    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;padding:32px;max-width:680px;width:100%;margin:auto;position:relative;">'
-      + '<button id="at-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Profit Audit</div>'
-      + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload your data files below. The POS Beverages report is required. Every additional file unlocks more scored sections and more specific action items. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
-      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
-      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
-      + (s.city_state ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(s.city_state) + '</div>' : '')
-      + '</div>'
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Annual Revenue</div>'
-      + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Bar Revenue ' + tt('at-ann-bar-rev') + ' <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-bar-rev" placeholder="480000" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
-      + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Food Revenue ' + tt('at-ann-food-rev') + ' <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-food-rev" placeholder="320000" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
-      + '</div>'
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Bar Data</div>'
-      + this.renderFileSection('required', 'POS Sales Report — Beverages',         'at-f-pos-bev',   'at-pos-bev',   'Unlocks: Revenue baseline, category split, estimated gap calculations')
-      + this.renderFileSection('optional', 'Bar Inventory Count Sheets',            'at-f-bar-inv',   'at-bar-inv',   'Unlocks: Actual pour cost %, theoretical vs. actual variance by product')
-      + this.renderFileSection('optional', 'POS Exception Report — Voids and Comps','at-f-exception', 'at-exception', 'Unlocks: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
-      + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',    'at-f-cash',      'at-cash',      'Unlocks: Cash handling gap analysis by shift')
-      + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv',  'at-bev-inv',   'Unlocks: Delivery accuracy rate, vendor short analysis')
-      + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices',  'at-f-vendor',    'at-vendor',    'Unlocks: Price drift analysis, distributor negotiation data')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Kitchen Data</div>'
-      + this.renderFileSection('optional', 'POS Sales Report — Food',               'at-f-pos-food',  'at-pos-food',  'Unlocks: Food cost benchmarking, category-level analysis')
-      + this.renderFileSection('optional', 'Kitchen Inventory Count Sheets',        'at-f-kit-inv',   'at-kit-inv',   'Unlocks: Actual food cost %, kitchen variance, spoilage rate')
-      + this.renderFileSection('optional', 'Food Invoices and Delivery Receipts',   'at-f-food-inv',  'at-food-inv',  'Unlocks: Food delivery accuracy, produce par analysis')
-      + this.renderFileSection('highlight','Recipe Costing Sheet',                  'at-f-recipe',    'at-recipe',    'Unlocks: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
-      + this.renderFileSection('optional', 'Daily Prep Sheets or Production Logs',  'at-f-prep',      'at-prep',      'Unlocks: Production loss analysis, prep yield by station')
-      + this.renderFileSection('optional', 'Daily Waste Logs',                      'at-f-waste',     'at-waste',     'Unlocks: Weekly spoilage cost, waste pattern diagnosis')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Labor Data</div>'
-      + this.renderFileSection('required', 'Payroll or Time Clock Data',            'at-f-payroll',   'at-payroll',   'Unlocks: Verified prime cost, labor by department, RPLH calculation')
-
-      + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-      + '<textarea id="at-notes" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;min-height:80px;resize:vertical;" placeholder="Recent ownership change, POS migration, seasonal operation, renovation period, staffing changes. Anything that might affect how the numbers look."></textarea></div>'
-
-      + '<div id="at-gen-status" style="font-size:12px;margin:14px 0;display:none;"></div>'
-      + '<div style="display:flex;gap:10px;margin-top:20px;">'
-      + '<button class="btn btn-primary" id="at-gen-btn">Generate Audit</button>'
-      + '<button class="btn btn-ghost" id="at-intake-cancel">Cancel</button>'
-      + '</div>'
-      + '</div>';
-
-    document.body.appendChild(modal);
-    modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
-    document.getElementById('at-intake-close').onclick  = () => modal.remove();
-    document.getElementById('at-intake-cancel').onclick = () => modal.remove();
-    document.getElementById('at-gen-btn').onclick = () => this.generateAudit(modal);
+    this._intakeStep = 1;
+    this._intakeDraft = { barRev: '', foodRev: '' };
+    this.actions.innerHTML = '';
+    this.renderIntakeStep();
   },
 
-  renderFileSection(type, title, inputId, ttId, unlocks) {
-    const badge = type === 'required'
-      ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
-      : type === 'highlight'
-      ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
-      : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
-    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
-      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
-      + (ttId ? tt(ttId) : '')
-      + '</div>'
-      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:8px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:8px;"></div>')
-      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
-      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
-      + '</div>';
+  intakeStepsHtml(total) {
+    let h = '<div class="steps">';
+    for (let i = 1; i <= total; i++) {
+      const cls = i < this._intakeStep ? 'done' : i === this._intakeStep ? 'active' : '';
+      h += (i > 1 ? '<div class="step-line' + (i-1 < this._intakeStep ? ' done' : '') + '"></div>' : '')
+        + '<div class="step-dot ' + cls + '">' + (i < this._intakeStep ? '&#10003;' : i) + '</div>';
+    }
+    return h + '</div>';
   },
 
-  async generateAudit(modal) {
-    const btn    = document.getElementById('at-gen-btn');
-    const status = document.getElementById('at-gen-status');
+  renderIntakeStep() {
+    const s    = App.data.settings;
+    const step = this._intakeStep;
+    const total = 5;
+    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
+
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Profit Audit</div>';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
+      + '</div>';
+
+    const nav = (showPrev, showNext, isSubmit) =>
+      '<div class="card-actions">'
+      + (showPrev ? '<button class="btn btn-ghost" id="at-iz-prev">&#8592; Back</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>' : '')
+      + (showNext ? '<button class="btn btn-primary" id="at-iz-next">Next &#8594;</button>' : '')
+      + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button>'
+      + '<div id="at-iz-status" style="font-size:12px;color:var(--t2);display:none;flex:1;margin-left:8px;"></div>'
+      + '</div>';
+
+    let stepHtml = '';
+    if (step === 1) {
+      stepHtml = '<div class="card">' + header + barInfo
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Enter your annual bar and food revenue. This sets the dollar baselines for every gap calculation in the audit. Your app data from the last 30 days is included automatically.</div>'
+        + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Bar Revenue <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-iz-bar-rev" placeholder="480000" value="' + esc(this._intakeDraft.barRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
+        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Food Revenue <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-iz-food-rev" placeholder="320000" value="' + esc(this._intakeDraft.foodRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
+        + '</div>'
+        + nav(false, true, false) + '</div>';
+    } else if (step === 2) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Bar Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Beverages report is required. Every additional file unlocks more scored sections.</div>'
+        + this.renderFileSection('required', 'POS Sales Report — Beverages',          'at-f-pos-bev',   'at-pos-bev',   'Unlocks: Revenue baseline, category split, estimated gap calculations')
+        + this.renderFileSection('optional', 'Bar Inventory Count Sheets',             'at-f-bar-inv',   'at-bar-inv',   'Unlocks: Actual pour cost %, theoretical vs. actual variance by product')
+        + this.renderFileSection('optional', 'POS Exception Report — Voids and Comps', 'at-f-exception', 'at-exception', 'Unlocks: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
+        + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',     'at-f-cash',      'at-cash',      'Unlocks: Cash handling gap analysis by shift')
+        + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv',   'at-bev-inv',   'Unlocks: Delivery accuracy rate, vendor short analysis')
+        + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices',   'at-f-vendor',    'at-vendor',    'Unlocks: Price drift analysis, distributor negotiation data')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 3) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Kitchen Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Upload whatever you have. Each file unlocks additional food cost scoring.</div>'
+        + this.renderFileSection('optional',   'POS Sales Report — Food',              'at-f-pos-food',  'at-pos-food',  'Unlocks: Food cost benchmarking, category-level analysis')
+        + this.renderFileSection('optional',   'Kitchen Inventory Count Sheets',       'at-f-kit-inv',   'at-kit-inv',   'Unlocks: Actual food cost %, kitchen variance, spoilage rate')
+        + this.renderFileSection('optional',   'Food Invoices and Delivery Receipts',  'at-f-food-inv',  'at-food-inv',  'Unlocks: Food delivery accuracy, produce par analysis')
+        + this.renderFileSection('highlight',  'Recipe Costing Sheet',                 'at-f-recipe',    'at-recipe',    'Unlocks: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
+        + this.renderFileSection('optional',   'Daily Prep Sheets or Production Logs', 'at-f-prep',      'at-prep',      'Unlocks: Production loss analysis, prep yield by station')
+        + this.renderFileSection('optional',   'Daily Waste Logs',                     'at-f-waste',     'at-waste',     'Unlocks: Weekly spoilage cost, waste pattern diagnosis')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 4) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Payroll or time clock data is required to calculate verified prime cost and RPLH.</div>'
+        + this.renderFileSection('required', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Unlocks: Verified prime cost, labor by department, RPLH calculation')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 5) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
+        + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+        + '<textarea id="at-iz-notes" rows="4" placeholder="Recent ownership change, POS migration, seasonal operation, renovation period, staffing changes. Anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
+        + nav(true, false, true) + '</div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + stepHtml + '</div>';
+
+    document.getElementById('at-iz-cancel')?.addEventListener('click', () => {
+      document.getElementById('topbar-sub').textContent = '';
+      this.renderMain();
+    });
+    document.getElementById('at-iz-prev')?.addEventListener('click', () => {
+      this._saveIntakeStep();
+      this._intakeStep--;
+      this.renderIntakeStep();
+    });
+    document.getElementById('at-iz-next')?.addEventListener('click', () => {
+      if (step === 1) {
+        const barRev  = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
+        const foodRev = parseFloat(document.getElementById('at-iz-food-rev')?.value) || 0;
+        if (barRev === 0 && foodRev === 0) {
+          const st = document.getElementById('at-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Enter at least one revenue figure to continue.'; }
+          return;
+        }
+        this._intakeDraft.barRev  = document.getElementById('at-iz-bar-rev')?.value || '';
+        this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
+      }
+      if (step === 2) {
+        const posFiles = document.getElementById('at-f-pos-bev')?.files;
+        if (!posFiles || posFiles.length === 0) {
+          const st = document.getElementById('at-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='POS Beverages report is required.'; }
+          return;
+        }
+      }
+      this._saveIntakeStep();
+      this._intakeStep++;
+      this.renderIntakeStep();
+    });
+    document.getElementById('at-iz-submit')?.addEventListener('click', () => {
+      this._intakeDraft.notes = document.getElementById('at-iz-notes')?.value || '';
+      this.generateAudit();
+    });
+  },
+
+  _saveIntakeStep() {
+    // File inputs can't be persisted but text values can
+    if (document.getElementById('at-iz-bar-rev'))  this._intakeDraft.barRev  = document.getElementById('at-iz-bar-rev').value;
+    if (document.getElementById('at-iz-food-rev')) this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev').value;
+    if (document.getElementById('at-iz-notes'))    this._intakeDraft.notes   = document.getElementById('at-iz-notes').value;
+  },
+
+
+  async generateAudit() {
+    // Show generating state in the current container
+    const submitBtn = document.getElementById('at-iz-submit');
+    const statusEl  = document.getElementById('at-iz-status');
     const setStatus = (msg, color='var(--t2)') => {
-      if (status) { status.style.display='block'; status.style.color=color; status.textContent=msg; }
+      if (statusEl) { statusEl.style.display='block'; statusEl.style.color=color; statusEl.textContent=msg; }
     };
+    if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
     const fileInputIds = ['at-f-pos-bev','at-f-bar-inv','at-f-exception','at-f-cash','at-f-bev-inv',
       'at-f-vendor','at-f-pos-food','at-f-kit-inv','at-f-food-inv','at-f-recipe','at-f-prep','at-f-waste','at-f-payroll'];
@@ -655,21 +720,10 @@ S.AuditTracker = {
       if (inp?.files) for (const f of inp.files) allFiles.push({file:f, field:id});
     }
 
-    const posFiles = document.getElementById('at-f-pos-bev')?.files;
-    if (!posFiles || posFiles.length === 0) {
-      setStatus('POS Beverages report is required. Attach that file to continue.', 'var(--red)');
-      return;
-    }
+    const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
+    const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
 
-    const barRev  = parseFloat(document.getElementById('at-bar-rev')?.value)  || 0;
-    const foodRev = parseFloat(document.getElementById('at-food-rev')?.value) || 0;
-    if (barRev === 0 && foodRev === 0) {
-      setStatus('Annual Bar Revenue and Annual Food Revenue are required. Enter at least one to continue.', 'var(--red)');
-      return;
-    }
-
-    if (btn) { btn.disabled=true; btn.textContent='Analyzing...'; }
-    setStatus('Reading your files and app data...', 'var(--t2)');
+    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
       const auditAppData = JSON.parse(JSON.stringify(App.data));
@@ -678,7 +732,7 @@ S.AuditTracker = {
 
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
-      form.append('notes', document.getElementById('at-notes')?.value || '');
+      form.append('notes', this._intakeDraft?.notes || '');
       for (const {file, field} of allFiles) form.append(field, file, file.name);
 
       setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
@@ -709,13 +763,13 @@ S.AuditTracker = {
       if (App.data.audits.length > 12) App.data.audits = App.data.audits.slice(-12);
       await App.saveKey('audits');
 
-      modal.remove();
+      document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
       setTimeout(() => this.viewAudit(0), 100);
 
     } catch(e) {
       setStatus('Error: ' + (e.message||'Generation failed. Please try again.'), 'var(--red)');
-      if (btn) { btn.disabled=false; btn.textContent='Generate Audit'; }
+      if (submitBtn) { submitBtn.disabled=false; submitBtn.textContent='Generate Audit'; }
     }
   },
 
