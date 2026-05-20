@@ -127,29 +127,7 @@ S.TrafficAudit = {
         + '<div class="empty-sub">Generate your first monthly Traffic Audit above. Upload your screenshots and the audit appears on screen immediately.</div></div>'
       : '';
 
-    // Gap Calculator tile
-    let gapTile = '';
-    if (latest && latest.action_items && latest.action_items.length) {
-      const totalMonthly = (latest.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
-      if (totalMonthly > 0) {
-        const gapRows = (latest.action_items||[]).filter(a => (a.monthly_impact||0) > 0).map(a =>
-          '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--b2);">'
-          + '<div style="font-size:12px;color:var(--t2);">' + esc(a.action||a) + '</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);white-space:nowrap;margin-left:16px;">+' + App.fmtCurrency(a.monthly_impact) + '/mo</div>'
-          + '</div>'
-        ).join('');
-        gapTile = '<div class="card" style="margin-bottom:16px;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Traffic Recovery Gap Calculator</div>'
-          + '<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px;">'
-          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Total Recoverable Per Month</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:48px;font-weight:700;color:var(--gold);line-height:1;">' + App.fmtCurrency(totalMonthly) + '</div></div>'
-          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Annualized</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:48px;font-weight:700;color:var(--gold);line-height:1;">' + App.fmtCurrency(totalMonthly*12) + '</div></div>'
-          + '</div>'
-          + gapRows
-          + '</div>';
-      }
-    }
+
 
     let scoreChart = '';
     if (audits.length >= 2) scoreChart = this.renderScoreChart(audits, 'ta');
@@ -160,7 +138,7 @@ S.TrafficAudit = {
     let sparklines = '';
     if (audits.length >= 3) sparklines = this.renderSparklines(audits);
 
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + gapTile + scoreChart + comparison + sparklines + historyCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + sparklines + historyCard + '</div>';
 
     document.getElementById('ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.ta-view-btn').forEach(btn => {
