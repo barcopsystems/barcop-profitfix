@@ -519,62 +519,137 @@ S.RevenueAudit = {
     return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
 
+  // ── Stepped intake wizard ─────────────────────────────────────────────────
+  _intakeStep: 1,
+  _intakeDraft: null,
+
   showIntakeForm() {
-    const s = App.data.settings;
-    const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:3000;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;';
-    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;width:100%;max-width:680px;padding:32px;position:relative;">'
-      + '<button id="ra-intake-close" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1;">x</button>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Revenue Audit</div>'
-      + '<div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:20px;">Upload Your Data Files</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Upload your POS reports and labor data. The daily sales summary and labor schedule are required. Every additional file unlocks more scored sections. <strong style="color:var(--t1);">Your app data from the last 30 days is included automatically.</strong></div>'
-      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:14px 16px;margin-bottom:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Confirming Audit For</div>'
-      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
-      + (s.city_state ? '<div style="font-size:12px;color:var(--t3);margin-top:2px;">' + esc(s.city_state) + '</div>' : '')
-      + '</div>'
+    this._intakeStep = 1;
+    this._intakeDraft = { barRev: '', foodRev: '' };
+    this.actions.innerHTML = '';
+    this.renderIntakeStep();
+  },
 
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Annual Revenue</div>'
-      + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Bar Revenue ' + tt('ra-ann-bar-rev') + ' <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="ra-bar-rev" placeholder="480000" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
-      + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Food Revenue ' + tt('ra-ann-food-rev') + ' <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="ra-food-rev" placeholder="320000" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
-      + '</div>'
+  intakeStepsHtml(total) {
+    let h = '<div class="steps">';
+    for (let i = 1; i <= total; i++) {
+      const cls = i < this._intakeStep ? 'done' : i === this._intakeStep ? 'active' : '';
+      h += (i > 1 ? '<div class="step-line' + (i-1 < this._intakeStep ? ' done' : '') + '"></div>' : '')
+        + '<div class="step-dot ' + cls + '">' + (i < this._intakeStep ? '&#10003;' : i) + '</div>';
+    }
+    return h + '</div>';
+  },
 
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Sales Data</div>'
-      + this.renderFileSection('required',  'POS Daily Sales Summary',                'ra-f-pos-daily',    'ra-pos-daily',   'Unlocks: Revenue trend, category split, blended check average')
-      + this.renderFileSection('optional',  'Menu Sales Mix Report',                  'ra-f-menu-mix',     'ra-menu-mix',    'Unlocks: Category concentration, menu engineering signals')
-      + this.renderFileSection('optional',  'Menu Price List',                        'ra-f-menu-prices',  'ra-menu-prices', 'Unlocks: Pricing gap analysis, contribution margin assessment')
+  renderIntakeStep() {
+    const s    = App.data.settings;
+    const step = this._intakeStep;
+    const total = 4;
+    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
 
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Server and Floor Data</div>'
-      + this.renderFileSection('highlight', 'Server Sales Report',                    'ra-f-server-sales', 'ra-server-sales','Unlocks: Check average by server, performance spread, top and bottom server')
-      + this.renderFileSection('optional',  'Server Upsell Tracking Report',          'ra-f-upsell',       'ra-upsell',      'Unlocks: Appetizer and dessert attach rates, upsell execution scoring by server')
-      + this.renderFileSection('optional',  'Pre-Shift Briefing Log',                 'ra-f-preshift',     'ra-preshift',    'Unlocks: Assessment of whether a performance standard is being communicated')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Labor Data</div>'
-      + this.renderFileSection('required',  'Weekly Labor Schedule',                  'ra-f-labor-sched',  'ra-labor-sched', 'Unlocks: RPLH calculation, labor percentage, schedule efficiency analysis')
-      + this.renderFileSection('optional',  'Time Clock or Payroll Actuals',          'ra-f-timeclock',    'ra-timeclock',   'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
-      + this.renderFileSection('optional',  'Labor Cost by Department',               'ra-f-labor-dept',   'ra-labor-dept',  'Unlocks: Department-level labor targeting, identifies which department is driving overage')
-
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px;">Events and Private Dining</div>'
-      + this.renderFileSection('optional',  'Private Dining and Event Revenue Records','ra-f-events',      'ra-events',      'Unlocks: Event frequency, average event revenue, minimum compliance, annual event revenue gap')
-      + this.renderFileSection('optional',  'Catering Revenue Records',               'ra-f-catering',     'ra-catering',    'Unlocks: Catering revenue trend, package performance, repeat client rate')
-      + this.renderFileSection('optional',  'Private Dining Rate Card',               'ra-f-rate-card',    'ra-rate-card',   'Unlocks: Pricing position analysis, minimum structure assessment')
-
-      + '<div style="margin-top:20px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-      + '<textarea id="ra-notes" rows="3" placeholder="Recent menu changes, staffing changes, seasonal factors, new event program, anything that affects how the numbers look..." style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);padding:10px;font-size:12px;resize:vertical;font-family:Barlow,sans-serif;"></textarea></div>'
-      + '<div style="display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="ra-gen-btn">Generate Audit</button>'
-      + '<button class="btn btn-ghost" id="ra-intake-cancel">Cancel</button>'
-      + '<div id="ra-gen-status" style="font-size:12px;color:var(--t2);display:none;flex:1;"></div>'
-      + '</div>'
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Revenue Audit</div>';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
       + '</div>';
 
-    document.body.appendChild(modal);
-    modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
-    document.getElementById('ra-intake-close').onclick  = () => modal.remove();
-    document.getElementById('ra-intake-cancel').onclick = () => modal.remove();
-    document.getElementById('ra-gen-btn').onclick = () => this.generateAudit(modal);
+    const nav = (showPrev, showNext, isSubmit) =>
+      '<div class="card-actions">'
+      + (showPrev ? '<button class="btn btn-ghost" id="ra-iz-prev">&#8592; Back</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>' : '')
+      + (showNext ? '<button class="btn btn-primary" id="ra-iz-next">Next &#8594;</button>' : '')
+      + '<button class="btn btn-ghost" id="ra-iz-cancel">Cancel</button>'
+      + '<div id="ra-iz-status" style="font-size:12px;color:var(--t2);display:none;flex:1;margin-left:8px;"></div>'
+      + '</div>';
+
+    let stepHtml = '';
+    if (step === 1) {
+      stepHtml = '<div class="card">' + header + barInfo
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Enter your annual bar and food revenue. This sets the dollar baselines for every gap calculation. Your app data from the last 30 days is included automatically.</div>'
+        + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Bar Revenue <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="ra-iz-bar-rev" placeholder="480000" value="' + esc(this._intakeDraft.barRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
+        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Annual Food Revenue <span style="color:var(--red);">*</span></label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="ra-iz-food-rev" placeholder="320000" value="' + esc(this._intakeDraft.foodRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
+        + '</div>'
+        + nav(false, true, false) + '</div>';
+    } else if (step === 2) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Sales Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Daily Sales Summary is required. Server sales report unlocks two full scored sections on its own.</div>'
+        + this.renderFileSection('required',  'POS Daily Sales Summary',                'ra-f-pos-daily',    'ra-pos-daily',   'Unlocks: Revenue trend, category split, blended check average')
+        + this.renderFileSection('optional',  'Menu Sales Mix Report',                  'ra-f-menu-mix',     'ra-menu-mix',    'Unlocks: Category concentration, menu engineering signals')
+        + this.renderFileSection('optional',  'Menu Price List',                        'ra-f-menu-prices',  'ra-menu-prices', 'Unlocks: Pricing gap analysis, contribution margin assessment')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 3) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Server, Labor and Events</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Server sales report is the highest-value file in this audit. Labor schedule is required for RPLH and prime cost.</div>'
+        + this.renderFileSection('highlight', 'Server Sales Report',                    'ra-f-server-sales', 'ra-server-sales','Unlocks: Check average by server, performance spread, top and bottom server')
+        + this.renderFileSection('optional',  'Server Upsell Tracking Report',          'ra-f-upsell',       'ra-upsell',      'Unlocks: Appetizer and dessert attach rates, upsell execution scoring by server')
+        + this.renderFileSection('optional',  'Pre-Shift Briefing Log',                 'ra-f-preshift',     'ra-preshift',    'Unlocks: Assessment of whether a performance standard is being communicated')
+        + this.renderFileSection('required',  'Weekly Labor Schedule',                  'ra-f-labor-sched',  'ra-labor-sched', 'Unlocks: RPLH calculation, labor percentage, schedule efficiency analysis')
+        + this.renderFileSection('optional',  'Time Clock or Payroll Actuals',          'ra-f-timeclock',    'ra-timeclock',   'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
+        + this.renderFileSection('optional',  'Labor Cost by Department',               'ra-f-labor-dept',   'ra-labor-dept',  'Unlocks: Department-level labor targeting')
+        + this.renderFileSection('optional',  'Private Dining and Event Revenue Records','ra-f-events',      'ra-events',      'Unlocks: Event frequency, average event revenue, minimum compliance')
+        + this.renderFileSection('optional',  'Catering Revenue Records',               'ra-f-catering',     'ra-catering',    'Unlocks: Catering revenue trend, package performance')
+        + this.renderFileSection('optional',  'Private Dining Rate Card',               'ra-f-rate-card',    'ra-rate-card',   'Unlocks: Pricing position analysis, minimum structure assessment')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 4) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
+        + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+        + '<textarea id="ra-iz-notes" rows="4" placeholder="Recent menu changes, staffing changes, seasonal factors, new event program, anything that affects how the numbers look..." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
+        + nav(true, false, true) + '</div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + stepHtml + '</div>';
+
+    document.getElementById('ra-iz-cancel')?.addEventListener('click', () => {
+      document.getElementById('topbar-sub').textContent = '';
+      this.renderMain();
+    });
+    document.getElementById('ra-iz-prev')?.addEventListener('click', () => {
+      this._saveIntakeStep();
+      this._intakeStep--;
+      this.renderIntakeStep();
+    });
+    document.getElementById('ra-iz-next')?.addEventListener('click', () => {
+      if (step === 1) {
+        const barRev  = parseFloat(document.getElementById('ra-iz-bar-rev')?.value) || 0;
+        const foodRev = parseFloat(document.getElementById('ra-iz-food-rev')?.value) || 0;
+        if (barRev === 0 && foodRev === 0) {
+          const st = document.getElementById('ra-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Enter at least one revenue figure to continue.'; }
+          return;
+        }
+        this._intakeDraft.barRev  = document.getElementById('ra-iz-bar-rev')?.value || '';
+        this._intakeDraft.foodRev = document.getElementById('ra-iz-food-rev')?.value || '';
+      }
+      if (step === 2) {
+        const posFiles = document.getElementById('ra-f-pos-daily')?.files;
+        if (!posFiles || posFiles.length === 0) {
+          const st = document.getElementById('ra-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='POS Daily Sales Summary is required.'; }
+          return;
+        }
+      }
+      this._saveIntakeStep();
+      this._intakeStep++;
+      this.renderIntakeStep();
+    });
+    document.getElementById('ra-iz-submit')?.addEventListener('click', () => {
+      this._intakeDraft.notes = document.getElementById('ra-iz-notes')?.value || '';
+      this.generateAudit();
+    });
   },
+
+  _saveIntakeStep() {
+    if (document.getElementById('ra-iz-bar-rev'))  this._intakeDraft.barRev  = document.getElementById('ra-iz-bar-rev').value;
+    if (document.getElementById('ra-iz-food-rev')) this._intakeDraft.foodRev = document.getElementById('ra-iz-food-rev').value;
+    if (document.getElementById('ra-iz-notes'))    this._intakeDraft.notes   = document.getElementById('ra-iz-notes').value;
+  },
+
 
   renderFileSection(type, title, inputId, ttId, unlocks) {
     const badge = type === 'required'
@@ -593,28 +668,18 @@ S.RevenueAudit = {
       + '</div>';
   },
 
-  async generateAudit(modal) {
-    const btn    = document.getElementById('ra-gen-btn');
-    const status = document.getElementById('ra-gen-status');
+  async generateAudit() {
+    const submitBtn = document.getElementById('ra-iz-submit');
+    const statusEl  = document.getElementById('ra-iz-status');
     const setStatus = (msg, color='var(--t2)') => {
-      if (status) { status.style.display='block'; status.style.color=color; status.textContent=msg; }
+      if (statusEl) { statusEl.style.display='block'; statusEl.style.color=color; statusEl.textContent=msg; }
     };
+    if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
-    const posFiles = document.getElementById('ra-f-pos-daily')?.files;
-    if (!posFiles || posFiles.length === 0) {
-      setStatus('POS Daily Sales Summary is required. Attach that file to continue.', 'var(--red)');
-      return;
-    }
+    const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
+    const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
 
-    const barRev  = parseFloat(document.getElementById('ra-bar-rev')?.value)  || 0;
-    const foodRev = parseFloat(document.getElementById('ra-food-rev')?.value) || 0;
-    if (barRev === 0 && foodRev === 0) {
-      setStatus('Annual Bar Revenue and Annual Food Revenue are required. Enter at least one to continue.', 'var(--red)');
-      return;
-    }
-
-    if (btn) { btn.disabled=true; btn.textContent='Analyzing...'; }
-    setStatus('Reading your files and app data...', 'var(--t2)');
+    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
       const auditAppData = JSON.parse(JSON.stringify(App.data));
@@ -629,13 +694,11 @@ S.RevenueAudit = {
       ];
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
-      form.append('notes', document.getElementById('ra-notes')?.value || '');
+      form.append('notes', this._intakeDraft?.notes || '');
       for (const id of fileInputIds) {
         const inp = document.getElementById(id);
         if (inp?.files) for (const f of inp.files) form.append(id, f, f.name);
       }
-
-      setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
       const res  = await fetch('/api/generate-revenue-audit', { method:'POST', body: form });
       const data = await res.json();
@@ -663,15 +726,16 @@ S.RevenueAudit = {
       if (App.data.revenue_audits.length > 12) App.data.revenue_audits = App.data.revenue_audits.slice(-12);
       await App.saveKey('revenue_audits');
 
-      modal.remove();
+      document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
       setTimeout(() => this.viewAudit(0), 100);
 
     } catch(e) {
       setStatus('Error: ' + (e.message || 'Audit generation failed. Try again.'), 'var(--red)');
-      if (btn) { btn.disabled=false; btn.textContent='Generate Audit'; }
+      if (submitBtn) { submitBtn.disabled=false; submitBtn.textContent='Generate Audit'; }
     }
   },
+
 
   extractSections(d) {
     const s = {};
