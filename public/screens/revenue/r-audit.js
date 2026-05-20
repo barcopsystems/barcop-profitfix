@@ -523,6 +523,10 @@ S.RevenueAudit = {
   _intakeStep: 1,
   _intakeDraft: null,
 
+  // ── Stepped intake wizard ─────────────────────────────────────────────────
+  _intakeStep: 1,
+  _intakeDraft: null,
+
   showIntakeForm() {
     this._intakeStep = 1;
     this._intakeDraft = { barRev: '', foodRev: '' };
@@ -543,7 +547,7 @@ S.RevenueAudit = {
   renderIntakeStep() {
     const s    = App.data.settings;
     const step = this._intakeStep;
-    const total = 4;
+    const total = 6;
     document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
 
     const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Revenue Audit</div>';
@@ -554,12 +558,13 @@ S.RevenueAudit = {
       + '</div>';
 
     const nav = (showPrev, showNext, isSubmit) =>
-      '<div class="card-actions">'
+      '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
       + (showPrev ? '<button class="btn btn-ghost" id="ra-iz-prev">&#8592; Back</button>' : '')
-      + (isSubmit ? '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>' : '')
       + (showNext ? '<button class="btn btn-primary" id="ra-iz-next">Next &#8594;</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>' : '')
+      + '<div style="flex:1;"></div>'
       + '<button class="btn btn-ghost" id="ra-iz-cancel">Cancel</button>'
-      + '<div id="ra-iz-status" style="font-size:12px;color:var(--t2);display:none;flex:1;margin-left:8px;"></div>'
+      + '<div id="ra-iz-status" style="font-size:12px;color:var(--t2);display:none;margin-left:8px;"></div>'
       + '</div>';
 
     let stepHtml = '';
@@ -575,31 +580,41 @@ S.RevenueAudit = {
     } else if (step === 2) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Sales Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Daily Sales Summary is required. Server sales report unlocks two full scored sections on its own.</div>'
-        + this.renderFileSection('required',  'POS Daily Sales Summary',                'ra-f-pos-daily',    'ra-pos-daily',   'Unlocks: Revenue trend, category split, blended check average')
-        + this.renderFileSection('optional',  'Menu Sales Mix Report',                  'ra-f-menu-mix',     'ra-menu-mix',    'Unlocks: Category concentration, menu engineering signals')
-        + this.renderFileSection('optional',  'Menu Price List',                        'ra-f-menu-prices',  'ra-menu-prices', 'Unlocks: Pricing gap analysis, contribution margin assessment')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Daily Sales Summary is required. Additional files unlock deeper category and menu scoring.</div>'
+        + this.renderFileSection('required', 'POS Daily Sales Summary',   'ra-f-pos-daily',   'ra-pos-daily',   'Unlocks: Revenue trend, category split, blended check average')
+        + this.renderFileSection('optional', 'Menu Sales Mix Report',      'ra-f-menu-mix',    'ra-menu-mix',    'Unlocks: Category concentration, menu engineering signals')
+        + this.renderFileSection('optional', 'Menu Price List',            'ra-f-menu-prices', 'ra-menu-prices', 'Unlocks: Pricing gap analysis, contribution margin assessment')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Server, Labor and Events</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Server sales report is the highest-value file in this audit. Labor schedule is required for RPLH and prime cost.</div>'
-        + this.renderFileSection('highlight', 'Server Sales Report',                    'ra-f-server-sales', 'ra-server-sales','Unlocks: Check average by server, performance spread, top and bottom server')
-        + this.renderFileSection('optional',  'Server Upsell Tracking Report',          'ra-f-upsell',       'ra-upsell',      'Unlocks: Appetizer and dessert attach rates, upsell execution scoring by server')
-        + this.renderFileSection('optional',  'Pre-Shift Briefing Log',                 'ra-f-preshift',     'ra-preshift',    'Unlocks: Assessment of whether a performance standard is being communicated')
-        + this.renderFileSection('required',  'Weekly Labor Schedule',                  'ra-f-labor-sched',  'ra-labor-sched', 'Unlocks: RPLH calculation, labor percentage, schedule efficiency analysis')
-        + this.renderFileSection('optional',  'Time Clock or Payroll Actuals',          'ra-f-timeclock',    'ra-timeclock',   'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
-        + this.renderFileSection('optional',  'Labor Cost by Department',               'ra-f-labor-dept',   'ra-labor-dept',  'Unlocks: Department-level labor targeting')
-        + this.renderFileSection('optional',  'Private Dining and Event Revenue Records','ra-f-events',      'ra-events',      'Unlocks: Event frequency, average event revenue, minimum compliance')
-        + this.renderFileSection('optional',  'Catering Revenue Records',               'ra-f-catering',     'ra-catering',    'Unlocks: Catering revenue trend, package performance')
-        + this.renderFileSection('optional',  'Private Dining Rate Card',               'ra-f-rate-card',    'ra-rate-card',   'Unlocks: Pricing position analysis, minimum structure assessment')
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Server and Floor Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Server sales report is the highest-value file in this audit. Unlocks two full scored sections on its own.</div>'
+        + this.renderFileSection('highlight', 'Server Sales Report',          'ra-f-server-sales', 'ra-server-sales', 'Unlocks: Check average by server, performance spread, top and bottom server — two full scored sections')
+        + this.renderFileSection('optional',  'Server Upsell Tracking Report','ra-f-upsell',       'ra-upsell',       'Unlocks: Appetizer and dessert attach rates, upsell execution scoring by server')
+        + this.renderFileSection('optional',  'Pre-Shift Briefing Log',       'ra-f-preshift',     'ra-preshift',     'Unlocks: Assessment of whether a performance standard is being communicated')
         + nav(true, true, false) + '</div>';
     } else if (step === 4) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Labor schedule is required for RPLH and prime cost calculations. Payroll actuals unlock deeper variance analysis.</div>'
+        + this.renderFileSection('required', 'Weekly Labor Schedule',       'ra-f-labor-sched', 'ra-labor-sched', 'Unlocks: RPLH calculation, labor percentage, schedule efficiency analysis')
+        + this.renderFileSection('optional', 'Time Clock or Payroll Actuals','ra-f-timeclock',   'ra-timeclock',   'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
+        + this.renderFileSection('optional', 'Labor Cost by Department',    'ra-f-labor-dept',  'ra-labor-dept',  'Unlocks: Department-level labor targeting, identifies which department is driving overage')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 5) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Events and Private Dining</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Upload whatever you have. Each file unlocks event revenue scoring and gap analysis.</div>'
+        + this.renderFileSection('optional', 'Private Dining and Event Revenue Records','ra-f-events',    'ra-events',    'Unlocks: Event frequency, average event revenue, minimum compliance, annual event revenue gap')
+        + this.renderFileSection('optional', 'Catering Revenue Records',                'ra-f-catering',  'ra-catering',  'Unlocks: Catering revenue trend, package performance, repeat client rate')
+        + this.renderFileSection('optional', 'Private Dining Rate Card',                'ra-f-rate-card', 'ra-rate-card', 'Unlocks: Pricing position analysis, minimum structure assessment')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 6) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
         + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-        + '<textarea id="ra-iz-notes" rows="4" placeholder="Recent menu changes, staffing changes, seasonal factors, new event program, anything that affects how the numbers look..." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
+        + '<textarea id="ra-iz-notes" rows="4" placeholder="Recent changes, seasonal factors, staffing changes, anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
         + nav(true, false, true) + '</div>';
     }
 
