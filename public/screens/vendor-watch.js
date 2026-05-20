@@ -63,8 +63,8 @@ S.VendorWatch = {
       +'<div class="calc-item"><div class="calc-label">Annual Impact $ '+tt('annual-impact')+'</div><div class="calc-val" id="vw-ai">—</div></div>'
       +'</div>'
       +'<div class="card-actions">'
-      +'<button class="btn btn-ghost" id="vw-cancel">Cancel</button>'
       +'<button class="btn btn-primary" id="vw-save">Update Cost</button>'
+      +'<button class="btn btn-ghost" id="vw-cancel">Cancel</button>'
       +'<span id="vw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       +'</div></div>';
   },
