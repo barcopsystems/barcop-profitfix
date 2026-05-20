@@ -296,17 +296,12 @@ S.TrafficAudit = {
 
     // Add Print button to topbar actions
     this.actions.innerHTML = '';
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print / Save PDF';
-    printBtn.onclick = () => window.print();
-    this.actions.appendChild(printBtn);
     const backBtn = document.createElement('button');
     backBtn.className = 'btn btn-ghost btn-sm';
     backBtn.textContent = '← Back';
     backBtn.style.marginRight = '8px';
     backBtn.onclick = () => this.renderMain();
-    this.actions.insertBefore(backBtn, printBtn);
+    this.actions.appendChild(backBtn);
 
     const d = audit.raw || audit;
     const scoreColor = (audit.overall_score||0) >= 80 ? '#C9A84C' : (audit.overall_score||0) >= 60 ? '#fff' : '#c0392b';
