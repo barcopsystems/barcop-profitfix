@@ -204,6 +204,9 @@ document.addEventListener('scroll', () => TT.hide(), true);
 /* ── App ── */
 const App = {
   data: null,
+  inventoryData: null,   // ic_ keys — ic_data table (see Rule 21)
+  laborData: null,       // lc_ keys — lc_data table
+  shiftData: null,       // sc_ keys — sc_data table
   subscription: { status: 'inactive', plan: null, active_modules: [], period_end: null },
 
   async init() {
@@ -213,7 +216,7 @@ const App = {
       if (el) el.innerHTML = '<div class="screen" style="color:var(--red);font-family:monospace;font-size:12px;white-space:pre-wrap;">ERROR: ' + msg + '\nLine: ' + line + '\n' + (err ? err.stack : '') + '</div>';
     };
     if (!window.SUPABASE_URL) {
-      this.data = await DB.readData();
+      await this.loadAllData();
       this.boot();
       return;
     }
@@ -230,7 +233,7 @@ const App = {
             if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
           });
         } else if (event === 'SIGNED_IN' && session) {
-          this.data = await DB.readData();
+          await this.loadAllData();
           this.subscription = await DB.getSubscription();
           this.boot();
         } else if (event === 'SIGNED_OUT') {
@@ -243,7 +246,7 @@ const App = {
     }
     const session = await DB.getSession();
     if (session) {
-      this.data = await DB.readData();
+      await this.loadAllData();
       this.subscription = await DB.getSubscription();
       this.boot();
     } else {
@@ -263,7 +266,7 @@ const App = {
           if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
         });
       } else if (event === 'SIGNED_IN' && session) {
-        this.data = await DB.readData();
+        await this.loadAllData();
         this.subscription = await DB.getSubscription();
         this.boot();
       } else if (event === 'SIGNED_OUT') {
@@ -362,6 +365,32 @@ const App = {
   async saveKey(key) {
     const r = await DB.writeKey(key, this.data[key]);
     if (!r.ok) console.error('saveKey failed:', r.error);
+    return r.ok;
+  },
+
+  // Load Recovery data plus the three Control data stores (Rule 21)
+  async loadAllData() {
+    this.data          = await DB.readData();
+    this.inventoryData = await DB.readInventoryData();
+    this.laborData     = await DB.readLaborData();
+    this.shiftData     = await DB.readShiftData();
+  },
+
+  async saveInventory() {
+    const r = await DB.writeInventoryData(this.inventoryData);
+    if (!r.ok) console.error('saveInventory failed:', r.error);
+    return r.ok;
+  },
+
+  async saveLabor() {
+    const r = await DB.writeLaborData(this.laborData);
+    if (!r.ok) console.error('saveLabor failed:', r.error);
+    return r.ok;
+  },
+
+  async saveShift() {
+    const r = await DB.writeShiftData(this.shiftData);
+    if (!r.ok) console.error('saveShift failed:', r.error);
     return r.ok;
   },
 
@@ -715,7 +744,7 @@ function wireAuth() {
     } else {
       msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block';
       // Manually boot since SIGNED_IN may not re-fire after updateUser
-      App.data = await DB.readData();
+      await App.loadAllData();
       App.subscription = await DB.getSubscription();
       App.boot();
     }
