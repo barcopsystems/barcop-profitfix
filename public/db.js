@@ -257,6 +257,9 @@ const DB = {
           monthly_sessions:   2000,
           social_posts_month: 12
         },
+        // Static digital-presence profile state — set once on the scorecard
+        // screens, not repeated on every weekly record.
+        profile: {},
         _targets_saved: false
       },
       traffic_weeks:   [],
