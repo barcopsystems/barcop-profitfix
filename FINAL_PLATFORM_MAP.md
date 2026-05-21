@@ -1,4 +1,4 @@
-[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28109699/FINAL_PLATFORM_MAP.md)
+[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28112929/FINAL_PLATFORM_MAP.md)
 # Bar Cop — Final Complete Platform Map
 # Version 3.0 — Hub as Command Center
 Created: May 21, 2026
@@ -1472,6 +1472,24 @@ On next app load: detect unsynced count, prompt to sync.
 13. Delete resources.js, r-resources.js, and t-resources.js from the repo and remove their script tags from index.html — Resources is removed platform-wide; the Control modules are built without Resources screens from the start
 
 ### Stage 3 — Inventory Control Phase 1
+
+> ## ⛔ STOP — GATE BEFORE STAGE 3
+> Do NOT write a single Control module screen (anything prefixed ic-, lc-, sc-)
+> until the Rule 21 Supabase tables exist. See SECTION 15 → RULE 21.
+>
+> Required first, in order:
+> 1. The chat MUST pause here and walk the user through running the Rule 21 SQL
+>    (the `CREATE TABLE ic_data / lc_data / sc_data` blocks plus RLS policies) in
+>    the Supabase dashboard: supabase.com → the project → SQL Editor → new query →
+>    paste the SQL from Rule 21 → Run. Confirm all three tables were created.
+> 2. Add that same SQL to SUPABASE_SETUP.sql in the repo.
+> 3. Add the six DB methods (readInventoryData/writeInventoryData, etc.) and the
+>    App.inventoryData / App.laborData / App.shiftData state objects, per Rule 21.
+>
+> Only after the user confirms the tables exist may screen-building (step 13+) begin.
+> Building Control screens against the old user_data JSON blob is the one mistake
+> this plan must not make. This is a hard gate, not a suggestion.
+
 13. ic-product-setup.js with Profit Recovery sync
 14. ic-locations.js
 15. ic-vendors.js
