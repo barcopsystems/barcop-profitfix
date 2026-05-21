@@ -284,7 +284,7 @@ S.Hub = {
       { name:'Traffic Recovery', icon:icons.traffic, screen:'t-dashboard', mod:'traffic' },
       { name:'Inventory Control',icon:icons.inv,   screen:'ic-dashboard', mod:'inventory' },
       { name:'Labor Control',    icon:icons.labor, soon:true },
-      { name:'Shift Control',    icon:icons.shift, screen:'sc-log-shift', mod:'shift' },
+      { name:'Shift Control',    icon:icons.shift, screen:'sc-dashboard', mod:'shift' },
     ];
     const navHtml = navItems.map(n => n.soon
       ? `<div class="hd-nav soon"><svg width="15" height="15" viewBox="0 0 15 15" fill="none">${n.icon}</svg><span style="flex:1;">${n.name}</span><span style="font-size:7px;font-weight:800;letter-spacing:0.07em;color:var(--t4);border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:2px 4px;">SOON</span></div>`
