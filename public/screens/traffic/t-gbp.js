@@ -1,67 +1,118 @@
 'use strict';
 S.TrafficGBP = {
+  // Profile completeness checklist — stored once in traffic_settings.profile
+  TOGGLES: [
+    ['gbp_claimed',    'Listing claimed'],
+    ['gbp_hours',      'Hours complete'],
+    ['gbp_phone',      'Phone number present'],
+    ['gbp_website',    'Website linked'],
+    ['gbp_menu',       'Menu link active'],
+    ['gbp_category',   'Primary category set'],
+    ['gbp_attributes', 'Attributes complete'],
+    ['gbp_qa',         'Q and A populated']
+  ],
+
   render(container, actions) {
     actions.innerHTML = '';
-    const weeks = (App.data.traffic_weeks || []).slice();
-    const ts    = App.data.traffic_settings?.targets || {};
-    const tGR   = ts.google_rating   || 4.3;
-    const tRV   = ts.review_velocity || 8;
-    const tRR   = ts.response_rate   || 75;
+    this.container = container;
+    this.draw();
+  },
 
-    if (!weeks.length) {
-      container.innerHTML = '<div class="screen"><div class="card"><div class="empty">'
-        + '<div class="empty-title">No Data Yet</div>'
-        + '<div class="empty-sub">Save a week in This Week with your Google rating, review count, and response rate to see your Google Business Profile scorecard.</div>'
-        + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'t-this-week\')">Go to This Week</button></div>'
-        + '</div></div></div>';
-      return;
-    }
+  draw() {
+    const container = this.container;
+    const ts    = App.data.traffic_settings || {};
+    const prof  = ts.profile || {};
+    const tGR   = ts.targets?.google_rating || 4.3;
+    const weeks = App.data.traffic_weeks || [];
+    const latest = weeks.length ? weeks[weeks.length - 1] : null;
 
-    const latest = weeks[weeks.length - 1];
-    const prev   = weeks[weeks.length - 2] || null;
+    const checked    = this.TOGGLES.filter(([k]) => prof[k]).length;
+    const completion = Math.round(checked / this.TOGGLES.length * 100);
+    const photos = prof.gbp_photos != null ? prof.gbp_photos : null;
+    const posts  = prof.gbp_posts  != null ? prof.gbp_posts  : null;
+    const rating = latest?.google_rating ?? null;
+    const reviews = latest?.google_total ?? null;
 
-    const trend = (cur, was, suffix) => {
-      if (cur == null || was == null) return ' ';
-      const diff = cur - was;
-      if (Math.abs(diff) < 0.01) return 'No change vs last week';
-      const arrow = diff > 0 ? '↑' : '↓';
-      const amt   = suffix === '★' ? Math.abs(diff).toFixed(1) : Math.round(Math.abs(diff)).toLocaleString();
-      return arrow + ' ' + amt + (suffix || '') + ' vs last week';
-    };
+    // ── Metric cards ──
+    const card = (label, valHtml, targetStr) =>
+      '<div class="metric-card"><div class="metric-label">' + label + '</div>'
+      + valHtml
+      + '<div class="metric-target">' + targetStr + '</div>'
+      + '<div class="metric-trend"> </div></div>';
 
-    const card = (label, val, targetStr, onTarget, trendStr) => {
-      const valHtml = val == null
-        ? '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>'
-        : '<div class="metric-val ' + (onTarget == null ? '' : onTarget ? 'on-target' : 'over-target') + '">' + val + '</div>';
-      return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
-        + valHtml
-        + '<div class="metric-target">' + targetStr + '</div>'
-        + '<div class="metric-trend">' + (trendStr || ' ') + '</div>'
-        + '</div>';
-    };
-
-    const gr = latest.google_rating, gt = latest.google_total, nr = latest.new_reviews, rr = latest.response_rate;
+    const onTargetVal = (val, onTarget) => '<div class="metric-val ' + (onTarget == null ? '' : onTarget ? 'on-target' : 'over-target') + '">' + val + '</div>';
+    const noData = '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>';
 
     const cards =
-        card('Google Rating',  gr != null ? gr.toFixed(1) + '★' : null,         'Target: ' + tGR + '★',   gr != null ? gr >= tGR : null, trend(gr, prev?.google_rating, '★'))
-      + card('Total Reviews',  gt != null ? gt.toLocaleString() : null,          'All reviews on Google',  null,                          trend(gt, prev?.google_total, ''))
-      + card('New Reviews/Mo', nr != null ? String(nr) : null,                   'Target: ' + tRV + '/mo', nr != null ? nr >= tRV : null, trend(nr, prev?.new_reviews, ''))
-      + card('Response Rate',  rr != null ? Math.round(rr) + '%' : null,          'Target: ' + tRR + '%',   rr != null ? rr >= tRR : null, trend(rr, prev?.response_rate, '%'));
+        card('Profile Completeness', '<div class="metric-val" style="color:' + App.scoreColor(completion) + ';">' + completion + '%</div>', checked + ' of ' + this.TOGGLES.length + ' complete')
+      + card('Google Rating',  rating  != null ? onTargetVal(rating.toFixed(1) + '★', rating >= tGR) : noData, 'Target: ' + tGR + '★')
+      + card('Photo Count',    photos  != null ? onTargetVal(photos.toLocaleString(), photos >= 100) : noData, 'Benchmark: 100+')
+      + card('GBP Posts/Mo',   posts   != null ? onTargetVal(String(posts), posts >= 8) : noData, 'Benchmark: 8/mo');
 
-    const histRows = weeks.slice().reverse().slice(0,12).map(w =>
-      '<tr><td>Wk ' + w.week_num + '</td>'
-      + '<td class="' + (w.google_rating == null ? '' : w.google_rating >= tGR ? 'pos' : 'neg') + '">' + (w.google_rating != null ? w.google_rating.toFixed(1) + '★' : '&mdash;') + '</td>'
-      + '<td>' + (w.google_total != null ? w.google_total.toLocaleString() : '&mdash;') + '</td>'
-      + '<td class="' + (w.new_reviews == null ? '' : w.new_reviews >= tRV ? 'pos' : 'neg') + '">' + (w.new_reviews != null ? w.new_reviews : '&mdash;') + '</td>'
-      + '<td class="' + (w.response_rate == null ? '' : w.response_rate >= tRR ? 'pos' : 'neg') + '">' + (w.response_rate != null ? Math.round(w.response_rate) + '%' : '&mdash;') + '</td>'
-      + '</tr>'
-    ).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
+    // ── Completeness checklist ──
+    const toggleRows = this.TOGGLES.map(([k, label]) =>
+      '<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);font-size:13px;color:var(--t1);cursor:pointer;">'
+      + '<input type="checkbox" class="gbp-tog" data-key="' + k + '"' + (prof[k] ? ' checked' : '')
+      + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
+      + label + '</label>'
+    ).join('');
+
+    const profileCard = '<div class="card">'
+      + '<div class="card-title">Profile Completeness</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:16px;">' + toggleRows + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:170px;"><label>Photo Count</label><div class="fw"><input class="suf" type="number" id="gbp-photos" value="' + (photos != null ? photos : '') + '" min="0"/><span class="suf">photos</span></div></div>'
+      + '<div class="f" style="width:170px;"><label>GBP Posts This Month</label><div class="fw"><input class="suf" type="number" id="gbp-posts" value="' + (posts != null ? posts : '') + '" min="0"/><span class="suf">posts</span></div></div>'
+      + '</div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="gbp-save">Save Profile</button>'
+      + '<span id="gbp-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;margin-left:8px;">Saved.</span>'
+      + '</div></div>';
+
+    // ── Action tips ──
+    const tips = [];
+    this.TOGGLES.forEach(([k, label]) => { if (!prof[k]) tips.push('Complete this profile item: ' + label + '.'); });
+    if (rating != null && rating < tGR) tips.push('Google rating is ' + rating.toFixed(1) + '★, below the ' + tGR + '★ target. Ask satisfied guests for reviews.');
+    if (photos != null && photos < 100) tips.push('Photo count is ' + photos + '. Aim for 100 or more — listings with more photos get more clicks.');
+    if (posts != null && posts < 8) tips.push('Only ' + posts + ' GBP posts this month. Post at least 8 — offers, events, and updates keep the listing active.');
+    if (photos == null) tips.push('Enter your photo count above to score this section.');
+    if (posts == null) tips.push('Enter your GBP posts this month above to score this section.');
+
+    const tipsCard = tips.length
+      ? '<div class="card"><div class="card-title">Action Items</div>'
+        + tips.map((t,i) =>
+            '<div style="display:flex;gap:12px;padding:9px 0;' + (i < tips.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t3);width:22px;flex-shrink:0;">' + (i+1) + '</div>'
+            + '<div style="font-size:13px;color:var(--t1);line-height:1.5;">' + esc(t) + '</div></div>'
+          ).join('')
+        + '</div>'
+      : '<div class="card"><div class="empty"><div class="empty-title">Profile Looks Strong</div>'
+        + '<div class="empty-sub">Every Google Business Profile item is complete and on benchmark. Keep posting and gathering reviews.</div></div></div>';
 
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
-      + '<div class="sh" style="margin-top:16px;">Profile History</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Week</th><th>Rating</th><th>Total Reviews</th><th>New/Mo</th><th>Response Rate</th></tr></thead>'
-      + '<tbody>' + histRows + '</tbody></table></div>'
+      + profileCard
+      + tipsCard
       + '</div>';
+
+    document.getElementById('gbp-save')?.addEventListener('click', () => this.save());
+  },
+
+  async save() {
+    const ts = App.data.traffic_settings || (App.data.traffic_settings = {});
+    const prof = ts.profile || (ts.profile = {});
+    this.container.querySelectorAll('.gbp-tog').forEach(cb => { prof[cb.dataset.key] = cb.checked; });
+    const photos = parseInt(document.getElementById('gbp-photos')?.value);
+    const posts  = parseInt(document.getElementById('gbp-posts')?.value);
+    prof.gbp_photos = isNaN(photos) ? null : photos;
+    prof.gbp_posts  = isNaN(posts)  ? null : posts;
+    const ok = await App.saveKey('traffic_settings');
+    this.draw();
+    const msg = document.getElementById('gbp-msg');
+    if (msg) {
+      msg.textContent = ok ? 'Saved.' : 'Save failed.';
+      msg.style.color = ok ? 'var(--gold)' : 'var(--red)';
+      msg.style.display = 'inline';
+    }
   }
 };
