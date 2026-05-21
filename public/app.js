@@ -581,6 +581,7 @@ const App = {
         'sc-closing-checklist': S.ShiftClosingChecklist,
         'sc-checklist-templates': S.ShiftChecklistTemplates,
         'sc-reports-shift': S.ShiftReportsShift,
+        'sc-reports-cash': S.ShiftReportsCash,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
