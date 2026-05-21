@@ -24,11 +24,17 @@ S.TrafficThisWeek = {
       google_total: '',
       new_reviews: '',
       response_rate: '',
+      yelp_rating: '',
       monthly_sessions: '',
       bounce_rate: '',
       ig_followers: '',
       ig_posts_month: '',
       fb_followers: '',
+      dd_rating: '',
+      ue_rating: '',
+      gh_rating: '',
+      email_list_size: '',
+      email_open_rate: '',
       notes: ''
     };
   },
@@ -47,15 +53,14 @@ S.TrafficThisWeek = {
   renderStep(step) {
     this.step = step;
     this.saveDraft();
-    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of 5';
+    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of 6';
     this.container.innerHTML = '<div class="screen">' + this.stepsHtml() + this.getStepHtml(step) + '</div>';
     this.wireStep(step);
   },
 
   stepsHtml() {
-    const labels = ['Period', 'Google', 'Website', 'Social', 'Review'];
     let h = '<div class="steps">';
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 6; i++) {
       const cls = i < this.step ? 'done' : i === this.step ? 'active' : '';
       h += (i > 1 ? '<div class="step-line' + (i-1 < this.step ? ' done' : '') + '"></div>' : '')
          + '<div class="step-dot ' + cls + '">' + (i < this.step ? '✓' : i) + '</div>';
@@ -70,6 +75,7 @@ S.TrafficThisWeek = {
       case 3: return this.step3();
       case 4: return this.step4();
       case 5: return this.step5();
+      case 6: return this.step6();
       default: return '';
     }
   },
@@ -110,12 +116,13 @@ S.TrafficThisWeek = {
       ? '<span class="calc-val good">' + rr.toFixed(0) + '% On Target</span>'
       : '<span class="calc-val warn">' + rr.toFixed(0) + '% Below Target (' + tRR + '%)</span>') : '';
 
-    return '<div class="card"><div class="card-title">Google Business Profile</div>'
+    return '<div class="card"><div class="card-title">Google and Yelp</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:160px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-gr" value="' + esc(this.draft.google_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">★</span></div></div>'
       + '<div class="f" style="width:160px;"><label>Total Google Reviews</label><div class="fw"><input class="suf" type="number" id="ttw-gt" value="' + esc(this.draft.google_total) + '" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">total</span></div></div>'
       + '<div class="f" style="width:160px;"><label>New Reviews/Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="ttw-nr" value="' + esc(this.draft.new_reviews) + '" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">/mo</span></div></div>'
       + '<div class="f" style="width:160px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="ttw-rr" value="' + esc(this.draft.response_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>Yelp Rating</label><div class="fw"><input class="suf" type="number" id="ttw-yr" value="' + esc(this.draft.yelp_rating) + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Rating vs Target</div><div id="ttw-gr-status">' + (grStatus || '<span class="calc-val">Enter rating</span>') + '</div></div>'
@@ -166,7 +173,7 @@ S.TrafficThisWeek = {
     const br  = parseFloat(document.getElementById('ttw-br')?.value)  || null;
     const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
     set('ttw-ss-status', ss != null ? (ss >= tSS ? '<span class="calc-val good">' + ss.toLocaleString() + ' On Target</span>' : '<span class="calc-val warn">' + ss.toLocaleString() + ' Below ' + tSS.toLocaleString() + ' Target</span>') : '<span class="calc-val">Enter sessions</span>');
-    set('ttw-br-status', br != null ? (br <= 60 ? '<span class="calc-val good">' + br.toFixed(0) + '% Good</span>' : br <= 70 ? '<span class="calc-val">' + br.toFixed(0) + '% Moderate</span>' : '<span class="calc-val warn">' + br.toFixed(0) + '% High — homepage needs a clearer call to action</span>') : '<span class="calc-val">Enter bounce rate</span>');
+    set('ttw-br-status', br != null ? (br <= 60 ? '<span class="calc-val good">' + br.toFixed(0) + '% Good</span>' : br <= 70 ? '<span class="calc-val">' + br.toFixed(0) + '% Moderate</span>' : '<span class="calc-val warn">' + br.toFixed(0) + '% High, homepage needs a clearer call to action</span>') : '<span class="calc-val">Enter bounce rate</span>');
   },
 
   step4() {
@@ -199,6 +206,36 @@ S.TrafficThisWeek = {
   },
 
   step5() {
+    return '<div class="card"><div class="card-title">Delivery and Email</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:160px;"><label>DoorDash Rating</label><div class="fw"><input class="suf" type="number" id="ttw-dd" value="' + esc(this.draft.dd_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>Uber Eats Rating</label><div class="fw"><input class="suf" type="number" id="ttw-ue" value="' + esc(this.draft.ue_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>Grubhub Rating</label><div class="fw"><input class="suf" type="number" id="ttw-gh" value="' + esc(this.draft.gh_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:200px;"><label>Email List Size</label><div class="fw"><input class="suf" type="number" id="ttw-els" value="' + esc(this.draft.email_list_size) + '"/><span class="suf">contacts</span></div></div>'
+      + '<div class="f" style="width:180px;"><label>Email Open Rate</label><div class="fw"><input class="suf" type="number" id="ttw-eor" value="' + esc(this.draft.email_open_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">%</span></div></div>'
+      + '</div>'
+      + '<div class="calc">'
+      + '<div class="calc-item"><div class="calc-label">Delivery Rating Avg</div><div id="ttw-dl-status"><span class="calc-val">Enter ratings</span></div></div>'
+      + '<div class="calc-item"><div class="calc-label">Email Open Rate</div><div id="ttw-eor-status"><span class="calc-val">Enter rate</span></div></div>'
+      + '</div>'
+      + this.nav(true, true) + '</div>';
+  },
+
+  calcDelivery() {
+    const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    const dd = parseFloat(document.getElementById('ttw-dd')?.value) || null;
+    const ue = parseFloat(document.getElementById('ttw-ue')?.value) || null;
+    const gh = parseFloat(document.getElementById('ttw-gh')?.value) || null;
+    const ratings = [dd, ue, gh].filter(v => v != null);
+    const avg = ratings.length ? ratings.reduce((a,b) => a+b, 0) / ratings.length : null;
+    const eor = parseFloat(document.getElementById('ttw-eor')?.value) || null;
+    set('ttw-dl-status', avg != null ? (avg >= 4.5 ? '<span class="calc-val good">' + avg.toFixed(1) + '★ On Target</span>' : '<span class="calc-val warn">' + avg.toFixed(1) + '★ Below 4.5★ Target</span>') : '<span class="calc-val">Enter ratings</span>');
+    set('ttw-eor-status', eor != null ? (eor >= 20 ? '<span class="calc-val good">' + eor.toFixed(0) + '% On Target</span>' : '<span class="calc-val warn">' + eor.toFixed(0) + '% Below 20% Target</span>') : '<span class="calc-val">Enter rate</span>');
+  },
+
+  step6() {
     const d   = this.draft;
     const ts  = App.data.traffic_settings?.targets || {};
     const tGR = ts.google_rating    || 4.3;
@@ -215,24 +252,35 @@ S.TrafficThisWeek = {
         + '<td style="color:var(--t3);">Target: ' + target + '</td></tr>';
     };
 
-    const gr = parseFloat(d.google_rating) || null;
-    const rv = parseInt(d.new_reviews)     || null;
-    const rr = parseFloat(d.response_rate) || null;
-    const ss = parseInt(d.monthly_sessions)|| null;
-    const br = parseFloat(d.bounce_rate)   || null;
-    const igp= parseInt(d.ig_posts_month)  || null;
+    const gr  = parseFloat(d.google_rating) || null;
+    const rv  = parseInt(d.new_reviews)     || null;
+    const rr  = parseFloat(d.response_rate) || null;
+    const yr  = parseFloat(d.yelp_rating)   || null;
+    const ss  = parseInt(d.monthly_sessions)|| null;
+    const br  = parseFloat(d.bounce_rate)   || null;
+    const igp = parseInt(d.ig_posts_month)  || null;
+    const dd  = parseFloat(d.dd_rating)     || null;
+    const ue  = parseFloat(d.ue_rating)     || null;
+    const gh  = parseFloat(d.gh_rating)     || null;
+    const eor = parseFloat(d.email_open_rate) || null;
 
-    return '<div class="card"><div class="card-title">Review — Week ' + esc(String(d.week_num)) + '</div>'
+    return '<div class="card"><div class="card-title">Week ' + esc(String(d.week_num)) + ' Review</div>'
       + '<div class="tbl-wrap" style="margin-bottom:14px;"><table class="sum-tbl"><thead><tr><th></th><th>This Week</th><th></th></tr></thead><tbody>'
       + row('Google Rating',    gr != null ? gr.toFixed(1) + '★' : '',         tGR + '★',    gr != null && gr >= tGR)
-      + row('Total Reviews',    d.google_total || '',                            '',           true)
+      + row('Total Reviews',    d.google_total || '',                           '',           true)
       + row('New Reviews/Mo',   rv != null ? rv + ' reviews' : '',              tRV + '/mo',  rv != null && rv >= tRV)
       + row('Response Rate',    rr != null ? rr.toFixed(0) + '%' : '',          tRR + '%',    rr != null && rr >= tRR)
-      + row('Sessions/Mo', ss != null ? ss.toLocaleString() : '',          tSS.toLocaleString() + '/mo', ss != null && ss >= tSS)
+      + row('Yelp Rating',      yr != null ? yr.toFixed(1) + '★' : '',          '4.0★',       yr != null && yr >= 4.0)
+      + row('Sessions/Mo',      ss != null ? ss.toLocaleString() : '',          tSS.toLocaleString() + '/mo', ss != null && ss >= tSS)
       + row('Bounce Rate',      br != null ? br.toFixed(0) + '%' : '',          'Under 60%',  br != null && br <= 60)
-      + row('IG Followers',     d.ig_followers || '',                            '',           true)
+      + row('IG Followers',     d.ig_followers || '',                           '',           true)
       + row('IG Posts/Mo',      igp != null ? igp + ' posts' : '',              tSP + '/mo',  igp != null && igp >= tSP)
-      + row('FB Followers',     d.fb_followers || '',                            '',           true)
+      + row('FB Followers',     d.fb_followers || '',                           '',           true)
+      + row('DoorDash Rating',  dd != null ? dd.toFixed(1) + '★' : '',          '4.5★',       dd != null && dd >= 4.5)
+      + row('Uber Eats Rating', ue != null ? ue.toFixed(1) + '★' : '',          '4.5★',       ue != null && ue >= 4.5)
+      + row('Grubhub Rating',   gh != null ? gh.toFixed(1) + '★' : '',          '4.5★',       gh != null && gh >= 4.5)
+      + row('Email List Size',  d.email_list_size || '',                        '',           true)
+      + row('Email Open Rate',  eor != null ? eor.toFixed(0) + '%' : '',        '20% or more', eor != null && eor >= 20)
       + '</tbody></table></div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label><textarea id="ttw-notes" rows="2">' + esc(d.notes || '') + '</textarea></div>'
       + this.nav(true, false, true)
@@ -244,6 +292,7 @@ S.TrafficThisWeek = {
     if (step === 2) setTimeout(() => this.calcGBP(), 0);
     if (step === 3) setTimeout(() => this.calcWeb(), 0);
     if (step === 4) setTimeout(() => this.calcSocial(), 0);
+    if (step === 5) setTimeout(() => this.calcDelivery(), 0);
 
     const nxt = document.getElementById('ttw-next');
     if (nxt) nxt.onclick = () => {
@@ -275,6 +324,7 @@ S.TrafficThisWeek = {
       d.google_total   = val('ttw-gt');
       d.new_reviews    = val('ttw-nr');
       d.response_rate  = val('ttw-rr');
+      d.yelp_rating    = val('ttw-yr');
     }
     if (step === 3) {
       d.monthly_sessions = val('ttw-ss');
@@ -286,6 +336,13 @@ S.TrafficThisWeek = {
       d.fb_followers   = val('ttw-fbf');
     }
     if (step === 5) {
+      d.dd_rating        = val('ttw-dd');
+      d.ue_rating        = val('ttw-ue');
+      d.gh_rating        = val('ttw-gh');
+      d.email_list_size  = val('ttw-els');
+      d.email_open_rate  = val('ttw-eor');
+    }
+    if (step === 6) {
       d.notes = val('ttw-notes');
     }
   },
@@ -317,11 +374,17 @@ S.TrafficThisWeek = {
       google_total:    parseInt(d.google_total)    || null,
       new_reviews:     rv,
       response_rate:   rr,
+      yelp_rating:     parseFloat(d.yelp_rating)   || null,
       monthly_sessions:ss,
       bounce_rate:     parseFloat(d.bounce_rate)   || null,
       ig_followers:    parseInt(d.ig_followers)    || null,
       ig_posts_month:  parseInt(d.ig_posts_month)  || null,
       fb_followers:    parseInt(d.fb_followers)    || null,
+      dd_rating:       parseFloat(d.dd_rating)     || null,
+      ue_rating:       parseFloat(d.ue_rating)     || null,
+      gh_rating:       parseFloat(d.gh_rating)     || null,
+      email_list_size: parseInt(d.email_list_size) || null,
+      email_open_rate: parseFloat(d.email_open_rate) || null,
       notes:           d.notes
     };
 
