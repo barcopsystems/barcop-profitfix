@@ -725,6 +725,14 @@ S.AuditTracker = {
     const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
     const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
 
+    // Validation — do not run an audit with nothing to analyze
+    const hasRealData = allFiles.length > 0 || (App.data.weeks && App.data.weeks.length > 0) || barRev > 0 || foodRev > 0;
+    if (!hasRealData) {
+      setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your POS reports.', 'var(--red)');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
+      return;
+    }
+
     setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
