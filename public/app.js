@@ -576,6 +576,7 @@ const App = {
         'sc-86-list': S.Shift86List,
         'sc-void-comp': S.ShiftVoidComp,
         'sc-maintenance': S.ShiftMaintenance,
+        'sc-opening-checklist': S.ShiftOpeningChecklist,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
