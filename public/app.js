@@ -520,9 +520,10 @@ const App = {
         'ic-help':             ['Help and FAQ', 'Inventory Control'],
       };
       const icScreens = {
-        'ic-product-setup': S.InventoryProducts,
-        'ic-locations':     S.InventoryLocations,
-        'ic-vendors':       S.InventoryVendors,
+        'ic-product-setup':  S.InventoryProducts,
+        'ic-locations':      S.InventoryLocations,
+        'ic-vendors':        S.InventoryVendors,
+        'ic-take-inventory': S.InventoryTakeInventory,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = icTitle;
