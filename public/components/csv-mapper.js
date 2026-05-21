@@ -1,0 +1,161 @@
+'use strict';
+
+/* ── CSV Mapper — reusable column-mapping import component ────────────────────
+   Used for POS sales imports (Variance Report) and timeclock imports (Labor
+   Control). Reads CSV / XLSX, auto-detects columns, lets the user remap, and
+   remembers the mapping per file format (header signature) in localStorage.
+
+   CSVMapper.mount(containerEl, {
+     fields:       [{ key, label, required, match:[keywords] }],
+     hint:         'optional help line (HTML allowed)',
+     confirmLabel: 'Import',
+     onComplete:   rows => {}      // rows: [{ <key>: value, ... }] one per data row
+   }); */
+
+const CSVMapper = {
+  _LS: 'csv_mappings',
+
+  mount(container, opts) {
+    container.innerHTML =
+      '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Accepted: CSV, XLSX, XLS</div>'
+      + (opts.hint ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + opts.hint + '</div>' : '')
+      + '<div class="form-row" style="gap:16px;"><div class="f"><label>Select File</label>'
+      + '<input type="file" class="csvm-file" accept=".csv,.xlsx,.xls" '
+      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:8px;font-size:12px;cursor:pointer;"/></div></div>'
+      + '<div class="csvm-area"></div>';
+    container.querySelector('.csvm-file').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (f) this._readFile(f, container, opts);
+    });
+  },
+
+  _area(c) { return c.querySelector('.csvm-area'); },
+  _msg(c, text, color) {
+    this._area(c).innerHTML = '<div style="font-size:12px;color:' + (color || 'var(--t3)') + ';margin-top:12px;">' + esc(text) + '</div>';
+  },
+
+  _readFile(file, container, opts) {
+    this._msg(container, 'Reading file...');
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+      const r = new FileReader();
+      r.onload = e => this._afterParse(this._parseCSV(e.target.result), container, opts);
+      r.readAsText(file);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      const r = new FileReader();
+      r.onload = e => this._parseXLSX(e.target.result, container, opts);
+      r.readAsArrayBuffer(file);
+    } else {
+      this._msg(container, 'Unsupported file type. Use CSV or Excel.', 'var(--red)');
+    }
+  },
+
+  _parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return null;
+    const parseLine = line => {
+      const out = []; let inQ = false, cur = '';
+      for (const ch of line) {
+        if (ch === '"') inQ = !inQ;
+        else if (ch === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
+        else cur += ch;
+      }
+      out.push(cur.trim());
+      return out;
+    };
+    const headers = parseLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
+    const rows = lines.slice(1).filter(l => l.trim()).map(parseLine);
+    return { headers, rows };
+  },
+
+  _parseXLSX(buffer, container, opts) {
+    const run = () => {
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (data.length < 2) { this._msg(container, 'File appears empty.', 'var(--red)'); return; }
+      const headers = data[0].map(h => String(h).trim());
+      const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));
+      this._afterParse({ headers, rows }, container, opts);
+    };
+    if (typeof XLSX === 'undefined') {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = run;
+      s.onerror = () => this._msg(container, 'Could not load the Excel reader. Try saving as CSV instead.', 'var(--red)');
+      document.head.appendChild(s);
+    } else run();
+  },
+
+  _sig(headers) { return headers.map(h => String(h).toLowerCase().trim()).join('|'); },
+  _savedMaps()  { try { return JSON.parse(localStorage.getItem(this._LS) || '{}'); } catch (e) { return {}; } },
+  _saveMap(sig, map) {
+    try { const all = this._savedMaps(); all[sig] = map; localStorage.setItem(this._LS, JSON.stringify(all)); } catch (e) {}
+  },
+
+  _autoMap(headers, fields) {
+    const map = {};
+    const used = {};
+    fields.forEach(f => {
+      const cands = [f.key, f.label, ...(f.match || [])].map(s => String(s).toLowerCase());
+      let hit = headers.find(h => !used[h] && cands.includes(String(h).toLowerCase().trim()));
+      if (!hit) hit = headers.find(h => !used[h] && cands.some(c => String(h).toLowerCase().trim().includes(c)));
+      if (hit) { map[f.key] = hit; used[hit] = true; }
+    });
+    return map;
+  },
+
+  _afterParse(parsed, container, opts) {
+    if (!parsed || !parsed.headers.length) {
+      this._msg(container, 'File appears empty or has only a header row.', 'var(--red)');
+      return;
+    }
+    const { headers, rows } = parsed;
+    const sig = this._sig(headers);
+    const map = this._savedMaps()[sig] || this._autoMap(headers, opts.fields);
+    this._renderMapper(headers, rows, map, sig, container, opts);
+  },
+
+  _renderMapper(headers, rows, map, sig, container, opts) {
+    const optsFor = sel => '<option value="">(skip)</option>'
+      + headers.map(h => '<option value="' + esc(h) + '"' + (h === sel ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
+    let html = '<div class="divider"></div><div class="card" style="margin-top:14px;">'
+      + '<div class="card-title">Map Your Columns</div>'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">Found <strong style="color:var(--w);">'
+      + rows.length + ' rows</strong>. Match each field to a column from your file. '
+      + 'Detected columns are pre-selected and this mapping is remembered for next time.</div>'
+      + '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">';
+    opts.fields.forEach(f => {
+      html += '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)
+        + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
+        + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] || '') + '</select></div>';
+    });
+    html += '</div><div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
+      + '<div class="card-actions"><button class="btn btn-primary csvm-go">'
+      + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button></div></div>';
+    this._area(container).innerHTML = html;
+
+    this._area(container).querySelector('.csvm-go').addEventListener('click', () => {
+      const sels = {};
+      this._area(container).querySelectorAll('.csvm-sel').forEach(s => { sels[s.dataset.key] = s.value; });
+      const missing = opts.fields.filter(f => f.required && !sels[f.key]);
+      if (missing.length) {
+        const err = this._area(container).querySelector('.csvm-err');
+        err.textContent = 'Map the required field: ' + missing.map(f => f.label).join(', ');
+        err.style.display = 'block';
+        return;
+      }
+      this._saveMap(sig, sels);
+      const idx = {};
+      Object.keys(sels).forEach(k => { idx[k] = headers.indexOf(sels[k]); });
+      const mapped = rows.map(row => {
+        const o = {};
+        Object.keys(idx).forEach(k => { o[k] = idx[k] >= 0 ? (row[idx[k]] || '') : ''; });
+        return o;
+      });
+      opts.onComplete(mapped);
+    });
+  }
+};
+
+window.CSVMapper = CSVMapper;
