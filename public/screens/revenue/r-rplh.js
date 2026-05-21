@@ -27,6 +27,19 @@ S.RevenueRPLH = {
         + '</div>';
     }).join('');
 
+    // Blended RPLH card — 4th metric box, matches the Blended column in the history table
+    const blendedTarget = (dayparts[0].target + dayparts[1].target + dayparts[2].target) / 3;
+    const blendedCur    = last?.rplh_blended || null;
+    const blendedAvg    = avg4(w => w.rplh_blended);
+    const blendedGap    = blendedCur != null ? blendedCur - blendedTarget : null;
+    const blendedCard = '<div class="metric-card">'
+      + '<div class="metric-label">Blended RPLH</div>'
+      + '<div class="metric-val ' + (blendedCur == null ? '' : blendedCur >= blendedTarget ? 'on-target' : 'over-target') + '">' + (blendedCur ? App.fmtCurrency(blendedCur) : ' ') + '</div>'
+      + '<div class="metric-target">Target: ' + App.fmtCurrency(blendedTarget) + '</div>'
+      + '<div class="metric-impact ' + (blendedGap == null ? '' : blendedGap >= 0 ? 'pos' : 'neg') + '">' + (blendedGap != null ? (blendedGap >= 0 ? '+' : '') + App.fmtCurrency(blendedGap) + ' vs target' : ' ') + '</div>'
+      + '<div class="metric-trend">' + (blendedAvg ? App.fmtCurrency(blendedAvg) + ' 4wk avg' : ' ') + '</div>'
+      + '</div>';
+
     // Optimal staffing calculator
     const calcHtml = '<div class="card" style="margin-top:16px;">'
       + '<div class="sh">Optimal Staffing Calculator</div>'
@@ -103,7 +116,7 @@ S.RevenueRPLH = {
     ).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
-      + '<div class="metric-grid">' + dpCards + '</div>'
+      + '<div class="metric-grid">' + dpCards + blendedCard + '</div>'
       + chartHtml
       + calcHtml
       + '<div class="sh" style="margin-top:16px;">RPLH History</div>'
