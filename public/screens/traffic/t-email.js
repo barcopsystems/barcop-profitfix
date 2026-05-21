@@ -64,6 +64,7 @@ S.TrafficEmail = {
 
     const formCard = '<div class="card">'
       + '<div class="card-title">Email Program Detail</div>'
+      + reviewedNote(prof.email_reviewed_at)
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:160px;"><label>Last Send Date ' + tt('t-email-lastsend') + '</label><input type="date" id="em-last" value="' + esc(prof.email_last_send || '') + '"/></div>'
       + '<div class="f" style="width:190px;"><label>Send Frequency ' + tt('t-email-frequency') + '</label><select id="em-freq">' + freqOpts + '</select></div>'
@@ -111,6 +112,7 @@ S.TrafficEmail = {
     prof.email_last_send = document.getElementById('em-last')?.value || '';
     prof.email_frequency = document.getElementById('em-freq')?.value || '';
     prof.email_growth    = document.getElementById('em-growth')?.value || '';
+    prof.email_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('em-msg');
