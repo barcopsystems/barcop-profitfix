@@ -77,6 +77,7 @@ S.TrafficDelivery = {
     const formCard = '<div class="card">'
       + '<div class="card-title">Delivery Platform Detail</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Active status and rating come from This Week. Set photo count, menu, and promo status here.</div>'
+      + reviewedNote(prof.delivery_reviewed_at)
       + platBlocks
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dl-save">Save Platform Detail</button>'
@@ -123,6 +124,7 @@ S.TrafficDelivery = {
       const n = parseInt(document.getElementById('dl-' + p.key + '-photos')?.value);
       prof[p.key + '_photos'] = isNaN(n) ? null : n;
     });
+    prof.delivery_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('dl-msg');
