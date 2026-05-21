@@ -678,6 +678,19 @@ S.RevenueAudit = {
     const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
     const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
 
+    // Validation — do not run an audit with nothing to analyze
+    let raFileCount = 0;
+    ['ra-f-pos-daily','ra-f-menu-mix','ra-f-menu-prices','ra-f-server-sales','ra-f-upsell','ra-f-preshift','ra-f-labor-sched','ra-f-timeclock','ra-f-labor-dept','ra-f-events','ra-f-catering','ra-f-rate-card'].forEach(id => {
+      const inp = document.getElementById(id);
+      if (inp?.files) raFileCount += inp.files.length;
+    });
+    const hasRealData = raFileCount > 0 || (App.data.revenue_weeks && App.data.revenue_weeks.length > 0) || barRev > 0 || foodRev > 0;
+    if (!hasRealData) {
+      setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your POS and labor reports.', 'var(--red)');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
+      return;
+    }
+
     setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
