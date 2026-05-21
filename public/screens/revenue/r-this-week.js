@@ -68,7 +68,7 @@ S.RevenueThisWeek = {
   },
 
   nav(showBack, showNext, saveLabel) {
-    return '<div class="card-actions" style="border-top:none;margin-top:8px;">'
+    return '<div class="card-actions">'
       + (showBack ? '<button class="btn btn-ghost" id="rw-back">← Back</button>' : '')
       + (showNext && this.step < 6 ? '<button class="btn btn-primary" id="rw-next">Next →</button>' : '')
       + (saveLabel ? '<button class="btn btn-primary" id="rw-save">' + saveLabel + '</button>' : '')
@@ -76,8 +76,8 @@ S.RevenueThisWeek = {
   },
 
   step1() {
-    return '<div class="card"><div class="sh">Step 1   Period Details</div>'
-      + '<div class="form-row" style="gap:16px;">'
+    return '<div class="card"><div class="card-title">Period Details</div>'
+      + '<div class="form-row">'
       + '<div class="f" style="width:100px;"><label>Week # ' + tt('tw-week-num') + '</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
       + '<div class="f" style="width:160px;"><label>Period End Date ' + tt('tw-period-end') + '</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
       + '</div>'
@@ -93,17 +93,19 @@ S.RevenueThisWeek = {
     const totalRev = barRev + floorRev;
     const checkAvg = covers > 0 ? (totalRev / covers) : 0;
     const caGap = checkAvg > 0 ? checkAvg - targetCA : 0;
-    return '<div class="card"><div class="sh">Step 2   Revenue by Department</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
+    const hasData = totalRev > 0 && covers > 0;
+    return '<div class="card"><div class="card-title">Revenue by Department</div>'
+      + '<div class="form-row">'
       + '<div class="f w-md"><label>Bar Revenue ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-brev" value="' + (this.draft.bar_revenue||'') + '" placeholder=""/></div></div>'
       + '<div class="f w-md"><label>Floor Revenue ' + tt('r-floor-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-frev" value="' + (this.draft.floor_revenue||'') + '" placeholder=""/></div></div>'
       + '<div class="f w-md"><label>Total Covers ' + tt('r-covers') + '</label><input type="number" id="rw-cov" value="' + (this.draft.covers||'') + '" placeholder=""/></div>'
       + '</div>'
-      + (totalRev > 0 && covers > 0 ? '<div style="background:var(--input);border-radius:6px;padding:12px 16px;display:flex;gap:24px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Total Revenue</div><div style="font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(totalRev) + '</div></div>'
-        + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Check Average</div><div style="font-size:18px;font-weight:700;color:' + (caGap >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(checkAvg) + '</div></div>'
-        + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">vs Target $' + targetCA + '</div><div style="font-size:18px;font-weight:700;color:' + (caGap >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) + '</div></div>'
-        + '</div>' : '')
+      + '<div class="calc">'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + (totalRev > 0 ? App.fmtCurrency(totalRev) : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val ' + (hasData ? (caGap >= 0 ? 'good' : 'warn') : '') + '">' + (hasData ? App.fmtCurrency(checkAvg) : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">$' + targetCA + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val ' + (hasData ? (caGap >= 0 ? 'good' : 'warn') : '') + '">' + (hasData ? ((caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap)) : '—') + '</div></div>'
+      + '</div>'
       + this.nav(true, true) + '</div>';
   },
 
@@ -124,13 +126,13 @@ S.RevenueThisWeek = {
       const gap  = pct ? (parseFloat(pct) - d.target).toFixed(1) : null;
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + '   Target: ' + d.target + '%</div>'
-        + '<div class="form-row" style="gap:16px;">'
+        + '<div class="form-row">'
         + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-labor-hours') + '</label><input type="number" id="rw-' + d.key + '-hrs" value="' + (this.draft[d.key + '_labor_hours']||'') + '" placeholder=""/></div>'
         + '<div class="f w-md"><label>' + d.label + ' Labor Cost ' + tt('r-labor-cost') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-' + d.key + '-cost" value="' + (this.draft[d.key + '_labor_cost']||'') + '" placeholder=""/></div></div>'
         + (pct ? '<div class="f" style="width:120px;"><label>Labor %</label><div style="font-size:18px;font-weight:700;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';padding-top:8px;">' + pct + '%<span style="font-size:11px;font-weight:400;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';margin-left:6px;">' + (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts</span></div></div>' : '')
         + '</div></div>';
     }).join('');
-    return '<div class="card"><div class="sh">Step 3   Labor by Department</div>' + rows + this.nav(true, true) + '</div>';
+    return '<div class="card"><div class="card-title">Labor by Department</div>' + rows + this.nav(true, true) + '</div>';
   },
 
   step4() {
@@ -146,14 +148,14 @@ S.RevenueThisWeek = {
       const rplh = hrs > 0 && rev > 0 ? (rev / hrs) : null;
       const gap  = rplh ? rplh - d.target : null;
       return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + ' : Target: $' + d.target + ' RPLH ' + tt('r-rplh-target') + '</div>'
-        + '<div class="form-row" style="gap:16px;">'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + '   Target: $' + d.target + ' RPLH ' + tt('r-rplh-target') + '</div>'
+        + '<div class="form-row">'
         + '<div class="f w-md"><label>' + d.label + ' Revenue ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-rplh-' + d.key + '-rev" value="' + (this.draft['rplh_' + d.key + '_rev']||'') + '" placeholder=""/></div></div>'
         + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-daypart-hrs') + '</label><input type="number" id="rw-rplh-' + d.key + '-hrs" value="' + (this.draft['rplh_' + d.key + '_hrs']||'') + '" placeholder=""/></div>'
         + (rplh ? '<div class="f" style="width:140px;"><label>RPLH ' + tt('r-rplh') + '</label><div style="font-size:18px;font-weight:700;color:' + (gap >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding-top:8px;">' + App.fmtCurrency(rplh) + '<span style="font-size:11px;font-weight:400;margin-left:6px;">' + (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + '</span></div></div>' : '')
         + '</div></div>';
     }).join('');
-    return '<div class="card"><div class="sh">Step 4 : RPLH by Daypart</div>'
+    return '<div class="card"><div class="card-title">RPLH by Daypart</div>'
       + rows + this.nav(true, true) + '</div>';
   },
 
@@ -162,10 +164,11 @@ S.RevenueThisWeek = {
     const t = App.data.revenue_settings?.targets || {};
     const targetCA = t.check_avg || 35;
     if (!servers.length) {
-      return '<div class="card"><div class="empty"><div class="empty-title">No Servers on Roster</div>'
+      return '<div class="card"><div class="card-title">Server Performance</div>'
+        + '<div class="empty"><div class="empty-title">No servers on roster</div>'
         + '<div class="empty-sub">Add servers in Settings, then return to enter their performance data.</div>'
         + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'r-settings\')">Go to Settings</button></div>'
-        + '</div></div>' + this.nav(true, true);
+        + '</div>' + this.nav(true, true) + '</div>';
     }
     if (!this.draft.server_entries || this.draft.server_entries.length !== servers.length) {
       this.draft.server_entries = servers.map(sv => ({ id: sv.id, name: sv.name, covers: '', sales: '' }));
@@ -189,7 +192,7 @@ S.RevenueThisWeek = {
         + '</div>';
     }).join('');
 
-    return '<div class="card"><div class="sh">Step 5 : Server Performance</div>'
+    return '<div class="card"><div class="card-title">Server Performance</div>'
       + (teamAvg ? '<div style="background:var(--input);border-radius:6px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--t2);">Team check average this week: <strong style="color:var(--t1);">' + App.fmtCurrency(teamAvg) + '</strong> vs target $' + targetCA + '</div>' : '')
       + rows + this.nav(true, true) + '</div>';
   },
@@ -220,14 +223,14 @@ S.RevenueThisWeek = {
       + (sub ? '<div style="font-size:11px;color:var(--t3);">' + sub + '</div>' : '')
       + '</div></div>';
 
-    return '<div class="card"><div class="sh">Step 6   Review and Save</div>'
+    return '<div class="card"><div class="card-title">Review and Save</div>'
       + row('Week', 'Week ' + d.week_num, d.period_end)
       + row('Bar Revenue', App.fmtCurrency(barRev), '')
       + row('Floor Revenue', App.fmtCurrency(floorRev), '')
       + row('Total Revenue', App.fmtCurrency(totalRev), '')
       + row('Covers', covers || ' ', '')
       + row('Check Average', checkAvg ? App.fmtCurrency(checkAvg) : ' ', 'Target $' + targetCA)
-      + (annualGap !== 0 ? row('Annual Check Avg Gap', App.fmtCurrency(Math.abs(annualGap)), annualGap >= 0 ? 'above target' : 'below target   recoverable') : '')
+      + (annualGap !== 0 ? row('Annual Check Avg Gap', App.fmtCurrency(Math.abs(annualGap)), annualGap >= 0 ? 'above target' : 'below target, recoverable') : '')
       + row('Total Labor Cost', App.fmtCurrency(totalLaborCost), '')
       + (laborPct ? row('Blended Labor %', laborPct + '%', '') : '')
       + (rplh ? row('Blended RPLH', App.fmtCurrency(parseFloat(rplh)), '') : '')
