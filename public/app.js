@@ -518,6 +518,35 @@ const App = {
     return Number(n).toFixed(d) + '%';
   },
 
+  /* ── Unified audit score system (0-100) ──────────────────────────────────
+     One scale for every audit score in all three sections:
+       70-100  Strong        gold
+       50-69   Below Target  white
+       0-49    Critical      red                                          */
+  scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--gold)' : s >= 50 ? 'var(--w)' : 'var(--red)'; },
+  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#C9A84C'     : s >= 50 ? '#ffffff'  : '#C03828'; },
+  scoreLabel(s) { s = Number(s) || 0; return s >= 70 ? 'Strong'      : s >= 50 ? 'Below Target' : 'Critical'; },
+
+  // Slim 0-100 scale bar with red / neutral / gold zones and a marker at the score.
+  scoreBar(score) {
+    const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+    return '<div style="margin-top:10px;max-width:300px;">'
+      + '<div style="display:flex;height:7px;border-radius:4px;overflow:hidden;">'
+      +   '<div style="width:50%;background:var(--red);"></div>'
+      +   '<div style="width:20%;background:var(--t2);"></div>'
+      +   '<div style="width:30%;background:var(--gold);"></div>'
+      + '</div>'
+      + '<div style="position:relative;height:0;">'
+      +   '<div style="position:absolute;top:-10px;left:' + s + '%;width:3px;height:13px;background:var(--w);border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 0 1.5px var(--surface);"></div>'
+      + '</div>'
+      + '<div style="display:flex;margin-top:6px;font-size:8px;font-weight:700;letter-spacing:0.5px;color:var(--t3);">'
+      +   '<span style="width:50%;">CRITICAL</span>'
+      +   '<span style="width:20%;text-align:center;">BELOW TGT</span>'
+      +   '<span style="width:30%;text-align:right;">STRONG</span>'
+      + '</div>'
+    + '</div>';
+  },
+
   nextWeekNum() {
     const weeks = this.data?.weeks || [];
     if (weeks.length === 0) return 1;
