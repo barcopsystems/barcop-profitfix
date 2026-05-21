@@ -672,10 +672,19 @@ S.TrafficAudit = {
       'ta-f-instagram','ta-f-facebook','ta-f-ig-analytics',
       'ta-f-delivery','ta-f-email','ta-f-email-analytics'
     ];
+    let taFileCount = 0;
     fileInputIds.forEach(id => {
       const inp = document.getElementById(id);
-      if (inp?.files) { for (const f of inp.files) form.append('file', f); }
+      if (inp?.files) { for (const f of inp.files) { form.append('file', f); taFileCount++; } }
     });
+
+    // Validation — do not run an audit with nothing to analyze
+    const hasRealData = taFileCount > 0 || (App.data.traffic_weeks && App.data.traffic_weeks.length > 0);
+    if (!hasRealData) {
+      setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your screenshots.', 'var(--red)');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
+      return;
+    }
 
     setStatus('Uploading files and generating audit...', 'var(--t2)');
 
