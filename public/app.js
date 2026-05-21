@@ -570,6 +570,7 @@ const App = {
       const scScreens = {
         'sc-log-shift': S.ShiftLogShift,
         'sc-shift-history': S.ShiftHistory,
+        'sc-cash-drop': S.ShiftCashDrop,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
