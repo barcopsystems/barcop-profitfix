@@ -522,6 +522,7 @@ const App = {
       const icScreens = {
         'ic-product-setup': S.InventoryProducts,
         'ic-locations':     S.InventoryLocations,
+        'ic-vendors':       S.InventoryVendors,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = icTitle;
