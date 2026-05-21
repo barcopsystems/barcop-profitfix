@@ -40,5 +40,43 @@ CREATE POLICY "Users can delete own data"
   USING (auth.uid() = user_id);
 
 -- ============================================================
--- Done. The table is ready.
+-- Control Module data tables (Inventory / Labor / Shift)
+-- Separate tables per Rule 21 — Control data is NOT stored in user_data.
+-- ============================================================
+
+-- Inventory Control data table
+CREATE TABLE ic_data (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users NOT NULL UNIQUE,
+  data jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE ic_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only access their own inventory data"
+  ON ic_data FOR ALL USING (auth.uid() = user_id);
+
+-- Labor Control data table
+CREATE TABLE lc_data (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users NOT NULL UNIQUE,
+  data jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE lc_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only access their own labor data"
+  ON lc_data FOR ALL USING (auth.uid() = user_id);
+
+-- Shift Control data table
+CREATE TABLE sc_data (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users NOT NULL UNIQUE,
+  data jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE sc_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only access their own shift data"
+  ON sc_data FOR ALL USING (auth.uid() = user_id);
+
+-- ============================================================
+-- Done. All tables are ready.
 -- ============================================================
