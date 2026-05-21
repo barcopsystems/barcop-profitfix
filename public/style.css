@@ -239,7 +239,11 @@ input,select,textarea{color-scheme:dark;}
 .f input[type=number]{-moz-appearance:textfield;}
 .f input[type=number]::-webkit-inner-spin-button,
 .f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
-.f input::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer;}
+/* Date inputs: color-scheme:dark makes the native calendar icon render light
+   on its own. Do NOT add filter:invert() here — that would flip the already
+   light icon back to black and make it invisible on the dark field. */
+input[type="date"]{color-scheme:dark;}
+input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .f select{
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 8px center;padding-right:26px;cursor:pointer;
