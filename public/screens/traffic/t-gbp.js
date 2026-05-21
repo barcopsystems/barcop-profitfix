@@ -59,6 +59,7 @@ S.TrafficGBP = {
 
     const profileCard = '<div class="card">'
       + '<div class="card-title">Profile Completeness</div>'
+      + reviewedNote(prof.gbp_reviewed_at)
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:16px;">' + toggleRows + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:170px;"><label>Photo Count ' + tt('t-gbp-photos') + '</label><div class="fw"><input class="suf" type="number" id="gbp-photos" value="' + (photos != null ? photos : '') + '" min="0"/><span class="suf">photos</span></div></div>'
@@ -106,6 +107,7 @@ S.TrafficGBP = {
     const posts  = parseInt(document.getElementById('gbp-posts')?.value);
     prof.gbp_photos = isNaN(photos) ? null : photos;
     prof.gbp_posts  = isNaN(posts)  ? null : posts;
+    prof.gbp_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('gbp-msg');
