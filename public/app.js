@@ -584,6 +584,7 @@ const App = {
         'sc-reports-shift': S.ShiftReportsShift,
         'sc-reports-cash': S.ShiftReportsCash,
         'sc-reports-ops': S.ShiftReportsOps,
+        'sc-help': S.ShiftHelp,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
