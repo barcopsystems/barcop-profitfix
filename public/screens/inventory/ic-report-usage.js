@@ -1,292 +1,189 @@
-'use strict';
-
-/* ── Inventory Control — Usage Report (reads ic_counts + ic_deliveries) ───────
-   Usage = Starting Stock + Purchases − Ending Stock, measured between two
-   consecutive inventory counts. Seven views over that computed data. */
-
-S.InventoryUsageReport = {
-  tab: 'usage',
-  endCountId: null,
-  catFilter: '',
-  locFilter: '',
-
-  TABS: [
-    ['usage','Usage Data'], ['totals','Usage Totals'], ['stock','Stock Values'],
-    ['most','Most Used'], ['least','Least Used'], ['history','Usage History'], ['check','Stock Check']
-  ],
-
-  countsAsc() {
-    return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
-  },
-  deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
-  productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
-  fmtDate(str) {
-    if (!str) return '—';
-    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  },
-
-  // ── Usage computation ─────────────────────────────────────────────────────
-  computeForPair(startC, endC) {
-    const startMap = {}; (startC.items || []).forEach(it => startMap[it.product_id] = it);
-    const endMap   = {}; (endC.items   || []).forEach(it => endMap[it.product_id]   = it);
-    const dels = this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date);
-    const purch = {};
-    dels.forEach(d => (d.line_items || []).forEach(li => {
-      purch[li.product_id] = (purch[li.product_id] || 0) + (li.qty || 0);
-    }));
-    const rows = [];
-    Object.keys(endMap).forEach(pid => {
-      if (!startMap[pid]) return;
-      const si = startMap[pid], ei = endMap[pid];
-      const p = this.productById(pid) || {};
-      const starting = si.total || 0, ending = ei.total || 0, purchases = purch[pid] || 0;
-      const used = starting + purchases - ending;
-      const ppc = p.pours_per_container || null;
-      const unitCost = p.unit_cost != null ? p.unit_cost : (ei.unit_cost != null ? ei.unit_cost : null);
-      const poursMade = ppc != null ? used * ppc : null;
-      const usageCost = unitCost != null ? used * unitCost : null;
-      const theoSales = poursMade != null && p.menu_price ? poursMade * p.menu_price : null;
-      const theoProfit = theoSales != null && usageCost != null ? theoSales - usageCost : null;
-      rows.push({
-        pid, name: ei.name, category: ei.category || p.category || '',
-        location: p.primary_location || '', starting, purchases, ending, used,
-        poursMade, usageCost, theoSales, theoProfit, unitCost,
-        par: p.par_level, reorder: p.reorder_point
-      });
-    });
-    return rows;
-  },
-
-  currentPeriod() {
-    const asc = this.countsAsc();
-    if (asc.length < 2) return null;
-    let endIdx = asc.findIndex(c => c.id === this.endCountId);
-    if (endIdx < 1) endIdx = asc.length - 1;
-    return { startC: asc[endIdx - 1], endC: asc[endIdx], rows: this.computeForPair(asc[endIdx - 1], asc[endIdx]) };
-  },
-
-  filtered(rows) {
-    return rows.filter(r =>
-      (!this.catFilter || r.category === this.catFilter) &&
-      (!this.locFilter || r.location === this.locFilter));
-  },
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  render(container, actions) {
-    this.container = container;
-    this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>';
-    document.getElementById('ur-export')?.addEventListener('click', () => window.print());
-    this.draw();
-  },
-
-  draw() {
-    const asc = this.countsAsc();
-    if (asc.length < 2) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Not enough counts yet</div>'
-        + '<div class="empty-sub">Usage is measured between two inventory counts. '
-        + 'Submit at least two counts in Take Inventory to see this report.</div>'
-        + '<button class="btn btn-primary" id="ur-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#ur-take')) App.navigate('ic-take-inventory'); };
-      return;
-    }
-
-    const period = this.currentPeriod();
-    const rows = this.filtered(period.rows);
-
-    // controls — period selector + filters
-    const periodOpts = asc.slice(1).map((c, i) => {
-      const startC = asc[i];
-      return '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
-        + this.fmtDate(startC.date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>';
-    }).reverse().join('');
-    const cats = [...new Set(period.rows.map(r => r.category).filter(Boolean))].sort();
-    const locs = [...new Set(period.rows.map(r => r.location).filter(Boolean))].sort();
-    const catOpts = '<option value="">All categories</option>'
-      + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-    const locOpts = '<option value="">All locations</option>'
-      + locs.map(l => '<option' + (this.locFilter === l ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
-
-    const controls = '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-      + '<div class="f" style="width:230px;"><label>Count Period</label><select id="ur-period">' + periodOpts + '</select></div>'
-      + '<div class="f" style="width:180px;"><label>Category</label><select id="ur-cat">' + catOpts + '</select></div>'
-      + '<div class="f" style="width:180px;"><label>Location</label><select id="ur-loc">' + locOpts + '</select></div>'
-      + '</div>';
-
-    const tabs = '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;flex-wrap:wrap;">'
-      + this.TABS.map(([k, label]) => {
-          const on = k === this.tab;
-          return '<button class="ur-tab" data-tab="' + k + '" style="background:none;border:none;'
-            + 'border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
-            + 'color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-            + 'letter-spacing:0.5px;text-transform:uppercase;padding:9px 13px;cursor:pointer;">' + label + '</button>';
-        }).join('') + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + controls + tabs
-      + '<div id="ur-body">' + this.tabBody(rows, period) + '</div></div>';
-
-    this.container.onclick = ev => {
-      const tab = ev.target.closest('.ur-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.draw(); }
-    };
-    document.getElementById('ur-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.catFilter = ''; this.locFilter = ''; this.draw(); });
-    document.getElementById('ur-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
-    document.getElementById('ur-loc')?.addEventListener('change', e => { this.locFilter = e.target.value; this.draw(); });
-  },
-
-  // ── Tab bodies ────────────────────────────────────────────────────────────
-  tabBody(rows, period) {
-    switch (this.tab) {
-      case 'usage':   return this.tabUsage(rows);
-      case 'totals':  return this.tabTotals(rows);
-      case 'stock':   return this.tabStock(period.endC, rows);
-      case 'most':    return this.tabRank(rows, true);
-      case 'least':   return this.tabRank(rows, false);
-      case 'history': return this.tabHistory();
-      case 'check':   return this.tabCheck(period.endC, rows);
-      default:        return '';
-    }
-  },
-
-  num(v, d) { return v == null ? '<span style="color:var(--t4);">—</span>' : Number(v).toFixed(d == null ? 1 : d); },
-  cur(v) { return v == null ? '<span style="color:var(--t4);">—</span>' : App.fmtCurrency(v); },
-
-  tabUsage(rows) {
-    if (!rows.length) return this.emptyRows();
-    const body = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.name) + '</div></td>'
-      + '<td>' + this.num(r.starting) + '</td>'
-      + '<td>' + this.num(r.purchases) + '</td>'
-      + '<td>' + this.num(r.ending) + '</td>'
-      + '<td class="val">' + this.num(r.used) + '</td>'
-      + '<td>' + this.num(r.poursMade, 0) + '</td>'
-      + '<td>' + this.cur(r.usageCost) + '</td>'
-      + '<td>' + this.cur(r.theoSales) + '</td>'
-      + '<td class="' + (r.theoProfit != null ? (r.theoProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.theoProfit) + '</td>'
-      + '</tr>').join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th>'
-      + '<th>Pours Made</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  tabTotals(rows) {
-    if (!rows.length) return this.emptyRows();
-    const sum = k => rows.reduce((s, r) => s + (r[k] || 0), 0);
-    const totUsed = sum('used'), totCost = sum('usageCost'), totPours = sum('poursMade');
-    const totSales = sum('theoSales'), totProfit = sum('theoProfit');
-    const byCat = {};
-    rows.forEach(r => {
-      const c = r.category || 'Uncategorized';
-      byCat[c] = byCat[c] || { cost: 0, sales: 0, profit: 0 };
-      byCat[c].cost += r.usageCost || 0; byCat[c].sales += r.theoSales || 0; byCat[c].profit += r.theoProfit || 0;
-    });
-    const catRows = Object.keys(byCat).sort().map(c => '<tr><td><div class="val">' + esc(c) + '</div></td>'
-      + '<td>' + this.cur(byCat[c].cost) + '</td><td>' + this.cur(byCat[c].sales) + '</td>'
-      + '<td class="' + (byCat[c].profit >= 0 ? 'pos' : 'neg') + '">' + this.cur(byCat[c].profit) + '</td></tr>').join('');
-    return '<div class="calc" style="margin-bottom:16px;">'
-      + '<div class="calc-item"><div class="calc-label">Total Units Used</div><div class="calc-val">' + totUsed.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Pours Made</div><div class="calc-val">' + Math.round(totPours) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Usage Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Theoretical Sales</div><div class="calc-val">' + App.fmtCurrency(totSales) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Theoretical Profit</div><div class="calc-val ' + (totProfit >= 0 ? 'good' : 'warn') + '">' + App.fmtCurrency(totProfit) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Category</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th></tr></thead><tbody>' + catRows + '</tbody></table></div>';
-  },
-
-  tabStock(endC, rows) {
-    const ids = new Set(rows.map(r => r.pid));
-    const items = (endC.items || []).filter(it => ids.has(it.product_id));
-    if (!items.length) return this.emptyRows();
-    let total = 0;
-    const body = items.map(it => {
-      const val = it.value != null ? it.value : (it.unit_cost != null ? (it.total || 0) * it.unit_cost : null);
-      total += val || 0;
-      return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td>' + esc(it.category || '—') + '</td>'
-        + '<td>' + this.num(it.total) + '</td>'
-        + '<td>' + this.cur(it.unit_cost) + '</td>'
-        + '<td class="val">' + this.cur(val) + '</td></tr>';
-    }).join('');
-    return '<div class="calc" style="margin-bottom:14px;"><div class="calc-item">'
-      + '<div class="calc-label">Total Stock Value (' + this.fmtDate(endC.date) + ' count)</div>'
-      + '<div class="calc-val good">' + App.fmtCurrency(total) + '</div></div></div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Category</th><th>On Hand</th><th>Unit Cost</th><th>Value</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  tabRank(rows, most) {
-    const ranked = [...rows].filter(r => r.used != null)
-      .sort((a, b) => most ? b.used - a.used : a.used - b.used).slice(0, 10);
-    if (!ranked.length) return this.emptyRows();
-    const max = Math.max(...ranked.map(r => Math.abs(r.used)), 1);
-    const body = ranked.map(r => {
-      const pct = Math.min(100, Math.abs(r.used) / max * 100);
-      return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
-        + '<td style="width:38%;"><div style="display:flex;align-items:center;gap:8px;">'
-        + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div>'
-        + '<span style="font-size:11px;color:var(--t2);">' + r.used.toFixed(1) + '</span></div></td>'
-        + '<td>' + this.cur(r.usageCost) + '</td></tr>';
-    }).join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + (most ? 'Top 10 products by units used this period.' : 'Bottom 10 products by units used — your slowest movers.')
-      + '</div><div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Units Used</th><th>Usage Cost</th></tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  tabHistory() {
-    const asc = this.countsAsc();
-    const pairs = [];
-    for (let i = 1; i < asc.length; i++) {
-      const r = this.computeForPair(asc[i - 1], asc[i]);
-      pairs.push({
-        start: asc[i - 1], end: asc[i], count: r.length,
-        cost: r.reduce((s, x) => s + (x.usageCost || 0), 0),
-        profit: r.reduce((s, x) => s + (x.theoProfit || 0), 0)
-      });
-    }
-    if (!pairs.length) return this.emptyRows();
-    const body = pairs.reverse().map(p => '<tr>'
-      + '<td><div class="val">' + this.fmtDate(p.start.start || p.start.date) + ' &rarr; ' + this.fmtDate(p.end.date) + '</div></td>'
-      + '<td>' + p.count + '</td>'
-      + '<td>' + App.fmtCurrency(p.cost) + '</td>'
-      + '<td class="' + (p.profit >= 0 ? 'pos' : 'neg') + '">' + App.fmtCurrency(p.profit) + '</td></tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Usage across every count period.</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Period</th><th>Products</th><th>Usage Cost</th><th>Theo Profit</th></tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  tabCheck(endC, rows) {
-    const ids = new Set(rows.map(r => r.pid));
-    const items = (endC.items || []).filter(it => ids.has(it.product_id)).map(it => {
-      const p = this.productById(it.product_id) || {};
-      return { name: it.name, onHand: it.total || 0, par: p.par_level, reorder: p.reorder_point };
-    });
-    if (!items.length) return this.emptyRows();
-    const body = items.map(it => {
-      let status, cls;
-      if (it.reorder != null && it.onHand <= it.reorder) { status = 'Below Reorder'; cls = 'badge-warn'; }
-      else if (it.par != null && it.onHand < it.par)     { status = 'Below Par'; cls = 'badge-warn'; }
-      else { status = 'OK'; cls = 'badge-ok'; }
-      return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td>' + it.onHand.toFixed(1) + '</td>'
-        + '<td>' + (it.par != null ? it.par : '—') + '</td>'
-        + '<td>' + (it.reorder != null ? it.reorder : '—') + '</td>'
-        + '<td><span class="badge ' + cls + '">' + status + '</span></td></tr>';
-    }).join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'On-hand from the latest count vs each product\'s par and reorder point.</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>On Hand</th><th>Par</th><th>Reorder</th><th>Status</th></tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  emptyRows() {
-    return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-      + 'No products match this period and filter. Both counts must include the same products.</div>';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bar Cop Recovery Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css?v=2"/>
+<style>
+@media print {
+  /* Flip the dark theme to a light, readable theme for print.
+     Almost everything reads these CSS variables, so overriding them
+     here recolors the whole audit automatically. */
+  :root {
+    --bg:#ffffff; --surface:#ffffff; --input:#ffffff;
+    --hover:transparent; --nav-act:#ffffff;
+    --gold:#8a6a16; --gold-h:#8a6a16; --gold-bg:#f3ecd6;
+    --red:#b3271a; --red-bg:#f7dfdc; --steel:#2f6a86;
+    --w:#000000; --t1:#1a1a1a; --t2:#333333; --t3:#555555; --t4:#777777;
+    --b1:#cccccc; --b2:#dddddd;
   }
-};
+  .sidebar, .topbar { display: none !important; }
+  .btn, button { display: none !important; }
+  html, body { background:#fff !important; height:auto !important; overflow:visible !important; }
+  .app { display:block !important; height:auto !important; overflow:visible !important; }
+  .main { display:block !important; }
+  .content { padding:0 !important; overflow:visible !important; }
+  .screen { max-width:none !important; padding:0 !important; }
+  .card { box-shadow:none !important; break-inside:avoid; }
+  /* Any element still painted pure white from a literal hex */
+  [style*="color:#fff"], [style*="color: #fff"],
+  [style*="color:#ffffff"], [style*="color: #ffffff"] { color:#000 !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen" class="auth-screen" style="display:none;">
+  <div class="auth-panel">
+    <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+    <div id="auth-login">
+      <div id="checkout-success-msg" style="background:rgba(201,168,76,0.1);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--gold);line-height:1.6;text-align:center;">
+        Your Bar Cop account is ready. Enter your email below and click Forgot Password to set your password and access your Recovery Hub.
+      </div>
+      <div class="auth-heading">Sign In</div>
+      <div class="auth-sub">Enter your email and password to access your account.</div>
+      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="login-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
+      <div class="f" style="margin-bottom:18px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/></div>
+      <button class="btn btn-primary" id="login-btn" style="width:100%;">Sign In</button>
+      <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:12px;"><button class="auth-link" id="show-reset" style="font-size:11px;">Forgot password?</button></div>
+    </div>
+    <div id="auth-reset" style="display:none;">
+      <div class="auth-heading">Reset Password</div>
+      <div class="auth-sub">Enter your email for a reset link.</div>
+      <div class="f" style="margin-bottom:18px;"><label>Email</label><input type="email" id="reset-email" placeholder="you@yourbar.com"/></div>
+      <button class="btn btn-primary" id="reset-btn" style="width:100%;">Send Reset Link</button>
+      <div id="reset-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:14px;"><button class="auth-link" id="show-login2">Back to sign in</button></div>
+    </div>
+    <div id="auth-set-password" style="display:none;">
+      <div class="auth-heading">Set Your Password</div>
+      <div class="auth-sub">Choose a password to access your Bar Cop account.</div>
+      <div class="f" style="margin-bottom:10px;"><label>New Password</label><input type="password" id="set-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
+      <div class="f" style="margin-bottom:18px;"><label>Confirm Password</label><input type="password" id="set-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
+      <button class="btn btn-primary" id="set-pw-btn" style="width:100%;">Set Password and Sign In</button>
+      <div id="set-pw-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="ob-overlay" class="ob-overlay hidden">
+  <div class="ob-panel">
+    <div class="ob-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:26px;"/></div>
+    <div id="ob-content"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
+      <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <!-- Nav injected dynamically by App._renderNav() -->
+    </nav>
+    <div class="sidebar-footer">
+      <div class="period-label">Current Period</div>
+      <div class="period-val" id="sidebar-period">—</div>
+      <button class="sidebar-btn" id="nav-settings" data-screen="settings">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="sidebar-btn-label">Settings</span>
+      </button>
+      <button class="sidebar-btn" id="signout-btn">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="sidebar-btn-label">Sign Out</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="topbar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
+        </button>
+        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+        <span class="topbar-sub" id="topbar-sub"></span>
+      </div>
+      <div class="topbar-right" id="topbar-actions"></div>
+    </header>
+    <main class="content" id="content-area"></main>
+  </div>
+</div>
+
+<!-- Tooltip box -->
+<div class="tt-box" id="tt-box">
+  <div class="tt-title" id="tt-title"></div>
+  <div class="tt-body" id="tt-body"></div>
+  <div class="tt-eg" id="tt-eg"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>const S = {};</script>
+<script src="nav.js?v=5"></script>
+<script src="screens/hub.js?v=10"></script>
+<script src="screens/dashboard.js?v=2"></script>
+<script src="screens/this-week.js?v=1778984711"></script>
+<script src="screens/shift-check.js?v=1778984711"></script>
+<script src="screens/bar-products.js?v=1778984714"></script>
+<script src="screens/kitchen-products.js?v=1778984714"></script>
+<script src="screens/recipe-library.js?v=1778984714"></script>
+<script src="screens/vendor-watch.js?v=1778984711"></script>
+<script src="screens/theft-risk.js?v=1778984711"></script>
+<script src="screens/cash-recon.js?v=1778984711"></script>
+<script src="screens/audit-tracker.js?v=7"></script>
+<script src="screens/resources.js?v=1778984713"></script>
+<script src="screens/reports.js?v=1778984711"></script>
+<script src="screens/settings.js?v=3"></script>
+<script src="screens/getting-started.js?v=4"></script>
+<script src="screens/help.js?v=4"></script>
+<script src="screens/revenue/r-audit.js?v=10"></script>
+<script src="screens/revenue/r-dashboard.js?v=4"></script>
+<script src="screens/revenue/r-settings.js?v=4"></script>
+<script src="screens/revenue/r-getting-started.js?v=1"></script>
+<script src="screens/revenue/r-this-week.js?v=9"></script>
+<script src="screens/revenue/r-server-check.js?v=7"></script>
+<script src="screens/revenue/r-menu-items.js?v=8"></script>
+<script src="screens/revenue/r-menu-engineering.js?v=6"></script>
+<script src="screens/revenue/r-labor-budget.js?v=10"></script>
+<script src="screens/revenue/r-rplh.js?v=6"></script>
+<script src="screens/revenue/r-check-average.js?v=6"></script>
+<script src="screens/revenue/r-events.js?v=8"></script>
+<script src="screens/revenue/r-reports.js?v=3"></script>
+<script src="screens/revenue/r-resources.js?v=3"></script>
+<script src="screens/revenue/r-help.js?v=4"></script>
+<script src="screens/traffic/t-dashboard.js?v=1"></script>
+<script src="screens/traffic/t-audit.js?v=7"></script>
+<script src="screens/traffic/t-this-week.js?v=4"></script>
+<script src="screens/traffic/t-gbp.js?v=3"></script>
+<script src="screens/traffic/t-reviews.js?v=3"></script>
+<script src="screens/traffic/t-search.js?v=2"></script>
+<script src="screens/traffic/t-website.js?v=2"></script>
+<script src="screens/traffic/t-social.js?v=2"></script>
+<script src="screens/traffic/t-delivery.js?v=2"></script>
+<script src="screens/traffic/t-email.js?v=2"></script>
+<script src="screens/traffic/t-reports.js?v=2"></script>
+<script src="screens/traffic/t-getting-started.js?v=1"></script>
+<script src="screens/traffic/t-resources.js?v=1"></script>
+<script src="screens/traffic/t-help.js?v=2"></script>
+<script src="screens/traffic/t-settings.js?v=2"></script>
+<script src="components/bottle-slider.js?v=1"></script>
+<script src="screens/inventory/ic-product-setup.js?v=1"></script>
+<script src="screens/inventory/ic-locations.js?v=1"></script>
+<script src="screens/inventory/ic-vendors.js?v=1"></script>
+<script src="screens/inventory/ic-take-inventory.js?v=1"></script>
+<script src="screens/inventory/ic-count-history.js?v=1"></script>
+<script src="screens/inventory/ic-receive-delivery.js?v=1"></script>
+<script src="screens/inventory/ic-delivery-history.js?v=1"></script>
+<script src="screens/inventory/ic-report-usage.js?v=1"></script>
+<script src="components/onboarding.js?v=2"></script>
+<script src="db.js?v=6"></script>
+<script src="app.js?v=17"></script>
+</body>
+</html>
