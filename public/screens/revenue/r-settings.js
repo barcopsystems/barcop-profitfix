@@ -80,11 +80,14 @@ S.RevenueSettings = {
             <div id="rs-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
           </div>
         </div>
-        <div class="settings-section"><div class="settings-title">Data</div>
-          <div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button class="btn btn-ghost" id="rs-load-sample">Load Sample Data</button>
-            <button class="btn btn-ghost" id="rs-clear-all" style="color:var(--red);">Clear Revenue Data</button>
-            <div id="rs-test-msg" style="font-size:12px;color:var(--gold);display:none;"></div>
+        <div class="settings-section"><div class="settings-title">Testing Tools</div>
+          <div class="card">
+            <div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every section to test calculations and screen layouts. Clear revenue data to wipe this module and start fresh with your real numbers.</div>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-ghost" id="rs-load-sample">Load Sample Data</button>
+              <button class="btn btn-danger" id="rs-clear-all">Clear Revenue Data</button>
+            </div>
+            <div id="rs-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>
           </div>
         </div>
         <div id="rs-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;margin-top:8px;">Settings saved.</div>
@@ -255,9 +258,18 @@ S.RevenueSettings = {
     if (!pw1 || pw1.length < 8) { if(msg){msg.style.color='var(--red)';msg.textContent='Password must be at least 8 characters.';msg.style.display='block';} return; }
     if (pw1 !== pw2) { if(msg){msg.style.color='var(--red)';msg.textContent='Passwords do not match.';msg.style.display='block';} return; }
     if(btn){btn.disabled=true;btn.textContent='Updating...';}
-    const {error} = await DB._sb.auth.updateUser({password:pw1});
-    if(btn){btn.disabled=false;btn.textContent='Update Password';}
-    if(msg){msg.style.color=error?'var(--red)':'var(--gold)';msg.textContent=error?error.message:'Password updated.';msg.style.display='block';}
+    try{
+      if(!DB._sb){throw new Error('Not connected to database.');}
+      const {error} = await DB._sb.auth.updateUser({password:pw1});
+      if(error)throw error;
+      if(msg){msg.style.color='var(--gold)';msg.textContent='Password updated successfully.';msg.style.display='block';}
+      document.getElementById('rs-pw1').value='';
+      document.getElementById('rs-pw2').value='';
+    }catch(e){
+      if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+(e.message||'Could not update password.');msg.style.display='block';}
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='Update Password';}
+    }
   },
 
   async loadSample() {
