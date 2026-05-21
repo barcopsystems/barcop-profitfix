@@ -1,4 +1,4 @@
-[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28103948/FINAL_PLATFORM_MAP.md)
+[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28109699/FINAL_PLATFORM_MAP.md)
 # Bar Cop — Final Complete Platform Map
 # Version 3.0 — Hub as Command Center
 Created: May 21, 2026
@@ -301,10 +301,10 @@ REMOVED from all modules:
 - Settings screens (all settings move to Hub)
 - Getting Started / Setup checklists (move to Hub)
 - Audit screens (Profit Audit, Revenue Audit, Traffic Audit all move to Hub)
-- Module-level dashboards (Hub key metrics replace these — module entry goes directly to first working screen)
 
 KEPT in modules:
 - All operational working screens
+- Module dashboards (simplified — the landing view when you enter a module; the Hub shows platform-level metrics, the module dashboard shows module-specific detail like the 8-week trend chart and weekly summary)
 - Help and FAQ screens (expanded — see below)
 - Reports screens
 
@@ -469,22 +469,22 @@ Note: Settings removed. Audit removed. Getting Started removed.
 
 | Screen | File | Status | Change When Control Built |
 |---|---|---|---|
-| Dashboard | revenue-dashboard.js | Complete | No change |
-| This Week | revenue-this-week.js | Complete | Add "Import from Labor Control" button |
-| Server Check | revenue-server-check.js | Complete | Staff list syncs from lc_staff |
-| Menu Items | revenue-menu-items.js | Complete | No change |
-| Menu Engineering | revenue-menu-engineering.js | Complete | No change |
-| Labor Budget | revenue-labor-budget.js | Complete | Syncs with lc_budget |
-| RPLH Tracker | revenue-rplh.js | Complete | No change |
-| Check Average | revenue-check-average.js | Complete | No change |
-| Events and Catering | revenue-events.js | Complete | No change |
-| Reports | revenue-reports.js | Complete | No change |
-| Help and FAQ | revenue-help.js | Complete | No change |
+| Dashboard | r-dashboard.js | Complete | No change |
+| This Week | r-this-week.js | Complete | Add "Import from Labor Control" button |
+| Server Check | r-server-check.js | Complete | Staff list syncs from lc_staff |
+| Menu Items | r-menu-items.js | Complete | No change |
+| Menu Engineering | r-menu-engineering.js | Complete | No change |
+| Labor Budget | r-labor-budget.js | Complete | Syncs with lc_budget |
+| RPLH Tracker | r-rplh.js | Complete | No change |
+| Check Average | r-check-average.js | Complete | No change |
+| Events and Catering | r-events.js | Complete | No change |
+| Reports | r-reports.js | Complete | No change |
+| Help and FAQ | r-help.js | Complete | No change |
 
 ### Removed Screens (moved to Hub)
-- revenue-settings.js → Hub Settings
-- revenue-audit.js → Hub Audit Center
-- revenue-getting-started.js → Hub Getting Started
+- r-settings.js → Hub Settings
+- r-audit.js → Hub Audit Center
+- r-getting-started.js → Hub Getting Started
 
 ---
 
@@ -530,22 +530,22 @@ Note: Settings removed. Audit removed. Getting Started removed.
 
 | Screen | File | Status | Notes |
 |---|---|---|---|
-| Dashboard | traffic-dashboard.js | Complete | No change |
-| This Week | traffic-this-week.js | Complete | Add missing fields: Yelp rating, delivery ratings, email metrics |
-| Google Business Profile | traffic-gbp.js | Needs build | Scorecard over traffic_weeks data |
-| Review Tracker | traffic-reviews.js | Needs build | Scorecard over traffic_weeks data |
-| Search and SEO | traffic-search.js | Needs build | Scorecard over traffic_weeks data |
-| Website Scorecard | traffic-website.js | Needs build | Scorecard over traffic_weeks data |
-| Social Media | traffic-social.js | Needs build | Scorecard over traffic_weeks data |
-| Delivery Platforms | traffic-delivery.js | Needs build | Scorecard over traffic_weeks data |
-| Email and Loyalty | traffic-email.js | Needs build | Scorecard over traffic_weeks data |
-| Reports | traffic-reports.js | Needs build | Trend charts from traffic_weeks history |
-| Help and FAQ | traffic-help.js | Needs build | FAQ specific to Traffic Recovery |
+| Dashboard | t-dashboard.js | Complete | No change |
+| This Week | t-this-week.js | Complete | 7-step wizard, all channel metrics captured |
+| Google Business Profile | t-gbp.js | Complete | Scorecard plus profile completeness checklist |
+| Review Tracker | t-reviews.js | Complete | Scorecard with velocity and response charts |
+| Search and SEO | t-search.js | Complete | Local SEO assessment scorecard |
+| Website Scorecard | t-website.js | Complete | Scorecard with sessions and bounce charts |
+| Social Media | t-social.js | Complete | Scorecard with follower and posts charts |
+| Delivery Platforms | t-delivery.js | Complete | Per-platform scorecard |
+| Email and Loyalty | t-email.js | Complete | Scorecard with open rate and list charts |
+| Reports | t-reports.js | Complete | Trend charts plus filterable history table |
+| Help and FAQ | t-help.js | Complete | Expanded knowledge layer plus Quick Reference Card |
 
 ### Removed Screens (moved to Hub)
-- traffic-settings.js → Hub Settings
-- traffic-audit.js → Hub Audit Center
-- traffic-getting-started.js → Hub Getting Started
+- t-settings.js → Hub Settings
+- t-audit.js → Hub Audit Center
+- t-getting-started.js → Hub Getting Started
 
 ### Traffic Screen Specs
 
@@ -562,10 +562,10 @@ Add these fields to the weekly entry form (save to traffic_weeks):
 - Loyalty program active (yes/no)
 - Loyalty member count (number — optional)
 
-#### Google Business Profile (traffic-gbp.js)
+#### Google Business Profile (t-gbp.js)
 Scorecard reading latest traffic_weeks entry + traffic_settings targets.
 
-Profile status section (yes/no toggles — saved to traffic_weeks):
+Profile status section (yes/no toggles — saved to traffic_settings.profile, not weekly records):
 Listing claimed | Hours complete | Phone present | Website linked | Menu link active | Category set | Attributes complete | Q&A populated
 
 Tracked metrics (from traffic_weeks):
@@ -575,7 +575,7 @@ Completeness score: auto-calculated from checklist. Shown as % with color.
 
 Benchmark status per metric. Action tips for anything below benchmark.
 
-#### Review Tracker (traffic-reviews.js)
+#### Review Tracker (t-reviews.js)
 Scorecard over traffic_weeks data.
 
 Metrics displayed from latest week:
@@ -585,27 +585,27 @@ Trend: review velocity chart over last 8 weeks. Response rate trend.
 
 Benchmark comparisons. Action tips.
 
-#### Search and SEO (traffic-search.js)
-Scorecard with manual assessment fields (saved to traffic_weeks):
+#### Search and SEO (t-search.js)
+Scorecard with manual assessment fields (saved to traffic_settings.profile, not weekly records):
 Maps pack confirmed (yes/no) | Primary keyword | NAP consistent (yes/no) | Business name on Google | Address on Google | Phone on Google | Website titles assessed (yes/no) | Citation count estimate
 
 Action tips: inconsistent NAP, not in maps pack, low citations.
 
-#### Website Scorecard (traffic-website.js)
+#### Website Scorecard (t-website.js)
 Scorecard reading traffic_weeks data.
 
 Metrics: website exists | mobile optimized | monthly sessions | bounce rate | menu page in top 3 | online ordering | reservation system | avg session duration | traffic source breakdown
 
 Benchmarks per metric. Trend charts for sessions and bounce rate.
 
-#### Social Media (traffic-social.js)
+#### Social Media (t-social.js)
 Scorecard reading traffic_weeks data.
 
 Metrics: IG followers | IG posts this month | IG engagement rate | FB followers | FB posts this month | content mix assessment | stories used | reels used
 
 Follower trend chart. Posts per month trend.
 
-#### Delivery Platforms (traffic-delivery.js)
+#### Delivery Platforms (t-delivery.js)
 Scorecard reading traffic_weeks data.
 
 Per platform (DoorDash / Uber Eats / Grubhub):
@@ -615,21 +615,21 @@ Overall: platform count | average rating across platforms
 
 Action tips: not on any platform, low ratings, incomplete menus.
 
-#### Email and Loyalty (traffic-email.js)
+#### Email and Loyalty (t-email.js)
 Scorecard reading traffic_weeks data.
 
 Metrics: list size | last send date | send frequency | open rate | growth mechanism | loyalty program active | member count
 
 Benchmarks. Open rate trend. Action tips.
 
-#### Reports — Traffic (traffic-reports.js)
+#### Reports — Traffic (t-reports.js)
 Trend charts from traffic_weeks history.
 
 Charts: Google rating over time | Review velocity | Website sessions | IG followers | Delivery platform ratings
 
 Summary table: all metrics by week, filterable by date range. Export to PDF.
 
-#### Help — Traffic (traffic-help.js)
+#### Help — Traffic (t-help.js)
 Expanded knowledge layer for Traffic Recovery. Replaces the removed Resources screen.
 
 Contextual explanation of every Traffic metric, what each benchmark means, and what to do when a number is off target. Covers: Google rating and review velocity, response rate, GBP completeness, website sessions and bounce rate, social posting cadence, delivery platform ratings, email open rate, NAP consistency, local SEO, score calculation, the Traffic Audit, and file submission for the audit.
@@ -1260,7 +1260,7 @@ revenue_price_log           — menu price change log
 revenue_events              — events and catering records
 revenue_rate_cards          — private dining rate cards
 getting_started_revenue     — revenue checklist state (moves to hub)
-traffic_settings            — traffic targets (move to settings)
+traffic_settings            — traffic targets + digital-presence profile state (move to settings)
 traffic_weeks               — traffic weekly data
 traffic_audits              — traffic audit history
 getting_started_traffic     — traffic checklist state (moves to hub)
@@ -1342,12 +1342,12 @@ All numbers consistent across all 6 modules. Every metric tells the same story.
 ### The Anchor Bar and Kitchen — Fake Operation Profile
 - Bar type: Full bar and kitchen, casual dining
 - Location: Austin, TX
-- Annual bar revenue: $480,000
-- Annual food revenue: $320,000
-- Bar pour cost: 24.8% (above 22% target — shows room for improvement)
-- Food cost: 36.7% (above 32% target)
-- Prime cost: 56.6% (near 60% target — decent but improvable)
-- Check average: $33.40 (below $38 target)
+- Annual bar revenue: $624,000
+- Annual food revenue: $374,400
+- Bar pour cost: running in the mid-20s%, above the 22% target
+- Food cost: running in the mid-30s%, above the 32% target
+- Prime cost: in the low 60s%, near the 60% target
+- Check average: in the low-30s dollars, below the $35 target
 - Google rating: 4.1 (below 4.3 target)
 - Labor %: 31% blended
 
@@ -1445,8 +1445,8 @@ On next app load: detect unsynced count, prompt to sync.
 
 ## Current State Checklist
 - [x] Profit Recovery — complete
-- [x] Revenue Recovery — complete  
-- [ ] Traffic Recovery — 7 screens + help need building
+- [x] Revenue Recovery — complete
+- [x] Traffic Recovery — complete
 - [ ] Hub — needs full rebuild as command center
 - [ ] Inventory Control — full build
 - [ ] Labor Control — full build
@@ -1455,11 +1455,11 @@ On next app load: detect unsynced count, prompt to sync.
 ## Recommended Build Order
 
 ### Stage 1 — Finish Recovery (do this now)
-1. Finish 7 Traffic screens + help
-2. Add missing fields to traffic-this-week.js
-3. Fix & vs and inconsistency in nav labels
-4. Populate sample audit data for Profit and Revenue in loadSample()
-5. Add audit validation — reject if no real data submitted
+1. Finish 7 Traffic screens + help — DONE
+2. Add missing fields to t-this-week.js — DONE
+3. Fix & vs and inconsistency in nav labels — DONE
+4. Populate sample audit data for Profit and Revenue in loadSample() — DONE
+5. Add audit validation — reject if no real data submitted — DONE
 
 ### Stage 2 — Rebuild Hub
 6. Rebuild hub.js as full command center
@@ -1469,7 +1469,7 @@ On next app load: detect unsynced count, prompt to sync.
 10. Update onboarding to new platform setup flow
 11. Remove settings/audit/getting-started screens from all 6 modules
 12. Update all module sidebars to remove those items and add ← Back to Hub
-13. Delete resources.js, revenue-resources.js, and traffic-resources.js from the repo and remove their script tags from index.html — Resources is removed platform-wide; the Control modules are built without Resources screens from the start
+13. Delete resources.js, r-resources.js, and t-resources.js from the repo and remove their script tags from index.html — Resources is removed platform-wide; the Control modules are built without Resources screens from the start
 
 ### Stage 3 — Inventory Control Phase 1
 13. ic-product-setup.js with Profit Recovery sync
@@ -1529,7 +1529,7 @@ On next app load: detect unsynced count, prompt to sync.
 61. lc-callout.js
 62. lc-dashboard.js
 63. lc-help.js
-64. Update revenue-this-week.js with Import from Labor Control button
+64. Update r-this-week.js with Import from Labor Control button
 65. Update RPLH bidirectional sync between Labor Control and Revenue Settings
 
 ### Stage 7 — Integration and Polish
@@ -1674,6 +1674,6 @@ The only Recovery screens that change are:
 - this-week.js reads from App.inventoryData.ic_counts for COGS import (when it exists)
 - vendor-watch.js reads from App.inventoryData.ic_deliveries for auto-feed (when it exists)
 - cash-recon.js reads from App.shiftData.sc_cash_drops for auto-feed (when it exists)
-- revenue-this-week.js reads from App.laborData.lc_actuals for import (when it exists)
+- r-this-week.js reads from App.laborData.lc_actuals for import (when it exists)
 
 All of these are additive — if the Control data doesn't exist yet, the Recovery screen works exactly as before. No breaking changes.
