@@ -312,3 +312,90 @@ const Inventory = {
     `;
   }
 };
+
+/* ── Shift Control Nav ── */
+const Shift = {
+  navHTML() {
+    return `
+      <div class="nav-section">Overview</div>
+      <div class="nav-item" id="nav-hub" data-nav="hub">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M11 3.5L5 8.5l6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Back to Hub</span>
+      </div>
+      <div class="nav-item" data-screen="sc-dashboard" id="nav-sc-dashboard">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-section">Shifts</div>
+      <div class="nav-item" data-screen="sc-active-shift" id="nav-sc-active-shift">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 5.5l4.5 3-4.5 3z" fill="currentColor"/></svg>
+        <span class="nav-label">Active Shift</span>
+      </div>
+      <div class="nav-item" data-screen="sc-log-shift" id="nav-sc-log-shift">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3.5" y="3" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3V1.7h4V3M6 8h5M6 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Log a Shift</span>
+      </div>
+      <div class="nav-item" data-screen="sc-shift-history" id="nav-sc-shift-history">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Shift History</span>
+      </div>
+      <div class="nav-section">Cash</div>
+      <div class="nav-item" data-screen="sc-cash-drop" id="nav-sc-cash-drop">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="6" width="13" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.2" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 1.5v3.5M6.8 3.3l1.7 1.7 1.7-1.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Cash Drop</span>
+      </div>
+      <div class="nav-item" data-screen="sc-safe-log" id="nav-sc-safe-log">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 8.5V6M11.5 8.5H14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Safe Log</span>
+      </div>
+      <div class="nav-item" data-screen="sc-variance-log" id="nav-sc-variance-log">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L15.5 14.5H1.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v3.4M8.5 12v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Variance Log</span>
+      </div>
+      <div class="nav-section">Operations</div>
+      <div class="nav-item" data-screen="sc-86-list" id="nav-sc-86-list">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 4l9 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">86 List</span>
+      </div>
+      <div class="nav-item" data-screen="sc-void-comp" id="nav-sc-void-comp">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h9v12l-2-1.3-2.5 1.3-2.5-1.3-2 1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 6.5l4 4M10.5 6.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Void and Comp Log</span>
+      </div>
+      <div class="nav-item" data-screen="sc-maintenance" id="nav-sc-maintenance">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Maintenance Log</span>
+      </div>
+      <div class="nav-section">Checklists</div>
+      <div class="nav-item" data-screen="sc-opening-checklist" id="nav-sc-opening-checklist">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Opening Checklist</span>
+      </div>
+      <div class="nav-item" data-screen="sc-closing-checklist" id="nav-sc-closing-checklist">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="7.5" width="11" height="7" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.3 7.5V5.5a3.2 3.2 0 0 1 6.4 0v2" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Closing Checklist</span>
+      </div>
+      <div class="nav-item" data-screen="sc-checklist-templates" id="nav-sc-checklist-templates">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Templates</span>
+      </div>
+      <div class="nav-section">Reports</div>
+      <div class="nav-item" data-screen="sc-reports-shift" id="nav-sc-reports-shift">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Shift Reports</span>
+      </div>
+      <div class="nav-item" data-screen="sc-reports-cash" id="nav-sc-reports-cash">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Cash Reports</span>
+      </div>
+      <div class="nav-item" data-screen="sc-reports-ops" id="nav-sc-reports-ops">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="8" width="3" height="5" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="4" width="3" height="9" stroke="currentColor" stroke-width="1.3"/><rect x="11.5" y="10" width="3" height="3" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Operations Reports</span>
+      </div>
+      <div class="nav-section">Support</div>
+      <div class="nav-item" data-screen="sc-help" id="nav-sc-help">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
+        <span class="nav-label">Help and FAQ</span>
+      </div>
+    `;
+  }
+};
