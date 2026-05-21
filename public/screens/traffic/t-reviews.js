@@ -62,6 +62,7 @@ S.TrafficReviews = {
     const age = prof.rev_age != null ? prof.rev_age : '';
     const inputsCard = '<div class="card">'
       + '<div class="card-title">Review Monitoring</div>'
+      + reviewedNote(prof.rev_reviewed_at)
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:200px;"><label>Most Recent Review Age ' + tt('t-review-age') + '</label><div class="fw"><input class="suf" type="number" id="rev-age" value="' + esc(String(age)) + '" min="0"/><span class="suf">days ago</span></div></div>'
       + '</div>'
@@ -109,6 +110,7 @@ S.TrafficReviews = {
     const age = parseInt(document.getElementById('rev-age')?.value);
     prof.rev_age = isNaN(age) ? null : age;
     prof.rev_patterns = document.getElementById('rev-patterns')?.value || '';
+    prof.rev_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('rev-msg');
