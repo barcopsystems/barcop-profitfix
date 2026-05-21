@@ -8,14 +8,28 @@
 <link rel="stylesheet" href="style.css?v=2"/>
 <style>
 @media print {
-  #sidebar, #topbar, #topbar-actions, .btn, button { display: none !important; }
-  #main-content { margin-left: 0 !important; padding: 0 !important; }
-  body { background: #fff !important; color: #111 !important; }
-  .card { background: #fff !important; border: 1px solid #ddd !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 12pt; }
-  .screen { padding: 0 !important; }
-  [style*="color:var(--gold)"] { color: #8B6914 !important; }
-  [style*="color:var(--red)"]  { color: #c0392b !important; }
-  [style*="background:var(--b2)"] { background: #eee !important; }
+  /* Flip the dark theme to a light, readable theme for print.
+     Almost everything reads these CSS variables, so overriding them
+     here recolors the whole audit automatically. */
+  :root {
+    --bg:#ffffff; --surface:#ffffff; --input:#ffffff;
+    --hover:transparent; --nav-act:#ffffff;
+    --gold:#8a6a16; --gold-h:#8a6a16; --gold-bg:#f3ecd6;
+    --red:#b3271a; --red-bg:#f7dfdc; --steel:#2f6a86;
+    --w:#000000; --t1:#1a1a1a; --t2:#333333; --t3:#555555; --t4:#777777;
+    --b1:#cccccc; --b2:#dddddd;
+  }
+  .sidebar, .topbar { display: none !important; }
+  .btn, button { display: none !important; }
+  html, body { background:#fff !important; height:auto !important; overflow:visible !important; }
+  .app { display:block !important; height:auto !important; overflow:visible !important; }
+  .main { display:block !important; }
+  .content { padding:0 !important; overflow:visible !important; }
+  .screen { max-width:none !important; padding:0 !important; }
+  .card { box-shadow:none !important; break-inside:avoid; }
+  /* Any element still painted pure white from a literal hex */
+  [style*="color:#fff"], [style*="color: #fff"],
+  [style*="color:#ffffff"], [style*="color: #ffffff"] { color:#000 !important; }
 }
 </style>
 </head>
