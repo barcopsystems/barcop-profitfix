@@ -68,6 +68,7 @@ S.ThisWeek = {
       +'<div class="f w-md"><label>Bar COGS '+tt('bar-cogs')+'</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-bc" value="'+b.cogs+'" oninput="S.ThisWeek.calcBar()" /></div></div>'
       +'<div class="f w-md"><label>Bar Labor '+tt('bar-labor')+'</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-bl" value="'+b.labor+'" oninput="S.ThisWeek.calcBar()" /></div></div>'
       +'</div>'
+      +(this.icCanImport()?'<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="S.ThisWeek.importBarCOGS()">Import COGS from Inventory Control</button><span id="tw-ic-status" style="font-size:11px;color:var(--t3);margin-left:10px;"></span></div>':'')
       +'<div class="calc">'
       +'<div class="calc-item"><div class="calc-label">Bar Pour Cost %</div><div class="calc-val" id="tw-bpct">—</div></div>'
       +'<div class="calc-item"><div class="calc-label">Bar Labor %</div><div class="calc-val" id="tw-blpct">—</div></div>'
@@ -92,6 +93,50 @@ S.ThisWeek = {
     set('tw-blpct',labPct!=null?App.fmtPct(labPct):'—');
     set('tw-bvpct',vp!=null?(vp>0?'+':'')+App.fmtPct(vp):'—',vp!=null?(vp>0?'warn':'good'):'');
     set('tw-bvdol',vd!=null?(vd>0?'+':'')+App.fmtCurrency(vd):'—',vd!=null?(vd>0?'warn':'good'):'');
+  },
+
+  // ── Import bar COGS from Inventory Control (Rule 21: reads ic_counts) ──────
+  icCanImport(){
+    return (((App.inventoryData&&App.inventoryData.ic_counts)||[]).length)>=2;
+  },
+
+  icBarCOGS(){
+    const counts=[...((App.inventoryData&&App.inventoryData.ic_counts)||[])]
+      .sort((a,b)=>new Date(a.created_at||a.date).getTime()-new Date(b.created_at||b.date).getTime());
+    if(counts.length<2)return null;
+    const startC=counts[counts.length-2],endC=counts[counts.length-1];
+    const BAR=['Liquor','Wine','Bottle Beer','Draft Beer'];
+    const prods=(App.inventoryData&&App.inventoryData.ic_products)||[];
+    const sMap={};(startC.items||[]).forEach(it=>sMap[it.product_id]=it);
+    const eMap={};(endC.items||[]).forEach(it=>eMap[it.product_id]=it);
+    const purch={};
+    ((App.inventoryData&&App.inventoryData.ic_deliveries)||[])
+      .filter(d=>d.date>startC.date&&d.date<=endC.date)
+      .forEach(d=>(d.line_items||[]).forEach(li=>{purch[li.product_id]=(purch[li.product_id]||0)+(li.qty||0);}));
+    let cogs=0;
+    Object.keys(eMap).forEach(pid=>{
+      if(!sMap[pid])return;
+      const p=prods.find(x=>x.id===pid);
+      if(!p||!BAR.includes(p.category))return;
+      const used=(sMap[pid].total||0)+(purch[pid]||0)-(eMap[pid].total||0);
+      const uc=p.unit_cost!=null?p.unit_cost:(eMap[pid].unit_cost!=null?eMap[pid].unit_cost:null);
+      if(uc!=null)cogs+=used*uc;
+    });
+    return cogs;
+  },
+
+  importBarCOGS(){
+    const status=document.getElementById('tw-ic-status');
+    const cogs=this.icBarCOGS();
+    if(cogs==null){
+      if(status){status.textContent='Need two inventory counts to import.';status.style.color='var(--red)';}
+      return;
+    }
+    const el=document.getElementById('tw-bc');
+    if(el)el.value=cogs.toFixed(2);
+    this.draft.bar.cogs=cogs.toFixed(2);
+    this.calcBar();
+    if(status){status.textContent='Imported '+App.fmtCurrency(cogs)+' from your latest inventory count period.';status.style.color='var(--gold)';}
   },
 
   step3(){
