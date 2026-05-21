@@ -60,6 +60,18 @@ S.TrafficHelp = {
         { q: 'What makes a strong delivery platform listing?',
           a: 'Three things drive delivery platform performance: photo coverage, menu completeness, and promotions. Photo coverage means every menu item has a photo, not just the top sellers. Menu completeness means descriptions are filled in, prices are current, and unavailable items are removed. Promotions, even a simple free delivery offer for new customers, give you a significant visibility lift within the platform algorithm. Most operators have a listing that is technically active but with photos on fewer than half the items and no promotions running. Closing that gap takes one afternoon and produces an immediate improvement in order volume.' },
       ]},
+      { t: 'Email and Loyalty', qa: [
+        { q: 'Why does an email list matter when I already have social media?',
+          a: 'Social followers are not yours. The platform decides who sees your posts, and organic reach keeps shrinking every year. An email list is an owned channel: when you send, it lands in the inbox. For a bar, email is the most reliable way to pull past guests back for a slow Tuesday, an event, or a new menu. A list of 1,000 engaged contacts you email monthly is worth more than 5,000 followers who might see one post in ten.' },
+        { q: 'What email open rate should I expect?',
+          a: 'The benchmark is 20 percent or higher. Bar and restaurant lists run a little above the all-industry average because guests who opted in genuinely like the place. Below 15 percent usually means one of three things: the list went stale from infrequent sending, the subject lines are weak, or the list was built from low-quality signups. Tighten the subject line, send around the time guests decide where to eat, and clear inactive contacts off the list.' },
+        { q: 'How do I grow the list?',
+          a: 'Growth matters more than raw size. Add contacts every month through an active mechanism: a signup form on the website, a capture point at the host stand or on receipts, WiFi login capture, or an opt-in at online-order checkout. A list that is not growing is shrinking, because contacts naturally go cold. The Email and Loyalty screen flags it when no growth mechanism is set.' },
+        { q: 'How often should I email?',
+          a: 'At least monthly, and twice a month is better for a bar with events and specials. Less than monthly and the list goes cold — opens drop and spam complaints rise because guests forget they signed up. A predictable cadence trains guests to expect and open your email. Pick a frequency you can sustain and hold it.' },
+        { q: 'Is a loyalty program worth running?',
+          a: 'For a bar, a simple one is. Loyalty turns a one-time delivery order or a walk-in into a regular. It does not need an app or a points engine — a basic visit-based reward tracked at the POS works fine. The real value is the contact capture and the built-in reason to come back. The Email and Loyalty screen tracks whether a program is active and the member count so you can watch it grow.' },
+      ]},
       { t: 'Traffic Audit', qa: [
         { q: 'How does the Traffic Audit work?',
           a: 'Click Generate This Month\'s Audit, upload your screenshots and data files, and the system reads every document you submit alongside the weekly data you have entered in the app. It scores seven sections: Google Business Profile, website, reviews, search and SEO, social media, delivery platforms, and email and loyalty. Each section gets a score based on what the submitted data shows. The overall score is a weighted composite. The report identifies your lowest-scoring section, the specific variables pulling the score down, and the highest-impact actions to take before your next audit. The PDF is ready to download within two minutes.' },
@@ -91,6 +103,53 @@ S.TrafficHelp = {
         + '</div>';
     }).join('');
 
-    container.innerHTML = '<div class="screen">' + sectionsHtml + '</div>';
+    const refCard = '<div class="card" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div style="flex:1;min-width:220px;"><div style="font-size:13px;font-weight:700;color:var(--t1);">Traffic Quick Reference Card</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.5;">Every Traffic benchmark on one page, with what each number means. Print it and post it where the team can see it.</div></div>'
+      + '<button class="btn btn-primary btn-sm" id="th-qref" style="flex-shrink:0;">Open Quick Reference Card</button></div>';
+
+    container.innerHTML = '<div class="screen">' + refCard + sectionsHtml + '</div>';
+
+    document.getElementById('th-qref')?.addEventListener('click', () => this.quickReferenceCard());
+  },
+
+  quickReferenceCard() {
+    const barName = App.data.settings?.bar_name || 'Bar Cop';
+    const rows = [
+      ['Google Rating',        '4.3 stars or higher', 'Below 4.0 and local search filters you out of results.'],
+      ['New Reviews',          '8 per month',         'Freshness ranks you. Below 4 per month your listing ages.'],
+      ['Review Response Rate', '75% or higher',       'Reply to every review. Google counts response activity.'],
+      ['Yelp Rating',          '4.0 stars or higher', 'Yelp runs lower than Google, but under 4.0 still hurts.'],
+      ['GBP Photos',           '100 or more',         'More photos drives more listing views and visits.'],
+      ['GBP Posts',            '8 per month',         'Posts appear in search before a guest clicks through.'],
+      ['Website Sessions',     '2,000 per month',     'Below 500 means you are not being found online.'],
+      ['Bounce Rate',          'Under 60%',           'Above 70% the homepage has no clear next step.'],
+      ['Avg Session Duration', '90 seconds or more',  'Shows visitors are finding what they came for.'],
+      ['Social Posts',         '12 per month',        'About 3 a week across Instagram and Facebook.'],
+      ['Instagram Engagement', '2% or higher',        'Confirms followers are actually interacting.'],
+      ['Delivery Rating',      '4.5 stars or higher', 'Below 4.0 cuts you from delivery consideration.'],
+      ['Local Citations',      '40 or more',          'Consistent directory listings build local authority.'],
+      ['Email Open Rate',      '20% or higher',       'Your one owned channel. Keep it warm by sending.']
+    ];
+    const tr = rows.map(r => '<tr><td class="m">' + r[0] + '</td><td class="b">' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('');
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Traffic Quick Reference Card</title>'
+      + '<style>body{font-family:Helvetica,Arial,sans-serif;color:#111;margin:0;padding:34px;}'
+      + 'h1{font-size:20px;margin:0 0 2px;}.sub{font-size:11px;color:#666;margin-bottom:18px;}'
+      + 'table{width:100%;border-collapse:collapse;font-size:12px;}'
+      + 'th{background:#1a1a2e;color:#fff;padding:8px 10px;text-align:left;font-size:10px;letter-spacing:0.5px;text-transform:uppercase;}'
+      + 'td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:top;}'
+      + 'td.m{font-weight:700;white-space:nowrap;}td.b{font-weight:700;color:#8a6a16;white-space:nowrap;}'
+      + '.footer{margin-top:18px;font-size:10px;color:#aaa;text-align:center;}</style></head><body>'
+      + '<h1>Traffic Quick Reference</h1>'
+      + '<div class="sub">' + esc(barName) + ' &nbsp;|&nbsp; Digital presence benchmarks for the team</div>'
+      + '<table><thead><tr><th>Metric</th><th>Benchmark</th><th>What the number means</th></tr></thead>'
+      + '<tbody>' + tr + '</tbody></table>'
+      + '<div class="footer">Bar Cop Traffic Recovery</div></body></html>';
+    const win = window.open('', '_blank');
+    if (!win) { alert('Allow pop-ups to open the reference card.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
   }
 };
