@@ -547,6 +547,46 @@ const App = {
     + '</div>';
   },
 
+  /* ── Reusable trend chart ─────────────────────────────────────────────────
+     opts: { title, points:[{label,value}], target (optional), suffix (optional) }
+     Returns a chart-card. Needs 2+ non-null values or shows a prompt.        */
+  trendChart(opts) {
+    const pts  = (opts.points || []).filter(Boolean);
+    const vals = pts.map(p => p.value).filter(v => v != null);
+    const title = opts.title || 'Trend';
+    const head = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">' + esc(title) + '</div>';
+    if (vals.length < 2) {
+      return '<div class="chart-card" style="padding:20px 24px 16px;">' + head
+        + '<div style="text-align:center;padding:16px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see this trend</div></div>';
+    }
+    const W = 700, H = 170, PAD = { t:24, r:18, b:34, l:46 };
+    const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
+    let minV = Math.min(...vals), maxV = Math.max(...vals);
+    if (opts.target != null) { minV = Math.min(minV, opts.target); maxV = Math.max(maxV, opts.target); }
+    const span = (maxV - minV) * 0.15 || 1;
+    const minY = minV - span, maxY = maxV + span;
+    const xs = i => PAD.l + (pts.length > 1 ? (i/(pts.length-1))*cw : cw/2);
+    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
+    const valid = pts.map((p,i) => p.value != null ? { x:xs(i), y:ys(p.value) } : null).filter(Boolean);
+    let d = 'M' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
+    for (let i = 1; i < valid.length; i++) {
+      const cp = (valid[i].x - valid[i-1].x) * 0.35;
+      d += ' C' + (valid[i-1].x+cp).toFixed(1) + ',' + valid[i-1].y.toFixed(1) + ' ' + (valid[i].x-cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
+    }
+    const dots = pts.map((p,i) => p.value != null ? '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p.value).toFixed(1) + '" r="4" fill="#0A1520" stroke="#C9A84C" stroke-width="2"/>' : '').join('');
+    const xl = pts.map((p,i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H-8) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + esc(String(p.label||'')) + '</text>').join('');
+    const yt = [minY, (minY+maxY)/2, maxY].map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (PAD.l-8) + '" y="' + (ys(v)+4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (Math.round(v*10)/10) + '</text>').join('');
+    const tl = opts.target != null
+      ? '<line x1="' + PAD.l + '" y1="' + ys(opts.target).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(opts.target).toFixed(1) + '" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/><text x="' + (W-PAD.r+4) + '" y="' + (ys(opts.target)+4).toFixed(1) + '" fill="rgba(201,168,76,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
+      : '';
+    return '<div class="chart-card" style="padding:20px 24px 14px;">' + head
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible;">'
+      + yt + tl
+      + '<path d="' + d + '" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
+      + dots + xl
+      + '</svg></div>';
+  },
+
   nextWeekNum() {
     const weeks = this.data?.weeks || [];
     if (weeks.length === 0) return 1;
