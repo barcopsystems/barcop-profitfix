@@ -649,6 +649,19 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+/* ── Reviewed-on staleness note ── */
+function reviewedNote(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  if (isNaN(then.getTime())) return '';
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+  const stale = days > 30;
+  return '<div style="font-size:11px;color:' + (stale ? 'var(--gold)' : 'var(--t3)')
+    + ';margin-bottom:10px;">Last reviewed ' + when
+    + (stale ? ' — consider updating' : '') + '</div>';
+}
+
 /* ── Auth UI ── */
 function wireAuth() {
   const show = (id) => {
