@@ -336,6 +336,8 @@ const App = {
       nav.innerHTML = Traffic.navHTML();
     } else if (module === 'inventory') {
       nav.innerHTML = Inventory.navHTML();
+    } else if (module === 'shift') {
+      nav.innerHTML = Shift.navHTML();
     } else {
       nav.innerHTML = ProfitNav.html();
     }
@@ -539,6 +541,40 @@ const App = {
       document.getElementById('topbar-sub').textContent = icSub;
       const icScreen = icScreens[id];
       if (icScreen) icScreen.render(content, actions);
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Shift Control module screens
+    if (this._activeModule === 'shift') {
+      const scTitles = {
+        'hub':                   ['Recovery Hub', ''],
+        'sc-dashboard':          ['Dashboard', 'Shift Control'],
+        'sc-active-shift':       ['Active Shift', 'Shift Control'],
+        'sc-log-shift':          ['Log a Shift', 'Shift Control'],
+        'sc-shift-history':      ['Shift History', 'Shift Control'],
+        'sc-cash-drop':          ['Cash Drop', 'Shift Control'],
+        'sc-safe-log':           ['Safe Log', 'Shift Control'],
+        'sc-variance-log':       ['Variance Log', 'Shift Control'],
+        'sc-86-list':            ['86 List', 'Shift Control'],
+        'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
+        'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
+        'sc-opening-checklist':  ['Opening Checklist', 'Shift Control'],
+        'sc-closing-checklist':  ['Closing Checklist', 'Shift Control'],
+        'sc-checklist-templates':['Checklist Templates', 'Shift Control'],
+        'sc-reports-shift':      ['Shift Reports', 'Shift Control'],
+        'sc-reports-cash':       ['Cash Reports', 'Shift Control'],
+        'sc-reports-ops':        ['Operations Reports', 'Shift Control'],
+        'sc-help':               ['Help and FAQ', 'Shift Control'],
+      };
+      const scScreens = {
+        'sc-log-shift': S.ShiftLogShift,
+      };
+      const [scTitle, scSub] = scTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = scTitle;
+      document.getElementById('topbar-sub').textContent = scSub;
+      const scScreen = scScreens[id];
+      if (scScreen) scScreen.render(content, actions);
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
