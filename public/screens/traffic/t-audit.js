@@ -37,8 +37,8 @@ S.TrafficAudit = {
     let latestCard = '';
     if (latest) {
       const prev = audits[1] || null;
-      const scoreColor = latest.overall_score >= 80 ? 'var(--gold)' : latest.overall_score >= 60 ? 'var(--t1)' : 'var(--red)';
-      const scoreLabel = latest.overall_score >= 80 ? 'Strong' : latest.overall_score >= 60 ? 'Moderate' : 'Needs Work';
+      const scoreColor = App.scoreColor(latest.overall_score);
+      const scoreLabel = App.scoreLabel(latest.overall_score);
       let progressBanner = '';
       if (prev) {
         const diff = (latest.overall_score||0) - (prev.overall_score||0);
@@ -55,8 +55,8 @@ S.TrafficAudit = {
         const bar  = Math.min(100, Math.max(0, score));
         return '<tr>'
           + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
-          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+bar+'%;background:'+(score>=70?'var(--gold)':score>=50?'rgba(255,200,0,0.6)':'var(--red)')+';border-radius:3px;"></div></div></td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:'+(score>=70?'var(--gold)':score>=50?'var(--t1)':'var(--red)')+';padding:8px 12px;">' + score + '</td>'
+          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+bar+'%;background:'+App.scoreColor(score)+';border-radius:3px;"></div></div></td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:'+App.scoreColor(score)+';padding:8px 12px;">' + score + '</td>'
           + (diff != null ? '<td style="font-size:12px;color:'+(diff>=0?'var(--gold)':'var(--red)')+';padding:8px 12px;">'+(diff>=0?'+':'')+diff+'</td>' : '<td></td>')
           + '</tr>';
       }).join('');
@@ -106,7 +106,7 @@ S.TrafficAudit = {
           : '';
         return '<tr>'
           + '<td>' + (a.date||'').slice(0,10) + '</td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + ((a.overall_score||0)>=70?'var(--gold)':(a.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (a.overall_score||0) + '</td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score||0) + ';">' + (a.overall_score||0) + '</td>'
           + (diff != null ? '<td style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</td>' : '<td></td>')
           + '<td>' + tierBadge + '</td>'
           + '<td><button class="btn btn-ghost btn-sm ta-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
@@ -185,7 +185,7 @@ S.TrafficAudit = {
     ).join('');
     const dots = sorted.map((a,i) => {
       const v = a.overall_score||0;
-      const col = v>=80?'#C9A84C':v>=60?'rgba(255,255,255,0.8)':'#c0392b';
+      const col = App.scoreHex(v);
       return `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="5" fill="#0A1520" stroke="${col}" stroke-width="2.5"/>
         <text x="${xs(i).toFixed(1)}" y="${(ys(v)-10).toFixed(1)}" text-anchor="middle" fill="${col}" font-family="'Barlow Condensed',sans-serif" font-size="13" font-weight="700">${v}</text>`;
     }).join('');
@@ -213,7 +213,7 @@ S.TrafficAudit = {
         : diff < 0
         ? '<span style="color:var(--red);font-weight:700;">&#9660; ' + diff + '</span>'
         : '<span style="color:var(--t3);">&#8212;</span>';
-      const col = (v) => v==null?'':v>=70?'var(--gold)':v>=50?'var(--t1)':'var(--red)';
+      const col = (v) => v==null?'':App.scoreColor(v);
       return '<tr>'
         + '<td style="padding:9px 12px;font-size:12px;color:var(--t2);">' + esc(name) + '</td>'
         + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(pv) + ';">' + (pv??'--') + '</td>'
@@ -226,11 +226,11 @@ S.TrafficAudit = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
       + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
       + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + ((prev.overall_score||0)>=70?'var(--gold)':(prev.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (prev.overall_score||0) + '</div></div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(prev.overall_score||0) + ';">' + (prev.overall_score||0) + '</div></div>'
       + '<div style="display:flex;align-items:center;padding:0 8px;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + (overallDiff>=0?'var(--gold)':'var(--red)') + ';">' + (overallDiff>=0?'+':'') + overallDiff + ' pts</div></div>'
       + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((curr.date||'').slice(0,7)) + (curr.grade?' &nbsp;&middot;&nbsp;' + esc(curr.grade):'') + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + ((curr.overall_score||0)>=70?'var(--gold)':(curr.overall_score||0)>=50?'var(--t1)':'var(--red)') + ';">' + (curr.overall_score||0) + '</div></div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(curr.overall_score||0) + ';">' + (curr.overall_score||0) + '</div></div>'
       + '</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
       + '<th style="text-align:left;">Section</th><th style="text-align:center;">' + esc((prev.date||'').slice(0,7)) + '</th><th style="text-align:center;">' + esc((curr.date||'').slice(0,7)) + '</th><th style="text-align:center;">Change</th>'
@@ -262,7 +262,7 @@ S.TrafficAudit = {
       const curr   = values[values.length-1] ?? 0;
       const prev   = values.slice(0,-1).reverse().find(v => v != null) ?? null;
       const diff   = prev != null ? curr - prev : null;
-      const col    = curr>=70?'var(--gold)':curr>=50?'var(--t1)':'var(--red)';
+      const col    = App.scoreColor(curr);
       return '<div style="flex:1;min-width:140px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:10px 12px;">'
         + '<div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:4px;letter-spacing:0.5px;">' + esc(name) + '</div>'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
@@ -303,12 +303,18 @@ S.TrafficAudit = {
     backBtn.onclick = () => this.renderMain();
     this.actions.appendChild(backBtn);
 
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-ghost btn-sm';
+    printBtn.textContent = 'Print / Save PDF';
+    printBtn.onclick = () => window.print();
+    this.actions.appendChild(printBtn);
+
     const d = audit.raw || audit;
-    const scoreColor = (audit.overall_score||0) >= 80 ? '#C9A84C' : (audit.overall_score||0) >= 60 ? '#fff' : '#c0392b';
+    const scoreColor = App.scoreColor(audit.overall_score||0);
 
     const sectionBlock = (num, name, score, items) => {
       const bar = Math.min(100, Math.max(0, score||0));
-      const color = (score||0) >= 70 ? 'var(--gold)' : (score||0) >= 50 ? 'var(--t1)' : 'var(--red)';
+      const color = App.scoreColor(score);
       const rows = items.filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([label,val]) =>
         '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
         + '<td style="padding:7px 0;font-size:11px;color:var(--t3);width:55%;">' + label + '</td>'
@@ -423,6 +429,10 @@ S.TrafficAudit = {
       + '<div style="font-size:11px;color:var(--t3);">Industry Avg: ' + (d.INDUSTRY_AVG||58) + '  |  Target: ' + (d.TARGET_SCORE||65) + '</div>'
       + '</div>'
       + '</div>'
+      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);">'
+      +   '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Digital Presence Score</div>'
+      +   App.scoreBar(audit.overall_score||0)
+      + '</div>'
       + (d.WEEKLY_GAP_AMT ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);font-size:13px;color:var(--t2);">Estimated Weekly Gap: <strong style="color:var(--gold);">' + esc(String(d.WEEKLY_GAP_AMT)) + '</strong></div>' : '')
       + '</div>'
       + '<div style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:16px;">'
@@ -431,7 +441,7 @@ S.TrafficAudit = {
       + '</div>'
       + '<div id="ta-tab-scores-content">'
       + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items -- Ranked by Impact</div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items, Ranked by Impact</div>'
         + actionItems + '</div>' : '')
       + sections
       + '</div>'
@@ -472,7 +482,7 @@ S.TrafficAudit = {
       const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
       if (!texts.length) return '';
       const score = d['S'+s.num+'_SCORE'];
-      const col = score!=null ? (score>=70?'var(--gold)':score>=50?'var(--t1)':'var(--red)') : 'var(--t3)';
+      const col = score!=null ? App.scoreColor(score) : 'var(--t3)';
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Section ' + s.num + '</div>'
@@ -541,21 +551,21 @@ S.TrafficAudit = {
       stepHtml = '<div class="card">' + header + barInfo
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile. The full profile view is required. GBP Insights unlocks Tier 3 scoring. Your app data is included automatically.</div>'
-        + this.renderFileSection('required', 'GBP Screenshot — Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Unlocks: Section 1 full — completeness audit, photo count, post frequency, response rate')
-        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Unlocks: Section 1 Tier 3 — full funnel from impression to action')
+        + this.renderFileSection('required', 'GBP Screenshot: Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Unlocks: Section 1 full. Completeness audit, photo count, post frequency, response rate')
+        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Unlocks: Section 1 Tier 3. Full funnel from impression to action')
         + nav(false, true, false) + '</div>';
     } else if (step === 2) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Website Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Website analytics is the highest-value file in this section. Mobile screenshot adds conversion assessment.</div>'
-        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Unlocks: Section 2 full — sessions, bounce rate, top pages, menu page performance')
-        + this.renderFileSection('optional',  'Website Screenshot — Homepage on Mobile','ta-f-mobile-site', 'ta-mobile-site', 'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Unlocks: Section 2 full. Sessions, bounce rate, top pages, menu page performance')
+        + this.renderFileSection('optional',  'Website Screenshot: Homepage on Mobile','ta-f-mobile-site', 'ta-mobile-site', 'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Reviews and Search Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Google review screenshot unlocks the full reviews section. Yelp and search screenshots add cross-platform scoring.</div>'
-        + this.renderFileSection('required', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Unlocks: Required for Section 3 full scoring — confirmed rating, review count, response rate, recency analysis')
+        + this.renderFileSection('required', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Unlocks: Required for Section 3 full scoring. Confirmed rating, review count, response rate, recency analysis')
         + this.renderFileSection('optional', 'Yelp Listing Screenshot',       'ta-f-yelp',           'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
         + this.renderFileSection('optional', 'Search Results Screenshots',    'ta-f-search',         'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
         + nav(true, true, false) + '</div>';
@@ -563,17 +573,17 @@ S.TrafficAudit = {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Social Media Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot unlocks the full social section. Analytics unlock Tier 3 engagement scoring.</div>'
-        + this.renderFileSection('optional', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Unlocks: Required for Section 5 full scoring — follower count, post frequency, engagement estimate, content audit')
+        + this.renderFileSection('optional', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Unlocks: Required for Section 5 full scoring. Follower count, post frequency, engagement estimate, content audit')
         + this.renderFileSection('optional', 'Facebook Page Screenshot',        'ta-f-facebook',     'ta-facebook',     'Unlocks: Cross-platform social presence analysis')
-        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',  'ta-f-ig-analytics', 'ta-ig-analytics', 'Unlocks: Section 5 Tier 3 — exact engagement rate, reach, best content type')
+        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',  'ta-f-ig-analytics', 'ta-ig-analytics', 'Unlocks: Section 5 Tier 3. Exact engagement rate, reach, best content type')
         + nav(true, true, false) + '</div>';
     } else if (step === 5) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Delivery, Email and Guest Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Each file unlocks additional section scoring for delivery platforms and email and loyalty programs.</div>'
-        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',       'ta-delivery',       'Unlocks: Section 6 full — confirmed rating, photo count, menu completeness, promo status')
-        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',          'ta-email',          'Unlocks: Section 7 full — list size, last send date, frequency, growth mechanism')
-        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics', 'Unlocks: Section 7 Tier 3 — list health, open rate trend, campaign history')
+        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',       'ta-delivery',       'Unlocks: Section 6 full. Confirmed rating, photo count, menu completeness, promo status')
+        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',          'ta-email',          'Unlocks: Section 7 full. List size, last send date, frequency, growth mechanism')
+        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics', 'Unlocks: Section 7 Tier 3. List health, open rate trend, campaign history')
         + nav(true, true, false) + '</div>';
     } else if (step === 6) {
       stepHtml = '<div class="card">' + header
