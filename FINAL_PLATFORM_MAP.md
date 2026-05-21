@@ -542,15 +542,19 @@ Supabase, keep local if unreachable, prompt to sync on next load.
 1. Restructure `this-week.js` (Profit) — remove count/variance steps; COGS auto-fills
    from Inventory Control; revenue/labor wired (light up when Shift/Labor Control ship).
 2. `vendor-watch.js` → loss-surfacing read-out of `ic_deliveries` price changes.
-3. `theft-risk.js` → auto-scored from `ic_spot_checks` + `sc_void_comps` + manual input.
-4. `recipe-library.js` → ingredient costs read-only from `ic_products`.
+3. `recipe-library.js` → ingredient costs read-only from `ic_products`.
+
+(`theft-risk.js` auto-scoring is in Stage C — its data sources, `sc_void_comps` and
+`ic_spot_checks`, are not built until Stages B and C.)
 
 ### Stage B — Shift Control (`screens/shift/`, `sc-` prefix)
 Build all 17 screens. Wire: shift revenue → weekly revenue source; cash → Cash
 Reconciliation (read-only); voids → Theft Risk; maintenance → Hub alerts.
 
-### Stage C — Inventory Control Phase 2
-`ic-spot-check`, `ic-order-sheet`, `ic-order-history`.
+### Stage C — Inventory Control Phase 2 + Theft Risk
+`ic-spot-check`, `ic-order-sheet`, `ic-order-history`. Then `theft-risk.js` — auto-scored
+from `ic_spot_checks` + `sc_void_comps` + cash variance, plus a manual judgment input
+(its three data sources now all exist).
 
 ### Stage D — Labor Control (`screens/labor/`, `lc-` prefix)
 Build all 16 screens. Wire: `lc_actuals` → Revenue This Week labor, Profit This Week
