@@ -62,6 +62,7 @@ S.TrafficSocial = {
 
     const formCard = '<div class="card">'
       + '<div class="card-title">Social Detail</div>'
+      + reviewedNote(prof.social_reviewed_at)
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:170px;"><label>IG Engagement Rate ' + tt('t-social-engagement') + '</label><div class="fw"><input class="suf" type="number" id="soc-eng" value="' + (eng != null ? eng : '') + '" step="0.1" min="0"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:170px;"><label>FB Posts/Mo ' + tt('t-social-fbposts') + '</label><input type="number" id="soc-fbp" value="' + (prof.social_fb_posts != null ? prof.social_fb_posts : '') + '" min="0"/></div>'
@@ -117,6 +118,7 @@ S.TrafficSocial = {
     prof.social_ig_engagement = isNaN(eng) ? null : eng;
     prof.social_fb_posts = isNaN(fbp) ? null : fbp;
     prof.social_content_mix = document.getElementById('soc-mix')?.value || '';
+    prof.social_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('soc-msg');
