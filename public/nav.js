@@ -57,7 +57,7 @@ const ProfitNav = {
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="reports" id="nav-reports">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Reports &amp; History</span>
+        <span class="nav-label">Reports and History</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="getting-started" id="nav-getting-started">
