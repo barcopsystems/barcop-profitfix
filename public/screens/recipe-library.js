@@ -4,8 +4,11 @@ S.RecipeLibrary={
   YUNITS:[{l:'oz',oz:1},{l:'ml',oz:0.033814},{l:'liters',oz:33.814},{l:'gallons',oz:128},{l:'quarts',oz:32},{l:'pints',oz:16},{l:'cups',oz:8}],
   yOpts(sel){return this.YUNITS.map(u=>'<option value="'+u.l+'"'+(u.l===(sel||'oz')?' selected':'')+'>'+u.l+'</option>').join('');},
   toOz(v,u){const m=this.YUNITS.find(x=>x.l===u);return v*(m?m.oz:1);},
-  allProds(){return[...(App.data.bar_products||[]).map(p=>({...p,_t:'bar'})),...(App.data.kitchen_products||[]).map(p=>({...p,_t:'kitchen'}))];},
-  prodsForMode(mode){if(mode==='food')return(App.data.kitchen_products||[]).map(p=>({...p,_t:'kitchen'}));if(mode==='batch')return this.allProds();return(App.data.bar_products||[]).map(p=>({...p,_t:'bar'}));},
+  IC_BAR:['Liquor','Wine','Bottle Beer','Draft Beer'],
+  IC_KITCHEN:['Food','Misc'],
+  icProducts(){return (App.inventoryData&&App.inventoryData.ic_products)||[];},
+  allProds(){return this.icProducts().map(p=>({...p,_t:this.IC_BAR.includes(p.category)?'bar':'kitchen'}));},
+  prodsForMode(mode){const all=this.allProds();if(mode==='food')return all.filter(p=>p._t==='kitchen');if(mode==='batch')return all;return all.filter(p=>p._t==='bar');},
   prodOpts(mode,selId){
     const prods=this.prodsForMode(mode);if(!prods.length)return'<option value="">No products set up</option>';
     if(mode==='batch'){
@@ -17,8 +20,23 @@ S.RecipeLibrary={
     }
     return'<option value="">Select ingredient...</option>'+prods.map(p=>'<option value="'+p.id+'"'+(p.id===selId?' selected':'')+'>'+esc(p.name)+'</option>').join('');
   },
-  unitLabel(prod,mode){if(!prod)return'—';if(mode==='single')return prod._t==='kitchen'?(prod.unit||'each'):'pours';if(mode==='batch')return prod._t==='kitchen'?(prod.unit||'each'):'bottles';return prod.unit||'units';},
-  costBasis(prod,mode){if(!prod)return 0;if(mode==='single')return prod.cost_per_pour||0;return prod.cost_per_unit||0;},
+  unitLabel(prod,mode){if(!prod)return'—';if(mode==='single')return prod._t==='kitchen'?'units':'pours';if(mode==='batch')return prod._t==='kitchen'?'units':'bottles';return'units';},
+  costBasis(prod,mode){if(!prod)return 0;if(mode==='single')return prod.cost_per_pour||0;return prod.unit_cost||0;},
+  // Recompute a recipe's cost live from the current ic_products master
+  recompute(r){
+    const prods=this.allProds();let tc=0;
+    (r.ingredients||[]).forEach(ing=>{
+      const p=prods.find(x=>x.id===ing.product_id);
+      const cost=p?(r.mode==='single'?(p.cost_per_pour||0):(p.unit_cost||0)):(ing.cost_per_unit||0);
+      tc+=cost*(ing.quantity||0);
+    });
+    let cps=tc;
+    if(r.mode==='batch'&&r.servings_per_batch>0)cps=tc/r.servings_per_batch;
+    else if(r.mode==='food'&&r.plate_yield>0)cps=tc/r.plate_yield;
+    const cpct=r.menu_price>0?cps/r.menu_price*100:null;
+    const tgt=r.target_cost_pct??22;
+    return {total_cost:tc,cost_per_serving:cps,cost_pct:cpct,flagged:cpct!=null?cpct>tgt:false};
+  },
 
   render(container,actions){
     this.container=container;
@@ -28,19 +46,20 @@ S.RecipeLibrary={
     this.renderList();
   },
   renderList(){
-    const recipes=App.data.recipes||[];const flagged=recipes.filter(r=>r.flagged).length;
+    const recipes=App.data.recipes||[];const flagged=recipes.filter(r=>this.recompute(r).flagged).length;
     const mL={single:'Single Drink',batch:'Batch Cocktail',food:'Food Plate'};
     let html='';
     if(recipes.length===0){html='<div class="empty"><div class="empty-title">No recipes yet</div><div class="empty-sub">Cost out single cocktails, batch bar recipes, or food plates.</div><button class="btn btn-primary" id="rl-add-first">Add Recipe</button></div>';}
     else{
       const rows=recipes.map(r=>{
-        const tgt=r.target_cost_pct??22;const over=r.cost_pct!=null&&r.cost_pct>tgt;
+        const live=this.recompute(r);
+        const tgt=r.target_cost_pct??22;const over=live.cost_pct!=null&&live.cost_pct>tgt;
         const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
         return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
-          +'<td><div class="val" style="margin-bottom:4px;">'+esc(r.name)+'</div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:'+(r.flagged?'var(--red)':'var(--t3)')+';">'+(mL[r.mode]||r.mode||'SINGLE')+'</div></td>'
+          +'<td><div class="val" style="margin-bottom:4px;">'+esc(r.name)+'</div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:'+(live.flagged?'var(--red)':'var(--t3)')+';">'+(mL[r.mode]||r.mode||'SINGLE')+'</div></td>'
           +'<td>'+esc(yld)+'</td>'
-          +'<td>'+App.fmtCurrency(r.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
-          +'<td class="'+(over?'neg':r.cost_pct!=null?'pos':'')+'">'+App.fmtPct(r.cost_pct)+'</td>'
+          +'<td>'+App.fmtCurrency(live.cost_per_serving)+'</td><td>'+App.fmtCurrency(r.menu_price)+'</td>'
+          +'<td class="'+(over?'neg':live.cost_pct!=null?'pos':'')+'">'+App.fmtPct(live.cost_pct)+'</td>'
           +'<td>'+App.fmtPct(tgt)+'</td>'
           +'<td><div class="row-actions"><button class="btn btn-ghost btn-sm rl-edit" data-id="'+r.id+'">Edit</button><button class="btn btn-danger btn-sm rl-del" data-id="'+r.id+'">Delete</button></div></td></tr>';
       }).join('');
@@ -132,7 +151,7 @@ S.RecipeLibrary={
     const r=id?(App.data.recipes||[]).find(r=>r.id===id):null;
     const target=App.data.settings.targets?.bar_pour_cost_pct??22;
 
-    this.rows=r?.ingredients?r.ingredients.map(i=>({...i})):[{product_id:'',quantity:'',cost_per_unit:0,total_cost:0}];
+    this.rows=r?.ingredients?r.ingredients.map(i=>{const p=this.prodsForMode(mode).find(x=>x.id===i.product_id);return {...i,cost_per_unit:this.costBasis(p,mode)};}):[{product_id:'',quantity:'',cost_per_unit:0,total_cost:0}];
     const mL={single:'Single Drink',batch:'Batch Cocktail',food:'Food Plate'};
     const catOpts=(mode==='food'?['Food Plate','Appetizer','Entree','Dessert','Side','Other']:['Cocktail','Shot','Beer','Wine','Non-Alcoholic','Other']).map(c=>'<option'+(r?.category===c?' selected':'')+'>'+c+'</option>').join('');
 
