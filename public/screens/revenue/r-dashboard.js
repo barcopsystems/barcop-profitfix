@@ -66,7 +66,7 @@ S.RevenueDashboard = {
     const trendHtml = (cur, avg, lowerBetter=false) => {
       if (avg==null||cur==null) return '<div class="metric-trend"> </div>';
       const diff = cur - avg;
-      if (Math.abs(diff) < 0.15) return '<div class="metric-trend">flat</div>';
+      if (Math.abs(diff) < 0.15) return '<div class="metric-trend">→ flat</div>';
       const improving = lowerBetter ? diff < 0 : diff > 0;
       return '<div class="metric-trend ' + (improving?'trend-up':'trend-dn') + '">' + (diff>0?'↑':'↓') + ' vs 4wk avg</div>';
     };
@@ -199,7 +199,7 @@ S.RevenueDashboard = {
 
     const range=maxY-minY, tickStep=range<=12?2:range<=24?4:8;
     const ticks=[]; for(let v=Math.ceil(minY/tickStep)*tickStep;v<=maxY;v+=tickStep)ticks.push(v);
-    const yTicks=ticks.map(v=>'<line x1="'+PAD.l+'" y1="'+ys(v).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(v).toFixed(1)+'" stroke="rgba(255,255,255,0.04)"/><text x="'+(PAD.l-6)+'" y="'+(ys(v)+4).toFixed(1)+'" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">'+v+'</text>').join('');
+    const yTicks=ticks.map(v=>'<line x1="'+PAD.l+'" y1="'+ys(v).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(v).toFixed(1)+'" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="'+(PAD.l-8)+'" y="'+(ys(v)+4).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'+v+'</text>').join('');
     const xLabels=weeks.map((w,i)=>'<text x="'+xs(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'+(w.period_end?w.period_end.slice(5).replace('-','/'):'Wk'+w.week_num)+'</text>').join('');
 
     const caLabels=caS.map((v,i)=>{if(v==null)return '';const x=xs(i),y=ys(v);const above=y>PAD.t+16;return '<text x="'+x.toFixed(1)+'" y="'+(above?y-10:y+18).toFixed(1)+'" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">$'+v.toFixed(0)+'</text>';}).join('');
@@ -210,19 +210,21 @@ S.RevenueDashboard = {
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
-      + '<div style="display:flex;gap:16px;">'
-      + '<span style="font-size:10px;color:var(--gold);font-weight:600;">  Check Avg</span>'
-      + '<span style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:600;">  Labor %</span>'
-      + '<span style="font-size:10px;color:#4888A8;font-weight:600;">  RPLH</span>'
+      + '<div style="display:flex;gap:20px;">'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:#C9A84C;display:inline-block;border-radius:1px;"></span>Check Avg</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.4);display:inline-block;border-radius:1px;"></span>Labor %</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.2);display:inline-block;border-radius:1px;"></span>RPLH</span>'
       + '</div></div>'
-      + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
-      + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/></linearGradient></defs>'
+      + '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
+      + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0.01"/></linearGradient></defs>'
       + yTicks
-      + '<line x1="'+PAD.l+'" y1="'+ys(tCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tCA).toFixed(1)+'" stroke="rgba(201,168,76,0.25)" stroke-width="1" stroke-dasharray="4,4"/>'
+      + '<line x1="'+PAD.l+'" y1="'+ys(tCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tCA).toFixed(1)+'" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>'
+      + '<text x="'+(W-PAD.r+6)+'" y="'+(ys(tCA)+4).toFixed(1)+'" fill="rgba(201,168,76,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
       + (areaPath(caS)?'<path d="'+areaPath(caS)+'" fill="url(#caGrad'+uid+')"/>':'')
-      + '<path d="'+smoothPath(caS)+'" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+smoothPath(labS)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+smoothPath(rplhS)+'" fill="none" stroke="#4888A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(rplhS)+'" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(labS)+'" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(caS)+'" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + caS.map((v,i)=>v!=null?'<circle cx="'+xs(i).toFixed(1)+'" cy="'+ys(v).toFixed(1)+'" r="4" fill="#0A1520" stroke="#C9A84C" stroke-width="2"/>':'').join('')
       + caLabels + xLabels
       + '</svg></div>';
   },
@@ -231,6 +233,7 @@ S.RevenueDashboard = {
     const weeks = (App.data.revenue_weeks||[]).filter(w=>(w.bar_revenue||0)+(w.floor_revenue||0)>0).slice(-8);
     const showModal = (html) => {
       const m = document.createElement('div');
+      m.className = 'ins-modal';
       m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
       const box = document.createElement('div');
       box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
