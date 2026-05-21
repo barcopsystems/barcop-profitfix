@@ -72,6 +72,7 @@ S.TrafficWebsite = {
 
     const formCard = '<div class="card">'
       + '<div class="card-title">Website Setup</div>'
+      + reviewedNote(prof.web_reviewed_at)
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:16px;">' + toggleRows + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:200px;"><label>Avg Session Duration ' + tt('t-web-duration') + '</label><div class="fw"><input class="suf" type="number" id="web-dur" value="' + (dur != null ? dur : '') + '" min="0"/><span class="suf">sec</span></div></div>'
@@ -119,6 +120,7 @@ S.TrafficWebsite = {
     const dur = parseInt(document.getElementById('web-dur')?.value);
     prof.web_avg_duration = isNaN(dur) ? null : dur;
     prof.web_top_source = document.getElementById('web-source')?.value || '';
+    prof.web_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('web-msg');
