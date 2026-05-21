@@ -1,109 +1,128 @@
 'use strict';
 S.TrafficReports = {
-  render(container, actions) {
-    const weeks    = App.data.traffic_weeks || [];
-    const t        = App.data.traffic_settings?.targets || {};
-    const settings = App.data.settings || {};
-    const targetGR = t.google_rating    || 4.3;
-    const targetRV = t.review_velocity  || 8;
-    const targetRR = t.response_rate    || 75;
+  range: 8,
 
-    if (!weeks.length) {
-      container.innerHTML = '<div class="screen"><div class="card"><div class="empty"><div class="empty-title">No Data Yet</div><div class="empty-sub">Enter at least one week in This Week to see reports.</div></div></div></div>';
+  render(container, actions) {
+    this.container = container;
+    actions.innerHTML = '';
+    this.draw();
+  },
+
+  draw() {
+    const container = this.container;
+    const all = App.data.traffic_weeks || [];
+    const ts  = App.data.traffic_settings?.targets || {};
+    const tGR = ts.google_rating || 4.3;
+    const tRV = ts.review_velocity || 8;
+    const tRR = ts.response_rate || 75;
+    const tSS = ts.monthly_sessions || 2000;
+
+    if (!all.length) {
+      container.innerHTML = '<div class="screen"><div class="card"><div class="empty">'
+        + '<div class="empty-title">No Data Yet</div>'
+        + '<div class="empty-sub">Enter at least one week in This Week to see Traffic reports and trends.</div>'
+        + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'t-this-week\')">Go to This Week</button></div>'
+        + '</div></div></div>';
       return;
     }
 
-    // Annual / summary projections
-    const recentWeeks   = weeks.slice(-12);
-    const avgGR  = recentWeeks.reduce((s,w)=>s+(w.google_rating||0),0) / (recentWeeks.filter(w=>w.google_rating).length||1);
-    const avgRV  = recentWeeks.reduce((s,w)=>s+(w.new_reviews||0),0)   / (recentWeeks.filter(w=>w.new_reviews).length||1);
-    const avgRR  = recentWeeks.reduce((s,w)=>s+(w.response_rate||0),0) / (recentWeeks.filter(w=>w.response_rate).length||1);
-    const annualReviews = Math.round(avgRV * 12);
+    const weeks = this.range === 'all' ? all.slice() : all.slice(-this.range);
+    const lbl = w => 'Wk ' + w.week_num;
+    const delivAvg = w => {
+      const r = ['dd','ue','gh'].map(k => w[k + '_rating']).filter(v => v != null);
+      return r.length ? Math.round(r.reduce((a,b)=>a+b,0)/r.length*100)/100 : null;
+    };
 
-    // Full history table
+    // ── Range selector ──
+    const ranges = [['8','Last 8 weeks'],['12','Last 12 weeks'],['26','Last 26 weeks'],['all','All time']];
+    const rangeSel = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+      + '<div class="f" style="width:180px;"><label>Date Range</label><select id="tr-range">'
+      + ranges.map(([v,t]) => '<option value="' + v + '"' + (String(this.range)===v?' selected':'') + '>' + t + '</option>').join('')
+      + '</select></div>'
+      + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
+      + '</div>';
+
+    // ── Trend charts ──
+    const charts =
+        App.trendChart({ title:'Google Rating Over Time', target:tGR, points: weeks.map(w => ({label:lbl(w), value:w.google_rating ?? null})) })
+      + App.trendChart({ title:'Review Velocity — New Reviews per Month', target:tRV, points: weeks.map(w => ({label:lbl(w), value:w.new_reviews ?? null})) })
+      + App.trendChart({ title:'Website Sessions per Month', target:tSS, points: weeks.map(w => ({label:lbl(w), value:w.monthly_sessions ?? null})) })
+      + App.trendChart({ title:'Instagram Followers', points: weeks.map(w => ({label:lbl(w), value:w.ig_followers ?? null})) })
+      + App.trendChart({ title:'Average Delivery Platform Rating', target:4.5, points: weeks.map(w => ({label:lbl(w), value:delivAvg(w)})) });
+
+    // ── History table ──
+    const cell = (val, gap) => '<td class="' + (gap == null ? '' : gap >= 0 ? 'pos' : 'neg') + '">' + val + '</td>';
     const rows = weeks.slice().reverse().map(w => {
-      const grGap = w.google_rating  ? w.google_rating  - targetGR : null;
-      const rvGap = w.new_reviews    ? w.new_reviews    - targetRV : null;
-      const rrGap = w.response_rate  ? w.response_rate  - targetRR : null;
+      const da = delivAvg(w);
       return '<tr>'
         + '<td>Wk ' + w.week_num + '</td>'
         + '<td>' + (w.period_end||'').slice(0,10) + '</td>'
-        + '<td class="' + (grGap!=null?(grGap>=0?'pos':'neg'):'') + '">' + (w.google_rating ? w.google_rating.toFixed(1)+'★' : '&mdash;') + '</td>'
-        + '<td class="' + (rvGap!=null?(rvGap>=0?'pos':'neg'):'') + '">' + (w.new_reviews ?? '&mdash;') + '</td>'
-        + '<td class="' + (rrGap!=null?(rrGap>=0?'pos':'neg'):'') + '">' + (w.response_rate ? w.response_rate.toFixed(0)+'%' : '&mdash;') + '</td>'
-        + '<td class="val">'  + (w.monthly_sessions ? w.monthly_sessions.toLocaleString() : '&mdash;') + '</td>'
-        + '<td>' + (w.ig_followers ?? '&mdash;') + '</td>'
+        + cell(w.google_rating != null ? w.google_rating.toFixed(1)+'★' : '&mdash;', w.google_rating != null ? w.google_rating-tGR : null)
+        + cell(w.yelp_rating != null ? w.yelp_rating.toFixed(1)+'★' : '&mdash;', w.yelp_rating != null ? w.yelp_rating-4.0 : null)
+        + cell(w.new_reviews != null ? w.new_reviews : '&mdash;', w.new_reviews != null ? w.new_reviews-tRV : null)
+        + cell(w.response_rate != null ? Math.round(w.response_rate)+'%' : '&mdash;', w.response_rate != null ? w.response_rate-tRR : null)
+        + cell(w.monthly_sessions != null ? w.monthly_sessions.toLocaleString() : '&mdash;', w.monthly_sessions != null ? w.monthly_sessions-tSS : null)
+        + '<td>' + (w.ig_followers != null ? w.ig_followers.toLocaleString() : '&mdash;') + '</td>'
+        + cell(da != null ? da.toFixed(1)+'★' : '&mdash;', da != null ? da-4.5 : null)
+        + cell(w.email_open_rate != null ? Math.round(w.email_open_rate)+'%' : '&mdash;', w.email_open_rate != null ? w.email_open_rate-20 : null)
         + '</tr>';
     }).join('');
 
-    container.innerHTML = '<div class="screen">'
-      + '<div class="sh">Traffic Summary</div>'
-      + '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">'
-      + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Avg Google Rating</div><div style="font-size:22px;font-weight:800;color:' + (avgGR >= targetGR ? 'var(--gold)' : 'var(--red)') + ';">' + avgGR.toFixed(2) + '★</div><div style="font-size:11px;color:var(--t3);">Target: ' + targetGR + '★</div></div>'
-      + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Avg New Reviews/Mo</div><div style="font-size:22px;font-weight:800;color:' + (avgRV >= targetRV ? 'var(--gold)' : 'var(--red)') + ';">' + avgRV.toFixed(1) + '</div><div style="font-size:11px;color:var(--t3);">Target: ' + targetRV + '/mo</div></div>'
-      + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Avg Response Rate</div><div style="font-size:22px;font-weight:800;color:' + (avgRR >= targetRR ? 'var(--gold)' : 'var(--red)') + ';">' + avgRR.toFixed(1) + '%</div><div style="font-size:11px;color:var(--t3);">Target: ' + targetRR + '%</div></div>'
-      + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Projected Annual Reviews</div><div style="font-size:22px;font-weight:800;color:var(--gold);">' + annualReviews + '</div><div style="font-size:11px;color:var(--t3);">Based on last ' + recentWeeks.length + ' weeks avg</div></div>'
-      + '</div></div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      + '<div class="sh" style="margin-bottom:0;">Weekly History</div>'
-      + '<button class="btn btn-ghost" id="tr-export" style="font-size:11px;padding:6px 14px;">Export PDF</button>'
-      + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl" id="tr-history-tbl"><thead><tr><th>Week</th><th>Period End</th><th>Google Rating</th><th>New Reviews</th><th>Response Rate</th><th>Sessions</th><th>IG Followers</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
+    const tableCard = '<div class="sh">Weekly History</div>'
+      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<th>Week</th><th>Period End</th><th>Google</th><th>Yelp</th><th>New Reviews</th><th>Response</th><th>Sessions</th><th>IG Followers</th><th>Delivery Avg</th><th>Email Open</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
-    document.getElementById('tr-export')?.addEventListener('click', () => this.exportPDF(weeks, settings, t, avgGR, avgRV, avgRR, targetGR, targetRV, targetRR));
+    container.innerHTML = '<div class="screen">' + rangeSel + charts + tableCard + '</div>';
+
+    document.getElementById('tr-range')?.addEventListener('change', e => {
+      const v = e.target.value;
+      this.range = v === 'all' ? 'all' : parseInt(v);
+      this.draw();
+    });
+    document.getElementById('tr-export')?.addEventListener('click', () => this.exportPDF(weeks));
   },
 
-  exportPDF(weeks, settings, t, avgGR, avgRV, avgRR, targetGR, targetRV, targetRR) {
-    const barName = settings.bar_name || 'Bar Cop Report';
-    const today   = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
-    const rows    = weeks.slice().reverse().map(w => `<tr>
-        <td>Wk ${w.week_num}</td>
-        <td>${(w.period_end||'').slice(0,10)}</td>
-        <td style="color:${(w.google_rating||0)>=targetGR?'#2a7a3b':'#b91c1c'};">${w.google_rating ? w.google_rating.toFixed(1)+'★' : ''}</td>
-        <td style="color:${(w.new_reviews||0)>=targetRV?'#2a7a3b':'#b91c1c'};">${w.new_reviews||''}</td>
-        <td style="color:${(w.response_rate||0)>=targetRR?'#2a7a3b':'#b91c1c'};">${w.response_rate ? w.response_rate.toFixed(0)+'%' : ''}</td>
-        <td>${w.monthly_sessions ? w.monthly_sessions.toLocaleString() : ''}</td>
-        <td>${w.ig_followers||''}</td>
-      </tr>`).join('');
+  exportPDF(weeks) {
+    const settings = App.data.settings || {};
+    const ts  = App.data.traffic_settings?.targets || {};
+    const barName = settings.bar_name || 'Bar Cop';
+    const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    const delivAvg = w => {
+      const r = ['dd','ue','gh'].map(k => w[k + '_rating']).filter(v => v != null);
+      return r.length ? (r.reduce((a,b)=>a+b,0)/r.length).toFixed(1)+'★' : '';
+    };
+    const rows = weeks.slice().reverse().map(w => '<tr>'
+      + '<td>Wk ' + w.week_num + '</td>'
+      + '<td>' + (w.period_end||'').slice(0,10) + '</td>'
+      + '<td>' + (w.google_rating != null ? w.google_rating.toFixed(1)+'★' : '') + '</td>'
+      + '<td>' + (w.yelp_rating != null ? w.yelp_rating.toFixed(1)+'★' : '') + '</td>'
+      + '<td>' + (w.new_reviews != null ? w.new_reviews : '') + '</td>'
+      + '<td>' + (w.response_rate != null ? Math.round(w.response_rate)+'%' : '') + '</td>'
+      + '<td>' + (w.monthly_sessions != null ? w.monthly_sessions.toLocaleString() : '') + '</td>'
+      + '<td>' + (w.ig_followers != null ? w.ig_followers.toLocaleString() : '') + '</td>'
+      + '<td>' + delivAvg(w) + '</td>'
+      + '<td>' + (w.email_open_rate != null ? Math.round(w.email_open_rate)+'%' : '') + '</td>'
+      + '</tr>').join('');
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>${barName} - Weekly Traffic Report</title>
-<style>
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #111; margin: 0; padding: 24px; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { font-size: 11px; color: #666; margin-bottom: 20px; }
-  .summary { display: flex; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
-  .metric { background: #f7f7f7; border-radius: 6px; padding: 10px 16px; min-width: 140px; }
-  .metric-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #888; margin-bottom: 4px; }
-  .metric-val { font-size: 20px; font-weight: 800; color: #111; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { background: #1a1a2e; color: #fff; padding: 7px 8px; text-align: left; font-weight: 700; font-size: 10px; letter-spacing: 0.5px; }
-  td { padding: 6px 8px; border-bottom: 1px solid #eee; }
-  tr:nth-child(even) td { background: #fafafa; }
-  .footer { margin-top: 20px; font-size: 10px; color: #aaa; text-align: center; }
-</style></head><body>
-<h1>${barName} - Weekly Traffic Report</h1>
-<div class="sub">Generated ${today} &nbsp;|&nbsp; ${weeks.length} weeks of data</div>
-<div class="summary">
-  <div class="metric"><div class="metric-label">Avg Google Rating</div><div class="metric-val">${avgGR.toFixed(2)}★</div></div>
-  <div class="metric"><div class="metric-label">Avg New Reviews/Mo</div><div class="metric-val">${avgRV.toFixed(1)}</div></div>
-  <div class="metric"><div class="metric-label">Avg Response Rate</div><div class="metric-val">${avgRR.toFixed(1)}%</div></div>
-  <div class="metric"><div class="metric-label">Rating Target</div><div class="metric-val">${targetGR}★</div></div>
-</div>
-<table>
-  <thead><tr><th>Week</th><th>Period End</th><th>Google Rating</th><th>New Reviews</th><th>Response Rate</th><th>Sessions</th><th>IG Followers</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="footer">Bar Cop Traffic Fix &nbsp;|&nbsp; barcop.com</div>
-</body></html>`;
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(barName) + ' Traffic Report</title>'
+      + '<style>body{font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#111;margin:0;padding:24px;}'
+      + 'h1{font-size:20px;margin:0 0 4px;}.sub{font-size:11px;color:#666;margin-bottom:20px;}'
+      + 'table{width:100%;border-collapse:collapse;font-size:11px;}'
+      + 'th{background:#1a1a2e;color:#fff;padding:7px 8px;text-align:left;font-weight:700;font-size:10px;}'
+      + 'td{padding:6px 8px;border-bottom:1px solid #eee;}tr:nth-child(even) td{background:#fafafa;}'
+      + '.footer{margin-top:20px;font-size:10px;color:#aaa;text-align:center;}</style></head><body>'
+      + '<h1>' + esc(barName) + ' — Weekly Traffic Report</h1>'
+      + '<div class="sub">Generated ' + today + ' &nbsp;|&nbsp; ' + weeks.length + ' weeks shown &nbsp;|&nbsp; Targets: ' + (ts.google_rating||4.3) + '★ rating, ' + (ts.review_velocity||8) + ' reviews/mo</div>'
+      + '<table><thead><tr><th>Week</th><th>Period End</th><th>Google</th><th>Yelp</th><th>New Reviews</th><th>Response</th><th>Sessions</th><th>IG Followers</th><th>Delivery Avg</th><th>Email Open</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table>'
+      + '<div class="footer">Bar Cop Traffic Recovery</div></body></html>';
 
     const win = window.open('', '_blank');
     if (!win) { alert('Allow pop-ups to export the report.'); return; }
     win.document.write(html);
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); }, 400);
+    setTimeout(() => win.print(), 400);
   }
 };
