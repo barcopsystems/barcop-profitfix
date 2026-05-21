@@ -176,6 +176,93 @@ const DB = {
     }
   },
 
+  // ── Control module data (separate Supabase tables — see Rule 21) ──────────
+  // Inventory / Labor / Shift data lives in its own table (ic_data / lc_data /
+  // sc_data), NOT in the user_data JSON blob. Same read/write pattern as
+  // readData()/writeData(); default for a fresh row is an empty object.
+  async _readControl(table, lsKey) {
+    if (this._sb && this._user) {
+      try {
+        const { data, error } = await this._sb
+          .from(table)
+          .select('data')
+          .eq('user_id', this._user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('read ' + table + ' error:', error);
+          return this._localReadControl(lsKey);
+        }
+        if (!data) {
+          // First access — create the row with an empty object
+          await this._sb.from(table).insert({
+            user_id: this._user.id,
+            data: {},
+            updated_at: new Date().toISOString()
+          });
+          return {};
+        }
+        return data.data || {};
+      } catch (e) {
+        console.error('read ' + table + ' exception:', e);
+        return this._localReadControl(lsKey);
+      }
+    }
+    return this._localReadControl(lsKey);
+  },
+
+  async _writeControl(table, lsKey, data) {
+    if (this._sb && this._user) {
+      try {
+        const { error } = await this._sb
+          .from(table)
+          .upsert({
+            user_id: this._user.id,
+            data: data,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
+
+        if (error) {
+          console.error('write ' + table + ' error:', error);
+          this._localWriteControl(lsKey, data);
+          return { ok: false, error };
+        }
+        this._localWriteControl(lsKey, data); // keep local copy in sync
+        return { ok: true };
+      } catch (e) {
+        console.error('write ' + table + ' exception:', e);
+        this._localWriteControl(lsKey, data);
+        return { ok: false, error: e };
+      }
+    }
+    this._localWriteControl(lsKey, data);
+    return { ok: true };
+  },
+
+  _localReadControl(lsKey) {
+    try {
+      const r = localStorage.getItem(lsKey);
+      return r ? JSON.parse(r) : {};
+    } catch (e) {
+      return {};
+    }
+  },
+
+  _localWriteControl(lsKey, data) {
+    try {
+      localStorage.setItem(lsKey, JSON.stringify(data));
+    } catch (e) {
+      console.warn('localStorage write failed:', e);
+    }
+  },
+
+  async readInventoryData()      { return await this._readControl('ic_data', 'pf_ic_data'); },
+  async writeInventoryData(data) { return await this._writeControl('ic_data', 'pf_ic_data', data); },
+  async readLaborData()          { return await this._readControl('lc_data', 'pf_lc_data'); },
+  async writeLaborData(data)     { return await this._writeControl('lc_data', 'pf_lc_data', data); },
+  async readShiftData()          { return await this._readControl('sc_data', 'pf_sc_data'); },
+  async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
+
   // ── Merge defaults (ensures all keys exist after updates) ─────────────────
   _mergeDefaults(data) {
     const d = this._defaultData();
