@@ -568,6 +568,7 @@ const App = {
         'sc-help':               ['Help and FAQ', 'Shift Control'],
       };
       const scScreens = {
+        'sc-active-shift': S.ShiftActiveShift,
         'sc-log-shift': S.ShiftLogShift,
         'sc-shift-history': S.ShiftHistory,
         'sc-cash-drop': S.ShiftCashDrop,
