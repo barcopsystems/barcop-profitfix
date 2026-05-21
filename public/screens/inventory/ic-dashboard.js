@@ -22,6 +22,21 @@ S.InventoryDashboard = {
     if (isNaN(d.getTime())) return null;
     return Math.floor((Date.now() - d.getTime()) / 86400000);
   },
+  // items 86'd 2+ times in the last 30 days (Shift Control feed → par alerts)
+  repeat86() {
+    const items = (App.shiftData && App.shiftData.sc_86_list) || [];
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    const counts = {};
+    items.forEach(i => {
+      const d = new Date((i.date_86 || '') + 'T00:00:00');
+      if (isNaN(d.getTime()) || d < cutoff) return;
+      const key = (i.item || '').trim().toLowerCase();
+      if (!key) return;
+      if (!counts[key]) counts[key] = { name: (i.item || '').trim(), count: 0 };
+      counts[key].count++;
+    });
+    return Object.values(counts).filter(x => x.count >= 2).sort((a, b) => b.count - a.count);
+  },
 
   render(container, actions) {
     this.container = container;
@@ -82,6 +97,22 @@ S.InventoryDashboard = {
         + '</div>';
     }
 
+    // ── Repeat 86s — Shift Control feed → par-level alerts ──
+    let repeat86Card = '';
+    const reps = this.repeat86();
+    if (reps.length) {
+      repeat86Card = '<div class="card"><div class="card-title">Repeat 86s — Review Par Levels</div>'
+        + reps.map((r, i) => '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
+            + (i < reps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+            + '<span style="width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;"></span>'
+            + '<div style="flex:1;font-size:13px;color:var(--t1);">' + esc(r.name)
+            + ' <span style="color:var(--t3);font-size:11px;">86\'d ' + r.count + ' times in the last 30 days</span></div>'
+            + '<button class="btn btn-ghost btn-sm ic-d-products" style="margin:0;">Review Par</button></div>').join('')
+        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
+        + 'An item that keeps running out usually has its par level set too low. Raise par in Products.</div>'
+        + '</div>';
+    }
+
     // ── This period ──
     const moverRows = movers.length
       ? movers.map(m => '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b2);">'
@@ -111,13 +142,15 @@ S.InventoryDashboard = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
-      + alertCard + periodCard + quick + '</div>';
+      + alertCard + repeat86Card + periodCard + quick + '</div>';
 
     this.container.onclick = ev => {
       const act = ev.target.closest('.ic-d-act');
       const ord = ev.target.closest('.ic-d-order');
+      const prod = ev.target.closest('.ic-d-products');
       if (act) App.navigate(act.dataset.go);
       if (ord) App.navigate('ic-order-sheet');
+      if (prod) App.navigate('ic-product-setup');
     };
   }
 };
