@@ -35,8 +35,8 @@ S.RevenueReports = {
         + '<td>' + App.fmtCurrency(w.floor_revenue||0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(totalRev) + '</td>'
         + '<td>' + (w.covers||'&mdash;') + '</td>'
-        + '<td class="' + (caGap >= 0 ? 'pos' : 'neg') + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '&mdash;') + '</td>'
-        + '<td class="' + (labGap <= 0 ? 'pos' : 'neg') + '">' + (w.labor_pct_blended ? w.labor_pct_blended.toFixed(1)+'%' : '&mdash;') + '</td>'
+        + '<td class="' + (caGap == null ? '' : caGap >= 0 ? 'pos' : 'neg') + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '&mdash;') + '</td>'
+        + '<td class="' + (labGap == null ? '' : labGap <= 0 ? 'pos' : 'neg') + '">' + (w.labor_pct_blended ? w.labor_pct_blended.toFixed(1)+'%' : '&mdash;') + '</td>'
         + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '&mdash;') + '</td>'
         + '</tr>';
     }).join('');
