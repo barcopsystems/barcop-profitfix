@@ -163,6 +163,10 @@ const TT = {
     't-email-lastsend': {t:'Last Send Date',b:'The date you last sent a marketing email to your list. If it has been more than a month, the list is going cold, recipients forget who you are, and open rates fall.',e:'Last campaign sent October 8'},
     't-email-frequency':{t:'Send Frequency',b:'How often you typically email your list. Weekly or every two weeks keeps the list warm and engaged. Rarely or Never means the list is a dead asset, so move to at least monthly.',e:'A weekly Thursday email announcing the weekend lineup'},
     't-email-growth':   {t:'List Growth Mechanism',b:'How new contacts get added to your email list. A passive list shrinks over time. A website signup form, an in-store capture point, or WiFi login capture all keep it growing.',e:'WiFi login capture adds about 30 contacts a week'},
+    // Inventory Control tooltips
+    'ic-par-level':     {t:'Par Level',b:'The target quantity to keep on hand for this product. When a count drops below par, the Order Sheet flags it for reordering. Set it to cover normal usage between deliveries plus a small safety buffer.',e:'You use 6 bottles of well vodka a week and order weekly, so par is 8'},
+    'ic-reorder-point': {t:'Reorder Point',b:'The on-hand quantity that should trigger a reorder. Set it a little above zero so you never run out before the next delivery arrives. The Order Sheet flags any product at or below this point.',e:'A reorder point of 2 bottles means you reorder once only 2 are left'},
+    'ic-pours-container':{t:'Pours Per Container',b:'Container Size divided by Pour Size. How many standard pours one full container yields. Calculated automatically.',e:'A 750ml bottle of 25.4 oz at a 1.5 oz pour = 16.9 pours'},
   },
   show(icon) {
     const id = icon.dataset.tt;
@@ -330,6 +334,8 @@ const App = {
       nav.innerHTML = Revenue.navHTML();
     } else if (module === 'traffic') {
       nav.innerHTML = Traffic.navHTML();
+    } else if (module === 'inventory') {
+      nav.innerHTML = Inventory.navHTML();
     } else {
       nav.innerHTML = ProfitNav.html();
     }
@@ -488,6 +494,39 @@ const App = {
       document.getElementById('topbar-sub').textContent = sub;
       const screen = trafficScreens[id];
       if (screen) screen.render(content, actions);
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Inventory Control module screens
+    if (this._activeModule === 'inventory') {
+      const icTitles = {
+        'hub':                 ['Recovery Hub', ''],
+        'ic-dashboard':        ['Dashboard', 'Inventory Control'],
+        'ic-product-setup':    ['Products', 'Inventory Control'],
+        'ic-locations':        ['Locations', 'Inventory Control'],
+        'ic-vendors':          ['Vendors', 'Inventory Control'],
+        'ic-take-inventory':   ['Take Inventory', 'Inventory Control'],
+        'ic-count-history':    ['Count History', 'Inventory Control'],
+        'ic-spot-check':       ['Spot Check', 'Inventory Control'],
+        'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
+        'ic-delivery-history': ['Delivery History', 'Inventory Control'],
+        'ic-order-sheet':      ['Order Sheet', 'Inventory Control'],
+        'ic-order-history':    ['Order History', 'Inventory Control'],
+        'ic-report-usage':     ['Usage Report', 'Inventory Control'],
+        'ic-report-variance':  ['Variance Report', 'Inventory Control'],
+        'ic-report-stock':     ['Stock Report', 'Inventory Control'],
+        'ic-report-movers':    ['Top Movers', 'Inventory Control'],
+        'ic-help':             ['Help and FAQ', 'Inventory Control'],
+      };
+      const icScreens = {
+        'ic-product-setup': S.InventoryProducts,
+      };
+      const [icTitle, icSub] = icTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = icTitle;
+      document.getElementById('topbar-sub').textContent = icSub;
+      const icScreen = icScreens[id];
+      if (icScreen) icScreen.render(content, actions);
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
