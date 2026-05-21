@@ -532,6 +532,7 @@ const App = {
         'ic-report-variance': S.InventoryVarianceReport,
         'ic-report-stock':    S.InventoryStockReport,
         'ic-report-movers':   S.InventoryMoversReport,
+        'ic-help':            S.InventoryHelp,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = icTitle;
