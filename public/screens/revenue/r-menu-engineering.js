@@ -70,7 +70,7 @@ S.RevenueMenuEngineering = {
 
     const svgMatrix = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Menu Engineering Matrix</div>'
-      + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:500px;height:auto;">'
+      + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;">'
       + '<rect x="'+PAD+'" y="'+PAD+'" width="'+(W-PAD*2)+'" height="'+(H-PAD*2)+'" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.07)"/>'
       + '<line x1="'+midX.toFixed(1)+'" y1="'+PAD+'" x2="'+midX.toFixed(1)+'" y2="'+(H-PAD)+'" stroke="rgba(255,255,255,0.15)" stroke-dasharray="4,4"/>'
       + '<line x1="'+PAD+'" y1="'+midY.toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+midY.toFixed(1)+'" stroke="rgba(255,255,255,0.15)" stroke-dasharray="4,4"/>'
@@ -165,7 +165,7 @@ S.RevenueMenuEngineering = {
         +'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">Old Cost %</div><div style="font-size:16px;font-weight:700;color:var(--t1);">'+oldPct+'%</div></div>'
         +'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">New Cost %</div><div style="font-size:16px;font-weight:700;color:var(--t1);">'+newPct+'%</div></div>'
         +'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">New Margin ' + tt('r-contrib-margin') + '</div><div style="font-size:16px;font-weight:700;color:'+(newCM>oldCM?'var(--gold)':'var(--red)')+';">'+App.fmtCurrency(newCM)+'</div></div>'
-        +'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">Weekly Impact</div><div style="font-size:16px;font-weight:700;color:'+(wkImpact>0?'var(--gold)':'var(--red)');+';">'+(wkImpact>0?'+':'')+App.fmtCurrency(wkImpact)+'</div></div>'
+        +'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">Weekly Impact</div><div style="font-size:16px;font-weight:700;color:'+(wkImpact>0?'var(--gold)':'var(--red)')+';">'+(wkImpact>0?'+':'')+App.fmtCurrency(wkImpact)+'</div></div>'
         +'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">Annual Impact</div><div style="font-size:16px;font-weight:700;color:'+(annImpact>0?'var(--gold)':'var(--red)')+';">'+(annImpact>0?'+':'')+App.fmtCurrency(annImpact)+'</div></div>'
         +(covers>0?'<div style="background:var(--input);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">Breakeven Volume Drop</div><div style="font-size:16px;font-weight:700;color:var(--t2);">'+Math.round(breakeven)+' covers</div></div>':'')
         +'</div>';
