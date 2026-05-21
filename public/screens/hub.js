@@ -282,7 +282,7 @@ S.Hub = {
       { name:'Profit Recovery',  icon:icons.profit,  screen:'dashboard',   mod:'profit'  },
       { name:'Revenue Recovery', icon:icons.revenue, screen:'r-dashboard', mod:'revenue' },
       { name:'Traffic Recovery', icon:icons.traffic, screen:'t-dashboard', mod:'traffic' },
-      { name:'Inventory Control',icon:icons.inv,   soon:true },
+      { name:'Inventory Control',icon:icons.inv,   screen:'ic-product-setup', mod:'inventory' },
       { name:'Labor Control',    icon:icons.labor, soon:true },
       { name:'Shift Control',    icon:icons.shift, soon:true },
     ];
