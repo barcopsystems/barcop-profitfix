@@ -50,6 +50,7 @@ S.TrafficSearch = {
 
     const formCard = '<div class="card">'
       + '<div class="card-title">Local Search Assessment</div>'
+      + reviewedNote(prof.search_reviewed_at)
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:16px;">' + toggleRows + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:230px;"><label>Primary Local Keyword ' + tt('t-search-keyword') + '</label><input type="text" id="srch-keyword" value="' + esc(keyword) + '" placeholder="austin sports bar"/></div>'
@@ -99,6 +100,7 @@ S.TrafficSearch = {
     prof.search_keyword = document.getElementById('srch-keyword')?.value || '';
     const cit = parseInt(document.getElementById('srch-citations')?.value);
     prof.search_citations = isNaN(cit) ? null : cit;
+    prof.search_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
     this.draw();
     const msg = document.getElementById('srch-msg');
