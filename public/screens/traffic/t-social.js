@@ -63,9 +63,9 @@ S.TrafficSocial = {
     const formCard = '<div class="card">'
       + '<div class="card-title">Social Detail</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:170px;"><label>IG Engagement Rate</label><div class="fw"><input class="suf" type="number" id="soc-eng" value="' + (eng != null ? eng : '') + '" step="0.1" min="0"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:170px;"><label>FB Posts This Month</label><input type="number" id="soc-fbp" value="' + (prof.social_fb_posts != null ? prof.social_fb_posts : '') + '" min="0"/></div>'
-      + '<div class="f" style="width:200px;"><label>Content Mix</label><select id="soc-mix">' + mixOpts + '</select></div>'
+      + '<div class="f" style="width:170px;"><label>IG Engagement Rate ' + tt('t-social-engagement') + '</label><div class="fw"><input class="suf" type="number" id="soc-eng" value="' + (eng != null ? eng : '') + '" step="0.1" min="0"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:170px;"><label>FB Posts/Mo ' + tt('t-social-fbposts') + '</label><input type="number" id="soc-fbp" value="' + (prof.social_fb_posts != null ? prof.social_fb_posts : '') + '" min="0"/></div>'
+      + '<div class="f" style="width:200px;"><label>Content Mix ' + tt('t-social-mix') + '</label><select id="soc-mix">' + mixOpts + '</select></div>'
       + '</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:16px;">'
       + toggle('social_stories', 'Instagram Stories used regularly')
