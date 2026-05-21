@@ -575,6 +575,7 @@ const App = {
         'sc-variance-log': S.ShiftVarianceLog,
         'sc-86-list': S.Shift86List,
         'sc-void-comp': S.ShiftVoidComp,
+        'sc-maintenance': S.ShiftMaintenance,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
