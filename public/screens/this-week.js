@@ -68,7 +68,7 @@ S.ThisWeek = {
       +'<div class="f w-md"><label>Bar COGS '+tt('bar-cogs')+'</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-bc" value="'+b.cogs+'" oninput="S.ThisWeek.calcBar()" /></div></div>'
       +'<div class="f w-md"><label>Bar Labor '+tt('bar-labor')+'</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-bl" value="'+b.labor+'" oninput="S.ThisWeek.calcBar()" /></div></div>'
       +'</div>'
-      +(this.icCanImport()?'<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="S.ThisWeek.importBarCOGS()">Import COGS from Inventory Control</button><span id="tw-ic-status" style="font-size:11px;color:var(--t3);margin-left:10px;"></span></div>':'')
+      +'<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="S.ThisWeek.importBarCOGS()">Import COGS from Inventory Control</button><span id="tw-ic-status" style="font-size:11px;color:var(--t3);margin-left:10px;"></span></div>'
       +'<div class="calc">'
       +'<div class="calc-item"><div class="calc-label">Bar Pour Cost %</div><div class="calc-val" id="tw-bpct">—</div></div>'
       +'<div class="calc-item"><div class="calc-label">Bar Labor %</div><div class="calc-val" id="tw-blpct">—</div></div>'
@@ -96,10 +96,6 @@ S.ThisWeek = {
   },
 
   // ── Import bar COGS from Inventory Control (Rule 21: reads ic_counts) ──────
-  icCanImport(){
-    return (((App.inventoryData&&App.inventoryData.ic_counts)||[]).length)>=2;
-  },
-
   icBarCOGS(){
     const counts=[...((App.inventoryData&&App.inventoryData.ic_counts)||[])]
       .sort((a,b)=>new Date(a.created_at||a.date).getTime()-new Date(b.created_at||b.date).getTime());
