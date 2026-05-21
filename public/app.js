@@ -520,6 +520,7 @@ const App = {
         'ic-help':             ['Help and FAQ', 'Inventory Control'],
       };
       const icScreens = {
+        'ic-dashboard':      S.InventoryDashboard,
         'ic-product-setup':  S.InventoryProducts,
         'ic-locations':      S.InventoryLocations,
         'ic-vendors':        S.InventoryVendors,
