@@ -525,6 +525,7 @@ const App = {
         'ic-vendors':        S.InventoryVendors,
         'ic-take-inventory': S.InventoryTakeInventory,
         'ic-count-history':  S.InventoryCountHistory,
+        'ic-receive-delivery': S.InventoryReceiveDelivery,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = icTitle;
