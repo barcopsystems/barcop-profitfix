@@ -68,7 +68,7 @@ S.TrafficDelivery = {
       return '<div style="padding:14px 0;border-bottom:1px solid var(--b2);">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:10px;">' + p.name + ' &nbsp;·&nbsp; ' + statusBadge + ratingTxt + '</div>'
         + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;">'
-        + '<div class="f" style="width:150px;"><label>Photo Count</label><div class="fw"><input class="suf" type="number" id="dl-' + p.key + '-photos" value="' + (p.photos != null ? p.photos : '') + '" min="0"/><span class="suf">photos</span></div></div>'
+        + '<div class="f" style="width:150px;"><label>Photo Count ' + tt('t-delivery-photos') + '</label><div class="fw"><input class="suf" type="number" id="dl-' + p.key + '-photos" value="' + (p.photos != null ? p.photos : '') + '" min="0"/><span class="suf">photos</span></div></div>'
         + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="dl-tog" data-key="' + p.key + '_menu"' + (p.menu ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>Menu complete</label>'
         + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="dl-tog" data-key="' + p.key + '_promo"' + (p.promo ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>Promo active</label>'
         + '</div></div>';
