@@ -188,13 +188,13 @@ const Traffic = {
       </div>
       <div class="nav-item" data-screen="t-search" id="nav-t-search">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Search &amp; SEO</span>
+        <span class="nav-label">Search and SEO</span>
       </div>
       <div class="nav-item" data-screen="t-website" id="nav-t-website">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3" width="14" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 7h14" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="5" r="0.7" fill="currentColor"/><circle cx="6.5" cy="5" r="0.7" fill="currentColor"/></svg>
         <span class="nav-label">Website Scorecard</span>
       </div>
-      <div class="nav-section">Social &amp; Delivery</div>
+      <div class="nav-section">Social and Delivery</div>
       <div class="nav-item" data-screen="t-social" id="nav-t-social">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="4.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="4" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="13" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M6.4 7.6l4.2-2.1M6.4 9.4l4.2 2.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Social Media</span>
@@ -205,7 +205,7 @@ const Traffic = {
       </div>
       <div class="nav-item" data-screen="t-email" id="nav-t-email">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3.5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 6.5l7 4.5 7-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Email &amp; Loyalty</span>
+        <span class="nav-label">Email and Loyalty</span>
       </div>
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="t-reports" id="nav-t-reports">
