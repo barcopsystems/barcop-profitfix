@@ -580,6 +580,7 @@ const App = {
         'sc-opening-checklist': S.ShiftOpeningChecklist,
         'sc-closing-checklist': S.ShiftClosingChecklist,
         'sc-checklist-templates': S.ShiftChecklistTemplates,
+        'sc-reports-shift': S.ShiftReportsShift,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
