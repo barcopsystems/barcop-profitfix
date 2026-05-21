@@ -22,7 +22,7 @@ S.AuditTracker = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div style="flex:1;min-width:200px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Monthly Profit Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive profit audit per month. Upload your POS reports and data files. Your scored audit appears on screen immediately. Print or save it as a PDF from your browser.</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive profit audit per month. Upload your POS reports and data files. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
       + '</div>'
       + (hasThisMonth
           ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' days</div>'
@@ -121,7 +121,7 @@ S.AuditTracker = {
 
     const emptyState = !latest
       ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
-        + '<div class="empty-sub">Generate your first monthly Profit Audit above. Upload your POS reports and the audit appears on screen immediately.</div></div>'
+        + '<div class="empty-sub">Generate your first monthly Profit Audit above. Upload your POS reports and the scored audit appears once the analysis finishes.</div></div>'
       : '';
 
 
