@@ -521,6 +521,7 @@ const App = {
       };
       const icScreens = {
         'ic-product-setup': S.InventoryProducts,
+        'ic-locations':     S.InventoryLocations,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = icTitle;
