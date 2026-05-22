@@ -3,7 +3,7 @@ S.RevenueGettingStarted = {
   TASKS: [
     { week:1, id:'rgs_targets',  label:'Set your revenue targets on the Dashboard. Check average, labor percentages, and RPLH targets are pre-filled with industry benchmarks.', screen:'r-dashboard' },
     { week:1, id:'rgs_menu',     label:'Add your menu items in Menu Items. Include food and drink categories with pricing and cost data.', screen:'r-menu-items' },
-    { week:1, id:'rgs_servers',  label:'Add your server roster in Settings. Every server you staff needs to be in the system before entering weekly data.', screen:'r-settings' },
+    { week:1, id:'rgs_servers',  label:'Add your staff roster in Labor Control. Every server you staff needs to be in the system before entering weekly data.', screen:'lc-staff-roster' },
     { week:1, id:'rgs_eng',      label:'Run Menu Engineering with your current menu data. Identify your Stars, Plowhorses, Puzzles, and Dogs.', screen:'r-menu-engineering' },
     { week:1, id:'rgs_labor',    label:'Review the Labor Budget calculator. Enter your projected revenue and let the app calculate your labor budget before you write the schedule.', screen:'r-labor-budget' },
     { week:2, id:'rgs_week1',    label:'Enter your first week of revenue and labor data in This Week.', screen:'r-this-week' },
