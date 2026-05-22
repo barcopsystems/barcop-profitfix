@@ -150,8 +150,11 @@ app.post('/api/generate-revenue-audit', (req, res) => {
       }
     }
 
+    let controlData = null;
+    try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
+
     try {
-      const auditData = await extractAuditData(apiKey, 'revenue', uploadedFiles, appData, notes);
+      const auditData = await extractAuditData(apiKey, 'revenue', uploadedFiles, appData, notes, controlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Revenue audit error:', e);
@@ -198,7 +201,7 @@ function parseSpreadsheetToText(filePath, fileName) {
 async function extractAuditData(apiKey, auditType, files, appData, notes='', controlData=null) {
   const prompts = {
     profit:  getExtractionPrompt_Profit(appData, controlData),
-    revenue: getExtractionPrompt_Revenue(appData),
+    revenue: getExtractionPrompt_Revenue(appData, controlData),
     traffic: getExtractionPrompt_Traffic(appData),
   };
 
@@ -419,7 +422,7 @@ Return this exact JSON structure with all values calculated (not 0):
 "S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
 }
 
-function getExtractionPrompt_Revenue(appData) {
+function getExtractionPrompt_Revenue(appData, controlData) {
   const settings     = appData.settings || {};
   const targets      = settings.targets || {};
   const weeks        = appData.revenue_weeks || [];
@@ -459,6 +462,22 @@ function getExtractionPrompt_Revenue(appData) {
     ? menuItems.slice(0,30).map(m => `  ${m.name||'Item'} | ${m.category||''} | Price: $${m.price||0} | Cost: $${m.cost||0}`).join('\n')
     : '  No menu items entered yet';
 
+  // Verified Control-module data — real logged Labor Control data the audit
+  // treats as ground truth for the sections it covers (map Section 8).
+  let controlBlock = '';
+  if (controlData && typeof controlData === 'object') {
+    const c = controlData, cl = [];
+    if (c.check_average != null)     cl.push('verified_check_average=$' + c.check_average + ' — S1 ground truth');
+    if (c.labor_pct_blended != null) cl.push('verified_labor_pct=' + c.labor_pct_blended + ' — S2 ground truth');
+    if (c.rplh_blended != null)      cl.push('verified_rplh=$' + c.rplh_blended + ' — S2 ground truth');
+    if (c.labor_hours != null)       cl.push('labor_hours_logged=' + c.labor_hours + ' labor_cost_$=' + c.labor_cost + ' — S2 ground truth');
+    if (c.roster_count)              cl.push('staff_on_roster=' + c.roster_count + ' — S4 server count ground truth');
+    if (cl.length) {
+      controlBlock = '\nVERIFIED CONTROL DATA — this operator runs Bar Cop\'s Labor Control module, and the weekly revenue and labor figures are confirmed records fed from Control. The figures below are real logged operational data, not estimates. Treat them as ground truth: score the sections they cover from these values, do not estimate those numbers or depend on uploaded files for them, and reflect this verified coverage in DATA_TIER_LABEL. Sections not covered here still rely on the uploads.\n'
+        + cl.map(l => '  ' + l).join('\n') + '\n';
+    }
+  }
+
   return `REVENUE AUDIT — respond with a single JSON object, no other text. Use app data below. Never output 0 for a score.
 
 SCORING (out of 100 each):
@@ -481,7 +500,7 @@ avg_bar_rev_week=$${avgBarRev?Math.round(avgBarRev):0} | avg_floor_rev_week=$${a
 monthly_covers_est=${avgCovers?Math.round(avgCovers*4.33):0} | monthly_rev_est=$${avgBarRev&&avgFloorRev?Math.round((avgBarRev+avgFloorRev)*4.33):0}
 ${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
 ${serverRoster?'SERVERS:\n'+serverRoster:''}
-
+${controlBlock}
 Return this exact JSON (all values calculated):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"RFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":61,"TARGET_SCORE":65,
 "OVERALL_SCORE":[calc weighted avg],
