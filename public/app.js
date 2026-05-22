@@ -294,7 +294,44 @@ const App = {
       Onboarding.start();
     } else {
       this.showHub();
+      this._promptSync();
     }
+  },
+
+  // Offline sync prompt (Section 14). If a write failed while offline, the
+  // local copy was kept and the store marked pending. On load, offer to push
+  // those changes to the server. The local data is already loaded, so nothing
+  // is lost if the operator defers.
+  async _promptSync() {
+    if (!DB.hasPendingSync() || document.getElementById('sync-banner')) return;
+    const bar = document.createElement('div');
+    bar.id = 'sync-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9500;background:var(--gold);'
+      + 'color:#000;display:flex;align-items:center;gap:14px;padding:9px 18px;'
+      + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
+    const btnDark = 'background:#000;color:var(--gold);border:none;';
+    const btnGhost = 'background:transparent;border:1px solid rgba(0,0,0,0.45);color:#000;';
+    const btnBase = 'border-radius:3px;font-size:11px;font-weight:800;letter-spacing:1px;'
+      + 'text-transform:uppercase;padding:6px 14px;cursor:pointer;flex-shrink:0;';
+    bar.innerHTML = '<span style="flex:1;">Changes you saved on this device while offline have not reached the server yet.</span>'
+      + '<button id="sync-now" style="' + btnDark + btnBase + '">Sync Now</button>'
+      + '<button id="sync-later" style="' + btnGhost + btnBase + '">Later</button>';
+    document.body.appendChild(bar);
+    document.getElementById('sync-later').onclick = () => bar.remove();
+    document.getElementById('sync-now').onclick = async () => {
+      const btn = document.getElementById('sync-now');
+      btn.disabled = true; btn.textContent = 'Syncing...';
+      const r = await DB.syncPending();
+      if (r.ok) {
+        bar.innerHTML = '<span style="flex:1;">All offline changes are synced.</span>';
+        setTimeout(() => bar.remove(), 2500);
+      } else {
+        btn.disabled = false; btn.textContent = 'Retry';
+        const span = bar.querySelector('span');
+        if (span) span.textContent = 'Still cannot reach the server. Your changes are safe on this device. '
+          + 'Try again once you have a connection.';
+      }
+    };
   },
 
   showHub() {
