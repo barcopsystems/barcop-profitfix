@@ -14,57 +14,10 @@ S.Dashboard = {
     const weeks = data.weeks || [];
     const targets = data.settings.targets || {};
     const latest = weeks.length > 0 ? weeks[weeks.length-1] : null;
-    const prior4 = weeks.slice(-5,-1);
 
-    const avg4 = fn => {
-      const vals = prior4.map(fn).filter(v => v!=null && !isNaN(v));
-      return vals.length > 0 ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
-    };
-
-    const barPct   = latest?.bar?.cost_pct ?? null;
-    const foodPct  = latest?.food?.cost_pct ?? null;
-    const primePct = latest?.prime_cost_pct ?? null;
-    const weekVar  = latest ? (latest.bar_variance||[]).reduce((s,r)=>s+(r.variance_dollar||0),0) : null;
-
-    const barTarget   = targets.bar_pour_cost_pct ?? 22;
-    const foodTarget  = targets.food_cost_pct ?? 32;
-    const primeTarget = targets.prime_cost_pct ?? 60;
-    const barRev = latest?.bar?.revenue ?? 0;
-    const foodRev = latest?.food?.revenue ?? 0;
-    const barImpact  = barPct!=null  ? ((barPct-barTarget)/100)*barRev : null;
-    const foodImpact = foodPct!=null ? ((foodPct-foodTarget)/100)*foodRev : null;
-
-    const barAvg = avg4(w=>w.bar?.cost_pct);
-    const foodAvg = avg4(w=>w.food?.cost_pct);
-    const primeAvg = avg4(w=>w.prime_cost_pct);
-    const varAvg = avg4(w=>(w.bar_variance||[]).reduce((s,r)=>s+(r.variance_dollar||0),0));
-
-    const trendHtml = (cur, avg, lowerBetter=true) => {
-      if (avg==null || cur==null) return '<div class="metric-trend"> </div>';
-      const diff = cur - avg;
-      if (Math.abs(diff) < 0.15) return '<div class="metric-trend">→ flat</div>';
-      const improving = lowerBetter ? diff < 0 : diff > 0;
-      return '<div class="metric-trend ' + (improving?'trend-up':'trend-dn') + '">'+(diff>0?'↑':'↓')+' vs 4wk avg</div>';
-    };
-
-    const metricCard = (label, val, target, impact, trendEl, cls) => {
-      const impactHtml = impact!=null
-        ? '<div class="metric-impact ' + (impact>0?'neg':'pos') + '">'+(impact>0?'+':'')+App.fmtCurrency(impact)+' vs target</div>'
-        : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
-      return '<div class="metric-card">'
-        +'<div class="metric-label">'+label+'</div>'
-        +(val != null
-          ? '<div class="metric-val '+cls+'">'+val+'</div>'
-          : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>')
-        +'<div class="metric-target">Target: '+App.fmtPct(target)+'</div>'
-        + impactHtml + trendEl
-        +'</div>';
-    };
-
-    const barCls   = barPct==null?'':barPct>barTarget?'over-target':'on-target';
-    const foodCls  = foodPct==null?'':foodPct>foodTarget?'over-target':'on-target';
-    const primeCls = primePct==null?'':primePct>primeTarget?'over-target':'on-target';
-    const varCls   = weekVar==null?'':weekVar>0?'over-target':'on-target';
+    const barPct    = latest?.bar?.cost_pct ?? null;
+    const barTarget = targets.bar_pour_cost_pct ?? 22;
+    const barRev    = latest?.bar?.revenue ?? 0;
 
     // Alert
     let alertHtml = '';
@@ -83,41 +36,38 @@ S.Dashboard = {
     // Flagged recipes
     const flagged = (data.recipes||[]).filter(r=>r.flagged).length;
 
-    // Chart
+    // Chart — annotated 8-week trend
     const chartHtml = this.buildChart(weeks.slice(-8), targets);
 
-    // Summary table
-    const prev = weeks.length > 1 ? weeks[weeks.length-2] : null;
-    const avg4full = fn => avg4(fn);
+    // Priority Action Items — ranked by dollar impact from the latest Profit audit
+    const audits = data.audits || [];
+    const latestAudit = audits.length ? audits[audits.length-1] : null;
+    const actionItems = (latestAudit?.action_items || [])
+      .filter(it => it && it.action)
+      .slice()
+      .sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0))
+      .slice(0,5);
 
-    let summaryHtml = '';
-    if (latest) {
-      const row = (label, twFn, lwFn, avgFn, isCurrency=true) => {
-        const tw = twFn(latest);
-        const lw = lwFn(prev);
-        const av = avgFn();
-        const fmt = isCurrency ? App.fmtCurrency : App.fmtPct;
-        const twCls = !isCurrency && tw!=null ? (tw>(isCurrency?0:barTarget)?'neg':'pos') : '';
-        return '<tr><td>'+label+'</td>'
-          +'<td class="val '+twCls+'">'+(tw!=null?fmt(tw):'No data')+'</td>'
-          +'<td>'+(lw!=null?fmt(lw):'No data')+'</td>'
-          +'<td>'+(av!=null?fmt(av):'No data')+'</td></tr>';
-      };
-      summaryHtml = '<div class="tbl-wrap" style="margin-bottom:18px;"><table class="sum-tbl">'
-        +'<thead><tr><th></th><th>This Week</th><th>Last Week</th><th>4-Week Avg</th></tr></thead>'
-        +'<tbody>'
-        +'<tr><td>Bar Revenue</td><td class="val">'+App.fmtCurrency(latest.bar?.revenue)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.revenue):'No data')+'</td><td>'+(avg4full(w=>w.bar?.revenue)!=null?App.fmtCurrency(avg4full(w=>w.bar?.revenue)):'No data')+'</td></tr>'
-        +'<tr><td>Bar COGS</td><td>'+App.fmtCurrency(latest.bar?.cogs)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.cogs):'No data')+'</td><td>'+(avg4full(w=>w.bar?.cogs)!=null?App.fmtCurrency(avg4full(w=>w.bar?.cogs)):'No data')+'</td></tr>'
-        +'<tr><td>Bar Labor</td><td>'+App.fmtCurrency(latest.bar?.labor)+'</td><td>'+(prev?App.fmtCurrency(prev.bar?.labor):'No data')+'</td><td>'+(avg4full(w=>w.bar?.labor)!=null?App.fmtCurrency(avg4full(w=>w.bar?.labor)):'No data')+'</td></tr>'
-        +'<tr><td>Bar Pour Cost %</td><td class="'+(barPct>barTarget?'neg':'pos')+' val">'+App.fmtPct(barPct)+'</td><td>'+(prev?App.fmtPct(prev.bar?.cost_pct):'No data')+'</td><td>'+(avg4full(w=>w.bar?.cost_pct)!=null?App.fmtPct(avg4full(w=>w.bar?.cost_pct)):'No data')+'</td></tr>'
-        +'<tr><td>Food Revenue</td><td class="val">'+App.fmtCurrency(latest.food?.revenue)+'</td><td>'+(prev?App.fmtCurrency(prev.food?.revenue):'No data')+'</td><td>'+(avg4full(w=>w.food?.revenue)!=null?App.fmtCurrency(avg4full(w=>w.food?.revenue)):'No data')+'</td></tr>'
-        +'<tr><td>Food Cost %</td><td class="'+(foodPct>foodTarget?'neg':'pos')+' val">'+App.fmtPct(foodPct)+'</td><td class="'+(prev?.food?.cost_pct>foodTarget?'neg':'pos')+'">'+App.fmtPct(prev?.food?.cost_pct)+'</td><td>'+(avg4full(w=>w.food?.cost_pct)!=null?App.fmtPct(avg4full(w=>w.food?.cost_pct)):'No data')+'</td></tr>'
-        +'<tr class="total"><td>Total Revenue</td><td class="val">'+App.fmtCurrency((latest.bar?.revenue||0)+(latest.food?.revenue||0))+'</td><td>'+(prev?App.fmtCurrency((prev.bar?.revenue||0)+(prev.food?.revenue||0)):'No data')+'</td><td>No data</td></tr>'
-        +'<tr class="total"><td>Prime Cost %</td><td class="val '+(primePct>primeTarget?'neg':'pos')+'">'+App.fmtPct(primePct)+'</td><td>'+(prev?App.fmtPct(prev.prime_cost_pct):'No data')+'</td><td>'+(avg4full(w=>w.prime_cost_pct)!=null?App.fmtPct(avg4full(w=>w.prime_cost_pct)):'No data')+'</td></tr>'
-        +'</tbody></table></div>';
+    let actionHtml = '<div class="sh">Priority Action Items</div>';
+    if (actionItems.length) {
+      actionHtml += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+        + actionItems.map((it,i) =>
+            '<div class="db-action" data-screen="audit-tracker" '
+            + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+            + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+            + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
+            + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</div>'
+            + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.5;">'+esc(it.action)+'</div>'
+            + (it.monthly_impact > 0
+                ? '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;color:var(--gold);">'
+                  + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
+                : '')
+            + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+            + '</div>').join('')
+        + '</div>';
     } else {
-      summaryHtml = '<div class="card"><div class="empty"><div class="empty-title">No weeks saved yet</div>'
-        +'<div class="empty-sub">Enter your first week to see your numbers here.</div></div></div>';
+      actionHtml += '<div class="card" style="margin-bottom:18px;"><div style="font-size:12px;color:var(--t3);line-height:1.65;">'
+        + 'Run a Profit Audit and your highest-impact opportunities will be ranked here by dollar impact.</div></div>';
     }
 
     // Start Here card — shows until cost targets have been saved by the user
@@ -144,23 +94,10 @@ S.Dashboard = {
     container.innerHTML = '<div class="screen">'
       + startHereHtml
       + alertHtml
-      + '<div class="metric-grid">'
-      + metricCard('Bar Pour Cost', barPct!=null?App.fmtPct(barPct):null, barTarget, barImpact, trendHtml(barPct,barAvg), barCls)
-      + metricCard('Food Cost', foodPct!=null?App.fmtPct(foodPct):null, foodTarget, foodImpact, trendHtml(foodPct,foodAvg), foodCls)
-      + metricCard('Prime Cost', primePct!=null?App.fmtPct(primePct):null, primeTarget, null, trendHtml(primePct,primeAvg), primeCls)
-      + '<div class="metric-card"><div class="metric-label">Weekly Variance</div>'
-      +(weekVar!=null
-        ? '<div class="metric-val '+(weekVar>0?'over-target':'on-target')+'">'+App.fmtCurrency(weekVar)+'</div>'
-        : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>')
-      +'<div class="metric-target">Target: $0</div>'
-      +'<div class="metric-impact" style="color:var(--t4);">From inventory count</div>'
-      +trendHtml(weekVar,varAvg,true)+'</div>'
-      + '</div>'
-      + chartHtml
-      + '<div class="sh">This Week Summary</div>'
-      + summaryHtml
-      + FixPanel.recoveryCard('profit')
       + FixPanel.fixAreasCard('profit')
+      + chartHtml
+      + actionHtml
+      + FixPanel.recoveryCard('profit')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       +'<button class="btn btn-primary" id="qa-week">Enter This Week</button>'
@@ -197,6 +134,9 @@ S.Dashboard = {
     document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
     document.getElementById('qa-recipes')?.addEventListener('click', ()=>App.navigate('recipe-library'));
+    container.querySelectorAll('.db-action').forEach(row => {
+      row.addEventListener('click', () => App.navigate(row.dataset.screen));
+    });
     FixPanel.wireFixAreas(container);
   },
 
