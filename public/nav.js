@@ -114,10 +114,6 @@ const Revenue = {
         <span class="nav-label">Menu Engineering</span>
       </div>
       <div class="nav-section">Labor</div>
-      <div class="nav-item" data-screen="r-labor-budget" id="nav-r-labor-budget">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Labor Budget</span>
-      </div>
       <div class="nav-item" data-screen="r-rplh" id="nav-r-rplh">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">RPLH Tracker</span>
