@@ -560,6 +560,48 @@ S.RevenueSettings = {
     });
     App.laborData.lc_actuals = lcActuals;
 
+    // Tip log — recent shifts for the tipped staff (bartenders and servers).
+    const tippedIdx = [0, 1, 2, 7, 8, 9, 10];
+    const lcTips = [];
+    [3, 10].forEach(dayBack => {
+      tippedIdx.forEach(idx => {
+        const st = lcStaff[idx];
+        const cash = 40 + Math.round(Math.random() * 120);
+        const card = 90 + Math.round(Math.random() * 180);
+        lcTips.push({ id:uid(), date:dateStr(dayBack), staff_id:st.id, name:st.name,
+          position_id:st.position_id, shift_type:'Dinner', cash_tips:cash, card_tips:card,
+          total_tips:cash + card, hours:+(5 + Math.random() * 3).toFixed(1), notes:'',
+          created_at:new Date().toISOString() });
+      });
+    });
+    App.laborData.lc_tips = lcTips;
+
+    App.laborData.lc_callouts = [
+      { id:uid(), date:dateStr(5),  staff_id:lcStaff[8].id,  name:lcStaff[8].name,  type:'No-Show', shift_type:'Dinner', covered:true,  covered_by:'Brianna K.', reason:'', notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date:dateStr(18), staff_id:lcStaff[5].id,  name:lcStaff[5].name,  type:'Sick',    shift_type:'Lunch',  covered:true,  covered_by:'Omar K.',    reason:'Flu', notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date:dateStr(33), staff_id:lcStaff[10].id, name:lcStaff[10].name, type:'Late',    shift_type:'Dinner', covered:false, covered_by:'',           reason:'Traffic', notes:'', created_at:new Date().toISOString() },
+    ];
+
+    // One posted schedule for the upcoming week.
+    const schedShifts = [
+      { staff_id:lcStaff[0].id,  name:lcStaff[0].name,  position_id:lcStaff[0].position_id,  day:'Fri', start:'16:00', end:'23:00', hours:7, wage:16, cost:112 },
+      { staff_id:lcStaff[1].id,  name:lcStaff[1].name,  position_id:lcStaff[1].position_id,  day:'Sat', start:'16:00', end:'23:00', hours:7, wage:16, cost:112 },
+      { staff_id:lcStaff[3].id,  name:lcStaff[3].name,  position_id:lcStaff[3].position_id,  day:'Fri', start:'15:00', end:'22:00', hours:7, wage:15, cost:105 },
+      { staff_id:lcStaff[7].id,  name:lcStaff[7].name,  position_id:lcStaff[7].position_id,  day:'Fri', start:'17:00', end:'23:00', hours:6, wage:14, cost:84 },
+      { staff_id:lcStaff[8].id,  name:lcStaff[8].name,  position_id:lcStaff[8].position_id,  day:'Sat', start:'17:00', end:'23:00', hours:6, wage:14, cost:84 },
+      { staff_id:lcStaff[11].id, name:lcStaff[11].name, position_id:lcStaff[11].position_id, day:'Sat', start:'16:00', end:'22:00', hours:6, wage:14, cost:84 },
+    ];
+    const schedHours = schedShifts.reduce((t, s) => t + s.hours, 0);
+    const schedCost  = schedShifts.reduce((t, s) => t + s.cost, 0);
+    const schedForecast = 19500;
+    App.laborData.lc_schedules = [{
+      id:uid(), week_start:dateStr(-2), revenue_forecast:schedForecast, shifts:schedShifts,
+      total_hours:schedHours, total_cost:schedCost,
+      labor_pct:+(schedCost / schedForecast * 100).toFixed(1),
+      rplh:+(schedForecast / schedHours).toFixed(2),
+      notes:'', status:'Posted', created_at:new Date().toISOString()
+    }];
+
     await App.save();
     await App.saveLabor();
 
