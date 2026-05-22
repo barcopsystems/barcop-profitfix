@@ -35,25 +35,14 @@ S.RevenueDashboard = {
       }
     }
 
-    // Start Here card
-    const targetsSet = rs._targets_saved || false;
+    // Setup pointer — a thin one-line nudge to the Hub Getting Started while
+    // targets are unset. Settings live on the Hub, never on the dashboard.
     let startHere = '';
-    if (!targetsSet) {
-      startHere = '<div class="card" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Revenue Targets</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Numbers below are industry benchmarks. Adjust any target to match your operation. Click the info icon on each field to see what it means and when to change it.</div>'
-        + '<div class="form-row" style="gap:12px 16px;margin-bottom:18px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsh-ca" value="' + targetCA + '" step="0.5"/></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Bar Labor % ' + tt('r-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="rsh-bl" value="' + (t.bar_labor_pct??28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Kitchen Labor % ' + tt('r-kitchen-labor') + '</label><div class="fw"><input class="suf" type="number" id="rsh-kl" value="' + (t.kitchen_labor_pct??30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Floor Labor % ' + tt('r-floor-labor') + '</label><div class="fw"><input class="suf" type="number" id="rsh-fl" value="' + (t.floor_labor_pct??32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsh-rl" value="' + (t.rplh_lunch??50) + '"/></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsh-rd" value="' + (t.rplh_dinner??75) + '"/></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rsh-rb" value="' + (t.rplh_bar??65) + '"/></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="rsh-ec" value="' + (t.event_close_rate??40) + '" step="1"/><span class="suf">%</span></div></div>'
-        + '</div>'
-        + '<button class="btn btn-primary" id="rsh-save">Save and Continue</button>'
+    if (!rs._targets_saved) {
+      startHere = '<div class="card r-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(201,168,76,0.35);">'
+        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
+        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Revenue targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
         + '</div>';
     }
 
@@ -110,28 +99,8 @@ S.RevenueDashboard = {
     container.querySelectorAll('.r-db-action').forEach(row => {
       row.addEventListener('click', () => App.navigate(row.dataset.screen));
     });
+    container.querySelector('.r-gs-pointer')?.addEventListener('click', () => App.navigate('r-getting-started'));
     FixPanel.wireFixAreas(container);
-
-    document.getElementById('rsh-save')?.addEventListener('click', async () => {
-      const rs2 = App.data.revenue_settings;
-      rs2.targets = {
-        check_avg:          parseFloat(document.getElementById('rsh-ca')?.value)||35,
-        bar_labor_pct:      parseFloat(document.getElementById('rsh-bl')?.value)||28,
-        kitchen_labor_pct:  parseFloat(document.getElementById('rsh-kl')?.value)||30,
-        floor_labor_pct:    parseFloat(document.getElementById('rsh-fl')?.value)||32,
-        rplh_lunch:         parseFloat(document.getElementById('rsh-rl')?.value)||50,
-        rplh_dinner:        parseFloat(document.getElementById('rsh-rd')?.value)||75,
-        rplh_bar:           parseFloat(document.getElementById('rsh-rb')?.value)||65,
-        event_close_rate:   parseFloat(document.getElementById('rsh-ec')?.value)||40,
-      };
-      rs2._targets_saved = true;
-      const gs = App.data.getting_started_revenue||{};
-      gs['rgs_targets'] = new Date().toISOString();
-      App.data.getting_started_revenue = gs;
-      await App.saveKey('revenue_settings');
-      await App.saveKey('getting_started_revenue');
-      App.navigate('r-getting-started');
-    });
   },
 
   buildChart(weeks, t) {
