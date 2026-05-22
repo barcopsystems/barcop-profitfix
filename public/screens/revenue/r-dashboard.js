@@ -176,6 +176,7 @@ S.RevenueDashboard = {
   },
 
   showInsights() {
+    if (App.demoBlock('AI Trend Insights')) return;
     const weeks = (App.data.revenue_weeks||[]).filter(w=>(w.bar_revenue||0)+(w.floor_revenue||0)>0).slice(-8);
     const showModal = (html) => {
       const m = document.createElement('div');
