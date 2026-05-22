@@ -70,24 +70,14 @@ S.Dashboard = {
         + 'Run a Profit Audit and your highest-impact opportunities will be ranked here by dollar impact.</div></div>';
     }
 
-    // Start Here card — shows until cost targets have been saved by the user
-    const targetsSet = App.data.settings._targets_saved || false;
+    // Setup pointer — a thin one-line nudge to the Hub Getting Started while
+    // targets are unset. Settings live on the Hub, never on the dashboard.
     let startHereHtml = '';
-    if (!targetsSet) {
-      const t = App.data.settings.targets || {};
-      startHereHtml = '<div class="card" id="db-start-here" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Cost Targets</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Numbers below are industry benchmarks. Adjust any target to match your operation. Click the info icon on each field to see what it means and when to change it.</div>'
-        + '<div class="form-row" style="gap:12px 16px;margin-bottom:18px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="sh-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="sh-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="sh-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Cash Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sh-ct" value="' + (App.data.settings.cash_tolerance ?? 10) + '"/></div></div>'
-        + '</div>'
-        + '<button class="btn btn-primary" id="sh-save">Save and Continue</button>'
+    if (!App.data.settings._targets_saved) {
+      startHereHtml = '<div class="card db-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(201,168,76,0.35);">'
+        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
+        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Profit targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
         + '</div>';
     }
 
@@ -112,24 +102,7 @@ S.Dashboard = {
       document.getElementById('db-alert')?.remove();
     });
 
-    document.getElementById('sh-save')?.addEventListener('click', async () => {
-      App.data.settings.targets = {
-        bar_pour_cost_pct:  parseFloat(document.getElementById('sh-bpc')?.value) || 22,
-        food_cost_pct:      parseFloat(document.getElementById('sh-fc')?.value)  || 32,
-        bar_labor_cost_pct: parseFloat(document.getElementById('sh-bl')?.value)  || 28,
-        food_labor_cost_pct:parseFloat(document.getElementById('sh-fl')?.value)  || 30,
-        prime_cost_pct:     parseFloat(document.getElementById('sh-pc')?.value)  || 60,
-      };
-      App.data.settings.cash_tolerance       = parseFloat(document.getElementById('sh-ct')?.value)   || 10;
-      App.data.settings._targets_saved = true;
-      // Mark cost targets task complete in Getting Started
-      const gs = App.data.getting_started_profit || {};
-      gs['t_targets'] = new Date().toISOString();
-      App.data.getting_started_profit = gs;
-      await App.saveKey('settings');
-      await App.saveKey('getting_started_profit');
-      App.navigate('getting-started');
-    });
+    container.querySelector('.db-gs-pointer')?.addEventListener('click', () => App.navigate('getting-started'));
     document.getElementById('qa-week')?.addEventListener('click', ()=>App.navigate('this-week'));
     document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
