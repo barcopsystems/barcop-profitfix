@@ -11,10 +11,6 @@ S.TrafficDashboard = {
 
     const googleRating  = latest?.google_rating ?? null;
     const responseRate  = latest?.response_rate ?? null;
-    const targetRating  = t.google_rating    ?? 4.3;
-    const targetVel     = t.review_velocity  ?? 8;
-    const targetResp    = t.response_rate    ?? 75;
-    const targetSessions= t.monthly_sessions ?? 2000;
 
     // Trend Insights button
     const insBtn = document.createElement('button');
@@ -34,22 +30,14 @@ S.TrafficDashboard = {
       }
     }
 
-    // Start Here card
-    const targetsSet = ts._targets_saved || false;
+    // Setup pointer — a thin one-line nudge to the Hub Getting Started while
+    // targets are unset. Settings live on the Hub, never on the dashboard.
     let startHere = '';
-    if (!targetsSet) {
-      startHere = '<div class="card" style="margin-bottom:18px;border:1px solid rgba(201,168,76,0.35);">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Start Here</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Set Your Traffic Targets</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Numbers below are industry benchmarks. Adjust any target to match your operation. Click the info icon on each field to see what it means and when to change it.</div>'
-        + '<div class="form-row" style="gap:12px 16px;margin-bottom:18px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="tsh-gr" value="' + targetRating + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>New Reviews/Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rv" value="' + targetVel + '" step="1"/><span class="suf">/mo</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="tsh-rr" value="' + targetResp + '" step="1"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="tsh-ms" value="' + targetSessions + '" step="100"/><span class="suf">/mo</span></div></div>'
-        + '<div class="f" style="width:130px;min-width:120px;"><label>Social Posts/Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="tsh-sp" value="' + (t.social_posts_month??12) + '" step="1"/><span class="suf">posts</span></div></div>'
-        + '</div>'
-        + '<button class="btn btn-primary" id="tsh-save">Save and Continue</button>'
+    if (!ts._targets_saved) {
+      startHere = '<div class="card t-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(201,168,76,0.35);">'
+        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
+        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Traffic targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
         + '</div>';
     }
 
@@ -124,24 +112,7 @@ S.TrafficDashboard = {
       document.getElementById('t-alert')?.remove();
     });
 
-    document.getElementById('tsh-save')?.addEventListener('click', async () => {
-      const ts2 = App.data.traffic_settings || {};
-      ts2.targets = {
-        ...(ts2.targets || {}),
-        google_rating:       parseFloat(document.getElementById('tsh-gr')?.value) || 4.3,
-        review_velocity:     parseInt(document.getElementById('tsh-rv')?.value)   || 8,
-        response_rate:       parseFloat(document.getElementById('tsh-rr')?.value) || 75,
-        monthly_sessions:    parseInt(document.getElementById('tsh-ms')?.value)   || 2000,
-        social_posts_month:  parseInt(document.getElementById('tsh-sp')?.value)   || 12,
-      };
-      ts2._targets_saved = true;
-      const gs = App.data.getting_started_traffic || {};
-      gs['tgs_targets'] = new Date().toISOString();
-      App.data.getting_started_traffic = gs;
-      await App.saveKey('traffic_settings');
-      await App.saveKey('getting_started_traffic');
-      App.navigate('t-getting-started');
-    });
+    container.querySelector('.t-gs-pointer')?.addEventListener('click', () => App.navigate('t-getting-started'));
 
     document.getElementById('t-qa-week')?.addEventListener('click',    () => App.navigate('t-this-week'));
     document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
