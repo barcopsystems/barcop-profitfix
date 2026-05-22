@@ -910,6 +910,128 @@ S.HubSettings = {
     ];
 
     // ════════════════════════════════════════════════════════════════════
+    //  REVENUE RECOVERY — the Anchor's revenue side, all traced to
+    //  window.ANCHOR: twelve weekly records, the menu, server checks,
+    //  events, dog tests and the price-change log.
+    // ════════════════════════════════════════════════════════════════════
+    App.data.revenue_settings = App.data.revenue_settings || {};
+    App.data.revenue_settings.targets = { check_avg:35, bar_labor_pct:28, kitchen_labor_pct:30,
+      floor_labor_pct:32, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
+    App.data.revenue_settings.avg_hourly_wage = { bar:16, kitchen:15, floor:14 };
+    App.data.revenue_settings._targets_saved = true;
+
+    // Four servers carry the floor. Each week's covers split by these weights,
+    // with the top server running a higher check average than the bottom.
+    const rServers     = ['Jessica M.','Marcus T.','Brianna K.','Priya N.'];
+    const rSrvWeight   = [0.30, 0.26, 0.24, 0.20];
+    const rSrvCheckMul = [1.14, 1.04, 0.96, 0.86];
+
+    App.data.revenue_weeks = window.ANCHOR.weeks.map(a => {
+      const dep   = window.ANCHOR.laborDepts(a);
+      const hours = a.bar_labor/16 + dep.kitchen/15 + dep.floor/14;
+      const serverEntries = rServers.map((nm,i) => {
+        const cv = Math.round(a.covers * rSrvWeight[i]);
+        return { name:nm, covers:cv, sales:+(cv * a.check_avg * rSrvCheckMul[i]).toFixed(2) };
+      });
+      return {
+        id:uid(), week_num:a.wk, period_end:dateStr((12 - a.wk) * 7),
+        bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
+        total_labor_cost:a.bar_labor + a.food_labor, total_hours:+hours.toFixed(1),
+        labor_pct_blended:a.labor_pct_blended, rplh_blended:+(a.total_rev / hours).toFixed(2),
+        rplh_lunch:0, rplh_dinner:0, rplh_bar:0,
+        server_entries:serverEntries, notes:'', saved_at:new Date().toISOString()
+      };
+    });
+
+    // ── Menu — the Anchor's full card, costed for Menu Engineering ──
+    const rMenu = [
+      ['Loaded Nachos',     'Appetizers', 12, 3.60,  95],
+      ['Smoked Wings',      'Appetizers', 13, 4.20, 110],
+      ['Fried Pickles',     'Appetizers',  8, 1.80,  58],
+      ['Pretzel Bites',     'Appetizers',  9, 2.10,  40],
+      ['Anchor Burger',     'Entrees',    16, 4.80, 140],
+      ['Brisket Sandwich',  'Entrees',    15, 5.20,  88],
+      ['Fish and Chips',    'Entrees',    17, 5.60,  52],
+      ['Chicken Caesar',    'Entrees',    14, 3.90,  70],
+      ['Steak Frites',      'Entrees',    26, 9.10,  38],
+      ['Veggie Grain Bowl', 'Entrees',    13, 3.20,  30],
+      ['Old Fashioned',     'Cocktails',  12, 2.40, 130],
+      ['House Margarita',   'Cocktails',  11, 2.10, 145],
+      ['Espresso Martini',  'Cocktails',  13, 2.90,  78],
+      ['Paloma',            'Cocktails',  11, 2.20,  62],
+      ['Austin IPA Draft',  'Beer',        6, 1.30, 320],
+      ['Modelo Especial',   'Beer',        5, 1.35, 180],
+      ['Bud Light',         'Beer',        4, 1.10, 150],
+      ['House Red Blend',   'Wine',        9, 2.20,  64],
+      ['Sauvignon Blanc',   'Wine',        9, 2.30,  70],
+      ['Skillet Cookie',    'Desserts',    8, 1.90,  48],
+      ['Key Lime Pie',      'Desserts',    7, 1.70,  30],
+    ].map(m => ({ id:uid(), name:m[0], category:m[1], price:m[2], cost:m[3], weekly_covers:m[4], notes:'' }));
+    App.data.revenue_menu_items = rMenu;
+    const rItem = nm => rMenu.find(x => x.name === nm);
+
+    // ── Price-change log ──
+    const rPrice = (nm, oldP, newP, daysBack, reason, volPct) => {
+      const it = rItem(nm);
+      return { id:uid(), date:dateStr(daysBack), item_id:it.id, item_name:it.name,
+        old_price:oldP, new_price:newP, cost:it.cost, reason:reason,
+        margin_impact:+(newP - oldP).toFixed(2), covers_at_change:it.weekly_covers,
+        predicted_vol_pct:volPct,
+        predicted_weekly_impact:+((newP - oldP) * it.weekly_covers * (1 + volPct/100)).toFixed(2),
+        saved_at:daysAgoISO(daysBack) };
+    };
+    App.data.revenue_price_log = [
+      rPrice('Anchor Burger', 15.00, 16.00, 40, 'Beef cost rose on the Sysco invoice.', -4),
+      rPrice('Old Fashioned', 11.00, 12.00, 26, 'Brought well bourbon pricing in line with the call list.', -2),
+      rPrice('Fish and Chips', 16.00, 17.00, 12, 'Cod cost up; repriced to hold the plate margin.', -5),
+    ];
+
+    // ── Dog tests ──
+    App.data.menu_dog_tests = [
+      { id:uid(), item_name:'Veggie Grain Bowl', start_date:dateStr(40), baseline_volume:28,
+        change_notes:'Rewrote the menu description and moved it up under Entrees.',
+        current_volume:41, status:'Kept', decided_at:daysAgoISO(12) },
+      { id:uid(), item_name:'Key Lime Pie', start_date:dateStr(34), baseline_volume:30,
+        change_notes:'Added a dessert mention to the server close-out script.',
+        current_volume:33, status:'Testing', decided_at:null },
+      { id:uid(), item_name:'Pretzel Bites', start_date:dateStr(78), baseline_volume:38,
+        change_notes:'Ran it as a featured app for two weeks to see if volume held.',
+        current_volume:19, status:'Removed', decided_at:daysAgoISO(58) },
+    ];
+
+    // ── Server checks — standalone per-server log ──
+    const rSC = [];
+    [7, 9, 12, 14, 16, 19, 21].forEach((d, i) => {
+      rServers.forEach((nm, j) => {
+        const cv = 18 + Math.round(Math.random() * 14);
+        rSC.push({ id:uid(), date:dateStr(d), shift:['Dinner','Lunch','Bar'][i % 3],
+          server_name:nm, covers:cv,
+          sales:+(cv * (31 + j * 1.5 + Math.random() * 7)).toFixed(2),
+          saved_at:daysAgoISO(d) });
+      });
+    });
+    App.data.revenue_server_checks = rSC;
+
+    // ── Events and catering pipeline ──
+    App.data.revenue_events = [
+      { id:uid(), event_name:'Reyes Rehearsal Dinner', event_type:'Private Dining', status:'Completed',
+        date:dateStr(38), covers:34, fb_minimum:2200, actual_revenue:2840, estimated_revenue:2500,
+        notes:'', saved_at:daysAgoISO(40) },
+      { id:uid(), event_name:'Downtown Tech Mixer', event_type:'Corporate', status:'Completed',
+        date:dateStr(17), covers:60, fb_minimum:3000, actual_revenue:3620, estimated_revenue:3400,
+        notes:'', saved_at:daysAgoISO(19) },
+      { id:uid(), event_name:'Hargrove 40th Birthday', event_type:'Social', status:'Confirmed',
+        date:dateStr(-9), covers:28, fb_minimum:1800, actual_revenue:0, estimated_revenue:2100,
+        notes:'', saved_at:daysAgoISO(6) },
+      { id:uid(), event_name:'Keller Group Saturday Buyout', event_type:'Buyout', status:'Proposal Sent',
+        date:dateStr(-21), covers:90, fb_minimum:6000, actual_revenue:0, estimated_revenue:6800,
+        notes:'', saved_at:daysAgoISO(3) },
+      { id:uid(), event_name:'Westlake Realty Lunch Catering', event_type:'Catering', status:'Inquiry',
+        date:dateStr(-32), covers:45, fb_minimum:0, actual_revenue:0, estimated_revenue:1500,
+        notes:'', saved_at:daysAgoISO(1) },
+    ];
+
+    // ════════════════════════════════════════════════════════════════════
     //  INVENTORY CONTROL — The Anchor's stockroom. The last two counts feed
     //  the Profit This Week COGS, so the Capture-to-Diagnose chain computes.
     // ════════════════════════════════════════════════════════════════════
@@ -1202,13 +1324,19 @@ S.HubSettings = {
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
     // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
     // and 5, which is where both cost trends break downward.
-    App.data.fix_log = (App.data.fix_log || []).filter(e => e.module !== 'profit').concat([
+    App.data.fix_log = (App.data.fix_log || [])
+      .filter(e => e.module !== 'profit' && e.module !== 'revenue')
+      .concat([
       { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
         date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
         date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft & Loss',
+      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',
         date:dateStr(24), logged_at:daysAgoISO(24) },
+      { id:uid(), module:'revenue', gap_id:'check-average', gap_name:'Check Average and Upsell',
+        date:dateStr(45), logged_at:daysAgoISO(45) },
+      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling',
+        date:dateStr(38), logged_at:daysAgoISO(38) },
     ]);
 
     // ── Variance Investigations ──
@@ -1310,10 +1438,87 @@ S.HubSettings = {
       lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo);
     });
     App.laborData.lc_actuals   = lcActuals;
-    App.laborData.lc_schedules = [];
-    App.laborData.lc_tips      = [];
-    App.laborData.lc_tip_pools = [];
-    App.laborData.lc_callouts  = [];
+
+    // ── Schedules — the two most recent weeks, built from the roster ──
+    const SCHED_PLAN = {
+      'Bartender': { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'23:00', hours:7 },
+      'Barback':   { days:['Thu','Fri','Sat','Sun'],       start:'18:00', end:'23:00', hours:5 },
+      'Line Cook': { days:['Tue','Wed','Thu','Fri','Sat'], start:'15:00', end:'22:00', hours:7 },
+      'Prep Cook': { days:['Mon','Tue','Wed','Thu'],       start:'09:00', end:'15:00', hours:6 },
+      'Server':    { days:['Wed','Thu','Fri','Sat','Sun'], start:'17:00', end:'22:00', hours:5 },
+      'Host':      { days:['Thu','Fri','Sat','Sun'],       start:'18:00', end:'22:00', hours:4 },
+      'Manager':   { days:['Tue','Wed','Thu','Fri','Sat'], start:'14:00', end:'22:00', hours:8 },
+    };
+    const posNameOf = id => (lcPositions.find(p => p.id === id) || {}).name;
+    const mondayISO = (daysBack) => {
+      const d = new Date(today); d.setDate(d.getDate() - daysBack);
+      const day = d.getDay();
+      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+      return d.toISOString().slice(0, 10);
+    };
+    const buildSchedule = (weekStart, forecast) => {
+      const shifts = [];
+      lcStaff.forEach(st => {
+        const plan = SCHED_PLAN[posNameOf(st.position_id)];
+        if (!plan) return;
+        plan.days.forEach(day => {
+          shifts.push({ staff_id:st.id, name:st.name, position_id:st.position_id, day:day,
+            start:plan.start, end:plan.end, hours:plan.hours, wage:st.wage,
+            cost:+(plan.hours * st.wage).toFixed(2) });
+        });
+      });
+      const total_hours = shifts.reduce((s, x) => s + x.hours, 0);
+      const total_cost  = +shifts.reduce((s, x) => s + x.cost, 0).toFixed(2);
+      return { id:uid(), week_start:weekStart, revenue_forecast:forecast, shifts:shifts,
+        total_hours:total_hours, total_cost:total_cost,
+        labor_pct:+(total_cost / forecast * 100).toFixed(2),
+        rplh:+(forecast / total_hours).toFixed(2),
+        notes:'', status:'Posted', created_at:new Date().toISOString() };
+    };
+    App.laborData.lc_schedules = [
+      buildSchedule(mondayISO(7), 18812),
+      buildSchedule(mondayISO(0), 19150),
+    ];
+
+    // ── Tips — recent shifts for every tipped staff member ──
+    const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server'].includes(posNameOf(st.position_id)));
+    const lcTips = [];
+    [3, 5, 8, 10, 12].forEach(d => {
+      lcTipped.forEach(st => {
+        const role = posNameOf(st.position_id);
+        const base = role === 'Bartender' ? 135 : role === 'Server' ? 100 : 55;
+        const cash = Math.round(base * (0.30 + Math.random() * 0.22));
+        const card = Math.round(base * (0.92 + Math.random() * 0.40));
+        lcTips.push({ id:uid(), date:dateStr(d), staff_id:st.id, name:st.name,
+          position_id:st.position_id, shift_type:'Dinner',
+          cash_tips:cash, card_tips:card, total_tips:cash + card,
+          hours:role === 'Server' ? 5 : 7, notes:'', created_at:daysAgoISO(d) });
+      });
+    });
+    App.laborData.lc_tips = lcTips;
+
+    // ── Tip pools — three recent close-outs, split by hours ──
+    const mkPool = (d, amount) => {
+      const parts = lcTipped.map(st => ({ staff_id:st.id, name:st.name,
+        hours:posNameOf(st.position_id) === 'Server' ? 5 : 7 }));
+      const totH = parts.reduce((s, p) => s + p.hours, 0);
+      parts.forEach(p => p.share = +(amount * p.hours / totH).toFixed(2));
+      return { id:uid(), date:dateStr(d), method:'hours', pool_amount:amount,
+        total_hours:totH, participants:parts, created_at:daysAgoISO(d) };
+    };
+    App.laborData.lc_tip_pools = [ mkPool(4, 980), mkPool(11, 1120), mkPool(18, 1040) ];
+
+    // ── Call-out log ──
+    const lcCO = (st, d, type, covered, by) => ({ id:uid(), date:dateStr(d), staff_id:st.id,
+      name:st.name, type:type, shift_type:'Dinner', covered:covered, covered_by:by,
+      reason:'', notes:'', created_at:daysAgoISO(d) });
+    App.laborData.lc_callouts = [
+      lcCO(lcStaff[1],  6,  'Called Out Sick', true,  'Maria G.'),
+      lcCO(lcStaff[9],  13, 'No-Show',         true,  'Jessica M.'),
+      lcCO(lcStaff[3],  22, 'Late Arrival',    false, ''),
+      lcCO(lcStaff[10], 31, 'Called Out Sick', true,  'Priya N.'),
+      lcCO(lcStaff[2],  44, 'Left Early',      true,  'Jake T.'),
+    ];
 
     // ── Save everything — App.data plus all three Control stores ──
     await App.save();
