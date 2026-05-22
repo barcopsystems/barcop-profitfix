@@ -15,18 +15,13 @@ S.RevenueDashboard = {
     const weeks  = App.data.revenue_weeks || [];
     const validWeeks = weeks.filter(w => (w.bar_revenue||0) + (w.floor_revenue||0) > 0);
     const latest = validWeeks.length ? validWeeks[validWeeks.length - 1] : null;
-    const prior4 = validWeeks.slice(-5, -1);
-    const avg4   = fn => { const v = prior4.map(fn).filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
 
     const checkAvg   = latest?.check_avg ?? null;
     const laborPct   = latest?.labor_pct_blended ?? null;
-    const rplh       = latest?.rplh_blended ?? null;
     const totalRev   = latest ? (latest.bar_revenue||0) + (latest.floor_revenue||0) : null;
     const covers     = latest?.covers ?? null;
     const targetCA   = t.check_avg ?? 35;
     const targetLP   = ((t.bar_labor_pct||28) + (t.kitchen_labor_pct||30) + (t.floor_labor_pct||32)) / 3;
-    const targetRPLH = ((t.rplh_lunch||50) + (t.rplh_dinner||75) + (t.rplh_bar||65)) / 3;
-    const weeklyGap  = checkAvg != null && covers != null ? (checkAvg - targetCA) * covers : null;
 
     // Alert
     let alertHtml = '';
@@ -62,72 +57,44 @@ S.RevenueDashboard = {
         + '</div>';
     }
 
-    // Metric cards
-    const trendHtml = (cur, avg, lowerBetter=false) => {
-      if (avg==null||cur==null) return '<div class="metric-trend"> </div>';
-      const diff = cur - avg;
-      if (Math.abs(diff) < 0.15) return '<div class="metric-trend">→ flat</div>';
-      const improving = lowerBetter ? diff < 0 : diff > 0;
-      return '<div class="metric-trend ' + (improving?'trend-up':'trend-dn') + '">' + (diff>0?'↑':'↓') + ' vs 4wk avg</div>';
-    };
+    // Priority Action Items — ranked by dollar impact from the latest Revenue audit
+    const rAudits = App.data.revenue_audits || [];
+    const latestAudit = rAudits.length ? rAudits[rAudits.length-1] : null;
+    const actionItems = (latestAudit?.action_items || [])
+      .filter(it => it && it.action)
+      .slice()
+      .sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0))
+      .slice(0,5);
 
-    const metCard = (label, val, target, impact, trendEl, cls) => {
-      const impHtml = impact != null
-        ? '<div class="metric-impact ' + (impact > 0 ? 'neg' : 'pos') + '">' + (impact > 0 ? '+' : '') + App.fmtCurrency(impact) + ' vs target</div>'
-        : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
-      const valHtml = val != null
-        ? '<div class="metric-val ' + cls + '">' + val + '</div>'
-        : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>';
-      return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
-        + valHtml
-        + '<div class="metric-target">Target: ' + target + '</div>'
-        + impHtml + trendEl + '</div>';
-    };
-
-    const caCls   = checkAvg==null?'':checkAvg>=targetCA?'on-target':'over-target';
-    const labCls  = laborPct==null?'':laborPct>targetLP?'over-target':'on-target';
-    const rplhCls = rplh==null?'':rplh>=targetRPLH?'on-target':'over-target';
-    const gapCls  = weeklyGap==null?'':weeklyGap>=0?'on-target':'over-target';
-
-    const caImpact   = checkAvg!=null&&covers!=null ? (checkAvg-targetCA)*covers : null;
-    const labImpact  = laborPct!=null&&totalRev!=null ? ((laborPct-targetLP)/100)*totalRev : null;
-    const rplhImpact = rplh!=null&&latest?.total_hours ? (rplh-targetRPLH)*latest.total_hours : null;
-
-    // Summary table
-    const prev = weeks.length > 1 ? weeks[weeks.length-2] : null;
-    let summaryHtml = '';
-    if (latest) {
-      const row = (label, tw, lw, av) => '<tr><td>' + label + '</td><td class="val">' + (tw||' ') + '</td><td>' + (lw||' ') + '</td><td>' + (av||' ') + '</td></tr>';
-      const f = App.fmtCurrency, p = App.fmtPct;
-      const a4 = fn => avg4(fn);
-      summaryHtml = '<div class="tbl-wrap" style="margin-bottom:18px;"><table class="sum-tbl">'
-        + '<thead><tr><th></th><th>This Week</th><th>Last Week</th><th>4-Week Avg</th></tr></thead><tbody>'
-        + row('Bar Revenue',      f(latest.bar_revenue),    prev?f(prev.bar_revenue):' ',    a4(w=>w.bar_revenue)?f(a4(w=>w.bar_revenue)):' ')
-        + row('Floor Revenue',    f(latest.floor_revenue),  prev?f(prev.floor_revenue):' ',  a4(w=>w.floor_revenue)?f(a4(w=>w.floor_revenue)):' ')
-        + row('Covers',           latest.covers,            prev?.covers??' ',               a4(w=>w.covers)?Math.round(a4(w=>w.covers)):' ')
-        + row('Check Average',    checkAvg?f(checkAvg):' ', prev?.check_avg?f(prev.check_avg):' ', a4(w=>w.check_avg)?f(a4(w=>w.check_avg)):' ')
-        + row('Labor Cost',       f(latest.total_labor_cost), prev?f(prev.total_labor_cost):' ', a4(w=>w.total_labor_cost)?f(a4(w=>w.total_labor_cost)):' ')
-        + row('Labor %',          laborPct?p(laborPct):' ', prev?.labor_pct_blended?p(prev.labor_pct_blended):' ', a4(w=>w.labor_pct_blended)?p(a4(w=>w.labor_pct_blended)):' ')
-        + row('RPLH',             rplh?f(rplh):' ',         prev?.rplh_blended?f(prev.rplh_blended):' ', a4(w=>w.rplh_blended)?f(a4(w=>w.rplh_blended)):' ')
-        + '</tbody></table></div>';
+    let actionHtml = '<div class="sh">Priority Action Items</div>';
+    if (actionItems.length) {
+      actionHtml += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+        + actionItems.map((it,i) =>
+            '<div class="r-db-action" data-screen="r-audit" '
+            + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+            + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+            + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
+            + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</div>'
+            + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.5;">'+esc(it.action)+'</div>'
+            + (it.monthly_impact > 0
+                ? '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;color:var(--gold);">'
+                  + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
+                : '')
+            + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+            + '</div>').join('')
+        + '</div>';
     } else {
-      summaryHtml = '<div class="card"><div class="empty"><div class="empty-title">No weeks saved yet</div><div class="empty-sub">Enter your first week to see your numbers here.</div></div></div>';
+      actionHtml += '<div class="card" style="margin-bottom:18px;"><div style="font-size:12px;color:var(--t3);line-height:1.65;">'
+        + 'Run a Revenue Audit and your highest-impact opportunities will be ranked here by dollar impact.</div></div>';
     }
 
     container.innerHTML = '<div class="screen">'
       + startHere
       + alertHtml
-      + '<div class="metric-grid">'
-      + metCard('Check Average',    checkAvg!=null?App.fmtCurrency(checkAvg):null, App.fmtCurrency(targetCA), caImpact,   trendHtml(checkAvg,avg4(w=>w.check_avg)), caCls)
-      + metCard('Labor Cost %',     laborPct!=null?App.fmtPct(laborPct):null,       App.fmtPct(targetLP),     labImpact,  trendHtml(laborPct,avg4(w=>w.labor_pct_blended),true), labCls)
-      + metCard('RPLH',             rplh!=null?App.fmtCurrency(rplh):null,          App.fmtCurrency(targetRPLH), rplhImpact, trendHtml(rplh,avg4(w=>w.rplh_blended)), rplhCls)
-      + metCard('Weekly Revenue Gap', weeklyGap!=null?App.fmtCurrency(Math.abs(weeklyGap)):null, '$0', weeklyGap!=null ? -weeklyGap : null, trendHtml(weeklyGap,avg4(w=>w.check_avg!=null&&w.covers?((w.check_avg-(t.check_avg||35))*w.covers):null)), gapCls)
-      + '</div>'
-      + this.buildChart(validWeeks.slice(-8), t)
-      + '<div class="sh">This Week Summary</div>'
-      + summaryHtml
-      + FixPanel.recoveryCard('revenue')
       + FixPanel.fixAreasCard('revenue')
+      + this.buildChart(validWeeks.slice(-8), t)
+      + actionHtml
+      + FixPanel.recoveryCard('revenue')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="r-qa-week">Enter This Week</button>'
@@ -140,6 +107,9 @@ S.RevenueDashboard = {
     document.getElementById('r-qa-week')?.addEventListener('click', () => App.navigate('r-this-week'));
     document.getElementById('r-qa-server')?.addEventListener('click', () => App.navigate('r-audit'));
     document.getElementById('r-qa-reports')?.addEventListener('click', () => App.navigate('r-reports'));
+    container.querySelectorAll('.r-db-action').forEach(row => {
+      row.addEventListener('click', () => App.navigate(row.dataset.screen));
+    });
     FixPanel.wireFixAreas(container);
 
     document.getElementById('rsh-save')?.addEventListener('click', async () => {
