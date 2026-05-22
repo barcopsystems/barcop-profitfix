@@ -19,6 +19,9 @@ S.HubSettings = {
       document.body.appendChild(wrap);
     }
     wrap.style.display = 'block';
+    // The Hub leaves hub-wrapper at overflowY:hidden (fixed-viewport dashboard).
+    // This view scrolls, so restore it whenever the wrapper is reused.
+    wrap.style.overflowY = 'auto';
     this.render(wrap);
   },
 
