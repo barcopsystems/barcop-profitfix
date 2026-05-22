@@ -633,6 +633,7 @@ const App = {
         'lc-tip-log': S.LaborTipLog,
         'lc-tip-pool': S.LaborTipPool,
         'lc-tip-history': S.LaborTipHistory,
+        'lc-overtime-watch': S.LaborOvertimeWatch,
       };
       const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = lcTitle;
