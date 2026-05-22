@@ -632,6 +632,7 @@ const App = {
         'lc-weekly-summary': S.LaborWeeklySummary,
         'lc-tip-log': S.LaborTipLog,
         'lc-tip-pool': S.LaborTipPool,
+        'lc-tip-history': S.LaborTipHistory,
       };
       const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = lcTitle;
