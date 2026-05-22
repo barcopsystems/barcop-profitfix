@@ -1,8 +1,13 @@
 'use strict';
 S.Settings = {
   render(container, actions) {
-    const s = App.data.settings;
-    const t = s.targets || {};
+    const s  = App.data.settings || {};
+    const t  = s.targets || {};
+    const rs = App.data.revenue_settings || {};
+    const rt = rs.targets || {};
+    const wg = rs.avg_hourly_wage || { bar:15, kitchen:14, floor:13 };
+    const ts = App.data.traffic_settings || {};
+    const tg = ts.targets || {};
 
     // Save button only shown on Settings tab
     const saveBtn = document.createElement('button');
@@ -19,13 +24,15 @@ S.Settings = {
       + '</div>'
       // ── General tab ──
       + '<div id="s-tab-general">'
-      + '<div class="settings-section"><div class="settings-title">Your Bar</div>'
+      + '<div class="settings-section"><div class="settings-title">Operation Profile</div>'
       + '<div class="card"><div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="s-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
       + '<div class="f" style="width:160px;"><label>City</label><input type="text" id="s-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin" /></div>'
       + '<div class="f" style="width:140px;"><label>State / Province</label><input type="text" id="s-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX" /></div>'
+      + '<div class="f" style="width:170px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-abr" value="' + (s.annual_bar_revenue || 0) + '" /></div></div>'
+      + '<div class="f" style="width:170px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-afr" value="' + (s.annual_food_revenue || 0) + '" /></div></div>'
       + '</div></div></div>'
-      + '<div class="settings-section"><div class="settings-title">Cost Targets</div>'
+      + '<div class="settings-section"><div class="settings-title">Profit Targets</div>'
       + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
       + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="s-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1" /><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="s-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1" /><span class="suf">%</span></div></div>'
@@ -33,6 +40,31 @@ S.Settings = {
       + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1" /><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="s-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1" /><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Cash Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-ct" value="' + (s.cash_tolerance ?? 10) + '" /></div></div>'
+      + '</div></div></div>'
+      + '<div class="settings-section"><div class="settings-title">Revenue Targets</div>'
+      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
+      + '<div class="f" style="width:130px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5" /></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('r-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-r-bl" value="' + (rt.bar_labor_pct ?? 28) + '" step="0.1" /><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Kitchen Labor % ' + tt('r-kitchen-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-r-kl" value="' + (rt.kitchen_labor_pct ?? 30) + '" step="0.1" /><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Floor Labor % ' + tt('r-floor-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-r-fl" value="' + (rt.floor_labor_pct ?? 32) + '" step="0.1" /><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-rl" value="' + (rt.rplh_lunch ?? 50) + '" /></div></div>'
+      + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-rd" value="' + (rt.rplh_dinner ?? 75) + '" /></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-rb" value="' + (rt.rplh_bar ?? 65) + '" /></div></div>'
+      + '<div class="f" style="width:130px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="s-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1" /><span class="suf">%</span></div></div>'
+      + '</div></div></div>'
+      + '<div class="settings-section"><div class="settings-title">Traffic Targets</div>'
+      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
+      + '<div class="f" style="width:130px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="s-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5" /><span class="suf">&#9733;</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>New Reviews / Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="s-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1" /><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="s-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1" /><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="s-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100" /><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="s-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1" /><span class="suf">posts</span></div></div>'
+      + '</div></div></div>'
+      + '<div class="settings-section"><div class="settings-title">Team and Wages</div>'
+      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
+      + '<div class="f" style="width:150px;"><label>Bar Staff Wage ' + tt('r-wage-bar') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-w-bar" value="' + (wg.bar ?? 15) + '" step="0.25" /></div></div>'
+      + '<div class="f" style="width:150px;"><label>Kitchen Staff Wage ' + tt('r-wage-kitchen') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-w-kit" value="' + (wg.kitchen ?? 14) + '" step="0.25" /></div></div>'
+      + '<div class="f" style="width:150px;"><label>Floor Staff Wage ' + tt('r-wage-floor') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-w-floor" value="' + (wg.floor ?? 13) + '" step="0.25" /></div></div>'
       + '</div></div></div>'
       + '<div class="settings-section"><div class="settings-title">Account</div>'
       + '<div class="card">'
@@ -217,20 +249,61 @@ S.Settings = {
   },
 
   save() {
+    const numOr = (id, d) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? d : v; };
+
+    // Operation profile + Profit targets — App.data.settings
     const s = App.data.settings;
     const city  = document.getElementById('s-city')?.value.trim() || '';
     const state = document.getElementById('s-state')?.value.trim() || '';
-    s.bar_name            = document.getElementById('s-name')?.value.trim();
-    s.city_state          = city && state ? city + ', ' + state : city || state || '';
+    s.bar_name             = document.getElementById('s-name')?.value.trim();
+    s.city_state           = city && state ? city + ', ' + state : city || state || '';
+    s.annual_bar_revenue   = numOr('s-abr', 0);
+    s.annual_food_revenue  = numOr('s-afr', 0);
     s.targets = {
-      bar_pour_cost_pct:  parseFloat(document.getElementById('s-bpc')?.value)  || 22,
-      food_cost_pct:      parseFloat(document.getElementById('s-fc')?.value)   || 32,
-      bar_labor_cost_pct: parseFloat(document.getElementById('s-bl')?.value)   || 28,
-      food_labor_cost_pct:parseFloat(document.getElementById('s-fl')?.value)   || 30,
-      prime_cost_pct:     parseFloat(document.getElementById('s-pc')?.value)   || 60
+      bar_pour_cost_pct:  numOr('s-bpc', 22),
+      food_cost_pct:      numOr('s-fc', 32),
+      bar_labor_cost_pct: numOr('s-bl', 28),
+      food_labor_cost_pct:numOr('s-fl', 30),
+      prime_cost_pct:     numOr('s-pc', 60)
     };
-    s.cash_tolerance = parseFloat(document.getElementById('s-ct')?.value) || 10;
-    App.saveKey('settings').then(() => {
+    s.cash_tolerance = numOr('s-ct', 10);
+    s._targets_saved = true;
+
+    // Revenue targets + team wages — App.data.revenue_settings
+    const rs = App.data.revenue_settings = App.data.revenue_settings || {};
+    rs.targets = Object.assign({}, rs.targets, {
+      check_avg:         numOr('s-r-ca', 35),
+      bar_labor_pct:     numOr('s-r-bl', 28),
+      kitchen_labor_pct: numOr('s-r-kl', 30),
+      floor_labor_pct:   numOr('s-r-fl', 32),
+      rplh_lunch:        numOr('s-r-rl', 50),
+      rplh_dinner:       numOr('s-r-rd', 75),
+      rplh_bar:          numOr('s-r-rb', 65),
+      event_close_rate:  numOr('s-r-ec', 40)
+    });
+    rs.avg_hourly_wage = {
+      bar:     numOr('s-w-bar', 15),
+      kitchen: numOr('s-w-kit', 14),
+      floor:   numOr('s-w-floor', 13)
+    };
+    rs._targets_saved = true;
+
+    // Traffic targets — App.data.traffic_settings
+    const ts = App.data.traffic_settings = App.data.traffic_settings || {};
+    ts.targets = Object.assign({}, ts.targets, {
+      google_rating:      numOr('s-t-gr', 4.3),
+      review_velocity:    numOr('s-t-rv', 8),
+      response_rate:      numOr('s-t-rr', 75),
+      monthly_sessions:   numOr('s-t-ms', 2000),
+      social_posts_month: numOr('s-t-sp', 12)
+    });
+    ts._targets_saved = true;
+
+    Promise.all([
+      App.saveKey('settings'),
+      App.saveKey('revenue_settings'),
+      App.saveKey('traffic_settings')
+    ]).then(() => {
       const m = document.getElementById('s-msg');
       if (m) { m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500); }
       App.updatePeriod();
