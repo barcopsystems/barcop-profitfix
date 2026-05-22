@@ -540,80 +540,8 @@ S.HubSettings = {
     ].map(p => ({ ...p, created_at: new Date().toISOString() }));
     App.data.kitchen_products = kp;
 
-    // ── Recipes ──
-    const titoId = bp[0].id, tequilaId = bp[1].id, ginId = bp[2].id, rumId = bp[4].id;
-    const limeId = kp[3].id, tripleSec = kp[4].id, simpleSyrup = kp[5].id;
-    const chickenId = kp[0].id, burgerPattyId = kp[6].id, cheeseId = kp[7].id, nachipsId = kp[8].id, quesoId = kp[9].id;
-
-    const recipes = [
-      {
-        id:uid(), name:'House Margarita', mode:'single', category:'Cocktail',
-        menu_price:10, target_cost_pct:20,
-        ingredients:[
-          { product_id:tequilaId, quantity:1,    cost_per_unit:bp[1].cost_per_pour,      total_cost:bp[1].cost_per_pour },
-          { product_id:tripleSec, quantity:0.5,  cost_per_unit:kp[4].cost_per_unit/4,    total_cost:kp[4].cost_per_unit/4*0.5 },
-          { product_id:limeId,    quantity:0.25, cost_per_unit:kp[3].cost_per_unit/4,    total_cost:kp[3].cost_per_unit/4*0.25 },
-        ],
-      },
-      {
-        id:uid(), name:'Vodka Soda', mode:'single', category:'Cocktail',
-        menu_price:9, target_cost_pct:20,
-        ingredients:[
-          { product_id:titoId, quantity:1, cost_per_unit:bp[0].cost_per_pour, total_cost:bp[0].cost_per_pour },
-        ],
-      },
-      {
-        id:uid(), name:'Classic Mojito', mode:'single', category:'Cocktail',
-        menu_price:11, target_cost_pct:20,
-        ingredients:[
-          { product_id:rumId,        quantity:1,   cost_per_unit:bp[4].cost_per_pour, total_cost:bp[4].cost_per_pour },
-          { product_id:limeId,       quantity:0.5, cost_per_unit:kp[3].cost_per_unit, total_cost:kp[3].cost_per_unit*0.5 },
-          { product_id:simpleSyrup,  quantity:0.5, cost_per_unit:kp[5].cost_per_unit, total_cost:kp[5].cost_per_unit*0.5 },
-        ],
-      },
-      {
-        id:uid(), name:'Frozen Margarita Batch', mode:'batch', category:'Cocktail',
-        menu_price:10, target_cost_pct:20,
-        batch_yield:1, batch_yield_unit:'gallons', serving_size:5, serving_size_unit:'oz',
-        servings_per_batch:25.6,
-        ingredients:[
-          { product_id:tequilaId, quantity:2,   cost_per_unit:bp[1].cost_per_unit, total_cost:bp[1].cost_per_unit*2 },
-          { product_id:tripleSec, quantity:1,   cost_per_unit:kp[4].cost_per_unit, total_cost:kp[4].cost_per_unit },
-          { product_id:limeId,    quantity:2,   cost_per_unit:kp[3].cost_per_unit, total_cost:kp[3].cost_per_unit*2 },
-          { product_id:simpleSyrup,quantity:1,  cost_per_unit:kp[5].cost_per_unit, total_cost:kp[5].cost_per_unit },
-        ],
-      },
-      {
-        id:uid(), name:'Grilled Chicken Plate', mode:'food', category:'Food Plate',
-        menu_price:14, target_cost_pct:32, plate_yield:1,
-        ingredients:[
-          { product_id:chickenId, quantity:0.5, cost_per_unit:kp[0].cost_per_unit, total_cost:kp[0].cost_per_unit*0.5 },
-        ],
-      },
-      {
-        id:uid(), name:'Smash Burger', mode:'food', category:'Food Plate',
-        menu_price:13, target_cost_pct:32, plate_yield:1,
-        ingredients:[
-          { product_id:burgerPattyId, quantity:2,   cost_per_unit:kp[6].cost_per_unit, total_cost:kp[6].cost_per_unit*2 },
-          { product_id:cheeseId,      quantity:0.25, cost_per_unit:kp[7].cost_per_unit, total_cost:kp[7].cost_per_unit*0.25 },
-        ],
-      },
-      {
-        id:uid(), name:'Bar Nachos', mode:'food', category:'Food Plate',
-        menu_price:12, target_cost_pct:32, plate_yield:1,
-        ingredients:[
-          { product_id:nachipsId, quantity:1,   cost_per_unit:kp[8].cost_per_unit, total_cost:kp[8].cost_per_unit },
-          { product_id:quesoId,   quantity:0.5, cost_per_unit:kp[9].cost_per_unit, total_cost:kp[9].cost_per_unit*0.5 },
-        ],
-      },
-    ].map(r => {
-      const tc  = r.ingredients.reduce((s,i) => s + i.total_cost, 0);
-      const spb = r.servings_per_batch || r.plate_yield || 1;
-      const cps = tc / spb;
-      const pct = r.menu_price ? cps / r.menu_price * 100 : null;
-      return { ...r, total_cost:tc, cost_per_serving:cps, cost_pct:pct, flagged:pct!=null?pct>r.target_cost_pct:false, updated_at:new Date().toISOString(), created_at:new Date().toISOString() };
-    });
-    App.data.recipes = recipes;
+    // Recipes are built further down, once ic_products exists — see
+    // "── Recipes" after the Inventory Control block.
 
     // ── 12 Weeks of Data — derived from the locked Anchor profile ──
     // Every figure traces to window.ANCHOR so Profit, Revenue and the Control
@@ -1013,6 +941,9 @@ S.HubSettings = {
       { name:'Flour Tortilla (case)',    category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:16.00, par_level:20,  reorder_point:8,   primary_location:'Kitchen Line' },
       { name:'Fryer Oil (jug)',          category:'Misc',        vendor:'Restaurant Depot',                                              unit_cost:28.00, par_level:10,  reorder_point:4,   primary_location:'Kitchen Line' },
       { name:'To-Go Boxes (case)',       category:'Misc',        vendor:'Restaurant Depot',                                              unit_cost:42.00, par_level:8,   reorder_point:3,   primary_location:'Kitchen Line' },
+      { name:'Triple Sec',               category:'Misc',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.75, unit_cost:9.00,  par_level:12,  reorder_point:5,   primary_location:'Back Bar' },
+      { name:'Lime Juice (qt)',          category:'Misc',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Simple Syrup (qt)',        category:'Misc',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
       const cpp   = pours ? p.unit_cost / pours : null;
@@ -1023,6 +954,44 @@ S.HubSettings = {
         ...p };
     });
     App.inventoryData.ic_products = icProducts;
+
+    // ── Recipes — costed against the ic_products master ─────────────────────
+    // Each ingredient's product_id is an ic_products id; cost_per_unit and
+    // total_cost are derived from that product so Recipe Library recomputes
+    // the same figures live.
+    const recipes = [
+      { id:uid(), name:'Vodka Soda', mode:'single', category:'Cocktail', menu_price:9, target_cost_pct:20,
+        ingredients:[ {product_id:icProducts[0].id, quantity:1} ] },
+      { id:uid(), name:'House Cabernet', mode:'single', category:'Wine', menu_price:10, target_cost_pct:25,
+        ingredients:[ {product_id:icProducts[4].id, quantity:1} ] },
+      { id:uid(), name:'Bourbon, Neat', mode:'single', category:'Cocktail', menu_price:12, target_cost_pct:20,
+        ingredients:[ {product_id:icProducts[2].id, quantity:1} ] },
+      { id:uid(), name:'Gin Martini', mode:'single', category:'Cocktail', menu_price:13, target_cost_pct:20,
+        ingredients:[ {product_id:icProducts[3].id, quantity:1.7} ] },
+      { id:uid(), name:'Frozen Margarita Batch', mode:'batch', category:'Cocktail', menu_price:10, target_cost_pct:20,
+        batch_yield:1, batch_yield_unit:'gallons', serving_size:5, serving_size_unit:'oz', servings_per_batch:25.6,
+        ingredients:[ {product_id:icProducts[1].id, quantity:2}, {product_id:icProducts[16].id, quantity:1}, {product_id:icProducts[17].id, quantity:2}, {product_id:icProducts[18].id, quantity:1} ] },
+      { id:uid(), name:'Smash Burger', mode:'food', category:'Food Plate', menu_price:13, target_cost_pct:32, plate_yield:1,
+        ingredients:[ {product_id:icProducts[9].id, quantity:0.33}, {product_id:icProducts[11].id, quantity:0.12} ] },
+      { id:uid(), name:'Chicken Tacos', mode:'food', category:'Food Plate', menu_price:12, target_cost_pct:32, plate_yield:1,
+        ingredients:[ {product_id:icProducts[10].id, quantity:0.35}, {product_id:icProducts[13].id, quantity:0.05}, {product_id:icProducts[11].id, quantity:0.08} ] },
+    ].map(r => {
+      const single = (r.mode === 'single');
+      r.ingredients = r.ingredients.map(ing => {
+        const p = icProducts.find(x => x.id === ing.product_id);
+        const cpu = p ? (single ? (p.cost_per_pour || 0) : (p.unit_cost || 0)) : 0;
+        return { product_id:ing.product_id, quantity:ing.quantity, cost_per_unit:cpu,
+          total_cost:+(ing.quantity * cpu).toFixed(4) };
+      });
+      const tc  = r.ingredients.reduce((s, i) => s + i.total_cost, 0);
+      const spb = r.servings_per_batch || r.plate_yield || 1;
+      const cps = tc / spb;
+      const pct = r.menu_price ? cps / r.menu_price * 100 : null;
+      return { ...r, total_cost:tc, cost_per_serving:cps, cost_pct:pct,
+        flagged:pct != null ? pct > r.target_cost_pct : false,
+        updated_at:new Date().toISOString(), created_at:new Date().toISOString() };
+    });
+    App.data.recipes = recipes;
 
     // Count totals per product index: [current (today), one week ago].
     // Usage = week-ago minus today; no deliveries land in the last 7 days, so
