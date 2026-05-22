@@ -733,6 +733,146 @@ S.Settings = {
       }})
     ];
 
+    // ════════════════════════════════════════════════════════════════════
+    //  INVENTORY CONTROL — The Anchor's stockroom. The last two counts feed
+    //  the Profit This Week COGS, so the Capture-to-Diagnose chain computes.
+    // ════════════════════════════════════════════════════════════════════
+    App.inventoryData = App.inventoryData || {};
+
+    App.inventoryData.ic_vendors = [
+      { id:uid(), name:'Republic National',   rep:'Dana Ortiz',  phone:'512-555-0142', email:'dortiz@rndc.example',   delivery_days:'Tue, Fri', payment_terms:'Net 30', account_number:'RNDC-4471',  notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:"Glazer's Beer & Bev", rep:'Marcus Hill', phone:'512-555-0188', email:'mhill@glazers.example', delivery_days:'Wed',      payment_terms:'Net 15', account_number:'GLZ-2210',   notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Austin Beerworks',    rep:'Priya Shah',  phone:'512-555-0119', email:'priya@abw.example',     delivery_days:'Thu',      payment_terms:'COD',    account_number:'ABW-0093',   notes:'Local draft', created_at:new Date().toISOString() },
+      { id:uid(), name:'Sysco Foods',         rep:'Tom Becker',  phone:'512-555-0203', email:'tbecker@sysco.example', delivery_days:'Mon, Thu', payment_terms:'Net 30', account_number:'SYS-88120',  notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Restaurant Depot',    rep:'Walk-in',     phone:'512-555-0250', email:'',                      delivery_days:'Pickup',   payment_terms:'COD',    account_number:'',           notes:'Supplies and paper', created_at:new Date().toISOString() },
+    ];
+
+    App.inventoryData.ic_locations = ['Main Bar','Back Bar','Liquor Room','Walk-in Cooler','Kitchen Line']
+      .map(n => ({ id:uid(), name:n, archived:false }));
+
+    // Categories must match Profit's BAR_CATS / KITCHEN_CATS for the COGS feed.
+    const icProducts = [
+      { name:"Tito's Handmade Vodka",    category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:22.40, menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Liquor Room' },
+      { name:'Espolòn Tequila Blanco',   category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:24.50, menu_price:10, par_level:20,  reorder_point:9,   primary_location:'Liquor Room' },
+      { name:'Bulleit Bourbon',          category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:27.90, menu_price:11, par_level:16,  reorder_point:7,   primary_location:'Liquor Room' },
+      { name:"Hendrick's Gin",           category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:31.00, menu_price:12, par_level:10,  reorder_point:5,   primary_location:'Liquor Room' },
+      { name:'House Cabernet',           category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:9.50,  menu_price:10, par_level:24,  reorder_point:10,  primary_location:'Back Bar' },
+      { name:'House Chardonnay',         category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:8.75,  menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Walk-in Cooler' },
+      { name:'Modelo Especial',          category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:1.35,  menu_price:6,  par_level:480, reorder_point:144, primary_location:'Walk-in Cooler' },
+      { name:'Lone Star',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:0.95,  menu_price:5,  par_level:360, reorder_point:120, primary_location:'Walk-in Cooler' },
+      { name:'ABW Pearl Snap (1/2 bbl)', category:'Draft Beer',  vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16,  unit_cost:165.00,menu_price:6,  par_level:6,   reorder_point:2,   primary_location:'Walk-in Cooler' },
+      { name:'Ground Beef 80/20 (lb)',   category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:4.20,  par_level:240, reorder_point:80,  primary_location:'Walk-in Cooler' },
+      { name:'Chicken Thigh (lb)',       category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:2.95,  par_level:200, reorder_point:60,  primary_location:'Walk-in Cooler' },
+      { name:'Cheddar Cheese (lb)',      category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:4.60,  par_level:90,  reorder_point:30,  primary_location:'Walk-in Cooler' },
+      { name:'Romaine (case)',           category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:22.00, par_level:16,  reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Flour Tortilla (case)',    category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:16.00, par_level:20,  reorder_point:8,   primary_location:'Kitchen Line' },
+      { name:'Fryer Oil (jug)',          category:'Misc',        vendor:'Restaurant Depot',                                              unit_cost:28.00, par_level:10,  reorder_point:4,   primary_location:'Kitchen Line' },
+      { name:'To-Go Boxes (case)',       category:'Misc',        vendor:'Restaurant Depot',                                              unit_cost:42.00, par_level:8,   reorder_point:3,   primary_location:'Kitchen Line' },
+    ].map(p => {
+      const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
+      const cpp   = pours ? p.unit_cost / pours : null;
+      return { id:uid(), brand:'', sub_category:'', secondary_location:'', notes:'', active:true,
+        container_size_oz:null, pour_size_oz:null, menu_price:null,
+        pours_per_container:pours, cost_per_pour:cpp,
+        pour_cost_pct:(cpp != null && p.menu_price) ? cpp/p.menu_price*100 : null,
+        ...p };
+    });
+    App.inventoryData.ic_products = icProducts;
+
+    // Count totals per product index: [current (today), one week ago].
+    // Usage = week-ago minus today; no deliveries land in the last 7 days, so
+    // the icCOGS feed reads cleanly as (start - end) x unit cost.
+    const icTotals = {
+      0:[9,25], 1:[8,21], 2:[7,17], 3:[6,10], 4:[10,25], 5:[9,22],
+      6:[96,456], 7:[72,352], 8:[2,6], 9:[40,220], 10:[35,195],
+      11:[18,88], 12:[4,15], 13:[5,19], 14:[3,9], 15:[2,6]
+    };
+    const icCountItem = (p, qty) => ({
+      product_id:p.id, name:p.name, category:p.category,
+      fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
+      unit_cost:p.unit_cost, value:+(qty * p.unit_cost).toFixed(2), notes:''
+    });
+    const mkCount = (daysAgo, pick) => {
+      const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
+      return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:'Maria G.',
+        locations:['Liquor Room','Back Bar','Walk-in Cooler','Kitchen Line'],
+        items:items, item_count:items.length,
+        total_value:+items.reduce((s, it) => s + it.value, 0).toFixed(2),
+        created_at:daysAgoISO(daysAgo) };
+    };
+    App.inventoryData.ic_counts = [
+      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
+      mkCount(7,  i => icTotals[i][1]),
+      mkCount(0,  i => icTotals[i][0]),
+    ];
+
+    // Deliveries — all dated 8+ days back so none fall inside the last count
+    // period. Two carry price increases, which Vendor Watch surfaces.
+    const icDLine = (p, qty, price, prev) => ({
+      product_id:p.id, name:p.name,
+      container_size_oz:p.container_size_oz != null ? p.container_size_oz : null,
+      qty:qty, price_per_unit:price, prev_price:prev,
+      price_changed:(prev != null && Math.abs(price - prev) > 0.001),
+      extended:+(qty * price).toFixed(2)
+    });
+    const mkDelivery = (daysAgo, vendor, inv, lines) => ({
+      id:uid(), vendor:vendor, date:dateStr(daysAgo), invoice_number:inv, driver:'', notes:'',
+      line_items:lines, item_count:lines.length,
+      total:+lines.reduce((s, l) => s + l.extended, 0).toFixed(2),
+      price_change_count:lines.filter(l => l.price_changed).length,
+      has_discrepancy:lines.some(l => l.price_changed), created_at:daysAgoISO(daysAgo)
+    });
+    App.inventoryData.ic_deliveries = [
+      mkDelivery(31, 'Republic National', 'RN-55021', [
+        icDLine(icProducts[0], 24, 21.40, 21.40),
+        icDLine(icProducts[1], 18, 23.60, 23.60),
+        icDLine(icProducts[2], 12, 27.90, 27.90),
+      ]),
+      mkDelivery(24, "Glazer's Beer & Bev", 'GLZ-3318', [
+        icDLine(icProducts[6], 480, 1.35, 1.28),
+        icDLine(icProducts[7], 360, 0.95, 0.95),
+      ]),
+      mkDelivery(17, 'Sysco Foods', 'SY-90455', [
+        icDLine(icProducts[9],  200, 4.20, 3.95),
+        icDLine(icProducts[10], 160, 2.95, 2.95),
+        icDLine(icProducts[11], 80,  4.60, 4.60),
+      ]),
+      mkDelivery(10, 'Republic National', 'RN-55190', [
+        icDLine(icProducts[0], 24, 22.40, 21.40),
+        icDLine(icProducts[3], 12, 31.00, 31.00),
+      ]),
+    ];
+
+    // Spot checks — feed the Theft Risk pour-variance signal.
+    const icSpotItem = (p, pre, post, sold, flagged) => {
+      const ppc = p.pours_per_container || 1, cpp = p.cost_per_pour || 0;
+      const used = +(pre - post).toFixed(2);
+      const poured = +(used * ppc).toFixed(1);
+      const varP = +(poured - sold).toFixed(1);
+      return { product_id:p.id, name:p.name, category:p.category,
+        pours_per_container:ppc, cost_per_pour:cpp, pre:pre, post:post,
+        pos_sold:sold, used_containers:used, poured:poured,
+        variance_pours:varP, variance_dollar:+(varP * cpp).toFixed(2), flagged:flagged };
+    };
+    const mkSpot = (daysAgo, items) => ({
+      id:uid(), date:dateStr(daysAgo), shift:'PM', checked_by:'Maria G.',
+      items:items, product_count:items.length,
+      flagged_count:items.filter(i => i.flagged).length,
+      total_variance_dollar:+items.reduce((t, i) => t + (i.variance_dollar || 0), 0).toFixed(2),
+      created_at:daysAgoISO(daysAgo)
+    });
+    App.inventoryData.ic_spot_checks = [
+      mkSpot(12, [
+        icSpotItem(icProducts[0], 4,   1.0, 44, true),
+        icSpotItem(icProducts[2], 3,   0.7, 33, true),
+        icSpotItem(icProducts[1], 3,   1.1, 40, false),
+      ]),
+      mkSpot(4, [
+        icSpotItem(icProducts[0], 4,   1.4, 56, false),
+        icSpotItem(icProducts[3], 2.5, 0.8, 38, false),
+      ]),
+    ];
+
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
     // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
     // and 5, which is where both cost trends break downward.
@@ -773,6 +913,7 @@ S.Settings = {
 
     // ── Save everything ──
     await App.save();
+    await App.saveInventory();
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded — all sections populated. Go test!'; }
