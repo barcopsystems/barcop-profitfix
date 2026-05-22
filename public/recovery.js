@@ -139,5 +139,23 @@ window.Recovery = {
       else if (r.status === 'pending') measuring++;
     });
     return { logged: mine.length, recovered: recovered, withFigure: withFigure, measuring: measuring };
+  },
+
+  /* Fix-event markers for an annotated trend chart. Given the charted weeks
+     (each with a period_end) and a module, return the markers to draw as
+     [{ index, label, date }], where index is the charted week the fix landed
+     in. Used so a trend chart shows when a fix went in against the metric. */
+  chartMarkers(weeks, moduleKey) {
+    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const dated = (weeks || []).filter(w => w && w.period_end);
+    if (dated.length < 2) return [];
+    const first = dated[0].period_end, last = dated[dated.length - 1].period_end;
+    return log
+      .filter(e => e.module === moduleKey && e.date && e.date >= first && e.date <= last)
+      .map(e => {
+        let idx = weeks.findIndex(w => w && w.period_end && w.period_end >= e.date);
+        if (idx < 0) idx = weeks.length - 1;
+        return { index: idx, label: e.gap_name || 'Fix', date: e.date };
+      });
   }
 };
