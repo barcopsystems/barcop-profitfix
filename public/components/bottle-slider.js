@@ -2,14 +2,14 @@
 
 /* ── Bottle Slider — reusable count component ─────────────────────────────────
    Used by Take Inventory and Spot Check. Estimates how full an open bottle is
-   (0.0–1.0 in 0.1 steps) plus a separate full-bottle integer count.
+   (0.00–1.00 in 0.01 steps) plus a separate full-bottle integer count.
 
    API:
      BottleSlider.html(id, {value, fulls, category})  → HTML string
      BottleSlider.mount(id, onChange)                 → wire after HTML is in DOM
      BottleSlider.get(id)                             → {value, fulls, total}
 
-   Interaction: drag the level, tap top/bottom half for ±0.1, arrow keys for
+   Interaction: drag the level, tap top/bottom half for ±0.01, arrow keys for
    accessibility, tap the value to type it directly, +/- for full bottles. */
 
 const BottleSlider = {
@@ -22,8 +22,8 @@ const BottleSlider = {
   },
   colorFor(cat) { return this.COLORS[cat] || '#C9A84C'; },
 
-  _snap(v) { v = Math.round((Number(v) || 0) * 10) / 10; return Math.max(0, Math.min(1, v)); },
-  _fmt(n)  { return (Math.round(n * 10) / 10).toFixed(1); },
+  _snap(v) { v = Math.round((Number(v) || 0) * 100) / 100; return Math.max(0, Math.min(1, v)); },
+  _fmt(n)  { return (Math.round(n * 100) / 100).toFixed(2); },
   _fillY(v){ return (this.TOP + (1 - v) * (this.BOT - this.TOP)).toFixed(1); },
   _fillH(v){ return (v * (this.BOT - this.TOP)).toFixed(1); },
 
@@ -60,7 +60,7 @@ const BottleSlider = {
       + '</svg>'
 
       + '<div style="text-align:center;">'
-      +   '<div class="bs-val" style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';line-height:1;cursor:pointer;">' + value.toFixed(1) + '</div>'
+      +   '<div class="bs-val" style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';line-height:1;cursor:pointer;">' + value.toFixed(2) + '</div>'
       +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:2px;">Open Bottle</div>'
       + '</div>'
 
@@ -88,7 +88,7 @@ const BottleSlider = {
       const totalEl = root.querySelector('.bs-total');
       if (fill)   { fill.setAttribute('y', this._fillY(inst.value)); fill.setAttribute('height', this._fillH(inst.value)); }
       if (handle) { handle.setAttribute('y1', this._fillY(inst.value)); handle.setAttribute('y2', this._fillY(inst.value)); }
-      if (valEl)  valEl.textContent = inst.value.toFixed(1);
+      if (valEl)  valEl.textContent = inst.value.toFixed(2);
       if (fullsEl) fullsEl.textContent = inst.fulls;
       if (totalEl) totalEl.textContent = this._fmt(inst.fulls + inst.value);
       inst.onChange({ value: inst.value, fulls: inst.fulls, total: inst.fulls + inst.value });
@@ -111,7 +111,7 @@ const BottleSlider = {
       dragging = false;
       if (!moved) {
         const r = svg.getBoundingClientRect();
-        inst.value = this._snap(inst.value + (clientY < r.top + r.height / 2 ? 0.1 : -0.1));
+        inst.value = this._snap(inst.value + (clientY < r.top + r.height / 2 ? 0.01 : -0.01));
       } else {
         inst.value = this._snap(inst.value);
       }
@@ -131,8 +131,8 @@ const BottleSlider = {
     svg.addEventListener('touchend',   e => { finish(e.changedTouches[0].clientY); });
 
     root.addEventListener('keydown', e => {
-      if (e.key === 'ArrowUp')   { e.preventDefault(); inst.value = this._snap(inst.value + 0.1); apply(); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); inst.value = this._snap(inst.value - 0.1); apply(); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); inst.value = this._snap(inst.value + 0.01); apply(); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); inst.value = this._snap(inst.value - 0.01); apply(); }
     });
 
     root.querySelector('.bs-minus').addEventListener('click', () => { inst.fulls = Math.max(0, inst.fulls - 1); apply(); });
@@ -141,8 +141,8 @@ const BottleSlider = {
     const valEl = root.querySelector('.bs-val');
     valEl.addEventListener('click', () => {
       const input = document.createElement('input');
-      input.type = 'number'; input.step = '0.1'; input.min = '0'; input.max = '1';
-      input.value = inst.value.toFixed(1);
+      input.type = 'number'; input.step = '0.01'; input.min = '0'; input.max = '1';
+      input.value = inst.value.toFixed(2);
       input.style.cssText = 'width:64px;text-align:center;font-size:18px;';
       valEl.replaceWith(input);
       input.focus(); input.select();
