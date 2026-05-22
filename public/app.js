@@ -630,6 +630,7 @@ const App = {
         'lc-log-hours': S.LaborLogHours,
         'lc-daily-view': S.LaborDailyView,
         'lc-weekly-summary': S.LaborWeeklySummary,
+        'lc-tip-log': S.LaborTipLog,
       };
       const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = lcTitle;
