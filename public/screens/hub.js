@@ -392,6 +392,7 @@ S.Hub = {
           <div style="font-size:14px;font-weight:800;color:var(--t1);">${esc(barName)}</div>
           <div style="display:flex;align-items:center;gap:14px;flex:1;justify-content:flex-end;">
             <span style="font-size:11px;color:var(--t3);">${todayStr}</span>
+            <button id="hub-getstarted" class="hd-btn">Getting Started</button>
             <button id="hub-settings" class="hd-btn">Settings</button>
             <button id="hub-signout" class="hd-btn">Sign Out</button>
           </div>
@@ -417,6 +418,7 @@ S.Hub = {
 
     document.getElementById('hub-signout')?.addEventListener('click', async () => { await DB.signOut(); });
     document.getElementById('hub-settings')?.addEventListener('click', () => S.HubSettings.open());
+    document.getElementById('hub-getstarted')?.addEventListener('click', () => S.HubGettingStarted.open());
 
     document.getElementById('hub-rec-set')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('hub-rec-target')?.value);
