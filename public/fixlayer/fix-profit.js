@@ -318,104 +318,66 @@ FIX.profit = [
     summary: 'Price drift, short counts, and quiet substitutions on every invoice. Audit each delivery against the PO, track prices monthly, and renegotiate quarterly with the data.',
 
     process: {
-      intro: 'Vendor overcharge recovery is an ongoing weekly process, not a one-time audit. Every discrepancy you document at delivery is a credit you can request; every one you miss is a cost you absorbed.',
+      intro: 'Vendor overcharge recovery is an ongoing weekly job, not a one-time audit. Every discrepancy you document at delivery is a credit you can request. Every one you miss is a cost you absorbed. The app flags price changes the moment you receive a delivery and tracks the drift over time. Each step below opens the screen where that happens.',
       steps: [
-        { title: 'Pull the PO before the delivery arrives',
-          detail: 'Know what you ordered and at what price before the truck is at the door. You cannot audit a delivery you do not have an order for.' },
-        { title: 'Count every case before you sign',
-          detail: 'Count the delivery against the order. A short count not caught at the door is a loss you already accepted — it is not recovered later.' },
-        { title: 'Audit the invoice against the PO line by line',
-          detail: 'Compare every line. Flag any price more than 2% above the PO. Note any substitution on the invoice before you sign — a lower-tier product at a premium price is an overcharge, not a substitution.' },
-        { title: 'File a discrepancy report on any variance',
-          detail: 'Document the SKU, agreed price, invoiced price, and overcharge, and contact your rep within 24 hours. Discrepancies age out fast.' },
-        { title: 'Run a monthly price review on the top 20 spend items',
-          detail: 'Enter current invoiced prices into a price tracker. Flag any item up more than 5% since last quarter, and any item where another vendor is 8%+ cheaper on the same product.' },
-        { title: 'Hold a quarterly vendor review',
-          detail: 'Bring the documented variance and price-drift data. Ask for a price match or an explanation, discuss volume terms, and confirm the substitution policy in writing.' },
-        { title: 'Confirm vendor terms in writing',
-          detail: 'Pricing, substitution policy, and delivery terms confirmed in writing within 48 hours of the review. When a price dispute happens and your only record is a phone call, you have no dispute.' }
+        { kind: 'action', target: 'ic-order-history', targetLabel: 'Order History',
+          title: 'Know what you ordered before the truck arrives',
+          detail: 'Open Order History and pull the order for the incoming delivery. You cannot audit a delivery against an order you do not have in front of you, so confirm the products, quantities, and agreed prices before the driver is at the door.' },
+        { kind: 'action', target: 'ic-receive-delivery', targetLabel: 'Receive Delivery',
+          title: 'Count every case before you sign',
+          detail: 'Log the delivery in Receive Delivery and count it against the order, line by line. A short count not caught at the door is a loss you already accepted. It does not get recovered later.' },
+        { kind: 'action', target: 'ic-receive-delivery', targetLabel: 'Receive Delivery',
+          title: 'Check the invoiced prices as you receive',
+          detail: 'As you receive, the app compares each invoiced price against the last price you paid and flags anything that moved. Note any substitution before you sign. A lower-tier product billed at the premium price is an overcharge, not a substitution.' },
+        { kind: 'reference', target: 'Vendor_Delivery_Discrepancy.pdf', targetLabel: 'Vendor Delivery Discrepancy Report',
+          title: 'File a discrepancy report on any variance',
+          detail: 'When a delivery is short or a price is wrong, print the Vendor Delivery Discrepancy Report, record the SKU, agreed price, invoiced price, and total overcharge, and get it to your rep within 24 hours. Discrepancies age out fast.' },
+        { kind: 'result', target: 'vendor-watch', targetLabel: 'Vendor Watch',
+          title: 'Read the price drift the app is tracking',
+          detail: 'Vendor Watch reads every delivery you receive and surfaces which vendor prices have drifted up and what that drift costs you per year. There is no price tracker to keep by hand. Check it once a month.' },
+        { kind: 'result', target: 'vendor-watch', targetLabel: 'Vendor Watch',
+          title: 'Bring the data to a quarterly vendor review',
+          detail: 'Once a quarter, sit down with your rep and the Vendor Watch numbers in hand. Ask for a price match or an explanation on every item that drifted, and talk volume terms. A documented price increase is hard for a rep to wave off.' },
+        { kind: 'reference', target: 'Vendor_Agreement_Terms_Checklist.docx', targetLabel: 'Vendor Agreement Terms Checklist',
+          title: 'Confirm the terms in writing',
+          detail: 'Within 48 hours of the review, download the Vendor Agreement Terms Checklist, fill in the pricing, substitution policy, and delivery terms you agreed to, and send it to your rep. When a price dispute happens and your only record is a phone call, you have no dispute.' }
       ]
     },
 
-    formulas: [
-      { label: 'Invoice Variance',
-        formula: '(Invoiced price - PO price) x quantity',
-        example: 'Titos 1L: ($24.50 - $22.40) x 18 bottles = $37.80 overcharge on one delivery' },
-      { label: 'Price Drift %',
-        formula: '(Current price - Original quoted price) / Original quoted price x 100',
-        example: '($24.50 - $22.40) / $22.40 = 9.4% drift since the original quote' },
-      { label: 'Substitution Overcharge',
-        formula: 'Price billed for the substitute - Price of the item actually ordered',
-        example: 'A lower-tier product billed at the premium SKU price is an overcharge for the difference' }
-    ],
-
     commonMistakes: [
-      'Paying invoices without comparing them to the PO line by line — every invoice you sign unchecked is a price you accepted by default.',
-      'Accepting substitutions without adjusting the invoice price — a lower-tier product at a premium price is an overcharge.',
-      'Never shopping competitive pricing because you assume distributor prices are fixed — most categories have negotiable elements and respond to documented competition.',
-      'Signing delivery receipts before counting the cases — a short count not caught at the door is a loss you already accepted.',
-      'Verbal-only vendor relationships with no confirmed pricing in writing — when a dispute happens, a phone conversation is not documentation.',
-      'Treating vendor overcharge recovery as a one-time audit rather than an ongoing weekly process.'
+      'Paying invoices without comparing them to the order line by line. Every invoice you sign unchecked is a price you accepted by default.',
+      'Accepting a substitution without adjusting the invoice price. A lower-tier product at the premium price is an overcharge for the difference.',
+      'Assuming distributor prices are fixed and never shopping them. Most categories have negotiable elements and respond to documented competition.',
+      'Signing the delivery receipt before counting the cases. A short count not caught at the door is a loss you already accepted.',
+      'Running vendor relationships on verbal terms with nothing in writing. When a dispute happens, a phone conversation is not documentation.',
+      'Treating overcharge recovery as a one-time audit rather than an ongoing job at every delivery.'
     ],
 
     quickRef: {
       rhythm: [
-        'Every delivery: pull the PO, count every case, audit the invoice line by line',
-        'Every delivery: complete the delivery inspection before the driver leaves',
+        'Every delivery: pull the order, count every case, check the invoiced prices',
+        'Every delivery: log the delivery and inspection in Receive Delivery before the driver leaves',
         'On any variance: file a discrepancy report and contact the rep within 24 hours',
-        'Monthly: enter the top 20 spend items into the price tracker',
-        'Monthly: flag any item up more than 5% since last quarter or 8%+ cheaper elsewhere',
-        'Quarterly: run the vendor review with the documented variance in hand',
+        'Monthly: review the price drift the app surfaced in Vendor Watch',
+        'Monthly: flag any item up more than 5% since last quarter or cheaper elsewhere',
+        'Quarterly: run the vendor review with the documented drift data in hand',
         'Quarterly: confirm pricing and substitution terms in writing within 48 hours'
       ],
       benchmarks: [
-        { label: 'Invoice price vs PO',          target: 'matches PO',  warning: 'up to 2% over', critical: 'above 2% over' },
-        { label: 'Price drift per quarter',      target: 'flat',        warning: 'up to 5%',      critical: 'above 5%' },
-        { label: 'Alternative-vendor gap',       target: 'in line',     warning: '5-8% cheaper',  critical: '8%+ cheaper elsewhere' },
-        { label: 'Cumulative overcharge / vendor', target: '$0',        warning: 'under $500 / qtr', critical: '$500+ / qtr' }
+        { label: 'Invoice price vs order',         target: 'matches order', warning: 'up to 2% over',  critical: 'above 2% over' },
+        { label: 'Price drift per quarter',        target: 'flat',          warning: 'up to 5%',       critical: 'above 5%' },
+        { label: 'Alternative-vendor gap',         target: 'in line',       warning: '5-8% cheaper',   critical: '8%+ cheaper elsewhere' },
+        { label: 'Cumulative overcharge per vendor', target: '$0',          warning: 'under $500 / qtr', critical: '$500+ / qtr' }
       ],
       escalation: [
-        'Pull the PO and the invoice and compare them line by line for the flagged delivery.',
+        'Pull the order and the invoice and compare them line by line for the flagged delivery.',
         'File a vendor discrepancy report: SKU, agreed price, invoiced price, and total overcharge.',
-        'Contact your rep within 24 hours of the delivery — discrepancies age out fast.',
+        'Contact your rep within 24 hours of the delivery. Discrepancies age out fast.',
         'Request a credit memo for the full overcharge with a specific response deadline.',
-        'Log the variance in the price tracker so the pattern is visible at the quarterly review.',
+        'Log the variance so the pattern is visible in Vendor Watch at the quarterly review.',
         'If overcharges recur after the dispute, renegotiate terms or move the category to another vendor.'
       ]
     },
-
-    templates: [
-      {
-        id: 'vendor-terms',
-        name: 'Vendor Agreement Terms Checklist',
-        intro: 'Confirms the terms of a vendor relationship in writing. Complete it after a quarterly review and send it to the rep so pricing and policy are on the record.',
-        fields: [
-          { key: 'bar_name',       label: 'Bar Name',       placeholder: 'Your bar' },
-          { key: 'vendor_name',    label: 'Vendor Name',    placeholder: 'Vendor' },
-          { key: 'effective_date', label: 'Effective Date', placeholder: 'e.g. March 4' }
-        ],
-        body: 'VENDOR AGREEMENT TERMS CONFIRMATION\n{{bar_name}} and {{vendor_name}}\nEffective {{effective_date}}\n\n'
-          + 'This document confirms in writing the terms discussed in our review. Please reply to confirm or correct any item.\n\n'
-          + 'PRICING\n'
-          + '- Confirmed pricing on our top spend SKUs is attached / listed below.\n'
-          + '- Price changes are communicated in writing before the affected delivery.\n'
-          + '- Invoiced prices match the confirmed pricing unless a written change was sent in advance.\n'
-          + '____________________________________________________________\n\n'
-          + 'SUBSTITUTIONS\n'
-          + '- Substitutions are pre-approved by us before delivery, or refused.\n'
-          + '- A substitution is billed at the price of the item actually delivered, never at the ordered item\'s price.\n\n'
-          + 'DELIVERY\n'
-          + '- Delivery days and window: ________________________\n'
-          + '- Deliveries are counted and inspected at the door before signing.\n'
-          + '- Short counts and discrepancies are credited on documented report.\n\n'
-          + 'VOLUME AND TERMS\n'
-          + '- Volume discount terms: ________________________\n'
-          + '- Payment terms: ________________________\n\n'
-          + 'CONFIRMED BY\n'
-          + 'Operator: ____________________   Date: __________\n'
-          + 'Vendor representative: ____________________   Date: __________'
-      }
-    ],
 
     aiWorkflows: [
       {
