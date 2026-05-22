@@ -461,9 +461,13 @@ const App = {
   },
 
   navigate(id) {
-    // Settings is a Hub-owned view, never a module screen — open it in the
-    // Hub container regardless of where the call came from.
+    // Settings and Getting Started are Hub-owned views, never module screens —
+    // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
+    if (id === 'getting-started' || id === 'r-getting-started' || id === 't-getting-started') {
+      S.HubGettingStarted.open();
+      return;
+    }
     this.updateNav(id);
     const content = document.getElementById('content-area');
     const actions = document.getElementById('topbar-actions');
@@ -484,7 +488,6 @@ const App = {
         'r-check-average':        ['Check Average', ''],
         'r-events':               ['Events and Catering', ''],
         'r-reports':              ['Reports and History', ''],
-        'r-getting-started':      ['Getting Started', '30-Day Setup'],
         'r-help':                 ['Help and FAQ', ''],
       };
       const revScreens = {
@@ -499,7 +502,6 @@ const App = {
         'r-check-average':    S.RevenueCheckAverage,
         'r-events':           S.RevenueEvents,
         'r-reports':          S.RevenueReports,
-        'r-getting-started':  S.RevenueGettingStarted,
         'r-help':             S.RevenueHelp,
       };
       const [title, sub] = revTitles[id] || [id, ''];
@@ -527,7 +529,6 @@ const App = {
         't-delivery':       ['Delivery Platforms', ''],
         't-email':          ['Email and Loyalty', ''],
         't-reports':        ['Reports and History', ''],
-        't-getting-started':['Getting Started', '30-Day Setup'],
         't-help':           ['Help and FAQ', ''],
       };
       const trafficScreens = {
@@ -543,7 +544,6 @@ const App = {
         't-delivery':       S.TrafficDelivery,
         't-email':          S.TrafficEmail,
         't-reports':        S.TrafficReports,
-        't-getting-started':S.TrafficGettingStarted,
         't-help':           S.TrafficHelp,
       };
       const [title, sub] = trafficTitles[id] || [id, ''];
@@ -715,8 +715,7 @@ const App = {
       'reports':       ['Reports & History', ''],
       'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
-      'profit-fix':    ['Profit Fix', 'Fix Process and Guidance'],
-      'getting-started': ['Getting Started', '30-Day Setup Checklist']
+      'profit-fix':    ['Profit Fix', 'Fix Process and Guidance']
     };
 
     const screens = {
@@ -733,8 +732,7 @@ const App = {
       'reports':       S.Reports,
       'help':          S.Help,
       'audit-tracker': S.AuditTracker,
-      'profit-fix':    S.ProfitFix,
-      'getting-started': S.GettingStarted
+      'profit-fix':    S.ProfitFix
     };
 
     const [title, sub] = titles[id] || [id, ''];
