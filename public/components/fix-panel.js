@@ -159,12 +159,33 @@ window.FixPanel = {
       + 'When you have this fix in place, log the date. The Recovery Scoreboard measures the metric before and after to show what the fix recovered.</div>';
 
     if (mine.length) {
-      html += mine.map(e =>
-        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t2);">'
-        + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);"></span>'
-        + 'Implemented ' + esc(e.date)
-        + '<button class="btn btn-ghost btn-sm fp-unlog" data-log="' + esc(e.id) + '" style="margin-left:auto;">Remove</button>'
-        + '</div>').join('');
+      html += mine.map(e => {
+        const r = (window.Recovery) ? Recovery.compute(e) : { status: 'untracked' };
+        let result = '', good = false;
+        if (r.status === 'ok') {
+          const move = r.fmt(r.before) + ' to ' + r.fmt(r.after);
+          if (r.dollars != null && r.dollars > 0) {
+            good = true;
+            result = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' a year. ' + r.label + ' ' + move + '.'
+              + (r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data so far.');
+          } else {
+            result = r.label + ' has not improved since this fix. ' + move + '.';
+          }
+        } else if (r.status === 'pending') {
+          result = 'Measuring. ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data since this fix.';
+        } else if (r.status === 'no-baseline') {
+          result = 'No weeks logged before this date to measure recovery against.';
+        }
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--b2);">'
+          + '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);">'
+          + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);"></span>'
+          + 'Implemented ' + esc(e.date)
+          + '<button class="btn btn-ghost btn-sm fp-unlog" data-log="' + esc(e.id) + '" style="margin-left:auto;">Remove</button>'
+          + '</div>'
+          + (result ? '<div style="font-size:12px;line-height:1.6;margin:4px 0 0 14px;color:'
+              + (good ? 'var(--gold)' : 'var(--t3)') + ';">' + esc(result) + '</div>' : '')
+          + '</div>';
+      }).join('');
     }
 
     html += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;">'
