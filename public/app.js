@@ -468,7 +468,7 @@ const App = {
       document.getElementById('topbar-title').textContent = title;
       document.getElementById('topbar-sub').textContent = sub;
       const screen = revScreens[id];
-      if (screen) screen.render(content, actions);
+      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -514,7 +514,7 @@ const App = {
       document.getElementById('topbar-title').textContent = title;
       document.getElementById('topbar-sub').textContent = sub;
       const screen = trafficScreens[id];
-      if (screen) screen.render(content, actions);
+      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -562,7 +562,7 @@ const App = {
       document.getElementById('topbar-title').textContent = icTitle;
       document.getElementById('topbar-sub').textContent = icSub;
       const icScreen = icScreens[id];
-      if (icScreen) icScreen.render(content, actions);
+      if (icScreen) { icScreen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -612,7 +612,7 @@ const App = {
       document.getElementById('topbar-title').textContent = scTitle;
       document.getElementById('topbar-sub').textContent = scSub;
       const scScreen = scScreens[id];
-      if (scScreen) scScreen.render(content, actions);
+      if (scScreen) { scScreen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -660,7 +660,7 @@ const App = {
       document.getElementById('topbar-title').textContent = lcTitle;
       document.getElementById('topbar-sub').textContent = lcSub;
       const lcScreen = lcScreens[id];
-      if (lcScreen) lcScreen.render(content, actions);
+      if (lcScreen) { lcScreen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -710,6 +710,27 @@ const App = {
     const screen = screens[id];
     if (screen) screen.render(content, actions);
     else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+  },
+
+  /* Report screens carry an Export to PDF button (Rule 10). The print
+     stylesheet in index.html flips the theme light and hides the chrome and
+     all buttons, so window.print() yields a clean PDF of the report content.
+     The set is every screen in a module's REPORTS section plus the three
+     Recovery Reports and History screens. */
+  _REPORT_SCREENS: {
+    'reports': 1, 'r-reports': 1, 't-reports': 1,
+    'ic-report-usage': 1, 'ic-report-variance': 1, 'ic-report-stock': 1, 'ic-report-movers': 1,
+    'lc-reports': 1, 'lc-overtime-watch': 1, 'lc-callout-log': 1,
+    'sc-reports-shift': 1, 'sc-reports-cash': 1, 'sc-reports-ops': 1
+  },
+  _exportBtn(id, actions) {
+    if (!this._REPORT_SCREENS[id] || !actions) return;
+    if (actions.querySelector('.export-pdf-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-ghost btn-sm export-pdf-btn';
+    btn.textContent = 'Export to PDF';
+    btn.addEventListener('click', () => window.print());
+    actions.appendChild(btn);
   },
 
   updateNav(id) {
