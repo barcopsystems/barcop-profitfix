@@ -1,135 +1,276 @@
 'use strict';
-S.Settings = {
-  render(container, actions) {
-    const s  = App.data.settings || {};
-    const t  = s.targets || {};
-    const rs = App.data.revenue_settings || {};
-    const rt = rs.targets || {};
-    const wg = rs.avg_hourly_wage || { bar:15, kitchen:14, floor:13 };
-    const ts = App.data.traffic_settings || {};
-    const tg = ts.targets || {};
+/* ── Hub Settings — the single platform-wide settings view ────────────────────
+   A Hub-owned view, not a module screen. Opens from the Hub into the Hub
+   container (never the module app shell), with a Back to Hub control. Nine
+   collapsible sections (map Section 1, item 8), each saving on its own. Reads
+   and writes the existing settings keys; this is purely a UI consolidation. */
+S.HubSettings = {
 
-    // Save button only shown on Settings tab
-    const saveBtn = document.createElement('button');
-    saveBtn.id = 's-save-btn';
-    saveBtn.className = 'btn btn-primary btn-sm';
-    saveBtn.textContent = 'Save';
-    saveBtn.addEventListener('click', () => this.save());
-    actions.appendChild(saveBtn);
+  // Open the Hub Settings view inside the Hub container. Mirrors App.showHub().
+  open() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('ob-overlay').classList.add('hidden');
+    document.getElementById('app').classList.add('hidden');
+    let wrap = document.getElementById('hub-wrapper');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'hub-wrapper';
+      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
+      document.body.appendChild(wrap);
+    }
+    wrap.style.display = 'block';
+    this.render(wrap);
+  },
 
-    container.innerHTML = '<div class="screen">'
-      + '<div class="s-tabs" style="display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:24px;">'
-      + '<button class="s-tab s-tab-active" data-tab="general" style="background:none;border:none;color:var(--gold);font-family:Barlow,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 20px;cursor:pointer;border-bottom:2px solid var(--gold);margin-bottom:-1px;">Settings</button>'
-      + '<button class="s-tab" data-tab="subscription" style="background:none;border:none;color:var(--t2);font-family:Barlow,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 20px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;">Subscription</button>'
+  render(container) {
+    const secs = [
+      { id:'profile',   title:'Operation Profile',     body:this.secProfile() },
+      { id:'profit',    title:'Profit Targets',        body:this.secProfit() },
+      { id:'revenue',   title:'Revenue Targets',       body:this.secRevenue() },
+      { id:'traffic',   title:'Traffic Targets',       body:this.secTraffic() },
+      { id:'team',      title:'Team and Wages',        body:this.secTeam() },
+      { id:'inventory', title:'Inventory Preferences', body:this.secInventory() },
+      { id:'shift',     title:'Shift Preferences',     body:this.secShift() },
+      { id:'notif',     title:'Notifications',         body:this.secNotifications() },
+      { id:'account',   title:'Account',               body:this.secAccount() }
+    ];
+    container.scrollTop = 0;
+    container.innerHTML =
+      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+      + '<div style="display:flex;align-items:center;gap:14px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
+      +   '<button id="hs-back" class="btn btn-ghost btn-sm">&#8592; Back to Hub</button>'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Platform Settings</div>'
       + '</div>'
-      // ── General tab ──
-      + '<div id="s-tab-general">'
-      + '<div class="settings-section"><div class="settings-title">Operation Profile</div>'
-      + '<div class="card"><div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="s-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
-      + '<div class="f" style="width:160px;"><label>City</label><input type="text" id="s-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin" /></div>'
-      + '<div class="f" style="width:140px;"><label>State / Province</label><input type="text" id="s-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX" /></div>'
-      + '<div class="f" style="width:170px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-abr" value="' + (s.annual_bar_revenue || 0) + '" /></div></div>'
-      + '<div class="f" style="width:170px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-afr" value="' + (s.annual_food_revenue || 0) + '" /></div></div>'
-      + '</div></div></div>'
-      + '<div class="settings-section"><div class="settings-title">Profit Targets</div>'
-      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
-      + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="s-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="s-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="s-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Cash Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-ct" value="' + (s.cash_tolerance ?? 10) + '" /></div></div>'
-      + '</div></div></div>'
-      + '<div class="settings-section"><div class="settings-title">Revenue Targets</div>'
-      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
-      + '<div class="f" style="width:130px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5" /></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('r-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-r-bl" value="' + (rt.bar_labor_pct ?? 28) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Kitchen Labor % ' + tt('r-kitchen-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-r-kl" value="' + (rt.kitchen_labor_pct ?? 30) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Floor Labor % ' + tt('r-floor-labor') + '</label><div class="fw"><input class="suf" type="number" id="s-r-fl" value="' + (rt.floor_labor_pct ?? 32) + '" step="0.1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-rl" value="' + (rt.rplh_lunch ?? 50) + '" /></div></div>'
-      + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-rd" value="' + (rt.rplh_dinner ?? 75) + '" /></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-r-rb" value="' + (rt.rplh_bar ?? 65) + '" /></div></div>'
-      + '<div class="f" style="width:130px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="s-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1" /><span class="suf">%</span></div></div>'
-      + '</div></div></div>'
-      + '<div class="settings-section"><div class="settings-title">Traffic Targets</div>'
-      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
-      + '<div class="f" style="width:130px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="s-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5" /><span class="suf">&#9733;</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>New Reviews / Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="s-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1" /><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="s-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1" /><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="s-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100" /><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="s-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1" /><span class="suf">posts</span></div></div>'
-      + '</div></div></div>'
-      + '<div class="settings-section"><div class="settings-title">Team and Wages</div>'
-      + '<div class="card"><div class="form-row" style="gap:16px 20px;">'
-      + '<div class="f" style="width:150px;"><label>Bar Staff Wage ' + tt('r-wage-bar') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-w-bar" value="' + (wg.bar ?? 15) + '" step="0.25" /></div></div>'
-      + '<div class="f" style="width:150px;"><label>Kitchen Staff Wage ' + tt('r-wage-kitchen') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-w-kit" value="' + (wg.kitchen ?? 14) + '" step="0.25" /></div></div>'
-      + '<div class="f" style="width:150px;"><label>Floor Staff Wage ' + tt('r-wage-floor') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="s-w-floor" value="' + (wg.floor ?? 13) + '" step="0.25" /></div></div>'
-      + '</div></div></div>'
-      + '<div class="settings-section"><div class="settings-title">Account</div>'
-      + '<div class="card">'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>New Password</label><div class="fw"><input class="suf" type="password" id="s-pw1" placeholder="Enter new password" autocomplete="new-password" /><button type="button" class="pw-eye" id="s-pw1-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'s-pw1\');const e=document.getElementById(\'s-pw1-eye\');i.type=i.type===\'password\'?\'text\':\'password\';e.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button></div></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Confirm Password</label><div class="fw"><input class="suf" type="password" id="s-pw2" placeholder="Confirm new password" autocomplete="new-password" /><button type="button" class="pw-eye" id="s-pw2-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'s-pw2\');const e=document.getElementById(\'s-pw2-eye\');i.type=i.type===\'password\'?\'text\':\'password\';e.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button></div></div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:16px;">Every platform setting in one place. Open a section, make your changes, and save that section. Each section saves on its own.</div>'
+      + secs.map(sec => this.card(sec)).join('')
+      + '</div>';
+    document.getElementById('hs-back').addEventListener('click', () => App.showHub());
+    this.wire(container);
+    this.renderSubscription();
+  },
+
+  card(sec) {
+    return '<div class="hs-card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;margin-bottom:10px;overflow:hidden;">'
+      + '<div class="hs-head" style="display:flex;align-items:center;gap:12px;padding:15px 20px;cursor:pointer;">'
+      +   '<div style="flex:1;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);">' + esc(sec.title) + '</div>'
+      +   '<span class="hs-chev" style="font-size:13px;color:var(--t3);transition:transform .15s;">&#9656;</span>'
+      + '</div>'
+      + '<div class="hs-body" style="display:none;padding:6px 20px 20px;border-top:1px solid var(--b2);">' + sec.body + '</div>'
+      + '</div>';
+  },
+
+  saveRow(id) {
+    return '<div style="display:flex;align-items:center;gap:12px;margin-top:18px;">'
+      + '<button class="btn btn-primary hs-save" data-save="' + id + '">Save</button>'
+      + '<span class="hs-msg" data-msg="' + id + '" style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
+      + '</div>';
+  },
+
+  // ── Section bodies ──────────────────────────────────────────────────────────
+  secProfile() {
+    const s = App.data.settings || {};
+    return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      + '<div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="width:160px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
+      + '<div class="f" style="width:140px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
+      + '<div class="f" style="width:170px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||0) + '"/></div></div>'
+      + '<div class="f" style="width:170px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||0) + '"/></div></div>'
+      + '</div>' + this.saveRow('profile');
+  },
+
+  secProfit() {
+    const t = (App.data.settings||{}).targets || {};
+    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '</div>' + this.saveRow('profit');
+  },
+
+  secRevenue() {
+    const rt = ((App.data.revenue_settings||{}).targets) || {};
+    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:130px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('r-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-bl" value="' + (rt.bar_labor_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Kitchen Labor % ' + tt('r-kitchen-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-kl" value="' + (rt.kitchen_labor_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Floor Labor % ' + tt('r-floor-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-fl" value="' + (rt.floor_labor_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rl" value="' + (rt.rplh_lunch ?? 50) + '"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
+      + '</div>' + this.saveRow('revenue');
+  },
+
+  secTraffic() {
+    const tg = ((App.data.traffic_settings||{}).targets) || {};
+    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:140px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5"/><span class="suf">&#9733;</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>New Reviews / Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
+      + '</div>' + this.saveRow('traffic');
+  },
+
+  secTeam() {
+    const wg = ((App.data.revenue_settings||{}).avg_hourly_wage) || { bar:15, kitchen:14, floor:13 };
+    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;"><label>Bar Staff Wage ' + tt('r-wage-bar') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-w-bar" value="' + (wg.bar ?? 15) + '" step="0.25"/></div></div>'
+      + '<div class="f" style="width:160px;"><label>Kitchen Staff Wage ' + tt('r-wage-kitchen') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-w-kit" value="' + (wg.kitchen ?? 14) + '" step="0.25"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Floor Staff Wage ' + tt('r-wage-floor') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-w-floor" value="' + (wg.floor ?? 13) + '" step="0.25"/></div></div>'
+      + '</div>' + this.saveRow('team');
+  },
+
+  secInventory() {
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Inventory Control has no platform-level preferences. Counting locations, vendors, and par levels are set inside the Inventory Control module, on each product and location.</div>';
+  },
+
+  secShift() {
+    const s = App.data.settings || {};
+    return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:180px;"><label>Cash Variance Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-ct" value="' + (s.cash_tolerance ?? 10) + '"/></div></div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">A drawer counted within this dollar amount of expected is treated as on target. This tolerance is shared by Shift Control and Profit Cash Reconciliation.</div>'
+      + this.saveRow('shift');
+  },
+
+  secNotifications() {
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Alerts surface automatically on the Hub: metric breaches, forward-looking warnings, and Traffic cadence nudges. There are no notification toggles to configure yet. When email or push delivery is added, its controls will live here.</div>';
+  },
+
+  secAccount() {
+    const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
+    const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 12px;">' + txt + '</div>';
+    return sh('Password').replace('margin:18px', 'margin:2px')
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:220px;"><label>New Password</label><div class="fw"><input class="suf" type="password" id="s-pw1" placeholder="Enter new password" autocomplete="new-password"/>' + eye('s-pw1') + '</div></div>'
+      + '<div class="f" style="width:220px;"><label>Confirm Password</label><div class="fw"><input class="suf" type="password" id="s-pw2" placeholder="Confirm new password" autocomplete="new-password"/>' + eye('s-pw2') + '</div></div>'
       + '<div style="display:flex;align-items:flex-end;padding-bottom:1px;"><button class="btn btn-ghost" id="s-pw-btn">Update Password</button></div>'
       + '</div>'
       + '<div id="s-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>'
-      + '</div></div>'
-      + '<div class="settings-section"><div class="settings-title">Data and Backup</div>'
-      + '<div class="card">'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export a full backup of everything in your account: settings, weekly numbers, audits, and your Inventory, Labor, and Shift Control records, all in one file you can keep offsite. Restore from a backup to recover your data or move it to another account.</div>'
+      + sh('Subscription')
+      + '<div id="s-sub-content"></div>'
+      + sh('Data and Backup')
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export a full backup of everything in your account: settings, weekly numbers, audits, and your Inventory, Labor, and Shift Control records, in one file you keep offsite. Restore from a backup to recover your data or move it.</div>'
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost" id="s-export-data">Export Backup</button>'
       + '<button class="btn btn-ghost" id="s-import-btn">Restore from Backup</button>'
       + '<input type="file" id="s-import-file" accept="application/json,.json" style="display:none;"/>'
       + '</div>'
       + '<div id="s-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
-      + '</div></div>'
-      + '<div class="settings-section"><div class="settings-title">Testing Tools</div>'
-      + '<div class="card">'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every section of the app to test calculations and screen layouts. Clear all data to wipe everything and start fresh with your real numbers.</div>'
-      + '<div style="display:flex;gap:10px;">'
+      + sh('Testing Tools')
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every section to test calculations and layouts. Clear all data to wipe everything and start fresh with your real numbers.</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost" id="s-load-sample">Load Sample Data</button>'
       + '<button class="btn btn-danger" id="s-clear-all">Clear All Data</button>'
       + '<button class="btn btn-ghost" id="s-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
       + '</div>'
-      + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
-      + '</div></div>'
-      + '<div id="s-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;">Settings saved.</div>'
-      + '</div>'
-      // ── Subscription tab ──
-      + '<div id="s-tab-subscription" style="display:none;">'
-      + '<div id="s-sub-content"></div>'
-      + '</div>'
-      + '</div>';
+      + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
+  },
 
+  // ── Wiring ──────────────────────────────────────────────────────────────────
+  wire(container) {
+    container.querySelectorAll('.hs-head').forEach(head => {
+      head.addEventListener('click', () => {
+        const body = head.nextElementSibling;
+        const chev = head.querySelector('.hs-chev');
+        const isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        if (chev) chev.style.transform = 'rotate(' + (isOpen ? '0' : '90') + 'deg)';
+      });
+    });
+    container.querySelectorAll('.hs-save').forEach(btn => {
+      btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
+    });
     document.getElementById('s-pw-btn')?.addEventListener('click', () => this.changePassword());
+    document.getElementById('s-export-data')?.addEventListener('click', () => this.exportBackup());
+    document.getElementById('s-import-btn')?.addEventListener('click', () => document.getElementById('s-import-file')?.click());
+    document.getElementById('s-import-file')?.addEventListener('change', (e) => this.importBackup(e));
     document.getElementById('s-load-sample')?.addEventListener('click', () => this.loadSample());
-    document.getElementById('s-clear-all')?.addEventListener('click',  () => this.clearAll());
+    document.getElementById('s-clear-all')?.addEventListener('click', () => this.clearAll());
     document.getElementById('s-reset-ob')?.addEventListener('click', async () => {
       App.data.settings.onboarding_complete = false;
       App.data.settings._targets_saved = false;
       await App.saveKey('settings');
       window.location.reload();
     });
-    document.getElementById('s-export-data')?.addEventListener('click', () => this.exportBackup());
-    document.getElementById('s-import-btn')?.addEventListener('click', () => document.getElementById('s-import-file')?.click());
-    document.getElementById('s-import-file')?.addEventListener('change', (e) => this.importBackup(e));
+  },
 
-    // Tab switching
-    container.querySelectorAll('.s-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const which = tab.dataset.tab;
-        container.querySelectorAll('.s-tab').forEach(t2 => {
-          const active = t2.dataset.tab === which;
-          t2.style.color = active ? 'var(--gold)' : 'var(--t2)';
-          t2.style.borderBottomColor = active ? 'var(--gold)' : 'transparent';
-        });
-        document.getElementById('s-tab-general').style.display = which === 'general' ? '' : 'none';
-        document.getElementById('s-tab-subscription').style.display = which === 'subscription' ? '' : 'none';
-        document.getElementById('s-save-btn').style.display = which === 'general' ? '' : 'none';
-        if (which === 'subscription') this.renderSubscription();
+  _flashSaved(id) {
+    const m = document.querySelector('.hs-msg[data-msg="' + id + '"]');
+    if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 2500); }
+  },
+
+  // ── Per-section save — writes only that section's existing keys ─────────────
+  saveSection(which) {
+    const numOr = (id, d) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? d : v; };
+    const keys = [];
+
+    if (which === 'profile') {
+      const s = App.data.settings;
+      const city  = document.getElementById('hs-city')?.value.trim() || '';
+      const state = document.getElementById('hs-state')?.value.trim() || '';
+      s.bar_name            = document.getElementById('hs-name')?.value.trim() || '';
+      s.city_state          = city && state ? city + ', ' + state : city || state || '';
+      s.annual_bar_revenue  = numOr('hs-abr', 0);
+      s.annual_food_revenue = numOr('hs-afr', 0);
+      keys.push('settings');
+    } else if (which === 'profit') {
+      const s = App.data.settings;
+      s.targets = Object.assign({}, s.targets, {
+        bar_pour_cost_pct:  numOr('hs-bpc', 22),
+        food_cost_pct:      numOr('hs-fc', 32),
+        bar_labor_cost_pct: numOr('hs-bl', 28),
+        food_labor_cost_pct:numOr('hs-fl', 30),
+        prime_cost_pct:     numOr('hs-pc', 60)
       });
+      s._targets_saved = true;
+      keys.push('settings');
+    } else if (which === 'revenue') {
+      const rs = App.data.revenue_settings = App.data.revenue_settings || {};
+      rs.targets = Object.assign({}, rs.targets, {
+        check_avg:         numOr('hs-r-ca', 35),
+        bar_labor_pct:     numOr('hs-r-bl', 28),
+        kitchen_labor_pct: numOr('hs-r-kl', 30),
+        floor_labor_pct:   numOr('hs-r-fl', 32),
+        rplh_lunch:        numOr('hs-r-rl', 50),
+        rplh_dinner:       numOr('hs-r-rd', 75),
+        rplh_bar:          numOr('hs-r-rb', 65),
+        event_close_rate:  numOr('hs-r-ec', 40)
+      });
+      rs._targets_saved = true;
+      keys.push('revenue_settings');
+    } else if (which === 'traffic') {
+      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
+      ts.targets = Object.assign({}, ts.targets, {
+        google_rating:      numOr('hs-t-gr', 4.3),
+        review_velocity:    numOr('hs-t-rv', 8),
+        response_rate:      numOr('hs-t-rr', 75),
+        monthly_sessions:   numOr('hs-t-ms', 2000),
+        social_posts_month: numOr('hs-t-sp', 12)
+      });
+      ts._targets_saved = true;
+      keys.push('traffic_settings');
+    } else if (which === 'team') {
+      const rs = App.data.revenue_settings = App.data.revenue_settings || {};
+      rs.avg_hourly_wage = {
+        bar:     numOr('hs-w-bar', 15),
+        kitchen: numOr('hs-w-kit', 14),
+        floor:   numOr('hs-w-floor', 13)
+      };
+      keys.push('revenue_settings');
+    } else if (which === 'shift') {
+      App.data.settings.cash_tolerance = numOr('hs-ct', 10);
+      keys.push('settings');
+    } else {
+      return;
+    }
+
+    Promise.all(keys.map(k => App.saveKey(k))).then(() => {
+      this._flashSaved(which);
+      App.updatePeriod();
     });
   },
 
@@ -246,68 +387,6 @@ S.Settings = {
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Manage Billing'; }
     }
-  },
-
-  save() {
-    const numOr = (id, d) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? d : v; };
-
-    // Operation profile + Profit targets — App.data.settings
-    const s = App.data.settings;
-    const city  = document.getElementById('s-city')?.value.trim() || '';
-    const state = document.getElementById('s-state')?.value.trim() || '';
-    s.bar_name             = document.getElementById('s-name')?.value.trim();
-    s.city_state           = city && state ? city + ', ' + state : city || state || '';
-    s.annual_bar_revenue   = numOr('s-abr', 0);
-    s.annual_food_revenue  = numOr('s-afr', 0);
-    s.targets = {
-      bar_pour_cost_pct:  numOr('s-bpc', 22),
-      food_cost_pct:      numOr('s-fc', 32),
-      bar_labor_cost_pct: numOr('s-bl', 28),
-      food_labor_cost_pct:numOr('s-fl', 30),
-      prime_cost_pct:     numOr('s-pc', 60)
-    };
-    s.cash_tolerance = numOr('s-ct', 10);
-    s._targets_saved = true;
-
-    // Revenue targets + team wages — App.data.revenue_settings
-    const rs = App.data.revenue_settings = App.data.revenue_settings || {};
-    rs.targets = Object.assign({}, rs.targets, {
-      check_avg:         numOr('s-r-ca', 35),
-      bar_labor_pct:     numOr('s-r-bl', 28),
-      kitchen_labor_pct: numOr('s-r-kl', 30),
-      floor_labor_pct:   numOr('s-r-fl', 32),
-      rplh_lunch:        numOr('s-r-rl', 50),
-      rplh_dinner:       numOr('s-r-rd', 75),
-      rplh_bar:          numOr('s-r-rb', 65),
-      event_close_rate:  numOr('s-r-ec', 40)
-    });
-    rs.avg_hourly_wage = {
-      bar:     numOr('s-w-bar', 15),
-      kitchen: numOr('s-w-kit', 14),
-      floor:   numOr('s-w-floor', 13)
-    };
-    rs._targets_saved = true;
-
-    // Traffic targets — App.data.traffic_settings
-    const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-    ts.targets = Object.assign({}, ts.targets, {
-      google_rating:      numOr('s-t-gr', 4.3),
-      review_velocity:    numOr('s-t-rv', 8),
-      response_rate:      numOr('s-t-rr', 75),
-      monthly_sessions:   numOr('s-t-ms', 2000),
-      social_posts_month: numOr('s-t-sp', 12)
-    });
-    ts._targets_saved = true;
-
-    Promise.all([
-      App.saveKey('settings'),
-      App.saveKey('revenue_settings'),
-      App.saveKey('traffic_settings')
-    ]).then(() => {
-      const m = document.getElementById('s-msg');
-      if (m) { m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500); }
-      App.updatePeriod();
-    });
   },
 
   async changePassword() {
