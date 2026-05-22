@@ -610,6 +610,102 @@ FIX.traffic = [
         whatToPaste: 'Fill in your concept, address, neighborhood, hours, and contact.'
       }
     ]
+  },
+
+  {
+    id: 'email-loyalty',
+    name: 'Email & Loyalty',
+    module: 'traffic',
+    summary: 'Email is the one channel where you own the audience. Build the list at every touchpoint, send a personal update every month, and write like the owner, not a marketing department.',
+
+    process: {
+      intro: 'Social platforms rent you an audience. Email is the one channel you own outright. A list that hears from you on a consistent monthly rhythm, in a real voice, brings guests back. A list that hears nothing goes cold within 30 days.',
+      steps: [
+        { title: 'Set up the platform and the welcome sequence first',
+          detail: 'Set up an email platform and build the welcome sequence before you collect a single address. The welcome email is the highest-opened email you will ever send, and most bars never set it up.' },
+        { title: 'Build the list at the five touchpoints',
+          detail: 'Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the touchpoints two at a time so each one gets set up properly.' },
+        { title: 'Run the three campaigns every bar needs',
+          detail: 'A welcome sequence for new subscribers, a monthly update, and an event announcement when there is something real to announce. Those three cover it.' },
+        { title: 'Write in owner voice',
+          detail: '"I wanted to tell you" reads like a person. "We are thrilled to announce" reads like a chain. Write the email first person, with one specific detail, and sign it with a name.' },
+        { title: 'Send on a consistent monthly rhythm',
+          detail: 'One email a month is the floor. More than two a month is where unsubscribes accelerate. A boring email that arrives every first Tuesday builds more loyalty than a brilliant one that arrives whenever the owner feels inspired.' },
+        { title: 'Track estimated visit conversion, not just open rate',
+          detail: 'Open rate tells you who read it. Estimated visit conversion, gathered by asking hosts and servers whether guests mentioned the email, tells you whether reading it drove anyone through the door.' },
+        { title: 'Run quarterly list hygiene',
+          detail: 'Every 90 days, send a re-engagement email to subscribers who have not opened in 90 days and remove the ones who do not respond. A clean list of 400 outperforms a stale list of 2,000.' }
+      ]
+    },
+
+    formulas: [],
+
+    commonMistakes: [
+      'Collecting email addresses but never sending. A list that hears nothing within 30 days of signup has already started to go cold.',
+      'Sending too infrequently and then too often. One email a month is the floor, more than two is where unsubscribes accelerate. Find the rhythm and hold it.',
+      'Writing in marketing voice instead of owner voice. "We are thrilled to announce" reads like a chain. "I wanted to tell you" reads like a person.',
+      'No welcome sequence, so new subscribers never hear from you after signing up. The welcome email is the highest-opened email in any sequence.',
+      'Sending the same message to the whole list. Regulars and new guests have different relationships with the bar and convert from different messages.',
+      'Not tracking estimated visit conversion. Open rate tells you who read it; visit conversion tells you whether it drove anyone in.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'First week of the month: write and send the monthly update',
+        'Subject line: conversational and personal, specific to something new this month',
+        'Body: under 200 words, first person, one specific detail, one invitation, signed with a name',
+        'Day after the send: ask hosts and servers whether any guests mentioned the email',
+        'Log open rate, click rate, and any attributable covers',
+        'Second send only if warranted, and only as an event announcement, not another general update',
+        'End of month: check the list growth rate against target'
+      ],
+      escalation: [
+        'Export the list and identify subscribers who have not opened anything in 90 days.',
+        'Send a re-engagement email asking whether they want to stay on the list.',
+        'Remove any subscriber who does not open the re-engagement email within 7 days.',
+        'Record the cleaned list size and the hygiene date.',
+        'Compare the open rate before and after hygiene. It should improve.',
+        'Review the capture touchpoints and add a new one if list growth is below target.'
+      ]
+    },
+
+    templates: [
+      { name: 'Email List Building Playbook', type: 'PDF', file: 'Email_List_Building_Playbook.pdf',
+        description: 'Seven list-building tactics for bars and restaurants, covering POS capture, table cards, WiFi sign-in, event registration, loyalty integration, and QR code placement.' },
+      { name: 'Email Campaign Templates', type: 'DOC', file: 'Email_Campaign_Templates.docx',
+        description: 'Ready-to-personalize templates for the welcome sequence, the monthly update, and the event announcement, all written in owner voice.' }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'em-ai-1',
+        title: 'Write This Month\'s Email Update',
+        whatItDoes: 'Drafts a monthly update in owner voice, under 200 words, with three subject line options.',
+        prompt: 'My bar: [NAME], [CONCEPT DESCRIPTION], [NEIGHBORHOOD]. What is new this month: [LIST 1 TO 3 SPECIFIC THINGS: menu addition, event, staff change, seasonal shift]. What is happening in the coming weeks: [1 TO 2 SPECIFIC EVENTS OR OCCASIONS]. The email should read like it came from me, not from a marketing department. Write a monthly email update under 200 words, first person singular throughout. Give 3 subject line options, conversational, no all-caps, no exclamation points. No discount offers. Sign off with my first name.',
+        whatToPaste: 'Fill in your bar, what is new this month, what is coming up, and your first name.'
+      },
+      {
+        id: 'em-ai-2',
+        title: 'Write a Welcome Sequence',
+        whatItDoes: 'Drafts the two welcome emails new subscribers receive, in owner voice, with no discount offers.',
+        prompt: 'My bar: [NAME], [CONCEPT], [NEIGHBORHOOD]. What makes the bar worth visiting: [2 TO 3 SPECIFIC THINGS]. Best nights or experiences: [DESCRIBE]. My name: [FIRST NAME]. Write two welcome emails. Email 1 (immediate): thanks for joining, what to expect from the list, one specific invitation for the near future, under 150 words. Email 2 (3 days later): something the subscriber would not find on the website, an insider detail about the bar, under 100 words. Both first person, both conversational, no discount offers.',
+        whatToPaste: 'Fill in your bar, what makes it worth visiting, best experiences, and your first name.'
+      },
+      {
+        id: 'em-ai-3',
+        title: 'Analyze Email Campaign Performance',
+        whatItDoes: 'Reads six months of campaign data to find what is converting and recommends two changes.',
+        prompt: 'Here is my campaign performance data for the last 6 months. [PASTE: campaign name, date sent, list size, open rate, click rate, estimated visit conversion if tracked]. Identify which campaign types and which subject line styles produced the highest open rates and estimated visit conversion. Identify any patterns in underperforming sends, such as day of week, subject line style, or content type. Recommend two changes to my email approach for the next 90 days.',
+        whatToPaste: 'Paste six months of campaign performance data.'
+      },
+      {
+        id: 'em-ai-4',
+        title: 'Write a Re-Engagement Email',
+        whatItDoes: 'Drafts a short re-engagement email for inactive subscribers with a clear click-to-stay and removal notice.',
+        prompt: 'My bar: [NAME], [NEIGHBORHOOD]. How long since these subscribers last opened: [TIME PERIOD]. Write a re-engagement email under 100 words. Subject line: creates mild curiosity about whether they want to stay on the list. Body: acknowledge they have not been hearing from us lately, give them a reason to stay, and give them a simple yes or no, click to stay or they will be removed in 7 days. No guilt, no discount, conversational.',
+        whatToPaste: 'Fill in your bar, neighborhood, and how long these subscribers have been inactive.'
+      }
+    ]
   }
 
 ];
