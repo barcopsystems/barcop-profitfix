@@ -374,26 +374,28 @@ FIX.traffic = [
     summary: 'Social media drives walk-ins when it shows what the bar feels like and runs on a calendar. Own one platform, post five times a week, and track visits and clicks, not likes.',
 
     process: {
-      intro: 'Consistency beats quality for social reach. Pick one platform, post on a fixed weekly rhythm with content the floor team captures, and measure the numbers that mean a new guest is considering a visit.',
+      intro: 'Consistency beats quality for social reach. Pick one platform where your guests are and own it before spreading to a second. Post on a fixed weekly rhythm with content the floor team captures, and measure the numbers that mean a new guest is considering a visit, not the numbers that just count the audience you already have. The Social Media screen tracks your numbers over time. Each step below opens where the work happens.',
       steps: [
-        { title: 'Own one platform before spreading to three',
-          detail: 'Pick the one platform where your guests are and post there consistently before adding a second. The same content posted everywhere ignores the format and audience differences between platforms.' },
-        { title: 'Set up the profile and record a baseline',
-          detail: 'Fix the bio, profile photo, and link-in-bio. Record your current follower count, profile visits, and link clicks before changing anything, so you can tell later whether the work moved them.' },
-        { title: 'Post five times a week on the 3-1-1 framework',
-          detail: 'Three experience posts, one promotional, one community, every week. Irregular posting is penalized by every algorithm, so the frequency itself matters more than any single post.' },
-        { title: 'Make experience content the dominant type',
-          detail: 'Show what it feels like to be in the bar, not promotional graphics. A 60-second walkthrough of a busy night outperforms a polished promo. Experience content is what drives a new guest\'s decision.' },
-        { title: 'Run on a content calendar',
-          detail: 'Plan the month on the calendar so posting is scheduled, not reactive. Assign a content captain each shift to capture the raw footage and photos the calendar needs.' },
-        { title: 'Protect the Sunday review',
-          detail: 'Sunday is the only content work that needs manager judgment: review the week\'s captured content, pick five posts, schedule them, and flag one to cross-post to the Google profile.' },
-        { title: 'Track visits and clicks, not likes',
-          detail: 'Profile visits and link-in-bio clicks measure new-guest consideration. Follower count and likes measure the audience you already have. Track the first two.' }
+        { kind: 'reference', target: 'Social_Media_Profile_Audit_Form.pdf', targetLabel: 'Social Media Profile Audit Form',
+          title: 'Audit the profile',
+          detail: 'Work the Social Media Profile Audit Form across bio, profile photo, link-in-bio, content mix, and posting frequency. Fix the bio, photo, and link-in-bio before you post anything new.' },
+        { kind: 'result', target: 't-social', targetLabel: 'Social Media',
+          title: 'Set the baseline',
+          detail: 'Record your current follower count, profile visits, link clicks, and posts per month in the Social Media screen. Set the baseline before you change anything, so you can tell later whether the work moved the numbers.' },
+        { kind: 'reference', target: 'Social_Content_Calendar.pdf', targetLabel: 'Social Content Calendar',
+          title: 'Run on a content calendar',
+          detail: 'Plan the month on the Social Content Calendar. Post five times a week on the 3-1-1 framework: three experience posts, one promotional, one community. Make experience content the dominant type. A 60-second walkthrough of a busy night outperforms a polished promo, because the feel of the room is what drives a new guest\'s decision.' },
+        { kind: 'reference', target: 'Social_Media_Standards_Policy.docx', targetLabel: 'Social Media Standards Policy',
+          title: 'Set the posting standard and the Sunday review',
+          detail: 'The Social Media Standards Policy covers posting frequency, image quality, caption tone, and the approval workflow for staff posts. Protect the Sunday review: go through the week\'s captured content, pick five posts, schedule them, and flag one to cross-post to the Google profile.' },
+        { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
+          title: 'Log the weekly numbers',
+          detail: 'Every Monday, in This Week, log profile visits and link clicks. Track visits and clicks, not likes. Profile visits and link-in-bio clicks measure new-guest consideration. Follower count and likes only measure the audience you already have.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend',
+          detail: 'The Traffic dashboard rolls your social numbers into the digital presence score and the 90-day trend. Read it weekly. Social content compounds over months, so 90 days of consistent posting gets fundamentally different distribution than the first 30.' }
       ]
     },
-
-    formulas: [],
 
     commonMistakes: [
       'Posting promotional graphics as the dominant content type. Promo content gets saves from existing followers and almost no new reach. Experience content drives new-guest decisions.',
@@ -422,15 +424,6 @@ FIX.traffic = [
         'Check whether any posts were referenced by arriving guests and log it.'
       ]
     },
-
-    templates: [
-      { name: 'Social Content Calendar', type: 'PDF', file: 'Social_Content_Calendar.pdf',
-        description: 'A 4-week content calendar template with daily posting slots, content category suggestions, caption prompts, and a hashtag strategy for Instagram and Facebook.' },
-      { name: 'Social Media Standards Policy', type: 'DOC', file: 'Social_Media_Standards_Policy.docx',
-        description: 'Internal policy covering posting frequency standards, image quality, caption tone, response time targets, and the approval workflow for staff posts.' },
-      { name: 'Social Media Profile Audit Form', type: 'PDF', file: 'Social_Media_Profile_Audit_Form.pdf',
-        description: 'Scoring form for your current social profile across bio, profile photo, link-in-bio, content mix, posting frequency, and the other profile criteria.' }
-    ],
 
     aiWorkflows: [
       {
