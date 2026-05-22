@@ -124,6 +124,10 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 1.8v13.4M11.7 4.4H6.9a2.1 2.1 0 0 0 0 4.2h3.2a2.1 2.1 0 0 1 0 4.2H5.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Price Calculator</span>
       </div>
+      <div class="nav-item" data-screen="r-dog-test" id="nav-r-dog-test">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Dog Test Tracker</span>
+      </div>
       <div class="nav-section">Labor</div>
       <div class="nav-item" data-screen="r-rplh" id="nav-r-rplh">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
