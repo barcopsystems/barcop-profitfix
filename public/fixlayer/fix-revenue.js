@@ -787,6 +787,133 @@ FIX.revenue = [
         whatToPaste: 'Fill in the client, event type, date, guest count, and a notable detail.'
       }
     ]
+  },
+
+  {
+    id: 'server-performance',
+    name: 'Server Performance',
+    module: 'revenue',
+    summary: 'A written standard turns serving from personal style into a trained, measurable system. Roll it out signed, measure by individual check average, and coach from data.',
+
+    process: {
+      intro: 'A briefing tells servers what to suggest today; a written standard tells them how to suggest it at every touch point. The standard is what makes performance trainable, measurable, and enforceable — and coaching has to run on data, not impression.',
+      steps: [
+        { title: 'Write the server standard',
+          detail: 'Document the six touch points — greeting and timing, beverage suggestion, appetizer suggestion, entree pairing, dessert close, and check average targets by shift. An unwritten standard means something different to every manager.' },
+        { title: 'Roll it out, signed',
+          detail: 'Distribute the standard to every active server, collect a signed acknowledgment, file the signed copies, and post a copy in the server area. The standard is only enforceable once it has been distributed and acknowledged.' },
+        { title: 'Brief every manager on the standard',
+          detail: 'Walk every manager through the standard so coaching language is consistent across shifts. A server should hear the same expectations from whoever is on the floor.' },
+        { title: 'Measure by individual check average',
+          detail: 'Track check average per server, not impression or total sales. The server with the most covers often ranks lower on check average — total sales hides the productivity difference.' },
+        { title: 'Audit the floor',
+          detail: 'Two unannounced table visit audits a week confirm the standard is actually executed and show which touch point a server is missing.' },
+        { title: 'Coach below-average servers from data',
+          detail: 'Open with the specific numbers, not a judgment. "Your check average is $24.80 against a $33.40 team average" is coaching; "your tables are not selling" is an accusation. One diagnostic question, one behavior change, one follow-up date.' },
+        { title: 'Train new servers on the standard and recognize top performers',
+          detail: 'New servers learn the written standard on day one, not just by shadowing — shadowing alone teaches another server\'s personal style. Name the prior week\'s top performer in the briefing.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Server Check Average',
+        formula: 'Server sales / server covers',
+        example: 'Track per server every week — the core server performance metric' },
+      { label: 'Annual Revenue Gap',
+        formula: '(Team average - server average) x weekly covers x 52',
+        example: '($33.20 - $24.55) x 72 covers x 52 = $24,883 a year — the number that opens the coaching conversation' },
+      { label: 'Top-Performer Revenue Premium',
+        formula: '(Server average - team average) x weekly covers x 52',
+        example: 'Quantifies what a strong server adds — use it in recognition language' }
+    ],
+
+    commonMistakes: [
+      'Managing server performance by impression and total sales instead of individual check average — total sales hides the productivity difference.',
+      'Not having a written standard — an unwritten standard means something different to every manager and cannot be trained or enforced.',
+      'Coaching the whole team when only two or three servers are below average — a general push has no impact on the people who need it.',
+      'Starting the coaching conversation with judgment rather than data — the numbers are a coaching conversation; "your tables are not selling" is an accusation.',
+      'Training new servers by shadowing without a written standard — they learn another server\'s personal style, not a consistent standard.',
+      'Not connecting the briefing Stars list to the upsell sequence — servers who know what to suggest before the shift perform better than those deciding in the moment.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Review check average by server and identify anyone below the threshold',
+        'Check the four-week trend — flag any server trending down two weeks in a row',
+        'Name the prior week\'s top performer in the next pre-shift briefing',
+        'Schedule coaching conversations for below-average servers this week, not next',
+        'Review the table visit audits — is the sequence being executed on the floor?',
+        'Update first-section assignments based on last week\'s performance data'
+      ],
+      escalation: [
+        'Open the conversation with the specific numbers — the server\'s check average, the team average, and the annual gap.',
+        'Ask one diagnostic question to identify the weakest touch point.',
+        'Use the table audit data to confirm whether it is a skill gap or an effort gap.',
+        'Agree on one specific behavior change to try this week, drawn from the briefing.',
+        'Set a follow-up checkpoint date and review the check average data together.',
+        'If there is no movement after two coaching cycles, move to a structured performance plan.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'server-performance-standard',
+        name: 'Server Performance Standard',
+        intro: 'The written performance standard with a signed acknowledgment. Distributed to every server and filed before the standard takes effect.',
+        fields: [
+          { key: 'bar_name',       label: 'Restaurant Name', placeholder: 'Your restaurant' },
+          { key: 'effective_date', label: 'Effective Date',  placeholder: 'e.g. March 4' }
+        ],
+        body: 'SERVER PERFORMANCE STANDARD\n{{bar_name}}\nEffective {{effective_date}}\n\n'
+          + 'This standard defines how every table is served at {{bar_name}}. It applies to every server, every shift. It is measured, coached from data, and reviewed quarterly.\n\n'
+          + 'THE SIX TOUCH POINTS\n'
+          + '1. Greeting — every table greeted within the timing standard, warmly and by name where known.\n'
+          + '2. Beverage suggestion — a specific drink offered the moment the table is seated.\n'
+          + '3. Appetizer suggestion — one specific starter suggested with the first drink order.\n'
+          + '4. Entree pairing — a specific wine or cocktail pairing named as the entree is ordered.\n'
+          + '5. Dessert close — dessert and an after-dinner drink offered together as one suggestion.\n'
+          + '6. Check average — each server works toward the shift check average target set in the briefing.\n\n'
+          + 'HOW PERFORMANCE IS MEASURED\n'
+          + 'Check average per cover is tracked weekly by server. Table visit audits run twice a week. Coaching is data-based and specific — never a general judgment.\n\n'
+          + 'COACHING AND RECOGNITION\n'
+          + 'A server below team average gets a data-based coaching conversation that week. Top performers are recognized by name in the pre-shift briefing.\n\n'
+          + 'ACKNOWLEDGEMENT\n'
+          + 'I have read and understand the Server Performance Standard for {{bar_name}}.\n\n'
+          + 'Server: ____________________   Signature: ____________________   Date: __________\n\n'
+          + 'Manager: ____________________   Signature: ____________________   Date: __________'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'sp-ai-1',
+        title: 'Build a Coaching Conversation Framework',
+        whatItDoes: 'Drafts a data-first coaching framework for a below-average server — number opening, one diagnostic question, one behavior change, a follow-up date.',
+        prompt: 'I need to coach a server whose check average is below team average. Server details: [NAME], average check last 4 weeks: $[X]. Team average: $[X]. Weekly covers: approximately [X]. Annual revenue gap versus team average: $[X]. Table audit results for this server: [DESCRIBE WHAT YOU OBSERVED]. Draft a coaching conversation framework that opens with the specific numbers (not a general statement), asks one question to identify their weakest touch point, suggests one specific behavior change to try this week, and closes with a follow-up checkpoint date.',
+        whatToPaste: 'Fill in the server\'s name, check average, the team average, weekly covers, annual gap, and audit notes.'
+      },
+      {
+        id: 'sp-ai-2',
+        title: 'Write the Server Upsell Standard',
+        whatItDoes: 'Drafts a concise server standard for your concept covering all six touch points with shift-specific check average targets.',
+        prompt: 'I need to write a server upsell standard for my concept. Concept type: [TYPE]. Current team check average: $[X]. Target check average: $[X]. Top 3 Stars from my menu engineering matrix: [LIST WITH BRIEF DESCRIPTION]. Current beverage program highlights: [LIST 2-3 ITEMS]. Write a server standard under 4 pages covering table greeting and timing, the beverage suggestion sequence, the appetizer suggestion, the entree pairing suggestion, the dessert close by name, and check average targets for peak versus shoulder shifts. Direct, specific language, no hospitality filler.',
+        whatToPaste: 'Fill in your concept type, current and target check average, top Stars, and beverage highlights.'
+      },
+      {
+        id: 'sp-ai-3',
+        title: 'Identify Top Performers for Recognition',
+        whatItDoes: 'Finds the top two servers, quantifies the revenue their performance adds, and writes one recognition line each for the briefing.',
+        prompt: 'Here is my server check average data for the last four weeks. [PASTE DATA]. My team average is $[X]. Identify the top two performers by four-week average, calculate how much additional annual revenue their performance generates compared to team average, and draft one sentence of recognition language for each that I can use in the next pre-shift briefing. Specific and fact-based, not generic praise.',
+        whatToPaste: 'Paste four weeks of by-server check average data and the team average.'
+      },
+      {
+        id: 'sp-ai-4',
+        title: 'Build a New-Server Training Schedule',
+        whatItDoes: 'Creates a day-by-day 14-day onboarding schedule built around the written standard, with a check average review at day 14.',
+        prompt: 'I need a two-week onboarding schedule for a new server. My concept: [TYPE]. Current server standard document: [DESCRIBE KEY ELEMENTS]. Top servers they can shadow: [NAMES]. Expected starting shift schedule: [DESCRIBE]. Build a day-by-day training schedule for the first 14 days that starts with the written standard on day one, includes shadow shifts with a specific observation focus, includes managed table time with check average tracking from day four, and ends with a check average review and first coaching conversation at day 14.',
+        whatToPaste: 'Fill in the concept, the standard\'s key elements, shadow servers, and the starting schedule.'
+      }
+    ]
   }
 
 ];
