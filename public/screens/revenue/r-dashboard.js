@@ -210,6 +210,9 @@ S.RevenueDashboard = {
     const tCA  = t.check_avg||35;
     const uid  = 'rg'+Math.random().toString(36).slice(2,6);
 
+    const fixMarkers = (window.Recovery && window.FixPanel)
+      ? FixPanel.markerSvg(Recovery.chartMarkers(weeks, 'revenue'), xs, PAD.t, PAD.t + ch) : '';
+
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
@@ -223,6 +226,7 @@ S.RevenueDashboard = {
       + yTicks
       + '<line x1="'+PAD.l+'" y1="'+ys(tCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tCA).toFixed(1)+'" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>'
       + '<text x="'+(W-PAD.r+6)+'" y="'+(ys(tCA)+4).toFixed(1)+'" fill="rgba(201,168,76,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
+      + fixMarkers
       + (areaPath(caS)?'<path d="'+areaPath(caS)+'" fill="url(#caGrad'+uid+')"/>':'')
       + '<path d="'+smoothPath(rplhS)+'" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<path d="'+smoothPath(labS)+'" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
