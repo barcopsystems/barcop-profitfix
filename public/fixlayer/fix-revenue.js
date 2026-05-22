@@ -277,60 +277,46 @@ FIX.revenue = [
     summary: 'Revenue per labor hour measures what the schedule produces, not just what it costs. Track it by shift, set targets off your own baseline, and diagnose every miss.',
 
     process: {
-      intro: 'Labor cost percentage tells you the ratio of labor to revenue. RPLH tells you the return on each scheduled hour. You need both — a schedule decision made with only one is missing half the picture.',
+      intro: 'Labor cost percentage tells you the ratio of labor to revenue. RPLH tells you the return on each scheduled hour. You need both. A schedule decision made with only one is missing half the picture. The RPLH Tracker pulls your labor hours straight from Labor Control and does the math. Each step below opens where the work happens.',
       steps: [
-        { title: 'Calculate RPLH by shift and department',
-          detail: 'Net revenue divided by labor hours, for each shift and each department separately. A blended RPLH hides which department or shift is underperforming.' },
-        { title: 'Use RPLH alongside labor percentage',
-          detail: 'A department can sit at an acceptable labor % while its RPLH runs well below target. Read the two numbers together to know whether the schedule is actually working.' },
-        { title: 'Establish your own 13-week baseline',
-          detail: 'Concept benchmarks are a starting orientation only. After one quarter, set each shift\'s RPLH target at roughly 12% above its own 13-week average — that reflects your concept, market, and guest mix.' },
-        { title: 'Build the schedule around the RPLH target',
-          detail: 'Work backward from the revenue forecast and the RPLH target to the labor hours each shift can support, then staff to that number.' },
-        { title: 'Diagnose every below-target shift',
-          detail: 'When a shift runs below target, determine whether labor hours ran above budget (a scheduling problem) or revenue ran below what the staffing should produce (a check average problem).' },
-        { title: 'Route the fix to the right system',
-          detail: 'A scheduling problem is fixed in next week\'s schedule. A check average problem is fixed in the pre-shift briefing — cutting the schedule on a check-average miss fixes nothing.' },
-        { title: 'Run the 10-minute Monday RPLH review',
-          detail: 'Review last week\'s RPLH by shift before the new schedule is built. Monday review, mid-week build, Thursday post — in that order the review drives the decision.' }
+        { kind: 'result', target: 'r-rplh', targetLabel: 'RPLH Tracker',
+          title: 'Read RPLH by shift every Monday',
+          detail: 'The RPLH Tracker works out net revenue divided by labor hours for each shift and department, using hours pulled straight from Labor Control. Read it every Monday before the new schedule is built. Read it next to labor percentage. A shift can sit at an acceptable labor percent while its RPLH runs well below target.' },
+        { kind: 'action', target: 'r-settings', targetLabel: 'Settings',
+          title: 'Set targets off your own 13-week baseline',
+          detail: 'Concept benchmarks are a starting orientation only. After one quarter of data, set each shift\'s RPLH target in Settings at roughly 12% above its own 13-week average. Your own baseline reflects your concept, your market, and your guest mix in a way a generic benchmark never will.' },
+        { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
+          title: 'Build the schedule to the RPLH target',
+          detail: 'In Build Schedule, work backward from the revenue forecast and the RPLH target to the labor hours each shift can support, then staff to that number. Build Schedule shows projected RPLH live as you assign hours.' },
+        { kind: 'result', target: 'r-rplh', targetLabel: 'RPLH Tracker',
+          title: 'Diagnose every below-target shift',
+          detail: 'When the tracker shows a shift below target, decide what drove it. Labor hours above budget is a scheduling problem, fixed in next week\'s schedule. Revenue below what the staffing should produce is a check average problem, fixed in the pre-shift briefing. Cutting the schedule on a check average miss fixes nothing.' }
       ]
     },
 
-    formulas: [
-      { label: 'Revenue Per Labor Hour (RPLH)',
-        formula: 'Net revenue / labor hours (per shift, per department)',
-        example: '$7,400 revenue / 102 labor hours = $72.55 RPLH' },
-      { label: 'RPLH Target',
-        formula: '13-week baseline average x 1.12',
-        example: 'A shift averaging $68.75 over 13 weeks sets a target near $77' },
-      { label: 'Labor Hours Available at Target',
-        formula: 'Revenue forecast / RPLH target',
-        example: '$14,200 Friday forecast / $77 target = 184 labor hours for that shift' }
-    ],
-
     commonMistakes: [
-      'Using labor percentage alone to evaluate scheduling — percentage is the ratio, RPLH is the return; a decision without both is missing half the picture.',
-      'Cutting the schedule when RPLH is low without diagnosing the cause — low RPLH from a check average problem needs an upsell response, not a staffing cut.',
-      'Setting RPLH targets once and never updating them — revenue mix shifts seasonally, so a July target may be too aggressive in January.',
-      'Tracking RPLH as a blended number across departments — bar, kitchen, and floor generate revenue differently and a blend hides the differences.',
-      'Not connecting RPLH data to the pre-shift briefing — servers who know their check average goal change behavior, which moves RPLH.',
-      'Treating a single week of low RPLH as a trend — one weak week is noise; four consecutive weeks on the same shift is a structural problem.'
+      'Using labor percentage alone to evaluate scheduling. The percentage is the ratio, RPLH is the return, and a decision without both is missing half the picture.',
+      'Cutting the schedule when RPLH is low without diagnosing the cause. Low RPLH from a check average problem needs an upsell response, not a staffing cut.',
+      'Setting RPLH targets once and never updating them. Revenue mix shifts seasonally, so a July target may be too aggressive in January.',
+      'Tracking RPLH as a blended number across departments. Bar, kitchen, and floor generate revenue differently and a blend hides the differences.',
+      'Not connecting RPLH data to the pre-shift briefing. Servers who know their check average goal change behavior, which moves RPLH.',
+      'Treating a single week of low RPLH as a trend. One weak week is noise. Four consecutive weeks on the same shift is a structural problem.'
     ],
 
     quickRef: {
       rhythm: [
-        'Enter last week\'s actual revenue and labor hours by shift',
-        'Review RPLH vs target by shift — flag any shift more than 10% below target',
-        'Check the four-week trend — is RPLH moving toward target or away from it?',
+        'Confirm last week\'s revenue and labor hours imported from Labor Control',
+        'Review RPLH vs target by shift and flag any shift more than 10% below target',
+        'Check the four-week trend and see whether RPLH is moving toward target or away from it',
         'Identify whether each below-target shift is a scheduling or a check average problem',
         'If scheduling: adjust next week\'s schedule before it is posted',
         'If check average: add the shift to next week\'s pre-shift briefing focus'
       ],
       benchmarks: [
-        { label: 'Bar — peak shift',          target: '$65-85', warning: '$45-65', critical: 'below $45' },
-        { label: 'Bar — shoulder shift',      target: '$45-60', warning: '$30-45', critical: 'below $30' },
-        { label: 'Full service — peak dinner', target: '$55-75', warning: '$38-55', critical: 'below $38' },
-        { label: 'Full service — slow night', target: '$35-50', warning: '$22-35', critical: 'below $22' },
+        { label: 'Bar, peak shift',           target: '$65-85', warning: '$45-65', critical: 'below $45' },
+        { label: 'Bar, shoulder shift',       target: '$45-60', warning: '$30-45', critical: 'below $30' },
+        { label: 'Full service, peak dinner', target: '$55-75', warning: '$38-55', critical: 'below $38' },
+        { label: 'Full service, slow night',  target: '$35-50', warning: '$22-35', critical: 'below $22' },
         { label: 'Kitchen department',        target: '$40-55', warning: '$28-40', critical: 'below $28' }
       ],
       escalation: [
@@ -342,37 +328,6 @@ FIX.revenue = [
         'Re-check the shift after two weeks to confirm the fix moved the number.'
       ]
     },
-
-    templates: [
-      {
-        id: 'rplh-review-worksheet',
-        name: 'Weekly RPLH Review Worksheet',
-        intro: 'The ten-minute Monday RPLH review on paper. Work it before the next schedule is built so the review drives the decision.',
-        fields: [
-          { key: 'bar_name',    label: 'Restaurant Name', placeholder: 'Your restaurant' },
-          { key: 'week_ending', label: 'Week Ending',     placeholder: 'e.g. March 9' }
-        ],
-        body: 'WEEKLY RPLH REVIEW\n{{bar_name}} — Week ending {{week_ending}}\n\n'
-          + 'For each shift: revenue / labor hours = RPLH, compared to target.\n\n'
-          + 'SHIFT 1: ____________________\n'
-          + 'Revenue: __________  Labor hrs: ______  RPLH: ______  Target: ______\n'
-          + 'SHIFT 2: ____________________\n'
-          + 'Revenue: __________  Labor hrs: ______  RPLH: ______  Target: ______\n'
-          + 'SHIFT 3: ____________________\n'
-          + 'Revenue: __________  Labor hrs: ______  RPLH: ______  Target: ______\n'
-          + 'SHIFT 4: ____________________\n'
-          + 'Revenue: __________  Labor hrs: ______  RPLH: ______  Target: ______\n\n'
-          + 'BELOW-TARGET SHIFTS (more than 10% below target)\n'
-          + '________________________________________________________\n\n'
-          + 'DIAGNOSIS — for each below-target shift, scheduling or check average?\n'
-          + '________________________________________________________\n'
-          + '________________________________________________________\n\n'
-          + 'ACTIONS INTO NEXT WEEK\n'
-          + 'Schedule adjustments: ____________________________________\n'
-          + 'Shifts added to pre-shift briefing focus: ________________\n\n'
-          + 'Completed by: ____________________   Date: __________'
-      }
-    ],
 
     aiWorkflows: [
       {
