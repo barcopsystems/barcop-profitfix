@@ -103,6 +103,102 @@ FIX.traffic = [
         whatToPaste: 'Paste your profile data and your top three competitors\' profile data.'
       }
     ]
+  },
+
+  {
+    id: 'website',
+    name: 'Website',
+    module: 'traffic',
+    summary: 'Most guests reach your website on a phone, after a Google search, ready to act. If they cannot find your hours, your menu, and a way to book in a few seconds, they leave.',
+
+    process: {
+      intro: 'A bar website has one job: turn a guest who is already looking for you into a visit. Audit it before you change anything so you can prove the fixes worked, then fix conversion in the order that returns the most per hour.',
+      steps: [
+        { title: 'Audit before you touch anything',
+          detail: 'Run a page-speed test on the homepage and the menu page, score the conversion audit, and record the baseline. An audit done after fixes cannot measure what changed.' },
+        { title: 'Pass the eight-second test',
+          detail: 'Open the site on your own phone. A guest should find the phone number, the hours, and the reservation link within eight seconds. If you cannot, neither can they.' },
+        { title: 'Get four elements above the fold on mobile',
+          detail: 'A clickable phone number, today\'s hours, the address, and a reservation or order button, all visible without scrolling. A full-screen hero photo with no information is a conversion failure no matter how good it looks.' },
+        { title: 'Fix speed first',
+          detail: 'Compress every image on the homepage and menu page to under 200KB. Image compression alone usually moves a page-speed score 15 to 25 points. It takes 20 minutes and costs nothing.' },
+        { title: 'Replace the PDF menu with a web page',
+          detail: 'A PDF menu cannot be indexed by Google and cannot be read on a phone without zooming. Put the menu on a web-readable HTML or platform page so it works and earns search value.' },
+        { title: 'Install analytics',
+          detail: 'Set up Google Analytics 4. Without bounce rate, session data, and click paths you cannot know whether a change helped. It takes 15 minutes and is free.' },
+        { title: 'Track weekly',
+          detail: 'Every Monday pull mobile load time, mobile bounce rate, and click-to-call and reservation clicks. Flag any metric that moved more than five points off the baseline.' }
+      ]
+    },
+
+    formulas: [],
+
+    commonMistakes: [
+      'Using a PDF menu instead of a web page. PDF menus cannot be indexed by Google, cannot be read on a phone without zooming, and produce no search value.',
+      'No clickable phone number above the fold on mobile. A number that takes scrolling to find loses the guest who needs to call.',
+      'A hero image that fills the whole mobile screen. A beautiful full-screen photo with no visible information is a conversion failure.',
+      'The action button only in the navigation or footer. The reserve or order button has to be above the fold on mobile, not buried.',
+      'A menu last updated over 12 months ago. An outdated online menu produces bad reviews when guests arrive expecting items that are gone.',
+      'No analytics installed. Without bounce rate, session duration, and click paths you cannot know whether your fixes worked.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Pull mobile load time from a page-speed test or hosting analytics and log it',
+        'Pull mobile bounce rate from Google Analytics and log it',
+        'Pull click-to-call events and reservation link clicks from the analytics events report',
+        'Flag any metric that moved more than five points below your baseline',
+        'Update the menu page if any items or prices changed in the past week',
+        'Confirm the reservation link still works and routes to the correct booking page'
+      ],
+      escalation: [
+        'Compress every image on the homepage and menu page to under 200KB.',
+        'Add a clickable phone number to the mobile header, visible without scrolling.',
+        'Replace any PDF menu with a web-readable HTML or platform menu page.',
+        'Add a reserve or order button to the mobile header or a sticky footer.',
+        'Confirm the address and today\'s hours are visible without scrolling on mobile.',
+        'Install Google Analytics 4 if it is not already tracking.',
+        'Re-run the page-speed test and record the updated score against the baseline.'
+      ]
+    },
+
+    templates: [
+      { name: 'Restaurant Website Audit Form', type: 'PDF', file: 'Restaurant_Website_Audit_Form.pdf',
+        description: 'Page-by-page website audit covering mobile optimization, menu page structure, calls to action, page load speed, and NAP consistency across all pages.' },
+      { name: 'Website Conversion Fix Checklist', type: 'PDF', file: 'Website_Conversion_Fix_Checklist.pdf',
+        description: 'The conversion fixes in priority order, from image compression through analytics setup, with the expected impact and effort of each.' }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'web-ai-1',
+        title: 'Rewrite the Homepage Headline for Mobile',
+        whatItDoes: 'Drafts three short homepage headlines with subheadlines, written for a guest who found you on a phone.',
+        prompt: 'My bar concept: [DESCRIBE IN 2 SENTENCES]. My neighborhood: [NEIGHBORHOOD AND CITY]. My primary offering or differentiator: [WHAT MAKES YOUR BAR WORTH VISITING]. My current homepage headline: [PASTE CURRENT HEADLINE]. Write three alternative headline options optimized for a guest on a phone who found me through a Google search. Each headline should be under 8 words, name the concept type or a key offering, and include the neighborhood name. Write a one-sentence subheadline for each that answers what the guest gets if they visit.',
+        whatToPaste: 'Fill in your concept, neighborhood, differentiator, and current headline.'
+      },
+      {
+        id: 'web-ai-2',
+        title: 'Write Online Menu Item Descriptions',
+        whatItDoes: 'Drafts tight online menu descriptions for your top items, each with a specific ingredient detail.',
+        prompt: 'I need online menu descriptions for my top performing items. For each item: name, key ingredients, preparation note, price. [PASTE ITEM LIST]. Write a description for each under 20 words, including one specific ingredient detail and one sensory word. For cocktails, include the base spirit and one flavor note. No filler, no "delicious", no "house-made" without a specific follow-up, no "fresh" as a standalone adjective. Format: item name on one line, description on the next.',
+        whatToPaste: 'Paste your top items with ingredients, prep notes, and prices.'
+      },
+      {
+        id: 'web-ai-3',
+        title: 'Rank Your Website Conversion Problems',
+        whatItDoes: 'Reads your audit scores and ranks the conversion problems by impact, with one non-developer fix for each.',
+        prompt: 'Here is my website conversion audit scores for each section. [PASTE SCORES: mobile speed score, above-fold elements present or absent, CTA placement score, menu accessibility score, reservation path step count]. My current mobile page-speed score: [SCORE]. My mobile bounce rate: [RATE]%. Rank my conversion problems by estimated impact on bounce rate. For each problem, suggest one specific fix that does not require a developer and estimate how long it takes to implement.',
+        whatToPaste: 'Paste your audit section scores, page-speed score, and bounce rate.'
+      },
+      {
+        id: 'web-ai-4',
+        title: 'Write the Contact and Hours Page',
+        whatItDoes: 'Drafts the full text of a mobile-friendly contact and hours page in under 150 words.',
+        prompt: 'My bar details: name [NAME], address [ADDRESS], neighborhood [NEIGHBORHOOD], phone [PHONE], hours [HOURS BY DAY], reservation policy [POLICY], parking [PARKING DETAILS], public transit [NEAREST STOP IF RELEVANT]. Write the complete text for a Contact and Hours page. Include a one-sentence intro with the neighborhood name, hours formatted for easy reading on mobile, the address with a note about landmarks or parking, the phone number with a note about reservations, and one sentence about walk-in availability. Under 150 words total, no marketing language.',
+        whatToPaste: 'Fill in your name, address, neighborhood, phone, hours, and policies.'
+      }
+    ]
   }
 
 ];
