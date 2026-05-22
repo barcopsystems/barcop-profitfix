@@ -416,7 +416,7 @@ S.Hub = {
     `;
 
     document.getElementById('hub-signout')?.addEventListener('click', async () => { await DB.signOut(); });
-    document.getElementById('hub-settings')?.addEventListener('click', () => this._enter('settings', 'profit'));
+    document.getElementById('hub-settings')?.addEventListener('click', () => S.HubSettings.open());
 
     document.getElementById('hub-rec-set')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('hub-rec-target')?.value);
