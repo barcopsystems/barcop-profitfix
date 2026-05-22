@@ -33,16 +33,30 @@ window.FixPanel = {
   fixAreasCard(moduleKey) {
     const gaps = this.gapAreas(moduleKey);
     if (!gaps.length) return '';
-    const rows = gaps.map((g, i) =>
-      '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
-      + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
-      + (i < gaps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-      + '<div style="flex:1;">'
-      + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(g.summary || '') + '</div>'
-      + '</div>'
-      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-      + '</div>').join('');
+    const rows = gaps.map((g, i) => {
+      const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
+      let impHtml = '';
+      if (imp && imp.onTarget) {
+        impHtml = '<span style="flex-shrink:0;font-size:8px;font-weight:800;letter-spacing:0.1em;'
+          + 'text-transform:uppercase;color:var(--gold);">On Target</span>';
+      } else if (imp && imp.dollars > 0) {
+        impHtml = '<div style="flex-shrink:0;text-align:right;">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;'
+          + 'color:var(--red);line-height:1;">' + App.fmtCurrency(imp.dollars) + '</div>'
+          + '<div style="font-size:8px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;'
+          + 'color:var(--t3);margin-top:2px;">Over target / yr</div></div>';
+      }
+      return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
+        + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+        + (i < gaps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(g.summary || '') + '</div>'
+        + '</div>'
+        + impHtml
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+        + '</div>';
+    }).join('');
     return '<div class="sh">Fix Areas</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + rows + '</div>';
   },
