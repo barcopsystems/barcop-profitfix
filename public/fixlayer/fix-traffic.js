@@ -314,6 +314,103 @@ FIX.traffic = [
         whatToPaste: 'Paste the review, why you believe it is inaccurate, and your contact.'
       }
     ]
+  },
+
+  {
+    id: 'search-seo',
+    name: 'Search & SEO',
+    module: 'traffic',
+    summary: 'Local search ranking comes from a clean, consistent listing across the web. Fix your name, address, and phone everywhere first, then build citations and track the terms that bring walk-ins.',
+
+    process: {
+      intro: 'Local-pack ranking is built on two things: a complete Google Business Profile and consistent business information across the web. Fix the foundation before you build on it, because a citation built on top of inconsistent information just creates another variant.',
+      steps: [
+        { title: 'Fix NAP consistency first',
+          detail: 'Name, address, and phone have to match exactly across every platform. One wrong character splits your citation authority. Audit all the major directories and fix every variant before building anything new.' },
+        { title: 'Build your target keyword list',
+          detail: 'Target neighborhood and occasion terms that drive walk-ins, like "bar Wicker Park" or "date night bar Chicago". Broad city terms like "best bar Chicago" drive almost no real traffic for an independent bar.' },
+        { title: 'Find and merge duplicate listings',
+          detail: 'Two Google listings for one bar split your review count and your citation authority in half. Find duplicates on Google and Yelp and submit merge requests before building more reviews.' },
+        { title: 'Build citations in priority order',
+          detail: 'Google first, then Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor, and the reservation platforms. Every listing carries the exact same name, address, and phone.' },
+        { title: 'Do not skip Foursquare',
+          detail: 'Foursquare is the citation most operators skip and most should not. Its data feeds dozens of downstream directories automatically, so a consistent Foursquare listing propagates accuracy across the web.' },
+        { title: 'Track keyword rank',
+          detail: 'Load your target terms into a rank tracker and record a baseline position before making changes. Without rank tracking you cannot know whether the GBP and citation work is moving you up.' },
+        { title: 'Keep local-pack and organic SEO separate',
+          detail: 'Local-pack ranking comes from profile completeness and citation consistency. Organic website ranking comes from website content. They are built differently, so work them as two jobs.' }
+      ]
+    },
+
+    formulas: [],
+
+    commonMistakes: [
+      'Optimizing for broad city-level terms instead of neighborhood and occasion terms. "Best bar Chicago" drives almost no new traffic; "bar Wicker Park" drives walk-ins.',
+      'Inconsistent name, address, and phone across platforms. A business name that appears three different ways splits citation authority three ways.',
+      'Not claiming listings on secondary directories. An unclaimed Foursquare listing produces variants on every downstream directory it feeds.',
+      'Ignoring duplicate listings. A bar with two Google listings splits its review count and its authority. Merge them before building more reviews.',
+      'Never checking keyword ranking position. Without weekly rank tracking you cannot know whether the work is producing a position improvement.',
+      'Treating organic SEO and local-pack SEO as the same thing. Local pack needs profile completeness and citations; organic needs website content.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Update keyword ranking positions for all of your target terms',
+        'Update the citation count and flag any directory showing a name, address, or phone variant',
+        'Correct any variant found in the check',
+        'Pull direction requests from the GBP insights and compare to last month',
+        'Log the SEO numbers in your monthly digital presence scorecard',
+        'Run the full local SEO audit once a quarter'
+      ],
+      escalation: [
+        'Confirm the Google Business Profile is claimed and 100% complete.',
+        'Build the target keyword list and identify your 10 terms.',
+        'Audit name, address, and phone across every platform and fix every variant.',
+        'Find duplicate listings on Google and Yelp and submit merge requests.',
+        'Record a baseline ranking position for each target keyword.',
+        'Build citations in priority order: Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor, reservation platforms.'
+      ]
+    },
+
+    templates: [
+      { name: 'NAP Consistency Audit', type: 'PDF', file: 'NAP_Consistency_Audit.pdf',
+        description: 'Audit form for checking your business name, address, and phone number across Google, Yelp, TripAdvisor, delivery platforms, and the top local directories.' },
+      { name: 'Local SEO Quick-Start Guide', type: 'DOC', file: 'Local_SEO_Quick_Start_Guide.docx',
+        description: 'Plain-English guide to local SEO for bars and restaurants. Covers profile optimization, citation building, website title tags, and keyword targeting for local search.' },
+      { name: 'Keyword Research Worksheet', type: 'DOC', file: 'Keyword_Research_Worksheet.docx',
+        description: 'Worksheet for identifying your 10 target search terms across neighborhood, occasion, concept, proximity, and competitor-comparison categories.' }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'seo-ai-1',
+        title: 'Identify Your 10 Target Search Terms',
+        whatItDoes: 'Generates 10 local-pack target terms across neighborhood, occasion, concept, proximity, and comparison categories, with intent classification.',
+        prompt: 'My bar concept: [DESCRIBE BRIEFLY]. My neighborhood: [NEIGHBORHOOD NAME]. My city: [CITY]. My primary Google category: [CATEGORY]. My secondary categories or key offerings: [LIST 3 TO 5]. Generate 10 target search terms I should be ranking for in Google Maps: 3 neighborhood-specific terms, 2 occasion-based terms, 2 concept-specific terms, 2 proximity terms a guest on their phone would use, and 1 competitor comparison term. For each term, estimate whether search intent is primarily foot traffic or information-seeking, and exclude any term where the intent is primarily informational.',
+        whatToPaste: 'Fill in your concept, neighborhood, city, primary category, and secondary categories.'
+      },
+      {
+        id: 'seo-ai-2',
+        title: 'Write Keyword-Rich Q&A for Your Profile',
+        whatItDoes: 'Drafts 8 owner-posted Q&A pairs that work your target keywords in naturally.',
+        prompt: 'My bar concept: [DESCRIBE]. My neighborhood: [NEIGHBORHOOD AND CITY]. My target keywords: [PASTE YOUR 10 TERMS]. Write 8 question and answer pairs I can post to my GBP Q&A section as the business owner. Each question should be phrased the way a guest searching locally would ask it, and each answer should include at least one of my target keywords naturally plus the neighborhood name. Answers under 80 words each, no keyword stuffing.',
+        whatToPaste: 'Fill in your concept and neighborhood and paste your 10 target keywords.'
+      },
+      {
+        id: 'seo-ai-3',
+        title: 'Find Citation Gaps vs a Competitor',
+        whatItDoes: 'Compares your citations to a competitor\'s and ranks the missing directories by value.',
+        prompt: 'Here is my current citation data and my top competitor\'s citation data. [PASTE: for each, list the directories where they appear that I do not, and vice versa]. Identify the directories where my competitor has a listing and I do not, rank them by domain authority for local search citation purposes, and for each gap describe what type of listing it is and estimate how long it takes to build.',
+        whatToPaste: 'Paste your citation list and your competitor\'s citation list.'
+      },
+      {
+        id: 'seo-ai-4',
+        title: 'Write a Location Page',
+        whatItDoes: 'Drafts a location or contact page that strengthens local search relevance without reading like marketing.',
+        prompt: 'I need to write or rewrite the location or contact page on my website. My bar: [NAME], [ADDRESS], [NEIGHBORHOOD], [CITY]. My target keywords: [PASTE TOP 5]. My hours: [HOURS]. My phone: [PHONE]. Write a location page that includes the neighborhood name and city naturally at least twice, uses two of my target keywords in the copy, describes how to find the bar including a landmark reference, and mentions parking or transit options. Under 200 words, no marketing language, factual and specific.',
+        whatToPaste: 'Fill in your name, address, neighborhood, top keywords, hours, and phone.'
+      }
+    ]
   }
 
 ];
