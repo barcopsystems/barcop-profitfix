@@ -120,6 +120,10 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Menu Engineering</span>
       </div>
+      <div class="nav-item" data-screen="r-pricing" id="nav-r-pricing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 1.8v13.4M11.7 4.4H6.9a2.1 2.1 0 0 0 0 4.2h3.2a2.1 2.1 0 0 1 0 4.2H5.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Price Calculator</span>
+      </div>
       <div class="nav-section">Labor</div>
       <div class="nav-item" data-screen="r-rplh" id="nav-r-rplh">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
