@@ -487,7 +487,81 @@ S.RevenueSettings = {
       }
     ];
 
+    // ════════════════════════════════════════════════════════════════════
+    //  LABOR CONTROL — derived from the locked Anchor profile. Each week's
+    //  lc_actuals sum to that week's labor: the Bar department to bar_labor,
+    //  Kitchen + Front of House to food_labor. Profit reads the split, Revenue
+    //  reads the total, and both trace to the same numbers.
+    // ════════════════════════════════════════════════════════════════════
+    App.laborData = App.laborData || {};
+    const ANCHL = window.ANCHOR, LW = ANCHL.wages;
+
+    const lcPositions = [
+      { id:uid(), name:'Bartender',  department:'Bar',            default_wage:LW.bar,     tipped:true,  notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Barback',    department:'Bar',            default_wage:LW.bar,     tipped:true,  notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Line Cook',  department:'Kitchen',        default_wage:LW.kitchen, tipped:false, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Prep Cook',  department:'Kitchen',        default_wage:LW.kitchen, tipped:false, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Dishwasher', department:'Kitchen',        default_wage:LW.kitchen, tipped:false, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Server',     department:'Front of House', default_wage:LW.floor,   tipped:true,  notes:'', created_at:new Date().toISOString() },
+      { id:uid(), name:'Host',       department:'Front of House', default_wage:LW.floor,   tipped:false, notes:'', created_at:new Date().toISOString() },
+    ];
+    App.laborData.lc_positions = lcPositions;
+    const posByName = {}; lcPositions.forEach(p => posByName[p.name] = p);
+
+    // dept is the Anchor labor bucket; share is the staff member's slice of it.
+    const lcStaffDef = [
+      { name:'Maria G.',   pos:'Bartender',  dept:'bar',     share:0.40 },
+      { name:'Jake T.',    pos:'Bartender',  dept:'bar',     share:0.35 },
+      { name:'Sam R.',     pos:'Barback',    dept:'bar',     share:0.25 },
+      { name:'Luis V.',    pos:'Line Cook',  dept:'kitchen', share:0.30 },
+      { name:'Tara B.',    pos:'Line Cook',  dept:'kitchen', share:0.28 },
+      { name:'Omar K.',    pos:'Prep Cook',  dept:'kitchen', share:0.24 },
+      { name:'Dan P.',     pos:'Dishwasher', dept:'kitchen', share:0.18 },
+      { name:'Jessica M.', pos:'Server',     dept:'floor',   share:0.22 },
+      { name:'Marcus T.',  pos:'Server',     dept:'floor',   share:0.21 },
+      { name:'Brianna K.', pos:'Server',     dept:'floor',   share:0.20 },
+      { name:'Derek W.',   pos:'Server',     dept:'floor',   share:0.19 },
+      { name:'Aimee R.',   pos:'Host',       dept:'floor',   share:0.18 },
+    ];
+    const lcWageOf = d => d === 'bar' ? LW.bar : d === 'kitchen' ? LW.kitchen : LW.floor;
+    const lcStaff = lcStaffDef.map((s, i) => ({
+      id:uid(), name:s.name, position_id:posByName[s.pos].id, wage:lcWageOf(s.dept),
+      status:'Active', hire_date:dateStr(150 + i*8), phone:'', email:'', notes:'',
+      created_at:new Date().toISOString()
+    }));
+    App.laborData.lc_staff = lcStaff;
+
+    // One actual per staff per week. Within a department the last member takes
+    // the remainder, so each week's department cost sums exactly to the profile.
+    const lcActuals = [];
+    ANCHL.weeks.forEach(a => {
+      const dep = ANCHL.laborDepts(a);
+      const baseAgo = (12 - a.wk) * 7;
+      const deptDate = { bar:dateStr(baseAgo), kitchen:dateStr(baseAgo + 2), floor:dateStr(baseAgo + 4) };
+      const deptCost = { bar:dep.bar, kitchen:dep.kitchen, floor:dep.floor };
+      ['bar','kitchen','floor'].forEach(dname => {
+        const members = lcStaffDef.map((s, i) => ({ s, i })).filter(x => x.s.dept === dname);
+        const wage = lcWageOf(dname);
+        let assigned = 0;
+        members.forEach((m, mi) => {
+          const cost = (mi === members.length - 1)
+            ? deptCost[dname] - assigned
+            : Math.round(deptCost[dname] * m.s.share);
+          assigned += cost;
+          const st = lcStaff[m.i];
+          lcActuals.push({
+            id:uid(), date:deptDate[dname], staff_id:st.id, name:st.name,
+            position_id:st.position_id, shift_type:'Week',
+            hours:+(cost / wage).toFixed(1), wage:wage, cost:cost,
+            notes:'', created_at:new Date().toISOString()
+          });
+        });
+      });
+    });
+    App.laborData.lc_actuals = lcActuals;
+
     await App.save();
+    await App.saveLabor();
 
     if (msg) { msg.style.color='var(--gold)'; msg.textContent='Sample data loaded. All sections populated.'; }
   },
