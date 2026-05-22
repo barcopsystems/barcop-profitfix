@@ -81,8 +81,11 @@ app.post('/api/generate-profit-audit', (req, res) => {
       }
     }
 
+    let controlData = null;
+    try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
+
     try {
-      const auditData = await extractAuditData(apiKey, 'profit', uploadedFiles, appData, notes);
+      const auditData = await extractAuditData(apiKey, 'profit', uploadedFiles, appData, notes, controlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Profit audit error:', e);
@@ -192,9 +195,9 @@ function parseSpreadsheetToText(filePath, fileName) {
 }
 
 // ── Extract audit data from uploaded files ────────────────────────────────────
-async function extractAuditData(apiKey, auditType, files, appData, notes='') {
+async function extractAuditData(apiKey, auditType, files, appData, notes='', controlData=null) {
   const prompts = {
-    profit:  getExtractionPrompt_Profit(appData),
+    profit:  getExtractionPrompt_Profit(appData, controlData),
     revenue: getExtractionPrompt_Revenue(appData),
     traffic: getExtractionPrompt_Traffic(appData),
   };
@@ -319,7 +322,7 @@ function callClaude(apiKey, bodyObj) {
 }
 
 // ── Extraction Prompts ─────────────────────────────────────────────────────────
-function getExtractionPrompt_Profit(appData) {
+function getExtractionPrompt_Profit(appData, controlData) {
   const settings = appData.settings || {};
   const weeks    = appData.weeks    || [];
   const shifts   = appData.shifts   || [];
@@ -358,6 +361,27 @@ function getExtractionPrompt_Profit(appData) {
     ? recons.slice(-4).map(r => '  ' + (r.date||'') + ' | Expected: $' + (r.expected||0) + ' | Actual: $' + (r.actual||0) + ' | Variance: $' + ((r.actual||0)-(r.expected||0)).toFixed(2)).join('\n')
     : '  No cash reconciliation entries';
 
+  // Verified Control-module data — real logged operational data the audit
+  // treats as ground truth for the sections it covers (map Section 8).
+  let controlBlock = '';
+  if (controlData && typeof controlData === 'object') {
+    const c = controlData, cl = [];
+    if (c.bar_cost_pct != null)    cl.push('verified_bar_pour_cost_pct=' + c.bar_cost_pct + ' — S1 ground truth');
+    if (c.food_cost_pct != null)   cl.push('verified_food_cost_pct=' + c.food_cost_pct + ' — S3 ground truth');
+    if (c.prime_cost_pct != null)  cl.push('verified_prime_cost_pct=' + c.prime_cost_pct + ' — S5 ground truth');
+    if (c.inventory_counts)        cl.push('inventory_counts_on_file=' + c.inventory_counts);
+    if (c.spot_checks)             cl.push('spot_checks=' + c.spot_checks + ' flagged_items=' + (c.spot_check_flagged||0) + ' pour_variance_$=' + (c.spot_check_variance_dollar||0) + ' — S2 theft ground truth');
+    if (c.void_comp_count != null) cl.push('void_comp_events=' + c.void_comp_count + ' total_$=' + c.void_comp_total + ' unauthorized=' + c.void_comp_unauthorized + ' — S2 ground truth');
+    if (c.cash_reconciliations)    cl.push('drawer_reconciliations=' + c.cash_reconciliations + ' total_variance_$=' + c.cash_variance_total + ' short_count=' + c.cash_short_count + ' — S2 cash ground truth');
+    if (c.cash_drops)              cl.push('cash_drops_logged=' + c.cash_drops);
+    if (c.deliveries_logged)       cl.push('deliveries_logged=' + c.deliveries_logged + ' vendor_price_changes=' + c.vendor_price_changes + ' — S4 vendor ground truth');
+    if (c.labor_hours != null)     cl.push('labor_hours=' + c.labor_hours + ' labor_cost_$=' + c.labor_cost + ' — S5 prime cost labor ground truth');
+    if (cl.length) {
+      controlBlock = '\nVERIFIED CONTROL DATA — this operator runs Bar Cop\'s Inventory, Shift and Labor Control modules. The figures below are real logged operational data, not estimates. Treat them as ground truth: score the sections they cover from these values, do not estimate those numbers or depend on uploaded files for them, and reflect this verified coverage in DATA_TIER_LABEL. Sections not covered here still rely on the uploads.\n'
+        + cl.map(l => '  ' + l).join('\n') + '\n';
+    }
+  }
+
   return `PROFIT AUDIT — respond with a single JSON object, no other text. Use the app data below to populate every field. Never output 0 for a score.
 
 SCORING (out of 100 each):
@@ -380,7 +404,7 @@ shift_checks=${shifts.length} | cash_recons=${recons.length} | vendor_log_entrie
 theft_score=${theft.length?(theft[theft.length-1]&&theft[theft.length-1].total)||'unscored':'unscored'}
 ${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
 ${reconSummary?'RECONS:\n'+reconSummary:''}
-
+${controlBlock}
 Return this exact JSON structure with all values calculated (not 0):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"PFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":63,"TARGET_SCORE":65,
 "OVERALL_SCORE":[calculated],
