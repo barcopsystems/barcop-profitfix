@@ -93,6 +93,19 @@ window.FixPanel = {
     });
   },
 
+  // Vertical fix-event markers for an annotated trend chart. xFn maps a week
+  // index to an x coordinate; top/bottom are the plot edges.
+  markerSvg(markers, xFn, top, bottom) {
+    if (!markers || !markers.length) return '';
+    return markers.map(m => {
+      const x = xFn(m.index).toFixed(1);
+      return '<line x1="' + x + '" y1="' + top.toFixed(1) + '" x2="' + x + '" y2="' + bottom.toFixed(1) + '" '
+        + 'stroke="rgba(201,168,76,0.5)" stroke-width="1" stroke-dasharray="2,3"/>'
+        + '<circle cx="' + x + '" cy="' + top.toFixed(1) + '" r="3" fill="#C9A84C">'
+        + '<title>' + esc(m.label) + ' implemented ' + esc(m.date) + '</title></circle>';
+    }).join('');
+  },
+
   renderInto(el, moduleKey, focusId) {
     if (!el) return;
     el.dataset.fixModule = moduleKey;
