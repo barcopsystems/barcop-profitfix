@@ -434,6 +434,7 @@ const App = {
       const revTitles = {
         'hub':                    ['Recovery Hub', ''],
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
+        'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
         'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
         'r-this-week':            ['This Week', 'Weekly Entry'],
         'r-server-check':         ['Server Check', ''],
@@ -450,6 +451,7 @@ const App = {
       };
       const revScreens = {
         'r-audit':            S.RevenueAudit,
+        'r-fix':              S.RevenueFix,
         'r-dashboard':        S.RevenueDashboard,
         'r-this-week':        S.RevenueThisWeek,
         'r-server-check':     S.RevenueServerCheck,
@@ -479,6 +481,7 @@ const App = {
         'hub':              ['Recovery Hub', ''],
         't-dashboard':      ['Dashboard', 'Traffic Recovery'],
         't-audit':          ['Traffic Audit', 'Monthly Score and Progress'],
+        't-fix':            ['Traffic Fix', 'Fix Process and Guidance'],
         't-this-week':      ['This Week', 'Weekly Entry'],
         't-gbp':            ['Google Business Profile', ''],
         't-reviews':        ['Review Tracker', ''],
@@ -496,6 +499,7 @@ const App = {
       const trafficScreens = {
         't-dashboard':      S.TrafficDashboard,
         't-audit':          S.TrafficAudit,
+        't-fix':            S.TrafficFix,
         't-this-week':      S.TrafficThisWeek,
         't-gbp':            S.TrafficGBP,
         't-reviews':        S.TrafficReviews,
@@ -680,6 +684,7 @@ const App = {
       'settings':      ['Settings', 'Profit Recovery'],
       'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
+      'profit-fix':    ['Profit Fix', 'Fix Process and Guidance'],
       'resources':     ['Resources', 'Tools, Templates & Checklists'],
       'getting-started': ['Getting Started', '30-Day Setup Checklist']
     };
@@ -699,6 +704,7 @@ const App = {
       'settings':      S.Settings,
       'help':          S.Help,
       'audit-tracker': S.AuditTracker,
+      'profit-fix':    S.ProfitFix,
       'resources':     S.Resources,
       'getting-started': S.GettingStarted
     };
