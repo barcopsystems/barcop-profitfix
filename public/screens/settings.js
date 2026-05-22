@@ -354,19 +354,24 @@ S.Settings = {
     });
     App.data.recipes = recipes;
 
-    // ── 8 Weeks of Data ──
+    // ── 8 Weeks of Data — a deliberate recovery trend for The Anchor ──
+    // Bar pour cost and food cost both decline across the window as the
+    // Pour Cost and Food Cost fixes take hold (see fix_log below). Week 8 is
+    // the oldest, week 1 the most recent.
+    const barPourByWeek  = { 8:27.4, 7:27.1, 6:26.8, 5:25.2, 4:24.4, 3:23.6, 2:23.1, 1:22.8 };
+    const foodCostByWeek = { 8:38.5, 7:38.1, 6:37.4, 5:36.2, 4:35.0, 3:34.1, 2:33.4, 1:32.9 };
     const weeks = [];
     for (let w = 8; w >= 1; w--) {
       const wkNum = w;
       const endDate = dateStr((w-1)*7);
-      const barRev  = 11800 + Math.round((Math.random()-0.5)*1200);
-      const barCogs = Math.round(barRev * (0.245 + (Math.random()-0.5)*0.04));
-      const barLab  = Math.round(barRev * (0.27  + (Math.random()-0.5)*0.03));
-      const foodRev = 7100  + Math.round((Math.random()-0.5)*800);
-      const foodCogs= Math.round(foodRev * (0.35  + (Math.random()-0.5)*0.05));
-      const foodLab = Math.round(foodRev * (0.29  + (Math.random()-0.5)*0.03));
-      const bPct    = barCogs / barRev * 100;
-      const fPct    = foodCogs/ foodRev* 100;
+      const barRev  = 11800 + Math.round((Math.random()-0.5)*900);
+      const foodRev = 7100  + Math.round((Math.random()-0.5)*600);
+      const bPct    = barPourByWeek[w];
+      const fPct    = foodCostByWeek[w];
+      const barCogs = Math.round(barRev * bPct/100);
+      const foodCogs= Math.round(foodRev * fPct/100);
+      const barLab  = Math.round(barRev * (0.27 + (Math.random()-0.5)*0.02));
+      const foodLab = Math.round(foodRev * (0.29 + (Math.random()-0.5)*0.02));
       const tRev    = barRev + foodRev;
       const pPct    = (barCogs+foodCogs+barLab+foodLab) / tRev * 100;
 
@@ -726,6 +731,44 @@ S.Settings = {
         S5_FINDING: 'The event channel is now a real revenue line. The remaining gap is peak-season capacity, not demand.',
         S5_TOOL: 'Add a second private dining time slot on Fridays and Saturdays.'
       }})
+    ];
+
+    // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
+    // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
+    // and 5, which is where both cost trends break downward.
+    App.data.fix_log = [
+      { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
+        date:dateStr(31), logged_at:daysAgoISO(31) },
+      { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
+        date:dateStr(31), logged_at:daysAgoISO(31) },
+      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft & Loss',
+        date:dateStr(24), logged_at:daysAgoISO(24) },
+    ];
+
+    // ── Variance Investigations ──
+    App.data.variance_investigations = [
+      { id:uid(), sku:"Tito's Handmade Vodka", opened_date:dateStr(38),
+        status:'resolved', resolved_date:dateStr(24),
+        steps:[
+          { done:true, finding:'Count sheets pulled. One 1L bottle was missed in the back well on the period-open count.' },
+          { done:true, finding:'Theoretical usage recalculated. The gap closed to under 2% once the missed bottle was added back.' },
+          { done:true, finding:'Variance traced to two consecutive Friday late shifts.' },
+          { done:true, finding:'Bar manager confirmed a keg-line spill on one of those shifts that was never logged.' },
+          { done:true, finding:'Mid-shift count run the following Friday came back clean.' },
+          { done:true, finding:'Closed as a counting error plus one unlogged spill. No theft indicated.' },
+        ],
+        resolution:'Counting error plus an unlogged spill. Added a spill line to the closing checklist so breakage is recorded going forward.' },
+      { id:uid(), sku:'Espolòn Tequila Blanco', opened_date:dateStr(9),
+        status:'open',
+        steps:[
+          { done:true, finding:'Count sheets pulled. No obvious missed bottles this time.' },
+          { done:true, finding:'Theoretical usage still runs about 9% above POS sales after a recheck.' },
+          { done:true, finding:'Variance concentrated on Thursday and Saturday PM shifts.' },
+          { done:false, finding:'' },
+          { done:false, finding:'' },
+          { done:false, finding:'' },
+        ],
+        resolution:'' },
     ];
 
     // ── Save everything ──
