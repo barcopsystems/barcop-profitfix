@@ -92,6 +92,22 @@ S.TrafficDashboard = {
     // Chart
     const chartHtml = this.buildChart(weeks, t);
 
+    // Cadence nudges
+    const nudges = this.cadence();
+    const shown = nudges.slice(0, 4);
+    const nudgeBody = shown.length
+      ? shown.map((n, i) =>
+          '<div onclick="App.navigate(\'' + n.screen + '\')" style="display:flex;align-items:center;gap:10px;'
+          + 'padding:9px 0;cursor:pointer;' + (i < shown.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+          + '<span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:'
+          + (n.sev === 'warn' ? 'var(--gold)' : 'var(--t3)') + ';"></span>'
+          + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">' + esc(n.text) + '</div>'
+          + '<span style="flex-shrink:0;font-size:12px;color:var(--t3);">&#9656;</span>'
+          + '</div>').join('')
+      : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Posting, reviews, and email are keeping pace. Nothing is slipping right now.</div>';
+    const cadenceHtml = '<div class="sh">Cadence Nudges</div>'
+      + '<div class="card" style="margin-bottom:18px;">' + nudgeBody + '</div>';
+
     // Trend Insights button
     const insBtn = document.createElement('button');
     insBtn.className = 'btn btn-ghost btn-sm';
@@ -125,6 +141,7 @@ S.TrafficDashboard = {
       + startHere
       + metrics
       + chartHtml
+      + cadenceHtml
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
       + FixPanel.recoveryCard('traffic')
@@ -167,6 +184,52 @@ S.TrafficDashboard = {
     FixPanel.wireFixAreas(container);
   },
 
+
+  /* Cadence nudges (Section 10) — advisory signals on whether the digital
+     presence routines are keeping pace. Each is computed from real weekly
+     data; no nudge fires on a number the app does not hold. */
+  cadence() {
+    const weeks = App.data.traffic_weeks || [];
+    const ts = (App.data.traffic_settings || {}).targets || {};
+    const nudges = [];
+    if (!weeks.length) {
+      nudges.push({ text: 'No traffic data logged yet. Enter your first week in This Week.', sev: 'warn', screen: 't-this-week' });
+      return nudges;
+    }
+    const latest = weeks[weeks.length - 1];
+    const daysSince = (str) => {
+      if (!str) return null;
+      const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+      return isNaN(d.getTime()) ? null : Math.floor((Date.now() - d.getTime()) / 86400000);
+    };
+    const age = daysSince(latest.period_end);
+    if (age != null && age > 10) {
+      nudges.push({ text: 'Traffic data is ' + age + ' days old. Log this week so the trend stays current.', sev: 'warn', screen: 't-this-week' });
+    }
+    const velT = ts.review_velocity ?? 8;
+    if (latest.new_reviews != null && latest.new_reviews < velT) {
+      nudges.push({ text: 'New reviews running at ' + latest.new_reviews + ' a month, below your target of ' + velT + '. Ask satisfied guests this week.', sev: 'warn', screen: 't-reviews' });
+    }
+    const priorRev = weeks.slice(-5, -1).map(w => w.new_reviews).filter(v => v != null);
+    if (priorRev.length >= 2 && latest.new_reviews != null) {
+      const avg = priorRev.reduce((a, b) => a + b, 0) / priorRev.length;
+      if (avg > 0 && latest.new_reviews < avg * 0.8) {
+        nudges.push({ text: 'Review velocity is down. ' + latest.new_reviews + ' this period against a ' + avg.toFixed(0) + ' average.', sev: 'info', screen: 't-reviews' });
+      }
+    }
+    const rrT = ts.response_rate ?? 75;
+    if (latest.response_rate != null && latest.response_rate < rrT) {
+      nudges.push({ text: 'Review response rate at ' + latest.response_rate.toFixed(0) + '%, below the ' + rrT + '% target. Respond to every open review.', sev: 'warn', screen: 't-reviews' });
+    }
+    const postT = ts.social_posts_month ?? 12;
+    if (latest.ig_posts_month != null && latest.ig_posts_month < postT) {
+      nudges.push({ text: 'Social posting at ' + latest.ig_posts_month + ' for the month, below the ' + postT + ' benchmark. Get on a posting calendar.', sev: 'info', screen: 't-social' });
+    }
+    if (!latest.emails_sent) {
+      nudges.push({ text: 'No marketing emails logged this period. A list you never email goes cold. Send at least one a month.', sev: 'info', screen: 't-email' });
+    }
+    return nudges.sort((a, b) => (a.sev === 'warn' ? 0 : 1) - (b.sev === 'warn' ? 0 : 1));
+  },
 
   showInsights() {
     const weeks = App.data.traffic_weeks || [];
