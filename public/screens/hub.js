@@ -22,7 +22,9 @@ S.Hub = {
     const pAudits = data.audits || [];
     const rAudits = data.revenue_audits || [];
     const tAudits = data.traffic_audits || [];
-    const recs    = data.reconciliations || [];
+    // Cash data is owned by Shift Control (sc_variances), not the legacy
+    // user_data reconciliations key — that key is empty for a real operator.
+    const recs    = (App.shiftData && App.shiftData.sc_variances) || [];
 
     const barName = s.bar_name || 'Your Operation';
 
@@ -125,7 +127,7 @@ S.Hub = {
     ['gbp_reviewed_at','search_reviewed_at','web_reviewed_at','rev_reviewed_at','social_reviewed_at','delivery_reviewed_at','email_reviewed_at']
       .forEach(k => { if (prof[k]) stamps.push(prof[k]); });
     [pAudits,rAudits,tAudits].forEach(arr => arr.forEach(a => { if (a && a.date) stamps.push(a.date); }));
-    recs.forEach(r => { if (r && r.saved_at) stamps.push(r.saved_at); });
+    recs.forEach(r => { const ts = r && (r.saved_at || r.created_at); if (ts) stamps.push(ts); });
 
     let lastStamp = null, lastT = -1;
     stamps.forEach(str => {
@@ -525,18 +527,15 @@ S.Hub = {
       }
     }
 
-    // 4. Recurring cash shortages — repeated shorts in recent reconciliations
-    const recs = data.reconciliations || [];
-    if (recs.length >= 2) {
-      const recent = recs.slice(-6);
-      const tolDefault = (data.settings || {}).cash_tolerance ?? 10;
-      const shorts = recent.filter(r => {
-        const tol = r.tolerance != null ? r.tolerance : tolDefault;
-        return r.over_short != null && r.over_short < -Math.abs(tol);
-      }).length;
+    // 4. Recurring cash shortages — repeated shorts in recent drawer counts
+    // (Shift Control sc_variances, the owner of cash data).
+    const variances = (App.shiftData || {}).sc_variances || [];
+    if (variances.length >= 2) {
+      const recent = variances.slice(-6);
+      const shorts = recent.filter(r => r.status === 'Short').length;
       if (shorts >= 2) out.push({
         sev: shorts >= 3 ? 'bad' : 'warn',
-        text: 'Cash came up short in ' + shorts + ' of the last ' + recent.length + ' counts. Recurring shortages point to a process gap, not a one-off.',
+        text: 'Cash came up short in ' + shorts + ' of the last ' + recent.length + ' drawer counts. Recurring shortages point to a process gap, not a one-off.',
         screen: 'cash-recon', mod: 'profit'
       });
     }
