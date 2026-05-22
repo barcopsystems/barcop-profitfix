@@ -199,6 +199,121 @@ FIX.traffic = [
         whatToPaste: 'Fill in your name, address, neighborhood, phone, hours, and policies.'
       }
     ]
+  },
+
+  {
+    id: 'reviews',
+    name: 'Reviews',
+    module: 'traffic',
+    summary: 'A steady stream of recent reviews ranks you and reassures the guest who is deciding. Respond to every one, ask every satisfied guest, and track velocity every week.',
+
+    process: {
+      intro: 'Review velocity matters more than the rating sitting on your profile today. A fresh stream of reviews tells Google the business is active and tells the guest other people went last week. Build the ask into service and respond to every review.',
+      steps: [
+        { title: 'Treat velocity as the metric, not just the rating',
+          detail: 'A high rating with no recent reviews looks stale. A steady flow of new reviews is what ranks you in the map results and reassures a guest comparing two listings.' },
+        { title: 'Respond to every review within 48 hours',
+          detail: 'Every review gets a response, named and specific, within two days. Set a phone alert for new reviews so nothing sits unanswered for more than a day.' },
+        { title: 'Use the four-sentence framework on negative reviews',
+          detail: 'Acknowledge, address the specific complaint, state your standard, invite them back. No defensiveness. Put your direct contact at the end so the next step happens off the public page.' },
+        { title: 'Respond to positive reviews specifically too',
+          detail: 'Use the guest name, reference a specific detail, mention the next visit. A generic thank-you signals you did not read it, and an unanswered positive review signals you only show up when there is a problem.' },
+        { title: 'Build the review ask into the service sequence',
+          detail: 'Train every server on a short compliment-moment ask, put a QR code on the bill presenter, and frame it as how the bar operates, not as a campaign. Never offer an incentive, that violates Google policy.' },
+        { title: 'Track velocity every week',
+          detail: 'Count new Google and Yelp reviews, calculate the rolling 30-day rating, and flag any week that comes in below your monthly target divided by four.' },
+        { title: 'Handle fake reviews through the escalation path',
+          detail: 'Respond factually that you have no record of the experience, without accusing the reviewer, then flag a policy-violating or fake review to Google.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Review Response Rate',
+        formula: 'Reviews responded to / total reviews x 100',
+        example: 'Target is 100%. At 8 to 12 new reviews a month that is two to three responses a week.' },
+      { label: 'Monthly Velocity Target',
+        formula: 'Your own monthly review baseline x 1.15',
+        example: 'A bar averaging 6 a month sets a target near 7, a 15% monthly growth goal' },
+      { label: 'Weekly Velocity Floor',
+        formula: 'Monthly review target / 4',
+        example: 'A target of 8 a month means any week under 2 new reviews gets flagged' }
+    ],
+
+    commonMistakes: [
+      'Responding to negative reviews but ignoring positive ones. An unanswered positive review tells future guests the owner only shows up when there is a problem.',
+      'Copy-paste responses that reference nothing specific. A generic reply to a specific compliment or complaint signals the owner did not read it.',
+      'Asking for reviews in a way that violates Google policy. Offering incentives or asking only happy guests both risk a profile suspension.',
+      'Not training staff on the ask. A review process that exists on paper but that no server has been shown how to run produces no reviews.',
+      'Letting velocity stall after the first push. The opening surge fades unless the ask becomes a permanent part of service.',
+      'Treating a 4.1 rating as fine. A 4.1 next to a competitor at 4.4 loses the comparison for every guest who sees both.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Read every new Google and Yelp review from the past 7 days',
+        'Respond to every unanswered review within 48 hours and log the response time',
+        'Count new Google and new Yelp reviews for the prior week and log them',
+        'Calculate the rolling 30-day average rating and compare it to last week',
+        'Flag any week where new reviews are below the monthly target divided by four',
+        'If velocity is low, find the shift with the weakest review ask and address it'
+      ],
+      benchmarks: [
+        { label: 'Average rating',                  target: '4.4 and up', warning: '4.0 to 4.3', critical: 'below 4.0' },
+        { label: 'Response rate',                   target: '100%',       warning: '80 to 99%',  critical: 'below 80%' },
+        { label: 'Monthly velocity, full-service',  target: '8-12 / mo',  warning: '4-7 / mo',   critical: 'under 4 / mo' },
+        { label: 'Monthly velocity, neighborhood bar', target: '4-8 / mo', warning: '2-3 / mo',  critical: 'under 2 / mo' },
+        { label: 'Monthly velocity, craft cocktail', target: '6-10 / mo', warning: '3-5 / mo',   critical: 'under 3 / mo' },
+        { label: 'Monthly velocity, tourist-area',  target: '15-25 / mo', warning: '8-14 / mo',  critical: 'under 8 / mo' }
+      ],
+      escalation: [
+        'Read the review fully and identify the specific complaint before drafting anything.',
+        'Respond within 48 hours: acknowledge, address it specifically, state your standard, invite them back.',
+        'Keep all defensiveness out, and put your direct contact at the end of a negative response.',
+        'If the review looks fake, respond factually that you have no record of the experience, without accusing the reviewer.',
+        'Flag a policy-violating or fake review to Google through the escalation path.',
+        'Log the response and its time in the response tracker.'
+      ]
+    },
+
+    templates: [
+      { name: 'Review Response Templates', type: 'DOC', file: 'Review_Response_Templates.docx',
+        description: 'Ready-to-use response templates for positive reviews, negative reviews by category, and no-comment ratings. Personalize each with the specific detail only you know.' },
+      { name: 'Review Request Script', type: 'PDF', file: 'Review_Request_Script.pdf',
+        description: 'Word-for-word verbal scripts for asking satisfied guests for a Google review, plus a table card template and QR code placement guide.' },
+      { name: 'Review Velocity Tracker', type: 'PDF', file: 'Review_Velocity_Tracker.pdf',
+        description: 'Weekly tracking sheet for new reviews by platform. Tracks total count, new reviews, star distribution, and response rate against your monthly target.' }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'rev-ai-1',
+        title: 'Draft Responses to Reviews',
+        whatItDoes: 'Drafts a response to each review using the four-sentence framework, specific to the review and ready for a quick human edit.',
+        prompt: 'Here are five reviews I need to respond to. [PASTE EACH REVIEW WITH ITS STAR RATING]. My bar name: [NAME]. My concept: [BRIEF DESCRIPTION]. My neighborhood: [NEIGHBORHOOD]. For each review, write a response using the four-sentence framework: acknowledge, address specifically, state your standard, invite return. Use the guest\'s name if it appears. No generic openings like "Thank you so much for the kind words." No defensive language in negative responses. Each response under 100 words. For negative responses, include my direct contact at the end.',
+        whatToPaste: 'Paste each review with its star rating, and fill in your bar name, concept, and neighborhood.'
+      },
+      {
+        id: 'rev-ai-2',
+        title: 'Write a Review Request Script',
+        whatItDoes: 'Drafts three short review-ask scripts matched to your service style: the compliment moment, the receipt, and a text follow-up.',
+        prompt: 'My bar concept: [DESCRIBE]. My team: primarily [servers/bartenders/both] interact with guests. My typical service style: [casual and conversational / professional and formal / somewhere between]. Write three versions of a review request script for my team: one for the compliment moment during service, one for the receipt presentation, and one short text message for guests who opted in to follow-up. Each version under 30 words, matched to the service style, and asking specifically for Google. No salesy language, no incentive offers.',
+        whatToPaste: 'Fill in your concept, who interacts with guests, and your service style.'
+      },
+      {
+        id: 'rev-ai-3',
+        title: 'Analyze Review Velocity',
+        whatItDoes: 'Reads 12 weeks of review counts, finds the patterns in slow weeks, and recommends one change to the ask process.',
+        prompt: 'Here is my weekly review count data for the last 12 weeks. [PASTE: week number, new Google reviews, new Yelp reviews, notes on busy vs slow weeks]. My current ask process: [DESCRIBE WHAT IS IN PLACE]. My target: [X] new reviews per month. Identify any patterns, including whether slow weeks correlate with specific days, shifts, or events. Based on the data, suggest the one change to the ask process most likely to improve velocity in the next 30 days.',
+        whatToPaste: 'Paste 12 weeks of review counts and describe your current ask process and target.'
+      },
+      {
+        id: 'rev-ai-4',
+        title: 'Respond to a Potentially Fake Review',
+        whatItDoes: 'Drafts a factual public response to a suspected fake review that does not accuse the reviewer.',
+        prompt: 'Here is a review I believe may be fake or inaccurate: [PASTE REVIEW]. Reason I believe it is inaccurate: [DESCRIBE: no record of this guest, experience described is impossible, etc.]. My bar name: [NAME]. My direct contact: [EMAIL OR PHONE]. Write a public response that acknowledges the review professionally, states factually that you have no record of this experience, invites them to contact you directly to resolve any genuine concern, and does not accuse them of fabricating the review. Under 80 words, factual and professional throughout.',
+        whatToPaste: 'Paste the review, why you believe it is inaccurate, and your contact.'
+      }
+    ]
   }
 
 ];
