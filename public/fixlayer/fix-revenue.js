@@ -365,47 +365,39 @@ FIX.revenue = [
     id: 'check-average',
     name: 'Check Average & Upsell',
     module: 'revenue',
-    summary: 'Check average per cover is the floor\'s biggest revenue lever. Brief it every shift, track it by server, and coach the few who are below average — not the whole team.',
+    summary: 'Check average per cover is the floor\'s biggest revenue lever. Brief it every shift, track it by server, and coach the few who are below average, not the whole team.',
 
     process: {
-      intro: 'The pre-shift briefing and the weekly review are two halves of one system. The briefing sets the behavior; the review tells you whether it worked. The system compounds — it feels like process for no result until about week four, then the data starts moving.',
+      intro: 'The pre-shift briefing and the weekly review are two halves of one system. The briefing sets the behavior. The review tells you whether it worked. The system compounds. It feels like process for no result until about week four, then the data starts moving. The app tracks check average by server and shows you the spread. Each step below opens where the work happens.',
       steps: [
-        { title: 'Track check average per cover by server',
-          detail: 'Track sales divided by covers, by individual server. Total sales hides the productivity difference — two servers with identical sales can have very different check averages if their cover counts differ.' },
-        { title: 'Establish a four-week team baseline',
-          detail: 'Before setting any target, gather four weeks of data to produce a real team average. A target set without a baseline is a guess.' },
-        { title: 'Read the spread',
-          detail: 'Flag any server more than 15% below the team average. The spread tells you whether you have a few coaching cases or a system-wide gap.' },
-        { title: 'Run the pre-shift briefing every shift',
-          detail: 'Five minutes before doors open: today\'s 2-3 Stars, one specific check average target for the shift, the upsell sequence, and one named beverage pairing. Use a written form so it is consistent across managers.' },
-        { title: 'Train and post the upsell sequence',
-          detail: 'Pre-dinner beverage, appetizer, dessert close — in that order. Upselling is a learned sequence, not a personality trait; written down and trained, every server can follow it.' },
-        { title: 'Audit the floor with table visit audits',
-          detail: 'Two unannounced table visit audits a week confirm the briefing actually produced floor behavior. A briefing with no audit is one-way communication.' },
-        { title: 'Coach below-average servers individually from data',
-          detail: 'Any server trending down two consecutive weeks gets a coaching conversation that week. Coach the two who need it, not the whole team — a general "sell more" message creates resistance from the eight already performing.' }
+        { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
+          title: 'Track check average by server',
+          detail: 'Server Check shows sales divided by covers for each individual server. Total sales hides the productivity difference. Two servers with identical sales can have very different check averages if their cover counts differ, and that difference is where the money is.' },
+        { kind: 'result', target: 'r-check-average', targetLabel: 'Check Average',
+          title: 'Set the team baseline and read the spread',
+          detail: 'Check Average shows your team average check and the upsell gap in dollars. Four weeks of data gives you a real baseline. Any server running more than 15% below the team average is flagged. The spread tells you whether you have a few coaching cases or a system-wide gap.' },
+        { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
+          title: 'Train and post the upsell sequence',
+          detail: 'Download the Server Upsell Standards and Scripts, post it in the server area, and use it in training. Pre-dinner beverage, appetizer, dessert close, in that order. Upselling is a learned sequence, not a personality trait. Written down and trained, every server can follow it.' },
+        { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
+          title: 'Run the pre-shift briefing every shift',
+          detail: 'Print the Pre-Shift Upsell Briefing and run it five minutes before doors open: today\'s two or three Stars, one specific check average target for the shift, the upsell sequence, and one named beverage pairing. A written form keeps it consistent across managers.' },
+        { kind: 'reference', target: 'Table_Visit_Audit.pdf', targetLabel: 'Table Visit Audit',
+          title: 'Audit the floor with table visit audits',
+          detail: 'Run two unannounced table visit audits a week with the Table Visit Audit form. They confirm the briefing actually produced floor behavior. A briefing with no audit behind it is one-way communication.' },
+        { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
+          title: 'Coach below-average servers from the data',
+          detail: 'Server Check identifies the servers trending down two weeks in a row. Each one gets a coaching conversation that week. Coach the two who need it, not the whole team. A general sell-more message creates resistance from the servers already performing.' }
       ]
     },
 
-    formulas: [
-      { label: 'Check Average',
-        formula: 'Server sales / covers',
-        example: '$2,808 in sales / 72 covers = $39.00 check average' },
-      { label: 'Below-Average Threshold',
-        formula: 'Team average check x 0.85 (15% below)',
-        example: 'Team average $32.25 x 0.85 = $27.41 — flag any server below this' },
-      { label: 'Annual Check Average Gap',
-        formula: '(Team average - server average) x covers per week x 52',
-        example: '$7.75 gap x 65 covers x 52 = $26,163 a year from one server' }
-    ],
-
     commonMistakes: [
-      'Tracking total server sales instead of check average per cover — total sales hides the productivity difference when cover counts differ.',
-      'Running the briefing without a written form — a verbal briefing varies by manager and produces inconsistent execution.',
-      'Coaching the whole team when only two servers are below average — a general message has no impact on the two who need it and creates resistance from the rest.',
-      'Setting check average targets without a four-week baseline — a target with no baseline is a guess.',
-      'Treating upselling as a personality trait rather than a learned sequence — every server can follow a written, trained sequence.',
-      'Forgetting the beverage pairing — a specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.'
+      'Tracking total server sales instead of check average per cover. Total sales hides the productivity difference when cover counts differ.',
+      'Running the briefing without a written form. A verbal briefing varies by manager and produces inconsistent execution.',
+      'Coaching the whole team when only two servers are below average. A general message has no impact on the two who need it and creates resistance from the rest.',
+      'Setting check average targets without a four-week baseline. A target with no baseline is a guess.',
+      'Treating upselling as a personality trait rather than a learned sequence. Every server can follow a written, trained sequence.',
+      'Forgetting the beverage pairing. A specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.'
     ],
 
     quickRef: {
@@ -414,47 +406,18 @@ FIX.revenue = [
         'Daily: brief the upsell sequence and one named beverage pairing, on the written form',
         'Weekly: pull server sales and covers and review check average by server',
         'Weekly: flag any server more than 15% below team average or trending down two weeks',
-        'Weekly: review the table visit audits — did the briefing produce floor behavior?',
+        'Weekly: review the table visit audits and confirm the briefing produced floor behavior',
         'Weekly: set next week\'s briefing Stars list from the menu engineering output'
       ],
       escalation: [
         'Confirm the server is more than 15% below team average, not just one slow week.',
-        'Check the four-week trend — is the server trending down two weeks in a row?',
+        'Check the four-week trend and see whether the server is trending down two weeks in a row.',
         'Calculate the annual revenue gap versus team average at the server\'s cover count.',
         'Open the conversation with that dollar number and ask which part of the upsell sequence they are least comfortable with.',
         'Set a specific check average target and focus items for the next two weeks.',
         'Re-review after two weeks; if there is no movement, move to a structured performance plan.'
       ]
     },
-
-    templates: [
-      {
-        id: 'server-upsell-standards',
-        name: 'Server Upsell Standards and Scripts',
-        intro: 'The written upsell standard, posted in the server area and used in training. The sequence is what makes upselling repeatable across every server and shift.',
-        fields: [
-          { key: 'bar_name', label: 'Restaurant Name', placeholder: 'Your restaurant' }
-        ],
-        body: 'SERVER UPSELL STANDARDS\n{{bar_name}}\n\n'
-          + 'WHY THIS EXISTS\n'
-          + 'Upselling is a sequence, not a personality. Followed consistently, it raises every guest\'s experience and the check average together. This standard applies on every shift.\n\n'
-          + 'THE UPSELL SEQUENCE\n'
-          + '1. Pre-dinner beverage — offer a specific drink the moment the table is seated.\n'
-          + '2. Appetizer — suggest one specific starter while taking the first drink order.\n'
-          + '3. Beverage pairing — name a specific pairing with the entree as it is ordered.\n'
-          + '4. Dessert close — offer dessert and an after-dinner drink as one suggestion.\n\n'
-          + 'HOW TO SUGGEST\n'
-          + '- Name a specific item, not a category. "The short rib" beats "an entree".\n'
-          + '- Suggest, do not ask. "Start you with our old fashioned?" beats "Anything to drink?".\n'
-          + '- One specific detail per suggestion — a preparation, an ingredient, or a pairing.\n'
-          + '- Read the table. A decided guest gets a quick pairing; an undecided guest gets a recommendation.\n\n'
-          + 'TONIGHT\'S FOCUS (filled in at the pre-shift briefing)\n'
-          + 'Featured Stars: ____________________________________________\n'
-          + 'Beverage pairing: __________________________________________\n'
-          + 'Shift check average target: $__________\n\n'
-          + 'Posted: ____________________   Reviewed in training: __________'
-      }
-    ],
 
     aiWorkflows: [
       {
@@ -467,7 +430,7 @@ FIX.revenue = [
       {
         id: 'ca-ai-2',
         title: 'Write Server Upsell Scripts',
-        whatItDoes: 'Drafts three suggestion versions per item — for an undecided guest, a decided guest, and as a pairing.',
+        whatItDoes: 'Drafts three suggestion versions per item: for an undecided guest, a decided guest, and as a pairing.',
         prompt: 'I need upsell language for my servers for the following category: [CATEGORY]. My current Stars in this category: [LIST ITEMS WITH BRIEF DESCRIPTION]. My target check average for a table that orders from this category: $[X]. Write three versions of the suggestion for each item: one for a guest who seems undecided, one for a guest who already knows what they want, and one that works as a pairing suggestion with a specific menu item. Keep each version under 20 words. No filler language.',
         whatToPaste: 'Fill in the category, your Stars in it, and the target check average.'
       },
