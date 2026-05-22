@@ -275,6 +275,9 @@ S.Dashboard = {
 
     const uid = 'ag'+Math.random().toString(36).slice(2,6);
 
+    const fixMarkers = (window.Recovery && window.FixPanel)
+      ? FixPanel.markerSvg(Recovery.chartMarkers(weeks, 'profit'), xs, PAD.t, PAD.t + ch) : '';
+
     return `<div class="chart-card" style="padding:20px 24px 16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>
@@ -300,6 +303,7 @@ S.Dashboard = {
         `).join('')}
         <line x1="${PAD.l}" y1="${tPx.toFixed(1)}" x2="${W-PAD.r}" y2="${tPx.toFixed(1)}" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>
         <text x="${W-PAD.r+6}" y="${(tPx+4).toFixed(1)}" fill="rgba(201,168,76,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>
+        ${fixMarkers}
         ${barArea ? `<path d="${barArea}" fill="url(#${uid})"/>` : ''}
         ${priPath ? `<path d="${priPath}" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linejoin="round"/>` : ''}
         ${foodPath ? `<path d="${foodPath}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linejoin="round"/>` : ''}
