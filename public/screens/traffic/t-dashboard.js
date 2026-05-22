@@ -8,17 +8,21 @@ S.TrafficDashboard = {
     const t      = ts.targets || {};
     const weeks  = App.data.traffic_weeks || [];
     const latest = weeks.length ? weeks[weeks.length - 1] : null;
-    const prior4 = weeks.slice(-5, -1);
-    const avg4   = fn => { const v = prior4.map(fn).filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
 
-    const googleRating  = latest?.google_rating  ?? null;
-    const reviewVel     = latest?.new_reviews     ?? null;
-    const responseRate  = latest?.response_rate   ?? null;
-    const sessions      = latest?.monthly_sessions ?? null;
-    const targetRating  = t.google_rating      ?? 4.3;
-    const targetVel     = t.review_velocity    ?? 8;
-    const targetResp    = t.response_rate      ?? 75;
-    const targetSessions= t.monthly_sessions   ?? 2000;
+    const googleRating  = latest?.google_rating ?? null;
+    const responseRate  = latest?.response_rate ?? null;
+    const targetRating  = t.google_rating    ?? 4.3;
+    const targetVel     = t.review_velocity  ?? 8;
+    const targetResp    = t.response_rate    ?? 75;
+    const targetSessions= t.monthly_sessions ?? 2000;
+
+    // Trend Insights button
+    const insBtn = document.createElement('button');
+    insBtn.className = 'btn btn-ghost btn-sm';
+    insBtn.id = 't-insights-btn';
+    insBtn.textContent = 'Trend Insights';
+    insBtn.addEventListener('click', () => this.showInsights());
+    actions.appendChild(insBtn);
 
     // Alert
     let alertHtml = '';
@@ -49,47 +53,7 @@ S.TrafficDashboard = {
         + '</div>';
     }
 
-    // Metric cards
-    const trendHtml = (cur, avg, lowerBetter=false) => {
-      if (avg==null||cur==null) return '<div class="metric-trend"> </div>';
-      const diff = cur - avg;
-      if (Math.abs(diff) < 0.05) return '<div class="metric-trend">flat</div>';
-      const improving = lowerBetter ? diff < 0 : diff > 0;
-      return '<div class="metric-trend ' + (improving?'trend-up':'trend-dn') + '">' + (diff>0?'↑':'↓') + ' vs 4wk avg</div>';
-    };
-
-    const metCard = (label, val, target, impact, trendEl, cls) => {
-      const impHtml = impact != null
-        ? '<div class="metric-impact ' + (impact > 0 ? 'neg' : 'pos') + '">' + (impact > 0 ? '+' : '') + impact + '</div>'
-        : '<div class="metric-impact" style="color:var(--t4);">&mdash;</div>';
-      const valHtml = val != null
-        ? '<div class="metric-val ' + cls + '">' + val + '</div>'
-        : '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>';
-      return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
-        + valHtml
-        + '<div class="metric-target">Target: ' + target + '</div>'
-        + impHtml + trendEl + '</div>';
-    };
-
-    const grCls  = googleRating==null?'':googleRating>=targetRating?'on-target':'over-target';
-    const rvCls  = reviewVel==null?'':reviewVel>=targetVel?'on-target':'over-target';
-    const rrCls  = responseRate==null?'':responseRate>=targetResp?'on-target':'over-target';
-    const ssCls  = sessions==null?'':sessions>=targetSessions?'on-target':'over-target';
-
-    const avgGR  = avg4(w=>w.google_rating);
-    const avgRV  = avg4(w=>w.new_reviews);
-
-    const grImpact  = googleRating != null && googleRating < targetRating ? +(targetRating - googleRating).toFixed(1) : null;
-    const rvImpact  = reviewVel != null && reviewVel < targetVel ? +(targetVel - reviewVel) : null;
-
-    const metrics = '<div class="metric-grid">'
-      + metCard('Google Rating',   googleRating!=null?googleRating.toFixed(1)+'★':null,   targetRating+'★',   grImpact!=null?grImpact+' stars below':null,  trendHtml(googleRating,avgGR), grCls)
-      + metCard('New Reviews/Mo',  reviewVel!=null?reviewVel+' reviews':null,              targetVel+'/mo',    rvImpact!=null?rvImpact+' below target':null, trendHtml(reviewVel,avgRV),    rvCls)
-      + metCard('Response Rate',   responseRate!=null?responseRate.toFixed(0)+'%':null,    targetResp+'%',     null,                                          trendHtml(responseRate,avg4(w=>w.response_rate)), rrCls)
-      + metCard('Monthly Sessions',sessions!=null?sessions.toLocaleString():null,          targetSessions.toLocaleString()+'/mo', null,                      trendHtml(sessions,avg4(w=>w.monthly_sessions)), ssCls)
-      + '</div>';
-
-    // Chart
+    // Chart — annotated 8-week trend
     const chartHtml = this.buildChart(weeks, t);
 
     // Cadence nudges
@@ -108,44 +72,45 @@ S.TrafficDashboard = {
     const cadenceHtml = '<div class="sh">Cadence Nudges</div>'
       + '<div class="card" style="margin-bottom:18px;">' + nudgeBody + '</div>';
 
-    // Trend Insights button
-    const insBtn = document.createElement('button');
-    insBtn.className = 'btn btn-ghost btn-sm';
-    insBtn.id = 't-insights-btn';
-    insBtn.textContent = 'Trend Insights';
-    insBtn.addEventListener('click', () => this.showInsights());
-    actions.appendChild(insBtn);
+    // Priority Action Items — ranked by dollar impact from the latest Traffic audit
+    const tAudits = App.data.traffic_audits || [];
+    const latestAudit = tAudits.length ? tAudits[tAudits.length-1] : null;
+    const actionItems = (latestAudit?.action_items || [])
+      .filter(it => it && it.action)
+      .slice()
+      .sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0))
+      .slice(0,5);
 
-    // This Week Summary
-    const prev = weeks.length > 1 ? weeks[weeks.length-2] : null;
-    let summaryHtml = '';
-    if (latest) {
-      const row = (label, tw, lw, av) => '<tr><td>' + label + '</td><td class="val">' + (tw||' ') + '</td><td>' + (lw||' ') + '</td><td>' + (av||' ') + '</td></tr>';
-      const a4 = fn => { const v = prior4.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
-      const p = v => v != null ? v.toFixed(1)+'%' : ' ';
-      const r = v => v != null ? v.toFixed(1)+'★' : ' ';
-      summaryHtml = '<div class="tbl-wrap" style="margin-bottom:18px;"><table class="sum-tbl">'
-        + '<thead><tr><th></th><th>This Week</th><th>Last Week</th><th>4-Week Avg</th></tr></thead><tbody>'
-        + row('Google Rating',   r(latest.google_rating),  prev?.google_rating?r(prev.google_rating):' ',  a4(w=>w.google_rating)?a4(w=>w.google_rating).toFixed(2)+'★':' ')
-        + row('New Reviews',     latest.new_reviews??'  ', prev?.new_reviews??'  ',                         a4(w=>w.new_reviews)?Math.round(a4(w=>w.new_reviews))+'':' ')
-        + row('Response Rate',   p(latest.response_rate),  prev?.response_rate?p(prev.response_rate):' ',  a4(w=>w.response_rate)?p(a4(w=>w.response_rate)):' ')
-        + row('Sessions',        latest.monthly_sessions?latest.monthly_sessions.toLocaleString():' ', prev?.monthly_sessions?prev.monthly_sessions.toLocaleString():' ', a4(w=>w.monthly_sessions)?Math.round(a4(w=>w.monthly_sessions)).toLocaleString():' ')
-        + row('IG Followers',    latest.ig_followers??' ',  prev?.ig_followers??' ',                        a4(w=>w.ig_followers)?Math.round(a4(w=>w.ig_followers))+'':' ')
-        + '</tbody></table></div>';
+    let actionHtml = '<div class="sh">Priority Action Items</div>';
+    if (actionItems.length) {
+      actionHtml += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+        + actionItems.map((it,i) =>
+            '<div class="t-db-action" data-screen="t-audit" '
+            + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+            + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+            + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
+            + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</div>'
+            + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.5;">'+esc(it.action)+'</div>'
+            + (it.monthly_impact > 0
+                ? '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;color:var(--gold);">'
+                  + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
+                : '')
+            + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+            + '</div>').join('')
+        + '</div>';
     } else {
-      summaryHtml = '<div class="card"><div class="empty"><div class="empty-title">No weeks saved yet</div><div class="empty-sub">Enter your first week to see your numbers here.</div></div></div>';
+      actionHtml += '<div class="card" style="margin-bottom:18px;"><div style="font-size:12px;color:var(--t3);line-height:1.65;">'
+        + 'Run a Traffic Audit and your highest-impact opportunities will be ranked here by dollar impact.</div></div>';
     }
 
     container.innerHTML = '<div class="screen">'
-      + alertHtml
       + startHere
-      + metrics
+      + alertHtml
+      + FixPanel.fixAreasCard('traffic')
       + chartHtml
       + cadenceHtml
-      + '<div class="sh">This Week Summary</div>'
-      + summaryHtml
+      + actionHtml
       + FixPanel.recoveryCard('traffic')
-      + FixPanel.fixAreasCard('traffic')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
@@ -181,6 +146,9 @@ S.TrafficDashboard = {
     document.getElementById('t-qa-week')?.addEventListener('click',    () => App.navigate('t-this-week'));
     document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
     document.getElementById('t-qa-reports')?.addEventListener('click', () => App.navigate('t-reports'));
+    container.querySelectorAll('.t-db-action').forEach(row => {
+      row.addEventListener('click', () => App.navigate(row.dataset.screen));
+    });
     FixPanel.wireFixAreas(container);
   },
 
