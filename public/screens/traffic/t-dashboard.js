@@ -270,6 +270,9 @@ S.TrafficDashboard = {
     const tGR  = (t.google_rating||4.3);
     const uid  = 'tg'+Math.random().toString(36).slice(2,6);
 
+    const fixMarkers = (window.Recovery && window.FixPanel)
+      ? FixPanel.markerSvg(Recovery.chartMarkers(last8, 'traffic'), xs, PAD.t, PAD.t + ch) : '';
+
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
@@ -282,6 +285,7 @@ S.TrafficDashboard = {
       + '<defs><linearGradient id="grGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/></linearGradient></defs>'
       + yTicks
       + '<line x1="'+PAD.l+'" y1="'+ys(tGR).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tGR).toFixed(1)+'" stroke="rgba(201,168,76,0.25)" stroke-width="1" stroke-dasharray="4,4"/>'
+      + fixMarkers
       + (areaPath(grS)?'<path d="'+areaPath(grS)+'" fill="url(#grGrad'+uid+')"/>':'')
       + '<path d="'+smoothPath(grS)+'" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<path d="'+smoothPath(rvS)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
