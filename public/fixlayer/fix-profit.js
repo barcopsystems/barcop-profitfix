@@ -312,6 +312,141 @@ FIX.profit = [
         whatToPaste: 'Fill in each bracketed field with the incident facts.'
       }
     ]
+  },
+
+  {
+    id: 'food-cost',
+    name: 'Food Cost',
+    module: 'profit',
+    summary: 'What the kitchen spends on product against what it sells. Cost every recipe on real prices, count weekly, track waste with reasons, and price surgically.',
+
+    process: {
+      intro: 'Food cost is controlled before service, on the cost card, and during service, at the station. The weekly count tells you the number; the recipe cards, waste log, and portion audits tell you why it moved.',
+      steps: [
+        { title: 'Build yield-adjusted recipe cost cards',
+          detail: 'Cost every menu item from current invoice prices, not memory. Proteins and produce are costed at true cost per usable pound after prep yield — costing at purchase price systematically understates every protein on the menu.' },
+        { title: 'Count food on the same weekly schedule as the bar',
+          detail: 'A full food count, same day every week, valued at cost. The count is the foundation every food cost calculation depends on.' },
+        { title: 'Calculate actual food cost by category',
+          detail: 'Opening inventory plus purchases received minus closing inventory, divided by food sales. Never calculate from purchases alone — that number moves with delivery timing, not kitchen performance.' },
+        { title: 'Track waste daily with reason codes',
+          detail: 'Every station logs waste every service with a reason code. A count of what was thrown away tells you nothing; the reason code tells you what to change.' },
+        { title: 'Run portion control audits',
+          detail: 'At least two stations a week at varied times. Over-portioning is almost always a standards gap, not a character gap — treat findings as training, not discipline.' },
+        { title: 'Review weekly with the kitchen manager',
+          detail: 'Top three waste categories by dollar value, portion audit findings, any category above benchmark. One specific action per category, with an owner.' },
+        { title: 'Price surgically when a category runs high',
+          detail: 'When food cost spikes, raise prices on the specific items above target — not across the board. A surgical increase is less visible to guests and fixes the margin without hiding the operational cause.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Food Cost %',
+        formula: '(Opening Inventory + Purchases - Closing Inventory) / Food Sales',
+        example: '$12,600 opening + $8,400 purchases - $11,200 closing / $28,000 sales = 35.0%' },
+      { label: 'True Cost per Usable Pound',
+        formula: 'Purchase price per pound / usable yield %',
+        example: 'Salmon $9.40/lb / 55% yield = $17.09 per usable pound' },
+      { label: 'Minimum Menu Price',
+        formula: 'Plate cost / target food cost %',
+        example: '$10.38 plate cost / 30% target = $34.60 minimum price' }
+    ],
+
+    commonMistakes: [
+      'Building recipe cards once and never updating them — a card built at January prices is wrong by March, and the error compounds with every price move since.',
+      'Costing proteins at purchase price without a yield adjustment — every protein on the menu is understated until you run a prep yield calculation.',
+      'Running a blended food cost instead of by category — a 34% blended number can hide a 48% seafood cost that has been invisible for months.',
+      'Treating portion audit findings as a disciplinary issue — over-portioning is almost always a standards gap, not a character gap.',
+      'Logging waste without reason codes — a count of what was thrown away tells you nothing about why it happened or what to change.',
+      'Raising prices across the board when food cost spikes — a surgical increase on the specific items above target is less visible and more effective.',
+      'Having no written portion standards posted at stations — a verbal instruction given on day one is a memory that fades and drifts.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Review the food waste log — identify the top three waste categories by dollar value',
+        'Run a portion control audit on at least two stations',
+        'Update recipe cost cards for any ingredients with invoice price changes',
+        'Confirm daily waste sheets are using reason codes correctly',
+        'Share the top waste categories with the kitchen manager, one action each',
+        'Confirm specials are costed before service, not after'
+      ],
+      benchmarks: [
+        { label: 'Proteins',          target: '28-34%', warning: '34-38%', critical: 'above 38%' },
+        { label: 'Produce',           target: '22-28%', warning: '28-32%', critical: 'above 32%' },
+        { label: 'Dairy & Eggs',      target: '18-24%', warning: '24-28%', critical: 'above 28%' },
+        { label: 'Dry Goods',         target: '15-22%', warning: '22-26%', critical: 'above 26%' },
+        { label: 'Bar Food',          target: '24-30%', warning: '30-34%', critical: 'above 34%' },
+        { label: 'Blended food cost', target: '28-34%', warning: '34-36%', critical: 'above 36%' }
+      ],
+      escalation: [
+        'Run the category breakdown to find which category is driving the blended number.',
+        'Pull recent invoices for that category and check for ingredient price changes not yet in the cost cards.',
+        'Re-cost the affected cards at current prices, with yield adjustment on proteins and produce.',
+        'Run a portion audit on the stations producing that category.',
+        'Review the waste log for that category and read the reason codes.',
+        'If cost is still above target, decide between a surgical price increase and a recipe modification.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'portion-standards',
+        name: 'Food Handling and Portion Standards Guide',
+        intro: 'The written portion standard, posted at every station. A standard that lives on paper at the station does not fade or drift the way a verbal instruction does.',
+        fields: [
+          { key: 'bar_name',       label: 'Bar / Kitchen Name', placeholder: 'Your kitchen' },
+          { key: 'effective_date', label: 'Effective Date',     placeholder: 'e.g. March 4' }
+        ],
+        body: 'FOOD HANDLING AND PORTION STANDARDS\n{{bar_name}}\nEffective {{effective_date}}\n\n'
+          + 'WHY THIS IS POSTED\n'
+          + 'Consistent portions are how we hold food cost, plate the menu the same way every time, and give every guest the same value. These standards apply at every station, every shift.\n\n'
+          + 'PORTIONING\n'
+          + '- Every portioned item is measured with a scale or a portion tool — not by eye.\n'
+          + '- Proteins are weighed to the spec on the recipe card before they hit the plate.\n'
+          + '- Sauces, cheese, and high-cost garnishes are portioned with the listed tool.\n'
+          + '- When in doubt, check the recipe card. The card is the standard.\n\n'
+          + 'WASTE\n'
+          + '- Every item discarded is logged on the daily waste sheet with a reason code.\n'
+          + '- Trim, spoilage, overproduction, and comp/remake waste are logged separately.\n'
+          + '- Prep to par. Overproduction that gets thrown away is cost with no sale.\n\n'
+          + 'HANDLING\n'
+          + '- Follow date labelling and FIFO rotation on all product.\n'
+          + '- Store proteins and produce at the correct temperatures; log cooler temps each shift.\n\n'
+          + 'These standards are reviewed in portion audits twice a week. Findings are a training matter — ask if a standard is unclear.'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'fc-ai-1',
+        title: 'Build a Recipe Cost Card',
+        whatItDoes: 'Costs a menu item from an ingredient list — yield-adjusted, with food cost % at your price and the minimum price to hit target.',
+        prompt: 'I need to cost a menu item called [ITEM NAME]. Here are the ingredients with purchase units and current purchase prices: [LIST]. The recipe uses these quantities per portion: [LIST RECIPE QUANTITIES]. Assume a waste factor of [X]% on proteins and [X]% on produce. Calculate total cost per portion, food cost percentage at my current menu price of $[PRICE], and the minimum menu price to hit a [TARGET]% food cost. Show your work on yield-adjusted costs for protein and produce items.',
+        whatToPaste: 'Fill in the item name, ingredient list, recipe quantities, waste factors, current price, and target.'
+      },
+      {
+        id: 'fc-ai-2',
+        title: 'Analyze the 30-Day Waste Log',
+        whatItDoes: 'Finds the top waste categories by dollar value, annualizes them, and suggests one specific operational change per category from the reason codes.',
+        prompt: 'Here is my food waste log for the past 30 days. Columns: date, item, quantity wasted, unit, reason code, dollar value, station. [PASTE DATA]. Identify the top three waste categories by total dollar value, calculate what each costs annually at this run rate, and for each category identify the most common reason code and suggest one specific operational change based on it. Do not suggest general improvements — one specific change per category.',
+        whatToPaste: 'Paste your 30-day waste log into [PASTE DATA].'
+      },
+      {
+        id: 'fc-ai-3',
+        title: 'Find Menu Items Below Food Cost Target',
+        whatItDoes: 'Flags every menu item above its category target and calculates the minimum price increase to fix it.',
+        prompt: 'Here are my recipe cost cards with current food cost percentages. [LIST MENU ITEMS WITH CURRENT FOOD COST % AND MENU PRICE]. My target food cost by category is: proteins [X]%, produce [X]%, dry goods [X]%. Identify all items above their category target. For each, calculate the minimum price increase to hit target without rounding up more than $1. Flag any item where hitting target needs an increase above $2 — those need a separate decision about recipe modification versus price change.',
+        whatToPaste: 'Paste your menu items with food cost % and price, and fill in the category targets.'
+      },
+      {
+        id: 'fc-ai-4',
+        title: 'Write the Weekly Food Cost Summary',
+        whatItDoes: 'Drafts a short, direct weekly summary for the kitchen manager with one named priority action.',
+        prompt: 'Here is this week\'s food cost data. Total food sales: $[AMOUNT]. Total food cost: $[AMOUNT]. Food cost by category: [LIST CATEGORIES WITH DOLLAR AMOUNTS]. Top three waste items this week with reason codes: [LIST]. Portion audit findings this week: [NOTES]. Write a brief weekly summary under 150 words for my kitchen manager covering what improved from last week, what is still above target, and one priority action for next week with a specific owner named. Direct and operational tone, not congratulatory.',
+        whatToPaste: 'Fill in the sales/cost figures, category amounts, waste items, and audit notes.'
+      }
+    ]
   }
 
 ];
