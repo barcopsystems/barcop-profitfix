@@ -352,6 +352,25 @@ const App = {
     });
   },
 
+  // Which module a screen id belongs to (by prefix; profit screens have none)
+  _moduleOf(id) {
+    if (/^ic-/.test(id)) return 'inventory';
+    if (/^lc-/.test(id)) return 'labor';
+    if (/^sc-/.test(id)) return 'shift';
+    if (/^r-/.test(id))  return 'revenue';
+    if (/^t-/.test(id))  return 'traffic';
+    return 'profit';
+  },
+
+  // Navigate to any screen, switching the active module first if needed.
+  // The deep-link target of every Fix Layer step.
+  openScreen(id) {
+    if (!id) return;
+    const mod = this._moduleOf(id);
+    if (mod !== this._activeModule) this.showApp(mod);
+    this.navigate(id);
+  },
+
   showAuth() {
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('app').classList.add('hidden');
