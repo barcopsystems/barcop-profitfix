@@ -143,6 +143,175 @@ FIX.profit = [
         whatToPaste: 'Fill in the SKU name and the four bracketed numbers from your reports.'
       }
     ]
+  },
+
+  {
+    id: 'theft-loss',
+    name: 'Theft & Loss',
+    module: 'profit',
+    summary: 'Cash, product, and comp loss that never shows as a line item. Track voids and comps by employee, reconcile every drawer, audit shifts, and act on documented patterns.',
+
+    process: {
+      intro: 'Theft is caught by accountability, not suspicion. Daily habits create the data; the weekly review reads it. The job is to make manipulation visible and to build a paper trail before you need it.',
+      steps: [
+        { title: 'Log voids, comps, and no-sales by employee — daily',
+          detail: 'Pull voids, comps, and no-sale transactions from the POS into a daily tracker, broken out by employee. A blended total hides every individual pattern that matters. Do it before the next shift starts.' },
+        { title: 'Reconcile every cash drawer before it leaves the floor',
+          detail: 'Count each drawer against expected cash from the POS at end of shift, while the person who ran it is still there. Log the direction — consistent shorts and consistent overs are both signals.' },
+        { title: 'Inspect every delivery against the invoice',
+          detail: 'Check the delivery before the driver leaves. Short counts and substitutions are most likely during a busy service and hardest to dispute afterward. File a discrepancy report on anything that does not match.' },
+        { title: 'Run unannounced shift audits',
+          detail: 'At least twice a week, on different shifts at varied times, do a mid-shift spot check — drawer, voids so far, product levels. The audit is a deterrent as much as a detection tool.' },
+        { title: 'Review weekly by employee',
+          detail: 'Every Monday, same time: void and comp rate by employee, drawer variance history, audit observations. Flag anyone running above benchmark against the group.' },
+        { title: 'Build the documentation trail',
+          detail: 'Document incidents in writing when you observe them — not when you are certain. By the time you are certain, the paper trail that makes action possible is gone.' },
+        { title: 'Escalate on a pattern, not a single incident',
+          detail: 'One incident is a data point; increase oversight and watch. Two incidents on the same employee within 30 days is a documented pattern that supports written corrective action.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Void Rate %',
+        formula: 'Total voids / Gross sales x 100 (per employee, not blended)',
+        example: '$1,240 voids / $42,800 sales = 2.9% — above the 2% warning line' },
+      { label: 'Comp Rate %',
+        formula: 'Total comps / Gross sales x 100 (per employee, not blended)',
+        example: '$890 comps / $42,800 sales = 2.1% — within range' },
+      { label: 'Cash Drawer Variance',
+        formula: 'Counted cash - Expected cash from POS',
+        example: 'Recurring shorts of $25+ on one drawer is a red flag — log the direction every shift' }
+    ],
+
+    commonMistakes: [
+      'Waiting until you are certain before documenting — by the time you are certain, the paper trail that makes action possible is gone.',
+      'Reviewing voids and comps as a blended total instead of by employee — a blended rate hides every individual pattern that matters.',
+      'Treating all comps the same — a manager comp for service recovery and a bartender comp for a regular are different things and must be tracked separately.',
+      'Skipping the delivery inspection when the truck arrives mid-service — that is exactly when short counts happen and are hardest to dispute later.',
+      'Having no written comp authorization policy — a comp that needs no manager sign-off is an unauthorized expense you approved by silence.',
+      'Acting on a single incident with no documentation — it creates legal exposure and rarely survives a dispute with an employee who denies it.',
+      'Using behavioral indicators as an accusation framework — they direct attention, they are not evidence.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Daily: reconcile every cash drawer before it leaves the floor',
+        'Daily: log all voids, comps, and no-sales by employee',
+        'Daily: confirm the delivery inspection form was completed for any deliveries',
+        'Weekly: review void and comp rate by employee, flag anyone above benchmark',
+        'Weekly: review drawer reconciliation history for recurring variance',
+        'Weekly: run at least two shift audits on different shifts at varied times',
+        'Weekly: document any incidents observed in writing before the week closes'
+      ],
+      benchmarks: [
+        { label: 'Void rate — all staff',     target: '0.5-1.5%', warning: 'above 2.5%', critical: 'above 4%' },
+        { label: 'Void rate — per bartender', target: 'under 1%',  warning: 'above 2%',   critical: 'above 4%' },
+        { label: 'Comp rate — all staff',     target: '1-2%',     warning: 'above 3%',   critical: 'above 5%' },
+        { label: 'Comp rate — per bartender', target: 'under 1.5%', warning: 'above 3%', critical: 'above 5%' },
+        { label: 'No-sale transactions',      target: '0-2 / shift', warning: '5+ / shift', critical: '10+ / shift' },
+        { label: 'Cash drawer variance',      target: 'under $5',  warning: '$10-$20 consistent', critical: '$25+ recurring' }
+      ],
+      escalation: [
+        'Single incident: document it, increase oversight, do not act yet.',
+        'Two incidents on the same employee within 30 days: issue written corrective action.',
+        'Unexplained variance above 4% after a full investigation: escalate to a Profit Audit.',
+        'Confirmed cash theft with documentation: consult legal before the termination conversation.',
+        'Confirmed vendor short count: file a discrepancy report and dispute the invoice.',
+        'Pattern of comps without manager approval: address in writing and revoke comp authority if needed.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'theft-loss-policy',
+        name: 'Theft and Loss Prevention Policy',
+        intro: 'Sets the cash, comp, and product accountability rules for all staff. Signed at hire and kept in the employee file.',
+        fields: [
+          { key: 'bar_name',       label: 'Bar Name',       placeholder: 'Your bar' },
+          { key: 'effective_date', label: 'Effective Date', placeholder: 'e.g. March 4' }
+        ],
+        body: 'THEFT AND LOSS PREVENTION POLICY\n{{bar_name}}\nEffective {{effective_date}}\n\n'
+          + 'PURPOSE\n'
+          + 'This policy protects the business and every honest employee by setting clear accountability standards for cash, product, and transactions at {{bar_name}}. It applies to all staff equally.\n\n'
+          + 'TRANSACTIONS\n'
+          + '- Every sale is rung into the POS before the drink is served. No exceptions.\n'
+          + '- Voids require a manager and a stated reason. Self-voids are not permitted.\n'
+          + '- Comps require manager authorization and are recorded with the reason and the approving manager.\n'
+          + '- No-sale drawer opens are logged. Repeated no-sales are reviewed.\n\n'
+          + 'CASH HANDLING\n'
+          + '- Each drawer is assigned to one person per shift and reconciled before it leaves the floor.\n'
+          + '- Cash variance is counted and logged every shift, short or over.\n\n'
+          + 'PRODUCT\n'
+          + '- Product leaves the bar only as a rung sale or an authorized comp.\n'
+          + '- Deliveries are inspected against the invoice before the driver leaves.\n\n'
+          + 'ACCOUNTABILITY\n'
+          + 'Voids, comps, drawer variance, and audits are reviewed regularly. Violations are addressed through the corrective-action process. Confirmed theft is grounds for termination and may be referred to law enforcement.\n\n'
+          + 'ACKNOWLEDGEMENT\n'
+          + 'I have read and understand the Theft and Loss Prevention Policy for {{bar_name}}.\n\n'
+          + 'Staff name: ____________________   Signature: ____________________   Date: __________\n\n'
+          + 'Manager: ____________________   Signature: ____________________   Date: __________'
+      },
+      {
+        id: 'corrective-action',
+        name: 'Employee Corrective Action Form',
+        intro: 'Documents a corrective conversation for the employee file. Fill it out factually, before the conversation, with only what was directly observed.',
+        fields: [
+          { key: 'bar_name',      label: 'Bar Name',       placeholder: 'Your bar' },
+          { key: 'employee_name', label: 'Employee Name',  placeholder: 'Employee' },
+          { key: 'incident_date', label: 'Incident Date',  placeholder: 'e.g. March 2' },
+          { key: 'policy_ref',    label: 'Policy Violated', placeholder: 'e.g. Comp authorization' }
+        ],
+        body: 'EMPLOYEE CORRECTIVE ACTION\n{{bar_name}}\n\n'
+          + 'Employee: {{employee_name}}\n'
+          + 'Date of incident: {{incident_date}}\n'
+          + 'Policy violated: {{policy_ref}}\n\n'
+          + 'WHAT WAS OBSERVED\n'
+          + '(State only what was directly observed — facts, specifics, no conclusions about intent.)\n'
+          + '________________________________________________________________\n'
+          + '________________________________________________________________\n\n'
+          + 'PRIOR WARNINGS\n'
+          + '(List any prior written warnings and their dates, or note None.)\n'
+          + '________________________________________________________________\n\n'
+          + 'CORRECTIVE ACTION AND EXPECTATION GOING FORWARD\n'
+          + '________________________________________________________________\n'
+          + '________________________________________________________________\n\n'
+          + 'ACKNOWLEDGEMENT\n'
+          + 'This corrective action was reviewed with the employee on the date below. The employee signature confirms the conversation took place, not necessarily agreement.\n\n'
+          + 'Employee: ____________________   Signature: ____________________   Date: __________\n\n'
+          + 'Manager: ____________________   Signature: ____________________   Date: __________'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'tl-ai-1',
+        title: 'Analyze Voids and Comps by Employee',
+        whatItDoes: 'Finds the statistical outliers in a month of void/comp data and quantifies the dollar gap versus the group median — without drawing conclusions about intent.',
+        prompt: 'Here is my void and comp data for the past 30 days by employee. Columns are: employee name, total sales, total voids, total comps, void rate %, comp rate %. [PASTE DATA]. Identify any employees running statistically above the group average, calculate the dollar value of their excess void and comp rate versus the group median, and flag any patterns by shift or day of week if visible. Do not draw conclusions about intent — report only what the numbers show.',
+        whatToPaste: 'Paste your by-employee void/comp table into [PASTE DATA].'
+      },
+      {
+        id: 'tl-ai-2',
+        title: 'Write the Void/Comp Tracking Staff Memo',
+        whatItDoes: 'Drafts a matter-of-fact memo introducing void and comp tracking as standard practice, not a response to an incident.',
+        prompt: 'I am introducing void and comp tracking by employee at my bar. Write a staff memo under 200 words that introduces the system, explains it is standard industry practice, frames it as a normal operational process rather than a sign of distrust, and confirms the start date of [DATE]. Tone should be matter-of-fact and professional with no accusatory language.',
+        whatToPaste: 'Replace [DATE] with your start date.'
+      },
+      {
+        id: 'tl-ai-3',
+        title: 'Generate a Monthly Theft Risk Summary',
+        whatItDoes: 'Turns scorecard indicators into a team risk summary and the top two employees for increased oversight, in pattern-based language.',
+        prompt: 'Here is my employee theft risk scorecard data for [MONTH]. For each employee I scored these indicators 0-3: void rate trend, cash drawer consistency, shift audit observations, delivery involvement, peer reports. [PASTE SCORES]. Summarize the risk profile of the team, identify the top two employees for increased oversight, and suggest one specific management action for each. Frame everything as observable patterns, not conclusions about intent.',
+        whatToPaste: 'Fill in [MONTH] and paste your scorecard values into [PASTE SCORES].'
+      },
+      {
+        id: 'tl-ai-4',
+        title: 'Write a Corrective Action Summary',
+        whatItDoes: 'Produces a factual, file-ready corrective action paragraph from the incident facts.',
+        prompt: 'I need to document a corrective action for an employee file. The facts: employee name [NAME], date of incident [DATE], shift [SHIFT], what was specifically observed [DESCRIPTION], which policy was violated [POLICY SECTION], prior written warnings [YES or NO and details]. Write a corrective action summary paragraph suitable for the employee file — factual and specific, with no editorializing or conclusions beyond what was directly observed.',
+        whatToPaste: 'Fill in each bracketed field with the incident facts.'
+      }
+    ]
   }
 
 ];
