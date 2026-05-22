@@ -192,36 +192,25 @@ FIX.traffic = [
     summary: 'A steady stream of recent reviews ranks you and reassures the guest who is deciding. Respond to every one, ask every satisfied guest, and track velocity every week.',
 
     process: {
-      intro: 'Review velocity matters more than the rating sitting on your profile today. A fresh stream of reviews tells Google the business is active and tells the guest other people went last week. Build the ask into service and respond to every review.',
+      intro: 'Review velocity matters more than the rating sitting on your profile today. A fresh stream of reviews tells Google the business is active and tells the guest other people went last week. Build the ask into service and respond to every review. The app tracks your velocity, rating, and response rate. Each step below opens where the work happens.',
       steps: [
-        { title: 'Treat velocity as the metric, not just the rating',
-          detail: 'A high rating with no recent reviews looks stale. A steady flow of new reviews is what ranks you in the map results and reassures a guest comparing two listings.' },
-        { title: 'Respond to every review within 48 hours',
-          detail: 'Every review gets a response, named and specific, within two days. Set a phone alert for new reviews so nothing sits unanswered for more than a day.' },
-        { title: 'Use the four-sentence framework on negative reviews',
-          detail: 'Acknowledge, address the specific complaint, state your standard, invite them back. No defensiveness. Put your direct contact at the end so the next step happens off the public page.' },
-        { title: 'Respond to positive reviews specifically too',
-          detail: 'Use the guest name, reference a specific detail, mention the next visit. A generic thank-you signals you did not read it, and an unanswered positive review signals you only show up when there is a problem.' },
-        { title: 'Build the review ask into the service sequence',
-          detail: 'Train every server on a short compliment-moment ask, put a QR code on the bill presenter, and frame it as how the bar operates, not as a campaign. Never offer an incentive, that violates Google policy.' },
-        { title: 'Track velocity every week',
-          detail: 'Count new Google and Yelp reviews, calculate the rolling 30-day rating, and flag any week that comes in below your monthly target divided by four.' },
-        { title: 'Handle fake reviews through the escalation path',
-          detail: 'Respond factually that you have no record of the experience, without accusing the reviewer, then flag a policy-violating or fake review to Google.' }
+        { kind: 'result', target: 't-reviews', targetLabel: 'Review Tracker',
+          title: 'Track velocity, not just the rating',
+          detail: 'The Review Tracker counts new Google and Yelp reviews, the rolling 30-day rating, and your response rate. Velocity is what ranks you in the map results. A high rating with no recent reviews looks stale next to a competitor getting a steady flow.' },
+        { kind: 'reference', target: 'Review_Response_Templates.docx', targetLabel: 'Review Response Templates',
+          title: 'Respond to every review within 48 hours',
+          detail: 'Download the Review Response Templates. Negative reviews get the four-sentence framework: acknowledge, address the specific complaint, state your standard, invite them back, with your direct contact at the end so the next step happens off the public page. Positive reviews get a named, specific reply too. A generic thank-you signals you did not read it.' },
+        { kind: 'reference', target: 'Review_Request_Script.pdf', targetLabel: 'Review Request Script',
+          title: 'Build the review ask into service',
+          detail: 'Use the Review Request Script: a short compliment-moment ask for every server, a QR code on the bill presenter, framed as how the bar operates rather than a campaign. Never offer an incentive and never ask only happy guests. Both violate Google policy and risk a suspension.' },
+        { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
+          title: 'Log the weekly numbers',
+          detail: 'Every Monday, in This Week, log new Google and Yelp reviews and your response rate. Flag any week that comes in below your monthly target divided by four, and find the shift with the weakest review ask.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend',
+          detail: 'The Traffic dashboard rolls reviews into the digital presence score and the 90-day trend. Read it weekly so a stall in velocity shows up before it costs you ranking.' }
       ]
     },
-
-    formulas: [
-      { label: 'Review Response Rate',
-        formula: 'Reviews responded to / total reviews x 100',
-        example: 'Target is 100%. At 8 to 12 new reviews a month that is two to three responses a week.' },
-      { label: 'Monthly Velocity Target',
-        formula: 'Your own monthly review baseline x 1.15',
-        example: 'A bar averaging 6 a month sets a target near 7, a 15% monthly growth goal' },
-      { label: 'Weekly Velocity Floor',
-        formula: 'Monthly review target / 4',
-        example: 'A target of 8 a month means any week under 2 new reviews gets flagged' }
-    ],
 
     commonMistakes: [
       'Responding to negative reviews but ignoring positive ones. An unanswered positive review tells future guests the owner only shows up when there is a problem.',
@@ -258,15 +247,6 @@ FIX.traffic = [
         'Log the response and its time in the response tracker.'
       ]
     },
-
-    templates: [
-      { name: 'Review Response Templates', type: 'DOC', file: 'Review_Response_Templates.docx',
-        description: 'Ready-to-use response templates for positive reviews, negative reviews by category, and no-comment ratings. Personalize each with the specific detail only you know.' },
-      { name: 'Review Request Script', type: 'PDF', file: 'Review_Request_Script.pdf',
-        description: 'Word-for-word verbal scripts for asking satisfied guests for a Google review, plus a table card template and QR code placement guide.' },
-      { name: 'Review Velocity Tracker', type: 'PDF', file: 'Review_Velocity_Tracker.pdf',
-        description: 'Weekly tracking sheet for new reviews by platform. Tracks total count, new reviews, star distribution, and response rate against your monthly target.' }
-    ],
 
     aiWorkflows: [
       {
