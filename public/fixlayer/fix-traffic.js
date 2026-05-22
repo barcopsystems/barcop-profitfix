@@ -16,26 +16,25 @@ FIX.traffic = [
     summary: 'Your Google Business Profile is the listing that decides whether you show up in the local map results. Complete every field, keep it current, and it ranks. Leave gaps and it does not.',
 
     process: {
-      intro: 'Profile completeness is the single largest factor in local map ranking. Complete the profile once, maintain it weekly, audit it quarterly. Every field you fill is a field a competitor with a complete profile is not beating you on.',
+      intro: 'Profile completeness is the single largest factor in local map ranking. Complete the profile once, maintain it weekly, audit it quarterly. Every field you fill is a field a competitor with a complete profile is not beating you on. The app scores your profile and tracks the numbers over time. Each step below opens where the work happens.',
       steps: [
-        { title: 'Complete every profile field',
-          detail: 'Name, address, phone, website, hours, and attributes all get filled in. An empty field is information a guest never gets and a ranking signal you never send. Use your exact business name and do not stuff keywords into it, that risks a suspension.' },
-        { title: 'Set the right categories',
-          detail: 'Your primary category carries the most weight. Add every accurate secondary category. Categories expand the searches you can appear for, so use all of the ones that genuinely fit the bar.' },
-        { title: 'Load real, current photos',
-          detail: 'Put up at least 25 real photos across the categories Google surfaces. Photos older than 12 months pull down click-through. Reshoot every six months. Stock photos do not convert.' },
-        { title: 'Write the business description',
-          detail: 'Use the full 750 characters. Lead with your primary category and your neighborhood name, name two or three specific things that make the bar distinctive, and close with a call to action. No filler, no superlatives.' },
-        { title: 'Seed and watch the Q&A section',
-          detail: 'Post 10 real questions and answer them as the business owner. Check the section every week. Anyone can answer a public question, including a competitor, so answer every new one within 24 hours.' },
-        { title: 'Post at least twice a month',
-          detail: 'A profile with no posts in 90 days reads as an inactive business to Google and to guests. Use the Event, What\'s New, Offer, and Update formats. Two posts a month is the floor, not the goal.' },
-        { title: 'Maintain weekly, audit quarterly',
-          detail: 'Every Monday pull profile views, call clicks, and direction requests, and log them. Every quarter re-audit completeness, update seasonal hours and attributes, and add fresh photos.' }
+        { kind: 'result', target: 't-gbp', targetLabel: 'Google Business Profile',
+          title: 'Audit where your profile stands',
+          detail: 'Open the Google Business Profile screen. It scores your profile completeness and tracks photo count, posts per month, and the weekly insight numbers. Start here, so you know which fields are costing you ranking before you change anything.' },
+        { kind: 'reference', target: 'GBP_Optimization_Checklist.pdf', targetLabel: 'GBP Optimization Checklist',
+          title: 'Complete and optimize every field',
+          detail: 'Work the GBP Optimization Checklist on Google itself. Every field filled, the right primary and secondary categories, the full 750-character description, and ten seeded Q&A entries. Use your exact business name and do not stuff keywords into it, that risks a suspension.' },
+        { kind: 'reference', target: 'GBP_Photo_Brief.pdf', targetLabel: 'GBP Photo Brief',
+          title: 'Load a real, current photo set',
+          detail: 'Use the GBP Photo Brief as your shot list. At least 25 real photos across the categories Google surfaces, reshot every six months. Stock photos do not convert, and photos over 12 months old pull down click-through.' },
+        { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
+          title: 'Log the weekly numbers and keep posting',
+          detail: 'Every Monday, in This Week, log profile views, call clicks, and direction requests. Post to the profile at least twice a month using the Event, Offer, and Update formats. A profile with no posts in 90 days reads as an inactive business to Google and to guests.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend and re-audit quarterly',
+          detail: 'The Traffic dashboard rolls your GBP numbers into the digital presence score and the 90-day trend. Read it weekly. Every quarter, re-audit completeness, update seasonal hours and attributes, and add fresh photos.' }
       ]
     },
-
-    formulas: [],
 
     commonMistakes: [
       'Setting the hours once and never updating them. Holiday and seasonal hours get changed before they happen, not after a guest finds a closed door and leaves a review.',
@@ -65,13 +64,6 @@ FIX.traffic = [
         'Pull the 90-day insights trend and compare it against last quarter.'
       ]
     },
-
-    templates: [
-      { name: 'GBP Optimization Checklist', type: 'PDF', file: 'GBP_Optimization_Checklist.pdf',
-        description: 'Step-by-step checklist to claim, complete, and optimize every field of your Google Business Profile, including categories, attributes, photos, posts, and Q&A.' },
-      { name: 'GBP Photo Brief', type: 'PDF', file: 'GBP_Photo_Brief.pdf',
-        description: 'The shot list for a profile photo set. Covers the photo categories Google surfaces, how many of each to load, and what each shot needs to show.' }
-    ],
 
     aiWorkflows: [
       {
