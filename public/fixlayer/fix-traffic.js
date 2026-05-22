@@ -464,33 +464,25 @@ FIX.traffic = [
     summary: 'A delivery listing is a storefront most operators never check. Audit it, curate the menu for travel and margin, answer every review, and check the dashboards weekly.',
 
     process: {
-      intro: 'Delivery platforms run on the same signals as Google: photos, accuracy, reviews, and activity. A listing left alone runs at about 60% of its potential and looks fine from the outside. You only see the gap after the audit.',
+      intro: 'Delivery platforms run on the same signals as Google: photos, accuracy, reviews, and activity. A listing left alone runs at about 60% of its potential and looks fine from the outside. You only see the gap after the audit. The Delivery Platforms screen tracks each listing over time. Each step below opens where the work happens.',
       steps: [
-        { title: 'Audit every active listing first',
-          detail: 'Before any other delivery work, log into each platform and audit photos, hours, menu items, descriptions, and reviews. It is a one-time project of three to four hours.' },
-        { title: 'Use current photos',
-          detail: 'Replace any photo showing a discontinued item or an old menu era. A listing with photos that do not match what arrives produces the exact bad experience that generates a one-star review.' },
-        { title: 'Match platform hours to kitchen hours exactly',
-          detail: 'Wrong delivery hours produce orders placed at the wrong time that arrive cold or get cancelled. Both outcomes generate reviews that hurt the listing.' },
-        { title: 'Curate the delivery menu',
-          detail: 'Do not list every in-house item. The delivery menu is a curated product. Items that travel poorly or lose margin at commission do not belong on it.' },
-        { title: 'Check item margin at the commission rate',
-          detail: 'Recalculate every delivery item\'s margin at the platform commission rate. Pull any item whose margin drops below 15%.' },
-        { title: 'Answer every platform review',
-          detail: 'Delivery platform reviews affect platform ranking the same way Google reviews affect your profile. Apply the same response standard, and do not blame the platform or the driver.' },
-        { title: 'Check the dashboards weekly',
-          detail: 'Ratings, order volume, flagged items, and policy changes all move week to week and are invisible from outside the dashboard. Ten minutes every Monday catches problems before they compound.' }
+        { kind: 'reference', target: 'Delivery_Platform_Audit_Checklist.pdf', targetLabel: 'Delivery Platform Audit Checklist',
+          title: 'Audit every active listing first',
+          detail: 'Work the Delivery Platform Audit Checklist across DoorDash, Uber Eats, and Grubhub: photos, hours, menu items, descriptions, and reviews. Replace any photo showing a discontinued item, and match platform hours to kitchen hours exactly. It is a one-time project of three to four hours.' },
+        { kind: 'result', target: 't-delivery', targetLabel: 'Delivery Platforms',
+          title: 'Score and baseline the listings',
+          detail: 'Record each platform\'s active status, rating, and photo count in the Delivery Platforms screen. Set the baseline so you can tell later whether the audit and the menu work moved the numbers.' },
+        { kind: 'reference', target: 'Delivery_Menu_Builder_Worksheet.pdf', targetLabel: 'Delivery Menu Builder Worksheet',
+          title: 'Curate the delivery menu',
+          detail: 'Use the Delivery Menu Builder Worksheet. The delivery menu is a curated product, not your whole in-house menu. Recalculate every item\'s margin at the platform commission rate, rate how well each item travels, and pull any item whose margin drops below 15%.' },
+        { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
+          title: 'Log the weekly numbers',
+          detail: 'Every Monday, in This Week, log each platform\'s rating and order volume. Answer every new platform review with the same standard you use for Google, and never blame the platform or the driver. Check the dashboards for any item the platform auto-flagged or removed.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend',
+          detail: 'The Traffic dashboard rolls your delivery numbers into the digital presence score and the 90-day trend. Read it weekly. Ten minutes a week catches a rating slide before it compounds.' }
       ]
     },
-
-    formulas: [
-      { label: 'Effective Delivery Revenue',
-        formula: 'Menu price x (1 - platform commission rate)',
-        example: '$16 item x (1 - 0.30 commission) = $11.20 kept after the platform fee' },
-      { label: 'Delivery Item Margin',
-        formula: 'Effective delivery revenue - item food cost',
-        example: '$11.20 - $4.80 cost = $6.40. Pull the item if margin falls below 15% of the menu price.' }
-    ],
 
     commonMistakes: [
       'Using photos from a previous menu or ownership era. A listing showing discontinued items produces the bad experience that generates a one-star review.',
@@ -519,13 +511,6 @@ FIX.traffic = [
         'Respond to every unanswered platform review.'
       ]
     },
-
-    templates: [
-      { name: 'Delivery Platform Audit Checklist', type: 'PDF', file: 'Delivery_Platform_Audit_Checklist.pdf',
-        description: 'Platform-by-platform audit form for DoorDash, Uber Eats, and Grubhub. Checks photo coverage, menu completeness, description quality, pricing accuracy, and promotional status.' },
-      { name: 'Delivery Menu Builder Worksheet', type: 'PDF', file: 'Delivery_Menu_Builder_Worksheet.pdf',
-        description: 'Worksheet for curating the delivery menu: item margin at the commission rate, a travel-quality rating, and the keep-or-cut decision for each item.' }
-    ],
 
     aiWorkflows: [
       {
