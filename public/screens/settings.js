@@ -858,6 +858,93 @@ S.Settings = {
       ]),
     ];
 
+    // ════════════════════════════════════════════════════════════════════
+    //  SHIFT CONTROL — derived from the Anchor profile. Each week's sc_shifts
+    //  revenue and covers sum to that week's bar_rev, food_rev and covers, so
+    //  the weekly revenue feed for Profit and Revenue computes back to it.
+    // ════════════════════════════════════════════════════════════════════
+    App.shiftData = App.shiftData || {};
+    const ANCHS = window.ANCHOR;
+    const dayW  = [0.10, 0.10, 0.12, 0.14, 0.20, 0.22, 0.12]; // Mon..Sun
+    const mgrs  = ['Maria G.', 'Jake T.', 'Carlos P.'];
+
+    const scShifts = [];
+    ANCHS.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      let barLeft = a.bar_rev, foodLeft = a.food_rev, covLeft = a.covers;
+      dayW.forEach((w, di) => {
+        const last   = di === dayW.length - 1;
+        const bar    = last ? barLeft  : Math.round(a.bar_rev  * w);
+        const floor  = last ? foodLeft : Math.round(a.food_rev * w);
+        const covers = last ? covLeft  : Math.round(a.covers   * w);
+        barLeft -= bar; foodLeft -= floor; covLeft -= covers;
+        scShifts.push({
+          id:uid(), date:dateStr(baseAgo + 6 - di), shift_type:'Full Day',
+          manager:mgrs[di % 3], bar_revenue:bar, floor_revenue:floor,
+          total_revenue:bar + floor, covers:covers, opening_bank:300,
+          staff_on_floor:di >= 4 ? 8 : 6, status:'Closed', notes:'',
+          created_at:new Date().toISOString()
+        });
+      });
+    });
+    App.shiftData.sc_shifts = scShifts;
+
+    // Drawer reconciliations — variance tightens after the fix week.
+    const scVariances = [];
+    ANCHS.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      const improving = a.wk >= ANCHS.fix_week;
+      [1, 4].forEach((dayOff, vi) => {
+        const exp = 600 + Math.round(Math.random() * 350);
+        const variance = improving
+          ? Math.round((Math.random() - 0.55) * 12)
+          : Math.round((Math.random() - 0.75) * 30);
+        scVariances.push({
+          id:uid(), date:dateStr(baseAgo + dayOff), shift_type:'Close',
+          drawer:'Drawer ' + (vi + 1), cashier:mgrs[(a.wk + vi) % 3],
+          expected_cash:exp, counted_cash:exp + variance, variance:variance,
+          tolerance:10, status:Math.abs(variance) <= 10 ? 'OK' : variance < 0 ? 'Short' : 'Over',
+          reason:'', notes:'', created_at:new Date().toISOString()
+        });
+      });
+    });
+    App.shiftData.sc_variances = scVariances;
+
+    // Voids and comps — fewer events and all manager-authorized after the fix.
+    const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Derek W.', 'Carlos P.'];
+    const scVoidComps = [];
+    ANCHS.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      const improving = a.wk >= ANCHS.fix_week;
+      const n = improving ? 2 : 4;
+      for (let k = 0; k < n; k++) {
+        const isComp = k % 2 === 1;
+        scVoidComps.push({
+          id:uid(), date:dateStr(baseAgo + (k + 1)), type:isComp ? 'Comp' : 'Void',
+          shift_type:'Dinner', item:isComp ? 'Guest recovery' : 'Wrong item rung',
+          amount:isComp ? 8 + Math.round(Math.random() * 22) : 6 + Math.round(Math.random() * 16),
+          server:vcServers[(a.wk + k) % 5],
+          authorized_by:improving ? mgrs[(a.wk + k) % 3] : (k === 0 ? '' : mgrs[k % 3]),
+          check_number:'', reason:isComp ? 'Service recovery' : 'Order error',
+          notes:'', created_at:new Date().toISOString()
+        });
+      }
+    });
+    App.shiftData.sc_void_comps = scVoidComps;
+
+    // One Saturday cash drop per week.
+    const scCashDrops = [];
+    ANCHS.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      scCashDrops.push({
+        id:uid(), date:dateStr(baseAgo + 1), shift_type:'Close', drop_time:'23:30',
+        drawer:'Drawer 1', performed_by:mgrs[a.wk % 3], witness:mgrs[(a.wk + 1) % 3],
+        amount:900 + Math.round(Math.random() * 500), denominations:{}, notes:'',
+        created_at:new Date().toISOString()
+      });
+    });
+    App.shiftData.sc_cash_drops = scCashDrops;
+
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
     // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
     // and 5, which is where both cost trends break downward.
@@ -899,6 +986,7 @@ S.Settings = {
     // ── Save everything ──
     await App.save();
     await App.saveInventory();
+    await App.saveShift();
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded — all sections populated. Go test!'; }
