@@ -1,377 +1,275 @@
 'use strict';
-S.RevenueThisWeek = {
-  step: 1,
-  draft: null,
-  container: null,
 
-  render(container, actions) {
-    this.container = container;
-    actions.innerHTML = '';
-    if (!this.draft) this.draft = this.loadDraft();
-    this.renderStep(this.step);
+/* ── Revenue Recovery — This Week (thin weekly confirm screen) ────────────────
+   Restructured per the platform map: a thin confirm screen, not a 6-step
+   wizard. Revenue and covers auto-fill from Shift Control (sc_shifts); labor
+   auto-fills from Labor Control (lc_actuals). Every field is editable as an
+   override only. RPLH-by-daypart and server entry moved to their own screens. */
+
+S.RevenueThisWeek = {
+  draft: null,
+  DRAFT_KEY: 'rf_draft',
+
+  // ── Shift Control revenue/covers feed ─────────────────────────────────────
+  hasShifts() {
+    return (((App.shiftData && App.shiftData.sc_shifts) || []).length) > 0;
+  },
+  shiftFeed(periodEnd) {
+    const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
+    if (!shifts.length || !periodEnd) return null;
+    const startD = new Date(periodEnd + 'T00:00:00');
+    if (isNaN(startD.getTime())) return null;
+    startD.setDate(startD.getDate() - 6);
+    const start = startD.toISOString().slice(0, 10);
+    let bar = 0, floor = 0, covers = 0, any = false;
+    shifts.forEach(s => {
+      if (!s.date || s.date < start || s.date > periodEnd) return;
+      bar += s.bar_revenue || 0;
+      floor += s.floor_revenue || 0;
+      covers += s.covers || 0;
+      any = true;
+    });
+    return any ? { bar, floor, covers } : { bar: 0, floor: 0, covers: 0 };
   },
 
+  // ── Labor Control labor feed ──────────────────────────────────────────────
+  hasLabor() {
+    return (((App.laborData && App.laborData.lc_actuals) || []).length) > 0;
+  },
+  laborFeed(periodEnd) {
+    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
+    if (!actuals.length || !periodEnd) return null;
+    const startD = new Date(periodEnd + 'T00:00:00');
+    if (isNaN(startD.getTime())) return null;
+    startD.setDate(startD.getDate() - 6);
+    const start = startD.toISOString().slice(0, 10);
+    let cost = 0, hours = 0, any = false;
+    actuals.forEach(a => {
+      if (!a.date || a.date < start || a.date > periodEnd) return;
+      cost += a.cost || 0;
+      hours += a.hours || 0;
+      any = true;
+    });
+    return any ? { cost, hours } : { cost: 0, hours: 0 };
+  },
+
+  targets() { return (App.data.revenue_settings && App.data.revenue_settings.targets) || {}; },
+  laborTarget() {
+    const t = this.targets();
+    return ((t.bar_labor_pct || 28) + (t.kitchen_labor_pct || 30) + (t.floor_labor_pct || 32)) / 3;
+  },
+
+  // ── Draft ─────────────────────────────────────────────────────────────────
   loadDraft() {
-    try {
-      const r = localStorage.getItem('rf_draft');
-      if (r) { const d = JSON.parse(r); this.step = d._step || 1; return d; }
-    } catch(e) {}
+    let saved = null;
+    try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) saved = JSON.parse(r); } catch (e) {}
     const weeks = App.data.revenue_weeks || [];
     const lastWeek = weeks.length ? weeks[weeks.length - 1] : null;
+    const periodEnd = (saved && saved.period_end) || (App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0, 10));
+    if (saved) {
+      return {
+        week_num: saved.week_num || ((lastWeek && lastWeek.week_num || 0) + 1),
+        period_end: periodEnd,
+        bar_revenue: saved.bar_revenue || '',
+        floor_revenue: saved.floor_revenue || '',
+        covers: saved.covers || '',
+        labor_hours: saved.labor_hours || '',
+        labor_cost: saved.labor_cost || '',
+        notes: saved.notes || ''
+      };
+    }
+    const sf = this.shiftFeed(periodEnd);
+    const lf = this.laborFeed(periodEnd);
     return {
-      _step: 1,
-      week_num: (lastWeek?.week_num || 0) + 1,
-      period_end: App.nextSunday ? App.nextSunday() : '',
-      bar_revenue: '', floor_revenue: '', covers: '',
-      bar_labor_hours: '', bar_labor_cost: '',
-      kitchen_labor_hours: '', kitchen_labor_cost: '',
-      floor_labor_hours: '', floor_labor_cost: '',
-      rplh_lunch_rev: '', rplh_lunch_hrs: '',
-      rplh_dinner_rev: '', rplh_dinner_hrs: '',
-      rplh_bar_rev: '', rplh_bar_hrs: '',
-      server_entries: [],
+      week_num: (lastWeek && lastWeek.week_num || 0) + 1,
+      period_end: periodEnd,
+      bar_revenue: sf && sf.bar ? sf.bar.toFixed(2) : '',
+      floor_revenue: sf && sf.floor ? sf.floor.toFixed(2) : '',
+      covers: sf && sf.covers ? String(sf.covers) : '',
+      labor_hours: lf && lf.hours ? lf.hours.toFixed(2) : '',
+      labor_cost: lf && lf.cost ? lf.cost.toFixed(2) : '',
       notes: ''
     };
   },
+  saveDraft() { try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
+  clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} this.draft = null; },
 
-  saveDraft() { this.draft._step = this.step; localStorage.setItem('rf_draft', JSON.stringify(this.draft)); },
-  clearDraft() { localStorage.removeItem('rf_draft'); this.draft = null; this.step = 1; },
-
-  renderStep(step) {
-    this.step = step; this.saveDraft();
-    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of 6';
-    this.container.innerHTML = '<div class="screen">' + this.stepsHtml() + this.getStepHtml(step) + '</div>';
-    this.wireStep(step);
+  render(container, actions) {
+    this.container = container;
+    if (actions) actions.innerHTML = '';
+    if (!this.draft) this.draft = this.loadDraft();
+    this.draw();
   },
 
-  stepsHtml() {
-    const labels = ['Period','Revenue','Labor','RPLH','Servers','Review'];
-    let h = '<div class="steps">';
-    for (let i = 1; i <= 6; i++) {
-      const cls = i < this.step ? 'done' : i === this.step ? 'active' : '';
-      h += (i > 1 ? '<div class="step-line' + (i-1 < this.step ? ' done' : '') + '"></div>' : '') +
-           '<div class="step-dot ' + cls + '">' + (i < this.step ? '✓' : i) + '</div>';
+  feedNote(kind) {
+    if (kind === 'revenue') {
+      return this.hasShifts()
+        ? 'Auto-filled from Shift Control — the weekly sum of shift revenue and covers. <a href="#" onclick="S.RevenueThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No shifts logged in Shift Control yet — log shifts there, or enter manually.';
     }
-    return h + '</div>';
-  },
-
-  getStepHtml(step) {
-    switch(step) {
-      case 1: return this.step1();
-      case 2: return this.step2();
-      case 3: return this.step3();
-      case 4: return this.step4();
-      case 5: return this.step5();
-      case 6: return this.step6();
-      default: return '';
+    if (kind === 'labor') {
+      return this.hasLabor()
+        ? 'Auto-filled from Labor Control — logged hours and cost for the week. <a href="#" onclick="S.RevenueThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No hours logged in Labor Control yet — log hours there, or enter manually.';
     }
+    return '';
   },
 
-  nav(showBack, showNext, saveLabel) {
-    return '<div class="card-actions">'
-      + (showBack ? '<button class="btn btn-ghost" id="rw-back">← Back</button>' : '')
-      + (showNext && this.step < 6 ? '<button class="btn btn-primary" id="rw-next">Next →</button>' : '')
-      + (saveLabel ? '<button class="btn btn-primary" id="rw-save">' + saveLabel + '</button>' : '')
+  moneyField(id, label, value, kind, prefix) {
+    const input = prefix === '$'
+      ? '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.RevenueThisWeek.onInput()"/></div>'
+      : '<input type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.RevenueThisWeek.onInput()"/>';
+    return '<div class="f w-md"><label>' + label + '</label>' + input
+      + (kind ? '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">' + this.feedNote(kind) + '</div>' : '')
       + '</div>';
   },
 
-  step1() {
-    return '<div class="card"><div class="card-title">Period Details</div>'
+  draw() {
+    const d = this.draft;
+    this.container.innerHTML = '<div class="screen">'
+      + '<div class="card"><div class="card-title">Period</div>'
       + '<div class="form-row">'
-      + '<div class="f" style="width:100px;"><label>Week # ' + tt('tw-week-num') + '</label><input type="number" id="rw-wk" value="' + this.draft.week_num + '" min="1"/></div>'
-      + '<div class="f" style="width:160px;"><label>Period End Date ' + tt('tw-period-end') + '</label><input type="date" id="rw-end" value="' + this.draft.period_end + '"/></div>'
-      + '</div>'
-      + this.nav(false, true) + '</div>';
-  },
+      + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="rw-wk" value="' + esc(String(d.week_num)) + '" min="1" oninput="S.RevenueThisWeek.onInput()"/></div>'
+      + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="rw-end" value="' + esc(d.period_end) + '" oninput="S.RevenueThisWeek.onInput()"/></div>'
+      + '</div></div>'
 
-  step2() {
-    const t = App.data.revenue_settings?.targets || {};
-    const targetCA = t.check_avg || 35;
-    const barRev = parseFloat(this.draft.bar_revenue) || 0;
-    const floorRev = parseFloat(this.draft.floor_revenue) || 0;
-    const covers = parseFloat(this.draft.covers) || 0;
-    const totalRev = barRev + floorRev;
-    const checkAvg = covers > 0 ? (totalRev / covers) : 0;
-    const caGap = checkAvg > 0 ? checkAvg - targetCA : 0;
-    const hasData = totalRev > 0 && covers > 0;
-    return '<div class="card"><div class="card-title">Revenue by Department</div>'
+      + '<div class="card"><div class="card-title">Revenue and Covers</div>'
       + '<div class="form-row">'
-      + '<div class="f w-md"><label>Bar Revenue ' + tt('r-bar-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-brev" value="' + (this.draft.bar_revenue||'') + '" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>Floor Revenue ' + tt('r-floor-revenue') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-frev" value="' + (this.draft.floor_revenue||'') + '" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>Total Covers ' + tt('r-covers') + '</label><input type="number" id="rw-cov" value="' + (this.draft.covers||'') + '" placeholder=""/></div>'
+      + this.moneyField('rw-brev', 'Bar Revenue', d.bar_revenue, 'revenue', '$')
+      + this.moneyField('rw-frev', 'Floor Revenue', d.floor_revenue, 'revenue', '$')
+      + this.moneyField('rw-cov', 'Total Covers', d.covers, 'revenue', '')
       + '</div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + (totalRev > 0 ? App.fmtCurrency(totalRev) : '—') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val ' + (hasData ? (caGap >= 0 ? 'good' : 'warn') : '') + '">' + (hasData ? App.fmtCurrency(checkAvg) : '—') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">$' + targetCA + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val ' + (hasData ? (caGap >= 0 ? 'good' : 'warn') : '') + '">' + (hasData ? ((caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap)) : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="rw-c-rev">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="rw-c-ca">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">$' + (this.targets().check_avg || 35) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val" id="rw-c-cagap">—</div></div>'
+      + '</div></div>'
+
+      + '<div class="card"><div class="card-title">Labor</div>'
+      + '<div class="form-row">'
+      + this.moneyField('rw-lhrs', 'Labor Hours', d.labor_hours, 'labor', '')
+      + this.moneyField('rw-lcost', 'Labor Cost', d.labor_cost, 'labor', '$')
       + '</div>'
-      + this.nav(true, true) + '</div>';
+      + '<div class="calc">'
+      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val" id="rw-c-lpct">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + App.fmtPct(this.laborTarget()) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val" id="rw-c-rplh">—</div></div>'
+      + '</div></div>'
+
+      + '<div class="card"><div class="card-title">Review</div>'
+      + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label>'
+      + '<textarea id="rw-notes" rows="2" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary btn-lg" id="rw-save">Save Week</button>'
+      + '<span id="rw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div></div>';
+
+    document.getElementById('rw-save')?.addEventListener('click', () => this.saveWeek());
+    this.calc();
   },
 
-  step3() {
-    const t = App.data.revenue_settings?.targets || {};
-    const barRev   = parseFloat(this.draft.bar_revenue)   || 0;
-    const floorRev = parseFloat(this.draft.floor_revenue) || 0;
-    const depts = [
-      { key: 'bar',     label: 'Bar',     rev: barRev,              target: t.bar_labor_pct || 28,     revLabel: 'Bar revenue' },
-      { key: 'kitchen', label: 'Kitchen', rev: barRev + floorRev,   target: t.kitchen_labor_pct || 30, revLabel: 'Blended (bar + floor)' },
-      { key: 'floor',   label: 'Floor',   rev: floorRev,            target: t.floor_labor_pct || 32,   revLabel: 'Floor revenue' },
-    ];
-    let rows = depts.map(d => {
-      const hrs  = parseFloat(this.draft[d.key + '_labor_hours']) || 0;
-      const cost = parseFloat(this.draft[d.key + '_labor_cost'])  || 0;
-      const rev  = d.rev;
-      const pct  = rev > 0 && cost > 0 ? (cost / rev * 100).toFixed(1) : null;
-      const gap  = pct ? (parseFloat(pct) - d.target).toFixed(1) : null;
-      return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + '   Target: ' + d.target + '%</div>'
-        + '<div class="form-row">'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-labor-hours') + '</label><input type="number" id="rw-' + d.key + '-hrs" value="' + (this.draft[d.key + '_labor_hours']||'') + '" placeholder=""/></div>'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Cost ' + tt('r-labor-cost') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-' + d.key + '-cost" value="' + (this.draft[d.key + '_labor_cost']||'') + '" placeholder=""/></div></div>'
-        + (pct ? '<div class="f" style="width:120px;"><label>Labor %</label><div style="font-size:18px;font-weight:700;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';padding-top:8px;">' + pct + '%<span style="font-size:11px;font-weight:400;color:' + (parseFloat(gap) > 0 ? 'var(--red)' : 'var(--gold)') + ';margin-left:6px;">' + (parseFloat(gap) > 0 ? '+' : '') + gap + ' pts</span></div></div>' : '')
-        + '</div></div>';
-    }).join('');
-    return '<div class="card"><div class="card-title">Labor by Department</div>' + rows + this.nav(true, true) + '</div>';
-  },
+  onInput() { this.collect(); this.saveDraft(); this.calc(); },
 
-  step4() {
-    const t = App.data.revenue_settings?.targets || {};
-    const dayparts = [
-      { key: 'lunch',  label: 'Lunch',  target: t.rplh_lunch  || 50 },
-      { key: 'dinner', label: 'Dinner', target: t.rplh_dinner || 75 },
-      { key: 'bar',    label: 'Bar',    target: t.rplh_bar    || 65 },
-    ];
-    let rows = dayparts.map(d => {
-      const rev  = parseFloat(this.draft['rplh_' + d.key + '_rev']) || 0;
-      const hrs  = parseFloat(this.draft['rplh_' + d.key + '_hrs']) || 0;
-      const rplh = hrs > 0 && rev > 0 ? (rev / hrs) : null;
-      const gap  = rplh ? rplh - d.target : null;
-      return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b2);">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + d.label + '   Target: $' + d.target + ' RPLH ' + tt('r-rplh-target') + '</div>'
-        + '<div class="form-row">'
-        + '<div class="f w-md"><label>' + d.label + ' Revenue ' + tt('r-daypart-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rw-rplh-' + d.key + '-rev" value="' + (this.draft['rplh_' + d.key + '_rev']||'') + '" placeholder=""/></div></div>'
-        + '<div class="f w-md"><label>' + d.label + ' Labor Hours ' + tt('r-daypart-hrs') + '</label><input type="number" id="rw-rplh-' + d.key + '-hrs" value="' + (this.draft['rplh_' + d.key + '_hrs']||'') + '" placeholder=""/></div>'
-        + (rplh ? '<div class="f" style="width:140px;"><label>RPLH ' + tt('r-rplh') + '</label><div style="font-size:18px;font-weight:700;color:' + (gap >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding-top:8px;">' + App.fmtCurrency(rplh) + '<span style="font-size:11px;font-weight:400;margin-left:6px;">' + (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + '</span></div></div>' : '')
-        + '</div></div>';
-    }).join('');
-    return '<div class="card"><div class="card-title">RPLH by Daypart</div>'
-      + rows + this.nav(true, true) + '</div>';
-  },
-
-  step5() {
-    const servers = App.data.revenue_settings?.servers || [];
-    const t = App.data.revenue_settings?.targets || {};
-    const targetCA = t.check_avg || 35;
-    if (!servers.length) {
-      return '<div class="card"><div class="card-title">Server Performance</div>'
-        + '<div class="empty"><div class="empty-title">No servers on roster</div>'
-        + '<div class="empty-sub">Add servers in Settings, then return to enter their performance data.</div>'
-        + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'r-settings\')">Go to Settings</button></div>'
-        + '</div>' + this.nav(true, true) + '</div>';
-    }
-    if (!this.draft.server_entries || this.draft.server_entries.length !== servers.length) {
-      this.draft.server_entries = servers.map(sv => ({ id: sv.id, name: sv.name, covers: '', sales: '' }));
-    }
-    const entries = this.draft.server_entries;
-    const validEntries = entries.filter(e => parseFloat(e.covers) > 0 && parseFloat(e.sales) > 0);
-    const teamAvg = validEntries.length ? validEntries.reduce((s,e) => s + parseFloat(e.sales)/parseFloat(e.covers), 0) / validEntries.length : null;
-
-    const rows = entries.map((e, i) => {
-      const covers = parseFloat(e.covers) || 0;
-      const sales  = parseFloat(e.sales)  || 0;
-      const ca     = covers > 0 && sales > 0 ? (sales / covers) : null;
-      const vsTeam = ca && teamAvg ? ca - teamAvg : null;
-      const vsTgt  = ca ? ca - targetCA : null;
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
-        + '<div style="width:130px;font-size:12px;font-weight:700;color:var(--t1);flex-shrink:0;">' + esc(e.name) + '</div>'
-        + '<div class="f" style="width:100px;"><label style="font-size:10px;">Covers ' + tt('r-sv-covers') + '</label><input type="number" class="rsv-cov" data-idx="' + i + '" value="' + (e.covers||'') + '" placeholder="" style="padding:6px 8px;font-size:12px;"/></div>'
-        + '<div class="f" style="width:110px;"><label style="font-size:10px;">Total Sales ' + tt('r-sv-sales') + '</label><div class="fw"><span class="pre">$</span><input class="pre rsv-sales" data-idx="' + i + '" type="number" value="' + (e.sales||'') + '" placeholder="" style="font-size:12px;"/></div></div>'
-        + (ca ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">Check Avg</div><div style="font-size:14px;font-weight:700;color:' + (vsTgt >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(ca) + '</div></div>' : '')
-        + (vsTeam != null ? '<div style="min-width:80px;"><div style="font-size:10px;color:var(--t3);">vs Team</div><div style="font-size:12px;color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</div></div>' : '')
-        + '</div>';
-    }).join('');
-
-    return '<div class="card"><div class="card-title">Server Performance</div>'
-      + (teamAvg ? '<div style="background:var(--input);border-radius:6px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--t2);">Team check average this week: <strong style="color:var(--t1);">' + App.fmtCurrency(teamAvg) + '</strong> vs target $' + targetCA + '</div>' : '')
-      + rows + this.nav(true, true) + '</div>';
-  },
-
-  step6() {
+  collect() {
+    const v = id => document.getElementById(id)?.value ?? '';
     const d = this.draft;
-    const t = App.data.revenue_settings?.targets || {};
-    const barRev   = parseFloat(d.bar_revenue)   || 0;
-    const floorRev = parseFloat(d.floor_revenue) || 0;
-    const covers   = parseFloat(d.covers)        || 0;
-    const totalRev = barRev + floorRev;
-    const checkAvg = covers > 0 ? totalRev / covers : 0;
-    const targetCA = t.check_avg || 35;
-    const annualGap = covers > 0 ? (checkAvg - targetCA) * covers * 52 : 0;
-
-    const totalLaborCost = (parseFloat(d.bar_labor_cost)||0) + (parseFloat(d.kitchen_labor_cost)||0) + (parseFloat(d.floor_labor_cost)||0);
-    const laborPct = totalRev > 0 && totalLaborCost > 0 ? (totalLaborCost / totalRev * 100).toFixed(1) : null;
-
-    const totalHrs = (parseFloat(d.bar_labor_hours)||0) + (parseFloat(d.kitchen_labor_hours)||0) + (parseFloat(d.floor_labor_hours)||0);
-    const rplh = totalHrs > 0 && totalRev > 0 ? (totalRev / totalHrs).toFixed(2) : null;
-
-    const validServers = (d.server_entries||[]).filter(e => parseFloat(e.covers) > 0 && parseFloat(e.sales) > 0);
-    const teamAvg = validServers.length ? validServers.reduce((s,e) => s + parseFloat(e.sales)/parseFloat(e.covers), 0) / validServers.length : null;
-
-    const row = (label, val, sub) => '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="font-size:12px;color:var(--t2);">' + label + '</div>'
-      + '<div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--t1);">' + val + '</div>'
-      + (sub ? '<div style="font-size:11px;color:var(--t3);">' + sub + '</div>' : '')
-      + '</div></div>';
-
-    return '<div class="card"><div class="card-title">Review and Save</div>'
-      + row('Week', 'Week ' + d.week_num, d.period_end)
-      + row('Bar Revenue', App.fmtCurrency(barRev), '')
-      + row('Floor Revenue', App.fmtCurrency(floorRev), '')
-      + row('Total Revenue', App.fmtCurrency(totalRev), '')
-      + row('Covers', covers || ' ', '')
-      + row('Check Average', checkAvg ? App.fmtCurrency(checkAvg) : ' ', 'Target $' + targetCA)
-      + (annualGap !== 0 ? row('Annual Check Avg Gap', App.fmtCurrency(Math.abs(annualGap)), annualGap >= 0 ? 'above target' : 'below target, recoverable') : '')
-      + row('Total Labor Cost', App.fmtCurrency(totalLaborCost), '')
-      + (laborPct ? row('Blended Labor %', laborPct + '%', '') : '')
-      + (rplh ? row('Blended RPLH', App.fmtCurrency(parseFloat(rplh)), '') : '')
-      + (teamAvg ? row('Team Check Average', App.fmtCurrency(teamAvg), validServers.length + ' servers') : '')
-      + '<div class="f" style="margin-top:14px;margin-bottom:4px;"><label>Notes (optional)</label><textarea id="rw-notes" rows="2">' + esc(d.notes || '') + '</textarea></div>'
-      + this.nav(true, false, 'Save Week')
-      + '</div>'
-      + '<div id="rw-alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Bar revenue and floor revenue are both zero. Enter at least one revenue figure before saving.</div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="rw-alert-ok">OK</button></div></div></div>';
+    d.week_num = v('rw-wk'); d.period_end = v('rw-end');
+    d.bar_revenue = v('rw-brev'); d.floor_revenue = v('rw-frev'); d.covers = v('rw-cov');
+    d.labor_hours = v('rw-lhrs'); d.labor_cost = v('rw-lcost');
+    d.notes = v('rw-notes');
   },
 
-  wireStep(step) {
-    document.getElementById('rw-back')?.addEventListener('click', () => {
-      this.collectStep(step);
-      this.renderStep(step - 1);
-    });
-    document.getElementById('rw-next')?.addEventListener('click', () => {
-      this.collectStep(step);
-      this.renderStep(step + 1);
-    });
-    document.getElementById('rw-save')?.addEventListener('click', () => {
-      this.collectStep(step);
-      this.saveWeek();
-    });
-
-    // Live recalc on step 2
-    if (step === 2) {
-      ['rw-brev','rw-frev','rw-cov'].forEach(id => {
-        document.getElementById(id)?.addEventListener('input', () => {
-          this.collectStep(2);
-          const html = this.step2();
-          const card = this.container.querySelector('.card');
-          if (card) card.outerHTML = html;
-          this.wireStep(2);
-        });
-      });
+  pullRevenue() {
+    const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
+    const sf = this.shiftFeed(pe);
+    if (sf) {
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      set('rw-brev', sf.bar.toFixed(2));
+      set('rw-frev', sf.floor.toFixed(2));
+      set('rw-cov', sf.covers ? String(sf.covers) : '');
     }
-
-    // Server entries
-    if (step === 5) {
-      this.container.querySelectorAll('.rsv-cov,.rsv-sales').forEach(inp => {
-        inp.addEventListener('input', () => {
-          const idx = parseInt(inp.dataset.idx);
-          if (inp.classList.contains('rsv-cov'))   this.draft.server_entries[idx].covers = inp.value;
-          if (inp.classList.contains('rsv-sales'))  this.draft.server_entries[idx].sales  = inp.value;
-          this.saveDraft();
-        });
-      });
+    this.onInput();
+  },
+  pullLabor() {
+    const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
+    const lf = this.laborFeed(pe);
+    if (lf) {
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      set('rw-lhrs', lf.hours.toFixed(2));
+      set('rw-lcost', lf.cost.toFixed(2));
     }
+    this.onInput();
   },
 
-  collectStep(step) {
-    const g = id => document.getElementById(id)?.value || '';
-    if (step === 1) {
-      this.draft.week_num   = parseInt(g('rw-wk')) || this.draft.week_num;
-      this.draft.period_end = g('rw-end');
-    }
-    if (step === 2) {
-      this.draft.bar_revenue   = g('rw-brev');
-      this.draft.floor_revenue = g('rw-frev');
-      this.draft.covers        = g('rw-cov');
-    }
-    if (step === 3) {
-      ['bar','kitchen','floor'].forEach(k => {
-        this.draft[k + '_labor_hours'] = g('rw-' + k + '-hrs');
-        this.draft[k + '_labor_cost']  = g('rw-' + k + '-cost');
-      });
-    }
-    if (step === 4) {
-      ['lunch','dinner','bar'].forEach(k => {
-        this.draft['rplh_' + k + '_rev'] = g('rw-rplh-' + k + '-rev');
-        this.draft['rplh_' + k + '_hrs'] = g('rw-rplh-' + k + '-hrs');
-      });
-    }
-    if (step === 6) {
-      this.draft.notes = g('rw-notes');
-    }
-    this.saveDraft();
+  calc() {
+    const num = id => parseFloat(document.getElementById(id)?.value) || 0;
+    const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    const totalRev = num('rw-brev') + num('rw-frev');
+    const covers = num('rw-cov');
+    const checkAvg = covers > 0 ? totalRev / covers : null;
+    const targetCA = this.targets().check_avg || 35;
+    set('rw-c-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '—');
+    set('rw-c-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '—', checkAvg != null ? (checkAvg >= targetCA ? 'good' : 'warn') : '');
+    const caGap = checkAvg != null ? checkAvg - targetCA : null;
+    set('rw-c-cagap', caGap != null ? (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) : '—', caGap != null ? (caGap >= 0 ? 'good' : 'warn') : '');
+
+    const laborCost = num('rw-lcost'), laborHrs = num('rw-lhrs');
+    const laborPct = totalRev > 0 && laborCost > 0 ? laborCost / totalRev * 100 : null;
+    const rplh = laborHrs > 0 && totalRev > 0 ? totalRev / laborHrs : null;
+    set('rw-c-lpct', laborPct != null ? App.fmtPct(laborPct) : '—', laborPct != null ? (laborPct > this.laborTarget() ? 'warn' : 'good') : '');
+    set('rw-c-rplh', rplh != null ? App.fmtCurrency(rplh) : '—');
   },
 
   async saveWeek() {
+    this.collect();
     const d = this.draft;
-    const barRev       = parseFloat(d.bar_revenue)       || 0;
-    const floorRev     = parseFloat(d.floor_revenue)     || 0;
-    const covers       = parseFloat(d.covers)            || 0;
-    const totalRev     = barRev + floorRev;
+    const err = document.getElementById('rw-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const barRev = parseFloat(d.bar_revenue) || 0;
+    const floorRev = parseFloat(d.floor_revenue) || 0;
+    const totalRev = barRev + floorRev;
+    if (totalRev === 0) { fail('Enter at least one revenue figure before saving.'); return; }
 
-    if (totalRev === 0) {
-      const modal = document.getElementById('rw-alert-modal');
-      if (modal) modal.style.display = 'flex';
-      document.getElementById('rw-alert-ok').onclick = () => { modal.style.display = 'none'; };
-      return;
-    }
-
-    const checkAvg     = covers > 0 ? totalRev / covers : 0;
-
-    const barLaborCost     = parseFloat(d.bar_labor_cost)     || 0;
-    const kitchenLaborCost = parseFloat(d.kitchen_labor_cost) || 0;
-    const floorLaborCost   = parseFloat(d.floor_labor_cost)   || 0;
-    const totalLaborCost   = barLaborCost + kitchenLaborCost + floorLaborCost;
-    const laborPctBlended  = totalRev > 0 ? totalLaborCost / totalRev * 100 : 0;
-
-    const barLaborHrs     = parseFloat(d.bar_labor_hours)     || 0;
-    const kitchenLaborHrs = parseFloat(d.kitchen_labor_hours) || 0;
-    const floorLaborHrs   = parseFloat(d.floor_labor_hours)   || 0;
-    const totalHrs        = barLaborHrs + kitchenLaborHrs + floorLaborHrs;
-    const rplhBlended     = totalHrs > 0 ? totalRev / totalHrs : 0;
-
-    const rplhLunch  = parseFloat(d.rplh_lunch_hrs)  > 0 ? (parseFloat(d.rplh_lunch_rev)  || 0) / parseFloat(d.rplh_lunch_hrs)  : 0;
-    const rplhDinner = parseFloat(d.rplh_dinner_hrs) > 0 ? (parseFloat(d.rplh_dinner_rev) || 0) / parseFloat(d.rplh_dinner_hrs) : 0;
-    const rplhBar    = parseFloat(d.rplh_bar_hrs)    > 0 ? (parseFloat(d.rplh_bar_rev)    || 0) / parseFloat(d.rplh_bar_hrs)    : 0;
+    const covers = parseFloat(d.covers) || 0;
+    const laborCost = parseFloat(d.labor_cost) || 0;
+    const laborHrs = parseFloat(d.labor_hours) || 0;
+    const checkAvg = covers > 0 ? totalRev / covers : 0;
+    const laborPct = totalRev > 0 ? laborCost / totalRev * 100 : 0;
+    const rplh = laborHrs > 0 ? totalRev / laborHrs : 0;
 
     const week = {
-      id:               App.uid(),
-      week_num:         parseInt(d.week_num) || 1,
-      period_end:       d.period_end,
-      bar_revenue:      barRev,
-      floor_revenue:    floorRev,
-      covers:           covers,
-      check_avg:        parseFloat(checkAvg.toFixed(2)),
-      bar_labor_hours:  barLaborHrs,
-      bar_labor_cost:   barLaborCost,
-      kitchen_labor_hours: kitchenLaborHrs,
-      kitchen_labor_cost:  kitchenLaborCost,
-      floor_labor_hours:   floorLaborHrs,
-      floor_labor_cost:    floorLaborCost,
-      total_labor_cost:    totalLaborCost,
-      total_hours:         totalHrs,
-      labor_pct_blended:   parseFloat(laborPctBlended.toFixed(2)),
-      rplh_blended:        parseFloat(rplhBlended.toFixed(2)),
-      rplh_lunch:          parseFloat(rplhLunch.toFixed(2)),
-      rplh_dinner:         parseFloat(rplhDinner.toFixed(2)),
-      rplh_bar:            parseFloat(rplhBar.toFixed(2)),
-      server_entries:      d.server_entries || [],
-      notes:               d.notes || '',
-      saved_at:            new Date().toISOString()
+      id:                App.uid(),
+      week_num:          parseInt(d.week_num) || 1,
+      period_end:        d.period_end,
+      bar_revenue:       barRev,
+      floor_revenue:     floorRev,
+      covers:            covers,
+      check_avg:         parseFloat(checkAvg.toFixed(2)),
+      total_labor_cost:  laborCost,
+      total_hours:       laborHrs,
+      labor_pct_blended: parseFloat(laborPct.toFixed(2)),
+      rplh_blended:      parseFloat(rplh.toFixed(2)),
+      rplh_lunch:        0,
+      rplh_dinner:       0,
+      rplh_bar:          0,
+      server_entries:    [],
+      notes:             d.notes || '',
+      saved_at:          new Date().toISOString()
     };
 
     if (!App.data.revenue_weeks) App.data.revenue_weeks = [];
     App.data.revenue_weeks.push(week);
-    await App.saveKey('revenue_weeks');
-    this.clearDraft();
-    App.navigate('r-dashboard');
+    const btn = document.getElementById('rw-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.saveKey('revenue_weeks');
+    if (ok) {
+      this.clearDraft();
+      App.navigate('r-dashboard');
+    } else {
+      App.data.revenue_weeks.pop();
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Week'; }
+      fail('Save failed. Try again.');
+    }
   }
 };
