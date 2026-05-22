@@ -528,6 +528,7 @@ const App = {
         'ic-vendors':        S.InventoryVendors,
         'ic-take-inventory': S.InventoryTakeInventory,
         'ic-count-history':  S.InventoryCountHistory,
+        'ic-spot-check':     S.InventorySpotCheck,
         'ic-receive-delivery': S.InventoryReceiveDelivery,
         'ic-delivery-history': S.InventoryDeliveryHistory,
         'ic-report-usage':    S.InventoryUsageReport,
