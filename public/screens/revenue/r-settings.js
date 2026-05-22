@@ -309,7 +309,7 @@ S.RevenueSettings = {
     };
 
     // Menu Items
-    App.data.revenue_menu_items = [
+    const menuItems = [
       { id:uid(), name:'Smash Burger',          category:'Entrees',    price:16, cost:4.80, weekly_covers:142 },
       { id:uid(), name:'Fish Tacos (3)',         category:'Entrees',    price:18, cost:5.40, weekly_covers:98  },
       { id:uid(), name:'Caesar Salad',           category:'Entrees',    price:14, cost:3.50, weekly_covers:64  },
@@ -330,6 +330,7 @@ S.RevenueSettings = {
       { id:uid(), name:'House Cabernet',         category:'Wine',       price:10, cost:2.50, weekly_covers:42  },
       { id:uid(), name:'House Chardonnay',       category:'Wine',       price:9,  cost:2.25, weekly_covers:38  },
     ];
+    App.data.revenue_menu_items = menuItems;
 
     // Server checks
     App.data.revenue_server_checks = [
@@ -362,44 +363,56 @@ S.RevenueSettings = {
       { id:uid(), package_name:'Corporate Lunch',          event_type:'Corporate',      min_covers:20, max_covers:80, fb_minimum:0, room_fee:0, per_head:35 },
     ];
 
-    // Pricing log
+    // Pricing log — full verification-shape entries so Price-Change
+    // Verification can measure each one against its prediction.
     App.data.revenue_price_log = [
-      { id:uid(), date:dateStr(30), item_name:'House Margarita',  old_price:11, new_price:12, reason:'Cost increase on lime and agave', margin_impact:1 },
-      { id:uid(), date:dateStr(45), item_name:'Smash Burger',     old_price:14, new_price:16, reason:'Beef cost up 18% since Q1',       margin_impact:2 },
-      { id:uid(), date:dateStr(60), item_name:'Ribeye (10 oz)',   old_price:38, new_price:42, reason:'Menu repositioning',              margin_impact:4 },
+      { id:uid(), date:dateStr(30), item_id:menuItems[10].id, item_name:'House Margarita',
+        old_price:11, new_price:12, cost:2.16, reason:'Cost increase on lime and agave',
+        margin_impact:1, covers_at_change:218, predicted_vol_pct:-5, predicted_weekly_impact:111,
+        saved_at:dateStr(30) },
+      { id:uid(), date:dateStr(45), item_id:menuItems[0].id, item_name:'Smash Burger',
+        old_price:14, new_price:16, cost:4.80, reason:'Beef cost up 18% since Q1',
+        margin_impact:2, covers_at_change:150, predicted_vol_pct:-8, predicted_weekly_impact:166,
+        saved_at:dateStr(45) },
+      { id:uid(), date:dateStr(60), item_id:menuItems[4].id, item_name:'Ribeye (10 oz)',
+        old_price:38, new_price:42, cost:14.70, reason:'Menu repositioning',
+        margin_impact:4, covers_at_change:30, predicted_vol_pct:-10, predicted_weekly_impact:38,
+        saved_at:dateStr(60) },
     ];
 
-    // 12 weeks of weekly data with varied performance
+    // 12 weeks of weekly data — a deliberate recovery trend for The Anchor.
+    // Check average climbs and labor percentage falls as the Check Average
+    // and Labor Scheduling fixes take hold around week 6 (see fix_log below).
+    // wkNum 1 is the oldest week, wkNum 12 the most recent.
     const serverNames = ['Jessica M.','Marcus T.','Brianna K.','Derek W.','Aimee R.','Carlos P.','Tiffany L.','Noah S.'];
-    const serverCheckAvgs = [44, 38, 35, 33, 41, 37, 26, 30]; // consistent individual averages
+    const serverCheckAvgs = [44, 38, 35, 33, 41, 37, 26, 30];
+    const checkAvgByWk = { 1:30.6, 2:31.1, 3:30.4, 4:31.5, 5:31.0, 6:33.6, 7:34.8, 8:35.6, 9:36.4, 10:37.2, 11:37.7, 12:38.3 };
+    const laborPctByWk = { 1:36.0, 2:35.6, 3:36.3, 4:35.4, 5:35.0, 6:33.0, 7:32.3, 8:31.7, 9:31.0, 10:30.5, 11:30.2, 12:30.0 };
 
     const weeks = [];
     for (let i = 12; i >= 1; i--) {
-      const wkNum = 13 - i;
-      const daysBack = i * 7;
-      const periodEnd = dateStr(daysBack);
-      // Add some variance to make the trends interesting
-      const trend = (12 - i) * 0.15; // improving trend
-      const barRev   = Math.round(6200 + (Math.random()-0.4)*800 + trend*80);
-      const floorRev = Math.round(5800 + (Math.random()-0.4)*700 + trend*60);
-      const covers   = Math.round(380 + (Math.random()-0.4)*60);
-      const checkAvg = parseFloat(((barRev + floorRev) / covers).toFixed(2));
-      const barLaborHrs     = Math.round(210 + (Math.random()-0.5)*20);
-      const kitchenLaborHrs = Math.round(180 + (Math.random()-0.5)*18);
-      const floorLaborHrs   = Math.round(240 + (Math.random()-0.5)*24);
+      const wkNum     = 13 - i;
+      const periodEnd = dateStr(i * 7);
+      const covers    = Math.round(372 + (Math.random()-0.5)*40);
+      const checkAvg  = parseFloat((checkAvgByWk[wkNum] + (Math.random()-0.5)*0.5).toFixed(2));
+      const totalRev  = Math.round(checkAvg * covers);
+      const barRev    = Math.round(totalRev * 0.52);
+      const floorRev  = totalRev - barRev;
+      const laborPct  = parseFloat((laborPctByWk[wkNum] + (Math.random()-0.5)*0.4).toFixed(2));
+      const totalLaborCost   = Math.round(totalRev * laborPct / 100);
+      const barLaborCost     = Math.round(totalLaborCost * 0.30);
+      const kitchenLaborCost = Math.round(totalLaborCost * 0.32);
+      const floorLaborCost   = totalLaborCost - barLaborCost - kitchenLaborCost;
+      const barLaborHrs     = Math.round(barLaborCost / 16);
+      const kitchenLaborHrs = Math.round(kitchenLaborCost / 15);
+      const floorLaborHrs   = Math.round(floorLaborCost / 14);
       const totalHrs        = barLaborHrs + kitchenLaborHrs + floorLaborHrs;
-      const barLaborCost    = Math.round(barLaborHrs * 16);
-      const kitchenLaborCost = Math.round(kitchenLaborHrs * 15);
-      const floorLaborCost  = Math.round(floorLaborHrs * 14);
-      const totalLaborCost  = barLaborCost + kitchenLaborCost + floorLaborCost;
-      const totalRev        = barRev + floorRev;
-      const laborPct        = parseFloat((totalLaborCost / totalRev * 100).toFixed(2));
       const rplhBlended     = parseFloat((totalRev / totalHrs).toFixed(2));
       // Daypart splits
       const lunchRev  = Math.round(floorRev * 0.32);
-      const dinnerRev = Math.round(floorRev * 0.68);
+      const dinnerRev = floorRev - lunchRev;
       const lunchHrs  = Math.round(floorLaborHrs * 0.35);
-      const dinnerHrs = Math.round(floorLaborHrs * 0.65);
+      const dinnerHrs = floorLaborHrs - lunchHrs;
       const rplhLunch  = parseFloat((lunchRev  / lunchHrs).toFixed(2));
       const rplhDinner = parseFloat((dinnerRev / dinnerHrs).toFixed(2));
       const rplhBar    = parseFloat((barRev / barLaborHrs).toFixed(2));
@@ -426,6 +439,14 @@ S.RevenueSettings = {
       });
     }
     App.data.revenue_weeks = weeks;
+
+    // ── Fix Layer — logged Revenue fixes feeding the Recovery Scoreboard ──
+    App.data.fix_log = (App.data.fix_log || []).filter(e => e.module !== 'revenue').concat([
+      { id:uid(), module:'revenue', gap_id:'check-average', gap_name:'Check Average & Upsell',
+        date:dateStr(52), logged_at:dateStr(52) },
+      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost & Scheduling',
+        date:dateStr(52), logged_at:dateStr(52) },
+    ]);
 
     // Getting Started progress
     App.data.getting_started_revenue = {
