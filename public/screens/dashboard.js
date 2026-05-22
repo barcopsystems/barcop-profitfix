@@ -159,6 +159,7 @@ S.Dashboard = {
       + chartHtml
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
+      + FixPanel.recoveryCard('profit')
       + FixPanel.fixAreasCard('profit')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
