@@ -104,50 +104,39 @@ FIX.revenue = [
     summary: 'Most menus are priced by feel and drift below cost as ingredients rise. Build every price from a cost floor, flag below-floor items, and correct them surgically each quarter.',
 
     process: {
-      intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be; the competition tells you what the market accepts. They are two different numbers used for two different decisions — and a menu priced once at opening drifts below floor within 18 months.',
+      intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be. The competition tells you what the market accepts. Those are two different numbers for two different decisions. A menu priced once at opening drifts below floor inside 18 months, so this is a quarterly job. The app holds your costs and prices and shows you cost percent per item. Each step below opens where the work happens.',
       steps: [
-        { title: 'Calculate cost-based price floors on yield-adjusted costs',
-          detail: 'For every item, divide the yield-adjusted ingredient cost by the target food cost %. A protein priced on raw purchase cost is actually 8 points higher once trim loss is in — build the floor from the right number.' },
-        { title: 'Flag every below-floor item',
-          detail: 'Compare each current price to its floor. Flag everything priced below it, show the gap in dollars and percent, and sort the flagged list by annual margin impact at current weekly volume.' },
-        { title: 'Run the price sensitivity calculation before any change',
-          detail: 'Before changing any price, calculate the break-even volume at the new price. Confirm break-even is comfortably below current volume — that is the difference between a confident decision and a guess.' },
-        { title: 'Reprice surgically, item by item',
-          detail: 'Correct individual items during a routine menu update. A blanket increase reads as a price event and invites guest attention; surgical adjustments rarely produce noticeable feedback.' },
-        { title: 'Price each category on its own math',
-          detail: 'Spirits, cocktails, beer, wine, and food run different target food costs. Do not apply one percentage across the menu — each category has its own floor.' },
-        { title: 'Brief staff on the change',
-          detail: 'Tell servers what changed and why before the new menu goes live, and update any item description that needs to support a higher price point.' },
-        { title: 'Review quarterly and on immediate triggers',
-          detail: 'Run the full review the first week of each quarter. Do not wait for the calendar when a supplier price jumps 8%+, a new item is added, or food cost moves 3+ points above target.' }
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+          title: 'Keep ingredient costs current',
+          detail: 'In Menu Items, refresh the yield-adjusted ingredient cost on every item whenever a supplier price moves. A protein priced on raw purchase cost is understated until trim loss is in it. Cost percent is only honest when the cost behind it is current.' },
+        { kind: 'result', target: 'r-menu-items', targetLabel: 'Menu Items',
+          title: 'Read which items are priced below their floor',
+          detail: 'Menu Items shows each item\'s cost percent and contribution margin against your category target. An item running well over its target cost percent is priced below its floor. The worst offenders are the biggest annual margin leaks, so start there.' },
+        { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
+          title: 'Weigh the margin dollars before you reprice',
+          detail: 'Open Menu Engineering and read the contribution margin in dollars on the items you flagged. The percentage tells you the item is underpriced. The dollar margin and the volume tell you how much a correction is actually worth.' },
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+          title: 'Reprice the flagged items surgically',
+          detail: 'Correct the flagged items one at a time, during a routine menu update. A blanket increase reads as a price event and draws guest attention. Surgical item-by-item changes rarely produce feedback. Each category carries its own target, so price spirits, cocktails, beer, wine, and food each on their own math.' },
+        { kind: 'reference', target: 'Quarterly_Pricing_Review.pdf', targetLabel: 'Quarterly Pricing Review Checklist',
+          title: 'Run the full pricing review every quarter',
+          detail: 'Download the Quarterly Pricing Review checklist and work it the first week of each quarter. It refreshes costs, lists the items to reprice and the items to remove, sets the menu print date, and confirms servers were briefed on the changes before the new menu goes live.' }
       ]
     },
 
-    formulas: [
-      { label: 'Price Floor',
-        formula: 'Yield-adjusted ingredient cost / target food cost %',
-        example: 'Salmon $9.40 cost / 30% target = $31.33 floor — a $28 price is $3.33 below floor' },
-      { label: 'Below-Floor Gap',
-        formula: 'Current price - price floor',
-        example: '$28.00 - $31.33 = -$3.33, or -10.6% below floor' },
-      { label: 'Annual Margin Impact of Repricing',
-        formula: '(Floor price - current price) x weekly volume x 52',
-        example: '$3.33 x 60 covers x 52 = $10,389 recovered at flat volume' }
-    ],
-
     commonMistakes: [
-      'Setting prices once at opening and never reviewing them on a schedule — costs change quarterly and a menu drifts below floor within 18 months.',
-      'Pricing by competition without calculating your own cost floor first — competitor prices say what the market accepts, your floor says what you need.',
-      'Raising all prices at once in a visible refresh — a blanket increase reads as a price event; surgical item-by-item increases rarely draw feedback.',
-      'Not yield-adjusting ingredient costs before setting floors — a protein at 30% on raw purchase cost is really 38% once trim loss is included.',
-      'Treating the competitive price as a ceiling — if your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
-      'Skipping the price sensitivity calculation on a high-volume item — knowing the break-even volume before you change the price is what makes the decision confident.'
+      'Setting prices once at opening and never reviewing them on a schedule. Costs change quarterly and a menu drifts below floor within 18 months.',
+      'Pricing by competition without calculating your own cost floor first. Competitor prices say what the market accepts. Your floor says what you need.',
+      'Raising all prices at once in a visible refresh. A blanket increase reads as a price event. Surgical item-by-item increases rarely draw feedback.',
+      'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is really 38% once trim loss is included.',
+      'Treating the competitive price as a ceiling. If your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
+      'Skipping the price sensitivity check on a high-volume item. Knowing the break-even volume before you change the price is what makes the decision confident.'
     ],
 
     quickRef: {
       rhythm: [
-        'Run the price floor calculation on every item whose ingredient cost moved since last review',
-        'Flag every item where the current price is below the new floor',
+        'Refresh costs in Menu Items for every item whose ingredient cost moved since last review',
+        'Flag every item running over its target cost percent',
         'Run each flagged Plowhorse through the sensitivity calculator at a $1.50-$3 increase',
         'List items to reprice, items to remove, and items needing new cost cards',
         'Close the review with a written action list and a target menu print date',
@@ -162,38 +151,6 @@ FIX.revenue = [
       ]
     },
 
-    templates: [
-      {
-        id: 'pricing-review-checklist',
-        name: 'Quarterly Pricing Review Checklist',
-        intro: 'The quarterly pricing review, on paper, signed off at close. A mental note to reprice an item is an intention — this is the review.',
-        fields: [
-          { key: 'bar_name',       label: 'Restaurant Name', placeholder: 'Your restaurant' },
-          { key: 'review_quarter', label: 'Review Quarter',  placeholder: 'e.g. Q2' }
-        ],
-        body: 'QUARTERLY PRICING REVIEW\n{{bar_name}} — {{review_quarter}}\n\n'
-          + 'STEP 1 — REFRESH COSTS\n'
-          + '[ ] Ingredient costs updated for every item with a supplier price change since last review.\n\n'
-          + 'STEP 2 — FLOOR CALCULATION\n'
-          + '[ ] Price floor recalculated for every affected item (cost / target food cost %).\n'
-          + 'Items now below floor: ____________________________________\n'
-          + '________________________________________________________\n\n'
-          + 'STEP 3 — SENSITIVITY\n'
-          + '[ ] Each below-floor item run through the price sensitivity calculation.\n'
-          + '[ ] Break-even volume confirmed comfortably below current volume.\n\n'
-          + 'STEP 4 — ACTION LIST\n'
-          + 'Items to reprice (item / current / new price):\n'
-          + '________________________________________________________\n'
-          + '________________________________________________________\n'
-          + 'Items to remove: __________________________________________\n'
-          + 'Items needing new cost cards: _____________________________\n\n'
-          + 'STEP 5 — EXECUTE\n'
-          + 'Target menu print date: ____________________\n'
-          + '[ ] Staff briefed on the changes before the new menu goes live.\n\n'
-          + 'Reviewed by: ____________________   Signature: ____________________   Date: __________'
-      }
-    ],
-
     aiWorkflows: [
       {
         id: 'pr-ai-1',
@@ -206,7 +163,7 @@ FIX.revenue = [
         id: 'pr-ai-2',
         title: 'Write Descriptions for High-Margin Items',
         whatItDoes: 'Drafts tight, specific menu descriptions that support a higher price point, each with a beverage pairing.',
-        prompt: 'I need menu descriptions for [NUMBER] items. For each item: name, key ingredients, preparation method, and one beverage pairing suggestion. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words including the preparation method, one specific ingredient detail, and the beverage pairing. No filler — no "fresh", "delicious", "to perfection", or "house-made" unless followed by a specific detail. Format: item name, then description on the next line.',
+        prompt: 'I need menu descriptions for [NUMBER] items. For each item: name, key ingredients, preparation method, and one beverage pairing suggestion. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words including the preparation method, one specific ingredient detail, and the beverage pairing. No filler. No "fresh", "delicious", "to perfection", or "house-made" unless followed by a specific detail. Format: item name, then description on the next line.',
         whatToPaste: 'Fill in the item count and paste each item\'s ingredients, prep method, and pairing.'
       },
       {
@@ -219,7 +176,7 @@ FIX.revenue = [
       {
         id: 'pr-ai-4',
         title: 'Draft a Seasonal Item with Pricing Rationale',
-        whatItDoes: 'Creates a seasonal menu item — name, description, and a floor-based recommended price with a server briefing line.',
+        whatItDoes: 'Creates a seasonal menu item: name, description, and a floor-based recommended price with a server briefing line.',
         prompt: 'I want to add a seasonal cocktail for [SEASON/OCCASION]. Key ingredients: [LIST]. My cost for the ingredients is approximately $[COST] per drink and my target beverage cost is 24%. Write a menu name, a description under 18 words, a recommended price based on my cost floor, and one sentence of server training language for the pre-shift briefing.',
         whatToPaste: 'Fill in the season/occasion, ingredient list, and per-drink cost.'
       }
