@@ -400,6 +400,7 @@ const DB = {
       revenue_audits: [],
       revenue_server_checks: [],
       revenue_menu_items: [],
+      menu_dog_tests: [],
       revenue_price_log: [],
       revenue_events: [],
       revenue_rate_cards: [],
