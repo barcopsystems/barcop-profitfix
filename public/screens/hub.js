@@ -46,6 +46,7 @@ S.Hub = {
     const overall   = sysScores.length ? Math.round(sysScores.reduce((a,b)=>a+b,0)/sysScores.length) : null;
     const anyAudit  = !!(pAudits.length || rAudits.length || tAudits.length);
     const totalOpp  = auditOpp(pA) + auditOpp(rA) + auditOpp(tA);
+    const recovery  = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
     const trendVals = [sysTrend(pAudits), sysTrend(rAudits), sysTrend(tAudits)].filter(v => v != null);
     const netTrend  = trendVals.length ? trendVals.reduce((a,b)=>a+b,0) : null;
 
@@ -165,6 +166,11 @@ S.Hub = {
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--red)' : 'var(--t4)',
              anyAudit ? 'Recoverable across audited systems' : 'Run an audit to surface this')
+      + tile('Annual Recovery', recovery.dollars > 0 ? App.fmtCurrency(recovery.dollars,0) : 'None',
+             recovery.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
+             recovery.dollars > 0
+               ? 'Annualized, from ' + recovery.fixes + ' measured fix' + (recovery.fixes === 1 ? '' : 'es')
+               : 'Log a fix to start tracking recovery')
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--gold)' : 'var(--red)',
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
@@ -326,7 +332,7 @@ S.Hub = {
         </div>
 
         <div style="grid-column:2;grid-row:2;display:grid;grid-template-rows:78px 1fr 1fr;gap:12px;padding:12px;overflow:hidden;min-height:0;">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">${tiles}</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">${tiles}</div>
           <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}</div>
           <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:12px;min-height:0;">${chartPanel}${actionPanel}</div>
         </div>
