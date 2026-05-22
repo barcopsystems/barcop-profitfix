@@ -458,44 +458,39 @@ FIX.revenue = [
     summary: 'Private dining and catering is revenue most independents leave on the table. Name an owner, publish a rate card, respond in two hours, and run the P&L before confirming.',
 
     process: {
-      intro: 'An events business runs on speed and process: a published rate card so pricing is instant, a two-hour response standard so the client stays engaged, and a pipeline so nothing goes cold. Margin varies widely by event — run the P&L before you confirm, not after.',
+      intro: 'An events business runs on speed and process. A published rate card so pricing is instant, a two-hour response standard so the client stays engaged, and a pipeline so nothing goes cold. Name one person to own all of it. Everyone responsible means nobody responsible. Margin varies widely by event, so run the P&L before you confirm, not after. Each step below opens where the work happens.',
       steps: [
-        { title: 'Name one owner for events',
-          detail: 'Everyone responsible means nobody responsible. One person owns the pipeline, the follow-up, and the close rate.' },
-        { title: 'Build a rate card before any inquiry',
-          detail: 'Published packages, per-head pricing, and F&B minimums by room. A rate card is faster, produces better margins, and looks more professional than bespoke pricing per inquiry.' },
-        { title: 'Respond to every inquiry within two hours',
-          detail: 'Send the complete package with a short personal note — not a link to the website. Booking probability drops sharply after two hours and below 20% after 24. Send the package first, ask clarifying questions after.' },
-        { title: 'Track every inquiry in a pipeline',
-          detail: 'Log each inquiry with its status and a follow-up date. Any inquiry without a next action in 7 days gets one assigned; anything stuck 14 days in one status gets a close-or-reactivate decision.' },
-        { title: 'Run the Event P&L before confirming',
-          detail: 'Event margin varies widely with staffing, F&B mix, and ancillary costs. Calculate the P&L on every booking before you confirm it.' },
-        { title: 'Require a deposit to hold a date',
-          detail: 'A booking without a deposit is just a hold, and holds cancel. A canceled hold that was not replaced costs the entire revenue of that date.' },
-        { title: 'Execute with checklists and review the pipeline weekly',
-          detail: 'Site inspection, event-day operations, and catering setup run off checklists with manager sign-off. A 15-minute Monday pipeline review keeps every open inquiry moving.' }
+        { kind: 'action', target: 'r-events', targetLabel: 'Events and Catering',
+          title: 'Build the rate card before any inquiry',
+          detail: 'In Events and Catering, set up your rate cards: published packages, per-head pricing, and F&B minimums by room. Pricing decided once, in advance, is faster, produces better margins, and looks more professional than bespoke pricing worked out per inquiry.' },
+        { kind: 'reference', target: 'Private_Dining_Events_Package.docx', targetLabel: 'Private Dining and Events Package',
+          title: 'Respond to every inquiry within two hours',
+          detail: 'Download the Private Dining and Events Package, fill in your venue details, and send it as the complete answer to every inquiry. Send the package first and ask clarifying questions after. Booking probability drops sharply after two hours and below 20% after 24.' },
+        { kind: 'action', target: 'r-events', targetLabel: 'Events and Catering',
+          title: 'Track every inquiry in the pipeline',
+          detail: 'Log every inquiry in Events and Catering with its status and a follow-up date. Any inquiry without a next action in 7 days gets one assigned. Anything stuck 14 days in one status gets a close-or-reactivate decision. A 15-minute Monday pipeline review keeps every open inquiry moving.' },
+        { kind: 'result', target: 'r-events', targetLabel: 'Events and Catering',
+          title: 'Run the Event P&L before you confirm',
+          detail: 'Events and Catering works out the P&L for each booking from its revenue, COGS, labor, and ancillary costs. Event margin varies widely, so read the P&L before you confirm the booking, not after. And take a deposit to hold the date. A hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.' },
+        { kind: 'reference', target: 'Private_Dining_Site_Inspection.pdf', targetLabel: 'Private Dining Site Inspection',
+          title: 'Walk the space before you confirm',
+          detail: 'For any private dining booking, run the Private Dining Site Inspection checklist with the client. Walking the room together sets expectations on capacity, layout, and service before anything is signed.' },
+        { kind: 'reference', target: 'Event_Day_Operations.pdf', targetLabel: 'Event Day Operations',
+          title: 'Execute the event off the checklist',
+          detail: 'Run the event off the Event Day Operations checklist with manager sign-off. A checklist is what makes a good event repeatable instead of dependent on whoever happens to be working.' },
+        { kind: 'reference', target: 'Catering_Delivery_Setup.pdf', targetLabel: 'Catering Delivery Setup',
+          title: 'Run catering deliveries off the setup checklist',
+          detail: 'For off-site catering, run the Catering Delivery Setup checklist. Transport, timing, equipment, and on-site setup all have to be confirmed before the truck leaves, because there is no kitchen to fall back on once it arrives.' }
       ]
     },
 
-    formulas: [
-      { label: 'Event P&L Margin',
-        formula: '(Event revenue - event COGS - event labor - ancillary costs) / Event revenue',
-        example: 'Run this on every booking before confirming — margin varies widely by event' },
-      { label: 'Catering Per-Head Price',
-        formula: 'Per-head cost / (1 - target margin)',
-        example: '$18 per-head cost / (1 - 0.30) = $25.71 per head at a 30% target margin' },
-      { label: 'F&B Minimum',
-        formula: 'Set to the room\'s typical revenue on a strong regular night',
-        example: 'A back room that does $1,200 on a busy Saturday carries a $1,200 Saturday F&B minimum' }
-    ],
-
     commonMistakes: [
-      'Having no named owner for events — everyone responsible means nobody responsible.',
-      'Pricing events per inquiry rather than from a rate card — bespoke pricing is slower, produces worse margins, and looks less professional.',
-      'Waiting more than two hours to respond — booking probability drops sharply after two hours and below 20% after 24.',
-      'Sending a website link instead of a complete package — a client who has to hunt for pricing calls the next venue.',
-      'Not requiring a deposit to hold a date — a hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.',
-      'Not running an Event P&L on every booking — event margin varies widely; calculate it before the event, not after.'
+      'Having no named owner for events. Everyone responsible means nobody responsible.',
+      'Pricing events per inquiry rather than from a rate card. Bespoke pricing is slower, produces worse margins, and looks less professional.',
+      'Waiting more than two hours to respond. Booking probability drops sharply after two hours and below 20% after 24.',
+      'Sending a website link instead of a complete package. A client who has to hunt for pricing calls the next venue.',
+      'Not requiring a deposit to hold a date. A hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.',
+      'Not running an Event P&L on every booking. Event margin varies widely, so calculate it before the event, not after.'
     ],
 
     quickRef: {
@@ -512,41 +507,10 @@ FIX.revenue = [
         'Close or reactivate any inquiry stuck in the same status for 14 days.',
         'Calculate the overall close rate and find the stage where inquiries go cold.',
         'Compare average response time on booked inquiries versus lost inquiries.',
-        'Look for patterns in lost bookings — event type, day of week, guest count, or price.',
+        'Look for patterns in lost bookings by event type, day of week, guest count, or price.',
         'Fix the most common loss cause first and re-check the close rate next quarter.'
       ]
     },
-
-    templates: [
-      {
-        id: 'events-package',
-        name: 'Private Dining and Events Package',
-        intro: 'The package sent to every event inquiry within two hours. Fill the fields, then send it as the complete answer to the inquiry.',
-        fields: [
-          { key: 'bar_name',      label: 'Venue Name',     placeholder: 'Your venue' },
-          { key: 'room_name',     label: 'Private Room',   placeholder: 'e.g. The Back Room' },
-          { key: 'capacity',      label: 'Room Capacity',  placeholder: 'e.g. 28 guests' },
-          { key: 'fnb_minimum',   label: 'F&B Minimum',    placeholder: 'e.g. $1,200 Saturdays' }
-        ],
-        body: 'PRIVATE DINING AND EVENTS\n{{bar_name}}\n\n'
-          + 'Thank you for considering {{bar_name}} for your event. Here is everything you need to plan with us.\n\n'
-          + 'THE SPACE\n'
-          + '{{room_name}} seats up to {{capacity}}. The room is yours for the booked window, with dedicated service staff.\n\n'
-          + 'PACKAGES\n'
-          + '- Dinner prix fixe: a three-course menu selected from our seasonal offerings.\n'
-          + '- Reception style: passed and stationed appetizers with a beverage package.\n'
-          + '- Custom: we will build a menu around your occasion.\n'
-          + 'Per-head pricing is listed on the attached rate card by package and party size.\n\n'
-          + 'BEVERAGE\n'
-          + 'Hosted bar, consumption bar, or a curated wine and cocktail package — your choice.\n\n'
-          + 'MINIMUMS AND DEPOSIT\n'
-          + '- Food and beverage minimum for {{room_name}}: {{fnb_minimum}}.\n'
-          + '- A deposit confirms and holds your date. Dates are not held without a deposit.\n\n'
-          + 'NEXT STEPS\n'
-          + 'Reply with your preferred date and guest count and we will confirm availability and hold the room. We are glad to schedule a site visit.\n\n'
-          + 'Events contact: ____________________   Phone: ____________________'
-      }
-    ],
 
     aiWorkflows: [
       {
@@ -574,7 +538,7 @@ FIX.revenue = [
         id: 'ec-ai-4',
         title: 'Write a Post-Event Follow-Up',
         whatItDoes: 'Drafts a personal post-event follow-up email that drives repeat bookings without offering a discount.',
-        prompt: 'Event details: client name [NAME], event type [TYPE], date [DATE], guest count [X], any notable details [NOTES]. Write a post-event follow-up email under 100 words that thanks the client personally, references one specific detail from the event, asks one question about their experience, and mentions you would love to host their next occasion. Do not offer a discount and do not use a template-sounding opener — write it as the manager who ran the event.',
+        prompt: 'Event details: client name [NAME], event type [TYPE], date [DATE], guest count [X], any notable details [NOTES]. Write a post-event follow-up email under 100 words that thanks the client personally, references one specific detail from the event, asks one question about their experience, and mentions you would love to host their next occasion. Do not offer a discount and do not use a template-sounding opener. Write it as the manager who ran the event.',
         whatToPaste: 'Fill in the client, event type, date, guest count, and a notable detail.'
       }
     ]
