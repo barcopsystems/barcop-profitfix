@@ -483,7 +483,6 @@ const App = {
         'r-reports':              ['Reports and History', ''],
         'r-getting-started':      ['Getting Started', '30-Day Setup'],
         'r-help':                 ['Help and FAQ', ''],
-        'r-settings':             ['Settings', 'Revenue Recovery'],
       };
       const revScreens = {
         'r-audit':            S.RevenueAudit,
@@ -499,7 +498,6 @@ const App = {
         'r-reports':          S.RevenueReports,
         'r-getting-started':  S.RevenueGettingStarted,
         'r-help':             S.RevenueHelp,
-        'r-settings':         S.RevenueSettings,
       };
       const [title, sub] = revTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = title;
@@ -528,7 +526,6 @@ const App = {
         't-reports':        ['Reports and History', ''],
         't-getting-started':['Getting Started', '30-Day Setup'],
         't-help':           ['Help and FAQ', ''],
-        't-settings':       ['Settings', 'Traffic Recovery'],
       };
       const trafficScreens = {
         't-dashboard':      S.TrafficDashboard,
@@ -545,7 +542,6 @@ const App = {
         't-reports':        S.TrafficReports,
         't-getting-started':S.TrafficGettingStarted,
         't-help':           S.TrafficHelp,
-        't-settings':       S.TrafficSettings,
       };
       const [title, sub] = trafficTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = title;
@@ -714,7 +710,7 @@ const App = {
       'theft-risk':    ['Theft Risk Scorecard', ''],
       'cash-recon':    ['Cash Reconciliation', ''],
       'reports':       ['Reports & History', ''],
-      'settings':      ['Settings', 'Profit Recovery'],
+      'settings':      ['Settings', 'Recovery Platform'],
       'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
       'profit-fix':    ['Profit Fix', 'Fix Process and Guidance'],
@@ -774,10 +770,6 @@ const App = {
     document.querySelectorAll('.nav-item, .sidebar-btn').forEach(el => el.classList.remove('active'));
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.add('active');
-    // Settings gear button should stay active for all three settings screens
-    if (id === 'r-settings' || id === 't-settings') {
-      document.getElementById('nav-settings')?.classList.add('active');
-    }
   },
 
   updatePeriod() {
@@ -1003,10 +995,9 @@ function wireAuth() {
 /* ── Boot ── */
 document.addEventListener('DOMContentLoaded', () => {
   // Nav items are injected dynamically   wired in App._renderNav()
-  // Settings button routes to correct settings screen based on active module
+  // Settings is one unified platform-wide screen (Hub-owned)
   document.getElementById('nav-settings')?.addEventListener('click', () => {
-    const screen = App._activeModule === 'revenue' ? 'r-settings' : App._activeModule === 'traffic' ? 't-settings' : 'settings';
-    App.navigate(screen);
+    App.navigate('settings');
   });
   wireAuth();
   App.init();
