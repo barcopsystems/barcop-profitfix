@@ -354,27 +354,11 @@ S.Settings = {
     });
     App.data.recipes = recipes;
 
-    // ── 8 Weeks of Data — a deliberate recovery trend for The Anchor ──
-    // Bar pour cost and food cost both decline across the window as the
-    // Pour Cost and Food Cost fixes take hold (see fix_log below). Week 8 is
-    // the oldest, week 1 the most recent.
-    const barPourByWeek  = { 8:27.4, 7:27.1, 6:26.8, 5:25.2, 4:24.4, 3:23.6, 2:23.1, 1:22.8 };
-    const foodCostByWeek = { 8:38.5, 7:38.1, 6:37.4, 5:36.2, 4:35.0, 3:34.1, 2:33.4, 1:32.9 };
-    const weeks = [];
-    for (let w = 8; w >= 1; w--) {
-      const wkNum = w;
-      const endDate = dateStr((w-1)*7);
-      const barRev  = 11800 + Math.round((Math.random()-0.5)*900);
-      const foodRev = 7100  + Math.round((Math.random()-0.5)*600);
-      const bPct    = barPourByWeek[w];
-      const fPct    = foodCostByWeek[w];
-      const barCogs = Math.round(barRev * bPct/100);
-      const foodCogs= Math.round(foodRev * fPct/100);
-      const barLab  = Math.round(barRev * (0.27 + (Math.random()-0.5)*0.02));
-      const foodLab = Math.round(foodRev * (0.29 + (Math.random()-0.5)*0.02));
-      const tRev    = barRev + foodRev;
-      const pPct    = (barCogs+foodCogs+barLab+foodLab) / tRev * 100;
-
+    // ── 12 Weeks of Data — derived from the locked Anchor profile ──
+    // Every figure traces to window.ANCHOR so Profit, Revenue and the Control
+    // modules all describe one operation. Week 1 is oldest, week 12 most recent.
+    const weeks = window.ANCHOR.weeks.map(a => {
+      const endDate = dateStr((12 - a.wk) * 7);
       const bar_count = bp.map(p => {
         const used = +(Math.random()*3+0.5).toFixed(2);
         return { product_id:p.id, beg_inv:+(Math.random()*2+0.5).toFixed(1), purchases:+(Math.random()*4+1).toFixed(0), end_inv:+(Math.random()*1.5).toFixed(1), units_used:used, total_cost:+(used*p.cost_per_unit).toFixed(2) };
@@ -386,13 +370,13 @@ S.Settings = {
         const varU = +(actualPours - theo).toFixed(1);
         return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':'Over — Investigate' };
       });
-
-      weeks.push({ id:uid(), week_num:wkNum, period_end:endDate, saved_at:new Date().toISOString(),
-        bar:{ revenue:barRev, cogs:barCogs, labor:barLab, cost_pct:bPct, labor_pct:barLab/barRev*100, vs_target_pct:bPct-22, vs_target_dollar:((bPct-22)/100)*barRev },
-        food:{ revenue:foodRev, cogs:foodCogs, labor:foodLab, cost_pct:fPct, labor_pct:foodLab/foodRev*100, vs_target_pct:fPct-32, vs_target_dollar:((fPct-32)/100)*foodRev },
-        prime_cost_pct:pPct, bar_count, bar_variance, food_count:[], notes:''
-      });
-    }
+      return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:new Date().toISOString(),
+        bar:{ revenue:a.bar_rev, cogs:a.bar_cogs, labor:a.bar_labor, cost_pct:a.bar_pour_pct,
+              labor_pct:a.bar_labor/a.bar_rev*100, vs_target_pct:a.bar_pour_pct-22, vs_target_dollar:((a.bar_pour_pct-22)/100)*a.bar_rev },
+        food:{ revenue:a.food_rev, cogs:a.food_cogs, labor:a.food_labor, cost_pct:a.food_cost_pct,
+               labor_pct:a.food_labor/a.food_rev*100, vs_target_pct:a.food_cost_pct-32, vs_target_dollar:((a.food_cost_pct-32)/100)*a.food_rev },
+        prime_cost_pct:a.prime_cost_pct, bar_count, bar_variance, food_count:[], notes:'' };
+    });
     App.data.weeks = weeks;
 
     // ── Shifts ──
@@ -878,9 +862,9 @@ S.Settings = {
     // and 5, which is where both cost trends break downward.
     App.data.fix_log = (App.data.fix_log || []).filter(e => e.module !== 'profit').concat([
       { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
-        date:dateStr(31), logged_at:daysAgoISO(31) },
+        date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
-        date:dateStr(31), logged_at:daysAgoISO(31) },
+        date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft & Loss',
         date:dateStr(24), logged_at:daysAgoISO(24) },
     ]);
