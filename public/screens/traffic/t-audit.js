@@ -655,6 +655,7 @@ S.TrafficAudit = {
   },
 
   async generateAudit() {
+    if (App.demoBlock('Running an audit')) return;
     const submitBtn = document.getElementById('ta-iz-submit');
     const statusEl  = document.getElementById('ta-iz-status');
     const setStatus = (msg, color='var(--t2)') => {
