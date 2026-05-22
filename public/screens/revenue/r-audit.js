@@ -677,6 +677,7 @@ S.RevenueAudit = {
   },
 
   async generateAudit() {
+    if (App.demoBlock('Running an audit')) return;
     const submitBtn = document.getElementById('ra-iz-submit');
     const statusEl  = document.getElementById('ra-iz-status');
     const setStatus = (msg, color='var(--t2)') => {
