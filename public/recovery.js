@@ -1,0 +1,127 @@
+'use strict';
+
+/* ── Recovery — the Recovery Scoreboard computation engine (Section 10) ────────
+   Turns a fix_log entry into a recovered figure by comparing the gap-area's
+   metric before vs after the implementation date.
+
+   Honesty rule: a dollar figure is shown only when it can be computed from
+   real data the app already holds, never from an invented conversion rate.
+   A gap-area with no clean weekly dollar metric (all of Traffic, and any
+   Recovery gap-area whose metric does not dollarize) is simply absent from
+   METRICS and returns status 'untracked'. The fix still logs, it just carries
+   no dollar figure, and recovery for it shows as the module score moving.
+
+   Maturing window: BEFORE is up to 8 weeks immediately before the fix date,
+   fixed the moment the fix is logged. AFTER is every week since, capped at 8,
+   so it grows. A figure surfaces once 2 weeks of after-data exist and is
+   flagged preliminary until the after-window reaches 8 weeks. */
+
+window.Recovery = {
+  WINDOW: 8,
+  MIN_AFTER: 2,
+
+  _avg(arr) {
+    const v = arr.filter(x => x != null && !isNaN(x));
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  },
+
+  // Gap-area id -> metric. Only gap-areas whose recovered dollars compute
+  // honestly from existing weekly data appear here. baseKind 'pts' means the
+  // metric is a percentage and dollars = (improvement / 100) x base x 52;
+  // 'unit' means dollars = improvement x base x 52.
+  METRICS: {
+    'pour-cost': {
+      series: 'weeks', label: 'Bar Pour Cost', lowerBetter: true,
+      value: w => (w.bar ? w.bar.cost_pct : null),
+      base:  w => (w.bar ? w.bar.revenue : null), baseKind: 'pts',
+      fmt: v => v.toFixed(1) + '%'
+    },
+    'food-cost': {
+      series: 'weeks', label: 'Food Cost', lowerBetter: true,
+      value: w => (w.food ? w.food.cost_pct : null),
+      base:  w => (w.food ? w.food.revenue : null), baseKind: 'pts',
+      fmt: v => v.toFixed(1) + '%'
+    },
+    'prime-cost': {
+      series: 'weeks', label: 'Prime Cost', lowerBetter: true,
+      value: w => w.prime_cost_pct,
+      base:  w => (w.bar ? w.bar.revenue || 0 : 0) + (w.food ? w.food.revenue || 0 : 0), baseKind: 'pts',
+      fmt: v => v.toFixed(1) + '%'
+    },
+    'pricing': {
+      series: 'revenue_weeks', label: 'Check Average', lowerBetter: false,
+      value: w => w.check_avg,
+      base:  w => w.covers, baseKind: 'unit',
+      fmt: v => '$' + v.toFixed(2)
+    },
+    'check-average': {
+      series: 'revenue_weeks', label: 'Check Average', lowerBetter: false,
+      value: w => w.check_avg,
+      base:  w => w.covers, baseKind: 'unit',
+      fmt: v => '$' + v.toFixed(2)
+    },
+    'labor-scheduling': {
+      series: 'revenue_weeks', label: 'Labor Cost', lowerBetter: true,
+      value: w => w.labor_pct_blended,
+      base:  w => (w.bar_revenue || 0) + (w.floor_revenue || 0), baseKind: 'pts',
+      fmt: v => v.toFixed(1) + '%'
+    },
+    'rplh': {
+      series: 'revenue_weeks', label: 'RPLH', lowerBetter: false,
+      value: w => w.rplh_blended,
+      base:  w => w.total_hours, baseKind: 'unit',
+      fmt: v => '$' + v.toFixed(0)
+    }
+  },
+
+  _series(key) {
+    if (key === 'weeks') return (App.data.weeks || []);
+    if (key === 'revenue_weeks') return (App.data.revenue_weeks || [])
+      .filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0);
+    return [];
+  },
+
+  /* Compute the recovery result for one fix_log entry. Returns one of:
+     { status:'untracked' }                          no dollar metric for this gap-area
+     { status:'no-baseline' }                         no weeks before the fix date
+     { status:'pending', weeksAfter }                 fewer than 2 weeks of after-data
+     { status:'ok', label, before, after, improvement, fmt, dollars, weeksAfter, mature }
+       dollars may be null, positive (recovered) or negative (regressed). */
+  compute(entry) {
+    const m = entry && this.METRICS[entry.gap_id];
+    if (!m || !entry.date) return { status: 'untracked' };
+
+    const weeks = this._series(m.series)
+      .filter(w => w.period_end)
+      .slice()
+      .sort((a, b) => a.period_end.localeCompare(b.period_end));
+
+    const beforeW = weeks.filter(w => w.period_end < entry.date).slice(-this.WINDOW);
+    const afterW  = weeks.filter(w => w.period_end >= entry.date).slice(0, this.WINDOW);
+
+    const bAvg = this._avg(beforeW.map(m.value));
+    const aAvg = this._avg(afterW.map(m.value));
+    const aN   = afterW.map(m.value).filter(v => v != null && !isNaN(v)).length;
+
+    if (bAvg == null) return { status: 'no-baseline' };
+    if (aN < this.MIN_AFTER) return { status: 'pending', weeksAfter: aN };
+
+    const improvement = m.lowerBetter ? (bAvg - aAvg) : (aAvg - bAvg);
+    const baseAvg = this._avg(afterW.map(m.base));
+    let dollars = null;
+    if (baseAvg != null) {
+      dollars = (m.baseKind === 'pts')
+        ? (improvement / 100) * baseAvg * 52
+        : improvement * baseAvg * 52;
+    }
+    return {
+      status: 'ok',
+      label: m.label,
+      before: bAvg, after: aAvg, improvement,
+      fmt: m.fmt,
+      dollars,
+      weeksAfter: aN,
+      mature: aN >= this.WINDOW
+    };
+  }
+};
