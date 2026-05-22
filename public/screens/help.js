@@ -1,6 +1,5 @@
 'use strict';
 S.Help = {
-  _focusGap: null,
   render(container) {
     const sections = [
       {t:'Getting Started', qa:[
@@ -81,17 +80,6 @@ S.Help = {
         + '</div>';
     }).join('');
 
-    container.innerHTML = '<div class="screen">'
-      + '<div class="sh">Fix Library</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.7;margin-bottom:14px;">'
-      + 'Step-by-step fix processes, Quick Reference cards, fill-in templates, and AI workflow '
-      + 'prompts for each profit gap-area. Tap a gap-area to open it.</div>'
-      + '<div id="fix-layer-host"></div>'
-      + '<div class="sh" style="margin-top:26px;">Knowledge Base</div>'
-      + html + '</div>';
-
-    const host = document.getElementById('fix-layer-host');
-    if (window.FixPanel && host) FixPanel.renderInto(host, 'profit', this._focusGap);
-    this._focusGap = null;
+    container.innerHTML = '<div class="screen">' + html + '</div>';
   }
 };
