@@ -1,4 +1,4 @@
-[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28132331/FINAL_PLATFORM_MAP.md)
+[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28150312/FINAL_PLATFORM_MAP.md)
 # Bar Cop — Final Complete Platform Map
 # Version 4.0 — The Three-Layer Platform
 Rewritten: 2026-05-21
@@ -389,20 +389,34 @@ through the Recovery modules, not a separate module.
    Sections 2–4). Each gap-area has, on the Dashboard: a score, a dollar-quantified
    current state, and a link into its **fix process**.
 
-3. **Fix processes.** For each gap-area, a static step-by-step process — the methodology
-   from the Fix System files (e.g. Profit Pour Cost: yields → written pour policy →
-   weekly counts → variance review → 6-step variance investigation). Presented as a
-   structured, readable workflow the operator can follow and check off.
+3. **Fix processes — linked workflows, not instructions.** For each gap-area, an
+   ordered process. Bar Cop automates the operational work, so a fix step never tells
+   the operator to calculate or do something by hand. Every step is one of three kinds:
+   - **Action** — a deep-link to the Control or Recovery feature that performs the
+     task, plus one line of what to do there and why. (Pour Cost step "set bottle
+     yields" links to Inventory Control Products; "count weekly" links to Take Inventory.)
+   - **Result** — a deep-link to where the app already shows a computed number, with one
+     line of what it means. The app does the math; the operator never does. (Pour Cost
+     "actual pour cost" links to the Profit dashboard, not a formula to compute.)
+   - **Reference** — a downloadable PDF or Word document, only for things genuinely not
+     computed: policies, standards, signed-document templates.
+   Deep-links cross modules (a Profit Fix step may target an Inventory Control screen),
+   so `navigate` switches the active module as needed. A step with no feature to link to
+   is a real gap in the app — the Fix processes double as the platform's completeness
+   check. The methodology (the steps, their order, what each accomplishes) is the
+   extracted Fix System content; only the expression changes — each step becomes a link.
 
 4. **Quick Reference Cards.** Per gap-area: the weekly rhythm, the benchmarks
    (target/warning/critical), the investigation/escalation steps. Static; printable via
    the print stylesheet.
 
-5. **Templates.** The original Word-doc tools (pour policy, theft/loss policy,
-   corrective-action form, server/portion standards, vendor terms checklist, etc.).
-   Built as **static in-app documents**: pre-written, the operator fills a few fields
-   (bar name, jigger size, date) with plain client-side text, then prints to PDF. Not
-   AI-generated. Template text is sourced from the Fix System files at build time.
+5. **Documents and tools.** The Fix System's documents (pour policy, theft/loss
+   policy, corrective-action form, portion standards, vendor terms checklist, audit
+   forms, checklists, etc.). Each is a **pre-made downloadable PDF or Word document**,
+   served as a static file from `public/assets/resources/`. Gap-areas reference the
+   relevant documents by filename and the operator downloads them. Not fill-in
+   templates, not AI-generated. Filenames come from the existing `assets/resources/`
+   files (the same documents the old Resources screens served).
 
 6. **AI Workflow cards.** The original "AI Workflows" — copy-paste prompt cards. The app
    displays the prompt and what to paste; the operator runs it in their own AI tool.
@@ -412,9 +426,14 @@ through the Recovery modules, not a separate module.
    **Getting Started** — a unified, ordered, checkable setup checklist across all 6
    modules.
 
-The Fix layer lives primarily inside each module's **Help and FAQ** (expanded into a
-real knowledge + fix layer) and is surfaced contextually: any flagged gap links straight
-to its fix process and Quick Reference Card.
+The Fix layer lives in a per-module **Fix screen** — **Profit Fix**, **Revenue Fix**,
+**Traffic Fix** — paired with that module's Audit. In each Recovery module's sidebar the
+old "Audit" section becomes **ANALYSIS**, holding **[Module] Audit** and **[Module]
+Fix**. Help and FAQ moves into the **Support** section beneath Getting Started. The
+standalone **Resources** screen is removed: its documents are now surfaced contextually
+inside the Fix processes (Reference steps), and the files stay in `assets/resources/`.
+Any flagged gap on a dashboard deep-links into the module's Fix screen at its fix
+process and Quick Reference Card.
 
 ---
 ---
@@ -566,8 +585,15 @@ Restructure `r-this-week.js` (revenue from Shift Control, covers from Shift Cont
 labor from Labor Control). Remove Labor Budget screen. RPLH Tracker pulls `lc_actuals`.
 
 ### Stage F — The Fix Layer
-Fix processes, Quick Reference Cards, static templates, AI Workflow cards woven into
-each module's Help and FAQ; gap→fix linking from dashboards.
+Static content files `public/fixlayer/fix-{profit,revenue,traffic}.js` (gap-area
+objects) plus a renderer. Per gap-area: fix process, formulas, common mistakes, Quick
+Reference Card, document references (PDF/Word downloads from `assets/resources/`), and
+AI Workflow cards. All copy in the operator voice (DESIGN_SYSTEM Writing Voice rules).
+The Fix Layer lives in **The Fix Library**, a dedicated sidebar screen above Help and
+FAQ in each module; a gap→fix deep-link card sits on each Recovery dashboard. Note: the
+early Profit build mounted the Fix Layer inside Help and used fill-in templates — a
+one-time presentation pass re-houses it into The Fix Library and converts those
+templates to document references.
 
 ### Stage G — Platform Features
 Recovery Scoreboard + `fix_log`; dollarize-everything helper; weekly money readout;
