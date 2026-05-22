@@ -64,17 +64,42 @@ S.ThisWeek = {
     return any ? { bar, food } : { bar: 0, food: 0 };
   },
 
+  // ── Labor Control labor feed ──────────────────────────────────────────────
+  hasLabor() {
+    return (((App.laborData && App.laborData.lc_actuals) || []).length) > 0;
+  },
+  // sum logged labor cost for the 7-day week ending at periodEnd, split bar vs food
+  laborCost(periodEnd) {
+    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
+    if (!actuals.length || !periodEnd) return null;
+    const startD = new Date(periodEnd + 'T00:00:00');
+    if (isNaN(startD.getTime())) return null;
+    startD.setDate(startD.getDate() - 6);
+    const start = startD.toISOString().slice(0, 10);
+    const posDept = {};
+    ((App.laborData && App.laborData.lc_positions) || []).forEach(p => { posDept[p.id] = p.department; });
+    let bar = 0, food = 0, any = false;
+    actuals.forEach(a => {
+      if (!a.date || a.date < start || a.date > periodEnd) return;
+      any = true;
+      if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
+      else food += a.cost || 0;
+    });
+    return any ? { bar, food } : { bar: 0, food: 0 };
+  },
+
   // ── Draft ─────────────────────────────────────────────────────────────────
   loadDraft() {
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
     const periodEnd = App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0, 10);
     const sr = this.shiftRevenue(periodEnd);
+    const lc = this.laborCost(periodEnd);
     return {
       week_num: App.nextWeekNum ? App.nextWeekNum() : 1,
       period_end: periodEnd,
-      bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: '', cogs: bc != null ? bc.toFixed(2) : '' },
-      food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: '', cogs: fc != null ? fc.toFixed(2) : '' },
+      bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
+      food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
       notes: ''
     };
   },
@@ -100,7 +125,11 @@ S.ThisWeek = {
         ? 'Auto-filled from Shift Control — the weekly sum of logged shift revenue. <a href="#" onclick="S.ThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
         : 'No shifts logged in Shift Control yet — log shifts there, or enter manually.';
     }
-    if (kind === 'labor')   return 'Will auto-fill from Labor Control once it is built — enter manually for now.';
+    if (kind === 'labor') {
+      return this.hasLabor()
+        ? 'Auto-filled from Labor Control — logged hours costed and split Bar vs Food. <a href="#" onclick="S.ThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No hours logged in Labor Control yet — log hours there, or enter manually.';
+    }
     return '';
   },
 
@@ -178,6 +207,16 @@ S.ThisWeek = {
     if (sr) {
       const br = document.getElementById('tw-br'); if (br) br.value = sr.bar.toFixed(2);
       const fr = document.getElementById('tw-fr'); if (fr) fr.value = sr.food.toFixed(2);
+    }
+    this.onInput();
+  },
+
+  pullLabor() {
+    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
+    const lc = this.laborCost(pe);
+    if (lc) {
+      const bl = document.getElementById('tw-bl'); if (bl) bl.value = lc.bar.toFixed(2);
+      const fl = document.getElementById('tw-fl'); if (fl) fl.value = lc.food.toFixed(2);
     }
     this.onInput();
   },
