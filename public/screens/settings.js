@@ -945,6 +945,27 @@ S.Settings = {
     });
     App.shiftData.sc_cash_drops = scCashDrops;
 
+    App.shiftData.sc_86_list = [
+      { id:uid(), item:'Ribeye (10 oz)',   category:'Food',      reason:'Out of product, delivery Thursday',
+        date_86:dateStr(2),  time_86:'19:40', reported_by:'Luis V.',  status:'86', date_back:'', notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Espresso Martini', category:'Cocktails', reason:'Espresso machine down',
+        date_86:dateStr(1),  time_86:'18:10', reported_by:'Maria G.', status:'86', date_back:'', notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'House Chardonnay', category:'Wine',      reason:'Ran the case, reorder placed',
+        date_86:dateStr(4),  time_86:'21:30', reported_by:'Jake T.',  status:'86', date_back:'', notes:'', created_at:new Date().toISOString() },
+    ];
+
+    App.shiftData.sc_maintenance = [
+      { id:uid(), date_reported:dateStr(3),  equipment:'Walk-in Cooler', location:'Kitchen',
+        issue:'Temperature running 4 degrees high', priority:'High', status:'Open',
+        reported_by:'Luis V.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(8),  equipment:'Ice Machine', location:'Main Bar',
+        issue:'Slow ice production', priority:'Normal', status:'Open',
+        reported_by:'Maria G.', assigned_to:'', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(20), equipment:'POS Terminal 2', location:'Front of House',
+        issue:'Card reader intermittent', priority:'Normal', status:'Resolved',
+        reported_by:'Jessica M.', assigned_to:'POS Vendor', date_resolved:dateStr(16), cost:140, notes:'', created_at:new Date().toISOString() },
+    ];
+
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
     // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
     // and 5, which is where both cost trends break downward.
