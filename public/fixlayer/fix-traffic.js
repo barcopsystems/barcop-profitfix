@@ -287,26 +287,25 @@ FIX.traffic = [
     summary: 'Local search ranking comes from a clean, consistent listing across the web. Fix your name, address, and phone everywhere first, then build citations and track the terms that bring walk-ins.',
 
     process: {
-      intro: 'Local-pack ranking is built on two things: a complete Google Business Profile and consistent business information across the web. Fix the foundation before you build on it, because a citation built on top of inconsistent information just creates another variant.',
+      intro: 'Local-pack ranking is built on two things: a complete Google Business Profile and consistent business information across the web. Fix the foundation before you build on it, because a citation built on top of inconsistent information just creates another variant. Local-pack ranking and organic website ranking are two separate jobs, built differently. The Search and SEO screen tracks your keyword positions and citation count. Each step below opens where the work happens.',
       steps: [
-        { title: 'Fix NAP consistency first',
-          detail: 'Name, address, and phone have to match exactly across every platform. One wrong character splits your citation authority. Audit all the major directories and fix every variant before building anything new.' },
-        { title: 'Build your target keyword list',
-          detail: 'Target neighborhood and occasion terms that drive walk-ins, like "bar Wicker Park" or "date night bar Chicago". Broad city terms like "best bar Chicago" drive almost no real traffic for an independent bar.' },
-        { title: 'Find and merge duplicate listings',
-          detail: 'Two Google listings for one bar split your review count and your citation authority in half. Find duplicates on Google and Yelp and submit merge requests before building more reviews.' },
-        { title: 'Build citations in priority order',
-          detail: 'Google first, then Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor, and the reservation platforms. Every listing carries the exact same name, address, and phone.' },
-        { title: 'Do not skip Foursquare',
-          detail: 'Foursquare is the citation most operators skip and most should not. Its data feeds dozens of downstream directories automatically, so a consistent Foursquare listing propagates accuracy across the web.' },
-        { title: 'Track keyword rank',
-          detail: 'Load your target terms into a rank tracker and record a baseline position before making changes. Without rank tracking you cannot know whether the GBP and citation work is moving you up.' },
-        { title: 'Keep local-pack and organic SEO separate',
-          detail: 'Local-pack ranking comes from profile completeness and citation consistency. Organic website ranking comes from website content. They are built differently, so work them as two jobs.' }
+        { kind: 'reference', target: 'NAP_Consistency_Audit.pdf', targetLabel: 'NAP Consistency Audit',
+          title: 'Fix NAP consistency first',
+          detail: 'Work the NAP Consistency Audit across Google, Yelp, TripAdvisor, and the top local directories. Your name, address, and phone have to match exactly everywhere. One wrong character splits your citation authority, so fix every variant before you build anything new.' },
+        { kind: 'reference', target: 'Keyword_Research_Worksheet.docx', targetLabel: 'Keyword Research Worksheet',
+          title: 'Build your target keyword list',
+          detail: 'Use the Keyword Research Worksheet to land 10 target terms across neighborhood, occasion, concept, and proximity. Aim at terms like "bar Wicker Park" that drive walk-ins. Broad city terms like "best bar Chicago" drive almost no real traffic for an independent bar.' },
+        { kind: 'reference', target: 'Local_SEO_Quick_Start_Guide.docx', targetLabel: 'Local SEO Quick-Start Guide',
+          title: 'Merge duplicates, then build citations',
+          detail: 'Follow the Local SEO Quick-Start Guide. Merge duplicate Google and Yelp listings first, because two listings split your reviews and authority in half. Then build citations in priority order: Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor. Do not skip Foursquare, its data feeds dozens of downstream directories.' },
+        { kind: 'result', target: 't-search', targetLabel: 'Search and SEO',
+          title: 'Track keyword rank and citations',
+          detail: 'Record your target keyword positions and citation count in the Search and SEO screen, and set a baseline before you change anything. Without rank tracking you cannot know whether the profile and citation work is moving you up.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend',
+          detail: 'The Traffic dashboard rolls your search numbers into the digital presence score and the 90-day trend. Read it weekly and run the full local SEO audit once a quarter.' }
       ]
     },
-
-    formulas: [],
 
     commonMistakes: [
       'Optimizing for broad city-level terms instead of neighborhood and occasion terms. "Best bar Chicago" drives almost no new traffic; "bar Wicker Park" drives walk-ins.',
@@ -335,15 +334,6 @@ FIX.traffic = [
         'Build citations in priority order: Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor, reservation platforms.'
       ]
     },
-
-    templates: [
-      { name: 'NAP Consistency Audit', type: 'PDF', file: 'NAP_Consistency_Audit.pdf',
-        description: 'Audit form for checking your business name, address, and phone number across Google, Yelp, TripAdvisor, delivery platforms, and the top local directories.' },
-      { name: 'Local SEO Quick-Start Guide', type: 'DOC', file: 'Local_SEO_Quick_Start_Guide.docx',
-        description: 'Plain-English guide to local SEO for bars and restaurants. Covers profile optimization, citation building, website title tags, and keyword targeting for local search.' },
-      { name: 'Keyword Research Worksheet', type: 'DOC', file: 'Keyword_Research_Worksheet.docx',
-        description: 'Worksheet for identifying your 10 target search terms across neighborhood, occasion, concept, proximity, and competitor-comparison categories.' }
-    ],
 
     aiWorkflows: [
       {
