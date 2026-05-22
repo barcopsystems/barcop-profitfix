@@ -23,6 +23,41 @@ window.FixPanel = {
     return this.RESOURCE_ROOT + (module === 'profit' ? '' : module + '/') + encodeURIComponent(file);
   },
 
+  // The per-module Fix screen id a gap-area deep-links into.
+  fixScreen(moduleKey) {
+    return moduleKey === 'revenue' ? 'r-fix' : moduleKey === 'traffic' ? 't-fix' : 'profit-fix';
+  },
+
+  // ── Compact "Fix Areas" card for a Recovery dashboard ───────────────────────
+  // Each row deep-links into the module's Fix screen at that gap-area.
+  fixAreasCard(moduleKey) {
+    const gaps = this.gapAreas(moduleKey);
+    if (!gaps.length) return '';
+    const rows = gaps.map((g, i) =>
+      '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
+      + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+      + (i < gaps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+      + '<div style="flex:1;">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(g.summary || '') + '</div>'
+      + '</div>'
+      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+      + '</div>').join('');
+    return '<div class="sh">Fix Areas</div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + rows + '</div>';
+  },
+
+  // Wire the Fix Areas card rows. Call after the dashboard HTML is in the DOM.
+  wireFixAreas(container) {
+    if (!container) return;
+    container.querySelectorAll('.fp-fixarea').forEach(row => {
+      row.addEventListener('click', () => {
+        App._fixFocus = row.dataset.gap;
+        App.openScreen(this.fixScreen(row.dataset.module));
+      });
+    });
+  },
+
   renderInto(el, moduleKey, focusId) {
     if (!el) return;
     const gaps = this.gapAreas(moduleKey);
