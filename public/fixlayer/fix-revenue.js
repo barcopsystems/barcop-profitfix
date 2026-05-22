@@ -282,7 +282,7 @@ FIX.revenue = [
         { kind: 'result', target: 'r-rplh', targetLabel: 'RPLH Tracker',
           title: 'Read RPLH by shift every Monday',
           detail: 'The RPLH Tracker works out net revenue divided by labor hours for each shift and department, using hours pulled straight from Labor Control. Read it every Monday before the new schedule is built. Read it next to labor percentage. A shift can sit at an acceptable labor percent while its RPLH runs well below target.' },
-        { kind: 'action', target: 'r-settings', targetLabel: 'Settings',
+        { kind: 'action', target: 'settings', targetLabel: 'Settings',
           title: 'Set targets off your own 13-week baseline',
           detail: 'Concept benchmarks are a starting orientation only. After one quarter of data, set each shift\'s RPLH target in Settings at roughly 12% above its own 13-week average. Your own baseline reflects your concept, your market, and your guest mix in a way a generic benchmark never will.' },
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
