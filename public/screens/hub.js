@@ -6,6 +6,7 @@ S.Hub = {
   WEEKLY_CUTOFF: 8,
 
   render(container) {
+    this._stage = container;
     container.style.overflowY = 'hidden';
     const data = App.data || {};
 
@@ -167,11 +168,6 @@ S.Hub = {
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--red)' : 'var(--t4)',
              anyAudit ? 'Recoverable across audited systems' : 'Run an audit to surface this')
-      + tile('Annual Recovery', recovery.dollars > 0 ? App.fmtCurrency(recovery.dollars,0) : 'None',
-             recovery.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
-             recovery.dollars > 0
-               ? 'Annualized, from ' + recovery.fixes + ' measured fix' + (recovery.fixes === 1 ? '' : 'es')
-               : 'Log a fix to start tracking recovery')
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--gold)' : 'var(--red)',
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
@@ -228,10 +224,42 @@ S.Hub = {
     const alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${alertsBody}</div></div>`;
 
+    // Recovery Scoreboard panel — running recovered dollars vs an operator-set
+    // target. The recovered figure is real computed dollars (Recovery.total);
+    // the target is operator-set, stored in settings.recovery_target.
+    const recTarget = Number(s.recovery_target) || 0;
+    const recInput = `<div style="display:flex;gap:6px;align-items:center;margin-top:9px;">
+        <input id="hub-rec-target" type="number" min="0" step="500" placeholder="Set $ target" value="${recTarget>0?recTarget:''}"
+          style="flex:1;min-width:0;background:var(--input);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:var(--t1);font-size:11px;padding:5px 7px;color-scheme:dark;"/>
+        <button class="hd-btn" id="hub-rec-set">${recTarget>0?'Update':'Set'}</button>
+      </div>`;
+    let scoreboardBody;
+    if (recovery.dollars <= 0) {
+      scoreboardBody = `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:11px;color:var(--t2);line-height:1.55;">No recovery measured yet. Mark a fix implemented on any module's Fix screen and the app measures what it recovered.</div>
+          ${recInput}
+        </div>`;
+    } else {
+      const bigNum = `<div style="font-size:25px;font-weight:800;line-height:1;color:var(--gold);">${App.fmtCurrency(recovery.dollars,0)}</div>
+        <div style="font-size:10px;color:var(--t3);margin:6px 0 10px;">annualized, from ${recovery.fixes} measured fix${recovery.fixes===1?'':'es'}</div>`;
+      let progress = '';
+      if (recTarget > 0) {
+        const pct  = Math.min(100, Math.round(recovery.dollars / recTarget * 100));
+        const toGo = Math.max(0, recTarget - recovery.dollars);
+        progress = `<div style="height:7px;border-radius:4px;background:rgba(255,255,255,0.07);overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:var(--gold);border-radius:4px;"></div></div>
+          <div style="font-size:10px;color:var(--t3);line-height:1.5;margin-top:6px;">${pct}% of your ${App.fmtCurrency(recTarget,0)} target${toGo>0?' · '+App.fmtCurrency(toGo,0)+' to go':' · target reached'}</div>`;
+      }
+      scoreboardBody = `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;">${bigNum}${progress}${recInput}</div>`;
+    }
+    const scoreboardPanel = `<div style="${PANEL}">${panelTitle('Recovery Scoreboard')}${scoreboardBody}</div>`;
+
     // Trend chart panel
     const buildChart = () => {
-      const pour = pWeeks.slice(-8).map(w => w?.bar?.cost_pct).filter(v => v != null);
-      const ca   = rWeeks.slice(-8).map(w => w?.check_avg).filter(v => v != null);
+      const pourWeeks = pWeeks.slice(-8).filter(w => w && w.bar && w.bar.cost_pct != null);
+      const caWeeks   = rWeeks.slice(-8).filter(w => w && w.check_avg != null);
+      const pour = pourWeeks.map(w => w.bar.cost_pct);
+      const ca   = caWeeks.map(w => w.check_avg);
       if (pour.length < 2 && ca.length < 2) {
         return '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Enter 2+ weeks to see trends</div>';
       }
@@ -252,7 +280,21 @@ S.Hub = {
         const dots = vals.map((v,i) => '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="2.6" fill="var(--surface)" stroke="'+color+'" stroke-width="1.6"/>').join('');
         return tgt + '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2"/>' + dots;
       };
+      // Fix-event markers (Section 10.5) against whichever series anchors the
+      // chart x-axis. The Anchor's profit and revenue weeks run in parallel, so
+      // all three modules' fixes map cleanly onto the reference week dates.
+      let markerSvg = '';
+      if (window.Recovery && window.FixPanel) {
+        const refWeeks = pour.length >= 2 ? pourWeeks : caWeeks;
+        if (refWeeks.length >= 2) {
+          const marks = ['profit','revenue','traffic']
+            .reduce((acc,m) => acc.concat(Recovery.chartMarkers(refWeeks, m)), []);
+          const mx = i => P.l + (i/(refWeeks.length-1))*cw;
+          markerSvg = FixPanel.markerSvg(marks, mx, P.t, H-P.b);
+        }
+      }
       return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
+        + markerSvg
         + series(pour, pourT, '#C9A84C')
         + series(ca, caT, '#ffffff')
         + '</svg>';
@@ -358,8 +400,8 @@ S.Hub = {
         </div>
 
         <div style="grid-column:2;grid-row:2;display:grid;grid-template-rows:78px 1fr 1fr;gap:12px;padding:12px;overflow:hidden;min-height:0;">
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">${tiles}</div>
-          <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">${tiles}</div>
+          <div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}${scoreboardPanel}</div>
           <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px;min-height:0;">${chartPanel}${readoutPanel}${actionPanel}</div>
         </div>
 
@@ -371,6 +413,14 @@ S.Hub = {
     `;
 
     document.getElementById('hub-signout')?.addEventListener('click', async () => { await DB.signOut(); });
+
+    document.getElementById('hub-rec-set')?.addEventListener('click', async () => {
+      const v = parseFloat(document.getElementById('hub-rec-target')?.value);
+      App.data.settings = App.data.settings || {};
+      App.data.settings.recovery_target = (!isNaN(v) && v > 0) ? v : 0;
+      await App.saveKey('settings');
+      this.render(this._stage);
+    });
   },
 
   _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); },
