@@ -447,6 +447,144 @@ FIX.profit = [
         whatToPaste: 'Fill in the sales/cost figures, category amounts, waste items, and audit notes.'
       }
     ]
+  },
+
+  {
+    id: 'vendor-control',
+    name: 'Vendor Control',
+    module: 'profit',
+    summary: 'Price drift, short counts, and quiet substitutions on every invoice. Audit each delivery against the PO, track prices monthly, and renegotiate quarterly with the data.',
+
+    process: {
+      intro: 'Vendor overcharge recovery is an ongoing weekly process, not a one-time audit. Every discrepancy you document at delivery is a credit you can request; every one you miss is a cost you absorbed.',
+      steps: [
+        { title: 'Pull the PO before the delivery arrives',
+          detail: 'Know what you ordered and at what price before the truck is at the door. You cannot audit a delivery you do not have an order for.' },
+        { title: 'Count every case before you sign',
+          detail: 'Count the delivery against the order. A short count not caught at the door is a loss you already accepted — it is not recovered later.' },
+        { title: 'Audit the invoice against the PO line by line',
+          detail: 'Compare every line. Flag any price more than 2% above the PO. Note any substitution on the invoice before you sign — a lower-tier product at a premium price is an overcharge, not a substitution.' },
+        { title: 'File a discrepancy report on any variance',
+          detail: 'Document the SKU, agreed price, invoiced price, and overcharge, and contact your rep within 24 hours. Discrepancies age out fast.' },
+        { title: 'Run a monthly price review on the top 20 spend items',
+          detail: 'Enter current invoiced prices into a price tracker. Flag any item up more than 5% since last quarter, and any item where another vendor is 8%+ cheaper on the same product.' },
+        { title: 'Hold a quarterly vendor review',
+          detail: 'Bring the documented variance and price-drift data. Ask for a price match or an explanation, discuss volume terms, and confirm the substitution policy in writing.' },
+        { title: 'Confirm vendor terms in writing',
+          detail: 'Pricing, substitution policy, and delivery terms confirmed in writing within 48 hours of the review. When a price dispute happens and your only record is a phone call, you have no dispute.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Invoice Variance',
+        formula: '(Invoiced price - PO price) x quantity',
+        example: 'Titos 1L: ($24.50 - $22.40) x 18 bottles = $37.80 overcharge on one delivery' },
+      { label: 'Price Drift %',
+        formula: '(Current price - Original quoted price) / Original quoted price x 100',
+        example: '($24.50 - $22.40) / $22.40 = 9.4% drift since the original quote' },
+      { label: 'Substitution Overcharge',
+        formula: 'Price billed for the substitute - Price of the item actually ordered',
+        example: 'A lower-tier product billed at the premium SKU price is an overcharge for the difference' }
+    ],
+
+    commonMistakes: [
+      'Paying invoices without comparing them to the PO line by line — every invoice you sign unchecked is a price you accepted by default.',
+      'Accepting substitutions without adjusting the invoice price — a lower-tier product at a premium price is an overcharge.',
+      'Never shopping competitive pricing because you assume distributor prices are fixed — most categories have negotiable elements and respond to documented competition.',
+      'Signing delivery receipts before counting the cases — a short count not caught at the door is a loss you already accepted.',
+      'Verbal-only vendor relationships with no confirmed pricing in writing — when a dispute happens, a phone conversation is not documentation.',
+      'Treating vendor overcharge recovery as a one-time audit rather than an ongoing weekly process.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Every delivery: pull the PO, count every case, audit the invoice line by line',
+        'Every delivery: complete the delivery inspection before the driver leaves',
+        'On any variance: file a discrepancy report and contact the rep within 24 hours',
+        'Monthly: enter the top 20 spend items into the price tracker',
+        'Monthly: flag any item up more than 5% since last quarter or 8%+ cheaper elsewhere',
+        'Quarterly: run the vendor review with the documented variance in hand',
+        'Quarterly: confirm pricing and substitution terms in writing within 48 hours'
+      ],
+      benchmarks: [
+        { label: 'Invoice price vs PO',          target: 'matches PO',  warning: 'up to 2% over', critical: 'above 2% over' },
+        { label: 'Price drift per quarter',      target: 'flat',        warning: 'up to 5%',      critical: 'above 5%' },
+        { label: 'Alternative-vendor gap',       target: 'in line',     warning: '5-8% cheaper',  critical: '8%+ cheaper elsewhere' },
+        { label: 'Cumulative overcharge / vendor', target: '$0',        warning: 'under $500 / qtr', critical: '$500+ / qtr' }
+      ],
+      escalation: [
+        'Pull the PO and the invoice and compare them line by line for the flagged delivery.',
+        'File a vendor discrepancy report: SKU, agreed price, invoiced price, and total overcharge.',
+        'Contact your rep within 24 hours of the delivery — discrepancies age out fast.',
+        'Request a credit memo for the full overcharge with a specific response deadline.',
+        'Log the variance in the price tracker so the pattern is visible at the quarterly review.',
+        'If overcharges recur after the dispute, renegotiate terms or move the category to another vendor.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'vendor-terms',
+        name: 'Vendor Agreement Terms Checklist',
+        intro: 'Confirms the terms of a vendor relationship in writing. Complete it after a quarterly review and send it to the rep so pricing and policy are on the record.',
+        fields: [
+          { key: 'bar_name',       label: 'Bar Name',       placeholder: 'Your bar' },
+          { key: 'vendor_name',    label: 'Vendor Name',    placeholder: 'Vendor' },
+          { key: 'effective_date', label: 'Effective Date', placeholder: 'e.g. March 4' }
+        ],
+        body: 'VENDOR AGREEMENT TERMS CONFIRMATION\n{{bar_name}} and {{vendor_name}}\nEffective {{effective_date}}\n\n'
+          + 'This document confirms in writing the terms discussed in our review. Please reply to confirm or correct any item.\n\n'
+          + 'PRICING\n'
+          + '- Confirmed pricing on our top spend SKUs is attached / listed below.\n'
+          + '- Price changes are communicated in writing before the affected delivery.\n'
+          + '- Invoiced prices match the confirmed pricing unless a written change was sent in advance.\n'
+          + '____________________________________________________________\n\n'
+          + 'SUBSTITUTIONS\n'
+          + '- Substitutions are pre-approved by us before delivery, or refused.\n'
+          + '- A substitution is billed at the price of the item actually delivered, never at the ordered item\'s price.\n\n'
+          + 'DELIVERY\n'
+          + '- Delivery days and window: ________________________\n'
+          + '- Deliveries are counted and inspected at the door before signing.\n'
+          + '- Short counts and discrepancies are credited on documented report.\n\n'
+          + 'VOLUME AND TERMS\n'
+          + '- Volume discount terms: ________________________\n'
+          + '- Payment terms: ________________________\n\n'
+          + 'CONFIRMED BY\n'
+          + 'Operator: ____________________   Date: __________\n'
+          + 'Vendor representative: ____________________   Date: __________'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'vc-ai-1',
+        title: 'Calculate Cumulative Overcharge by Vendor',
+        whatItDoes: 'Reads a quarter of invoice audit data and totals the overcharge by vendor, flags the worst SKUs, and projects the annual cost.',
+        prompt: 'Here is my invoice audit data for the past quarter. Columns: vendor name, SKU, PO price, invoiced price, variance per unit, quantity, total variance. [PASTE DATA]. Calculate cumulative overcharge by vendor, identify which SKUs have the most consistent variance across deliveries, project the annual overcharge at this run rate, and flag any vendor where cumulative overcharge exceeds $500 for the quarter.',
+        whatToPaste: 'Paste your quarter of invoice audit rows into [PASTE DATA].'
+      },
+      {
+        id: 'vc-ai-2',
+        title: 'Draft a Vendor Dispute Letter',
+        whatItDoes: 'Writes a direct, factual dispute letter requesting a credit memo for a documented overcharge.',
+        prompt: 'I need to dispute a price variance with my vendor [VENDOR NAME]. Details: SKU [NAME], agreed price $[AMOUNT], invoiced price $[AMOUNT], quantity [NUMBER], total overcharge $[AMOUNT], delivery date [DATE], invoice number [NUMBER]. Write a professional dispute letter requesting a credit memo for the full overcharge amount. Direct and factual tone, not adversarial. Include a specific deadline for the credit memo response.',
+        whatToPaste: 'Fill in the vendor, SKU, prices, quantity, overcharge, date, and invoice number.'
+      },
+      {
+        id: 'vc-ai-3',
+        title: 'Build a Quarterly Vendor Review Agenda',
+        whatItDoes: 'Turns a quarter of purchase history into a printable review agenda with talking points, questions, and target outcomes.',
+        prompt: 'I am preparing for my quarterly review with [VENDOR NAME]. Here is my purchase history for the quarter: total spend $[AMOUNT], top 5 SKUs by spend [LIST WITH AMOUNTS], invoice variances found [LIST], substitutions received [LIST], quality issues [NOTES]. Build a structured meeting agenda with talking points for each item, specific questions to ask, and a target outcome for each agenda item. Format it so I can print it and bring it to the meeting.',
+        whatToPaste: 'Fill in the vendor and the quarter\'s spend, SKUs, variances, substitutions, and quality notes.'
+      },
+      {
+        id: 'vc-ai-4',
+        title: 'Identify Price Drift on a SKU',
+        whatItDoes: 'Reads six months of invoiced prices for one SKU and reports the drift trend, total increase, and cumulative overcharge.',
+        prompt: 'Here are my invoiced prices for [SKU NAME] over the past six months, one entry per delivery: [LIST DATES AND PRICES]. Identify the trend direction, calculate the total price increase over the period as a percentage, determine whether it is gradual drift or step changes at specific dates, tell me at what point the price first moved above my original quoted rate of $[AMOUNT], and express the cumulative overcharge in dollars based on my average weekly order volume of [QUANTITY].',
+        whatToPaste: 'Fill in the SKU, the dated price list, your original quoted rate, and weekly order volume.'
+      }
+    ]
   }
 
 ];
