@@ -622,6 +622,7 @@ const App = {
         'lc-help':               ['Help and FAQ', 'Labor Control'],
       };
       const lcScreens = {
+        'lc-dashboard': S.LaborDashboard,
         'lc-positions': S.LaborPositions,
         'lc-staff-roster': S.LaborStaffRoster,
         'lc-build-schedule': S.LaborBuildSchedule,
