@@ -736,14 +736,14 @@ S.Settings = {
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
     // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
     // and 5, which is where both cost trends break downward.
-    App.data.fix_log = [
+    App.data.fix_log = (App.data.fix_log || []).filter(e => e.module !== 'profit').concat([
       { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
         date:dateStr(31), logged_at:daysAgoISO(31) },
       { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
         date:dateStr(31), logged_at:daysAgoISO(31) },
       { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft & Loss',
         date:dateStr(24), logged_at:daysAgoISO(24) },
-    ];
+    ]);
 
     // ── Variance Investigations ──
     App.data.variance_investigations = [
