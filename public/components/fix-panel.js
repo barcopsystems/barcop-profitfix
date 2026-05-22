@@ -47,7 +47,39 @@ window.FixPanel = {
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + rows + '</div>';
   },
 
-  // Wire the Fix Areas card rows. Call after the dashboard HTML is in the DOM.
+  // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
+  // The module's running recovery from logged fixes. Dollar figure where the
+  // metric dollarizes, fix count otherwise. Clicking opens the Fix screen.
+  recoveryCard(moduleKey) {
+    if (!window.Recovery) return '';
+    const s = Recovery.moduleSummary(moduleKey);
+    let body;
+    if (s.logged === 0) {
+      body = '<div style="font-size:12px;color:var(--t3);line-height:1.65;">'
+        + 'No fixes logged yet. When you put a fix in place, mark it implemented on the Fix screen '
+        + 'and the app measures what it recovered.</div>';
+    } else if (s.withFigure > 0) {
+      body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
+        + App.fmtCurrency(s.recovered) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">annualized recovery across '
+        + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
+        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '</div>';
+    } else {
+      body = '<div style="font-size:13px;color:var(--t2);line-height:1.6;">'
+        + s.logged + ' fix' + (s.logged === 1 ? '' : 'es') + ' logged. '
+        + 'Recovery for this module shows as the scores improve, not in dollars.</div>'
+        + (s.measuring > 0 ? '<div style="font-size:11px;color:var(--t4);margin-top:4px;">'
+            + s.measuring + ' still measuring.</div>' : '');
+    }
+    return '<div class="sh">Recovery Scoreboard</div>'
+      + '<div class="card fp-recovery-go" data-screen="' + esc(this.fixScreen(moduleKey)) + '" '
+      + 'style="margin-bottom:18px;display:flex;align-items:center;gap:16px;justify-content:space-between;cursor:pointer;">'
+      + '<div style="flex:1;min-width:0;">' + body + '</div>'
+      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+      + '</div>';
+  },
+
+  // Wire the Fix Areas rows and the Recovery card. Call after render.
   wireFixAreas(container) {
     if (!container) return;
     container.querySelectorAll('.fp-fixarea').forEach(row => {
@@ -55,6 +87,9 @@ window.FixPanel = {
         App._fixFocus = row.dataset.gap;
         App.openScreen(this.fixScreen(row.dataset.module));
       });
+    });
+    container.querySelectorAll('.fp-recovery-go').forEach(card => {
+      card.addEventListener('click', () => App.openScreen(card.dataset.screen));
     });
   },
 
