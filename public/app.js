@@ -532,6 +532,7 @@ const App = {
         'ic-receive-delivery': S.InventoryReceiveDelivery,
         'ic-delivery-history': S.InventoryDeliveryHistory,
         'ic-order-sheet':     S.InventoryOrderSheet,
+        'ic-order-history':   S.InventoryOrderHistory,
         'ic-report-usage':    S.InventoryUsageReport,
         'ic-report-variance': S.InventoryVarianceReport,
         'ic-report-stock':    S.InventoryStockReport,
