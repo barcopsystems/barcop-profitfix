@@ -715,6 +715,7 @@ S.AuditTracker = {
   },
 
   async generateAudit() {
+    if (App.demoBlock('Running an audit')) return;
     // Show generating state in the current container
     const submitBtn = document.getElementById('at-iz-submit');
     const statusEl  = document.getElementById('at-iz-status');
