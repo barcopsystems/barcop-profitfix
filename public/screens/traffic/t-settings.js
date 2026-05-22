@@ -197,6 +197,15 @@ S.TrafficSettings = {
     }
     App.data.traffic_weeks = weeks;
 
+    // ── Fix Layer — logged Traffic fixes. Traffic metrics do not dollarize,
+    // so these log as implemented and recovery shows as the scores improving. ──
+    App.data.fix_log = (App.data.fix_log || []).filter(e => e.module !== 'traffic').concat([
+      { id:App.uid(), module:'traffic', gap_id:'gbp', gap_name:'Google Business Profile',
+        date:wkDate(6), logged_at:wkDate(6) },
+      { id:App.uid(), module:'traffic', gap_id:'reviews', gap_name:'Reviews',
+        date:wkDate(5), logged_at:wkDate(5) },
+    ]);
+
     // ── traffic_settings: targets + digital-presence profile ──
     App.data.traffic_settings = {
       targets: { google_rating:4.3, review_velocity:8, response_rate:75, monthly_sessions:2000, social_posts_month:12 },
