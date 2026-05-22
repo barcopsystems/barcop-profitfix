@@ -415,53 +415,45 @@ FIX.profit = [
     id: 'prime-cost',
     name: 'Prime Cost',
     module: 'profit',
-    summary: 'COGS plus labor as a share of sales — the single number that confirms whether the other systems are working. Run it weekly, isolate the driver, act before the next week starts.',
+    summary: 'COGS plus labor as a share of sales. The single number that confirms whether your other cost systems are working. Read it weekly, find the driver when it moves, act before the next week starts.',
 
     process: {
-      intro: 'Prime cost is an operations metric, not a finance metric. It belongs in the weekly management meeting alongside pour cost and waste — read weekly, on Monday, in fifteen minutes.',
+      intro: 'Prime cost is an operations metric, not a finance metric. It is the one number that tells you whether pour cost, food cost, and labor control are actually working. The app pulls the inputs from your Control modules and computes it for you. Read it weekly, on Monday, in fifteen minutes. Each step below opens where that happens.',
       steps: [
-        { title: 'Pull accurate weekly inputs',
-          detail: 'Net sales after comps and discounts, COGS by category, and total labor including payroll taxes and employer benefits. Inaccurate inputs produce a prime cost that looks better than it is every week.' },
-        { title: 'Run prime cost every Monday, not monthly',
-          detail: 'A 30-day lag is 30 days of compounding loss before you see the number, and another 30 before you know if the fix worked. Weekly review is the whole point.' },
-        { title: 'Calculate it correctly',
-          detail: '(Total COGS + Total Labor) divided by Net Sales. Keep food COGS and beverage COGS separate — a blended number hides which side is the problem.' },
-        { title: 'Read it against your concept target',
-          detail: 'A 60% prime cost is healthy for a full-service bar-restaurant and concerning for high-volume nightlife. Know your target before you read the number.' },
-        { title: 'Isolate the driver when above target',
-          detail: 'Decide whether COGS or labor moved the number. If COGS, which category. If labor, which shifts or departments. The number tells you it moved; the components tell you where.' },
-        { title: 'Assign the action before the week starts',
-          detail: 'A weekly review ends in one decision: is anything here enough to open an investigation or a corrective action today? If yes, assign it before the week begins.' },
-        { title: 'Roll weekly snapshots into a monthly review',
-          detail: 'File a weekly P&L snapshot each Monday. Once a month, review the four weeks together with management and set the next month\'s cost-control priorities with named owners.' }
+        { kind: 'action', target: 'this-week', targetLabel: 'This Week',
+          title: 'Confirm the week\'s inputs',
+          detail: 'Open This Week. Net sales come from Shift Control, labor from Labor Control, and COGS from Inventory Control, already filled in. Confirm them. Prime cost is only as honest as the numbers feeding it, so an unconfirmed week is a prime cost you cannot trust.' },
+        { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
+          title: 'Read prime cost every Monday',
+          detail: 'The app works out prime cost as total COGS plus total labor over net sales, food and beverage kept separate, and shows it on the Profit dashboard against your concept target. There is nothing for you to calculate. Read it weekly, not monthly. A 30-day lag is 30 days of loss before you see it.' },
+        { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
+          title: 'Find which part moved when it is over',
+          detail: 'The dashboard breaks prime cost into its parts: bar pour cost, food cost, and labor, each dollar-quantified. The number tells you it moved. The parts tell you where. Decide before the week starts whether the gap is enough to open an investigation or a corrective action today.' },
+        { kind: 'result', target: 'reports', targetLabel: 'Reports and History',
+          title: 'Check spike against trend',
+          detail: 'Reports and History shows prime cost across the past weeks. Before you act, look at whether this is a one-week spike from a bulk purchase or a payroll correction, or a real trend that has been building.' },
+        { kind: 'reference', target: 'Weekly_PL_Snapshot.pdf', targetLabel: 'Weekly P&L Snapshot',
+          title: 'File a weekly P&L snapshot',
+          detail: 'Print the Weekly P&L Snapshot each Monday and file it. Four filed snapshots are the monthly review. Skipping them means rebuilding the month from memory, and memory rounds in the wrong direction.' },
+        { kind: 'reference', target: 'Monthly_Cost_Control_Review_Agenda.docx', targetLabel: 'Monthly Cost Control Review Agenda',
+          title: 'Run the monthly cost review',
+          detail: 'Once a month, download the Monthly Cost Control Review Agenda and walk management through the four weeks together. Set the next month\'s cost-control priorities with a named owner on each one.' }
       ]
     },
 
-    formulas: [
-      { label: 'Prime Cost %',
-        formula: '(Total COGS + Total Labor) / Net Sales x 100',
-        example: '($21,620 COGS + $16,835 labor) / $62,000 net sales = 62.0%' },
-      { label: 'True Labor Cost',
-        formula: 'Wages + payroll taxes + employer benefits',
-        example: 'Real labor runs 10-15% above wages alone — wages-only understates prime cost' },
-      { label: 'Net Sales',
-        formula: 'Gross sales - comps - discounts',
-        example: 'Register totals are not net sales; comps left in the denominator flatter the number' }
-    ],
-
     commonMistakes: [
-      'Calculating prime cost monthly instead of weekly — a 30-day lag means 30 days of compounding loss before you see it, and 30 more before you know the fix worked.',
-      'Excluding payroll taxes and benefits from labor — real labor cost is 10-15% above wages alone, and wages-only systematically understates the problem.',
-      'Using gross sales instead of net sales as the denominator — comps and discounts left in make prime cost look better than it is every week.',
-      'Not separating COGS into food and beverage — a blended COGS number hides which side is the problem and sends you looking in the wrong place.',
-      'Treating prime cost as a finance metric — it belongs in the weekly management meeting, not the monthly P&L review.',
-      'Acting on a single week\'s spike before checking the data — a miscoded payroll run or a one-time purchase produces a false spike.'
+      'Calculating prime cost monthly instead of weekly. A 30-day lag means 30 days of compounding loss before you see it, and 30 more before you know the fix worked.',
+      'Excluding payroll taxes and benefits from labor. Real labor cost runs 10 to 15% above wages alone, and a wages-only number understates the problem every week.',
+      'Using gross sales instead of net sales as the denominator. Comps and discounts left in make prime cost look better than it is.',
+      'Not separating COGS into food and beverage. A blended COGS number hides which side is the problem and sends you looking in the wrong place.',
+      'Treating prime cost as a finance metric. It belongs in the weekly management meeting, not the monthly P&L review.',
+      'Acting on a single week\'s spike before checking the data. A miscoded payroll run or a one-time bulk purchase produces a false spike.'
     ],
 
     quickRef: {
       rhythm: [
         'Pull prior-week net sales (after comps and discounts), COGS by category, and total labor',
-        'Calculate prime cost and compare it to target and to last week',
+        'Read prime cost on the dashboard and compare it to target and to last week',
         'If above target, identify whether COGS or labor is the driver',
         'If COGS, isolate the category; if labor, isolate the shifts or departments',
         'Assign an investigation or corrective action before the week starts',
@@ -476,47 +468,14 @@ FIX.profit = [
         { label: 'Craft cocktail bar',           target: '50-58%', warning: '58-63%', critical: 'above 63%' }
       ],
       escalation: [
-        'Verify the data first — net sales truly net of comps, labor including taxes. A miscode produces a false spike.',
+        'Verify the data first. Net sales truly net of comps, labor including taxes. A miscode produces a false spike.',
         'Split the move: did COGS or labor drive the change versus last week?',
         'If COGS, isolate food versus beverage, then drill to the category.',
         'If labor, isolate which shifts or departments ran over their hours.',
-        'Check for one-time events — a bulk purchase or a payroll correction landing in the week.',
+        'Check for one-time events: a bulk purchase or a payroll correction landing in the week.',
         'Decide whether this is a structural problem or a one-week anomaly before acting.'
       ]
     },
-
-    templates: [
-      {
-        id: 'monthly-cost-review',
-        name: 'Monthly Cost Control Review Agenda',
-        intro: 'The agenda for the monthly management review of prime cost and its components. Run it the first Tuesday of every month.',
-        fields: [
-          { key: 'bar_name',     label: 'Bar Name',      placeholder: 'Your bar' },
-          { key: 'review_month', label: 'Review Month',  placeholder: 'e.g. March' }
-        ],
-        body: 'MONTHLY COST CONTROL REVIEW\n{{bar_name}} — {{review_month}}\n\n'
-          + '1. PRIME COST FOR THE MONTH\n'
-          + '- Prime cost by week (four weeks): __________________________\n'
-          + '- Monthly average vs. concept target: ______________________\n'
-          + '- Direction versus the prior month: ________________________\n\n'
-          + '2. COGS REVIEW\n'
-          + '- Beverage cost: target vs. actual, and the driver if off.\n'
-          + '- Food cost: target vs. actual, by category.\n'
-          + '- Vendor price changes caught this month: __________________\n\n'
-          + '3. LABOR REVIEW\n'
-          + '- Labor cost % vs. target.\n'
-          + '- Overtime and any departments or shifts that ran over.\n\n'
-          + '4. RESULTS OF LAST MONTH\'S PRIORITIES\n'
-          + '- Priority 1: __________________  Result: __________________\n'
-          + '- Priority 2: __________________  Result: __________________\n'
-          + '- Priority 3: __________________  Result: __________________\n\n'
-          + '5. PRIORITIES FOR NEXT MONTH (assign a named owner to each)\n'
-          + '- Priority 1: __________________  Owner: ___________________\n'
-          + '- Priority 2: __________________  Owner: ___________________\n'
-          + '- Priority 3: __________________  Owner: ___________________\n\n'
-          + 'Reviewed by: ____________________   Date: __________'
-      }
-    ],
 
     aiWorkflows: [
       {
@@ -530,7 +489,7 @@ FIX.profit = [
         id: 'pr-ai-2',
         title: 'Diagnose a Prime Cost Spike',
         whatItDoes: 'Walks a week-over-week prime cost jump through probable causes in order and names the exact data to pull for each.',
-        prompt: 'My prime cost moved from [X]% to [Y]% this week. Component changes: food cost [X]% to [Y]%, beverage cost [X]% to [Y]%, labor [X]% to [Y]%. Net sales this week: $[AMOUNT] versus $[AMOUNT] last week. Walk me through the most likely cause of the spike in order of probability and tell me exactly what data to pull to confirm each one. Do not suggest general improvements — suggest specific things to check, in order.',
+        prompt: 'My prime cost moved from [X]% to [Y]% this week. Component changes: food cost [X]% to [Y]%, beverage cost [X]% to [Y]%, labor [X]% to [Y]%. Net sales this week: $[AMOUNT] versus $[AMOUNT] last week. Walk me through the most likely cause of the spike in order of probability and tell me exactly what data to pull to confirm each one. Do not suggest general improvements. Suggest specific things to check, in order.',
         whatToPaste: 'Fill in this week and last week\'s prime cost, component percentages, and net sales.'
       },
       {
@@ -544,7 +503,7 @@ FIX.profit = [
         id: 'pr-ai-4',
         title: 'Write the Monthly Cost Control Summary',
         whatItDoes: 'Drafts a direct monthly review summary for management with three named priorities for next month.',
-        prompt: 'Here is my prime cost data for the past month by week: [PASTE WEEKLY DATA]. Top three cost control actions we took this month: [LIST]. Results from last month\'s priority actions: [NOTES]. Write a brief monthly review summary under 200 words for my management team covering what the numbers showed, what we did about it, and three priorities for next month with a named owner for each. Direct and operational tone — not encouraging, not congratulatory.',
+        prompt: 'Here is my prime cost data for the past month by week: [PASTE WEEKLY DATA]. Top three cost control actions we took this month: [LIST]. Results from last month\'s priority actions: [NOTES]. Write a brief monthly review summary under 200 words for my management team covering what the numbers showed, what we did about it, and three priorities for next month with a named owner for each. Direct and operational tone, not encouraging, not congratulatory.',
         whatToPaste: 'Paste the weekly data, this month\'s actions, and last month\'s results.'
       }
     ]
