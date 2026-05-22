@@ -126,6 +126,7 @@ S.RevenueDashboard = {
       + this.buildChart(validWeeks.slice(-8), t)
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
+      + FixPanel.recoveryCard('revenue')
       + FixPanel.fixAreasCard('revenue')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
