@@ -16,52 +16,43 @@ FIX.profit = [
     summary: 'The gap between what you spent on bar product and what you sold. Measure it weekly, investigate variance, and hold the line with a written pour standard.',
 
     process: {
-      intro: 'A functioning pour cost system has four parts that all have to run: a count on the same day every week, pour cost calculated right after the count, a variance report reviewed within 48 hours, and a written procedure so anyone can run it. Remove any one and the system falls apart within 60 days.',
+      intro: 'A working pour cost system has four parts that all have to run: a count on the same day every week, the pour cost calculated right after it, a variance report reviewed within 48 hours, and a written pour standard. The app does the counting and the math. Each step below opens the screen where that happens.',
       steps: [
-        { title: 'Set accurate bottle yields',
-          detail: 'Pour cost is only as good as your yield inputs. A 750ml bottle at a 1.5oz pour yields 16.9 drinks, not 17 — never round. Enter every active SKU with its container size and standard pour so cost-per-drink is exact.' },
-        { title: 'Count on the same day every week',
-          detail: 'A full physical count of every storage location, same day, no exceptions. Value inventory at cost using your most recent invoice price. Measure partial bottles — do not estimate by eye.' },
-        { title: 'Calculate actual pour cost',
-          detail: 'Opening inventory plus purchases received minus closing inventory, divided by beverage sales. Purchases means product physically received in the period, not invoices paid. Run it right after the count, broken out by category.' },
-        { title: 'Run the variance report',
-          detail: 'Variance is the gap between theoretical usage (POS sales times recipe ounces) and actual usage (physical count movement). Flag any SKU above 3%. Four things produce variance: over-pouring, waste, theft, and unrecorded comps.' },
-        { title: 'Review within 48 hours',
-          detail: 'Fifteen minutes, Monday morning. Pour cost by category first, variance report second. One decision: is anything here enough to open an investigation today? If yes, assign it before you leave.' },
-        { title: 'Hold the line with a written pour standard',
-          detail: 'Introduce a measured-pour (jigger) policy as an operational standard that applies to everyone on the same date. Every staff member signs before the effective date — a signed policy makes later corrective action a policy issue, not a personal conflict.' }
+        { kind: 'action', target: 'ic-product-setup', targetLabel: 'Products',
+          title: 'Set accurate bottle yields',
+          detail: 'In Inventory Control Products, enter every active product with its container size, pour size, and unit cost. The app turns that into pours per container and cost per pour, and pour cost is only as accurate as those numbers.' },
+        { kind: 'action', target: 'ic-take-inventory', targetLabel: 'Take Inventory',
+          title: 'Count on the same day every week',
+          detail: 'Run a full count in Take Inventory on the same day each week. Count partial bottles with the bottle slider instead of estimating by eye. The count is what every pour cost number is built from.' },
+        { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
+          title: 'Read your actual pour cost',
+          detail: 'There is nothing for you to calculate. The app works out pour cost from your counts and deliveries and shows it on the Profit dashboard, by category, against your target.' },
+        { kind: 'action', target: 'ic-report-variance', targetLabel: 'Variance Report',
+          title: 'Run the variance report',
+          detail: 'The Variance Report compares what your count says you used against what the POS says you sold. Anything above the flag threshold is over-pouring, waste, theft, or unrecorded comps.' },
+        { kind: 'result', target: 'reports', targetLabel: 'Reports and History',
+          title: 'Review the numbers every week',
+          detail: 'Once a week, check pour cost by category against target and read the variance report. The trend in Reports and History tells you whether the number is holding or drifting.' },
+        { kind: 'reference', target: 'Measured_Pour_Standards_Policy.docx', targetLabel: 'Measured Pour Standards Policy',
+          title: 'Put a written pour standard in place',
+          detail: 'Download the Measured Pour Standards Policy, set your pour sizes, and have every staff member sign it before the effective date. A signed policy makes later corrective action a policy issue, not a personal one.' }
       ]
     },
 
-    formulas: [
-      { label: 'Actual Pour Cost %',
-        formula: '(Opening Inventory + Purchases - Closing Inventory) / Beverage Sales',
-        example: '$8,400 opening + $3,200 purchases - $7,100 closing / $22,000 sales = 20.9%' },
-      { label: 'Variance (oz)',
-        formula: 'Actual usage from count - Theoretical usage from POS sales',
-        example: 'POS drink types x recipe ounces = expected oz; the gap to counted oz is variance' },
-      { label: 'Bottle Yield',
-        formula: 'Container size (oz) / Standard pour (oz)',
-        example: '750ml = 25.4oz / 1.5oz = 16.9 drinks (never round to 17)' },
-      { label: 'Over-Pour Cost',
-        formula: 'Average overage (oz) x cost per oz x drinks per night x service nights',
-        example: '0.3oz x $0.90 x 250 drinks x 300 nights = $20,250 per year' }
-    ],
-
     commonMistakes: [
-      'Rounding bottle yield to a whole number — the 0.1-drink gap compounds across every SKU and quietly understates theoretical pour cost.',
-      'Estimating partial bottles by eye instead of measuring them — a back bar with 40 open bottles builds a real error into every calculation.',
-      'Counting purchases as invoices paid rather than product physically received in the period — one delivery on the wrong side of a count date throws the number off by a full case.',
-      'Letting the count slip when a manager is out — the system dies from a missed cycle, not a bad number. Write the process down so it lives in paper, not people.',
-      'Starting a variance investigation with a conversation instead of the data — verify the count first; many spikes turn out to be a counting error, not a person.'
+      'Rounding bottle yield to a whole number. The 0.1-drink gap compounds across every product and quietly understates theoretical pour cost.',
+      'Estimating partial bottles by eye instead of measuring them. A back bar with 40 open bottles builds a real error into every calculation.',
+      'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.',
+      'Letting the count slip when a manager is out. The system dies from a missed cycle, not a bad number. Write the process down so it lives in paper, not people.',
+      'Starting a variance investigation with a conversation instead of the data. Verify the count first. Many spikes turn out to be a counting error, not a person.'
     ],
 
     quickRef: {
       rhythm: [
         'Complete a full physical bar inventory count',
-        'Calculate actual pour cost by category',
-        'Run the variance report and flag any SKU above 3%',
-        'Review flagged SKUs within 48 hours of the count',
+        'Read actual pour cost by category on the Profit dashboard',
+        'Run the variance report and flag any product above 3%',
+        'Review flagged products within 48 hours of the count',
         'Verify opening and closing counts were completed every shift',
         'Confirm the jigger policy was enforced with the floor manager'
       ],
@@ -74,44 +65,14 @@ FIX.profit = [
         { label: 'Blended bar cost', target: '20-26%', warning: '26-28%', critical: 'above 28%' }
       ],
       escalation: [
-        'Verify the count: pull the SKU count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error.',
+        'Verify the count: pull the product count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error.',
         'Calculate theoretical usage: POS sales by drink type times recipe ounces, compared to actual ounce movement.',
         'Identify which shifts drove the variance from the opening and closing counts.',
-        'Talk to the bar manager about what they noticed on those shifts — breakage, waste, unusual activity.',
-        'Run an unannounced mid-shift count on the flagged SKU during a service period.',
-        'Document the finding and resolution in writing before closing the investigation — even when it is inconclusive.'
+        'Talk to the bar manager about what they noticed on those shifts, such as breakage, waste, or unusual activity.',
+        'Run an unannounced mid-shift count on the flagged product during a service period.',
+        'Document the finding and resolution in writing before closing the investigation, even when it is inconclusive.'
       ]
     },
-
-    templates: [
-      {
-        id: 'measured-pour-policy',
-        name: 'Measured Pour Standards Policy',
-        intro: 'The document that makes the jigger requirement official and enforceable. Every staff member signs before the effective date; keep originals in employee files.',
-        fields: [
-          { key: 'bar_name',       label: 'Bar Name',                  placeholder: 'Your bar' },
-          { key: 'jigger_size',    label: 'Standard Spirit Pour',      placeholder: '1.5 oz' },
-          { key: 'wine_pour',      label: 'Wine by the Glass Pour',    placeholder: '5 oz' },
-          { key: 'effective_date', label: 'Effective Date',            placeholder: 'e.g. March 4' }
-        ],
-        body: 'MEASURED POUR STANDARDS POLICY\n{{bar_name}}\nEffective {{effective_date}}\n\n'
-          + 'PURPOSE\n'
-          + 'This policy sets the measured-pour standard for all bar staff at {{bar_name}}. Accurate pours are how we calculate product cost, price the menu correctly, and run the bar on data rather than guesswork. This standard applies to every staff member equally.\n\n'
-          + 'THE STANDARD\n'
-          + '- Every spirit pour is measured with a jigger. Standard spirit pour: {{jigger_size}}.\n'
-          + '- Wine by the glass is poured to {{wine_pour}} using a measured pour or lined glassware.\n'
-          + '- Draft beer is poured to a full, properly settled glass with minimal foam waste.\n'
-          + '- Speed pours and count pours are not a substitute for a jigger on priced drinks.\n\n'
-          + 'WHY\n'
-          + 'We cannot know what we spend on product without knowing what is poured. Measured pours are how professionally run bars operate. This is an operational standard, not a judgment of anyone\'s skill.\n\n'
-          + 'ENFORCEMENT\n'
-          + 'This standard takes effect on {{effective_date}}. Every staff member signs this policy before working a shift on or after that date. After the effective date, measured pours are a job requirement, and repeated failure to follow the standard is addressed through the corrective-action process.\n\n'
-          + 'ACKNOWLEDGEMENT\n'
-          + 'I have read and understand the Measured Pour Standards Policy for {{bar_name}}.\n\n'
-          + 'Staff name: ____________________   Signature: ____________________   Date: __________\n\n'
-          + 'Manager: ____________________   Signature: ____________________   Date: __________'
-      }
-    ],
 
     aiWorkflows: [
       {
