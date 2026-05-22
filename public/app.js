@@ -745,6 +745,19 @@ const App = {
     return Number(n).toFixed(d) + '%';
   },
 
+  /* ── Dollarize a percentage gap (Section 10.2) ───────────────────────────
+     The shared helper that puts a dollar figure on a percentage. Pass the
+     metric, its target, and the annual revenue base it applies to. Returns
+     the signed gap in points and dollars (annual and weekly), where a
+     positive figure means the metric sits above target. Returns null when
+     any input is missing, so callers never print a fabricated number. */
+  dollarize(metric, target, annualBase) {
+    if (metric == null || target == null || !annualBase || isNaN(annualBase)) return null;
+    const gapPts = metric - target;
+    const annual = (gapPts / 100) * annualBase;
+    return { gapPts: gapPts, annual: annual, weekly: annual / 52 };
+  },
+
   /* ── Unified audit score system (0-100) ──────────────────────────────────
      One scale for every audit score in all three sections:
        70-100  Strong        gold
