@@ -445,7 +445,6 @@ const App = {
         'r-events':               ['Events and Catering', ''],
         'r-reports':              ['Reports and History', ''],
         'r-getting-started':      ['Getting Started', '30-Day Setup'],
-        'r-resources':            ['Resources', ''],
         'r-help':                 ['Help and FAQ', ''],
         'r-settings':             ['Settings', 'Revenue Recovery'],
       };
@@ -462,7 +461,6 @@ const App = {
         'r-events':           S.RevenueEvents,
         'r-reports':          S.RevenueReports,
         'r-getting-started':  S.RevenueGettingStarted,
-        'r-resources':        S.RevenueResources,
         'r-help':             S.RevenueHelp,
         'r-settings':         S.RevenueSettings,
       };
@@ -492,7 +490,6 @@ const App = {
         't-email':          ['Email and Loyalty', ''],
         't-reports':        ['Reports and History', ''],
         't-getting-started':['Getting Started', '30-Day Setup'],
-        't-resources':      ['Resources', ''],
         't-help':           ['Help and FAQ', ''],
         't-settings':       ['Settings', 'Traffic Recovery'],
       };
@@ -510,7 +507,6 @@ const App = {
         't-email':          S.TrafficEmail,
         't-reports':        S.TrafficReports,
         't-getting-started':S.TrafficGettingStarted,
-        't-resources':      S.TrafficResources,
         't-help':           S.TrafficHelp,
         't-settings':       S.TrafficSettings,
       };
@@ -685,7 +681,6 @@ const App = {
       'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
       'profit-fix':    ['Profit Fix', 'Fix Process and Guidance'],
-      'resources':     ['Resources', 'Tools, Templates & Checklists'],
       'getting-started': ['Getting Started', '30-Day Setup Checklist']
     };
 
@@ -705,7 +700,6 @@ const App = {
       'help':          S.Help,
       'audit-tracker': S.AuditTracker,
       'profit-fix':    S.ProfitFix,
-      'resources':     S.Resources,
       'getting-started': S.GettingStarted
     };
 
