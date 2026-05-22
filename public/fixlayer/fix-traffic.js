@@ -551,26 +551,25 @@ FIX.traffic = [
     summary: 'Email is the one channel where you own the audience. Build the list at every touchpoint, send a personal update every month, and write like the owner, not a marketing department.',
 
     process: {
-      intro: 'Social platforms rent you an audience. Email is the one channel you own outright. A list that hears from you on a consistent monthly rhythm, in a real voice, brings guests back. A list that hears nothing goes cold within 30 days.',
+      intro: 'Social platforms rent you an audience. Email is the one channel you own outright. A list that hears from you on a consistent monthly rhythm, in a real voice, brings guests back. A list that hears nothing goes cold within 30 days. The Email and Loyalty screen tracks your list and your sends. Each step below opens where the work happens.',
       steps: [
-        { title: 'Set up the platform and the welcome sequence first',
-          detail: 'Set up an email platform and build the welcome sequence before you collect a single address. The welcome email is the highest-opened email you will ever send, and most bars never set it up.' },
-        { title: 'Build the list at the five touchpoints',
-          detail: 'Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the touchpoints two at a time so each one gets set up properly.' },
-        { title: 'Run the three campaigns every bar needs',
-          detail: 'A welcome sequence for new subscribers, a monthly update, and an event announcement when there is something real to announce. Those three cover it.' },
-        { title: 'Write in owner voice',
-          detail: '"I wanted to tell you" reads like a person. "We are thrilled to announce" reads like a chain. Write the email first person, with one specific detail, and sign it with a name.' },
-        { title: 'Send on a consistent monthly rhythm',
-          detail: 'One email a month is the floor. More than two a month is where unsubscribes accelerate. A boring email that arrives every first Tuesday builds more loyalty than a brilliant one that arrives whenever the owner feels inspired.' },
-        { title: 'Track estimated visit conversion, not just open rate',
-          detail: 'Open rate tells you who read it. Estimated visit conversion, gathered by asking hosts and servers whether guests mentioned the email, tells you whether reading it drove anyone through the door.' },
-        { title: 'Run quarterly list hygiene',
-          detail: 'Every 90 days, send a re-engagement email to subscribers who have not opened in 90 days and remove the ones who do not respond. A clean list of 400 outperforms a stale list of 2,000.' }
+        { kind: 'reference', target: 'Email_List_Building_Playbook.pdf', targetLabel: 'Email List Building Playbook',
+          title: 'Build the list at every touchpoint',
+          detail: 'Work the Email List Building Playbook. Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the touchpoints two at a time so each one gets set up properly. A loyalty program sign-up is one of the strongest capture points, so run the two together.' },
+        { kind: 'reference', target: 'Email_Campaign_Templates.docx', targetLabel: 'Email Campaign Templates',
+          title: 'Set up the three campaigns in owner voice',
+          detail: 'Use the Email Campaign Templates for the three campaigns every bar needs: a welcome sequence, a monthly update, and an event announcement. Set up the welcome sequence before you collect a single address, it is the highest-opened email you will ever send. Write first person, with one specific detail, signed with a name. I wanted to tell you reads like a person. We are thrilled to announce reads like a chain.' },
+        { kind: 'result', target: 't-email', targetLabel: 'Email and Loyalty',
+          title: 'Track the list, the sends, and loyalty',
+          detail: 'The Email and Loyalty screen tracks list size, emails sent, open rate, and loyalty members. Read it so you know whether the list is growing and whether the sends are landing.' },
+        { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
+          title: 'Log the monthly send',
+          detail: 'Send on a consistent monthly rhythm, one email a month is the floor and more than two is where unsubscribes accelerate. In This Week, log open rate, click rate, and any covers a guest attributed to the email. Track estimated visit conversion, not just open rate. Open rate tells you who read it. Visit conversion tells you whether it drove anyone in.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend and run quarterly hygiene',
+          detail: 'The Traffic dashboard rolls email into the digital presence score and the 90-day trend. Read it weekly. Every 90 days, re-engage subscribers who have not opened in 90 days and remove the ones who do not respond. A clean list of 400 outperforms a stale list of 2,000.' }
       ]
     },
-
-    formulas: [],
 
     commonMistakes: [
       'Collecting email addresses but never sending. A list that hears nothing within 30 days of signup has already started to go cold.',
@@ -600,13 +599,6 @@ FIX.traffic = [
         'Review the capture touchpoints and add a new one if list growth is below target.'
       ]
     },
-
-    templates: [
-      { name: 'Email List Building Playbook', type: 'PDF', file: 'Email_List_Building_Playbook.pdf',
-        description: 'Seven list-building tactics for bars and restaurants, covering POS capture, table cards, WiFi sign-in, event registration, loyalty integration, and QR code placement.' },
-      { name: 'Email Campaign Templates', type: 'DOC', file: 'Email_Campaign_Templates.docx',
-        description: 'Ready-to-personalize templates for the welcome sequence, the monthly update, and the event announcement, all written in owner voice.' }
-    ],
 
     aiWorkflows: [
       {
