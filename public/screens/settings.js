@@ -160,14 +160,17 @@ S.HubSettings = {
       + '<input type="file" id="s-import-file" accept="application/json,.json" style="display:none;"/>'
       + '</div>'
       + '<div id="s-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
-      + sh('Testing Tools')
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every section to test calculations and layouts. Clear all data to wipe everything and start fresh with your real numbers.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost" id="s-load-sample">Load Sample Data</button>'
-      + '<button class="btn btn-danger" id="s-clear-all">Clear All Data</button>'
-      + '<button class="btn btn-ghost" id="s-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
-      + '</div>'
-      + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
+      // Testing Tools — build-time only. Remove the Load Sample button (and its
+      // wire() listener) before launching the paid app.
+      + (App.demoMode ? '' :
+          sh('Testing Tools')
+          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every module to test calculations and layouts. Clear all data wipes every store, App data and Inventory, Labor, and Shift Control, and starts fresh.</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+          + '<button class="btn btn-ghost" id="s-load-sample">Load Sample Data</button>'
+          + '<button class="btn btn-danger" id="s-clear-all">Clear All Data</button>'
+          + '<button class="btn btn-ghost" id="s-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
+          + '</div>'
+          + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>');
   },
 
   // ── Wiring ──────────────────────────────────────────────────────────────────
@@ -1351,6 +1354,7 @@ S.HubSettings = {
   },
 
   async clearAll() {
+    if (!confirm('This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.\n\nClear all data?')) return;
     const msg = document.getElementById('s-test-msg');
     if (msg) { msg.style.color = 'var(--t3)'; msg.textContent = 'Clearing...'; msg.style.display = 'block'; }
 
