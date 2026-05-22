@@ -535,6 +535,15 @@ S.RevenueAudit = {
     document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
 
     const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Revenue Audit</div>';
+
+    const cd = this.buildControlData();
+    const controlBanner = (cd && cd.sources && cd.sources.length)
+      ? '<div style="background:var(--gold-bg);border:1px solid rgba(201,168,76,0.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+        + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:5px;">Control Data Is Feeding This Audit</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Verified figures from ' + esc(cd.sources.join(', '))
+        + ' go in automatically as ground truth. The uploads below only need to cover what your Control modules do not.</div>'
+        + '</div>'
+      : '';
     const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
@@ -602,7 +611,7 @@ S.RevenueAudit = {
         + nav(true, false, true) + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + stepHtml + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + controlBanner + stepHtml + '</div>';
 
     document.getElementById('ra-iz-cancel')?.addEventListener('click', () => {
       document.getElementById('topbar-sub').textContent = '';
@@ -707,6 +716,8 @@ S.RevenueAudit = {
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
       form.append('notes', this._intakeDraft?.notes || '');
+      const controlData = this.buildControlData();
+      if (controlData) form.append('controlData', JSON.stringify(controlData));
       for (const id of fileInputIds) {
         const inp = document.getElementById(id);
         if (inp?.files) for (const f of inp.files) form.append(id, f, f.name);
@@ -767,5 +778,49 @@ S.RevenueAudit = {
     if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Close server performance spread. $' + Math.round(d.S4_MONTHLY_GAP) + '/month from bottom third to team average.', monthly_impact: d.S4_MONTHLY_GAP });
     if (d.S5_MONTHLY_GAP > 0) items.push({ action: 'Grow event revenue. $' + Math.round(d.S5_MONTHLY_GAP) + '/month gap to target.', monthly_impact: d.S5_MONTHLY_GAP });
     return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
+  },
+
+  /* Verified Control-module data sent with the audit as ground truth (map
+     Section 8 — Revenue labor and server roster come from Labor Control).
+     Each slice appears only when its data exists, so the server never gets a
+     fabricated figure. Returns null when no Control data is available. */
+  buildControlData() {
+    const lab = App.laborData || {};
+    const r1  = n => (n == null || isNaN(n)) ? null : Math.round(n * 10) / 10;
+    const cd  = { sources: [] };
+
+    // Confirmed weekly labor and check average. Per Stage E the weekly labor
+    // figure is fed from Labor Control and revenue/covers from Shift Control,
+    // so the confirmed week is verified Control data.
+    const weeks = (App.data.revenue_weeks || [])
+      .filter(w => (w.bar_revenue||0) + (w.floor_revenue||0) > 0).slice(-4);
+    if (weeks.length) {
+      const avg = fn => { const v = weeks.map(fn).filter(x => x != null && !isNaN(x));
+        return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+      const lp = r1(avg(w => w.labor_pct_blended));
+      const rp = r1(avg(w => w.rplh_blended));
+      const ca = r1(avg(w => w.check_avg));
+      if (lp != null) cd.labor_pct_blended = lp;
+      if (rp != null) cd.rplh_blended = rp;
+      if (ca != null) cd.check_average = ca;
+      if (lp != null || rp != null) cd.sources.push('Labor Control (confirmed weekly labor)');
+    }
+
+    // Labor Control — raw actual hours and cost
+    const actuals = lab.lc_actuals || [];
+    if (actuals.length) {
+      cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
+      cd.labor_cost  = Math.round(actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0));
+      cd.sources.push('Labor Control actuals');
+    }
+
+    // Labor Control — staff roster (server performance section)
+    const staff = lab.lc_staff || [];
+    if (staff.length) {
+      cd.roster_count = staff.length;
+      cd.sources.push('Labor Control staff roster');
+    }
+
+    return cd.sources.length ? cd : null;
   }
 };
