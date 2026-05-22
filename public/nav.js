@@ -27,10 +27,6 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">This Week</span>
       </div>
-      <div class="nav-item" data-screen="shift-check" id="nav-shift-check">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Shift Check</span>
-      </div>
       <div class="nav-section">Products</div>
       <div class="nav-item" data-screen="bar-products" id="nav-bar-products">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6l1 4H4.5l1-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5v8h8v-8" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 10.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
