@@ -309,6 +309,7 @@ const DB = {
       bar_products: [], kitchen_products: [], recipes: [],
       weeks: [], shifts: [], reconciliations: [],
       theft_scores: [], vendor_log: [], last_theft_score_date: null,
+      variance_investigations: [],
       audits: [],
       getting_started_profit: {},
       // Revenue Recovery data
