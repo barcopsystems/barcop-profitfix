@@ -417,6 +417,8 @@ const DB = {
       traffic_weeks:   [],
       traffic_audits:  [],
       getting_started_traffic: {},
+      // Hub — unified setup checklist progress (Section 1, Section 9)
+      hub_setup_progress: {},
       // Fix layer — implemented-fix events feeding the Recovery Scoreboard
       fix_log: []
     };
