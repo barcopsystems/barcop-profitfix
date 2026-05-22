@@ -380,72 +380,55 @@ S.RevenueSettings = {
         saved_at:dateStr(60) },
     ];
 
-    // 12 weeks of weekly data — a deliberate recovery trend for The Anchor.
-    // Check average climbs and labor percentage falls as the Check Average
-    // and Labor Scheduling fixes take hold around week 6 (see fix_log below).
-    // wkNum 1 is the oldest week, wkNum 12 the most recent.
+    // 12 weeks of weekly data — derived from the locked Anchor profile so
+    // Revenue, Profit and the Control modules describe one operation.
     const serverNames = ['Jessica M.','Marcus T.','Brianna K.','Derek W.','Aimee R.','Carlos P.','Tiffany L.','Noah S.'];
     const serverCheckAvgs = [44, 38, 35, 33, 41, 37, 26, 30];
-    const checkAvgByWk = { 1:30.6, 2:31.1, 3:30.4, 4:31.5, 5:31.0, 6:33.6, 7:34.8, 8:35.6, 9:36.4, 10:37.2, 11:37.7, 12:38.3 };
-    const laborPctByWk = { 1:36.0, 2:35.6, 3:36.3, 4:35.4, 5:35.0, 6:33.0, 7:32.3, 8:31.7, 9:31.0, 10:30.5, 11:30.2, 12:30.0 };
+    const ANCH = window.ANCHOR, AW = ANCH.wages;
 
-    const weeks = [];
-    for (let i = 12; i >= 1; i--) {
-      const wkNum     = 13 - i;
-      const periodEnd = dateStr(i * 7);
-      const covers    = Math.round(372 + (Math.random()-0.5)*40);
-      const checkAvg  = parseFloat((checkAvgByWk[wkNum] + (Math.random()-0.5)*0.5).toFixed(2));
-      const totalRev  = Math.round(checkAvg * covers);
-      const barRev    = Math.round(totalRev * 0.52);
-      const floorRev  = totalRev - barRev;
-      const laborPct  = parseFloat((laborPctByWk[wkNum] + (Math.random()-0.5)*0.4).toFixed(2));
-      const totalLaborCost   = Math.round(totalRev * laborPct / 100);
-      const barLaborCost     = Math.round(totalLaborCost * 0.30);
-      const kitchenLaborCost = Math.round(totalLaborCost * 0.32);
-      const floorLaborCost   = totalLaborCost - barLaborCost - kitchenLaborCost;
-      const barLaborHrs     = Math.round(barLaborCost / 16);
-      const kitchenLaborHrs = Math.round(kitchenLaborCost / 15);
-      const floorLaborHrs   = Math.round(floorLaborCost / 14);
-      const totalHrs        = barLaborHrs + kitchenLaborHrs + floorLaborHrs;
-      const rplhBlended     = parseFloat((totalRev / totalHrs).toFixed(2));
-      // Daypart splits
-      const lunchRev  = Math.round(floorRev * 0.32);
-      const dinnerRev = floorRev - lunchRev;
-      const lunchHrs  = Math.round(floorLaborHrs * 0.35);
-      const dinnerHrs = floorLaborHrs - lunchHrs;
-      const rplhLunch  = parseFloat((lunchRev  / lunchHrs).toFixed(2));
-      const rplhDinner = parseFloat((dinnerRev / dinnerHrs).toFixed(2));
-      const rplhBar    = parseFloat((barRev / barLaborHrs).toFixed(2));
-      // Server entries - spread around check averages
+    const weeks = ANCH.weeks.map(a => {
+      const periodEnd = dateStr((12 - a.wk) * 7);
+      const dep = ANCH.laborDepts(a);
+      const barHrs     = Math.round(dep.bar / AW.bar);
+      const kitchenHrs = Math.round(dep.kitchen / AW.kitchen);
+      const floorHrs   = Math.round(dep.floor / AW.floor);
+      const totalHrs   = barHrs + kitchenHrs + floorHrs;
+      const lunchRev   = Math.round(a.food_rev * 0.32);
+      const dinnerRev  = a.food_rev - lunchRev;
+      const lunchHrs   = Math.round(floorHrs * 0.35);
+      const dinnerHrs  = floorHrs - lunchHrs;
       const serverEntries = serverNames.map((name, si) => {
-        const svCovers = Math.round((covers / serverNames.length) * (0.8 + Math.random()*0.4));
+        const svCovers = Math.round((a.covers / serverNames.length) * (0.8 + Math.random()*0.4));
         const svCA     = serverCheckAvgs[si] + (Math.random()-0.5)*3;
-        return { id: 'sv'+(si+1), name, covers: svCovers, sales: Math.round(svCA * svCovers) };
+        return { id:'sv'+(si+1), name, covers:svCovers, sales:Math.round(svCA*svCovers) };
       });
-      weeks.push({
-        id: uid(), week_num: wkNum, period_end: periodEnd,
-        bar_revenue: barRev, floor_revenue: floorRev, covers, check_avg: checkAvg,
-        bar_labor_hours: barLaborHrs, bar_labor_cost: barLaborCost,
-        kitchen_labor_hours: kitchenLaborHrs, kitchen_labor_cost: kitchenLaborCost,
-        floor_labor_hours: floorLaborHrs, floor_labor_cost: floorLaborCost,
-        total_labor_cost: totalLaborCost, total_hours: totalHrs,
-        labor_pct_blended: laborPct, rplh_blended: rplhBlended,
-        rplh_lunch: rplhLunch, rplh_dinner: rplhDinner, rplh_bar: rplhBar,
+      return {
+        id: uid(), week_num: a.wk, period_end: periodEnd,
+        bar_revenue: a.bar_rev, floor_revenue: a.food_rev, covers: a.covers, check_avg: a.check_avg,
+        bar_labor_hours: barHrs, bar_labor_cost: dep.bar,
+        kitchen_labor_hours: kitchenHrs, kitchen_labor_cost: dep.kitchen,
+        floor_labor_hours: floorHrs, floor_labor_cost: dep.floor,
+        total_labor_cost: a.bar_labor + a.food_labor, total_hours: totalHrs,
+        labor_pct_blended: a.labor_pct_blended,
+        rplh_blended: +(a.total_rev / totalHrs).toFixed(2),
+        rplh_lunch: +(lunchRev / lunchHrs).toFixed(2),
+        rplh_dinner: +(dinnerRev / dinnerHrs).toFixed(2),
+        rplh_bar: +(a.bar_rev / barHrs).toFixed(2),
         rplh_lunch_rev: lunchRev, rplh_lunch_hrs: lunchHrs,
         rplh_dinner_rev: dinnerRev, rplh_dinner_hrs: dinnerHrs,
-        rplh_bar_rev: barRev, rplh_bar_hrs: barLaborHrs,
+        rplh_bar_rev: a.bar_rev, rplh_bar_hrs: barHrs,
         server_entries: serverEntries,
         notes: '', saved_at: new Date().toISOString()
-      });
-    }
+      };
+    });
     App.data.revenue_weeks = weeks;
 
     // ── Fix Layer — logged Revenue fixes feeding the Recovery Scoreboard ──
     App.data.fix_log = (App.data.fix_log || []).filter(e => e.module !== 'revenue').concat([
       { id:uid(), module:'revenue', gap_id:'check-average', gap_name:'Check Average & Upsell',
-        date:dateStr(52), logged_at:dateStr(52) },
+        date:dateStr(45), logged_at:dateStr(45) },
       { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost & Scheduling',
-        date:dateStr(52), logged_at:dateStr(52) },
+        date:dateStr(45), logged_at:dateStr(45) },
     ]);
 
     // Getting Started progress
