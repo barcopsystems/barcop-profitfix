@@ -461,6 +461,9 @@ const App = {
   },
 
   navigate(id) {
+    // Settings is a Hub-owned view, never a module screen — open it in the
+    // Hub container regardless of where the call came from.
+    if (id === 'settings') { S.HubSettings.open(); return; }
     this.updateNav(id);
     const content = document.getElementById('content-area');
     const actions = document.getElementById('topbar-actions');
@@ -710,7 +713,6 @@ const App = {
       'theft-risk':    ['Theft Risk Scorecard', ''],
       'cash-recon':    ['Cash Reconciliation', ''],
       'reports':       ['Reports & History', ''],
-      'settings':      ['Settings', 'Recovery Platform'],
       'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
       'profit-fix':    ['Profit Fix', 'Fix Process and Guidance'],
@@ -729,7 +731,6 @@ const App = {
       'theft-risk':    S.TheftRisk,
       'cash-recon':    S.CashRecon,
       'reports':       S.Reports,
-      'settings':      S.Settings,
       'help':          S.Help,
       'audit-tracker': S.AuditTracker,
       'profit-fix':    S.ProfitFix,
