@@ -104,26 +104,25 @@ FIX.traffic = [
     summary: 'Most guests reach your website on a phone, after a Google search, ready to act. If they cannot find your hours, your menu, and a way to book in a few seconds, they leave.',
 
     process: {
-      intro: 'A bar website has one job: turn a guest who is already looking for you into a visit. Audit it before you change anything so you can prove the fixes worked, then fix conversion in the order that returns the most per hour.',
+      intro: 'A bar website has one job: turn a guest who is already looking for you into a visit. Audit it before you change anything so you can prove the fixes worked, then fix conversion in the order that returns the most per hour. The app scores the site and tracks the numbers over time. Each step below opens where the work happens.',
       steps: [
-        { title: 'Audit before you touch anything',
-          detail: 'Run a page-speed test on the homepage and the menu page, score the conversion audit, and record the baseline. An audit done after fixes cannot measure what changed.' },
-        { title: 'Pass the eight-second test',
-          detail: 'Open the site on your own phone. A guest should find the phone number, the hours, and the reservation link within eight seconds. If you cannot, neither can they.' },
-        { title: 'Get four elements above the fold on mobile',
-          detail: 'A clickable phone number, today\'s hours, the address, and a reservation or order button, all visible without scrolling. A full-screen hero photo with no information is a conversion failure no matter how good it looks.' },
-        { title: 'Fix speed first',
-          detail: 'Compress every image on the homepage and menu page to under 200KB. Image compression alone usually moves a page-speed score 15 to 25 points. It takes 20 minutes and costs nothing.' },
-        { title: 'Replace the PDF menu with a web page',
-          detail: 'A PDF menu cannot be indexed by Google and cannot be read on a phone without zooming. Put the menu on a web-readable HTML or platform page so it works and earns search value.' },
-        { title: 'Install analytics',
-          detail: 'Set up Google Analytics 4. Without bounce rate, session data, and click paths you cannot know whether a change helped. It takes 15 minutes and is free.' },
-        { title: 'Track weekly',
-          detail: 'Every Monday pull mobile load time, mobile bounce rate, and click-to-call and reservation clicks. Flag any metric that moved more than five points off the baseline.' }
+        { kind: 'reference', target: 'Restaurant_Website_Audit_Form.pdf', targetLabel: 'Restaurant Website Audit Form',
+          title: 'Audit the site before you change anything',
+          detail: 'Work the Restaurant Website Audit Form page by page: page speed on the homepage and menu page, mobile elements, menu structure, and calls to action. Do the eight-second test on your own phone, you should find the phone number, the hours, and the reservation link without scrolling. An audit done after fixes cannot measure what changed.' },
+        { kind: 'result', target: 't-website', targetLabel: 'Website Scorecard',
+          title: 'Score it and hold the baseline',
+          detail: 'Enter the audit results into the Website Scorecard. It turns them into a conversion score and a baseline. Every fix from here is measured against that baseline, so set it before you change a thing.' },
+        { kind: 'reference', target: 'Website_Conversion_Fix_Checklist.pdf', targetLabel: 'Website Conversion Fix Checklist',
+          title: 'Fix conversion in priority order',
+          detail: 'Work the Website Conversion Fix Checklist, which lists each fix by impact and effort. Compress every homepage and menu image under 200KB, get four elements above the fold on mobile, replace any PDF menu with a web page, and install Google Analytics 4. Speed first, it is 20 minutes and costs nothing.' },
+        { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
+          title: 'Log the weekly numbers',
+          detail: 'Every Monday, in This Week, log mobile load time, mobile bounce rate, and click-to-call and reservation clicks. Flag any metric that moved more than five points off the baseline.' },
+        { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
+          title: 'Watch the trend',
+          detail: 'The Traffic dashboard rolls your website metrics into the digital presence score and the 90-day trend. Read it weekly so a fix that helped, or one that did not, shows up where you can see it.' }
       ]
     },
-
-    formulas: [],
 
     commonMistakes: [
       'Using a PDF menu instead of a web page. PDF menus cannot be indexed by Google, cannot be read on a phone without zooming, and produce no search value.',
@@ -153,13 +152,6 @@ FIX.traffic = [
         'Re-run the page-speed test and record the updated score against the baseline.'
       ]
     },
-
-    templates: [
-      { name: 'Restaurant Website Audit Form', type: 'PDF', file: 'Restaurant_Website_Audit_Form.pdf',
-        description: 'Page-by-page website audit covering mobile optimization, menu page structure, calls to action, page load speed, and NAP consistency across all pages.' },
-      { name: 'Website Conversion Fix Checklist', type: 'PDF', file: 'Website_Conversion_Fix_Checklist.pdf',
-        description: 'The conversion fixes in priority order, from image compression through analytics setup, with the expected impact and effort of each.' }
-    ],
 
     aiWorkflows: [
       {
