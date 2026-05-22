@@ -127,6 +127,7 @@ S.TrafficDashboard = {
       + chartHtml
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
+      + FixPanel.fixAreasCard('traffic')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
@@ -162,6 +163,7 @@ S.TrafficDashboard = {
     document.getElementById('t-qa-week')?.addEventListener('click',    () => App.navigate('t-this-week'));
     document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
     document.getElementById('t-qa-reports')?.addEventListener('click', () => App.navigate('t-reports'));
+    FixPanel.wireFixAreas(container);
   },
 
 
