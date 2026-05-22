@@ -576,6 +576,15 @@ S.AuditTracker = {
     document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
 
     const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Profit Audit</div>';
+
+    const cd = this.buildControlData();
+    const controlBanner = (cd && cd.sources && cd.sources.length)
+      ? '<div style="background:var(--gold-bg);border:1px solid rgba(201,168,76,0.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+        + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:5px;">Control Data Is Feeding This Audit</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Verified figures from ' + esc(cd.sources.join(', '))
+        + ' go in automatically as ground truth. The uploads below only need to cover what your Control modules do not.</div>'
+        + '</div>'
+      : '';
     const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
@@ -639,7 +648,7 @@ S.AuditTracker = {
         + nav(true, false, true) + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + stepHtml + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + controlBanner + stepHtml + '</div>';
 
     document.getElementById('at-iz-cancel')?.addEventListener('click', () => {
       document.getElementById('topbar-sub').textContent = '';
@@ -743,6 +752,8 @@ S.AuditTracker = {
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
       form.append('notes', this._intakeDraft?.notes || '');
+      const controlData = this.buildControlData();
+      if (controlData) form.append('controlData', JSON.stringify(controlData));
       for (const {file, field} of allFiles) form.append(field, file, file.name);
 
       setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
@@ -801,5 +812,82 @@ S.AuditTracker = {
     if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY });
     if (d.S5_COMBINED_COGS_GAP > 0) items.push({ action: 'Close prime cost gap. $' + Math.round(d.S5_COMBINED_COGS_GAP) + '/month combined COGS overage.', monthly_impact: d.S5_COMBINED_COGS_GAP });
     return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
+  },
+
+  /* Verified Control-module data sent with the audit as ground truth (map
+     Section 8). Each slice is real logged operational data; a section only
+     appears when its Control data exists, so the server never gets a
+     fabricated figure. Returns null when no Control module has data. */
+  buildControlData() {
+    const inv = App.inventoryData || {};
+    const sh  = App.shiftData || {};
+    const lab = App.laborData || {};
+    const r1  = n => (n == null || isNaN(n)) ? null : Math.round(n * 10) / 10;
+    const cd  = { sources: [] };
+
+    // Bar / food / prime cost — the weeks already derive from Control feeds
+    const weeks = (App.data.weeks || []).filter(w => w.period_end).slice(-4);
+    if (weeks.length) {
+      const avg = fn => { const v = weeks.map(fn).filter(x => x != null && !isNaN(x));
+        return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+      cd.bar_cost_pct   = r1(avg(w => w.bar && w.bar.cost_pct));
+      cd.food_cost_pct  = r1(avg(w => w.food && w.food.cost_pct));
+      cd.prime_cost_pct = r1(avg(w => w.prime_cost_pct));
+    }
+
+    // Inventory Control — counts
+    const counts = inv.ic_counts || [];
+    if (counts.length) { cd.inventory_counts = counts.length; cd.sources.push('Inventory Control counts'); }
+
+    // Inventory Control — deliveries and vendor price drift
+    const dels = inv.ic_deliveries || [];
+    if (dels.length) {
+      let changes = 0;
+      dels.forEach(d => (d.line_items || []).forEach(li => {
+        if (li.price_changed && li.prev_price != null && li.price_per_unit != null) changes++;
+      }));
+      cd.deliveries_logged = dels.length;
+      cd.vendor_price_changes = changes;
+      cd.sources.push('Inventory Control deliveries');
+    }
+
+    // Inventory Control — spot checks (theft pour-variance signal)
+    const spots = inv.ic_spot_checks || [];
+    if (spots.length) {
+      cd.spot_checks = spots.length;
+      cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
+      cd.spot_check_variance_dollar = r1(spots.reduce((s,c) => s + (c.total_variance_dollar || 0), 0));
+      cd.sources.push('Inventory Control spot checks');
+    }
+
+    // Shift Control — voids and comps
+    const vc = sh.sc_void_comps || [];
+    if (vc.length) {
+      cd.void_comp_count = vc.length;
+      cd.void_comp_total = r1(vc.reduce((s,v) => s + (v.amount || 0), 0));
+      cd.void_comp_unauthorized = vc.filter(v => !v.authorized_by).length;
+      cd.sources.push('Shift Control void and comp log');
+    }
+
+    // Shift Control — drawer reconciliations and cash drops
+    const variances = sh.sc_variances || [];
+    if (variances.length) {
+      cd.cash_reconciliations = variances.length;
+      cd.cash_variance_total = r1(variances.reduce((s,v) => s + (v.variance || 0), 0));
+      cd.cash_short_count = variances.filter(v => v.status === 'Short').length;
+      cd.sources.push('Shift Control drawer reconciliation');
+    }
+    const drops = sh.sc_cash_drops || [];
+    if (drops.length) cd.cash_drops = drops.length;
+
+    // Labor Control — actual hours and cost (prime cost labor)
+    const actuals = lab.lc_actuals || [];
+    if (actuals.length) {
+      cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
+      cd.labor_cost  = Math.round(actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0));
+      cd.sources.push('Labor Control actuals');
+    }
+
+    return cd.sources.length ? cd : null;
   }
 };
