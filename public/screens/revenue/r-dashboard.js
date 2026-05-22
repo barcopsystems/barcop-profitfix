@@ -126,6 +126,7 @@ S.RevenueDashboard = {
       + this.buildChart(validWeeks.slice(-8), t)
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
+      + FixPanel.fixAreasCard('revenue')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="r-qa-week">Enter This Week</button>'
@@ -138,6 +139,7 @@ S.RevenueDashboard = {
     document.getElementById('r-qa-week')?.addEventListener('click', () => App.navigate('r-this-week'));
     document.getElementById('r-qa-server')?.addEventListener('click', () => App.navigate('r-audit'));
     document.getElementById('r-qa-reports')?.addEventListener('click', () => App.navigate('r-reports'));
+    FixPanel.wireFixAreas(container);
 
     document.getElementById('rsh-save')?.addEventListener('click', async () => {
       const rs2 = App.data.revenue_settings;
