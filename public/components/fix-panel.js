@@ -1,19 +1,26 @@
 'use strict';
 
-/* ── Fix Panel — the Fix Layer renderer ───────────────────────────────────────
-   Renders a Recovery module's gap-areas from the static FIX content: the fix
-   process, formulas, common mistakes, Quick Reference card, fill-in templates,
-   and AI workflow cards. 100% static + client-side (Rule 23 — zero API cost).
-   Used by each module's Help & FAQ screen.
+/* ── Fix Panel — the Fix Layer renderer (v2) ──────────────────────────────────
+   Renders a Recovery module's gap-areas from the static FIX content. The Fix
+   Layer is the connective spine of the platform: each fix-process step is a
+   deep-link into the feature that performs it, never manual instruction text.
 
-   FixPanel.renderInto(el, moduleKey, focusId)
-     el        — container element
-     moduleKey — 'profit' | 'revenue' | 'traffic'
-     focusId   — optional gap-area id to auto-expand and scroll to */
+   Step kinds:
+     action    — deep-link to the Control/Recovery feature that does the task
+     result    — deep-link to where the app already shows the computed number
+     reference — a downloadable PDF/Word document (policies, standards)
+
+   FixPanel.renderInto(el, moduleKey, focusId) — el container, module key,
+   optional gap-area id to auto-expand and scroll to. 100% static, zero API. */
 
 window.FixPanel = {
+  RESOURCE_ROOT: 'assets/resources/',
+
   gapAreas(moduleKey) {
     return (window.FIX && Array.isArray(FIX[moduleKey])) ? FIX[moduleKey] : [];
+  },
+  docPath(module, file) {
+    return this.RESOURCE_ROOT + (module === 'profit' ? '' : module + '/') + encodeURIComponent(file);
   },
 
   renderInto(el, moduleKey, focusId) {
@@ -34,7 +41,6 @@ window.FixPanel = {
 
   // ── One gap-area collapsible card ───────────────────────────────────────────
   gapCard(g, expanded) {
-    const body = expanded ? 'block' : 'none';
     return '<div class="card fp-gap" data-gap="' + esc(g.id) + '" style="padding:0;overflow:hidden;">'
       + '<div class="fp-head" style="display:flex;align-items:flex-start;gap:12px;padding:18px 20px;cursor:pointer;">'
       + '<div style="flex:1;">'
@@ -43,12 +49,10 @@ window.FixPanel = {
       + '</div>'
       + '<span class="fp-chev" style="flex-shrink:0;font-size:14px;color:var(--t3);transform:rotate(' + (expanded ? '90' : '0') + 'deg);transition:transform 0.15s;">&#9656;</span>'
       + '</div>'
-      + '<div class="fp-body" style="display:' + body + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
+      + '<div class="fp-body" style="display:' + (expanded ? 'block' : 'none') + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
       + this.processSection(g)
-      + this.formulasSection(g)
       + this.mistakesSection(g)
       + this.quickRefSection(g)
-      + this.templatesSection(g)
       + this.aiSection(g)
       + '</div></div>';
   },
@@ -58,32 +62,51 @@ window.FixPanel = {
       + 'color:var(--gold);margin:20px 0 12px;">' + esc(text) + '</div>';
   },
 
-  // ── Fix process ─────────────────────────────────────────────────────────────
+  // ── Fix process — every step is a link ──────────────────────────────────────
   processSection(g) {
     const p = g.process;
     if (!p) return '';
-    const steps = (p.steps || []).map((s, i) =>
-      '<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
-      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</div>'
-      + '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-top:3px;">' + esc(s.detail) + '</div></div>'
-      + '</div>').join('');
+    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i + 1)).join('');
     return this.sh('The Fix Process')
       + (p.intro ? '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(p.intro) + '</div>' : '')
       + steps;
   },
 
-  // ── Formulas ────────────────────────────────────────────────────────────────
-  formulasSection(g) {
-    if (!g.formulas || !g.formulas.length) return '';
-    const boxes = g.formulas.map(f =>
-      '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:5px;">' + esc(f.label) + '</div>'
-      + '<div style="font-size:12px;color:var(--w);line-height:1.6;">' + esc(f.formula) + '</div>'
-      + (f.example ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:4px;">e.g. ' + esc(f.example) + '</div>' : '')
-      + '</div>').join('');
-    return this.sh('Formulas') + boxes;
+  stepRow(s, module, num) {
+    const kind = s.kind || 'action';
+    const meta = {
+      action:    { label: 'DO IT',     color: 'var(--gold)',  bg: 'var(--gold-bg)' },
+      result:    { label: 'SEE IT',    color: 'var(--steel)', bg: 'rgba(72,136,168,0.12)' },
+      reference: { label: 'DOCUMENT',  color: 'var(--t3)',    bg: 'rgba(255,255,255,0.06)' }
+    }[kind] || {};
+    const label = esc(s.targetLabel || '');
+
+    let link = '';
+    if (kind === 'reference') {
+      if (s.target) {
+        link = '<a class="btn btn-ghost btn-sm" href="' + this.docPath(module, s.target) + '" download '
+          + 'style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">'
+          + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M2.5 5l3 3 3-3M1 9.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+          + 'Download' + (label ? ': ' + label : '') + '</a>';
+      }
+    } else if (s.target) {
+      const verb = kind === 'result' ? 'View' : 'Open';
+      link = '<button class="btn btn-ghost btn-sm fp-go" data-target="' + esc(s.target) + '">'
+        + verb + (label ? ': ' + label : '') + '</button>';
+    }
+
+    return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);">'
+      + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
+      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span>'
+      + (meta.label ? '<span style="font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
+          + 'padding:2px 6px;border-radius:3px;background:' + meta.bg + ';color:' + meta.color + ';">' + meta.label + '</span>' : '')
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-top:4px;">' + esc(s.detail || '') + '</div>'
+      + (link ? '<div style="margin-top:8px;">' + link + '</div>' : '')
+      + '</div></div>';
   },
 
   // ── Common mistakes ─────────────────────────────────────────────────────────
@@ -135,34 +158,12 @@ window.FixPanel = {
     return html;
   },
 
-  // ── Templates ───────────────────────────────────────────────────────────────
-  templatesSection(g) {
-    if (!g.templates || !g.templates.length) return '';
-    let html = this.sh('Templates');
-    g.templates.forEach(t => {
-      const fields = (t.fields || []).map(f =>
-        '<div class="f" style="width:200px;flex-shrink:0;"><label>' + esc(f.label) + '</label>'
-        + '<input type="text" class="fp-tpl-field" data-tpl="' + esc(t.id) + '" data-key="' + esc(f.key) + '" '
-        + 'placeholder="' + esc(f.placeholder || '') + '"/></div>').join('');
-      html += '<div class="fp-tpl" data-tpl="' + esc(t.id) + '" data-body="' + esc(t.body || '') + '" '
-        + 'style="border:1px solid var(--b1);border-radius:4px;padding:16px 18px;margin-bottom:10px;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(t.name) + '</div>'
-        + (t.intro ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin:5px 0 12px;">' + esc(t.intro) + '</div>' : '')
-        + '<div class="form-row" style="gap:14px;margin-bottom:12px;">' + fields + '</div>'
-        + '<div class="fp-tpl-preview" style="background:var(--input);border:1px solid var(--b2);border-radius:4px;'
-        + 'padding:16px 18px;font-size:12px;color:var(--t1);line-height:1.7;white-space:pre-wrap;"></div>'
-        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm fp-print">Print Template</button></div>'
-        + '</div>';
-    });
-    return html;
-  },
-
   // ── AI workflow cards ───────────────────────────────────────────────────────
   aiSection(g) {
     if (!g.aiWorkflows || !g.aiWorkflows.length) return '';
     let html = this.sh('AI Workflow Cards')
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;">'
-      + 'Copy a prompt into your own AI tool. Run it on real, verified numbers — the app never sends these for you.</div>';
+      + 'Copy a prompt into your own AI tool. Run it on real, verified numbers. The app never sends these for you.</div>';
     g.aiWorkflows.forEach((w, i) => {
       html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:14px 16px;margin-bottom:10px;">'
         + '<div style="display:flex;gap:10px;align-items:baseline;">'
@@ -191,8 +192,11 @@ window.FixPanel = {
       });
     });
     el.addEventListener('click', ev => {
+      const go = ev.target.closest('.fp-go');
       const copy = ev.target.closest('.fp-copy');
       const print = ev.target.closest('.fp-print');
+      if (go) { App.openScreen(go.dataset.target); return; }
+      if (print) { window.print(); return; }
       if (copy) {
         const block = copy.closest('div').parentElement.querySelector('.fp-prompt');
         if (block && navigator.clipboard) {
@@ -202,35 +206,6 @@ window.FixPanel = {
           });
         }
       }
-      if (print) window.print();
     });
-    el.querySelectorAll('.fp-tpl').forEach(tpl => {
-      const id = tpl.dataset.tpl;
-      let saved = {};
-      try { saved = JSON.parse(localStorage.getItem('fixtpl_' + id) || '{}'); } catch (e) {}
-      tpl.querySelectorAll('.fp-tpl-field').forEach(inp => {
-        const key = inp.dataset.key;
-        if (saved[key] != null) inp.value = saved[key];
-        else if (key === 'bar_name' && App.data && App.data.settings && App.data.settings.bar_name) {
-          inp.value = App.data.settings.bar_name;
-        }
-        inp.addEventListener('input', () => this.renderPreview(tpl));
-      });
-      this.renderPreview(tpl);
-    });
-  },
-
-  renderPreview(tpl) {
-    const id = tpl.dataset.tpl;
-    let body = tpl.dataset.body || '';
-    const vals = {};
-    tpl.querySelectorAll('.fp-tpl-field').forEach(inp => {
-      vals[inp.dataset.key] = inp.value.trim();
-    });
-    try { localStorage.setItem('fixtpl_' + id, JSON.stringify(vals)); } catch (e) {}
-    body = body.replace(/\{\{(\w+)\}\}/g, (m, k) =>
-      vals[k] ? vals[k] : '_______');
-    const preview = tpl.querySelector('.fp-tpl-preview');
-    if (preview) preview.textContent = body;
   }
 };
