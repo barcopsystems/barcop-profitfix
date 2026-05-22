@@ -43,6 +43,16 @@ S.Settings = {
       + '</div>'
       + '<div id="s-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>'
       + '</div></div>'
+      + '<div class="settings-section"><div class="settings-title">Data and Backup</div>'
+      + '<div class="card">'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export a full backup of everything in your account: settings, weekly numbers, audits, and your Inventory, Labor, and Shift Control records, all in one file you can keep offsite. Restore from a backup to recover your data or move it to another account.</div>'
+      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost" id="s-export-data">Export Backup</button>'
+      + '<button class="btn btn-ghost" id="s-import-btn">Restore from Backup</button>'
+      + '<input type="file" id="s-import-file" accept="application/json,.json" style="display:none;"/>'
+      + '</div>'
+      + '<div id="s-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
+      + '</div></div>'
       + '<div class="settings-section"><div class="settings-title">Testing Tools</div>'
       + '<div class="card">'
       + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every section of the app to test calculations and screen layouts. Clear all data to wipe everything and start fresh with your real numbers.</div>'
@@ -70,6 +80,9 @@ S.Settings = {
       await App.saveKey('settings');
       window.location.reload();
     });
+    document.getElementById('s-export-data')?.addEventListener('click', () => this.exportBackup());
+    document.getElementById('s-import-btn')?.addEventListener('click', () => document.getElementById('s-import-file')?.click());
+    document.getElementById('s-import-file')?.addEventListener('change', (e) => this.importBackup(e));
 
     // Tab switching
     container.querySelectorAll('.s-tab').forEach(tab => {
@@ -129,6 +142,23 @@ S.Settings = {
         + '</div>';
     }
 
+    // 30-day cancellation retention (Section 15) — after a subscription is
+    // canceled the operator's data is kept 30 days so they can export it.
+    let retentionBlock = '';
+    if (status === 'canceled') {
+      let removalLine = 'Your data is kept for 30 days after your access ends so you have time to export it. After that it is removed.';
+      if (periodEnd) {
+        const removal = new Date(periodEnd.getTime() + 30 * 86400000);
+        removalLine = 'Your data is kept until ' + removal.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+          + ', 30 days after your access ends, so you have time to export it. After that it is removed.';
+      }
+      retentionBlock = '<div class="card" style="margin-top:0;border:1px solid rgba(192,56,40,0.35);">'
+        + '<div class="settings-title" style="margin-bottom:10px;">Export Your Data Before It Is Removed</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">' + removalLine + ' Download a full backup now so you keep your records.</div>'
+        + '<button class="btn btn-primary" id="s-retain-export">Export a Backup</button>'
+        + '</div>';
+    }
+
     let noSubBlock = '';
     if (status === 'inactive' || status === 'canceled') {
       noSubBlock = '<div class="card" style="margin-top:0;">'
@@ -155,12 +185,14 @@ S.Settings = {
       + '</div>'
       + '</div>'
       + upgradeBlock
+      + retentionBlock
       + noSubBlock
       + '</div>';
 
     document.getElementById('s-portal-btn')?.addEventListener('click', () => this.openBillingPortal());
     document.getElementById('s-upgrade-btn')?.addEventListener('click', () => App.showHub());
     document.getElementById('s-go-hub-btn')?.addEventListener('click', () => App.showHub());
+    document.getElementById('s-retain-export')?.addEventListener('click', () => this.exportBackup());
   },
 
   async openBillingPortal() {
@@ -224,6 +256,80 @@ S.Settings = {
       if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+(e.message||'Could not update password.');msg.style.display='block';}
     }finally{
       if(btn){btn.disabled=false;btn.textContent='Update Password';}
+    }
+  },
+
+  // ── Data backup (Section 15) ───────────────────────────────────────────────
+  // A full, self-contained backup: the Recovery data blob plus all three
+  // Control stores. Plain JSON the operator keeps offsite.
+  _backupMsg(text, color) {
+    const m = document.getElementById('s-backup-msg');
+    if (m) { m.style.color = color || 'var(--gold)'; m.textContent = text; m.style.display = 'block'; }
+  },
+
+  exportBackup() {
+    const backup = {
+      _backup: 'barcop',
+      version: 1,
+      exported_at: new Date().toISOString(),
+      bar_name: (App.data.settings && App.data.settings.bar_name) || '',
+      data:          App.data || {},
+      inventoryData: App.inventoryData || {},
+      laborData:     App.laborData || {},
+      shiftData:     App.shiftData || {}
+    };
+    try {
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const safe = (backup.bar_name || 'bar-cop').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'bar-cop';
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'barcop-backup-' + safe + '-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      this._backupMsg('Backup downloaded. Keep it somewhere safe.', 'var(--gold)');
+    } catch (e) {
+      this._backupMsg('Could not create the backup file: ' + (e.message || 'unknown error'), 'var(--red)');
+    }
+  },
+
+  async importBackup(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    let backup;
+    try {
+      backup = JSON.parse(await file.text());
+    } catch (e) {
+      this._backupMsg('That file is not readable. Pick a Bar Cop backup file.', 'var(--red)');
+      return;
+    }
+    if (!backup || backup._backup !== 'barcop' || !backup.data) {
+      this._backupMsg('That is not a Bar Cop backup file.', 'var(--red)');
+      return;
+    }
+    const when = backup.exported_at
+      ? new Date(backup.exported_at).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+      : 'an unknown date';
+    if (!confirm('Restore the backup from ' + when + '?\n\nThis replaces every record currently in your account: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.')) {
+      return;
+    }
+    this._backupMsg('Restoring backup...', 'var(--t3)');
+    try {
+      App.data          = backup.data;
+      App.inventoryData = backup.inventoryData || {};
+      App.laborData     = backup.laborData || {};
+      App.shiftData     = backup.shiftData || {};
+      await App.save();
+      await App.saveInventory();
+      await App.saveLabor();
+      await App.saveShift();
+      this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      this._backupMsg('Restore failed: ' + (e.message || 'unknown error'), 'var(--red)');
     }
   },
 
