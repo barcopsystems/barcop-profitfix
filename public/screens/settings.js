@@ -765,10 +765,11 @@ S.Settings = {
 
     // Count totals per product index: [current (today), one week ago].
     // Usage = week-ago minus today; no deliveries land in the last 7 days, so
-    // the icCOGS feed reads cleanly as (start - end) x unit cost.
+    // the icCOGS feed reads cleanly as (start - end) x unit cost. Tuned so the
+    // feed computes to Anchor week 12: ~$2,729 bar and ~$2,364 food COGS.
     const icTotals = {
       0:[9,25], 1:[8,21], 2:[7,17], 3:[6,10], 4:[10,25], 5:[9,22],
-      6:[96,456], 7:[72,352], 8:[2,6], 9:[40,220], 10:[35,195],
+      6:[96,456], 7:[72,332], 8:[2,6], 9:[40,220], 10:[35,199],
       11:[18,88], 12:[4,15], 13:[5,19], 14:[3,9], 15:[2,6]
     };
     const icCountItem = (p, qty) => ({
