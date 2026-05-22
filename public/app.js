@@ -338,6 +338,8 @@ const App = {
       nav.innerHTML = Inventory.navHTML();
     } else if (module === 'shift') {
       nav.innerHTML = Shift.navHTML();
+    } else if (module === 'labor') {
+      nav.innerHTML = Labor.navHTML();
     } else {
       nav.innerHTML = ProfitNav.html();
     }
@@ -594,6 +596,39 @@ const App = {
       document.getElementById('topbar-sub').textContent = scSub;
       const scScreen = scScreens[id];
       if (scScreen) scScreen.render(content, actions);
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Labor Control module screens
+    if (this._activeModule === 'labor') {
+      const lcTitles = {
+        'hub':                   ['Recovery Hub', ''],
+        'lc-dashboard':          ['Dashboard', 'Labor Control'],
+        'lc-build-schedule':     ['Build Schedule', 'Labor Control'],
+        'lc-schedule-templates': ['Schedule Templates', 'Labor Control'],
+        'lc-schedule-history':   ['Schedule History', 'Labor Control'],
+        'lc-log-hours':          ['Log Hours', 'Labor Control'],
+        'lc-daily-view':         ['Daily View', 'Labor Control'],
+        'lc-weekly-summary':     ['Weekly Summary', 'Labor Control'],
+        'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
+        'lc-positions':          ['Positions', 'Labor Control'],
+        'lc-tip-log':            ['Tip Log', 'Labor Control'],
+        'lc-tip-pool':           ['Tip Pool Calculator', 'Labor Control'],
+        'lc-tip-history':        ['Tip History', 'Labor Control'],
+        'lc-reports':            ['Labor Reports', 'Labor Control'],
+        'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
+        'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
+        'lc-help':               ['Help and FAQ', 'Labor Control'],
+      };
+      const lcScreens = {
+        'lc-positions': S.LaborPositions,
+      };
+      const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = lcTitle;
+      document.getElementById('topbar-sub').textContent = lcSub;
+      const lcScreen = lcScreens[id];
+      if (lcScreen) lcScreen.render(content, actions);
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
