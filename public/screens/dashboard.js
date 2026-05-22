@@ -229,6 +229,7 @@ S.Dashboard = {
   },
 
   showInsights() {
+    if (App.demoBlock('AI Trend Insights')) return;
     const weeks=(App.data.weeks||[]).slice(-8);
     const showModal=(html)=>{
       const m=document.createElement('div');
