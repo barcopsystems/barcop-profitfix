@@ -93,6 +93,11 @@ const DB = {
   async readData() {
     // Supabase mode
     if (this._sb && this._user) {
+      // Unsynced local changes from an offline session are newer than the
+      // server copy — load them so no offline work is lost.
+      if (this._pendingList().includes('pf_data')) {
+        return this._mergeDefaults(this._localRead());
+      }
       try {
         const { data, error } = await this._sb
           .from('user_data')
@@ -138,13 +143,16 @@ const DB = {
         if (error) {
           console.error('writeData error:', error);
           this._localWrite(appData);
+          this._markPending('pf_data');
           return { ok: false, error };
         }
         this._localWrite(appData); // keep local copy in sync
+        this._clearPending('pf_data');
         return { ok: true };
       } catch (e) {
         console.error('writeData exception:', e);
         this._localWrite(appData);
+        this._markPending('pf_data');
         return { ok: false, error: e };
       }
     }
@@ -156,6 +164,55 @@ const DB = {
     if (!App.data) return { ok: false };
     App.data[key] = value;
     return await this.writeData(App.data);
+  },
+
+  // ── Offline sync (Section 14) ─────────────────────────────────────────────
+  // When a write to Supabase fails (offline or server unreachable), the local
+  // copy is kept and the store is marked pending. On the next load the local
+  // copy is loaded (it is newer than the server), and App prompts to sync.
+  _PENDING_KEY: 'pf_pending_sync',
+
+  _pendingList() {
+    try { const r = localStorage.getItem(this._PENDING_KEY); return r ? JSON.parse(r) : []; }
+    catch (e) { return []; }
+  },
+  _setPendingList(list) {
+    try {
+      if (list && list.length) localStorage.setItem(this._PENDING_KEY, JSON.stringify(list));
+      else localStorage.removeItem(this._PENDING_KEY);
+    } catch (e) { /* storage full or unavailable */ }
+  },
+  _markPending(lsKey) {
+    const list = this._pendingList();
+    if (!list.includes(lsKey)) { list.push(lsKey); this._setPendingList(list); }
+  },
+  _clearPending(lsKey) {
+    this._setPendingList(this._pendingList().filter(k => k !== lsKey));
+  },
+  // True only in Supabase mode with a signed-in user and unsynced local data.
+  hasPendingSync() {
+    return !!(this._sb && this._user && this._pendingList().length > 0);
+  },
+
+  // Re-push every pending store's local copy to Supabase. Each store clears
+  // from the pending list only on its own successful write.
+  async syncPending() {
+    if (!this._sb || !this._user) return { ok: false, synced: 0, failed: 0, error: 'Not connected' };
+    const tableOf = { pf_data: 'user_data', pf_ic_data: 'ic_data', pf_lc_data: 'lc_data', pf_sc_data: 'sc_data' };
+    let synced = 0, failed = 0;
+    for (const lsKey of this._pendingList()) {
+      const table = tableOf[lsKey];
+      if (!table) { this._clearPending(lsKey); continue; }
+      const data = lsKey === 'pf_data' ? this._localRead() : this._localReadControl(lsKey);
+      try {
+        const { error } = await this._sb.from(table).upsert({
+          user_id: this._user.id, data: data, updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) { failed++; }
+        else { this._clearPending(lsKey); synced++; }
+      } catch (e) { failed++; }
+    }
+    return { ok: failed === 0, synced: synced, failed: failed };
   },
 
   // ── Local storage fallback ────────────────────────────────────────────────
@@ -182,6 +239,10 @@ const DB = {
   // readData()/writeData(); default for a fresh row is an empty object.
   async _readControl(table, lsKey) {
     if (this._sb && this._user) {
+      // Unsynced offline changes are newer than the server copy.
+      if (this._pendingList().includes(lsKey)) {
+        return this._localReadControl(lsKey);
+      }
       try {
         const { data, error } = await this._sb
           .from(table)
@@ -225,13 +286,16 @@ const DB = {
         if (error) {
           console.error('write ' + table + ' error:', error);
           this._localWriteControl(lsKey, data);
+          this._markPending(lsKey);
           return { ok: false, error };
         }
         this._localWriteControl(lsKey, data); // keep local copy in sync
+        this._clearPending(lsKey);
         return { ok: true };
       } catch (e) {
         console.error('write ' + table + ' exception:', e);
         this._localWriteControl(lsKey, data);
+        this._markPending(lsKey);
         return { ok: false, error: e };
       }
     }
