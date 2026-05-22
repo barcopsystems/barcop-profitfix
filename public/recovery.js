@@ -153,6 +153,18 @@ window.Recovery = {
     return { logged: mine.length, recovered: recovered, withFigure: withFigure, measuring: measuring };
   },
 
+  /* Cross-module recovery total for the Hub Scoreboard. Sums the annualized
+     recovered dollars across every logged fix that has produced a figure. */
+  total() {
+    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    let dollars = 0, fixes = 0;
+    log.forEach(e => {
+      const r = this.compute(e);
+      if (r.status === 'ok' && r.dollars > 0) { dollars += r.dollars; fixes++; }
+    });
+    return { dollars: dollars, fixes: fixes };
+  },
+
   /* Fix-event markers for an annotated trend chart. Given the charted weeks
      (each with a period_end) and a module, return the markers to draw as
      [{ index, label, date }], where index is the charted week the fix landed
