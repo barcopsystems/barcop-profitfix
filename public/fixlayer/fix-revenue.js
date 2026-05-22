@@ -268,6 +268,133 @@ FIX.revenue = [
         whatToPaste: 'Fill in the season/occasion, ingredient list, and per-drink cost.'
       }
     ]
+  },
+
+  {
+    id: 'labor-scheduling',
+    name: 'Labor Cost & Scheduling',
+    module: 'revenue',
+    summary: 'Build the schedule from a revenue forecast, not from last week. Budget labor in hours per department, staff to the budget, and review actuals every Monday.',
+
+    process: {
+      intro: 'A schedule built before the revenue number is checked is built on habit. A schedule built from a revenue forecast is a plan — and the difference shows up in your labor percentage every week.',
+      steps: [
+        { title: 'Pull a revenue forecast by day and daypart',
+          detail: 'Before writing any names, pull the coming week\'s revenue forecast from POS history, adjusted for known factors. The forecast is the input the whole schedule is built from.' },
+        { title: 'Convert the forecast to a labor budget in hours',
+          detail: 'For each department and day, revenue forecast times target labor % gives the labor budget in dollars; divide by the loaded hourly wage to get the hours available. Review the hours before writing names.' },
+        { title: 'Build the schedule to the budget',
+          detail: 'Start with must-have coverage, then fill from there to the budgeted hours. Flag any shift where the proposed schedule exceeds the budget by more than 5%.' },
+        { title: 'Manage labor by department, not blended',
+          detail: 'Bar, kitchen, and floor have different labor economics. A blended number lets one department running over hide behind the others — budget and review each separately.' },
+        { title: 'Calculate labor cost on total labor',
+          detail: 'Labor cost % includes wages plus payroll taxes and employer benefits. Total labor runs 10-15% above wages alone — a wages-only number understates the problem every time.' },
+        { title: 'Treat overtime as a scheduling error',
+          detail: 'Almost all overtime is hours concentrated on too few employees, not a need for more total hours. Redistribute concentrated hours to under-scheduled staff.' },
+        { title: 'Run the Monday labor review',
+          detail: 'Pull actual labor hours and revenue by department, compare to target, flag any department 2+ points over, and decide whether it was a scheduling error or a revenue miss. One action assigned before the review closes.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Labor Cost %',
+        formula: 'Total labor (wages + taxes + benefits) / Revenue x 100',
+        example: 'Wages-only understates labor — total labor runs 10-15% higher' },
+      { label: 'Labor Budget ($)',
+        formula: 'Revenue forecast x target labor %',
+        example: '$7,400 Wednesday forecast x 20% target = $1,480 labor budget' },
+      { label: 'Labor Hours Available',
+        formula: 'Labor budget $ / loaded hourly wage',
+        example: '$1,480 / $14.50 per hour = 102 hours = about 4 servers at a 5-hour shift' }
+    ],
+
+    commonMistakes: [
+      'Managing labor as a blended total instead of by department — bar, kitchen, and floor have different economics, and one running over hides in the blend.',
+      'Building the schedule before checking the revenue forecast — the schedule should be built from a revenue number, not from who worked last week.',
+      'Calculating labor percentage on wages only — total labor cost is 10-15% higher than wages, so a wages-only number understates the problem.',
+      'Treating overtime as a staffing cost instead of a scheduling error — almost all overtime is hours concentrated on too few people.',
+      'Overstaffing slow shifts because it feels safer — an idle server on a slow Tuesday is a labor percentage problem that compounds across the year.',
+      'Building a schedule with no revenue reference at all — a schedule without a forecast is a guess.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Pull the revenue forecast by day for the coming week from POS history',
+        'Enter the forecast by day and department and generate the labor budget in hours',
+        'Build the schedule to the budget — must-have coverage first, then fill',
+        'Flag any shift where the proposed schedule exceeds the labor budget by more than 5%',
+        'Review the schedule with the manager before posting — a budget conversation is easy before, hard after',
+        'Confirm department labor targets are current for the season'
+      ],
+      escalation: [
+        'Pull actual labor hours and revenue by department for the prior week.',
+        'Compare actual labor percentage to target for each department.',
+        'Flag any department that ran more than 2 points above target.',
+        'Determine whether the variance was a scheduling error or a revenue miss.',
+        'If a scheduling error, identify the specific over-budget shifts to correct next week.',
+        'Assign one action item before the review closes.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'weekly-labor-review',
+        name: 'Weekly Labor Review Form',
+        intro: 'The Monday labor review, on paper. Completed by the manager on duty so the data is ready before the new schedule is posted.',
+        fields: [
+          { key: 'bar_name',    label: 'Restaurant Name', placeholder: 'Your restaurant' },
+          { key: 'week_ending', label: 'Week Ending',     placeholder: 'e.g. March 9' }
+        ],
+        body: 'WEEKLY LABOR REVIEW\n{{bar_name}} — Week ending {{week_ending}}\n\n'
+          + 'For each department, enter actual hours, actual revenue, and labor %.\n\n'
+          + 'BAR\n'
+          + 'Actual labor $: __________  Revenue: __________  Labor %: ______  Target: ______\n'
+          + 'Variance vs target: ______ points\n\n'
+          + 'KITCHEN\n'
+          + 'Actual labor $: __________  Revenue: __________  Labor %: ______  Target: ______\n'
+          + 'Variance vs target: ______ points\n\n'
+          + 'FLOOR\n'
+          + 'Actual labor $: __________  Revenue: __________  Labor %: ______  Target: ______\n'
+          + 'Variance vs target: ______ points\n\n'
+          + 'DIAGNOSIS\n'
+          + 'Any department more than 2 points over target: _____________________\n'
+          + 'Cause — scheduling error or revenue miss: ________________________\n\n'
+          + 'ACTION ITEM (one, assigned before this review closes)\n'
+          + 'Action: ____________________________   Owner: ____________________\n\n'
+          + 'Completed by: ____________________   Date: __________'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'ls-ai-1',
+        title: 'Build a Revenue-Based Schedule',
+        whatItDoes: 'Turns a revenue forecast into a staffing table — labor budget, hours available, and recommended headcount by day and department.',
+        prompt: 'Here is my revenue forecast for next week by day and daypart. [PASTE FORECAST]. My labor targets by department: bar [X]%, kitchen [X]%, floor [X]%. My average hourly wage including taxes and benefits: bar $[X]/hr, kitchen $[X]/hr, floor $[X]/hr. Average shift length: bar [X] hrs, kitchen [X] hrs, floor [X] hrs. Calculate the maximum labor hours available for each department each day and show the result as a staffing table: day, department, revenue, labor budget, hours available, recommended headcount.',
+        whatToPaste: 'Paste the forecast and fill in your department targets, loaded wages, and shift lengths.'
+      },
+      {
+        id: 'ls-ai-2',
+        title: 'Find Over-Scheduled Shifts',
+        whatItDoes: 'Analyzes four weeks of labor data, flags every shift over budget, and ranks the worst by annual dollar impact.',
+        prompt: 'Here is four weeks of actual labor data by department and day. Columns: date, day of week, department, actual labor hours, actual revenue, labor percentage. [PASTE DATA]. My target labor percentages: bar [X]%, kitchen [X]%, floor [X]%. Identify every shift where actual labor exceeded target by more than 2 points, calculate the annualized dollar cost of those over-budget shifts, sort by total annual impact, and show the top five shifts to address first.',
+        whatToPaste: 'Paste four weeks of labor data and fill in the department targets.'
+      },
+      {
+        id: 'ls-ai-3',
+        title: 'Calculate the Annual Cost of Overtime',
+        whatItDoes: 'Totals and annualizes overtime premium, names the top earners, and shows the redistribution opportunity.',
+        prompt: 'Here is four weeks of payroll data showing regular and overtime hours by employee. [PASTE DATA]. My regular wage rates by employee: [PASTE RATES]. Overtime premium is 1.5x the regular rate for hours above 40 per week. Calculate total overtime premium paid in these four weeks, annualize it, identify the top three overtime earners, and for each show how many overtime hours could have been redistributed to under-scheduled employees based on the same four weeks.',
+        whatToPaste: 'Paste four weeks of regular/overtime hours and the wage rates.'
+      },
+      {
+        id: 'ls-ai-4',
+        title: 'Build a Slow-Season Labor Strategy',
+        whatItDoes: 'Recalculates department labor targets and headcount for the slow season so margin holds when revenue drops.',
+        prompt: 'My high season runs [MONTHS] and my slow season runs [MONTHS]. My high season average weekly revenue is $[AMOUNT] and my slow season average weekly revenue is $[AMOUNT]. My current labor targets were set for high season. Calculate what my labor targets by department should be in slow season to maintain the same margin, given that fixed labor costs do not flex, then show the schedule headcount implications for a typical slow-season week.',
+        whatToPaste: 'Fill in the season months and the high- and slow-season weekly revenue.'
+      }
+    ]
   }
 
 ];
