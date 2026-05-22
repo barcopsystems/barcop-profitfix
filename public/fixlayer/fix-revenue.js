@@ -190,53 +190,42 @@ FIX.revenue = [
     summary: 'Build the schedule from a revenue forecast, not from last week. Budget labor in hours per department, staff to the budget, and review actuals every Monday.',
 
     process: {
-      intro: 'A schedule built before the revenue number is checked is built on habit. A schedule built from a revenue forecast is a plan — and the difference shows up in your labor percentage every week.',
+      intro: 'A schedule built before the revenue number is checked is built on habit. A schedule built from a revenue forecast is a plan. The difference shows up in your labor percentage every week. Build Schedule in Labor Control turns a forecast into a labor budget in hours, so the math is done before you write a single name. Each step below opens where the work happens.',
       steps: [
-        { title: 'Pull a revenue forecast by day and daypart',
-          detail: 'Before writing any names, pull the coming week\'s revenue forecast from POS history, adjusted for known factors. The forecast is the input the whole schedule is built from.' },
-        { title: 'Convert the forecast to a labor budget in hours',
-          detail: 'For each department and day, revenue forecast times target labor % gives the labor budget in dollars; divide by the loaded hourly wage to get the hours available. Review the hours before writing names.' },
-        { title: 'Build the schedule to the budget',
-          detail: 'Start with must-have coverage, then fill from there to the budgeted hours. Flag any shift where the proposed schedule exceeds the budget by more than 5%.' },
-        { title: 'Manage labor by department, not blended',
-          detail: 'Bar, kitchen, and floor have different labor economics. A blended number lets one department running over hide behind the others — budget and review each separately.' },
-        { title: 'Calculate labor cost on total labor',
-          detail: 'Labor cost % includes wages plus payroll taxes and employer benefits. Total labor runs 10-15% above wages alone — a wages-only number understates the problem every time.' },
-        { title: 'Treat overtime as a scheduling error',
-          detail: 'Almost all overtime is hours concentrated on too few employees, not a need for more total hours. Redistribute concentrated hours to under-scheduled staff.' },
-        { title: 'Run the Monday labor review',
-          detail: 'Pull actual labor hours and revenue by department, compare to target, flag any department 2+ points over, and decide whether it was a scheduling error or a revenue miss. One action assigned before the review closes.' }
+        { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
+          title: 'Start the schedule from a revenue forecast',
+          detail: 'Open Build Schedule in Labor Control and enter the coming week\'s revenue forecast by day and daypart. The screen turns the forecast into a labor budget in hours for each department. That budget is the input the whole schedule is built from, so set it before you write a single name.' },
+        { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
+          title: 'Staff to the budget, department by department',
+          detail: 'Fill must-have coverage first, then build out to the budgeted hours. Build Schedule flags any shift that runs more than 5% over budget. Bar, kitchen, and floor have different labor economics, so budget and watch each one on its own. A blended number lets one department running over hide behind the others.' },
+        { kind: 'action', target: 'lc-overtime-watch', targetLabel: 'Overtime Watch',
+          title: 'Clear projected overtime before you post',
+          detail: 'Overtime Watch shows who is heading into overtime on the schedule you just built. Almost all overtime is hours concentrated on too few employees, not a need for more total hours. Redistribute the concentrated hours to under-scheduled staff before the schedule goes out.' },
+        { kind: 'result', target: 'lc-weekly-summary', targetLabel: 'Weekly Summary',
+          title: 'Read labor cost on total labor',
+          detail: 'After the week, Weekly Summary shows labor cost percent by department against target. It is built on total labor, wages plus payroll taxes and employer benefits, which runs 10 to 15% above wages alone. A wages-only number understates the problem every week.' },
+        { kind: 'reference', target: 'Weekly_Labor_Review.pdf', targetLabel: 'Weekly Labor Review Form',
+          title: 'Run the Monday labor review',
+          detail: 'Download the Weekly Labor Review Form and work it every Monday before the new schedule is built. Flag any department more than 2 points over target, decide whether it was a scheduling error or a revenue miss, and assign one action before the review closes. A scheduling error is fixed in next week\'s schedule. A revenue miss is fixed in the pre-shift briefing.' }
       ]
     },
 
-    formulas: [
-      { label: 'Labor Cost %',
-        formula: 'Total labor (wages + taxes + benefits) / Revenue x 100',
-        example: 'Wages-only understates labor — total labor runs 10-15% higher' },
-      { label: 'Labor Budget ($)',
-        formula: 'Revenue forecast x target labor %',
-        example: '$7,400 Wednesday forecast x 20% target = $1,480 labor budget' },
-      { label: 'Labor Hours Available',
-        formula: 'Labor budget $ / loaded hourly wage',
-        example: '$1,480 / $14.50 per hour = 102 hours = about 4 servers at a 5-hour shift' }
-    ],
-
     commonMistakes: [
-      'Managing labor as a blended total instead of by department — bar, kitchen, and floor have different economics, and one running over hides in the blend.',
-      'Building the schedule before checking the revenue forecast — the schedule should be built from a revenue number, not from who worked last week.',
-      'Calculating labor percentage on wages only — total labor cost is 10-15% higher than wages, so a wages-only number understates the problem.',
-      'Treating overtime as a staffing cost instead of a scheduling error — almost all overtime is hours concentrated on too few people.',
-      'Overstaffing slow shifts because it feels safer — an idle server on a slow Tuesday is a labor percentage problem that compounds across the year.',
-      'Building a schedule with no revenue reference at all — a schedule without a forecast is a guess.'
+      'Managing labor as a blended total instead of by department. Bar, kitchen, and floor have different economics, and one running over hides in the blend.',
+      'Building the schedule before checking the revenue forecast. The schedule should be built from a revenue number, not from who worked last week.',
+      'Calculating labor percentage on wages only. Total labor cost runs 10 to 15% higher than wages, so a wages-only number understates the problem.',
+      'Treating overtime as a staffing cost instead of a scheduling error. Almost all overtime is hours concentrated on too few people.',
+      'Overstaffing slow shifts because it feels safer. An idle server on a slow Tuesday is a labor percentage problem that compounds across the year.',
+      'Building a schedule with no revenue reference at all. A schedule without a forecast is a guess.'
     ],
 
     quickRef: {
       rhythm: [
         'Pull the revenue forecast by day for the coming week from POS history',
         'Enter the forecast by day and department and generate the labor budget in hours',
-        'Build the schedule to the budget — must-have coverage first, then fill',
+        'Build the schedule to the budget, must-have coverage first, then fill',
         'Flag any shift where the proposed schedule exceeds the labor budget by more than 5%',
-        'Review the schedule with the manager before posting — a budget conversation is easy before, hard after',
+        'Review the schedule with the manager before posting. A budget conversation is easy before, hard after',
         'Confirm department labor targets are current for the season'
       ],
       escalation: [
@@ -249,40 +238,11 @@ FIX.revenue = [
       ]
     },
 
-    templates: [
-      {
-        id: 'weekly-labor-review',
-        name: 'Weekly Labor Review Form',
-        intro: 'The Monday labor review, on paper. Completed by the manager on duty so the data is ready before the new schedule is posted.',
-        fields: [
-          { key: 'bar_name',    label: 'Restaurant Name', placeholder: 'Your restaurant' },
-          { key: 'week_ending', label: 'Week Ending',     placeholder: 'e.g. March 9' }
-        ],
-        body: 'WEEKLY LABOR REVIEW\n{{bar_name}} — Week ending {{week_ending}}\n\n'
-          + 'For each department, enter actual hours, actual revenue, and labor %.\n\n'
-          + 'BAR\n'
-          + 'Actual labor $: __________  Revenue: __________  Labor %: ______  Target: ______\n'
-          + 'Variance vs target: ______ points\n\n'
-          + 'KITCHEN\n'
-          + 'Actual labor $: __________  Revenue: __________  Labor %: ______  Target: ______\n'
-          + 'Variance vs target: ______ points\n\n'
-          + 'FLOOR\n'
-          + 'Actual labor $: __________  Revenue: __________  Labor %: ______  Target: ______\n'
-          + 'Variance vs target: ______ points\n\n'
-          + 'DIAGNOSIS\n'
-          + 'Any department more than 2 points over target: _____________________\n'
-          + 'Cause — scheduling error or revenue miss: ________________________\n\n'
-          + 'ACTION ITEM (one, assigned before this review closes)\n'
-          + 'Action: ____________________________   Owner: ____________________\n\n'
-          + 'Completed by: ____________________   Date: __________'
-      }
-    ],
-
     aiWorkflows: [
       {
         id: 'ls-ai-1',
         title: 'Build a Revenue-Based Schedule',
-        whatItDoes: 'Turns a revenue forecast into a staffing table — labor budget, hours available, and recommended headcount by day and department.',
+        whatItDoes: 'Turns a revenue forecast into a staffing table: labor budget, hours available, and recommended headcount by day and department.',
         prompt: 'Here is my revenue forecast for next week by day and daypart. [PASTE FORECAST]. My labor targets by department: bar [X]%, kitchen [X]%, floor [X]%. My average hourly wage including taxes and benefits: bar $[X]/hr, kitchen $[X]/hr, floor $[X]/hr. Average shift length: bar [X] hrs, kitchen [X] hrs, floor [X] hrs. Calculate the maximum labor hours available for each department each day and show the result as a staffing table: day, department, revenue, labor budget, hours available, recommended headcount.',
         whatToPaste: 'Paste the forecast and fill in your department targets, loaded wages, and shift lengths.'
       },
