@@ -411,6 +411,103 @@ FIX.traffic = [
         whatToPaste: 'Fill in your name, address, neighborhood, top keywords, hours, and phone.'
       }
     ]
+  },
+
+  {
+    id: 'social',
+    name: 'Social Media',
+    module: 'traffic',
+    summary: 'Social media drives walk-ins when it shows what the bar feels like and runs on a calendar. Own one platform, post five times a week, and track visits and clicks, not likes.',
+
+    process: {
+      intro: 'Consistency beats quality for social reach. Pick one platform, post on a fixed weekly rhythm with content the floor team captures, and measure the numbers that mean a new guest is considering a visit.',
+      steps: [
+        { title: 'Own one platform before spreading to three',
+          detail: 'Pick the one platform where your guests are and post there consistently before adding a second. The same content posted everywhere ignores the format and audience differences between platforms.' },
+        { title: 'Set up the profile and record a baseline',
+          detail: 'Fix the bio, profile photo, and link-in-bio. Record your current follower count, profile visits, and link clicks before changing anything, so you can tell later whether the work moved them.' },
+        { title: 'Post five times a week on the 3-1-1 framework',
+          detail: 'Three experience posts, one promotional, one community, every week. Irregular posting is penalized by every algorithm, so the frequency itself matters more than any single post.' },
+        { title: 'Make experience content the dominant type',
+          detail: 'Show what it feels like to be in the bar, not promotional graphics. A 60-second walkthrough of a busy night outperforms a polished promo. Experience content is what drives a new guest\'s decision.' },
+        { title: 'Run on a content calendar',
+          detail: 'Plan the month on the calendar so posting is scheduled, not reactive. Assign a content captain each shift to capture the raw footage and photos the calendar needs.' },
+        { title: 'Protect the Sunday review',
+          detail: 'Sunday is the only content work that needs manager judgment: review the week\'s captured content, pick five posts, schedule them, and flag one to cross-post to the Google profile.' },
+        { title: 'Track visits and clicks, not likes',
+          detail: 'Profile visits and link-in-bio clicks measure new-guest consideration. Follower count and likes measure the audience you already have. Track the first two.' }
+      ]
+    },
+
+    formulas: [],
+
+    commonMistakes: [
+      'Posting promotional graphics as the dominant content type. Promo content gets saves from existing followers and almost no new reach. Experience content drives new-guest decisions.',
+      'Abandoning a platform after 30 days. Social content compounds over months. Ninety days of consistent posting gets fundamentally different distribution than the first 30.',
+      'Using the same post on every platform without format adjustment. A square photo pushed to three platforms at once ignores the format and audience differences.',
+      'Never showing the inside of the bar in video. Food and cocktail photos show what guests can order, not what it feels like to be there. The feel is the decision driver.',
+      'Tracking follower count and likes instead of profile visits and link clicks. The first pair measures your existing audience, the second measures new-guest consideration.',
+      'No content calendar, so posting is reactive and irregular. Irregular posting is penalized by every algorithm. Consistency matters more than polish for distribution.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Sunday: review the week\'s captured content and select five posts',
+        'Schedule the five posts on the 3-1-1 split, three experience, one promotional, one community',
+        'Flag one post to cross-post to the Google profile as a What\'s New or Event post',
+        'Monday: ask one server and one bartender the weekly social question and log the answer',
+        'Monday: pull profile visits and link clicks from platform analytics and log them',
+        'Mid-week: confirm all five posts for the week are scheduled or in draft'
+      ],
+      escalation: [
+        'Pull the 30-day totals: posts published, profile visits, link clicks, saves, direct messages.',
+        'Identify the two highest-performing posts by profile visits and link clicks.',
+        'Identify the two lowest-performing posts and note the content type.',
+        'Log the social numbers in your monthly digital presence scorecard.',
+        'Adjust next month\'s 3-1-1 ratio if one content pillar is clearly outperforming.',
+        'Check whether any posts were referenced by arriving guests and log it.'
+      ]
+    },
+
+    templates: [
+      { name: 'Social Content Calendar', type: 'PDF', file: 'Social_Content_Calendar.pdf',
+        description: 'A 4-week content calendar template with daily posting slots, content category suggestions, caption prompts, and a hashtag strategy for Instagram and Facebook.' },
+      { name: 'Social Media Standards Policy', type: 'DOC', file: 'Social_Media_Standards_Policy.docx',
+        description: 'Internal policy covering posting frequency standards, image quality, caption tone, response time targets, and the approval workflow for staff posts.' },
+      { name: 'Social Media Profile Audit Form', type: 'PDF', file: 'Social_Media_Profile_Audit_Form.pdf',
+        description: 'Scoring form for your current social profile across bio, profile photo, link-in-bio, content mix, posting frequency, and the other profile criteria.' }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'soc-ai-1',
+        title: 'Write This Week\'s Captions',
+        whatItDoes: 'Drafts a caption for each of the week\'s posts, matched to post type, with a specific detail in each.',
+        prompt: 'Here is my content plan for this week. For each post: content type, what was captured, platform, and any relevant context. [PASTE: e.g., Post 1: Reel, Friday night walkthrough, Instagram, busy with live music]. My bar name: [NAME]. My neighborhood: [NEIGHBORHOOD]. Write a caption for each post. Experience posts: under 50 words, first sentence is a hook that does not start with "We", one specific detail about what is shown, a location tag reference, no hashtags in the body. Promotional posts: one sentence description, one sentence call to action. Community posts: reference the local context specifically. No emojis unless the post explicitly calls for them.',
+        whatToPaste: 'Paste this week\'s post plan and fill in your bar name and neighborhood.'
+      },
+      {
+        id: 'soc-ai-2',
+        title: 'Plan a 30-Day Content Calendar',
+        whatItDoes: 'Builds a 30-day calendar of 20 posts on the 3-1-1 framework, with type, description, and caption theme for each.',
+        prompt: 'My bar concept: [DESCRIBE]. My primary platform: [INSTAGRAM / FACEBOOK]. Upcoming events or specials this month: [LIST]. My team size: [NUMBER]. Build a 30-day content calendar using the 3-1-1 framework, three experience posts, one promotional post, and one community post per week. For each post include the date, content type, content description, caption theme, and whether it should also be posted to the Google profile. Promotional posts should correspond to actual events or specials listed above, and community posts should reference local seasonal or neighborhood context.',
+        whatToPaste: 'Fill in your concept, primary platform, this month\'s events, and team size.'
+      },
+      {
+        id: 'soc-ai-3',
+        title: 'Analyze What Is Driving Walk-Ins',
+        whatItDoes: 'Reads a month of engagement data to find which content types produce visits and clicks, and recommends a ratio adjustment.',
+        prompt: 'Here is my monthly social engagement data. [PASTE: for each week, post type, reach, likes, saves, shares, profile visits, link clicks]. Here are my weekly social question responses: [PASTE: week number, yes/no, and if yes what content the guest mentioned]. Identify which content types produced the most profile visits and link clicks, identify which content types were mentioned by arriving guests, and recommend one adjustment to my 3-1-1 ratio for next month based on this data.',
+        whatToPaste: 'Paste your monthly engagement data and the weekly guest-mention responses.'
+      },
+      {
+        id: 'soc-ai-4',
+        title: 'Write an Email Signup Post',
+        whatItDoes: 'Drafts a link-in-bio post that drives followers to join the email list, with a specific benefit up front.',
+        prompt: 'My bar concept: [DESCRIBE]. My email list current size: [NUMBER]. What people on my email list receive: [DESCRIBE: early access to events, monthly update, etc.]. Write an Instagram post designed to drive followers to sign up for my email list. Caption under 60 words. First sentence: a specific reason to be on the list, not a generic "join our community" opener. Second sentence: what they get. Third sentence: a link-in-bio call to action. No urgency language, no discount offers.',
+        whatToPaste: 'Fill in your concept, list size, and what list members receive.'
+      }
+    ]
   }
 
 ];
