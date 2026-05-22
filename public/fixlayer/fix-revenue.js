@@ -16,51 +16,40 @@ FIX.revenue = [
     summary: 'Every menu item is a Star, Plowhorse, Puzzle, or Dog. Classify them by contribution margin and volume, then reposition, reprice, and brief servers off the result.',
 
     process: {
-      intro: 'Menu engineering plots every item on two axes — contribution margin (dollars, not food cost %) and sales volume — into four quadrants. Stars: high margin, high volume. Plowhorses: low margin, high volume. Puzzles: high margin, low volume. Dogs: low margin, low volume. Each quadrant gets a different action.',
+      intro: 'Menu engineering plots every item on two axes: contribution margin in dollars, not food cost percent, and sales volume. That puts every item in one of four quadrants. Stars are high margin and high volume. Plowhorses are low margin and high volume. Puzzles are high margin and low volume. Dogs are low margin and low volume. Each quadrant gets a different action. The app plots the quadrant for you. Each step below opens where the work happens.',
       steps: [
-        { title: 'Set up the menu data',
-          detail: 'Every item entered with name, category, current price, and yield-adjusted food cost. The matrix is only as accurate as this data — refresh ingredient costs whenever a supplier price moves more than 5%.' },
-        { title: 'Run the engineering matrix quarterly',
-          detail: 'Enter weekly sales counts and classify every item Star, Plowhorse, Puzzle, or Dog against the category-average margin and category-average volume. Re-run the first week of January, April, July, and October.' },
-        { title: 'Analyze on contribution margin dollars',
-          detail: 'Sort by contribution margin in dollars, not food cost %. The percentage tells you structural efficiency; the dollar amount tells you what the item is actually worth to the business.' },
-        { title: 'Reposition by quadrant',
-          detail: 'Move Stars and high-margin Puzzles into prime menu positions — a Star in a prime slot with server promotion typically lifts weekly orders 15-25%. Where items live determines what gets ordered.' },
-        { title: 'Reprice Plowhorses surgically',
-          detail: 'For each Plowhorse, calculate the price floor, test price sensitivity, and target Star margin territory. A targeted $2 increase on five Plowhorses is far less visible than a 6% blanket increase.' },
-        { title: 'Test or remove Dogs',
-          detail: 'Give each Dog a 90-day test in a repositioned slot with a rewritten description before pulling it — some Dogs are just buried items with a description problem.' },
-        { title: 'Brief servers off the Stars list',
-          detail: 'Positioning and pricing only produce results when servers know what to suggest and why. Every item featured in the pre-shift briefing comes from the Stars list.' }
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+          title: 'Set up the menu data',
+          detail: 'In Menu Items, enter every item with its name, category, current price, and yield-adjusted food cost. The quadrant is only as accurate as this catalog, so refresh an item\'s cost whenever a supplier price moves more than 5%.' },
+        { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
+          title: 'Read the quadrant every quarter',
+          detail: 'Menu Engineering plots every item into Stars, Plowhorses, Puzzles, and Dogs, sorted on contribution margin in dollars and sales volume. The percentage tells you structural efficiency. The dollar margin tells you what the item is actually worth. Re-read it the first week of January, April, July, and October.' },
+        { kind: 'reference', target: 'Menu_Engineering_Audit.pdf', targetLabel: 'Menu Engineering Review Worksheet',
+          title: 'Work the quadrant decisions on the worksheet',
+          detail: 'Download the Menu Engineering Review Worksheet and record a decision for every item. Move Stars and high-margin Puzzles into prime menu positions. Give each Dog a 90-day test in a repositioned slot with a rewritten description before you pull it. Some Dogs are buried items with a description problem, not bad items.' },
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+          title: 'Reprice the Plowhorses',
+          detail: 'Back in Menu Items, apply the price changes to the Plowhorses one item at a time. A targeted $2 increase on five Plowhorses is far less visible to guests than a 6% increase across the whole menu.' },
+        { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
+          title: 'Brief servers off the Stars list',
+          detail: 'Positioning and pricing only produce results when servers know what to suggest and why. Print the Pre-Shift Upsell Briefing and build it off the current Stars list. Every item you feature in the briefing comes from that list.' }
       ]
     },
 
-    formulas: [
-      { label: 'Contribution Margin',
-        formula: 'Menu price - yield-adjusted ingredient cost',
-        example: 'Ribeye $48 - $14.60 cost = $33.40 margin — three times the category average' },
-      { label: 'Price Floor',
-        formula: 'Ingredient cost / target food cost %',
-        example: '$6.20 cost / 30% target = $20.67 minimum price' },
-      { label: 'Break-Even Volume After a Price Change',
-        formula: '(Current margin x current volume) / New margin',
-        example: 'Confirm the break-even volume is at least 20% below current weekly volume before repricing' }
-    ],
-
     commonMistakes: [
-      'Running the analysis on food cost percentage instead of contribution margin dollars — the percentage is structural efficiency; the dollar amount is what the item is worth.',
-      'Engineering the menu once and treating it as done — costs move and seasonality shifts; a January menu can have three items below floor by August.',
-      'Removing Dogs without a 90-day test in a repositioned slot — some Dogs are buried items with a description problem, not bad items.',
-      'Leaving Stars in mid-menu positions because they sell anyway — a Star in a prime position with server promotion typically lifts orders 15-25%.',
-      'Announcing price increases across the board instead of surgically — a targeted increase on a few Plowhorses is far less visible than a blanket raise.',
-      'Running menu engineering without connecting it to the server briefing — positioning and pricing only work when servers know what to suggest.'
+      'Running the analysis on food cost percentage instead of contribution margin dollars. The percentage is structural efficiency. The dollar amount is what the item is worth.',
+      'Engineering the menu once and treating it as done. Costs move and seasons shift, and a January menu can have three items below floor by August.',
+      'Removing Dogs without a 90-day test in a repositioned slot. Some Dogs are buried items with a description problem, not bad items.',
+      'Leaving Stars in mid-menu positions because they sell anyway. A Star in a prime position with server promotion typically lifts orders 15 to 25%.',
+      'Announcing price increases across the board instead of surgically. A targeted increase on a few Plowhorses is far less visible than a blanket raise.',
+      'Running menu engineering without connecting it to the server briefing. Positioning and pricing only work when servers know what to suggest.'
     ],
 
     quickRef: {
       rhythm: [
         'Confirm every item in the menu data has name, category, price, and yield-adjusted food cost %',
-        'Enter the latest weekly sales counts and re-run the engineering matrix',
-        'Review the quadrant output — which Stars are not in prime menu positions?',
+        'Re-read the engineering matrix with the latest weekly sales counts in',
+        'Review the quadrant output and note which Stars are not in prime menu positions',
         'Sort by contribution margin dollars and flag every Plowhorse for a pricing review',
         'List every Dog with a 90-day test or remove decision before the review closes',
         'Refresh ingredient costs for any item whose supplier price moved more than 5%',
@@ -76,39 +65,6 @@ FIX.revenue = [
       ]
     },
 
-    templates: [
-      {
-        id: 'menu-engineering-worksheet',
-        name: 'Menu Engineering Review Worksheet',
-        intro: 'The quarterly review worksheet. Print it, work through every item by quadrant, and record the repositioning and repricing decisions.',
-        fields: [
-          { key: 'bar_name',       label: 'Restaurant Name', placeholder: 'Your restaurant' },
-          { key: 'review_quarter', label: 'Review Quarter',  placeholder: 'e.g. Q2' }
-        ],
-        body: 'MENU ENGINEERING REVIEW\n{{bar_name}} — {{review_quarter}}\n\n'
-          + 'Classify every menu item into one quadrant by contribution margin (dollars) and sales volume, then record the decision.\n\n'
-          + 'STARS — high margin, high volume\n'
-          + 'Action: protect, keep in a prime position, feature in briefings.\n'
-          + 'Items: ____________________________________________________\n'
-          + 'Decisions: _________________________________________________\n\n'
-          + 'PLOWHORSES — low margin, high volume\n'
-          + 'Action: reprice toward floor, reduce portion cost, or re-engineer the recipe.\n'
-          + 'Items: ____________________________________________________\n'
-          + 'Reprice targets: ___________________________________________\n\n'
-          + 'PUZZLES — high margin, low volume\n'
-          + 'Action: reposition to a prime slot, rewrite the description, feature in briefings.\n'
-          + 'Items: ____________________________________________________\n'
-          + 'Decisions: _________________________________________________\n\n'
-          + 'DOGS — low margin, low volume\n'
-          + 'Action: 90-day test in a repositioned slot, then remove if it does not move.\n'
-          + 'Items: ____________________________________________________\n'
-          + 'Test or remove: ____________________________________________\n\n'
-          + 'PRE-SHIFT BRIEFING LIST FOR NEXT QUARTER (from the Stars)\n'
-          + '1. ________________________   2. ________________________\n\n'
-          + 'Reviewed by: ____________________   Date: __________'
-      }
-    ],
-
     aiWorkflows: [
       {
         id: 'me-ai-1',
@@ -121,7 +77,7 @@ FIX.revenue = [
         id: 'me-ai-2',
         title: 'Write Menu Descriptions for Your Stars',
         whatItDoes: 'Drafts tight, specific menu descriptions for your top Stars, each with a beverage pairing.',
-        prompt: 'I need updated menu descriptions for my top Stars. For each item I will provide: name, key ingredients, preparation method, and one beverage pairing. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words, including the preparation method, one specific ingredient detail, and the beverage pairing. No filler — no "fresh", "delicious", or "house-made" unless followed by a specific detail. Format: item name on one line, description on the next.',
+        prompt: 'I need updated menu descriptions for my top Stars. For each item I will provide: name, key ingredients, preparation method, and one beverage pairing. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words, including the preparation method, one specific ingredient detail, and the beverage pairing. No filler. No "fresh", "delicious", or "house-made" unless followed by a specific detail. Format: item name on one line, description on the next.',
         whatToPaste: 'Paste each Star with its ingredients, prep method, and pairing into [PASTE ITEM DETAILS].'
       },
       {
