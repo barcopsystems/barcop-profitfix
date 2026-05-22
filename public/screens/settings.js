@@ -1262,13 +1262,92 @@ S.HubSettings = {
         resolution:'' },
     ];
 
-    // ── Save everything ──
+    // ════════════════════════════════════════════════════════════════════
+    //  LABOR CONTROL — derived from the Anchor profile. Each week's logged
+    //  hours by department reconcile to ANCHOR bar_labor and food_labor.
+    // ════════════════════════════════════════════════════════════════════
+    App.laborData = App.laborData || {};
+    const ANCHL = window.ANCHOR;
+
+    const lcPositions = [
+      { name:'Bartender', department:'Bar',            default_wage:ANCHL.wages.bar,     tipped:true  },
+      { name:'Barback',   department:'Bar',            default_wage:12,                  tipped:true  },
+      { name:'Line Cook', department:'Kitchen',        default_wage:ANCHL.wages.kitchen, tipped:false },
+      { name:'Prep Cook', department:'Kitchen',        default_wage:13.5,                tipped:false },
+      { name:'Server',    department:'Front of House', default_wage:ANCHL.wages.floor,   tipped:true  },
+      { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
+      { name:'Manager',   department:'Management',     default_wage:28,                  tipped:false },
+    ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
+    App.laborData.lc_positions = lcPositions;
+    const lcPos = n => lcPositions.find(p => p.name === n).id;
+
+    const mkStaff = (name, posName, wage, hiredDaysAgo) => ({
+      id:uid(), name:name, position_id:lcPos(posName), wage:wage, status:'Active',
+      hire_date:dateStr(hiredDaysAgo), phone:'', email:'', created_at:new Date().toISOString()
+    });
+    const lcStaff = [
+      mkStaff('Maria G.',   'Bartender', 16,   320),
+      mkStaff('Jake T.',    'Bartender', 16,   210),
+      mkStaff('Ashley B.',  'Bartender', 16,   150),
+      mkStaff('Devin R.',   'Barback',   12,   135),
+      mkStaff('Luis V.',    'Line Cook', 15,   400),
+      mkStaff('Sam P.',     'Line Cook', 15,   240),
+      mkStaff('Hector M.',  'Line Cook', 15,   165),
+      mkStaff('Tonya B.',   'Prep Cook', 13.5, 95),
+      mkStaff('Jessica M.', 'Server',    14,   360),
+      mkStaff('Marcus T.',  'Server',    14,   250),
+      mkStaff('Brianna K.', 'Server',    14,   175),
+      mkStaff('Priya N.',   'Server',    14,   110),
+      mkStaff('Owen L.',    'Host',      12.5, 80),
+      mkStaff('Carlos P.',  'Manager',   28,   520),
+    ];
+    App.laborData.lc_staff = lcStaff;
+
+    const lcByPos = (...names) => {
+      const ids = names.map(lcPos);
+      return lcStaff.filter(st => ids.includes(st.position_id));
+    };
+    const lcBar     = lcByPos('Bartender', 'Barback');
+    const lcKitchen = lcByPos('Line Cook', 'Prep Cook');
+    const lcFloor   = lcByPos('Server', 'Host');
+
+    // Per week, split each department's labor dollars across its staff, then
+    // log five daily hour entries per person. cost sums back to ANCHOR labor.
+    const lcActuals = [];
+    const lcAllocate = (staff, weights, deptDollars, baseAgo) => {
+      staff.forEach((st, i) => {
+        const weekHours = (deptDollars * (weights[i] || 0)) / st.wage;
+        for (let d = 0; d < 5; d++) {
+          const h = +(weekHours / 5).toFixed(1);
+          if (h <= 0) continue;
+          lcActuals.push({
+            id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name,
+            position_id:st.position_id, shift_type:'', hours:h, wage:st.wage,
+            cost:+(h * st.wage).toFixed(2), notes:''
+          });
+        }
+      });
+    };
+    ANCHL.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo);
+      lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo);
+    });
+    App.laborData.lc_actuals   = lcActuals;
+    App.laborData.lc_schedules = [];
+    App.laborData.lc_tips      = [];
+    App.laborData.lc_tip_pools = [];
+    App.laborData.lc_callouts  = [];
+
+    // ── Save everything — App.data plus all three Control stores ──
     await App.save();
     await App.saveInventory();
+    await App.saveLabor();
     await App.saveShift();
     App.updatePeriod();
 
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded — all sections populated. Go test!'; }
+    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded — all six modules populated. Go test!'; }
   },
 
   async clearAll() {
@@ -1295,9 +1374,19 @@ S.HubSettings = {
       traffic_settings: App.data.traffic_settings,
       traffic_weeks: App.data.traffic_weeks || [],
       traffic_audits: App.data.traffic_audits || [],
-      getting_started_traffic: App.data.getting_started_traffic || {}
+      getting_started_traffic: App.data.getting_started_traffic || {},
+      hub_setup_progress: {},
+      fix_log: [],
+      variance_investigations: []
     };
+    // Clear the three Control stores too — Inventory, Labor, and Shift.
+    App.inventoryData = {};
+    App.laborData     = {};
+    App.shiftData     = {};
     await App.save();
+    await App.saveInventory();
+    await App.saveLabor();
+    await App.saveShift();
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Ready for real data.'; }
