@@ -1,4 +1,10 @@
 'use strict';
+
+/* ── Onboarding — the first-run doorway, not the setup ────────────────────────
+   Three light steps: identity, operation profile, orientation. It captures
+   only what the Hub needs from minute one (name, location, dollar baselines)
+   and hands off to the unified Hub Getting Started for the six-module setup.
+   The setup checklist is the wizard; onboarding is just the front door. */
 const Onboarding = {
   SIZES: [
     {g:'Spirits',l:'50ml (1.7 oz)',oz:1.7},{g:'Spirits',l:'200ml (6.8 oz)',oz:6.8},
@@ -21,31 +27,48 @@ const Onboarding = {
     if (g) h += '</optgroup>';
     return h;
   },
+
+  _step: 1,
+
   start() {
+    this._step = 1;
     document.getElementById('ob-overlay').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
     this.render();
   },
-  render() {
-    const s = App.data.settings;
-    const cityParts = (s.city_state || '').split(',').map(p => p.trim());
-    const cityVal  = cityParts[0] || '';
-    const stateVal = cityParts[1] || '';
 
+  render() {
+    if (this._step === 1)      this.renderIdentity();
+    else if (this._step === 2) this.renderProfile();
+    else                       this.renderOrientation();
+  },
+
+  _stepDots(n) {
+    return '<div style="text-align:center;font-size:9px;font-weight:700;letter-spacing:2px;'
+      + 'text-transform:uppercase;color:var(--t3);margin-bottom:24px;">Step ' + n + ' of 3</div>';
+  },
+
+  // ── Step 1 — Welcome and identity ───────────────────────────────────────────
+  renderIdentity() {
+    const s = App.data.settings;
+    const parts = (s.city_state || '').split(',').map(p => p.trim());
     document.getElementById('ob-content').innerHTML =
-      '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:28px;">Enter your establishment name and we will get you straight into your Recovery Hub.</div>'
+      '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Welcome to Bar Cop</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Bar Cop recovers lost money in three layers. Capture your operation, diagnose where it is leaking, and fix it.</div>'
+      + this._stepDots(1)
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
-      + '<div class="f" style="flex:2;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail" /></div>'
-      + '<div class="f" style="flex:1.2;"><label>City</label><input type="text" id="ob-city" value="' + esc(cityVal) + '" placeholder="Austin" /></div>'
-      + '<div class="f" style="flex:0.8;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(stateVal) + '" placeholder="TX" /></div>'
+      + '<div class="f" style="flex:2;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="flex:1.2;"><label>City</label><input type="text" id="ob-city" value="' + esc(parts[0] || '') + '" placeholder="Austin"/></div>'
+      + '<div class="f" style="flex:0.8;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
       + '</div>'
       + '<div id="ob-err" style="color:var(--red);font-size:12px;margin-bottom:8px;display:none;"></div>'
-      + '<div class="ob-actions" style="margin-top:20px;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Enter Recovery Hub</button></div>';
+      + '<div class="ob-actions" style="margin-top:20px;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-next">Continue</button></div>';
 
     document.getElementById('ob-name')?.focus();
-
-    document.getElementById('ob-finish')?.addEventListener('click', () => {
+    document.getElementById('ob-name')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('ob-next')?.click();
+    });
+    document.getElementById('ob-next')?.addEventListener('click', () => {
       const name  = document.getElementById('ob-name')?.value.trim();
       const city  = document.getElementById('ob-city')?.value.trim();
       const state = document.getElementById('ob-state')?.value.trim();
@@ -56,12 +79,64 @@ const Onboarding = {
       }
       App.data.settings.bar_name   = name;
       App.data.settings.city_state = city && state ? city + ', ' + state : city || state || '';
-      App.data.settings.onboarding_complete = true;
-      App.saveKey('settings').then(() => App.showHub());
+      this._step = 2;
+      this.render();
     });
+  },
 
-    document.getElementById('ob-name')?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('ob-finish')?.click();
+  // ── Step 2 — Operation profile ──────────────────────────────────────────────
+  renderProfile() {
+    const s = App.data.settings;
+    const bt = s.bar_type || 'bar_kitchen';
+    const opt = (v, label) => '<option value="' + v + '"' + (bt === v ? ' selected' : '') + '>' + label + '</option>';
+    document.getElementById('ob-content').innerHTML =
+      '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Your Operation</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">These set the dollar baselines for every calculation and audit. You can change them any time in Settings.</div>'
+      + this._stepDots(2)
+      + '<div class="f" style="margin-bottom:14px;"><label>Operation Type</label>'
+      + '<select id="ob-type" style="width:100%;">' + opt('bar_kitchen', 'Bar and Kitchen') + opt('bar_only', 'Bar Only') + '</select></div>'
+      + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
+      + '<div class="f" style="flex:1;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + (s.annual_bar_revenue || '') + '" placeholder="480000"/></div></div>'
+      + '<div class="f" style="flex:1;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + (s.annual_food_revenue || '') + '" placeholder="320000"/></div></div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:8px;">Best estimate is fine. If you only know your total, split it roughly. The audit refines these later.</div>'
+      + '<div class="ob-actions" style="margin-top:18px;display:flex;gap:10px;">'
+      + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
+      + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-next">Continue</button>'
+      + '</div>';
+
+    document.getElementById('ob-back')?.addEventListener('click', () => { this._step = 1; this.render(); });
+    document.getElementById('ob-next')?.addEventListener('click', () => {
+      App.data.settings.bar_type            = document.getElementById('ob-type')?.value || 'bar_kitchen';
+      App.data.settings.annual_bar_revenue  = parseFloat(document.getElementById('ob-bar-rev')?.value)  || 0;
+      App.data.settings.annual_food_revenue = parseFloat(document.getElementById('ob-food-rev')?.value) || 0;
+      this._step = 3;
+      this.render();
+    });
+  },
+
+  // ── Step 3 — Orientation and handoff ────────────────────────────────────────
+  renderOrientation() {
+    document.getElementById('ob-content').innerHTML =
+      '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">You Are Set Up</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Here is how Bar Cop is laid out.</div>'
+      + this._stepDots(3)
+      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
+      + 'Your <strong style="color:var(--t1);">Recovery Hub</strong> is the command center. Six modules sit under it. Inventory, Labor, and Shift Control capture your daily operation. Profit, Revenue, and Traffic Recovery diagnose where money is leaking and prescribe the fix. '
+      + '<strong style="color:var(--t1);">Getting Started</strong>, in the Hub top bar, walks you through configuring each one in order.'
+      + '</div>'
+      + '<div class="ob-actions" style="display:flex;gap:10px;">'
+      + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
+      + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-finish">Enter Recovery Hub</button>'
+      + '</div>';
+
+    document.getElementById('ob-back')?.addEventListener('click', () => { this._step = 2; this.render(); });
+
+    document.getElementById('ob-finish')?.addEventListener('click', async () => {
+      App.data.settings.onboarding_complete = true;
+      await App.saveKey('settings');
+      document.getElementById('ob-overlay').classList.add('hidden');
+      App.showHub();
     });
   }
 };
