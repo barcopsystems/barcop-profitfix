@@ -628,6 +628,7 @@ const App = {
         'lc-schedule-history': S.LaborScheduleHistory,
         'lc-schedule-templates': S.LaborScheduleTemplates,
         'lc-log-hours': S.LaborLogHours,
+        'lc-daily-view': S.LaborDailyView,
       };
       const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = lcTitle;
