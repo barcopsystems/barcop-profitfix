@@ -508,6 +508,108 @@ FIX.traffic = [
         whatToPaste: 'Fill in your concept, list size, and what list members receive.'
       }
     ]
+  },
+
+  {
+    id: 'delivery',
+    name: 'Delivery Platforms',
+    module: 'traffic',
+    summary: 'A delivery listing is a storefront most operators never check. Audit it, curate the menu for travel and margin, answer every review, and check the dashboards weekly.',
+
+    process: {
+      intro: 'Delivery platforms run on the same signals as Google: photos, accuracy, reviews, and activity. A listing left alone runs at about 60% of its potential and looks fine from the outside. You only see the gap after the audit.',
+      steps: [
+        { title: 'Audit every active listing first',
+          detail: 'Before any other delivery work, log into each platform and audit photos, hours, menu items, descriptions, and reviews. It is a one-time project of three to four hours.' },
+        { title: 'Use current photos',
+          detail: 'Replace any photo showing a discontinued item or an old menu era. A listing with photos that do not match what arrives produces the exact bad experience that generates a one-star review.' },
+        { title: 'Match platform hours to kitchen hours exactly',
+          detail: 'Wrong delivery hours produce orders placed at the wrong time that arrive cold or get cancelled. Both outcomes generate reviews that hurt the listing.' },
+        { title: 'Curate the delivery menu',
+          detail: 'Do not list every in-house item. The delivery menu is a curated product. Items that travel poorly or lose margin at commission do not belong on it.' },
+        { title: 'Check item margin at the commission rate',
+          detail: 'Recalculate every delivery item\'s margin at the platform commission rate. Pull any item whose margin drops below 15%.' },
+        { title: 'Answer every platform review',
+          detail: 'Delivery platform reviews affect platform ranking the same way Google reviews affect your profile. Apply the same response standard, and do not blame the platform or the driver.' },
+        { title: 'Check the dashboards weekly',
+          detail: 'Ratings, order volume, flagged items, and policy changes all move week to week and are invisible from outside the dashboard. Ten minutes every Monday catches problems before they compound.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Effective Delivery Revenue',
+        formula: 'Menu price x (1 - platform commission rate)',
+        example: '$16 item x (1 - 0.30 commission) = $11.20 kept after the platform fee' },
+      { label: 'Delivery Item Margin',
+        formula: 'Effective delivery revenue - item food cost',
+        example: '$11.20 - $4.80 cost = $6.40. Pull the item if margin falls below 15% of the menu price.' }
+    ],
+
+    commonMistakes: [
+      'Using photos from a previous menu or ownership era. A listing showing discontinued items produces the bad experience that generates a one-star review.',
+      'Not updating platform hours when kitchen hours change. Wrong hours produce wrong-time orders that arrive cold or get cancelled.',
+      'Listing every in-house item on delivery. Items that travel poorly or lose margin at commission should not be on a curated delivery menu.',
+      'Ignoring delivery platform reviews. They affect platform ranking the way Google reviews affect your profile. The same response standard applies.',
+      'Never logging into the platform dashboards. Ratings and order volume change weekly, and an operator who checks monthly misses problems that compound for weeks.',
+      'Adding a third platform before optimizing the first two. A poor listing on two platforms is not fixed by adding a third.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Log into every active platform dashboard and pull the current rating and order volume',
+        'Log rating, order count, and average order value for each platform',
+        'Flag any platform where the rating dropped from the prior week',
+        'Read and respond to any new platform reviews',
+        'Verify no menu items have been auto-flagged or removed by the platform',
+        'Log the delivery numbers in your monthly digital presence scorecard'
+      ],
+      escalation: [
+        'Log into every active platform and note the current rating, order volume, and any flagged issues.',
+        'Update all photos to the current menu and remove any showing discontinued items.',
+        'Verify hours match current kitchen hours exactly on every platform.',
+        'Remove any menu item that is no longer served.',
+        'Add a description to every item over $12 that currently has none.',
+        'Respond to every unanswered platform review.'
+      ]
+    },
+
+    templates: [
+      { name: 'Delivery Platform Audit Checklist', type: 'PDF', file: 'Delivery_Platform_Audit_Checklist.pdf',
+        description: 'Platform-by-platform audit form for DoorDash, Uber Eats, and Grubhub. Checks photo coverage, menu completeness, description quality, pricing accuracy, and promotional status.' },
+      { name: 'Delivery Menu Builder Worksheet', type: 'PDF', file: 'Delivery_Menu_Builder_Worksheet.pdf',
+        description: 'Worksheet for curating the delivery menu: item margin at the commission rate, a travel-quality rating, and the keep-or-cut decision for each item.' }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'del-ai-1',
+        title: 'Write Delivery Menu Item Descriptions',
+        whatItDoes: 'Drafts tight delivery menu descriptions, key ingredient first, with a travel note where it matters.',
+        prompt: 'I need descriptions for my delivery menu items. For each item: name, key ingredients, price, and whether it travels well. [PASTE ITEM LIST]. Write a description for each item under 25 words. Include the most recognizable ingredient first, one sensory or preparation detail, and for items that travel in parts note "sauce served separately" or similar. No filler language, no "house-made" without a specific follow-up, no "delicious" or "fresh" as standalone adjectives.',
+        whatToPaste: 'Paste your delivery items with ingredients, prices, and travel notes.'
+      },
+      {
+        id: 'del-ai-2',
+        title: 'Build a Curated Delivery Menu',
+        whatItDoes: 'Calculates each item\'s margin at the commission rate and recommends a 15 to 20 item delivery menu by margin and travel quality.',
+        prompt: 'Here is my full in-house menu with food cost percentages. [PASTE MENU]. My delivery platform commission rate: [RATE]%. My minimum acceptable margin on delivery: 15%. For each item, calculate the effective margin at the commission rate and flag any item where margin falls below 15%. For items above 15%, assess travel quality as good, moderate, or poor based on item category. Recommend a delivery menu of 15 to 20 items that maximizes margin and travel quality, and explain any item removed from the recommendation.',
+        whatToPaste: 'Paste your in-house menu with food cost percentages and fill in the commission rate.'
+      },
+      {
+        id: 'del-ai-3',
+        title: 'Draft Delivery Review Responses',
+        whatItDoes: 'Drafts responses to delivery platform reviews using the four-sentence framework, with no blame on the platform or driver.',
+        prompt: 'Here are five reviews from my delivery platforms with star ratings. [PASTE REVIEWS]. My bar name: [NAME]. My direct contact for escalation: [EMAIL]. Apply the four-sentence response framework: acknowledge, address specifically, state your standard, invite return or escalate. For food quality or delivery time complaints, acknowledge without assigning blame to the platform or the driver. For wrong or missing item complaints, offer to resolve directly. Each response under 80 words.',
+        whatToPaste: 'Paste five delivery reviews with ratings and your bar name and contact.'
+      },
+      {
+        id: 'del-ai-4',
+        title: 'Write a Delivery-to-Dine-In Insert',
+        whatItDoes: 'Drafts the copy for a package insert card that invites a delivery guest to visit in person.',
+        prompt: 'My bar concept: [DESCRIBE BRIEFLY]. My address: [ADDRESS]. My neighborhood: [NEIGHBORHOOD]. My hours: [HOURS]. My reservation link or phone: [CONTACT]. Write the copy for a small package insert card, credit-card size, front and back. Front: a headline under 8 words that creates curiosity about the in-person experience. Back: address, hours, and one sentence that connects the delivery order to the in-person experience. No discount, no offer, just the invitation.',
+        whatToPaste: 'Fill in your concept, address, neighborhood, hours, and contact.'
+      }
+    ]
   }
 
 ];
