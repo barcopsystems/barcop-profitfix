@@ -635,6 +635,7 @@ const App = {
         'lc-tip-history': S.LaborTipHistory,
         'lc-overtime-watch': S.LaborOvertimeWatch,
         'lc-callout-log': S.LaborCalloutLog,
+        'lc-reports': S.LaborReports,
       };
       const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = lcTitle;
