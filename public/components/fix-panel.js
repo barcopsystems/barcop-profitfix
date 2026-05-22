@@ -60,6 +60,7 @@ window.FixPanel = {
 
   renderInto(el, moduleKey, focusId) {
     if (!el) return;
+    el.dataset.fixModule = moduleKey;
     const gaps = this.gapAreas(moduleKey);
     if (gaps.length === 0) {
       el.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--t3);">'
@@ -86,6 +87,7 @@ window.FixPanel = {
       + '</div>'
       + '<div class="fp-body" style="display:' + (expanded ? 'block' : 'none') + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
       + this.processSection(g)
+      + this.implementSection(g)
       + this.mistakesSection(g)
       + this.quickRefSection(g)
       + this.aiSection(g)
@@ -142,6 +144,38 @@ window.FixPanel = {
       + '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-top:4px;">' + esc(s.detail || '') + '</div>'
       + (link ? '<div style="margin-top:8px;">' + link + '</div>' : '')
       + '</div></div>';
+  },
+
+  // ── Recovery tracking — log when a fix went in ──────────────────────────────
+  implementSection(g) {
+    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const mine = log.filter(e => e.gap_id === g.id)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;'
+      + 'color:#fff;font-size:13px;padding:7px 10px;width:100%;color-scheme:dark;';
+
+    let html = this.sh('Recovery Tracking');
+    html += '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-bottom:10px;">'
+      + 'When you have this fix in place, log the date. The Recovery Scoreboard measures the metric before and after to show what the fix recovered.</div>';
+
+    if (mine.length) {
+      html += mine.map(e =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t2);">'
+        + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);"></span>'
+        + 'Implemented ' + esc(e.date)
+        + '<button class="btn btn-ghost btn-sm fp-unlog" data-log="' + esc(e.id) + '" style="margin-left:auto;">Remove</button>'
+        + '</div>').join('');
+    }
+
+    html += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;">'
+      + '<div class="f" style="width:150px;">'
+      + '<label>Implemented On</label>'
+      + '<input type="date" class="fp-impl-date" data-gap="' + esc(g.id) + '" style="' + inputStyle + '"/>'
+      + '</div>'
+      + '<button class="btn btn-primary btn-sm fp-impl-save" data-gap="' + esc(g.id) + '" '
+      + 'data-module="' + esc(g.module) + '" data-name="' + esc(g.name) + '">Mark Implemented</button>'
+      + '</div>';
+    return html;
   },
 
   // ── Common mistakes ─────────────────────────────────────────────────────────
@@ -230,8 +264,39 @@ window.FixPanel = {
       const go = ev.target.closest('.fp-go');
       const copy = ev.target.closest('.fp-copy');
       const print = ev.target.closest('.fp-print');
+      const implSave = ev.target.closest('.fp-impl-save');
+      const unlog = ev.target.closest('.fp-unlog');
       if (go) { App.openScreen(go.dataset.target); return; }
       if (print) { window.print(); return; }
+      if (implSave) {
+        const gapId = implSave.dataset.gap;
+        const dateEl = el.querySelector('.fp-impl-date[data-gap="' + gapId + '"]');
+        const date = dateEl ? dateEl.value : '';
+        if (!date) {
+          if (dateEl) dateEl.style.borderColor = 'var(--red)';
+          return;
+        }
+        App.data.fix_log = App.data.fix_log || [];
+        App.data.fix_log.push({
+          id: App.uid(),
+          module: implSave.dataset.module,
+          gap_id: gapId,
+          gap_name: implSave.dataset.name,
+          date: date,
+          logged_at: new Date().toISOString()
+        });
+        App.saveKey('fix_log');
+        this.renderInto(el, el.dataset.fixModule, gapId);
+        return;
+      }
+      if (unlog) {
+        const logId = unlog.dataset.log;
+        App.data.fix_log = (App.data.fix_log || []).filter(e => e.id !== logId);
+        App.saveKey('fix_log');
+        const card = unlog.closest('.fp-gap');
+        this.renderInto(el, el.dataset.fixModule, card ? card.dataset.gap : null);
+        return;
+      }
       if (copy) {
         const block = copy.closest('div').parentElement.querySelector('.fp-prompt');
         if (block && navigator.clipboard) {
