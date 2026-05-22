@@ -159,6 +159,7 @@ S.Dashboard = {
       + chartHtml
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
+      + FixPanel.fixAreasCard('profit')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       +'<button class="btn btn-primary" id="qa-week">Enter This Week</button>'
@@ -195,6 +196,7 @@ S.Dashboard = {
     document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
     document.getElementById('qa-recipes')?.addEventListener('click', ()=>App.navigate('recipe-library'));
+    FixPanel.wireFixAreas(container);
   },
 
   buildChart(weeks, targets) {
