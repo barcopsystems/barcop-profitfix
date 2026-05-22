@@ -4,13 +4,30 @@ S.RevenueServerCheck = {
   _entryId: null,
   _saving: false,
 
+  /* Roster auto-syncs from Labor Control (Rule 20): active Front of House and
+     Bar staff. Falls back to all active staff, then the legacy server list. */
+  serverRoster() {
+    const staff = (App.laborData && App.laborData.lc_staff) || [];
+    const positions = (App.laborData && App.laborData.lc_positions) || [];
+    const deptOf = {};
+    positions.forEach(p => { deptOf[p.id] = p.department; });
+    const active = staff.filter(s => s.status !== 'Inactive');
+    const serving = active.filter(s => {
+      const d = deptOf[s.position_id];
+      return d === 'Front of House' || d === 'Bar';
+    });
+    const pick = serving.length ? serving : active;
+    if (pick.length) return pick.map(s => ({ name: s.name }));
+    return (App.data.revenue_settings && App.data.revenue_settings.servers) || [];
+  },
+
   render(container, actions) {
     actions.innerHTML = '';
     this._entryId = App.uid();
     this._calc    = null;
 
     const t        = App.data.revenue_settings?.targets || {};
-    const servers  = App.data.revenue_settings?.servers || [];
+    const servers  = this.serverRoster();
     const targetCA = t.check_avg || 35;
     const today    = new Date().toISOString().slice(0,10);
     const h        = new Date().getHours();
@@ -43,7 +60,7 @@ S.RevenueServerCheck = {
       + '<div class="form-row" style="flex-wrap:nowrap;gap:10px;align-items:flex-end;">'
       + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input type="date" id="rsc-date" value="' + today + '" style="width:100%;"/></div>'
       + '<div class="f" style="width:88px;flex-shrink:0;"><label>Shift</label><select id="rsc-shift" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;"><option' + (shift==='Lunch'?' selected':'') + '>Lunch</option><option' + (shift==='Dinner'?' selected':'') + '>Dinner</option><option' + (shift==='Bar'?' selected':'') + '>Bar</option></select></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Server</label><select id="rsc-server" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;">' + (serverOpts||'<option>No servers in roster</option>') + '</select></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Server</label><select id="rsc-server" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:8px 10px;font-size:13px;">' + (serverOpts||'<option>Add staff in Labor Control</option>') + '</select></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Covers ' + tt('r-covers') + '</label><input type="number" id="rsc-cov" placeholder="" style="width:100%;"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Total Sales ' + tt('r-check-avg') + '</label><div class="fw" style="width:100%;"><span class="pre">$</span><input class="pre" type="number" id="rsc-sales" placeholder="" style="width:100%;"/></div></div>'
       + '<div class="f" style="flex-shrink:0;"><label style="opacity:0;">x</label><button class="btn btn-primary" id="rsc-submit" style="white-space:nowrap;">Submit</button></div>'
