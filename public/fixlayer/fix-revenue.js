@@ -139,6 +139,135 @@ FIX.revenue = [
         whatToPaste: 'Paste the three items with current price, floor price, and weekly volume.'
       }
     ]
+  },
+
+  {
+    id: 'pricing',
+    name: 'Pricing',
+    module: 'revenue',
+    summary: 'Most menus are priced by feel and drift below cost as ingredients rise. Build every price from a cost floor, flag below-floor items, and correct them surgically each quarter.',
+
+    process: {
+      intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be; the competition tells you what the market accepts. They are two different numbers used for two different decisions — and a menu priced once at opening drifts below floor within 18 months.',
+      steps: [
+        { title: 'Calculate cost-based price floors on yield-adjusted costs',
+          detail: 'For every item, divide the yield-adjusted ingredient cost by the target food cost %. A protein priced on raw purchase cost is actually 8 points higher once trim loss is in — build the floor from the right number.' },
+        { title: 'Flag every below-floor item',
+          detail: 'Compare each current price to its floor. Flag everything priced below it, show the gap in dollars and percent, and sort the flagged list by annual margin impact at current weekly volume.' },
+        { title: 'Run the price sensitivity calculation before any change',
+          detail: 'Before changing any price, calculate the break-even volume at the new price. Confirm break-even is comfortably below current volume — that is the difference between a confident decision and a guess.' },
+        { title: 'Reprice surgically, item by item',
+          detail: 'Correct individual items during a routine menu update. A blanket increase reads as a price event and invites guest attention; surgical adjustments rarely produce noticeable feedback.' },
+        { title: 'Price each category on its own math',
+          detail: 'Spirits, cocktails, beer, wine, and food run different target food costs. Do not apply one percentage across the menu — each category has its own floor.' },
+        { title: 'Brief staff on the change',
+          detail: 'Tell servers what changed and why before the new menu goes live, and update any item description that needs to support a higher price point.' },
+        { title: 'Review quarterly and on immediate triggers',
+          detail: 'Run the full review the first week of each quarter. Do not wait for the calendar when a supplier price jumps 8%+, a new item is added, or food cost moves 3+ points above target.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Price Floor',
+        formula: 'Yield-adjusted ingredient cost / target food cost %',
+        example: 'Salmon $9.40 cost / 30% target = $31.33 floor — a $28 price is $3.33 below floor' },
+      { label: 'Below-Floor Gap',
+        formula: 'Current price - price floor',
+        example: '$28.00 - $31.33 = -$3.33, or -10.6% below floor' },
+      { label: 'Annual Margin Impact of Repricing',
+        formula: '(Floor price - current price) x weekly volume x 52',
+        example: '$3.33 x 60 covers x 52 = $10,389 recovered at flat volume' }
+    ],
+
+    commonMistakes: [
+      'Setting prices once at opening and never reviewing them on a schedule — costs change quarterly and a menu drifts below floor within 18 months.',
+      'Pricing by competition without calculating your own cost floor first — competitor prices say what the market accepts, your floor says what you need.',
+      'Raising all prices at once in a visible refresh — a blanket increase reads as a price event; surgical item-by-item increases rarely draw feedback.',
+      'Not yield-adjusting ingredient costs before setting floors — a protein at 30% on raw purchase cost is really 38% once trim loss is included.',
+      'Treating the competitive price as a ceiling — if your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
+      'Skipping the price sensitivity calculation on a high-volume item — knowing the break-even volume before you change the price is what makes the decision confident.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Run the price floor calculation on every item whose ingredient cost moved since last review',
+        'Flag every item where the current price is below the new floor',
+        'Run each flagged Plowhorse through the sensitivity calculator at a $1.50-$3 increase',
+        'List items to reprice, items to remove, and items needing new cost cards',
+        'Close the review with a written action list and a target menu print date',
+        'Update ingredient costs in the menu data whenever supplier prices change'
+      ],
+      escalation: [
+        'Supplier price increase above 8% on any item: recalculate the floor before the next service.',
+        'New item added to the menu: cost card and floor calculation required before it prints.',
+        'Food cost moves 3+ points above target in a single weekly review: run a pricing review now.',
+        'A category review shows more than 20% of items below their margin floor: review the category.',
+        'Staff report consistent guest pushback on a specific item\'s price: re-run that item\'s numbers.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'pricing-review-checklist',
+        name: 'Quarterly Pricing Review Checklist',
+        intro: 'The quarterly pricing review, on paper, signed off at close. A mental note to reprice an item is an intention — this is the review.',
+        fields: [
+          { key: 'bar_name',       label: 'Restaurant Name', placeholder: 'Your restaurant' },
+          { key: 'review_quarter', label: 'Review Quarter',  placeholder: 'e.g. Q2' }
+        ],
+        body: 'QUARTERLY PRICING REVIEW\n{{bar_name}} — {{review_quarter}}\n\n'
+          + 'STEP 1 — REFRESH COSTS\n'
+          + '[ ] Ingredient costs updated for every item with a supplier price change since last review.\n\n'
+          + 'STEP 2 — FLOOR CALCULATION\n'
+          + '[ ] Price floor recalculated for every affected item (cost / target food cost %).\n'
+          + 'Items now below floor: ____________________________________\n'
+          + '________________________________________________________\n\n'
+          + 'STEP 3 — SENSITIVITY\n'
+          + '[ ] Each below-floor item run through the price sensitivity calculation.\n'
+          + '[ ] Break-even volume confirmed comfortably below current volume.\n\n'
+          + 'STEP 4 — ACTION LIST\n'
+          + 'Items to reprice (item / current / new price):\n'
+          + '________________________________________________________\n'
+          + '________________________________________________________\n'
+          + 'Items to remove: __________________________________________\n'
+          + 'Items needing new cost cards: _____________________________\n\n'
+          + 'STEP 5 — EXECUTE\n'
+          + 'Target menu print date: ____________________\n'
+          + '[ ] Staff briefed on the changes before the new menu goes live.\n\n'
+          + 'Reviewed by: ____________________   Signature: ____________________   Date: __________'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'pr-ai-1',
+        title: 'Calculate Price Floors Across the Full Menu',
+        whatItDoes: 'Runs the floor calculation on every item, flags everything below floor, and sorts the flagged list by annual margin impact.',
+        prompt: 'Here is my current menu with ingredient costs and current prices. For each item: item name, ingredient cost (yield-adjusted), current price, category. [PASTE DATA]. My target food cost by category: spirits 22%, cocktails 26%, draft beer 24%, wine by glass 30%, food 30%. Calculate the price floor for each item at its category target, flag every item where the current price is below the floor, show the gap in dollars and as a percentage, and sort flagged items by annual margin impact at current weekly volume.',
+        whatToPaste: 'Paste your menu with yield-adjusted costs, prices, and categories into [PASTE DATA]; adjust the category targets to yours.'
+      },
+      {
+        id: 'pr-ai-2',
+        title: 'Write Descriptions for High-Margin Items',
+        whatItDoes: 'Drafts tight, specific menu descriptions that support a higher price point, each with a beverage pairing.',
+        prompt: 'I need menu descriptions for [NUMBER] items. For each item: name, key ingredients, preparation method, and one beverage pairing suggestion. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words including the preparation method, one specific ingredient detail, and the beverage pairing. No filler — no "fresh", "delicious", "to perfection", or "house-made" unless followed by a specific detail. Format: item name, then description on the next line.',
+        whatToPaste: 'Fill in the item count and paste each item\'s ingredients, prep method, and pairing.'
+      },
+      {
+        id: 'pr-ai-3',
+        title: 'Model the Cost of Never Raising Prices',
+        whatItDoes: 'Projects five years of margin loss from flat pricing against rising costs, then the same with a managed quarterly review.',
+        prompt: 'My current annual revenue is $[AMOUNT], my current average food cost percentage is [X]%, and my sales split is [BAR]% bar and [FOOD]% food. Assume ingredient costs increase [Y]% per year for five years with no price changes. Calculate my food cost percentage each year, the annual margin lost versus the current baseline, and the cumulative five-year margin loss. Then show the same calculation with a quarterly pricing review that makes targeted adjustments to hold my current food cost percentage.',
+        whatToPaste: 'Fill in revenue, current food cost %, the bar/food split, and an annual cost-inflation assumption.'
+      },
+      {
+        id: 'pr-ai-4',
+        title: 'Draft a Seasonal Item with Pricing Rationale',
+        whatItDoes: 'Creates a seasonal menu item — name, description, and a floor-based recommended price with a server briefing line.',
+        prompt: 'I want to add a seasonal cocktail for [SEASON/OCCASION]. Key ingredients: [LIST]. My cost for the ingredients is approximately $[COST] per drink and my target beverage cost is 24%. Write a menu name, a description under 18 words, a recommended price based on my cost floor, and one sentence of server training language for the pre-shift briefing.',
+        whatToPaste: 'Fill in the season/occasion, ingredient list, and per-drink cost.'
+      }
+    ]
   }
 
 ];
