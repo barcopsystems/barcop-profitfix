@@ -3,6 +3,7 @@
 const DB = {
   _sb: null,
   _user: null,
+  _demo: false,   // demo mode — all writes are no-ops so the demo never persists
 
   // ── Init ─────────────────────────────────────────────────────────────────
   async init() {
@@ -130,6 +131,7 @@ const DB = {
   },
 
   async writeData(appData) {
+    if (this._demo) return { ok: true };
     if (this._sb && this._user) {
       try {
         const { error } = await this._sb
@@ -273,6 +275,7 @@ const DB = {
   },
 
   async _writeControl(table, lsKey, data) {
+    if (this._demo) return { ok: true };
     if (this._sb && this._user) {
       try {
         const { error } = await this._sb
