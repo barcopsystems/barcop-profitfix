@@ -106,20 +106,65 @@ S.RevenueMenuEngineering = {
     container.innerHTML = '<div class="screen">' + svgMatrix + quadSections + '</div>';
   },
 
+  /* Price-Change Verification (Section 10) — measure a logged price change
+     against the prediction made when it was logged, once three weeks of
+     covers data have accumulated. Honest by construction: it returns a
+     result only when the captured baseline and current covers both exist. */
+  verify(entry) {
+    if (!entry || !entry.date || entry.covers_at_change == null || entry.cost == null) {
+      return { status: 'old-format' };
+    }
+    const t = new Date(entry.date + 'T00:00:00').getTime();
+    if (isNaN(t)) return { status: 'old-format' };
+    const weeks = Math.floor((Date.now() - t) / (7 * 86400000));
+    if (weeks < 3) return { status: 'pending', weeks: Math.max(weeks, 0) };
+    const item = (App.data.revenue_menu_items || []).find(i => i.id === entry.item_id);
+    if (!item || item.weekly_covers == null) return { status: 'no-item' };
+    const coversThen = entry.covers_at_change, coversNow = item.weekly_covers;
+    if (!coversThen) return { status: 'no-baseline' };
+    const oldCM = entry.old_price - entry.cost, newCM = entry.new_price - entry.cost;
+    return {
+      status: 'ok', weeks: weeks,
+      coversThen: coversThen, coversNow: coversNow,
+      volPct: (coversNow - coversThen) / coversThen * 100,
+      actualWeekly: newCM * coversNow - oldCM * coversThen,
+      predicted: entry.predicted_weekly_impact != null ? entry.predicted_weekly_impact : null
+    };
+  },
+
+  // One Pricing Review Log row, including the verification cell.
+  logRow(entry) {
+    const v = this.verify(entry);
+    let vCell;
+    if (v.status === 'ok') {
+      const tone = v.actualWeekly >= 0 ? 'var(--gold)' : 'var(--red)';
+      const pred = v.predicted != null
+        ? 'predicted ' + (v.predicted > 0 ? '+' : '') + App.fmtCurrency(v.predicted) + '/wk'
+        : 'no prediction on file';
+      vCell = '<div style="font-weight:700;color:' + tone + ';">'
+        + (v.actualWeekly > 0 ? '+' : '') + App.fmtCurrency(v.actualWeekly) + '/wk actual</div>'
+        + '<div style="font-size:10px;color:var(--t3);">covers ' + v.coversThen + ' to ' + v.coversNow
+        + ', ' + pred + '</div>';
+    } else if (v.status === 'pending') {
+      vCell = '<span style="color:var(--t3);">Measuring, week ' + v.weeks + ' of 3</span>';
+    } else {
+      vCell = '<span style="color:var(--t4);">Not verifiable</span>';
+    }
+    return '<tr><td>' + (entry.date || '').slice(0, 10) + '</td>'
+      + '<td>' + esc(entry.item_name || '') + '</td>'
+      + '<td>' + App.fmtCurrency(entry.old_price) + '</td>'
+      + '<td>' + App.fmtCurrency(entry.new_price) + '</td>'
+      + '<td style="font-size:11px;">' + vCell + '</td>'
+      + '<td style="font-size:11px;color:var(--t2);">' + esc(entry.reason || '') + '</td></tr>';
+  },
+
   renderPriceSensitivity(container) {
     const items = (App.data.revenue_menu_items||[]).filter(i=>i.price&&i.cost);
     const log   = (App.data.revenue_price_log||[]).slice().reverse();
     const itemOpts = items.map((i,idx)=>'<option value="'+idx+'">'+esc(i.name)+'   $'+i.price+'</option>').join('');
 
-    const logRows = log.map(e =>
-      '<tr><td>' + (e.date||'').slice(0,10) + '</td>'
-      + '<td>' + esc(e.item_name||'') + '</td>'
-      + '<td>' + App.fmtCurrency(e.old_price) + '</td>'
-      + '<td>' + App.fmtCurrency(e.new_price) + '</td>'
-      + '<td style="color:' + (e.margin_impact>0?'var(--gold)':'var(--red)') + ';font-weight:700;">' + (e.margin_impact>0?'+':'') + App.fmtCurrency(e.margin_impact) + '</td>'
-      + '<td style="font-size:11px;color:var(--t2);">' + esc(e.reason||'') + '</td>'
-      + '</tr>'
-    ).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No price changes logged yet.</td></tr>';
+    const logRows = log.map(e => S.RevenueMenuEngineering.logRow(e)).join('')
+      || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No price changes logged yet.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
       + '<div class="card" style="margin-bottom:16px;">'
@@ -139,7 +184,7 @@ S.RevenueMenuEngineering = {
       + '</div>'
       + '<div class="card">'
       + '<div class="sh">Pricing Review Log</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Margin Impact</th><th>Reason</th></tr></thead>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th><th>Reason</th></tr></thead>'
       + '<tbody id="rps-log-table">' + logRows + '</tbody></table></div>'
       + '</div>'
       + '</div>';
@@ -180,7 +225,15 @@ S.RevenueMenuEngineering = {
       const reason   = document.getElementById('rps-reason')?.value||'';
       if (isNaN(idx)||!items[idx]||!newPrice) return;
       const item = items[idx];
-      const entry = { id:App.uid(), date:new Date().toISOString().slice(0,10), item_name:item.name, old_price:item.price, new_price:newPrice, reason, margin_impact:newPrice-item.price, saved_at:new Date().toISOString() };
+      const volChg2 = parseFloat(document.getElementById('rps-vol')?.value) || 0;
+      const oldCM2  = item.price - item.cost;
+      const newCM2  = newPrice - item.cost;
+      const covers2 = item.weekly_covers || 0;
+      const predWk  = (newCM2 * (covers2 * (1 + volChg2/100))) - (oldCM2 * covers2);
+      const entry = { id:App.uid(), date:new Date().toISOString().slice(0,10),
+        item_id:item.id, item_name:item.name, old_price:item.price, new_price:newPrice, cost:item.cost,
+        reason, margin_impact:newPrice-item.price, covers_at_change:covers2,
+        predicted_vol_pct:volChg2, predicted_weekly_impact:predWk, saved_at:new Date().toISOString() };
       if (!App.data.revenue_price_log) App.data.revenue_price_log=[];
       App.data.revenue_price_log.push(entry);
       const allItems = App.data.revenue_menu_items||[];
@@ -192,9 +245,8 @@ S.RevenueMenuEngineering = {
       const tbody = document.getElementById('rps-log-table');
       if (tbody) {
         const newLog = (App.data.revenue_price_log||[]).slice().reverse();
-        tbody.innerHTML = newLog.map(e=>
-          '<tr><td>'+(e.date||'').slice(0,10)+'</td><td>'+esc(e.item_name||'')+'</td><td>'+App.fmtCurrency(e.old_price)+'</td><td>'+App.fmtCurrency(e.new_price)+'</td><td style="color:'+(e.margin_impact>0?'var(--gold)':'var(--red)')+';font-weight:700;">'+(e.margin_impact>0?'+':'')+App.fmtCurrency(e.margin_impact)+'</td><td style="font-size:11px;color:var(--t2);">'+esc(e.reason||'')+'</td></tr>'
-        ).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No price changes logged yet.</td></tr>';
+        tbody.innerHTML = newLog.map(e=>S.RevenueMenuEngineering.logRow(e)).join('')
+          || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No price changes logged yet.</td></tr>';
       }
       document.getElementById('rps-reason').value='';
     });
