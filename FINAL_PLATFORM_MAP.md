@@ -1,3 +1,4 @@
+[FINAL_PLATFORM_MAP.md](https://github.com/user-attachments/files/28132331/FINAL_PLATFORM_MAP.md)
 # Bar Cop — Final Complete Platform Map
 # Version 4.0 — The Three-Layer Platform
 Rewritten: 2026-05-21
@@ -574,9 +575,13 @@ forward-looking alerts; annotated trend charts; guided variance investigation;
 price-change verification; cadence nudges.
 
 ### Stage H — Hub polish, integration, sample data
-Hub polish pass (all 6 modules now live); `loadSample()` with The Anchor; audit intake
-controlData wiring; PDF export on all reports; offline sync; data export/backup;
-30-day cancellation retention; full cross-module testing.
+Hub polish pass (all 6 modules now live); **Recovery dashboard restructure** —
+rebuild the Profit/Revenue/Traffic dashboards as scored, dollar-quantified
+gap-area diagnosis views per Sections 2–4 (they were built metric-card style;
+Stage F added only the lightweight "Fix Areas" deep-link card, not the rebuild);
+`loadSample()` with The Anchor; audit intake controlData wiring; PDF export on all
+reports; offline sync; data export/backup; 30-day cancellation retention; full
+cross-module testing.
 
 ---
 ---
