@@ -90,17 +90,18 @@ S.Hub = {
       { label:'Open Cash Variances', val: recOpen, disp: recOpen!=null?String(recOpen):null, tgt: '0 open', status: recOpen==null?'none':recOpen===0?'good':recOpen<=2?'warn':'bad', screen:'cash-recon', mod:'profit' },
     ];
 
-    // ── Alerts (metric breaches) ──
+    // ── Alerts — metric breaches plus forward-looking signals ──
     const sevRank = { bad:0, warn:1 };
-    const alerts = metrics
+    const metricAlerts = metrics
       .filter(m => m.status === 'warn' || m.status === 'bad')
-      .sort((a,b) => sevRank[a.status] - sevRank[b.status])
-      .slice(0, 5)
       .map(m => ({
         sev: m.status,
         text: m.label + ' at ' + m.disp + ' · target ' + m.tgt,
         screen: m.screen, mod: m.mod
       }));
+    const alerts = metricAlerts.concat(this.forwardAlerts())
+      .sort((a,b) => sevRank[a.sev] - sevRank[b.sev])
+      .slice(0, 5);
 
     // ── Priority action items ──
     const itemRows = [];
@@ -275,6 +276,31 @@ S.Hub = {
     const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${actionBody}</div></div>`;
 
+    // Weekly money readout panel — what is leaking this week, where, biggest first
+    const readout = this.weeklyReadout();
+    const hasWeekData = pWeeks.length > 0 || rWeeks.length > 0;
+    let readoutBody;
+    if (!hasWeekData) {
+      readoutBody = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 16px;">Enter this week's numbers in Profit and Revenue to see what is leaking and where.</div>`;
+    } else if (readout.items.length === 0) {
+      readoutBody = `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--gold)" stroke-width="1.4"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="font-size:12px;font-weight:700;color:var(--t1);">Holding the Line</div>
+          <div style="font-size:10px;color:var(--t3);text-align:center;line-height:1.4;">Every gap area with a weekly dollar metric is on target.</div>
+        </div>`;
+    } else {
+      const roRows = readout.items.slice(0, 4).map((it, i) => `
+          <div class="hd-row" onclick="S.Hub._enterFix('${it.module}','${esc(it.gapId)}')" style="display:flex;align-items:center;gap:8px;padding:6px;${i<Math.min(readout.items.length,4)-1?'border-bottom:1px solid rgba(255,255,255,0.05);':''}">
+            <div style="flex:1;min-width:0;font-size:11px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(it.label)}${i===0?' <span style="font-size:8px;font-weight:800;letter-spacing:0.06em;color:var(--gold);">BIGGEST</span>':''}</div>
+            <div style="flex-shrink:0;font-size:11px;font-weight:800;color:${it.band==='over'?'var(--red)':'var(--gold)'};">${App.fmtCurrency(it.weekly,0)}/wk</div>
+          </div>`).join('');
+      readoutBody = `
+          <div style="font-size:23px;font-weight:800;line-height:1;color:var(--red);">${App.fmtCurrency(readout.total,0)}</div>
+          <div style="font-size:10px;color:var(--t3);margin:6px 0 9px;">leaking this week across ${readout.items.length} gap area${readout.items.length===1?'':'s'}</div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${roRows}</div>`;
+    }
+    const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Money Readout')}${readoutBody}</div>`;
+
     // Sidebar
     const icons = {
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
@@ -334,7 +360,7 @@ S.Hub = {
         <div style="grid-column:2;grid-row:2;display:grid;grid-template-rows:78px 1fr 1fr;gap:12px;padding:12px;overflow:hidden;min-height:0;">
           <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">${tiles}</div>
           <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}</div>
-          <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:12px;min-height:0;">${chartPanel}${actionPanel}</div>
+          <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px;min-height:0;">${chartPanel}${readoutPanel}${actionPanel}</div>
         </div>
 
         <div style="grid-column:1/-1;grid-row:3;display:flex;align-items:center;padding:0 18px;border-top:1px solid rgba(255,255,255,0.07);background:var(--surface);">
@@ -347,6 +373,141 @@ S.Hub = {
     document.getElementById('hub-signout')?.addEventListener('click', async () => { await DB.signOut(); });
   },
 
-  _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); }
+  _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); },
+
+  // Deep-link from the weekly readout into a module's Fix screen at a gap-area.
+  _enterFix(module, gapId) {
+    App.showApp(module || 'profit');
+    if (gapId) App._fixFocus = gapId;
+    App.navigate(module === 'revenue' ? 'r-fix' : 'profit-fix');
+  },
+
+  /* Weekly money readout (Section 10.3) — what is leaking this week, where, and
+     biggest first. Reads the live per-gap-area band from Recovery.gapImpact, the
+     same engine the dashboards use. A gap-area only counts when its weekly dollar
+     loss computes honestly from real data; metrics shared by two gap-areas (the
+     check-average pair) are counted once. */
+  weeklyReadout() {
+    if (!window.Recovery || !window.FIX) return { items: [], total: 0 };
+    const seen = {};
+    const items = [];
+    [['profit'], ['revenue']].forEach(([mod]) => {
+      (FIX[mod] || []).forEach(g => {
+        const imp = Recovery.gapImpact(g.id);
+        if (!imp || imp.onTarget || !(imp.dollars > 0)) return;
+        if (seen[imp.label]) return;
+        seen[imp.label] = true;
+        items.push({ label: imp.label, gapId: g.id, module: mod,
+                     weekly: imp.dollars / 52, band: imp.band });
+      });
+    });
+    items.sort((a, b) => b.weekly - a.weekly);
+    return { items: items, total: items.reduce((s, x) => s + x.weekly, 0) };
+  },
+
+  /* Forward-looking alerts (Section 10.4) — predictive signals, not just
+     historical breaches. Each fires only when the data to compute it exists,
+     never on a fabricated projection. They feed the same Hub alert strip. */
+  forwardAlerts() {
+    const data = App.data || {};
+    const out = [];
+    const iso = d => d.toISOString().slice(0, 10);
+    const mondayOf = d => { const x = new Date(d); const day = x.getDay();
+      x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return iso(x); };
+
+    // 1. Projected overtime — current week, lc_actuals projected against lc_schedules
+    const ld = App.laborData || {};
+    const ws = mondayOf(new Date());
+    const weEnd = (() => { const d = new Date(ws + 'T00:00:00'); d.setDate(d.getDate() + 6); return iso(d); })();
+    const wkActuals = (ld.lc_actuals || []).filter(a => a.date >= ws && a.date <= weEnd);
+    const sched = (ld.lc_schedules || []).find(s => {
+      if (!s.week_start) return false;
+      const st = new Date(s.week_start + 'T00:00:00').getTime();
+      const tg = new Date(ws + 'T00:00:00').getTime();
+      return !isNaN(st) && tg >= st && tg <= st + 6 * 86400000;
+    });
+    const otMap = {};
+    wkActuals.forEach(a => { const id = a.staff_id || a.name;
+      (otMap[id] = otMap[id] || { actual: 0, scheduled: 0, wage: a.wage, name: a.name }).actual += (a.hours || 0); });
+    if (sched) (sched.shifts || []).forEach(sh => { const id = sh.staff_id || sh.name;
+      (otMap[id] = otMap[id] || { actual: 0, scheduled: 0, name: sh.name }).scheduled += (sh.hours || 0); });
+    let otCount = 0, otCost = 0;
+    Object.keys(otMap).forEach(id => {
+      const e = otMap[id];
+      const st = (ld.lc_staff || []).find(s => s.id === id);
+      const wage = st && st.wage != null ? st.wage : (e.wage || 0);
+      const otHrs = Math.max(0, Math.max(e.actual, e.scheduled) - 40);
+      if (otHrs > 0) { otCount++; otCost += otHrs * wage * 0.5; }
+    });
+    if (otCount > 0) out.push({
+      sev: otCount >= 3 ? 'bad' : 'warn',
+      text: 'Overtime projected: ' + otCount + ' staff over 40 hours this week, about ' + App.fmtCurrency(otCost, 0) + ' in extra OT premium.',
+      screen: 'lc-overtime-watch', mod: 'labor'
+    });
+
+    // 2. Projected month-end prime cost — latest week's pace held to month end
+    const weeks = data.weeks || [];
+    const lw = weeks.length ? weeks[weeks.length - 1] : null;
+    const primeT = ((data.settings || {}).targets || {}).prime_cost_pct ?? 60;
+    if (lw && lw.prime_cost_pct != null && lw.prime_cost_pct > primeT) {
+      const gap = lw.prime_cost_pct - primeT;
+      const monthlyRev = (((lw.bar || {}).revenue || 0) + ((lw.food || {}).revenue || 0)) * 4.345;
+      const monthlyOver = (gap / 100) * monthlyRev;
+      out.push({
+        sev: gap > 3 ? 'bad' : 'warn',
+        text: 'Prime cost is tracking at ' + lw.prime_cost_pct.toFixed(1) + '%, ' + gap.toFixed(1) + ' points over your ' + primeT + '% target. Hold this pace and the month closes about ' + App.fmtCurrency(monthlyOver, 0) + ' over.',
+        screen: 'dashboard', mod: 'profit'
+      });
+    }
+
+    // 3. Declining review velocity — latest period below its recent average
+    const tw = data.traffic_weeks || [];
+    if (tw.length >= 3) {
+      const latestT = tw[tw.length - 1];
+      const prior = tw.slice(-5, -1).map(w => w.new_reviews).filter(v => v != null);
+      if (latestT && latestT.new_reviews != null && prior.length >= 2) {
+        const avg = prior.reduce((a, b) => a + b, 0) / prior.length;
+        if (avg > 0 && latestT.new_reviews < avg * 0.8) out.push({
+          sev: 'warn',
+          text: 'Review velocity is sliding: ' + latestT.new_reviews + ' new reviews this period against a ' + avg.toFixed(0) + ' average. Reviews drive local ranking.',
+          screen: 't-reviews', mod: 'traffic'
+        });
+      }
+    }
+
+    // 4. Recurring cash shortages — repeated shorts in recent reconciliations
+    const recs = data.reconciliations || [];
+    if (recs.length >= 2) {
+      const recent = recs.slice(-6);
+      const tolDefault = (data.settings || {}).cash_tolerance ?? 10;
+      const shorts = recent.filter(r => {
+        const tol = r.tolerance != null ? r.tolerance : tolDefault;
+        return r.over_short != null && r.over_short < -Math.abs(tol);
+      }).length;
+      if (shorts >= 2) out.push({
+        sev: shorts >= 3 ? 'bad' : 'warn',
+        text: 'Cash came up short in ' + shorts + ' of the last ' + recent.length + ' counts. Recurring shortages point to a process gap, not a one-off.',
+        screen: 'cash-recon', mod: 'profit'
+      });
+    }
+
+    // 5. Vendor price re-drift — fresh price increases in recent deliveries
+    const dels = (App.inventoryData || {}).ic_deliveries || [];
+    const cutoff = (() => { const d = new Date(); d.setDate(d.getDate() - 45); return iso(d); })();
+    let incCount = 0;
+    dels.filter(d => d.date && d.date >= cutoff).forEach(d => {
+      (d.line_items || []).forEach(li => {
+        if (li.price_changed && li.prev_price != null && li.price_per_unit != null
+            && li.price_per_unit > li.prev_price) incCount++;
+      });
+    });
+    if (incCount >= 2) out.push({
+      sev: 'warn',
+      text: 'Vendor prices rose on ' + incCount + ' items in deliveries over the last 45 days. Verify these against quoted sheets before they stick.',
+      screen: 'vendor-watch', mod: 'profit'
+    });
+
+    return out;
+  }
 
 };
