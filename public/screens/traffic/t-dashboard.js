@@ -171,6 +171,7 @@ S.TrafficDashboard = {
   },
 
   showInsights() {
+    if (App.demoBlock('AI Trend Insights')) return;
     const weeks = App.data.traffic_weeks || [];
     const showModal = (html) => {
       const m = document.createElement('div');
