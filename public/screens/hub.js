@@ -283,7 +283,7 @@ S.Hub = {
       { name:'Revenue Recovery', icon:icons.revenue, screen:'r-dashboard', mod:'revenue' },
       { name:'Traffic Recovery', icon:icons.traffic, screen:'t-dashboard', mod:'traffic' },
       { name:'Inventory Control',icon:icons.inv,   screen:'ic-dashboard', mod:'inventory' },
-      { name:'Labor Control',    icon:icons.labor, soon:true },
+      { name:'Labor Control',    icon:icons.labor, screen:'lc-positions', mod:'labor' },
       { name:'Shift Control',    icon:icons.shift, screen:'sc-dashboard', mod:'shift' },
     ];
     const navHtml = navItems.map(n => n.soon
