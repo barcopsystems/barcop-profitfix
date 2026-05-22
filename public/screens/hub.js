@@ -394,7 +394,7 @@ S.Hub = {
             <span style="font-size:11px;color:var(--t3);">${todayStr}</span>
             <button id="hub-getstarted" class="hd-btn">Getting Started</button>
             <button id="hub-settings" class="hd-btn">Settings</button>
-            <button id="hub-signout" class="hd-btn">Sign Out</button>
+            <button id="hub-signout" class="hd-btn">${App.demoMode ? 'Exit Demo' : 'Sign Out'}</button>
           </div>
         </div>
 
@@ -416,7 +416,10 @@ S.Hub = {
       </div>
     `;
 
-    document.getElementById('hub-signout')?.addEventListener('click', async () => { await DB.signOut(); });
+    document.getElementById('hub-signout')?.addEventListener('click', async () => {
+      if (App.demoMode) { window.location.href = '/'; return; }
+      await DB.signOut();
+    });
     document.getElementById('hub-settings')?.addEventListener('click', () => S.HubSettings.open());
     document.getElementById('hub-getstarted')?.addEventListener('click', () => S.HubGettingStarted.open());
 
