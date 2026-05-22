@@ -33,18 +33,24 @@ window.FixPanel = {
   fixAreasCard(moduleKey) {
     const gaps = this.gapAreas(moduleKey);
     if (!gaps.length) return '';
+    const BANDS = {
+      ok:    { label: 'On Target', color: 'var(--gold)' },
+      watch: { label: 'Watch',     color: 'var(--w)' },
+      over:  { label: 'Over',      color: 'var(--red)' }
+    };
     const rows = gaps.map((g, i) => {
       const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
       let impHtml = '';
-      if (imp && imp.onTarget) {
-        impHtml = '<span style="flex-shrink:0;font-size:8px;font-weight:800;letter-spacing:0.1em;'
-          + 'text-transform:uppercase;color:var(--gold);">On Target</span>';
-      } else if (imp && imp.dollars > 0) {
+      if (imp && BANDS[imp.band]) {
+        const bm = BANDS[imp.band];
         impHtml = '<div style="flex-shrink:0;text-align:right;">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;'
-          + 'color:var(--red);line-height:1;">' + App.fmtCurrency(imp.dollars) + '</div>'
-          + '<div style="font-size:8px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;'
-          + 'color:var(--t3);margin-top:2px;">Over target / yr</div></div>';
+          + '<div style="font-size:8px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;'
+          + 'color:' + bm.color + ';">' + bm.label + '</div>'
+          + (imp.dollars > 0
+              ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;'
+                + 'color:' + bm.color + ';line-height:1.1;margin-top:2px;">' + App.fmtCurrency(imp.dollars)
+                + '<span style="font-size:9px;"> /yr</span></div>'
+              : '') + '</div>';
       }
       return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
         + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
