@@ -86,6 +86,91 @@ S.TheftRisk = {
     this.renderMain();
   },
 
+  /* Guided Variance Investigation (Section 10) — the Fix System's 6-step
+     variance process as a trackable workflow on a flagged product. */
+  VARIANCE_STEPS: [
+    { title: 'Verify the count',
+      detail: 'Pull the product count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error.' },
+    { title: 'Calculate theoretical usage',
+      detail: 'POS sales by drink type times recipe ounces, compared against the actual ounce movement from the count.' },
+    { title: 'Identify the shifts',
+      detail: 'Use the opening and closing counts to find which shifts the variance landed on.' },
+    { title: 'Talk to the bar manager',
+      detail: 'Ask what they noticed on those shifts: breakage, waste, comps, or unusual activity.' },
+    { title: 'Run a mid-shift count',
+      detail: 'Run an unannounced mid-shift count on the flagged product during a service period.' },
+    { title: 'Document the finding',
+      detail: 'Write down the finding and the resolution before closing, even when it is inconclusive.' }
+  ],
+
+  _inv(id) { return (App.data.variance_investigations || []).find(x => x.id === id); },
+
+  investigationsCard() {
+    const invs = App.data.variance_investigations || [];
+    const open = invs.filter(i => i.status !== 'resolved');
+    const resolved = invs.filter(i => i.status === 'resolved');
+    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;'
+      + 'color:#fff;font-size:13px;padding:7px 10px;color-scheme:dark;';
+
+    let html = '<div class="card"><div class="card-title">Variance Investigations</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
+      + 'When a product shows unexplained variance, open an investigation and work the six steps in order. '
+      + 'It keeps the process honest and leaves a paper trail.</div>'
+      + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:18px;">'
+      + '<div class="f" style="width:230px;"><label>Flagged Product</label>'
+      + '<input type="text" class="vi-sku-input" placeholder="e.g. Titos 1L" style="' + inputStyle + 'width:100%;"/></div>'
+      + '<button class="btn btn-primary vi-open-btn">Open Investigation</button></div>';
+
+    open.forEach(inv => {
+      const doneN = inv.steps.filter(s => s.done).length;
+      html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<span style="font-size:13px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(inv.sku) + '</span>'
+        + '<span style="font-size:11px;color:var(--t3);">opened ' + esc(inv.opened_date) + '</span>'
+        + '<span style="font-size:11px;font-weight:700;color:var(--gold);margin-left:auto;">' + doneN + ' of 6 steps</span>'
+        + '</div>';
+      inv.steps.forEach((s, idx) => {
+        const st = this.VARIANCE_STEPS[idx];
+        html += '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);">'
+          + '<input type="checkbox" class="vi-step-check" data-inv="' + inv.id + '" data-step="' + idx + '"'
+          + (s.done ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;width:15px;height:15px;accent-color:#C9A84C;"/>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:12px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+          + (idx + 1) + '. ' + esc(st.title) + '</div>'
+          + '<div style="font-size:11px;color:var(--t3);line-height:1.55;margin:3px 0 6px;">' + esc(st.detail) + '</div>'
+          + '<input type="text" class="vi-finding" data-inv="' + inv.id + '" data-step="' + idx + '" '
+          + 'value="' + esc(s.finding) + '" placeholder="What you found" style="' + inputStyle + 'width:100%;"/>'
+          + '</div></div>';
+      });
+      html += '<div style="margin-top:12px;">'
+        + '<label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
+        + '<textarea class="vi-resolution" data-inv="' + inv.id + '" rows="2" '
+        + 'placeholder="The conclusion, even if inconclusive" style="' + inputStyle + 'width:100%;margin-top:5px;resize:vertical;">'
+        + esc(inv.resolution || '') + '</textarea>'
+        + '<div style="display:flex;gap:10px;margin-top:10px;">'
+        + '<button class="btn btn-primary btn-sm vi-resolve-btn" data-inv="' + inv.id + '">Resolve and Close</button>'
+        + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
+        + '</div></div></div>';
+    });
+    if (!open.length) {
+      html += '<div style="font-size:12px;color:var(--t4);">No open investigations.</div>';
+    }
+
+    if (resolved.length) {
+      html += '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 8px;">Resolved</div>'
+        + resolved.slice().reverse().map(inv =>
+          '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
+          + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-top:5px;"></span>'
+          + '<div style="flex:1;min-width:0;"><span style="font-weight:700;color:var(--t1);">' + esc(inv.sku) + '</span> '
+          + '<span style="color:var(--t3);">resolved ' + esc(inv.resolved_date || '') + '</span>'
+          + (inv.resolution ? '<div style="color:var(--t2);line-height:1.55;margin-top:2px;">' + esc(inv.resolution) + '</div>' : '')
+          + '</div>'
+          + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
+          + '</div>').join('');
+    }
+    return html + '</div>';
+  },
+
   renderMain() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
     const autoScores = [pour.score, voids.score, cash.score].filter(s => s != null);
@@ -181,7 +266,8 @@ S.TheftRisk = {
         + '<th>Date</th><th>Score</th><th>Rating</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + scoreCard + signals + manualCard + histCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + scoreCard + signals + manualCard
+      + this.investigationsCard() + histCard + '</div>';
 
     document.getElementById('tr-manual')?.addEventListener('change', e => {
       this._manual.notes = document.getElementById('tr-notes')?.value || '';
@@ -191,6 +277,50 @@ S.TheftRisk = {
     document.getElementById('tr-notes')?.addEventListener('input', e => {
       this._manual.notes = e.target.value;
     });
+
+    // ── Variance investigation wiring ──
+    this.container.querySelectorAll('.vi-open-btn').forEach(b => b.addEventListener('click', () => {
+      const inp = this.container.querySelector('.vi-sku-input');
+      const sku = inp && inp.value.trim();
+      if (!sku) { if (inp) inp.style.borderColor = 'var(--red)'; return; }
+      App.data.variance_investigations = App.data.variance_investigations || [];
+      App.data.variance_investigations.push({
+        id: App.uid(), sku: sku, opened_date: new Date().toISOString().slice(0, 10),
+        status: 'open', steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })), resolution: ''
+      });
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-step-check').forEach(c => c.addEventListener('change', () => {
+      const inv = this._inv(c.dataset.inv); if (!inv) return;
+      inv.steps[+c.dataset.step].done = c.checked;
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-finding').forEach(i => i.addEventListener('change', () => {
+      const inv = this._inv(i.dataset.inv); if (!inv) return;
+      inv.steps[+i.dataset.step].finding = i.value;
+      App.saveKey('variance_investigations');
+    }));
+    this.container.querySelectorAll('.vi-resolution').forEach(t => t.addEventListener('change', () => {
+      const inv = this._inv(t.dataset.inv); if (!inv) return;
+      inv.resolution = t.value;
+      App.saveKey('variance_investigations');
+    }));
+    this.container.querySelectorAll('.vi-resolve-btn').forEach(b => b.addEventListener('click', () => {
+      const inv = this._inv(b.dataset.inv); if (!inv) return;
+      const ta = this.container.querySelector('.vi-resolution[data-inv="' + inv.id + '"]');
+      if (ta) inv.resolution = ta.value;
+      inv.status = 'resolved';
+      inv.resolved_date = new Date().toISOString().slice(0, 10);
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-remove').forEach(b => b.addEventListener('click', () => {
+      App.data.variance_investigations = (App.data.variance_investigations || []).filter(x => x.id !== b.dataset.inv);
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
   },
 
   async save() {
