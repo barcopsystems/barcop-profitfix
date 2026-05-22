@@ -351,7 +351,9 @@ const DB = {
       },
       traffic_weeks:   [],
       traffic_audits:  [],
-      getting_started_traffic: {}
+      getting_started_traffic: {},
+      // Fix layer — implemented-fix events feeding the Recovery Scoreboard
+      fix_log: []
     };
   }
 };
