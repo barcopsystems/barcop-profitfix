@@ -183,10 +183,12 @@ window.Recovery = {
       });
   },
 
-  /* Current dollar impact of a gap-area: its latest weekly metric measured
-     against target and annualized. Returns { dollars, onTarget } where a
-     positive dollars figure is money being lost now, or null when it cannot
-     be computed honestly (no metric, no data, or no revenue base). */
+  /* Live diagnosis of a gap-area: its latest weekly metric measured against
+     target. Returns { band, onTarget, dollars, current, target, label } where
+     band is 'ok' | 'watch' | 'over' and dollars is the annualized cost of
+     being off target. Returns null when it cannot be computed honestly (no
+     metric, no data, or no revenue base). The 0-100 score stays in the Audit;
+     this is the always-current status band the dashboard reads. */
   gapImpact(gapId) {
     const m = this.METRICS[gapId];
     if (!m) return null;
@@ -198,11 +200,19 @@ window.Recovery = {
     if (!latest) return null;
     const cur = m.value(latest), tgt = m.target(), base = m.base(latest);
     if (cur == null || isNaN(cur) || tgt == null || !base || isNaN(base)) return null;
-    const delta = m.lowerBetter ? (cur - tgt) : (tgt - cur);
-    if (delta <= 0) return { dollars: 0, onTarget: true };
-    const dollars = (m.baseKind === 'pts')
-      ? Math.abs(App.dollarize(cur, tgt, base * 52).annual)
-      : delta * base * 52;
-    return { dollars: dollars, onTarget: false };
+    const delta = m.lowerBetter ? (cur - tgt) : (tgt - cur);   // positive = off target
+    let band, dollars = 0;
+    if (delta <= 0) {
+      band = 'ok';
+    } else {
+      // Watch within 10% past target, Over beyond it — the same target
+      // logic the Audit grades this metric by.
+      band = (delta / tgt) <= 0.10 ? 'watch' : 'over';
+      dollars = (m.baseKind === 'pts')
+        ? Math.abs(App.dollarize(cur, tgt, base * 52).annual)
+        : delta * base * 52;
+    }
+    return { band: band, onTarget: band === 'ok', dollars: dollars,
+             current: cur, target: tgt, label: m.label };
   }
 };
