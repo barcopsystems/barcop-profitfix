@@ -29,47 +29,59 @@ window.Recovery = {
   // honestly from existing weekly data appear here. baseKind 'pts' means the
   // metric is a percentage and dollars = (improvement / 100) x base x 52;
   // 'unit' means dollars = improvement x base x 52.
+  _ptargets() { return (App.data.settings || {}).targets || {}; },
+  _rtargets() { return ((App.data.revenue_settings || {}).targets) || {}; },
+
   METRICS: {
     'pour-cost': {
       series: 'weeks', label: 'Bar Pour Cost', lowerBetter: true,
       value: w => (w.bar ? w.bar.cost_pct : null),
       base:  w => (w.bar ? w.bar.revenue : null), baseKind: 'pts',
+      target: () => Recovery._ptargets().bar_pour_cost_pct ?? 22,
       fmt: v => v.toFixed(1) + '%'
     },
     'food-cost': {
       series: 'weeks', label: 'Food Cost', lowerBetter: true,
       value: w => (w.food ? w.food.cost_pct : null),
       base:  w => (w.food ? w.food.revenue : null), baseKind: 'pts',
+      target: () => Recovery._ptargets().food_cost_pct ?? 32,
       fmt: v => v.toFixed(1) + '%'
     },
     'prime-cost': {
       series: 'weeks', label: 'Prime Cost', lowerBetter: true,
       value: w => w.prime_cost_pct,
       base:  w => (w.bar ? w.bar.revenue || 0 : 0) + (w.food ? w.food.revenue || 0 : 0), baseKind: 'pts',
+      target: () => Recovery._ptargets().prime_cost_pct ?? 60,
       fmt: v => v.toFixed(1) + '%'
     },
     'pricing': {
       series: 'revenue_weeks', label: 'Check Average', lowerBetter: false,
       value: w => w.check_avg,
       base:  w => w.covers, baseKind: 'unit',
+      target: () => Recovery._rtargets().check_avg ?? 35,
       fmt: v => '$' + v.toFixed(2)
     },
     'check-average': {
       series: 'revenue_weeks', label: 'Check Average', lowerBetter: false,
       value: w => w.check_avg,
       base:  w => w.covers, baseKind: 'unit',
+      target: () => Recovery._rtargets().check_avg ?? 35,
       fmt: v => '$' + v.toFixed(2)
     },
     'labor-scheduling': {
       series: 'revenue_weeks', label: 'Labor Cost', lowerBetter: true,
       value: w => w.labor_pct_blended,
       base:  w => (w.bar_revenue || 0) + (w.floor_revenue || 0), baseKind: 'pts',
+      target: () => { const t = Recovery._rtargets();
+        return ((t.bar_labor_pct ?? 28) + (t.kitchen_labor_pct ?? 30) + (t.floor_labor_pct ?? 32)) / 3; },
       fmt: v => v.toFixed(1) + '%'
     },
     'rplh': {
       series: 'revenue_weeks', label: 'RPLH', lowerBetter: false,
       value: w => w.rplh_blended,
       base:  w => w.total_hours, baseKind: 'unit',
+      target: () => { const t = Recovery._rtargets();
+        return ((t.rplh_lunch ?? 50) + (t.rplh_dinner ?? 75) + (t.rplh_bar ?? 65)) / 3; },
       fmt: v => '$' + v.toFixed(0)
     }
   },
@@ -157,5 +169,28 @@ window.Recovery = {
         if (idx < 0) idx = weeks.length - 1;
         return { index: idx, label: e.gap_name || 'Fix', date: e.date };
       });
+  },
+
+  /* Current dollar impact of a gap-area: its latest weekly metric measured
+     against target and annualized. Returns { dollars, onTarget } where a
+     positive dollars figure is money being lost now, or null when it cannot
+     be computed honestly (no metric, no data, or no revenue base). */
+  gapImpact(gapId) {
+    const m = this.METRICS[gapId];
+    if (!m) return null;
+    const weeks = this._series(m.series)
+      .filter(w => w.period_end)
+      .slice()
+      .sort((a, b) => a.period_end.localeCompare(b.period_end));
+    const latest = weeks[weeks.length - 1];
+    if (!latest) return null;
+    const cur = m.value(latest), tgt = m.target(), base = m.base(latest);
+    if (cur == null || isNaN(cur) || tgt == null || !base || isNaN(base)) return null;
+    const delta = m.lowerBetter ? (cur - tgt) : (tgt - cur);
+    if (delta <= 0) return { dollars: 0, onTarget: true };
+    const dollars = (m.baseKind === 'pts')
+      ? Math.abs(App.dollarize(cur, tgt, base * 52).annual)
+      : delta * base * 52;
+    return { dollars: dollars, onTarget: false };
   }
 };
