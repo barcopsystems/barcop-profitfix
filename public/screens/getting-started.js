@@ -16,7 +16,7 @@ S.GettingStarted = {
     { week:3, id:'t12', label:'Log any vendor price changes from your last invoice in Vendor Watch.', screen:'vendor-watch' },
     { week:4, id:'t13', label:'Review the 8-week trend chart on your Dashboard.', screen:'dashboard' },
     { week:4, id:'t14', label:'Check Reports and History. Run the annual cost calculator.', screen:'reports' },
-    { week:4, id:'t15', label:'Download and review the resources in the Resources section.', screen:'resources' },
+    { week:4, id:'t15', label:'Open Profit Fix and walk the fix process for each gap-area. The policy and audit documents you need are linked there as downloads.', screen:'profit-fix' },
     { week:4, id:'t16', label:'Request your second Profit Audit. The app now includes all your 30-day tracked data for a deeper, more complete analysis.', screen:'audit-tracker' },
   ],
 
