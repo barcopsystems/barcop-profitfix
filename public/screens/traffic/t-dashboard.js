@@ -127,6 +127,7 @@ S.TrafficDashboard = {
       + chartHtml
       + '<div class="sh">This Week Summary</div>'
       + summaryHtml
+      + FixPanel.recoveryCard('traffic')
       + FixPanel.fixAreasCard('traffic')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
