@@ -123,5 +123,21 @@ window.Recovery = {
       weeksAfter: aN,
       mature: aN >= this.WINDOW
     };
+  },
+
+  /* Roll a module's logged fixes into a slice for its dashboard. Returns
+     { logged, recovered, withFigure, measuring }: total logged fixes, the
+     summed annualized recovered dollars, how many produced a dollar figure,
+     and how many are still in the measuring window. */
+  moduleSummary(moduleKey) {
+    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const mine = log.filter(e => e.module === moduleKey);
+    let recovered = 0, withFigure = 0, measuring = 0;
+    mine.forEach(e => {
+      const r = this.compute(e);
+      if (r.status === 'ok' && r.dollars != null && r.dollars > 0) { recovered += r.dollars; withFigure++; }
+      else if (r.status === 'pending') measuring++;
+    });
+    return { logged: mine.length, recovered: recovered, withFigure: withFigure, measuring: measuring };
   }
 };
