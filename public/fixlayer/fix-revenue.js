@@ -658,6 +658,135 @@ FIX.revenue = [
         whatToPaste: 'Fill in the shift, covers, Stars, pairing, and the check average target.'
       }
     ]
+  },
+
+  {
+    id: 'events-catering',
+    name: 'Events & Catering',
+    module: 'revenue',
+    summary: 'Private dining and catering is revenue most independents leave on the table. Name an owner, publish a rate card, respond in two hours, and run the P&L before confirming.',
+
+    process: {
+      intro: 'An events business runs on speed and process: a published rate card so pricing is instant, a two-hour response standard so the client stays engaged, and a pipeline so nothing goes cold. Margin varies widely by event — run the P&L before you confirm, not after.',
+      steps: [
+        { title: 'Name one owner for events',
+          detail: 'Everyone responsible means nobody responsible. One person owns the pipeline, the follow-up, and the close rate.' },
+        { title: 'Build a rate card before any inquiry',
+          detail: 'Published packages, per-head pricing, and F&B minimums by room. A rate card is faster, produces better margins, and looks more professional than bespoke pricing per inquiry.' },
+        { title: 'Respond to every inquiry within two hours',
+          detail: 'Send the complete package with a short personal note — not a link to the website. Booking probability drops sharply after two hours and below 20% after 24. Send the package first, ask clarifying questions after.' },
+        { title: 'Track every inquiry in a pipeline',
+          detail: 'Log each inquiry with its status and a follow-up date. Any inquiry without a next action in 7 days gets one assigned; anything stuck 14 days in one status gets a close-or-reactivate decision.' },
+        { title: 'Run the Event P&L before confirming',
+          detail: 'Event margin varies widely with staffing, F&B mix, and ancillary costs. Calculate the P&L on every booking before you confirm it.' },
+        { title: 'Require a deposit to hold a date',
+          detail: 'A booking without a deposit is just a hold, and holds cancel. A canceled hold that was not replaced costs the entire revenue of that date.' },
+        { title: 'Execute with checklists and review the pipeline weekly',
+          detail: 'Site inspection, event-day operations, and catering setup run off checklists with manager sign-off. A 15-minute Monday pipeline review keeps every open inquiry moving.' }
+      ]
+    },
+
+    formulas: [
+      { label: 'Event P&L Margin',
+        formula: '(Event revenue - event COGS - event labor - ancillary costs) / Event revenue',
+        example: 'Run this on every booking before confirming — margin varies widely by event' },
+      { label: 'Catering Per-Head Price',
+        formula: 'Per-head cost / (1 - target margin)',
+        example: '$18 per-head cost / (1 - 0.30) = $25.71 per head at a 30% target margin' },
+      { label: 'F&B Minimum',
+        formula: 'Set to the room\'s typical revenue on a strong regular night',
+        example: 'A back room that does $1,200 on a busy Saturday carries a $1,200 Saturday F&B minimum' }
+    ],
+
+    commonMistakes: [
+      'Having no named owner for events — everyone responsible means nobody responsible.',
+      'Pricing events per inquiry rather than from a rate card — bespoke pricing is slower, produces worse margins, and looks less professional.',
+      'Waiting more than two hours to respond — booking probability drops sharply after two hours and below 20% after 24.',
+      'Sending a website link instead of a complete package — a client who has to hunt for pricing calls the next venue.',
+      'Not requiring a deposit to hold a date — a hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.',
+      'Not running an Event P&L on every booking — event margin varies widely; calculate it before the event, not after.'
+    ],
+
+    quickRef: {
+      rhythm: [
+        'Within 2 hours of any inquiry: log it, send the complete package with a personal note',
+        'Set a follow-up date 48 hours out on every inquiry when the package goes out',
+        'Confirm or propose the requested date in the same first response',
+        'Weekly: review every open inquiry and its status in the pipeline',
+        'Weekly: assign a follow-up to any inquiry without a next action in 7 days',
+        'Weekly: calculate pipeline value and review last week\'s closed and lost inquiries'
+      ],
+      escalation: [
+        'Review every open inquiry\'s current status and last action.',
+        'Close or reactivate any inquiry stuck in the same status for 14 days.',
+        'Calculate the overall close rate and find the stage where inquiries go cold.',
+        'Compare average response time on booked inquiries versus lost inquiries.',
+        'Look for patterns in lost bookings — event type, day of week, guest count, or price.',
+        'Fix the most common loss cause first and re-check the close rate next quarter.'
+      ]
+    },
+
+    templates: [
+      {
+        id: 'events-package',
+        name: 'Private Dining and Events Package',
+        intro: 'The package sent to every event inquiry within two hours. Fill the fields, then send it as the complete answer to the inquiry.',
+        fields: [
+          { key: 'bar_name',      label: 'Venue Name',     placeholder: 'Your venue' },
+          { key: 'room_name',     label: 'Private Room',   placeholder: 'e.g. The Back Room' },
+          { key: 'capacity',      label: 'Room Capacity',  placeholder: 'e.g. 28 guests' },
+          { key: 'fnb_minimum',   label: 'F&B Minimum',    placeholder: 'e.g. $1,200 Saturdays' }
+        ],
+        body: 'PRIVATE DINING AND EVENTS\n{{bar_name}}\n\n'
+          + 'Thank you for considering {{bar_name}} for your event. Here is everything you need to plan with us.\n\n'
+          + 'THE SPACE\n'
+          + '{{room_name}} seats up to {{capacity}}. The room is yours for the booked window, with dedicated service staff.\n\n'
+          + 'PACKAGES\n'
+          + '- Dinner prix fixe: a three-course menu selected from our seasonal offerings.\n'
+          + '- Reception style: passed and stationed appetizers with a beverage package.\n'
+          + '- Custom: we will build a menu around your occasion.\n'
+          + 'Per-head pricing is listed on the attached rate card by package and party size.\n\n'
+          + 'BEVERAGE\n'
+          + 'Hosted bar, consumption bar, or a curated wine and cocktail package — your choice.\n\n'
+          + 'MINIMUMS AND DEPOSIT\n'
+          + '- Food and beverage minimum for {{room_name}}: {{fnb_minimum}}.\n'
+          + '- A deposit confirms and holds your date. Dates are not held without a deposit.\n\n'
+          + 'NEXT STEPS\n'
+          + 'Reply with your preferred date and guest count and we will confirm availability and hold the room. We are glad to schedule a site visit.\n\n'
+          + 'Events contact: ____________________   Phone: ____________________'
+      }
+    ],
+
+    aiWorkflows: [
+      {
+        id: 'ec-ai-1',
+        title: 'Draft an Event Inquiry Response',
+        whatItDoes: 'Writes a warm, professional response email that confirms the date, references the attached package, and gives a direct contact.',
+        prompt: 'I received an event inquiry with the following details: client name [NAME], event type [TYPE], estimated guest count [X], requested date [DATE], any specific requests noted [DETAILS]. My venue details: room name [ROOM], capacity [X], F&B minimum [X], available packages [DESCRIBE]. Write a professional response email under 150 words that confirms receipt and interest, notes that the package is attached, confirms or proposes the requested date, and provides a direct contact name and number. Warm and direct, no sales language.',
+        whatToPaste: 'Fill in the inquiry details and your venue\'s room, capacity, minimum, and packages.'
+      },
+      {
+        id: 'ec-ai-2',
+        title: 'Analyze the Events Pipeline',
+        whatItDoes: 'Reads 90 days of pipeline data to find the close rate, the stage where inquiries go cold, and the patterns in lost bookings.',
+        prompt: 'Here is my event pipeline data for the last 90 days. Columns: inquiry date, event type, guest count, status (booked/lost/open), days to first response, notes on reason for loss if known. [PASTE DATA]. Calculate my overall close rate, identify the most common stage where inquiries go cold, calculate average response time for bookings versus lost inquiries, and identify any patterns in lost bookings by event type, day of week, or guest count.',
+        whatToPaste: 'Paste 90 days of pipeline rows into [PASTE DATA].'
+      },
+      {
+        id: 'ec-ai-3',
+        title: 'Build a Catering Package Description',
+        whatItDoes: 'Writes a client-facing catering package description with the per-head price at your target margin.',
+        prompt: 'I want to add a catering package for [EVENT TYPE]. The package includes: [LIST ITEMS]. My per-head cost at current ingredient prices is approximately $[X] and my target margin for catering is [X]%. Write a client-facing package description under 120 words that describes what is included, the service style, the per-head price at target margin, and the minimum guest count. Professional and specific, no filler.',
+        whatToPaste: 'Fill in the event type, item list, per-head cost, and target margin.'
+      },
+      {
+        id: 'ec-ai-4',
+        title: 'Write a Post-Event Follow-Up',
+        whatItDoes: 'Drafts a personal post-event follow-up email that drives repeat bookings without offering a discount.',
+        prompt: 'Event details: client name [NAME], event type [TYPE], date [DATE], guest count [X], any notable details [NOTES]. Write a post-event follow-up email under 100 words that thanks the client personally, references one specific detail from the event, asks one question about their experience, and mentions you would love to host their next occasion. Do not offer a discount and do not use a template-sounding opener — write it as the manager who ran the event.',
+        whatToPaste: 'Fill in the client, event type, date, guest count, and a notable detail.'
+      }
+    ]
   }
 
 ];
