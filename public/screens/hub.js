@@ -463,7 +463,7 @@ S.Hub = {
             + 'style="display:flex;align-items:center;gap:12px;padding:10px 4px;'
             + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
             + '<div style="flex-shrink:0;min-width:78px;">'
-            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:var(--gold);line-height:1;">' + dollar + '</div>'
+            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:var(--red);line-height:1;">' + dollar + '</div>'
             +   (it.impact > 0 ? '<div style="font-size:9px;color:var(--t3);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-top:2px;">Per Month</div>' : '')
             + '</div>'
             + '<div style="flex:1;min-width:0;">'
