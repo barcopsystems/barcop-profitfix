@@ -57,9 +57,9 @@ S.TrafficEmail = {
     });
 
     // ── Email detail inputs ──
-    const freqOpts = '<option value="">—</option>' + this.FREQUENCY.map(f =>
+    const freqOpts = '<option value="">-</option>' + this.FREQUENCY.map(f =>
       '<option' + (prof.email_frequency === f ? ' selected' : '') + '>' + f + '</option>').join('');
-    const growthOpts = '<option value="">—</option>' + this.GROWTH.map(g =>
+    const growthOpts = '<option value="">-</option>' + this.GROWTH.map(g =>
       '<option' + (prof.email_growth === g ? ' selected' : '') + '>' + g + '</option>').join('');
 
     const formCard = '<div class="card">'
@@ -77,9 +77,9 @@ S.TrafficEmail = {
 
     // ── Action items ──
     const tips = [];
-    if (list != null && list < this.LIST_BENCHMARK) tips.push('Email list is ' + list.toLocaleString() + ' contacts, below the ' + this.LIST_BENCHMARK + ' benchmark. An owned list is the one channel no algorithm controls — grow it.');
+    if (list != null && list < this.LIST_BENCHMARK) tips.push('Email list is ' + list.toLocaleString() + ' contacts, below the ' + this.LIST_BENCHMARK + ' benchmark. An owned list is the one channel no algorithm controls. Grow it.');
     if (open != null && open < this.OPEN_RATE_BENCHMARK) tips.push('Open rate is ' + Math.round(open) + '%, below the ' + this.OPEN_RATE_BENCHMARK + '% benchmark. Tighten subject lines and send when guests are deciding where to eat.');
-    if (sent != null && sent < 1) tips.push('No emails sent this month. A list you never email is a dead asset — send at least monthly.');
+    if (sent != null && sent < 1) tips.push('No emails sent this month. A list you never email is a dead asset. Send at least monthly.');
     if (prof.email_frequency === 'Rarely' || prof.email_frequency === 'Never') tips.push('Send frequency is "' + prof.email_frequency + '". Move to at least monthly so the list stays warm.');
     if (!prof.email_growth || prof.email_growth === 'No active mechanism') tips.push('No active list-growth mechanism. Add a signup form on the website and a capture point in-store.');
     if (!loyal) tips.push('No loyalty program active. A simple loyalty program turns one-time delivery and walk-in guests into regulars.');
@@ -94,7 +94,7 @@ S.TrafficEmail = {
           ).join('')
         + '</div>'
       : '<div class="card"><div class="empty"><div class="empty-title">Email and Loyalty Are Working</div>'
-        + '<div class="empty-sub">List size, open rate, send cadence, and loyalty are all on track. Keep sending consistently.</div></div></div>';
+        + '<div class="empty-sub">List size, open rate, send frequency, and loyalty are all on track. Keep sending consistently.</div></div></div>';
 
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
