@@ -152,12 +152,12 @@ S.RevenueServerCheck = {
     const ca   = sales / cov;
     const diff = ca - target;
     let status, sBg, sColor, cColor;
-    if (diff>=0)      { status='ON TARGET';          sBg='rgba(201,168,76,0.12)'; sColor='#C9A84C'; cColor='#C9A84C'; }
+    if (diff>=0)      { status='ON TARGET';          sBg='rgba(219,171,70,0.12)'; sColor='#DBAB46'; cColor='#DBAB46'; }
     else if (diff>=-5){ status='WATCH';              sBg='rgba(255,255,255,0.08)'; sColor='rgba(255,255,255,0.8)'; cColor='#fff'; }
     else              { status='BELOW STANDARD';     sBg='rgba(192,56,40,0.15)'; sColor='#C03828'; cColor='#C03828'; }
     const caEl=document.getElementById('rsc-ca'), vEl=document.getElementById('rsc-var'), bEl=document.getElementById('rsc-badge');
     if(caEl){caEl.textContent=App.fmtCurrency(ca);caEl.style.color=cColor;}
-    if(vEl) {vEl.textContent=(diff>=0?'+':'')+App.fmtCurrency(diff);vEl.style.color=diff>=0?'#C9A84C':'#C03828';}
+    if(vEl) {vEl.textContent=(diff>=0?'+':'')+App.fmtCurrency(diff);vEl.style.color=diff>=0?'#DBAB46':'#C03828';}
     if(bEl) {bEl.textContent=status;bEl.style.background=sBg;bEl.style.color=sColor;}
     this._calc={ca,diff,status};
   },
