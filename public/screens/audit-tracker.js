@@ -346,14 +346,20 @@ S.AuditTracker = {
           + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
           + '</div>';
       }).join('');
+      // score === null means the section is intentionally unscored (Risk
+      // Signals). Skip the big number + scale bar so we don't paint a
+      // red "0" that reads like a failing score.
+      const scoreBlock = score == null
+        ? ''
+        : '<div style="text-align:right;">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
+          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
+          + '</div>';
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
-        + '<div style="text-align:right;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + (score||0) + '</div>'
-        + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
-        + '</div></div>'
+        + scoreBlock + '</div>'
         + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
         + sigRows
         + '</div>';
@@ -434,7 +440,7 @@ S.AuditTracker = {
         ['Labor by Department',     d.S5_LABOR_BY_DEPT],
         ['Monthly COGS Gap',        cur(d.S5_COMBINED_COGS_GAP), d.S5_COMBINED_COGS_GAP > 0 ? 'warn' : ''],
       ]),
-      sectionBlock(6, 'Operational Risk Signals', d.S6_SIG1_SCORE ? null : 0, [], signals6),
+      ...(signals6.length ? [sectionBlock(6, 'Operational Risk Signals', null, [], signals6)] : []),
     ].join('');
 
     const actionItems = (audit.action_items || []).map((a,i) =>
