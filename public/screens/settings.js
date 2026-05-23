@@ -140,7 +140,7 @@ S.HubSettings = {
   },
 
   secNotifications() {
-    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Alerts surface automatically on the Hub: metric breaches, forward-looking warnings, and Traffic cadence nudges. There are no notification toggles to configure yet. When email or push delivery is added, its controls will live here.</div>';
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Alerts surface automatically on the Hub: metric breaches, forward-looking warnings, and Traffic activity reminders. There are no notification toggles to configure yet. When email or push delivery is added, its controls will live here.</div>';
   },
 
   secAccount() {
@@ -316,7 +316,7 @@ S.HubSettings = {
     if (status === 'active' && !hasAll) {
       upgradeBlock = '<div class="card" style="margin-top:0;">'
         + '<div class="settings-title" style="margin-bottom:12px;">Add More Modules</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Unlock Revenue Recovery or Traffic Recovery to get a full picture of where your bar is bleeding money.</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Add Revenue Recovery or Traffic Recovery to get a full picture of where your bar is bleeding money.</div>'
         + '<button class="btn btn-primary" id="s-upgrade-btn">View Upgrade Options</button>'
         + '</div>';
     }
@@ -679,7 +679,7 @@ S.HubSettings = {
         S4_INVOICE_VS_PO: 'Never matched', S4_PRICE_VERIFY: 'No', S4_ANNUAL_BIDS: 'No', S4_BACKUP_VENDORS: 'None on file',
         S4_EXPOSURE_MONTHLY: 1140, S4_EXPOSURE_ANNUAL: 13680,
         S4_NARRATIVE: 'Invoices are never matched against orders and prices are never verified against quoted sheets.',
-        S4_FINDING: 'Sampled invoices show price drift and at least two short deliveries that were paid in full. That works out to roughly $1,140 of monthly exposure, with no backup vendor leverage.',
+        S4_FINDING: 'Sampled invoices show price drift and at least two short deliveries that were paid in full. That works out to roughly $1,140 of monthly exposure, with no backup vendor to put pressure on prices.',
         S4_TOOL: 'Match every invoice to its delivery using the Vendor Delivery Inspection sheet.',
         S5_SCORE: 18, S5_TOTAL_REV_PERIOD: 82000, S5_TOTAL_COGS_PERIOD: 27311, S5_LABOR_PERIOD: 30340,
         S5_LABOR_PCT: 37.0, S5_BAR_COST_PCT: 29.4, S5_FOOD_COST_PCT: 39.8, S5_PRIME_COST_PCT: 70.3,
@@ -783,7 +783,7 @@ S.HubSettings = {
         S4_INVOICE_VS_PO: 'Matched on every delivery', S4_PRICE_VERIFY: 'Yes', S4_ANNUAL_BIDS: 'Scheduled', S4_BACKUP_VENDORS: 'Two per category',
         S4_EXPOSURE_MONTHLY: 210, S4_EXPOSURE_ANNUAL: 2520,
         S4_NARRATIVE: 'Every delivery is now matched to its order and prices are verified against quoted sheets.',
-        S4_FINDING: 'Exposure has fallen to about $210 per month. Two backup vendors per category give real negotiating leverage; the annual bid is scheduled but not yet run.',
+        S4_FINDING: 'Exposure has fallen to about $210 per month. Two backup vendors per category give you real negotiating room. The annual bid is scheduled but not yet run.',
         S4_TOOL: 'Run the scheduled annual bid to lock in pricing for the next cycle.',
         S5_SCORE: 57, S5_TOTAL_REV_PERIOD: 84400, S5_TOTAL_COGS_PERIOD: 23004, S5_LABOR_PERIOD: 26964,
         S5_LABOR_PCT: 32.0, S5_BAR_COST_PCT: 23.4, S5_FOOD_COST_PCT: 33.8, S5_PRIME_COST_PCT: 59.2,
@@ -798,7 +798,7 @@ S.HubSettings = {
         S6_SIG1_TOOL: 'Spot-check measured pours during pre-shift once a week.',
         S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Annual vendor bid not yet run',
         S6_SIG2_EVIDENCE: 'Backup vendors are identified but the annual competitive bid is still pending.',
-        S6_SIG2_GAP: 'Leaving roughly $1,800/year of negotiating leverage unused.',
+        S6_SIG2_GAP: 'Leaving roughly $1,800/year of negotiating room unused.',
         S6_SIG2_TOOL: 'Complete the annual bid before the next supplier contract renews.'
       }})
     ];
@@ -899,7 +899,7 @@ S.HubSettings = {
         S6_SIG3_SCORE: 'LOW', S6_SIG3_LABEL: 'Bottom server gap closing',
         S6_SIG3_EVIDENCE: 'Bottom-third check average up $4.70, spread now $13.70.',
         S6_SIG3_GAP: 'On track. Spread under $10 is the target.',
-        S6_SIG3_TOOL: 'Keep the briefing cadence and add a monthly server-by-server review.'
+        S6_SIG3_TOOL: 'Keep the daily briefings going and add a monthly server-by-server review.'
       }}),
       mkAudit('revenue', { date: dateStr(8), generated_at: daysAgoISO(8), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 60,
@@ -937,7 +937,7 @@ S.HubSettings = {
         S6_SIG1_SCORE: 'LOW', S6_SIG1_LABEL: 'Server spread tightened',
         S6_SIG1_EVIDENCE: 'Top to bottom spread is $9.40, under the $10 benchmark.',
         S6_SIG1_GAP: 'No action required.',
-        S6_SIG1_TOOL: 'Continue the pre-shift briefing cadence.',
+        S6_SIG1_TOOL: 'Continue the daily pre-shift briefings.',
         S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Dessert attach lagging',
         S6_SIG2_EVIDENCE: 'Dessert attach at 18% against a 25% target.',
         S6_SIG2_GAP: 'Smallest remaining lift in the upsell program.',
@@ -1158,8 +1158,8 @@ S.HubSettings = {
       push(raw.S1_MONTHLY_GAP, 'Complete the Google Business Profile setup.');
       push(raw.S2_MONTHLY_GAP, 'Lift website conversion and reduce bounce.');
       push(raw.S3_MONTHLY_GAP, 'Close the review velocity and response gap.');
-      push(raw.S5_MONTHLY_GAP, 'Tighten social cadence and content mix.');
-      push(raw.S6_MONTHLY_GAP, 'Optimize delivery platform listings.');
+      push(raw.S5_MONTHLY_GAP, 'Tighten posting schedule and content mix.');
+      push(raw.S6_MONTHLY_GAP, 'Tighten delivery platform listings.');
       push(raw.S7_MONTHLY_GAP, 'Activate the email list and loyalty program.');
       items.sort((a, b) => (b.monthly_impact||0) - (a.monthly_impact||0));
       const totalMo = items.reduce((s, it) => s + (it.monthly_impact||0), 0);
@@ -1209,7 +1209,7 @@ S.HubSettings = {
         S4_TOOL:'Pick the canonical NAP and fix every directory listing to match it exactly.',
         S5_SCORE:35, S5_IG_FOLLOWERS:1880, S5_IG_POSTS_LAST_30:5, S5_IG_POSTS_BENCHMARK:12,
         S5_FB_FOLLOWERS:1050, S5_CONTENT_TYPE:'Mostly promotional', S5_MONTHLY_GAP:380,
-        S5_NARRATIVE:'Instagram posting cadence runs 5 per 30 days against a 12 benchmark.',
+        S5_NARRATIVE:'Instagram posting runs 5 per 30 days against a 12 benchmark.',
         S5_FINDING:'Content is mostly promotional graphics. Food and people content drives the engagement that grows followers.',
         S5_TOOL:'Move to a balanced mix of food, people and the room. Post three times a week.',
         S6_SCORE:38, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
@@ -1273,8 +1273,8 @@ S.HubSettings = {
         S4_TOOL:'Add the bar to ten more local-bar directories.',
         S5_SCORE:52, S5_IG_FOLLOWERS:2120, S5_IG_POSTS_LAST_30:9, S5_IG_POSTS_BENCHMARK:12,
         S5_FB_FOLLOWERS:1115, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:200,
-        S5_NARRATIVE:'Posting cadence is up to 9 per 30 days and content shifted to a balanced mix.',
-        S5_FINDING:'Follower growth followed the cadence change. Three more posts per month hits the benchmark.',
+        S5_NARRATIVE:'Posting is up to 9 per 30 days and content shifted to a balanced mix.',
+        S5_FINDING:'Follower growth followed the schedule change. Three more posts per month hits the benchmark.',
         S5_TOOL:'Set a Tuesday and Friday content slot and stick to it.',
         S6_SCORE:54, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
         S6_DOORDASH_RATING:4.4, S6_UBEREATS_RATING:4.2,
@@ -1287,9 +1287,9 @@ S.HubSettings = {
         S7_LAST_SEND_DAYS_AGO:9, S7_SEND_FREQUENCY:'Monthly', S7_OPEN_RATE:24, S7_OPEN_BENCHMARK:20,
         S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Started', S7_MONTHLY_GAP:220,
         S7_NARRATIVE:'List grew past 500 and a loyalty program launched. Open rate of 24% beats the 20% benchmark.',
-        S7_FINDING:'A monthly cadence works. Moving to weekly during event months grows revenue per send.',
+        S7_FINDING:'Sending monthly works. Moving to weekly during event months grows revenue per send.',
         S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.',
-        S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Posting cadence inconsistent',
+        S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Posting schedule inconsistent',
         S8_SIG1_EVIDENCE:'IG posts at 9 per 30 days, but clustered in two bursts.',
         S8_SIG1_GAP:'Algorithms reward regular posting more than total volume.',
         S8_SIG1_TOOL:'Lock a Tuesday and Friday content slot.',
@@ -1333,7 +1333,7 @@ S.HubSettings = {
         S4_TOOL:'Audit citations quarterly and add new ones as new directories appear.',
         S5_SCORE:66, S5_IG_FOLLOWERS:2600, S5_IG_POSTS_LAST_30:14, S5_IG_POSTS_BENCHMARK:12,
         S5_FB_FOLLOWERS:1240, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:0,
-        S5_NARRATIVE:'Follower growth has compounded. Cadence is above benchmark with a balanced mix.',
+        S5_NARRATIVE:'Follower growth has compounded. Posting frequency is above benchmark with a balanced mix.',
         S5_FINDING:'IG engagement rate is up to 2.4%. Reels are now in rotation.',
         S5_TOOL:'Add one staff-introduction post a month to deepen the human side.',
         S6_SCORE:68, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
@@ -1352,7 +1352,7 @@ S.HubSettings = {
         S7_TOOL:'Add a redemption-rate report to the monthly review and run a member-only event quarterly.',
         S8_SIG1_SCORE:'LOW', S8_SIG1_LABEL:'Photo library steady',
         S8_SIG1_EVIDENCE:'138 photos current, with 54 added in the last 30 days.',
-        S8_SIG1_GAP:'On track. Consider a seasonal refresh.',
+        S8_SIG1_GAP:'On track. Refresh photos seasonally.',
         S8_SIG1_TOOL:'Replace the menu cover shots quarterly with current plating.',
         S8_SIG2_SCORE:'LOW', S8_SIG2_LABEL:'Grubhub still inactive',
         S8_SIG2_EVIDENCE:'Grubhub listing remains off.',
