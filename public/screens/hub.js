@@ -178,26 +178,53 @@ S.Hub = {
              wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All modules entered this week',
              wkOverdue.length ? 'var(--red)' : 'var(--t3)');
 
-    // Audit scores panel
-    const ringCol = (name, audit, trend, screen, mod) => {
-      const score = audit?.overall_score ?? null;
+    // Audit Scores panel — three stacked rows, one per module.
+    // Each row: big score number (left) · name + date + trend (middle) ·
+    // action (right). The action mirrors the 30-day rolling rule each audit
+    // screen enforces: no audits yet → "Run First Audit"; 30+ days since the
+    // last one → "Run Audit"; inside the window → "Next in N days".
+    const auditDaysLeft = (a) => {
+      if (!a || !a.date) return 0;
+      const d = Math.floor((Date.now() - new Date(a.date + 'T00:00:00').getTime()) / 86400000);
+      return Math.max(0, 30 - d);
+    };
+    const auditRow = (name, audit, trend, screen, mod, isFirst) => {
+      const score      = audit?.overall_score ?? null;
+      const scoreColor = score != null ? App.scoreHex(score) : 'var(--t4)';
+      const daysLeft   = auditDaysLeft(audit);
+      const canRun     = daysLeft <= 0;
+      const noAudits   = !audit;
+      const btnLabel   = noAudits ? 'Run First Audit' : 'Run Audit';
+
       const trendHtml = trend == null
-        ? '<span style="color:var(--t4);">No trend</span>'
-        : `<span style="color:${trend>=0?'var(--gold)':'var(--red)'};font-weight:700;">${trend>=0?'+':''}${trend} pts</span>`;
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">
-        ${ring(score,52)}
-        <div style="font-size:10px;font-weight:700;color:var(--t2);">${name}</div>
-        <div style="font-size:9px;">${trendHtml}</div>
-        <div style="font-size:9px;color:var(--t3);">Audit: ${audit?.date ? shortDate(audit.date) : 'None'}</div>
-        <div style="font-size:9px;color:var(--t4);">Ind. avg 58</div>
-        <button class="hd-btn" style="width:100%;" onclick="S.Hub._enter('${screen}','${mod}')">Run Audit</button>
-      </div>`;
+        ? ''
+        : '<span style="color:' + (trend>=0?'var(--gold)':'var(--red)') + ';font-weight:700;">'
+          + (trend>=0?'+':'') + trend + ' pts</span> <span style="color:var(--t4);">·</span> ';
+      const dateHtml = audit?.date ? 'Audit ' + shortDate(audit.date) : 'No audit yet';
+
+      const actionHtml = canRun
+        ? '<button class="hd-btn" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
+        : '<div style="text-align:right;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;line-height:1.3;">'
+          + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow Condensed\',sans-serif;font-size:14px;letter-spacing:0;">in '
+          + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
+
+      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 0;'
+        + (isFirst ? '' : 'border-top:1px solid var(--b2);') + '">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:'
+        + scoreColor + ';line-height:1;min-width:42px;text-align:right;">'
+        + (score != null ? score : '&#8212;') + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<div style="font-size:11px;font-weight:700;color:var(--t1);letter-spacing:0.04em;">' + name + '</div>'
+        +   '<div style="font-size:10px;color:var(--t3);margin-top:3px;">' + trendHtml + dateHtml + '</div>'
+        + '</div>'
+        + '<div style="flex-shrink:0;">' + actionHtml + '</div>'
+        + '</div>';
     };
     const auditPanel = `<div style="${PANEL}">${panelTitle('Audit Scores')}
-      <div style="display:flex;gap:10px;flex:1;align-items:center;">
-        ${ringCol('Profit', pA, sysTrend(pAudits), 'audit-tracker', 'profit')}
-        ${ringCol('Revenue', rA, sysTrend(rAudits), 'r-audit', 'revenue')}
-        ${ringCol('Traffic', tA, sysTrend(tAudits), 't-audit', 'traffic')}
+      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;">
+        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
+        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
+        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
       </div></div>`;
 
     // Key metrics panel
