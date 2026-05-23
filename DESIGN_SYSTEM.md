@@ -1,3 +1,4 @@
+[DESIGN_SYSTEM.md](https://github.com/user-attachments/files/28178168/DESIGN_SYSTEM.md)
 # Bar Cop — Profit Fix Design System
 ## Version 1.0 — Locked
 
@@ -260,6 +261,157 @@ Gradient: `linearGradient` from gold 18% opacity at top to 1% at bottom.
 - Within tolerance → Gold (OK)
 - Over (more cash than expected) → Neutral (dim)
 - Short (less cash than expected) → Red
+
+---
+
+## Writing Voice and Copy Rules
+
+All written copy in the app uses one voice. This applies everywhere: screen
+text, fix processes, help and FAQ content, tooltips, field labels, alerts,
+button text, empty states, audit narratives, and the Claude API audit prompts
+in `server/index.js`. No exceptions.
+
+### The voice anchor
+
+The voice is a 30-year bar and restaurant operator veteran talking to a fellow
+operator. The three Fix System PDFs in `fix-system-files/` are the canonical
+reference. When in doubt about how a sentence should sound, open one of those
+documents and read the nearest topic. Match the tone, register, and sentence
+construction.
+
+The app uses the same voice as the PDFs but compressed. The PDFs use
+storytelling, operator anecdotes, and on-ramps to make a long-form document
+readable. The app strips all of that out. Every line is action-only: name the
+gap, show the dollar, prescribe the fix.
+
+### The voice in eight characteristics
+
+1. **Specific over vague.** Numbers, names, mechanisms. "$0.27 per drink, 250
+   drinks a night, 300 nights a year, $20,250 a year." Never "a significant
+   amount" or "meaningful savings."
+2. **System over person.** Blame the missing standard, the absent system, the
+   broken process. Never the bartender, server, or manager. "The problem is
+   not the bartender. The problem is a system that lets accuracy depend on
+   attention during the busiest hour of the night."
+3. **Mechanism named.** Tell the operator exactly what is happening, in their
+   vocabulary. "Free-pour drift," "comp without sign-off," "NAP inconsistent
+   across directories." Not "operational gap" or "policy challenge."
+4. **Math shown.** When the answer is a calculation, walk it. "0.3-ounce
+   overage at $0.90/oz = $0.27/drink x 250 drinks x 300 nights = $20,250/yr."
+5. **Refusal of softening.** "Not optional. Not temporary." / "The jigger
+   costs $4. The policy costs an uncomfortable conversation." No "could,"
+   "might," "consider," "potentially," "best practice."
+6. **Insider register.** Trust the reader to know operator terms: the rail,
+   in the weeds, well/call/premium, BTG, the 3-pack, NAP, RPLH, plowhorse,
+   the floor. Do not over-define.
+7. **Compassion for the operator.** Always. "The owner was not incompetent,
+   he was busy running a bar." Never condescend, never imply they should
+   have already known.
+8. **Declarative force.** Short sentences stacked. "Gone. Every year." /
+   "Variance is not a rounding error. Variance is a dollar amount with a
+   cause." Patterns like "Not X. Not Y. Just Z." earn force through
+   repetition.
+
+### Screen-length compression rule
+
+The PDFs run long because they are documents. App copy is the same voice in
+1/5 the words. The compression formula:
+
+- **Tooltip:** one declarative sentence + one specific example.
+- **Help answer:** 2-4 sentences, each one earns its place.
+- **Fix process step:** one sentence, one action, one number if available.
+- **Audit narrative:** one sentence per S{n}_NARRATIVE/FINDING/TOOL field.
+- **Empty state:** one sentence telling the operator what is missing and what
+  to do.
+
+**Compression example.** Full PDF passage (~95 words):
+
+> "Social media gives you reach. Email gives you access. Reach means your
+> content might appear in someone's feed if the algorithm decides to show it
+> and if the person is scrolling at that moment. Access means you land
+> directly in someone's inbox with their permission, at a time of your
+> choosing. One of those things drives 41 covers on a Tuesday. The other one
+> drives 84 likes."
+
+Screen version (~24 words):
+
+> Reach hopes the algorithm shows your post. Access lands in the inbox on your
+> schedule. One filled 41 seats Tuesday. The other got 84 likes.
+
+Voice held, fluff cut.
+
+### Banned words and phrases
+
+**Hard rules** (apply everywhere, no exceptions):
+- No emdashes. No en-dashes used as punctuation. No double hyphens used as a dash.
+- Where a sentence needs a break, use a period, comma, or restructure.
+- Second person. "You," "your bar." Plain declarative sentences.
+- No congratulatory tone, no motivational filler. Say the thing.
+
+**Banned: AI-corporate words.** Replace with the right operator word.
+
+leverage, optimize, ecosystem, actionable, holistic, framework, methodology,
+paradigm, drive [growth/engagement/revenue], unlock, empower, delight,
+streamline, scalable, mission-critical, best-in-class, world-class, going
+forward, at the end of the day, granular, stakeholder, synergy, touchpoint,
+circle back, deep dive, double-click, level-set, move the needle, low-hanging
+fruit, north star, rockstar, ninja, pivot (as verb), iterate (in prose),
+operationalize, solutioning, ideate.
+
+**Banned: AI-prose flourishes.** Words you only see in machine-written text or
+boutique marketing. Restaurants do not need to call themselves authentic.
+
+delve, tapestry, symphony, culinary (when excessive for ordinary food), haven,
+gem, unparalleled, unwind, embark, journey, immersive, authentic (as
+self-description), gastronomic, vibrant, elevate, testament, going beyond,
+cannot be overstated, seamless, beacon, masterpiece, captivating, ever-evolving,
+curated, robust, redefine, exquisite, signature (as marketing on every menu
+item), warm corner, landscape (figurative), intersection (figurative), array
+(figurative), intricate, craft (as generic descriptor), wholesome.
+
+**Banned: hedging and softening.** The operator voice does not hedge.
+
+a meaningful, significant, substantial, potentially, may help, could help,
+consider (as a soft suggestion), we recommend, best practices, industry-leading.
+
+### Context exceptions
+
+Words on the banned list are sometimes the right operator word in context. The
+allowed exceptions:
+
+- **"Craft" and "signature" as drink-category labels.** "Craft cocktail,"
+  "signature cocktail" in a menu or POS context are the operator's terms for
+  the category. Allowed.
+- **"Touch point" as a named upsell-sequence stage.** "Every server upsell
+  touch point" reads operator in a coaching context. Allowed when it names a
+  specific stage. Banned in marketing-register sentences ("every customer
+  touchpoint matters"), and never as one word.
+- **"Unlock" only in literal physical-key context.** "Unlock the door at open"
+  is fine. Product-gating "submit X to unlock Y" is banned; rewrite as "with X
+  attached, the audit produces Y."
+- **"Framework" is banned even as a mechanism name.** Rename "four-sentence
+  framework" to "four-sentence pattern" or "four-sentence template." Rename
+  "3-1-1 framework" to "3-1-1 mix." Rename "coaching framework" to "coaching
+  routine." Apply the new term consistently wherever the old one appears.
+
+### Positive patterns to use
+
+- **"Not X. Not Y. Just Z."** for cause attribution. "Not stolen. Not fraud.
+  Just never counted."
+- **Specific dollar over vague impact.** Always. Compute when you can.
+- **Mechanism + math + fix** in that order, when the line has room.
+- **"The X costs Y. The Z costs an uncomfortable conversation."** for naming
+  what the fix actually requires.
+- **Short force endings.** "Gone. Every year." / "Run the math."
+- **Verb-first imperatives.** "Pull the report." "Drop the QR card." "Run a
+  spec-check every shift."
+
+### Where this applies
+
+Every user-visible string the operator can read. Tooltips, help, fix layer,
+audit narratives, empty states, button labels, alert text, field labels, modal
+text, and the Claude API audit prompts in `server/index.js`. Any code chat
+building or editing a screen reads this section first.
 
 ---
 
