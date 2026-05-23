@@ -50,7 +50,6 @@ S.Hub = {
     const overall   = sysScores.length ? Math.round(sysScores.reduce((a,b)=>a+b,0)/sysScores.length) : null;
     const anyAudit  = !!(pAudits.length || rAudits.length || tAudits.length);
     const totalOpp  = auditOpp(pA) + auditOpp(rA) + auditOpp(tA);
-    const recovery  = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
     const trendVals = [sysTrend(pAudits), sysTrend(rAudits), sysTrend(tAudits)].filter(v => v != null);
     const netTrend  = trendVals.length ? trendVals.reduce((a,b)=>a+b,0) : null;
 
@@ -227,36 +226,6 @@ S.Hub = {
     const alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${alertsBody}</div></div>`;
 
-    // Recovery Scoreboard panel — running recovered dollars vs an operator-set
-    // target. The recovered figure is real computed dollars (Recovery.total);
-    // the target is operator-set, stored in settings.recovery_target.
-    const recTarget = Number(s.recovery_target) || 0;
-    const recInput = `<div style="display:flex;gap:6px;align-items:center;margin-top:9px;">
-        <input id="hub-rec-target" type="number" min="0" step="500" placeholder="Set $ target" value="${recTarget>0?recTarget:''}"
-          style="flex:1;min-width:0;background:var(--input);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:var(--t1);font-size:11px;padding:5px 7px;color-scheme:dark;"/>
-        <button class="hd-btn" id="hub-rec-set">${recTarget>0?'Update':'Set'}</button>
-      </div>`;
-    let scoreboardBody;
-    if (recovery.dollars <= 0) {
-      scoreboardBody = `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-          <div style="font-size:11px;color:var(--t2);line-height:1.55;">No recovery measured yet. Mark a fix implemented on any module's Fix screen and the app measures what it recovered.</div>
-          ${recInput}
-        </div>`;
-    } else {
-      const bigNum = `<div style="font-size:25px;font-weight:800;line-height:1;color:var(--gold);">${App.fmtCurrency(recovery.dollars,0)}</div>
-        <div style="font-size:10px;color:var(--t3);margin:6px 0 10px;">annualized, from ${recovery.fixes} measured fix${recovery.fixes===1?'':'es'}</div>`;
-      let progress = '';
-      if (recTarget > 0) {
-        const pct  = Math.min(100, Math.round(recovery.dollars / recTarget * 100));
-        const toGo = Math.max(0, recTarget - recovery.dollars);
-        progress = `<div style="height:7px;border-radius:4px;background:rgba(255,255,255,0.07);overflow:hidden;">
-            <div style="height:100%;width:${pct}%;background:var(--gold);border-radius:4px;"></div></div>
-          <div style="font-size:10px;color:var(--t3);line-height:1.5;margin-top:6px;">${pct}% of your ${App.fmtCurrency(recTarget,0)} target${toGo>0?' · '+App.fmtCurrency(toGo,0)+' to go':' · target reached'}</div>`;
-      }
-      scoreboardBody = `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;">${bigNum}${progress}${recInput}</div>`;
-    }
-    const scoreboardPanel = `<div style="${PANEL}">${panelTitle('Recovery Scoreboard')}${scoreboardBody}</div>`;
-
     // Trend chart panel
     const buildChart = () => {
       const pourWeeks = pWeeks.slice(-8).filter(w => w && w.bar && w.bar.cost_pct != null);
@@ -398,7 +367,7 @@ S.Hub = {
     container.innerHTML = `
       <style>
         .hub-app{height:100% !important;}
-        .hub-app .content{overflow:hidden !important;padding:12px;min-width:0;}
+        .hub-app .content{overflow:hidden !important;padding:24px;min-width:0;}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
@@ -439,7 +408,7 @@ S.Hub = {
           <main class="content">
             <div style="height:100%;display:grid;grid-template-rows:78px 1fr 1fr;gap:12px;min-height:0;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">${tiles}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}${scoreboardPanel}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}</div>
               <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px;min-height:0;">${chartPanel}${readoutPanel}${actionPanel}</div>
             </div>
           </main>
@@ -469,13 +438,6 @@ S.Hub = {
       else if (action === 'settings')        S.HubSettings.open();
     });
 
-    document.getElementById('hub-rec-set')?.addEventListener('click', async () => {
-      const v = parseFloat(document.getElementById('hub-rec-target')?.value);
-      App.data.settings = App.data.settings || {};
-      App.data.settings.recovery_target = (!isNaN(v) && v > 0) ? v : 0;
-      await App.saveKey('settings');
-      this.render(this._stage);
-    });
   },
 
   _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); },
