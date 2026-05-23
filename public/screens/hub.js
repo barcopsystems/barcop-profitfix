@@ -509,17 +509,13 @@ S.Hub = {
     } else {
       const shown = readout.items.slice(0, 50);
       const roRows = shown.map((it, i) => {
-        const isBiggest = i === 0;
-        const isLast    = i === shown.length - 1;
+        const isLast = i === shown.length - 1;
         return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.module + '\',\'' + esc(it.gapId) + '\')"'
           + ' style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
           + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
           + modBadge(it.module)
-          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
-          +   esc(it.label)
-          +   (isBiggest ? ' <span style="font-size:8px;font-weight:800;letter-spacing:0.08em;color:var(--red);background:var(--red-bg);padding:2px 5px;border-radius:3px;margin-left:4px;">BIGGEST</span>' : '')
-          + '</div>'
-          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--red);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-size:10px;color:var(--t3);font-weight:600;">/wk</span></div>'
+          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.label) + '</div>'
+          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-size:10px;color:var(--t3);font-weight:600;">/wk</span></div>'
           + '</div>';
       }).join('');
       readoutBody = ''
