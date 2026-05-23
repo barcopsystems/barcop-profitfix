@@ -301,57 +301,105 @@ S.Hub = {
     const alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${alertsBody}</div></div>`;
 
-    // Trend chart panel
-    const buildChart = () => {
-      const pourWeeks = pWeeks.slice(-8).filter(w => w && w.bar && w.bar.cost_pct != null);
-      const caWeeks   = rWeeks.slice(-8).filter(w => w && w.check_avg != null);
-      const pour = pourWeeks.map(w => w.bar.cost_pct);
-      const ca   = caWeeks.map(w => w.check_avg);
-      if (pour.length < 2 && ca.length < 2) {
-        return '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Enter 2+ weeks to see trends</div>';
+    // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
+    // Check Average $, Prime Cost %. Line style (gold #C9A84C, 2.5 stroke,
+    // round caps, dashed target line) matches the module dashboards
+    // (dashboard.js, r-dashboard.js) so the look is consistent across the
+    // app. Fix-event markers (Section 10.5) ride on the bottom chart only,
+    // so they appear once instead of three times.
+    const miniChart = (label, series, target, valFmt, dir, withMarkers) => {
+      const lastVal  = [...series].reverse().find(v => v != null) ?? null;
+      const status   = lastVal != null ? band(lastVal, target, dir) : 'none';
+      const curColor = bandColor(status);
+      const curDisp  = lastVal != null ? valFmt(lastVal) : '—';
+      const tgtDisp  = valFmt(target);
+
+      const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:3px;flex-shrink:0;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + curColor + ';line-height:1;">' + curDisp + '</div>'
+        + '<div style="margin-left:auto;font-size:9px;color:var(--t4);">Target ' + tgtDisp + '</div>'
+        + '</div>';
+
+      const nonNull = series.filter(v => v != null);
+      if (nonNull.length < 2) {
+        return '<div style="flex:1;display:flex;flex-direction:column;min-height:0;padding:4px 0;">'
+          + head
+          + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Need 2+ weeks</div>'
+          + '</div>';
       }
-      const W = 540, H = 188, P = { t:14, r:14, b:18, l:14 };
+
+      const W = 540, H = 64, P = { t:6, r:10, b:6, l:10 };
       const cw = W-P.l-P.r, ch = H-P.t-P.b;
-      const series = (vals, target, color) => {
-        if (vals.length < 2) return '';
-        let mn = Math.min(...vals, target), mx = Math.max(...vals, target);
-        const sp = (mx-mn)*0.2 || 1; mn -= sp; mx += sp;
-        const x = i => P.l + (i/(vals.length-1))*cw;
-        const y = v => P.t + ch - ((v-mn)/(mx-mn||1))*ch;
-        let d = 'M' + x(0).toFixed(1) + ',' + y(vals[0]).toFixed(1);
-        for (let i = 1; i < vals.length; i++) {
-          const cp = (x(i)-x(i-1))*0.35;
-          d += ' C' + (x(i-1)+cp).toFixed(1) + ',' + y(vals[i-1]).toFixed(1) + ' ' + (x(i)-cp).toFixed(1) + ',' + y(vals[i]).toFixed(1) + ' ' + x(i).toFixed(1) + ',' + y(vals[i]).toFixed(1);
+      let mn = Math.min(...nonNull, target);
+      let mx = Math.max(...nonNull, target);
+      const sp = (mx-mn)*0.2 || 1; mn -= sp; mx += sp;
+      const x = i => P.l + (series.length > 1 ? (i/(series.length-1))*cw : cw/2);
+      const y = v => P.t + ch - ((v-mn)/(mx-mn||1))*ch;
+
+      // Smooth path through non-null values; nulls keep their x slot so the
+      // time axis stays honest, the path just skips them.
+      let d = '';
+      let prev = -1;
+      for (let i = 0; i < series.length; i++) {
+        const v = series[i];
+        if (v == null) continue;
+        if (prev < 0) {
+          d = 'M' + x(i).toFixed(1) + ',' + y(v).toFixed(1);
+        } else {
+          const cp = (x(i)-x(prev))*0.35;
+          d += ' C' + (x(prev)+cp).toFixed(1) + ',' + y(series[prev]).toFixed(1) + ' '
+            + (x(i)-cp).toFixed(1) + ',' + y(v).toFixed(1) + ' '
+            + x(i).toFixed(1) + ',' + y(v).toFixed(1);
         }
-        const tgt = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="'+color+'" stroke-width="1" stroke-dasharray="4,4" opacity="0.4"/>';
-        const dots = vals.map((v,i) => '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="2.6" fill="var(--surface)" stroke="'+color+'" stroke-width="1.6"/>').join('');
-        return tgt + '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2"/>' + dots;
-      };
-      // Fix-event markers (Section 10.5) against whichever series anchors the
-      // chart x-axis. The Anchor's profit and revenue weeks run in parallel, so
-      // all three modules' fixes map cleanly onto the reference week dates.
+        prev = i;
+      }
+
+      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>';
+      const dots = series.map((v,i) => v != null
+        ? '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="3" fill="#0A1520" stroke="#C9A84C" stroke-width="1.8"/>'
+        : ''
+      ).join('');
+
       let markerSvg = '';
-      if (window.Recovery && window.FixPanel) {
-        const refWeeks = pour.length >= 2 ? pourWeeks : caWeeks;
+      if (withMarkers && window.Recovery && window.FixPanel) {
+        const refWeeks = pWeeks.slice(-series.length);
         if (refWeeks.length >= 2) {
           const marks = ['profit','revenue','traffic']
             .reduce((acc,m) => acc.concat(Recovery.chartMarkers(refWeeks, m)), []);
-          const mx = i => P.l + (i/(refWeeks.length-1))*cw;
-          markerSvg = FixPanel.markerSvg(marks, mx, P.t, H-P.b);
+          const mxFn = i => P.l + (refWeeks.length > 1 ? (i/(refWeeks.length-1))*cw : cw/2);
+          markerSvg = FixPanel.markerSvg(marks, mxFn, P.t, H-P.b);
         }
       }
-      return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
-        + markerSvg
-        + series(pour, pourT, '#C9A84C')
-        + series(ca, caT, '#ffffff')
-        + '</svg>';
+
+      return '<div style="flex:1;display:flex;flex-direction:column;min-height:0;padding:4px 0;">'
+        + head
+        + '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" style="display:block;flex:1;min-height:0;">'
+        +   markerSvg
+        +   tgtLine
+        +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        +   dots
+        + '</svg></div>';
     };
-    const chartLegend = `<div style="display:flex;gap:16px;margin-bottom:8px;flex-shrink:0;">
-        <span style="font-size:9px;color:var(--t3);"><span style="display:inline-block;width:9px;height:2px;background:#C9A84C;vertical-align:middle;margin-right:5px;"></span>Bar Pour Cost %</span>
-        <span style="font-size:9px;color:var(--t3);"><span style="display:inline-block;width:9px;height:2px;background:#ffffff;vertical-align:middle;margin-right:5px;"></span>Check Average</span>
-        <span style="font-size:9px;color:var(--t4);margin-left:auto;">Last 8 weeks</span>
-      </div>`;
-    const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartLegend}${buildChart()}</div>`;
+
+    const pourSeries  = pWeeks.slice(-8).map(w => w?.bar?.cost_pct ?? null);
+    const caSeries    = rWeeks.slice(-8).map(w => w?.check_avg ?? null);
+    const primeSeries = pWeeks.slice(-8).map(w => w?.prime_cost_pct ?? null);
+    const anyTrend = pourSeries.filter(v=>v!=null).length >= 2
+                  || caSeries.filter(v=>v!=null).length >= 2
+                  || primeSeries.filter(v=>v!=null).length >= 2;
+
+    let trendBody;
+    if (!anyTrend) {
+      trendBody = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Enter 2+ weeks to see trends</div>';
+    } else {
+      trendBody = ''
+        + miniChart('Bar Pour Cost %', pourSeries,  pourT,  v => v.toFixed(1) + '%', 'low',  false)
+        + miniChart('Check Average',   caSeries,    caT,    v => App.fmtCurrency(v), 'high', false)
+        + miniChart('Prime Cost %',    primeSeries, primeT, v => v.toFixed(1) + '%', 'low',  true);
+    }
+    const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:4px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
+    const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${trendBody}</div></div>`;
 
     // Priority action items panel
     const actionBody = topItems.length
