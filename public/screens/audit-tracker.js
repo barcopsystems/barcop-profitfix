@@ -549,7 +549,7 @@ S.AuditTracker = {
         + '</div>';
     }).filter(Boolean).join('');
     if (!cards) {
-      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. Include your POS exception report and inventory sheets with your next submission to unlock section narratives.</div>';
+      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. With your POS exception report and inventory sheets attached, the audit produces section narratives.</div>';
     }
     return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
@@ -621,29 +621,29 @@ S.AuditTracker = {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Bar Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Beverages report is required. Every additional file unlocks more scored sections.</div>'
-        + this.renderFileSection('required', 'POS Sales Report: Beverages',           'at-f-pos-bev',   'at-pos-bev',   'Unlocks: Revenue baseline, category split, estimated gap calculations')
-        + this.renderFileSection('optional', 'Bar Inventory Count Sheets',             'at-f-bar-inv',   'at-bar-inv',   'Unlocks: Actual pour cost %, theoretical vs. actual variance by product')
-        + this.renderFileSection('optional', 'POS Exception Report: Voids and Comps', 'at-f-exception', 'at-exception', 'Unlocks: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
-        + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',     'at-f-cash',      'at-cash',      'Unlocks: Cash handling gap analysis by shift')
-        + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv',   'at-bev-inv',   'Unlocks: Delivery accuracy rate, vendor short analysis')
-        + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices',   'at-f-vendor',    'at-vendor',    'Unlocks: Price drift analysis, distributor negotiation data')
+        + this.renderFileSection('required', 'POS Sales Report: Beverages',           'at-f-pos-bev',   'at-pos-bev',   'Adds: Revenue baseline, category split, estimated gap calculations')
+        + this.renderFileSection('optional', 'Bar Inventory Count Sheets',             'at-f-bar-inv',   'at-bar-inv',   'Adds: Actual pour cost %, theoretical vs. actual variance by product')
+        + this.renderFileSection('optional', 'POS Exception Report: Voids and Comps', 'at-f-exception', 'at-exception', 'Adds: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
+        + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',     'at-f-cash',      'at-cash',      'Adds: Cash handling gap analysis by shift')
+        + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv',   'at-bev-inv',   'Adds: Delivery accuracy rate, vendor short analysis')
+        + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices',   'at-f-vendor',    'at-vendor',    'Adds: Price drift analysis, distributor negotiation data')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Kitchen Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Upload whatever you have. Each file unlocks additional food cost scoring.</div>'
-        + this.renderFileSection('optional',   'POS Sales Report: Food',               'at-f-pos-food',  'at-pos-food',  'Unlocks: Food cost benchmarking, category-level analysis')
-        + this.renderFileSection('optional',   'Kitchen Inventory Count Sheets',       'at-f-kit-inv',   'at-kit-inv',   'Unlocks: Actual food cost %, kitchen variance, spoilage rate')
-        + this.renderFileSection('optional',   'Food Invoices and Delivery Receipts',  'at-f-food-inv',  'at-food-inv',  'Unlocks: Food delivery accuracy, produce par analysis')
-        + this.renderFileSection('highlight',  'Recipe Costing Sheet',                 'at-f-recipe',    'at-recipe',    'Unlocks: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
-        + this.renderFileSection('optional',   'Daily Prep Sheets or Production Logs', 'at-f-prep',      'at-prep',      'Unlocks: Production loss analysis, prep yield by station')
-        + this.renderFileSection('optional',   'Daily Waste Logs',                     'at-f-waste',     'at-waste',     'Unlocks: Weekly spoilage cost, waste pattern diagnosis')
+        + this.renderFileSection('optional',   'POS Sales Report: Food',               'at-f-pos-food',  'at-pos-food',  'Adds: Food cost benchmarking, category-level analysis')
+        + this.renderFileSection('optional',   'Kitchen Inventory Count Sheets',       'at-f-kit-inv',   'at-kit-inv',   'Adds: Actual food cost %, kitchen variance, spoilage rate')
+        + this.renderFileSection('optional',   'Food Invoices and Delivery Receipts',  'at-f-food-inv',  'at-food-inv',  'Adds: Food delivery accuracy, produce par analysis')
+        + this.renderFileSection('highlight',  'Recipe Costing Sheet',                 'at-f-recipe',    'at-recipe',    'Adds: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
+        + this.renderFileSection('optional',   'Daily Prep Sheets or Production Logs', 'at-f-prep',      'at-prep',      'Adds: Production loss analysis, prep yield by station')
+        + this.renderFileSection('optional',   'Daily Waste Logs',                     'at-f-waste',     'at-waste',     'Adds: Weekly spoilage cost, waste pattern diagnosis')
         + nav(true, true, false) + '</div>';
     } else if (step === 4) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Payroll or time clock data is required to calculate verified prime cost and RPLH.</div>'
-        + this.renderFileSection('optional', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Unlocks: Required for prime cost calculation, labor by department, RPLH calculation')
+        + this.renderFileSection('optional', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Adds: Required for prime cost calculation, labor by department, RPLH calculation')
         + nav(true, true, false) + '</div>';
     } else if (step === 5) {
       stepHtml = '<div class="card">' + header
