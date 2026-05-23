@@ -37,7 +37,7 @@ S.RevenueCheckAverage = {
         + '<td style="font-weight:700;color:var(--t1);">' + esc(sv.name) + '</td>'
         + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + (sv.checkAvg >= targetCA ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(sv.checkAvg) + '</td>'
         + '<td style="color:' + (vs >= 0 ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (vs >= 0 ? '+' : '') + App.fmtCurrency(vs) + '</td>'
-        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam != null ? (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) : '&mdash;') + '</td>'
+        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam != null ? (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) : '-') + '</td>'
         + '<td>' + Math.round(sv.totalCovers) + '</td>'
         + '<td>' + sv.weeks + '</td>'
         + '</tr>';
@@ -58,16 +58,16 @@ S.RevenueCheckAverage = {
     const trendRows = weeks.slice().reverse().slice(0,12).map(w =>
       '<tr><td>Wk ' + w.week_num + '</td>'
       + '<td>' + (w.period_end||'').slice(0,10) + '</td>'
-      + '<td>' + (w.covers||'&mdash;') + '</td>'
-      + '<td class="' + (w.check_avg >= targetCA ? 'pos' : 'neg') + ' val">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '&mdash;') + '</td>'
-      + '<td style="color:' + ((w.check_avg||0) >= targetCA ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (w.check_avg ? ((w.check_avg - targetCA) >= 0 ? '+' : '') + App.fmtCurrency(w.check_avg - targetCA) : '&mdash;') + '</td>'
+      + '<td>' + (w.covers||'-') + '</td>'
+      + '<td class="' + (w.check_avg >= targetCA ? 'pos' : 'neg') + ' val">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '-') + '</td>'
+      + '<td style="color:' + ((w.check_avg||0) >= targetCA ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;">' + (w.check_avg ? ((w.check_avg - targetCA) >= 0 ? '+' : '') + App.fmtCurrency(w.check_avg - targetCA) : '-') + '</td>'
       + '</tr>'
     ).join('') || '<tr><td colspan="5" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid" style="margin-bottom:16px;">'
       + '<div class="metric-card"><div class="metric-label">Target Check Average</div><div class="metric-val">' + App.fmtCurrency(targetCA) + '</div><div class="metric-target">Your set target</div></div>'
-      + '<div class="metric-card"><div class="metric-label">Team Average</div><div class="metric-val ' + (teamAvg == null ? '' : teamAvg >= targetCA ? 'on-target' : 'over-target') + '">' + (teamAvg ? App.fmtCurrency(teamAvg) : '&mdash;') + '</div><div class="metric-target">All servers</div></div>'
+      + '<div class="metric-card"><div class="metric-label">Team Average</div><div class="metric-val ' + (teamAvg == null ? '' : teamAvg >= targetCA ? 'on-target' : 'over-target') + '">' + (teamAvg ? App.fmtCurrency(teamAvg) : '-') + '</div><div class="metric-target">All servers</div></div>'
       + (spread != null ? '<div class="metric-card"><div class="metric-label">Performance Spread</div><div class="metric-val ' + (spread > 10 ? 'over-target' : 'on-target') + '">' + App.fmtCurrency(spread) + '</div><div class="metric-target">Top vs bottom</div></div>' : '')
       + (topServer ? '<div class="metric-card"><div class="metric-label">Top Server</div><div class="metric-val on-target">' + App.fmtCurrency(topServer.checkAvg) + '</div><div class="metric-target">' + esc(topServer.name) + '</div></div>' : '')
       + '</div>'
@@ -163,14 +163,14 @@ S.RevenueCheckAverage = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Check Average Trend</div>'
       + '<div style="display:flex;gap:16px;">'
       + '<span style="font-size:10px;color:var(--gold);font-weight:600;">-- Check Avg</span>'
-      + '<span style="font-size:10px;color:rgba(201,168,76,0.4);font-weight:600;">- - Target $' + targetCA + '</span>'
+      + '<span style="font-size:10px;color:rgba(219,171,70,0.4);font-weight:600;">- - Target $' + targetCA + '</span>'
       + '</div></div>'
       + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
-      + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.22"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/></linearGradient></defs>'
+      + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.22"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0"/></linearGradient></defs>'
       + yTicks
-      + '<line x1="'+PAD.l+'" y1="'+ys(targetCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(targetCA).toFixed(1)+'" stroke="rgba(201,168,76,0.3)" stroke-width="1.5" stroke-dasharray="5,4"/>'
+      + '<line x1="'+PAD.l+'" y1="'+ys(targetCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(targetCA).toFixed(1)+'" stroke="rgba(219,171,70,0.3)" stroke-width="1.5" stroke-dasharray="5,4"/>'
       + (areaPath(caS) ? '<path d="'+areaPath(caS)+'" fill="url(#caGrad'+uid+')"/>' : '')
-      + '<path d="'+smoothPath(caS)+'" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(caS)+'" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
       + caLabels + xLabels
       + '</svg></div>';
   }
