@@ -13,6 +13,10 @@
   --red:       #C03828;
   --red-bg:    rgba(192,56,40,0.13);
   --steel:     #4888A8;
+  --green:     #518A79;                /* Success: on-target, strong scores, positive trend */
+  --green-bg:  rgba(81,138,121,0.12);
+  --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
+  --blue-bg:   rgba(76,142,171,0.10);
 
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.88);
