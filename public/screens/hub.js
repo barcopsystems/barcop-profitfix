@@ -480,7 +480,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--input);padding:10px 13px;border:1px solid transparent;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--input);padding:10px 13px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--gold);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
