@@ -367,7 +367,7 @@ S.Hub = {
     container.innerHTML = `
       <style>
         .hub-app{height:100% !important;}
-        .hub-app .content{overflow:hidden !important;padding:12px;min-width:0;}
+        .hub-app .content{overflow:hidden !important;padding:24px;min-width:0;}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
