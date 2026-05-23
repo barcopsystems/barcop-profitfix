@@ -53,7 +53,7 @@ S.TrafficSocial = {
     });
 
     // ── Social detail inputs ──
-    const mixOpts = '<option value="">—</option>' + this.CONTENT_MIX.map(m =>
+    const mixOpts = '<option value="">-</option>' + this.CONTENT_MIX.map(m =>
       '<option' + (prof.social_content_mix === m ? ' selected' : '') + '>' + m + '</option>').join('');
     const toggle = (k, label) =>
       '<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);font-size:13px;color:var(--t1);cursor:pointer;">'
@@ -79,13 +79,13 @@ S.TrafficSocial = {
 
     // ── Action items ──
     const tips = [];
-    if (igp != null && igp < tSP) tips.push('Instagram posts are ' + igp + ' this month, below the ' + tSP + '/month target. A consistent cadence keeps the account in front of followers.');
-    if (eng != null && eng < this.ENGAGEMENT_BENCHMARK) tips.push('IG engagement rate is ' + eng.toFixed(1) + '%, below the ' + this.ENGAGEMENT_BENCHMARK + '% benchmark. Followers are not interacting — try food close-ups, staff, and behind-the-scenes content.');
+    if (igp != null && igp < tSP) tips.push('Instagram posts are ' + igp + ' this month, below the ' + tSP + '/month target. A consistent posting schedule keeps the account in front of followers.');
+    if (eng != null && eng < this.ENGAGEMENT_BENCHMARK) tips.push('IG engagement rate is ' + eng.toFixed(1) + '%, below the ' + this.ENGAGEMENT_BENCHMARK + '% benchmark. Followers are not interacting. Try food close-ups, staff, and behind-the-scenes content.');
     if (eng == null) tips.push('Enter your IG engagement rate above to score this section.');
     if (prof.social_fb_posts != null && prof.social_fb_posts < tSP) tips.push('Facebook posts are ' + prof.social_fb_posts + ' this month. Cross-post to keep the Facebook audience warm.');
     if (!prof.social_stories) tips.push('Instagram Stories are not used regularly. Stories reach followers who never see grid posts.');
     if (!prof.social_reels) tips.push('No Reels posted this month. Reels get the most reach of any Instagram format right now.');
-    if (prof.social_content_mix && prof.social_content_mix !== 'Balanced') tips.push('Content mix is "' + prof.social_content_mix + '". Aim for a balanced mix — food, people, and the room, not just promotions.');
+    if (prof.social_content_mix && prof.social_content_mix !== 'Balanced') tips.push('Content mix is "' + prof.social_content_mix + '". Aim for a balanced mix: food, people, and the room, not just promotions.');
     if (!latest) tips.push('No weekly data yet. Enter a week in This Week to score this section.');
 
     const tipsCard = tips.length
@@ -97,7 +97,7 @@ S.TrafficSocial = {
           ).join('')
         + '</div>'
       : '<div class="card"><div class="empty"><div class="empty-title">Social Is Active</div>'
-        + '<div class="empty-sub">Posting cadence, engagement, and content mix are all on track. Keep it consistent.</div></div></div>';
+        + '<div class="empty-sub">Posting schedule, engagement, and content mix are all on track. Keep it consistent.</div></div></div>';
 
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
