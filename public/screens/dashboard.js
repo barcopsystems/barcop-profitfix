@@ -74,7 +74,7 @@ S.Dashboard = {
     // targets are unset. Settings live on the Hub, never on the dashboard.
     let startHereHtml = '';
     if (!App.data.settings._targets_saved) {
-      startHereHtml = '<div class="card db-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(201,168,76,0.35);">'
+      startHereHtml = '<div class="card db-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(219,171,70,0.35);">'
         + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
         + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Profit targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
         + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
@@ -196,7 +196,7 @@ S.Dashboard = {
         <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>
         <div style="display:flex;gap:20px;">
           <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
-            <span style="width:20px;height:2px;background:#C9A84C;display:inline-block;border-radius:1px;"></span>Bar Pour Cost</span>
+            <span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Bar Pour Cost</span>
           <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
             <span style="width:20px;height:2px;background:rgba(255,255,255,0.4);display:inline-block;border-radius:1px;"></span>Food Cost</span>
           <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
@@ -206,22 +206,22 @@ S.Dashboard = {
       <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">
         <defs>
           <linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/>
-            <stop offset="100%" stop-color="#C9A84C" stop-opacity="0.01"/>
+            <stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/>
           </linearGradient>
         </defs>
         ${ticks.map(v=>`
           <line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <text x="${PAD.l-8}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${v}%</text>
         `).join('')}
-        <line x1="${PAD.l}" y1="${tPx.toFixed(1)}" x2="${W-PAD.r}" y2="${tPx.toFixed(1)}" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>
-        <text x="${W-PAD.r+6}" y="${(tPx+4).toFixed(1)}" fill="rgba(201,168,76,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>
+        <line x1="${PAD.l}" y1="${tPx.toFixed(1)}" x2="${W-PAD.r}" y2="${tPx.toFixed(1)}" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>
+        <text x="${W-PAD.r+6}" y="${(tPx+4).toFixed(1)}" fill="rgba(219,171,70,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>
         ${fixMarkers}
         ${barArea ? `<path d="${barArea}" fill="url(#${uid})"/>` : ''}
         ${priPath ? `<path d="${priPath}" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linejoin="round"/>` : ''}
         ${foodPath ? `<path d="${foodPath}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linejoin="round"/>` : ''}
-        ${barPath ? `<path d="${barPath}" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
-        ${barS.map((v,i) => v!=null ? `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="4" fill="#0A1520" stroke="#C9A84C" stroke-width="2"/>` : '').join('')}
+        ${barPath ? `<path d="${barPath}" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+        ${barS.map((v,i) => v!=null ? `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="4" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>` : '').join('')}
         ${barLabels}
         ${xLabels}
       </svg>
