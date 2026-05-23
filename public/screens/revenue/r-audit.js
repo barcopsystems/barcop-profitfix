@@ -15,11 +15,13 @@ S.RevenueAudit = {
     this.actions.innerHTML = '';
     const audits       = (App.data.revenue_audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const latest       = audits[0] || null;
-    const now          = new Date();
-    const thisMonthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-    const hasThisMonth = audits.some(a => (a.date||'').slice(0,7) === thisMonthKey);
-    const endOfMonth   = new Date(now.getFullYear(), now.getMonth()+1, 1);
-    const daysLeft     = Math.ceil((endOfMonth - now) / (1000*60*60*24));
+    // 30-day rolling: next audit is available 30 days after the last one
+    // ran, independent of the calendar month. First audit is always available.
+    const daysSince    = latest && latest.date
+      ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000)
+      : Infinity;
+    const canRunAudit  = daysSince >= 30;
+    const daysLeft     = canRunAudit ? 0 : 30 - daysSince;
 
     const requestCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -27,10 +29,10 @@ S.RevenueAudit = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Monthly Revenue Audit</div>'
       + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive revenue audit per month. Upload your POS reports and labor data. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
       + '</div>'
-      + (hasThisMonth
-          ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' days</div>'
-            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit available</div></div>'
-          : '<button class="btn btn-primary" id="ra-new-btn" style="flex-shrink:0;">Generate This Month\'s Audit</button>')
+      + (canRunAudit
+          ? '<button class="btn btn-primary" id="ra-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>'
+          : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' day' + (daysLeft===1?'':'s') + '</div>'
+            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit</div></div>')
       + '</div></div>';
 
     let latestCard = '';
