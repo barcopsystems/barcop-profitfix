@@ -885,7 +885,7 @@ const App = {
   // Strong scores use green (success), below-target stays white, critical red.
   // Gold is reserved for brand accents and CTAs, not "doing well" state.
   scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red)'; },
-  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#D5963A'      : '#C03828'; },
+  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#C76B2C'      : '#C03828'; },
   scoreLabel(s) { s = Number(s) || 0; return s >= 70 ? 'Strong'       : s >= 50 ? 'Below Target' : 'Critical'; },
 
   // Slim 0-100 scale bar with red / amber / green zones and a marker at the score.
