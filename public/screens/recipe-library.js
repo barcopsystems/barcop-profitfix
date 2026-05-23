@@ -20,7 +20,7 @@ S.RecipeLibrary={
     }
     return'<option value="">Select ingredient...</option>'+prods.map(p=>'<option value="'+p.id+'"'+(p.id===selId?' selected':'')+'>'+esc(p.name)+'</option>').join('');
   },
-  unitLabel(prod,mode){if(!prod)return'—';if(mode==='single')return prod._t==='kitchen'?'units':'pours';if(mode==='batch')return prod._t==='kitchen'?'units':'bottles';return'units';},
+  unitLabel(prod,mode){if(!prod)return'-';if(mode==='single')return prod._t==='kitchen'?'units':'pours';if(mode==='batch')return prod._t==='kitchen'?'units':'bottles';return'units';},
   costBasis(prod,mode){if(!prod)return 0;if(mode==='single')return prod.cost_per_pour||0;return prod.unit_cost||0;},
   // Recompute a recipe's cost live from the current ic_products master
   recompute(r){
@@ -54,7 +54,7 @@ S.RecipeLibrary={
       const rows=recipes.map(r=>{
         const live=this.recompute(r);
         const tgt=r.target_cost_pct??22;const over=live.cost_pct!=null&&live.cost_pct>tgt;
-        const yld=r.mode==='batch'?(r.batch_yield||'—')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
+        const yld=r.mode==='batch'?(r.batch_yield||'-')+' '+(r.batch_yield_unit||''):r.mode==='food'?(r.plate_yield>1?r.plate_yield+' plates':'1 plate'):'1 drink';
         return '<tr><td style="width:36px;"><input type="checkbox" class="rl-chk" data-id="'+r.id+'" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
           +'<td><div class="val" style="margin-bottom:4px;">'+esc(r.name)+'</div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:'+(live.flagged?'var(--red)':'var(--t3)')+';">'+(mL[r.mode]||r.mode||'SINGLE')+'</div></td>'
           +'<td>'+esc(yld)+'</td>'
@@ -63,7 +63,7 @@ S.RecipeLibrary={
           +'<td>'+App.fmtPct(tgt)+'</td>'
           +'<td><div class="row-actions"><button class="btn btn-ghost btn-sm rl-edit" data-id="'+r.id+'">Edit</button><button class="btn btn-danger btn-sm rl-del" data-id="'+r.id+'">Delete</button></div></td></tr>';
       }).join('');
-      html=(flagged>0?'<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'+flagged+' recipe'+(flagged>1?'s are':' is')+' above target cost — highlighted red in the Recipe column.</div></div>':'')
+      html=(flagged>0?'<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'+flagged+' recipe'+(flagged>1?'s are':' is')+' above target cost, highlighted red in the Recipe column.</div></div>':'')
         +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" id="rl-sel-all">Select All</button><button class="btn btn-danger btn-sm" id="rl-del-sel" style="display:none;">Delete Selected</button><span id="rl-sel-count" style="font-size:11px;color:var(--t3);"></span></div>'
         +'<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr><th style="width:36px;"></th><th>Recipe</th><th>Category</th><th>Yield</th><th>Cost/Serving</th><th>Menu Price</th><th>Recipe Cost %</th><th>Target %</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
@@ -136,7 +136,7 @@ S.RecipeLibrary={
       +card('rl-mode-food','Food Plate','Cost a food dish from kitchen ingredients.','Chicken Wings, Burger, Nachos')
       +'</div><button class="btn btn-ghost btn-sm" id="rl-mode-cancel">Cancel</button></div>';
     this.container.querySelectorAll('.rl-mode-card').forEach(card=>{
-      card.addEventListener('mouseenter',()=>{card.style.borderColor='var(--gold)';card.style.background='rgba(201,168,76,0.04)';});
+      card.addEventListener('mouseenter',()=>{card.style.borderColor='var(--gold)';card.style.background='rgba(219,171,70,0.04)';});
       card.addEventListener('mouseleave',()=>{card.style.borderColor='var(--b1)';card.style.background='var(--surface)';});
     });
   },
@@ -154,7 +154,7 @@ S.RecipeLibrary={
       ?'<div class="form-row" style="margin-bottom:12px;gap:16px;">'
         +'<div class="f" style="width:200px;flex-shrink:0;"><label>Batch Yield '+tt('batch-yield')+'</label><div class="fj"><input type="number" id="rl-batch-yield" value="'+(r?.batch_yield||'')+'" placeholder="e.g. 1" /><select id="rl-batch-yield-unit">'+this.yOpts(r?.batch_yield_unit)+'</select></div></div>'
         +'<div class="f" style="width:200px;flex-shrink:0;"><label>Serving Size '+tt('serving-size')+'</label><div class="fj"><input type="number" id="rl-serving-size" value="'+(r?.serving_size||'')+'" placeholder="e.g. 5" /><select id="rl-serving-size-unit">'+this.yOpts(r?.serving_size_unit)+'</select></div></div>'
-        +'<div class="f" style="width:140px;flex-shrink:0;"><label>Servings Per Batch '+tt('servings-batch')+'</label><div class="f-display" id="rl-spb">—</div></div>'
+        +'<div class="f" style="width:140px;flex-shrink:0;"><label>Servings Per Batch '+tt('servings-batch')+'</label><div class="f-display" id="rl-spb">-</div></div>'
         +'</div>'
       : mode==='food'
       ? '' // plate yield is inline in main form row
@@ -167,7 +167,7 @@ S.RecipeLibrary={
 
     this.container.innerHTML='<div class="screen">'
       +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
-      +'<div class="sh" style="margin-bottom:0;">'+(id?'Edit':'New')+' — '+mL[mode]+'</div>'
+      +'<div class="sh" style="margin-bottom:0;">'+(id?'Edit':'New')+': '+mL[mode]+'</div>'
       +(!id?'<button class="btn btn-ghost btn-sm" id="rl-switch" style="padding:3px 8px;font-size:9px;">Change Type</button>':'')
       +'</div>'
       +'<div class="card"><div class="form-row" style="gap:16px;">'
@@ -182,10 +182,10 @@ S.RecipeLibrary={
       +'<div id="rl-ings" style="margin-bottom:12px;"></div>'
       +'<button class="btn btn-ghost btn-sm" id="rl-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
       +'<div class="calc" style="margin-bottom:0;">'
-      +'<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="rl-tc">—</div></div>'
-      +'<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="rl-cps">—</div></div>'
-      +'<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="rl-cpct">—</div></div>'
-      +'<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim" id="rl-tgt-d">—</div></div>'
+      +'<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="rl-tc">-</div></div>'
+      +'<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="rl-cps">-</div></div>'
+      +'<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="rl-cpct">-</div></div>'
+      +'<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim" id="rl-tgt-d">-</div></div>'
       +'</div>'
       +'<div class="card-actions">'
       +'<button class="btn btn-primary" id="rl-save">'+(id?'Update':'Save')+'</button>'
@@ -204,8 +204,8 @@ S.RecipeLibrary={
         const prod=ing.product_id?this.prodsForMode(mode).find(p=>p.id===ing.product_id):null;
         const unit=this.unitLabel(prod,mode);
         const cost=this.costBasis(prod,mode);
-        const costD=cost>0?App.fmtCurrency(cost):(prod?'<span style="color:var(--red);font-size:10px;">Add cost</span>':'—');
-        const lineD=ing.total_cost>0?App.fmtCurrency(ing.total_cost):'—';
+        const costD=cost>0?App.fmtCurrency(cost):(prod?'<span style="color:var(--red);font-size:10px;">Add cost</span>':'-');
+        const lineD=ing.total_cost>0?App.fmtCurrency(ing.total_cost):'-';
         return '<tr><td style="min-width:180px;"><select class="form-input rl-ing-prod" data-i="'+idx+'" style="width:100%;">'+this.prodOpts(mode,ing.product_id)+'</select></td>'
           +'<td style="width:90px;"><input class="form-input rl-ing-qty" type="number" data-i="'+idx+'" value="'+(ing.quantity||'')+'" min="0" step="0.25" style="width:100%;padding:6px 8px;" /></td>'
           +'<td style="width:70px;color:var(--t2);font-size:12px;">'+unit+'</td>'
@@ -226,7 +226,7 @@ S.RecipeLibrary={
     document.querySelectorAll('.rl-ing-qty').forEach(el=>{
       const idx=parseInt(el.dataset.i);if(!this.rows[idx])return;
       const qty=parseFloat(el.value)||0;this.rows[idx].quantity=qty;this.rows[idx].total_cost=qty*(this.rows[idx].cost_per_unit||0);
-      const le=document.getElementById('rl-lc-'+idx);if(le)le.textContent=this.rows[idx].total_cost>0?App.fmtCurrency(this.rows[idx].total_cost):'—';
+      const le=document.getElementById('rl-lc-'+idx);if(le)le.textContent=this.rows[idx].total_cost>0?App.fmtCurrency(this.rows[idx].total_cost):'-';
     });
     const tc=this.rows.reduce((s,i)=>s+(i.total_cost||0),0);
     const mp=parseFloat(document.getElementById('rl-menu-price')?.value)||0;
@@ -238,15 +238,15 @@ S.RecipeLibrary={
       const ss=parseFloat(document.getElementById('rl-serving-size')?.value)||0;
       const su=document.getElementById('rl-serving-size-unit')?.value||'oz';
       const spb=by>0&&ss>0?this.toOz(by,bu)/this.toOz(ss,su):null;
-      const spbEl=document.getElementById('rl-spb');if(spbEl)spbEl.textContent=spb!=null?spb.toFixed(1)+' drinks':'—';
+      const spbEl=document.getElementById('rl-spb');if(spbEl)spbEl.textContent=spb!=null?spb.toFixed(1)+' drinks':'-';
       cps=spb&&spb>0?tc/spb:tc;
     } else if(mode==='food'){
       const py=parseFloat(document.getElementById('rl-plate-yield')?.value)||1;cps=py>0?tc/py:tc;
     }
     const cpct=mp>0?(cps/mp*100):null;
     const set=(id,val,cls)=>{const el=document.getElementById(id);if(!el)return;el.textContent=val;el.className='calc-val'+(cls?' '+cls:'');};
-    set('rl-tc',tc>0?App.fmtCurrency(tc):'—');set('rl-cps',cps>0?App.fmtCurrency(cps):'—');
-    set('rl-cpct',cpct!=null?App.fmtPct(cpct):'—',cpct!=null?(cpct>tpct?'warn':'good'):'');
+    set('rl-tc',tc>0?App.fmtCurrency(tc):'-');set('rl-cps',cps>0?App.fmtCurrency(cps):'-');
+    set('rl-cpct',cpct!=null?App.fmtPct(cpct):'-',cpct!=null?(cpct>tpct?'warn':'good'):'');
     set('rl-tgt-d',App.fmtPct(tpct));
   },
   saveRecipe(){
