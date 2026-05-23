@@ -76,7 +76,7 @@ S.Hub = {
       if (dir === 'low')  return val <= target ? 'good' : val <= target*1.1 ? 'warn' : 'bad';
       return val >= target ? 'good' : val >= target*0.9 ? 'warn' : 'bad';
     };
-    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--w)' : b === 'bad' ? 'var(--red)' : 'var(--t4)';
+    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red)' : 'var(--t4)';
 
     const pourT = pt.bar_pour_cost_pct ?? 22;
     const foodT = pt.food_cost_pct ?? 32;
@@ -219,10 +219,13 @@ S.Hub = {
           +     score + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
           +   '<div style="flex:1;font-size:10px;color:var(--t3);">Industry avg ' + indAvg + ' &middot; Your target 65+</div>'
           + '</div>'
-          + '<div style="margin-top:7px;">'
+          // Status bar shortened on the right so it clears the "Next Audit"
+          // countdown / "Run Audit" button area (~85px wide on the right
+          // edge of the row above). Bar still spans the score+industry text.
+          + '<div style="margin-top:7px;margin-right:85px;">'
           +   '<div style="display:flex;height:6px;border-radius:4px;overflow:hidden;">'
           +     '<div style="width:50%;background:var(--red);"></div>'
-          +     '<div style="width:20%;background:var(--t2);"></div>'
+          +     '<div style="width:20%;background:var(--amber);"></div>'
           +     '<div style="width:30%;background:var(--green);"></div>'
           +   '</div>'
           +   '<div style="position:relative;height:0;">'
@@ -242,7 +245,7 @@ S.Hub = {
         const monthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
         const weekly  = monthly / 4.345;
         if (weekly > 0) {
-          dollarLine = '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:7px;">'
+          dollarLine = '<div style="font-size:11px;color:var(--t3);font-weight:700;margin-top:7px;">'
             + 'Leaking an estimated ' + App.fmtCurrency(weekly, 0) + ' per week.</div>';
         } else {
           dollarLine = '<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:7px;">'
@@ -700,7 +703,7 @@ S.Hub = {
     const tip = container.querySelector('#hd-chart-tip');
     if (tip) {
       const bandText = { good: 'on target', warn: 'watch', bad: 'off target' };
-      const bandCol  = { good: 'var(--green)', warn: 'var(--w)', bad: 'var(--red)' };
+      const bandCol  = { good: 'var(--green)', warn: 'var(--amber)', bad: 'var(--red)' };
       container.querySelectorAll('.hd-chart-dot').forEach(g => {
         g.addEventListener('mouseenter', () => {
           const r  = g.getBoundingClientRect();
