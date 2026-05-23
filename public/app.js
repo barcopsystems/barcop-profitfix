@@ -884,17 +884,17 @@ const App = {
        0-49    Critical      red                                          */
   // Strong scores use green (success), below-target stays white, critical red.
   // Gold is reserved for brand accents and CTAs, not "doing well" state.
-  scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--w)' : 'var(--red)'; },
-  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#ffffff'  : '#C03828'; },
+  scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red)'; },
+  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#D5963A'      : '#C03828'; },
   scoreLabel(s) { s = Number(s) || 0; return s >= 70 ? 'Strong'       : s >= 50 ? 'Below Target' : 'Critical'; },
 
-  // Slim 0-100 scale bar with red / neutral / gold zones and a marker at the score.
+  // Slim 0-100 scale bar with red / amber / green zones and a marker at the score.
   scoreBar(score) {
     const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
     return '<div style="margin-top:10px;max-width:300px;">'
       + '<div style="display:flex;height:7px;border-radius:4px;overflow:hidden;">'
       +   '<div style="width:50%;background:var(--red);"></div>'
-      +   '<div style="width:20%;background:var(--t2);"></div>'
+      +   '<div style="width:20%;background:var(--amber);"></div>'
       +   '<div style="width:30%;background:var(--green);"></div>'
       + '</div>'
       + '<div style="position:relative;height:0;">'
