@@ -44,7 +44,7 @@ S.RevenueMenuEngineering = {
 
     const actionMap = {
       'STAR':      'Feature prominently. Brief servers to push this item every pre-shift.',
-      'PLOWHORSE': 'High volume, low margin. Consider a price increase.',
+      'PLOWHORSE': 'High volume, low margin. Raise the price.',
       'PUZZLE':    'High margin, low volume. Needs promotion and server attention.',
       'DOG':       'Low margin and low volume. Candidate for removal or full rework.',
     };
