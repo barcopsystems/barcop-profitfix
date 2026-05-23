@@ -302,11 +302,11 @@ S.Hub = {
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${alertsBody}</div></div>`;
 
     // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
-    // Check Average $, Prime Cost %. Line style (gold #C9A84C, 2.5 stroke,
-    // round caps, dashed target line) matches the module dashboards
-    // (dashboard.js, r-dashboard.js) so the look is consistent across the
-    // app. Fix-event markers (Section 10.5) ride on the bottom chart only,
-    // so they appear once instead of three times.
+    // Check Average $, Prime Cost %. Each chart sits in its own bordered
+    // card. Line stroke is tuned for the small chart size (1.4px) — the
+    // module dashboards use 2.5 because those charts are 3x taller.
+    // Fix-event markers (Section 10.5) ride on the bottom chart only so
+    // they show up once instead of three times.
     const miniChart = (label, series, target, valFmt, dir, withMarkers) => {
       const lastVal  = [...series].reverse().find(v => v != null) ?? null;
       const status   = lastVal != null ? band(lastVal, target, dir) : 'none';
@@ -314,21 +314,21 @@ S.Hub = {
       const curDisp  = lastVal != null ? valFmt(lastVal) : '—';
       const tgtDisp  = valFmt(target);
 
-      const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:3px;flex-shrink:0;">'
+      const card = (inner) => '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
+
+      const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + curColor + ';line-height:1;">' + curDisp + '</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:700;color:' + curColor + ';line-height:1;">' + curDisp + '</div>'
         + '<div style="margin-left:auto;font-size:9px;color:var(--t4);">Target ' + tgtDisp + '</div>'
         + '</div>';
 
       const nonNull = series.filter(v => v != null);
       if (nonNull.length < 2) {
-        return '<div style="flex:1;display:flex;flex-direction:column;min-height:0;padding:4px 0;">'
-          + head
-          + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Need 2+ weeks</div>'
-          + '</div>';
+        return card(head
+          + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Need 2+ weeks</div>');
       }
 
-      const W = 540, H = 64, P = { t:6, r:10, b:6, l:10 };
+      const W = 540, H = 54, P = { t:6, r:6, b:4, l:6 };
       const cw = W-P.l-P.r, ch = H-P.t-P.b;
       let mn = Math.min(...nonNull, target);
       let mx = Math.max(...nonNull, target);
@@ -354,9 +354,9 @@ S.Hub = {
         prev = i;
       }
 
-      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>';
+      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#C9A84C" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
       const dots = series.map((v,i) => v != null
-        ? '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="3" fill="#0A1520" stroke="#C9A84C" stroke-width="1.8"/>'
+        ? '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="1.6" fill="#0A1520" stroke="#C9A84C" stroke-width="1"/>'
         : ''
       ).join('');
 
@@ -371,14 +371,13 @@ S.Hub = {
         }
       }
 
-      return '<div style="flex:1;display:flex;flex-direction:column;min-height:0;padding:4px 0;">'
-        + head
+      return card(head
         + '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" style="display:block;flex:1;min-height:0;">'
         +   markerSvg
         +   tgtLine
-        +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>'
         +   dots
-        + '</svg></div>';
+        + '</svg>');
     };
 
     const pourSeries  = pWeeks.slice(-8).map(w => w?.bar?.cost_pct ?? null);
@@ -397,9 +396,9 @@ S.Hub = {
         + miniChart('Check Average',   caSeries,    caT,    v => App.fmtCurrency(v), 'high', false)
         + miniChart('Prime Cost %',    primeSeries, primeT, v => v.toFixed(1) + '%', 'low',  true);
     }
-    const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:4px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
+    const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:6px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
     const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
-      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${trendBody}</div></div>`;
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div></div>`;
 
     // Priority action items panel
     const actionBody = topItems.length
