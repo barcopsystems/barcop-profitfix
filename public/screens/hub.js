@@ -73,7 +73,7 @@ S.Hub = {
       if (dir === 'low')  return val <= target ? 'good' : val <= target*1.1 ? 'warn' : 'bad';
       return val >= target ? 'good' : val >= target*0.9 ? 'warn' : 'bad';
     };
-    const bandColor = b => b === 'good' ? 'var(--gold)' : b === 'warn' ? 'var(--w)' : b === 'bad' ? 'var(--red)' : 'var(--t4)';
+    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--w)' : b === 'bad' ? 'var(--red)' : 'var(--t4)';
 
     const pourT = pt.bar_pour_cost_pct ?? 22;
     const foodT = pt.food_cost_pct ?? 32;
@@ -89,8 +89,6 @@ S.Hub = {
       { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high'), screen:'r-dashboard', mod:'revenue' },
       { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low'), screen:'r-dashboard', mod:'revenue' },
       { label:'Google Rating', val: tW?.google_rating ?? null, disp: tW?.google_rating!=null?tW.google_rating.toFixed(1)+' / 5.0':null, tgt: grT.toFixed(1)+' stars', status: band(tW?.google_rating ?? null, grT, 'high'), screen:'t-dashboard', mod:'traffic' },
-      { label:'Inventory Variance', val: invVar, disp: invVar!=null?App.fmtCurrency(invVar,0):null, tgt: 'Under $25', status: invVar==null?'none':Math.abs(invVar)<=25?'good':Math.abs(invVar)<=75?'warn':'bad', screen:'dashboard', mod:'profit' },
-      { label:'Open Cash Variances', val: recOpen, disp: recOpen!=null?String(recOpen):null, tgt: '0 open', status: recOpen==null?'none':recOpen===0?'good':recOpen<=2?'warn':'bad', screen:'cash-recon', mod:'profit' },
     ];
 
     // ── Alerts — metric breaches plus forward-looking signals ──
@@ -155,12 +153,14 @@ S.Hub = {
     const panelTitle = (t) => `<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;flex-shrink:0;">${t}</div>`;
     const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
-    // Stat tiles
+    // Stat tiles — center-aligned to match the 4-stat tile pattern used
+    // throughout the rest of the app (module dashboards, etc.). Big number in
+    // Barlow Condensed, colored by status (green for good, red for bad).
     const tile = (label, big, bigColor, sub, subColor) => `
-      <div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:11px 15px;display:flex;flex-direction:column;justify-content:center;">
-        <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">${label}</div>
-        <div style="font-size:23px;font-weight:800;line-height:1;color:${bigColor};">${big}</div>
-        <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:6px;">${sub}</div>
+      <div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">${label}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;line-height:1;color:${bigColor};">${big}</div>
+        <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
       </div>`;
 
     const tiles =
@@ -171,10 +171,10 @@ S.Hub = {
              anyAudit && totalOpp > 0 ? 'var(--red)' : 'var(--t4)',
              anyAudit ? 'Recoverable across audited systems' : 'Run an audit to surface this')
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
-             netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--gold)' : 'var(--red)',
+             netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
-      + tile('Weekly Status', `${wkCount} / 3 <span style="font-size:11px;color:var(--t3);font-weight:400;">this week</span>`,
-             wkCount === 3 ? 'var(--gold)' : 'var(--t1)',
+      + tile('Weekly Status', `${wkCount} / 3 <span style="font-size:13px;color:var(--t3);font-weight:600;">this week</span>`,
+             wkCount === 3 ? 'var(--green)' : 'var(--t1)',
              wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All modules entered this week',
              wkOverdue.length ? 'var(--red)' : 'var(--t3)');
 
@@ -273,15 +273,17 @@ S.Hub = {
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
       </div></div>`;
 
-    // Key metrics panel
+    // Key metrics panel — 6 tiles in a 2x3 grid (reduced from 8). Left-aligned
+    // big number in Barlow Condensed, colored by status band, default blue
+    // tinted background, hover swaps border to gold.
     const metricCells = metrics.map(m => `
       <div class="hd-metric" onclick="S.Hub._enter('${m.screen}','${m.mod}')">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">${m.label}</div>
-        <div style="font-size:19px;font-weight:800;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
     const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;flex:1;">${metricCells}</div></div>`;
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;">${metricCells}</div></div>`;
 
     // Alerts panel
     const alertsBody = alerts.length
@@ -478,8 +480,8 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{padding:8px 11px;border:1px solid rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;}
-        .hub-app .hd-metric:hover{border-color:rgba(201,168,76,0.4);background:rgba(255,255,255,0.02);}
+        .hub-app .hd-metric{background:var(--blue-bg);padding:10px 13px;border:1px solid transparent;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
+        .hub-app .hd-metric:hover{border-color:var(--gold);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
         .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
