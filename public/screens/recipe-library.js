@@ -91,16 +91,11 @@ S.RecipeLibrary={
       if(btn)btn.style.display=checked.length>0?'':'none';
       if(cnt)cnt.textContent=checked.length>0?checked.length+' selected':'';
     };
-    document.getElementById('rl-chk-all')?.addEventListener('change',function(){
-      document.querySelectorAll('.rl-chk').forEach(c=>{c.checked=this.checked;});
-      updateSel();
-    });
     this.container.addEventListener('change',ev=>{if(ev.target.classList.contains('rl-chk'))updateSel();});
     document.getElementById('rl-sel-all')?.addEventListener('click',()=>{
       const chks=document.querySelectorAll('.rl-chk');
       const allChecked=[...chks].every(c=>c.checked);
       chks.forEach(c=>{c.checked=!allChecked;});
-      const ca=document.getElementById('rl-chk-all');if(ca)ca.checked=!allChecked;
       updateSel();
     });
     document.getElementById('rl-del-sel')?.addEventListener('click',()=>{
