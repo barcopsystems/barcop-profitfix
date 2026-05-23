@@ -279,7 +279,7 @@ S.Hub = {
     const metricCells = metrics.map(m => `
       <div class="hd-metric" onclick="S.Hub._enter('${m.screen}','${m.mod}')">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">${m.label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
     const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
@@ -480,7 +480,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--blue-bg);padding:10px 13px;border:1px solid transparent;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--input);padding:10px 13px;border:1px solid transparent;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--gold);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
