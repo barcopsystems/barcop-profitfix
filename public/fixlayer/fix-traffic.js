@@ -282,7 +282,7 @@ FIX.traffic = [
 
   {
     id: 'search-seo',
-    name: 'Search & SEO',
+    name: 'Search and SEO',
     module: 'traffic',
     summary: 'Local search ranking comes from a clean, consistent listing across the web. Fix your name, address, and phone everywhere first, then build citations and track the terms that bring walk-ins.',
 
