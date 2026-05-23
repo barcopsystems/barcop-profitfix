@@ -326,11 +326,13 @@ S.Hub = {
 
     // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
     // Check Average $, Prime Cost %. Each chart sits in its own bordered
-    // card. Line stroke is tuned for the small chart size (1.4px) — the
+    // card. Line stroke is tuned for the small chart size (1.7px) — the
     // module dashboards use 2.5 because those charts are 3x taller.
     // Fix-event markers (Section 10.5) ride on the bottom chart only so
-    // they show up once instead of three times.
-    const miniChart = (label, series, target, valFmt, dir, withMarkers) => {
+    // they show up once instead of three times. Each data point carries
+    // hover data attributes consumed by the shared tooltip below.
+    const miniChart = (label, weeks, valueOf, target, valFmt, dir, withMarkers) => {
+      const series   = weeks.map(w => valueOf(w));
       const lastVal  = [...series].reverse().find(v => v != null) ?? null;
       const status   = lastVal != null ? band(lastVal, target, dir) : 'none';
       const curColor = bandColor(status);
@@ -366,7 +368,7 @@ S.Hub = {
       // transparent, matching the audit score chart style.
       const baseY = (H-P.b).toFixed(1);
       let d = '', area = '';
-      let prev = -1, firstX = null, lastX = null;
+      let prev = -1, lastX = null;
       for (let i = 0; i < series.length; i++) {
         const v = series[i];
         if (v == null) continue;
@@ -374,7 +376,6 @@ S.Hub = {
         if (prev < 0) {
           d    = 'M' + xi.toFixed(1) + ',' + yi.toFixed(1);
           area = 'M' + xi.toFixed(1) + ',' + baseY + ' L' + xi.toFixed(1) + ',' + yi.toFixed(1);
-          firstX = xi;
         } else {
           const cp = (xi-x(prev))*0.35;
           const seg = ' C' + (x(prev)+cp).toFixed(1) + ',' + y(series[prev]).toFixed(1) + ' '
@@ -391,10 +392,27 @@ S.Hub = {
       const gradId = 'hub-trend-' + label.replace(/[^a-z]/gi,'').toLowerCase();
 
       const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#C9A84C" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
-      const dots = series.map((v,i) => v != null
-        ? '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="1.6" fill="#0A1520" stroke="#C9A84C" stroke-width="1"/>'
-        : ''
-      ).join('');
+
+      // Each data point is wrapped in a <g.hd-chart-dot> with an invisible
+      // hit circle (r=8) for easy hover and a visible marker (r=1.6) that
+      // grows to 2.4 on hover via CSS. Data attrs feed the shared tooltip.
+      const dots = series.map((v,i) => {
+        if (v == null) return '';
+        const cx = x(i).toFixed(1);
+        const cy = y(v).toFixed(1);
+        const wkRaw = weeks[i] && weeks[i].period_end;
+        const wkDate = wkRaw ? (shortDate(wkRaw) || '').toUpperCase() : '';
+        const dotBand = band(v, target, dir);
+        return '<g class="hd-chart-dot"'
+          + ' data-label="' + esc(label) + '"'
+          + ' data-disp="' + esc(valFmt(v)) + '"'
+          + ' data-tgt="' + esc(tgtDisp) + '"'
+          + ' data-date="' + esc(wkDate) + '"'
+          + ' data-band="' + dotBand + '">'
+          + '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="transparent" style="cursor:pointer;"/>'
+          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="1.6" fill="#0A1520" stroke="#C9A84C" stroke-width="1.3"/>'
+          + '</g>';
+      }).join('');
 
       let markerSvg = '';
       if (withMarkers && window.Recovery && window.FixPanel) {
@@ -416,14 +434,16 @@ S.Hub = {
         +   markerSvg
         +   tgtLine
         +   (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>'
+        +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
         +   dots
         + '</svg>');
     };
 
-    const pourSeries  = pWeeks.slice(-8).map(w => w?.bar?.cost_pct ?? null);
-    const caSeries    = rWeeks.slice(-8).map(w => w?.check_avg ?? null);
-    const primeSeries = pWeeks.slice(-8).map(w => w?.prime_cost_pct ?? null);
+    const w8p = pWeeks.slice(-8);
+    const w8r = rWeeks.slice(-8);
+    const pourSeries  = w8p.map(w => w?.bar?.cost_pct ?? null);
+    const caSeries    = w8r.map(w => w?.check_avg ?? null);
+    const primeSeries = w8p.map(w => w?.prime_cost_pct ?? null);
     const anyTrend = pourSeries.filter(v=>v!=null).length >= 2
                   || caSeries.filter(v=>v!=null).length >= 2
                   || primeSeries.filter(v=>v!=null).length >= 2;
@@ -433,9 +453,9 @@ S.Hub = {
       trendBody = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Enter 2+ weeks to see trends</div>';
     } else {
       trendBody = ''
-        + miniChart('Bar Pour Cost %', pourSeries,  pourT,  v => v.toFixed(1) + '%', 'low',  false)
-        + miniChart('Check Average',   caSeries,    caT,    v => App.fmtCurrency(v), 'high', false)
-        + miniChart('Prime Cost %',    primeSeries, primeT, v => v.toFixed(1) + '%', 'low',  true);
+        + miniChart('Bar Pour Cost %', w8p, w => w?.bar?.cost_pct ?? null,    pourT,  v => v.toFixed(1) + '%', 'low',  false)
+        + miniChart('Check Average',   w8r, w => w?.check_avg ?? null,        caT,    v => App.fmtCurrency(v), 'high', false)
+        + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  true);
     }
     const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:6px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
     const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
@@ -598,7 +618,20 @@ S.Hub = {
         .hub-app .hd-scroll::-webkit-scrollbar-track{background:transparent;}
         .hub-app .hd-scroll::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
         .hub-app .hd-scroll::-webkit-scrollbar-thumb:hover{background:var(--b1);}
+        /* Trend chart data point hover — the marker grows on hover so the
+           interaction reads as "this dot does something." */
+        .hub-app .hd-chart-marker{transition:r 0.12s ease;}
+        .hub-app .hd-chart-dot:hover .hd-chart-marker{r:2.4;}
+        /* Shared tooltip element used by all three mini charts. */
+        .hub-app #hd-chart-tip{
+          position:fixed;z-index:200;pointer-events:none;display:none;
+          background:var(--surface);border:1px solid var(--b-edge);border-radius:5px;
+          padding:8px 12px;min-width:140px;
+          font-family:Barlow,sans-serif;font-size:11px;color:var(--t1);
+          box-shadow:0 4px 14px rgba(0,0,0,0.45);
+        }
       </style>
+      <div id="hd-chart-tip"></div>
       <div class="app hub-app${collapsedClass}">
         <aside class="sidebar">
           <div class="sidebar-logo">
@@ -658,6 +691,35 @@ S.Hub = {
       else if (action === 'help')            S.HubHelp.open();
       else if (action === 'settings')        S.HubSettings.open();
     });
+
+    // Trend chart data point hover — populate and position the shared
+    // tooltip with the dot's week, value, status, and target.
+    const tip = container.querySelector('#hd-chart-tip');
+    if (tip) {
+      const bandText = { good: 'on target', warn: 'watch', bad: 'off target' };
+      const bandCol  = { good: 'var(--green)', warn: 'var(--w)', bad: 'var(--red)' };
+      container.querySelectorAll('.hd-chart-dot').forEach(g => {
+        g.addEventListener('mouseenter', () => {
+          const r  = g.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const b  = g.dataset.band || 'none';
+          const col = bandCol[b] || 'var(--t1)';
+          tip.innerHTML =
+              '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">Week Ending ' + g.dataset.date + '</div>'
+            + '<div style="display:flex;align-items:baseline;gap:10px;margin-top:5px;">'
+            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:' + col + ';line-height:1;">' + g.dataset.disp + '</div>'
+            +   (bandText[b] ? '<div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:' + col + ';">' + bandText[b] + '</div>' : '')
+            + '</div>'
+            + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">Target ' + g.dataset.tgt + '</div>';
+          tip.style.left = cx + 'px';
+          tip.style.top  = (cy - 12) + 'px';
+          tip.style.transform = 'translate(-50%, -100%)';
+          tip.style.display = 'block';
+        });
+        g.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+      });
+    }
 
   },
 
