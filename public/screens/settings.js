@@ -1459,7 +1459,8 @@ S.HubSettings = {
     const icTotals = {
       0:[9,25], 1:[8,21], 2:[7,17], 3:[6,10], 4:[10,25], 5:[9,22],
       6:[96,456], 7:[72,332], 8:[2,6], 9:[40,220], 10:[35,199],
-      11:[18,88], 12:[4,15], 13:[5,19], 14:[3,9], 15:[2,6]
+      11:[18,88], 12:[4,15], 13:[5,19], 14:[3,9], 15:[2,6],
+      16:[2,4], 17:[6,14], 18:[3,7]
     };
     const icCountItem = (p, qty) => ({
       product_id:p.id, name:p.name, category:p.category,
@@ -1873,30 +1874,15 @@ S.HubSettings = {
     const msg = document.getElementById('s-test-msg');
     if (msg) { msg.style.color = 'var(--t3)'; msg.textContent = 'Clearing...'; msg.style.display = 'block'; }
 
+    // Reset every data key to its default. App.data.settings (bar name,
+    // targets, etc.) is preserved — that is "user settings" the dialog says
+    // it keeps. Everything else — Profit, Revenue, Traffic, fix log —
+    // goes back to its empty default.
     const s = App.data.settings;
+    const defaults = DB._defaultData();
     App.data = {
-      settings: { ...s, onboarding_complete:true, _targets_saved:false },
-      bar_products:[], kitchen_products:[], recipes:[],
-      weeks:[], shifts:[], reconciliations:[],
-      theft_scores:[], vendor_log:[], last_theft_score_date:null,
-      audits:[],
-      getting_started_profit:{},
-      revenue_settings: App.data.revenue_settings,
-      revenue_weeks: App.data.revenue_weeks || [],
-      revenue_audits: App.data.revenue_audits || [],
-      revenue_server_checks: App.data.revenue_server_checks || [],
-      revenue_menu_items: App.data.revenue_menu_items || [],
-      revenue_price_log: App.data.revenue_price_log || [],
-      revenue_events: App.data.revenue_events || [],
-      revenue_rate_cards: App.data.revenue_rate_cards || [],
-      getting_started_revenue: App.data.getting_started_revenue || {},
-      traffic_settings: App.data.traffic_settings,
-      traffic_weeks: App.data.traffic_weeks || [],
-      traffic_audits: App.data.traffic_audits || [],
-      getting_started_traffic: App.data.getting_started_traffic || {},
-      hub_setup_progress: {},
-      fix_log: [],
-      variance_investigations: []
+      ...defaults,
+      settings: { ...s, onboarding_complete:true, _targets_saved:false }
     };
     // Clear the three Control stores too — Inventory, Labor, and Shift.
     App.inventoryData = {};
