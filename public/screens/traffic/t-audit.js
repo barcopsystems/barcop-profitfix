@@ -523,7 +523,7 @@ S.TrafficAudit = {
         + '</div>';
     }).filter(Boolean).join('');
     if (!cards) {
-      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. Include your website analytics export and GBP insights with your next submission to unlock section narratives.</div>';
+      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. With your website analytics export and GBP insights attached, the audit produces section narratives.</div>';
     }
     return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
@@ -577,39 +577,39 @@ S.TrafficAudit = {
       stepHtml = '<div class="card">' + header + barInfo
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile. The full profile view is required. GBP Insights unlocks Tier 3 scoring. Your app data is included automatically.</div>'
-        + this.renderFileSection('required', 'GBP Screenshot: Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Unlocks: Section 1 full. Completeness audit, photo count, post frequency, response rate')
-        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Unlocks: Section 1 Tier 3. Full funnel from impression to action')
+        + this.renderFileSection('required', 'GBP Screenshot: Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Adds: Section 1 full. Completeness audit, photo count, post frequency, response rate')
+        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Adds: Section 1 Tier 3. Full funnel from impression to action')
         + nav(false, true, false) + '</div>';
     } else if (step === 2) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Website Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Website analytics is the highest-value file in this section. Mobile screenshot adds conversion assessment.</div>'
-        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Unlocks: Section 2 full. Sessions, bounce rate, top pages, menu page performance')
-        + this.renderFileSection('optional',  'Website Screenshot: Homepage on Mobile','ta-f-mobile-site', 'ta-mobile-site', 'Unlocks: Mobile conversion assessment, above-the-fold call-to-action analysis')
+        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Adds: Section 2 full. Sessions, bounce rate, top pages, menu page performance')
+        + this.renderFileSection('optional',  'Website Screenshot: Homepage on Mobile','ta-f-mobile-site', 'ta-mobile-site', 'Adds: Mobile conversion assessment, above-the-fold call-to-action analysis')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Reviews and Search Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Google review screenshot unlocks the full reviews section. Yelp and search screenshots add cross-platform scoring.</div>'
-        + this.renderFileSection('required', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Unlocks: Required for Section 3 full scoring. Confirmed rating, review count, response rate, recency analysis')
-        + this.renderFileSection('optional', 'Yelp Listing Screenshot',       'ta-f-yelp',           'ta-yelp',           'Unlocks: Cross-platform reputation comparison')
-        + this.renderFileSection('optional', 'Search Results Screenshots',    'ta-f-search',         'ta-search',         'Unlocks: Maps pack presence confirmed, primary search visibility signal')
+        + this.renderFileSection('required', 'Google Review Page Screenshot', 'ta-f-google-reviews', 'ta-google-reviews', 'Adds: Required for Section 3 full scoring. Confirmed rating, review count, response rate, recency analysis')
+        + this.renderFileSection('optional', 'Yelp Listing Screenshot',       'ta-f-yelp',           'ta-yelp',           'Adds: Cross-platform reputation comparison')
+        + this.renderFileSection('optional', 'Search Results Screenshots',    'ta-f-search',         'ta-search',         'Adds: Maps pack presence confirmed, primary search visibility signal')
         + nav(true, true, false) + '</div>';
     } else if (step === 4) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Social Media Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot unlocks the full social section. Analytics unlock Tier 3 engagement scoring.</div>'
-        + this.renderFileSection('optional', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Unlocks: Required for Section 5 full scoring. Follower count, post frequency, engagement estimate, content audit')
-        + this.renderFileSection('optional', 'Facebook Page Screenshot',        'ta-f-facebook',     'ta-facebook',     'Unlocks: Cross-platform social presence analysis')
-        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',  'ta-f-ig-analytics', 'ta-ig-analytics', 'Unlocks: Section 5 Tier 3. Exact engagement rate, reach, best content type')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Instagram profile screenshot adds the full social section. Analytics produce Tier 3 engagement scoring.</div>'
+        + this.renderFileSection('optional', 'Instagram Profile Screenshot',    'ta-f-instagram',    'ta-instagram',    'Adds: Required for Section 5 full scoring. Follower count, post frequency, engagement estimate, content audit')
+        + this.renderFileSection('optional', 'Facebook Page Screenshot',        'ta-f-facebook',     'ta-facebook',     'Adds: Cross-platform social presence analysis')
+        + this.renderFileSection('optional', 'Instagram Analytics Screenshot',  'ta-f-ig-analytics', 'ta-ig-analytics', 'Adds: Section 5 Tier 3. Exact engagement rate, reach, best content type')
         + nav(true, true, false) + '</div>';
     } else if (step === 5) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Delivery, Email and Guest Data</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Each file unlocks additional section scoring for delivery platforms and email and loyalty programs.</div>'
-        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',       'ta-delivery',       'Unlocks: Section 6 full. Confirmed rating, photo count, menu completeness, promo status')
-        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',          'ta-email',          'Unlocks: Section 7 full. List size, last send date, frequency, growth mechanism')
-        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics', 'Unlocks: Section 7 Tier 3. List health, open rate trend, campaign history')
+        + this.renderFileSection('optional', 'Delivery Platform Dashboard Screenshot', 'ta-f-delivery',       'ta-delivery',       'Adds: Section 6 full. Confirmed rating, photo count, menu completeness, promo status')
+        + this.renderFileSection('optional', 'Email Platform Screenshot',              'ta-f-email',          'ta-email',          'Adds: Section 7 full. List size, last send date, frequency, growth mechanism')
+        + this.renderFileSection('optional', 'Email Analytics Export',                 'ta-f-email-analytics','ta-email-analytics', 'Adds: Section 7 Tier 3. List health, open rate trend, campaign history')
         + nav(true, true, false) + '</div>';
     } else if (step === 6) {
       stepHtml = '<div class="card">' + header
