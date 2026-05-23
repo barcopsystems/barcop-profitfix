@@ -148,12 +148,15 @@ S.ShiftClosingChecklist = {
 
     this.container.innerHTML = '<div class="screen">' + runner + histCard + '</div>' + modal;
     this._bindRunner();
-    this.container.addEventListener('click', this._histHandler = ev => {
+    // Property assignment, not addEventListener — renderMain() runs on every
+    // checkbox toggle and reset, so addEventListener would stack handlers and
+    // history clicks would fire N+1 times after N re-renders.
+    this.container.onclick = ev => {
       const hrow = ev.target.closest('.cl-hrow');
       const hdel = ev.target.closest('.cl-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
-    });
+    };
   },
 
   _bindRunner() {
