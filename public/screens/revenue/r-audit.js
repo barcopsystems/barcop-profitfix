@@ -528,7 +528,7 @@ S.RevenueAudit = {
         + '</div>';
     }).filter(Boolean).join('');
     if (!cards) {
-      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. Include your server sales report and labor schedule with your next submission to unlock section narratives.</div>';
+      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. With your server sales report and labor schedule attached, the audit produces section narratives.</div>';
     }
     return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
   },
@@ -603,34 +603,34 @@ S.RevenueAudit = {
     } else if (step === 2) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Sales Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Daily Sales Summary is required. Additional files unlock deeper category and menu scoring.</div>'
-        + this.renderFileSection('required', 'POS Daily Sales Summary',   'ra-f-pos-daily',   'ra-pos-daily',   'Unlocks: Revenue trend, category split, blended check average')
-        + this.renderFileSection('optional', 'Menu Sales Mix Report',      'ra-f-menu-mix',    'ra-menu-mix',    'Unlocks: Category concentration, menu engineering signals')
-        + this.renderFileSection('optional', 'Menu Price List',            'ra-f-menu-prices', 'ra-menu-prices', 'Unlocks: Pricing gap analysis, contribution margin assessment')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Daily Sales Summary is required. Additional files add deeper category and menu scoring.</div>'
+        + this.renderFileSection('required', 'POS Daily Sales Summary',   'ra-f-pos-daily',   'ra-pos-daily',   'Adds: Revenue trend, category split, blended check average')
+        + this.renderFileSection('optional', 'Menu Sales Mix Report',      'ra-f-menu-mix',    'ra-menu-mix',    'Adds: Category concentration, menu engineering signals')
+        + this.renderFileSection('optional', 'Menu Price List',            'ra-f-menu-prices', 'ra-menu-prices', 'Adds: Pricing gap analysis, contribution margin assessment')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Server and Floor Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Server sales report is the highest-value file in this audit. Unlocks two full scored sections on its own.</div>'
-        + this.renderFileSection('highlight', 'Server Sales Report',          'ra-f-server-sales', 'ra-server-sales', 'Unlocks: Check average by server, performance spread, top and bottom server, two full scored sections')
-        + this.renderFileSection('optional',  'Server Upsell Tracking Report','ra-f-upsell',       'ra-upsell',       'Unlocks: Appetizer and dessert attach rates, upsell execution scoring by server')
-        + this.renderFileSection('optional',  'Pre-Shift Briefing Log',       'ra-f-preshift',     'ra-preshift',     'Unlocks: Assessment of whether a performance standard is being communicated')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Server sales report is the highest-value file in this audit. Adds two full scored sections on its own.</div>'
+        + this.renderFileSection('highlight', 'Server Sales Report',          'ra-f-server-sales', 'ra-server-sales', 'Adds: Check average by server, performance spread, top and bottom server, two full scored sections')
+        + this.renderFileSection('optional',  'Server Upsell Tracking Report','ra-f-upsell',       'ra-upsell',       'Adds: Appetizer and dessert attach rates, upsell execution scoring by server')
+        + this.renderFileSection('optional',  'Pre-Shift Briefing Log',       'ra-f-preshift',     'ra-preshift',     'Adds: Assessment of whether a performance standard is being communicated')
         + nav(true, true, false) + '</div>';
     } else if (step === 4) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Labor schedule is required for RPLH and prime cost calculations. Payroll actuals unlock deeper variance analysis.</div>'
-        + this.renderFileSection('optional', 'Weekly Labor Schedule',       'ra-f-labor-sched', 'ra-labor-sched', 'Unlocks: Required for RPLH calculation, labor percentage, schedule efficiency analysis')
-        + this.renderFileSection('optional', 'Time Clock or Payroll Actuals','ra-f-timeclock',   'ra-timeclock',   'Unlocks: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
-        + this.renderFileSection('optional', 'Labor Cost by Department',    'ra-f-labor-dept',  'ra-labor-dept',  'Unlocks: Department-level labor targeting, identifies which department is driving overage')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Labor schedule is required for RPLH and prime cost calculations. Payroll actuals add deeper variance analysis.</div>'
+        + this.renderFileSection('optional', 'Weekly Labor Schedule',       'ra-f-labor-sched', 'ra-labor-sched', 'Adds: Required for RPLH calculation, labor percentage, schedule efficiency analysis')
+        + this.renderFileSection('optional', 'Time Clock or Payroll Actuals','ra-f-timeclock',   'ra-timeclock',   'Adds: Clock drift analysis, actual vs scheduled hours, verified overtime cost')
+        + this.renderFileSection('optional', 'Labor Cost by Department',    'ra-f-labor-dept',  'ra-labor-dept',  'Adds: Department-level labor targeting, identifies which department is driving overage')
         + nav(true, true, false) + '</div>';
     } else if (step === 5) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Events and Private Dining</div>'
         + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Upload whatever you have. Each file unlocks event revenue scoring and gap analysis.</div>'
-        + this.renderFileSection('optional', 'Private Dining and Event Revenue Records','ra-f-events',    'ra-events',    'Unlocks: Event frequency, average event revenue, minimum compliance, annual event revenue gap')
-        + this.renderFileSection('optional', 'Catering Revenue Records',                'ra-f-catering',  'ra-catering',  'Unlocks: Catering revenue trend, package performance, repeat client rate')
-        + this.renderFileSection('optional', 'Private Dining Rate Card',                'ra-f-rate-card', 'ra-rate-card', 'Unlocks: Pricing position analysis, minimum structure assessment')
+        + this.renderFileSection('optional', 'Private Dining and Event Revenue Records','ra-f-events',    'ra-events',    'Adds: Event frequency, average event revenue, minimum compliance, annual event revenue gap')
+        + this.renderFileSection('optional', 'Catering Revenue Records',                'ra-f-catering',  'ra-catering',  'Adds: Catering revenue trend, package performance, repeat client rate')
+        + this.renderFileSection('optional', 'Private Dining Rate Card',                'ra-f-rate-card', 'ra-rate-card', 'Adds: Pricing position analysis, minimum structure assessment')
         + nav(true, true, false) + '</div>';
     } else if (step === 6) {
       stepHtml = '<div class="card">' + header
