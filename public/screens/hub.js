@@ -394,7 +394,7 @@ S.Hub = {
 
       const gradId = 'hub-trend-' + label.replace(/[^a-z]/gi,'').toLowerCase();
 
-      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#C9A84C" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
+      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#DBAB46" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
 
       // Each data point is wrapped in a <g.hd-chart-dot> with an invisible
       // hit circle (r=8) for easy hover and a visible marker (r=1.6) that
@@ -413,7 +413,7 @@ S.Hub = {
           + ' data-date="' + esc(wkDate) + '"'
           + ' data-band="' + dotBand + '">'
           + '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="transparent" style="cursor:pointer;"/>'
-          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="1.6" fill="#0A1520" stroke="#C9A84C" stroke-width="1.3"/>'
+          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="1.6" fill="#0A1520" stroke="#DBAB46" stroke-width="1.3"/>'
           + '</g>';
       }).join('');
 
@@ -431,13 +431,13 @@ S.Hub = {
       return card(head
         + '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" style="display:block;flex:1;min-height:0;">'
         +   '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +     '<stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/>'
-        +     '<stop offset="100%" stop-color="#C9A84C" stop-opacity="0.01"/>'
+        +     '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/>'
+        +     '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/>'
         +   '</linearGradient></defs>'
         +   markerSvg
         +   tgtLine
         +   (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+        +   '<path d="'+d+'" fill="none" stroke="#DBAB46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
         +   dots
         + '</svg>');
     };
