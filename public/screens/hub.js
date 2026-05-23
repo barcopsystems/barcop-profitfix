@@ -105,18 +105,28 @@ S.Hub = {
       .slice(0, 5);
 
     // ── Priority action items ──
-    const itemRows = [];
-    const collect = (audit, sysName, screen, mod) => {
-      if (!audit) return;
-      (audit.action_items || []).forEach(it => {
-        if (it && it.action) itemRows.push({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, screen, mod });
-      });
+    // Take the top 2 from each audited module by dollar impact, then fill
+    // remaining slots from the global top-by-impact pool. This guarantees
+    // every audited module is represented, while still ranking primarily
+    // by impact within the visible set.
+    const perModule = (audit, sysName, screen, mod) => {
+      if (!audit) return [];
+      return (audit.action_items || [])
+        .filter(it => it && it.action)
+        .map(it => ({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, screen, mod }))
+        .sort((a,b) => b.impact - a.impact);
     };
-    collect(pA, 'Profit',  'audit-tracker', 'profit');
-    collect(rA, 'Revenue', 'r-audit',       'revenue');
-    collect(tA, 'Traffic', 't-audit',       'traffic');
-    itemRows.sort((a,b) => b.impact - a.impact);
-    const topItems = itemRows.slice(0, 5);
+    const profItems = perModule(pA, 'Profit',  'audit-tracker', 'profit');
+    const revItems  = perModule(rA, 'Revenue', 'r-audit',       'revenue');
+    const traItems  = perModule(tA, 'Traffic', 't-audit',       'traffic');
+    const CAP = 6, PER = 2;
+    const topItems = [];
+    [profItems, revItems, traItems].forEach(arr => topItems.push(...arr.slice(0, PER)));
+    const used = new Set(topItems.map(i => i.action));
+    [...profItems, ...revItems, ...traItems]
+      .sort((a,b) => b.impact - a.impact)
+      .forEach(it => { if (topItems.length < CAP && !used.has(it.action)) { topItems.push(it); used.add(it.action); } });
+    topItems.sort((a,b) => b.impact - a.impact);
 
     // ── Last updated ──
     const stamps = [];
@@ -656,18 +666,24 @@ S.Hub = {
   _enterFix(module, gapId) {
     App.showApp(module || 'profit');
     if (gapId) App._fixFocus = gapId;
-    App.navigate(module === 'revenue' ? 'r-fix' : 'profit-fix');
+    const scr = module === 'revenue' ? 'r-fix'
+              : module === 'traffic' ? 't-fix'
+              : 'profit-fix';
+    App.navigate(scr);
   },
 
   /* Weekly money readout (Section 10.3) — what is leaking this week, where, and
-     biggest first. Reads the live per-gap-area band from Recovery.gapImpact, the
-     same engine the dashboards use. A gap-area only counts when its weekly dollar
-     loss computes honestly from real data; metrics shared by two gap-areas (the
-     check-average pair) are counted once. */
+     biggest first. Profit and Revenue read live from Recovery.gapImpact (same
+     engine the dashboards use). Traffic doesn't have weekly dollar-quantifiable
+     live metrics, so its leak figures come from the latest traffic_audit's
+     action_items.monthly_impact divided by 4.345. A gap-area only counts when
+     its weekly dollar loss computes from real data. */
   weeklyReadout() {
     if (!window.Recovery || !window.FIX) return { items: [], total: 0 };
     const seen = {};
     const items = [];
+
+    // Profit + Revenue — live metric-based
     [['profit'], ['revenue']].forEach(([mod]) => {
       (FIX[mod] || []).forEach(g => {
         const imp = Recovery.gapImpact(g.id);
@@ -678,6 +694,33 @@ S.Hub = {
                      weekly: imp.dollars / 52, band: imp.band });
       });
     });
+
+    // Traffic — audit-based. Map each action item to the closest traffic
+    // gap-area for the deep-link. The action text from settings.js
+    // mkTrafficAudit gets the " $XXX/month opportunity." suffix stripped.
+    const tA = ((App.data || {}).traffic_audits || []).slice(-1)[0];
+    if (tA && Array.isArray(tA.action_items)) {
+      const hints = [
+        { rx: /google business|gbp/i,           id: 'gbp' },
+        { rx: /website|bounce|conversion/i,     id: 'website' },
+        { rx: /review/i,                        id: 'reviews' },
+        { rx: /search|seo|maps pack|nap/i,      id: 'search-seo' },
+        { rx: /social|instagram|facebook|post/i, id: 'social' },
+        { rx: /delivery|doordash|uber/i,        id: 'delivery' },
+        { rx: /email|loyalty/i,                 id: 'email-loyalty' }
+      ];
+      tA.action_items.forEach(it => {
+        if (!it || !(it.monthly_impact > 0)) return;
+        const raw = it.action || '';
+        const label = raw.replace(/\s*\$[\d,]+\/month opportunity\.?$/, '').replace(/\.\s*$/, '');
+        if (!label || seen[label]) return;
+        seen[label] = true;
+        const hint = hints.find(h => h.rx.test(raw));
+        items.push({ label, gapId: hint ? hint.id : 'gbp', module: 'traffic',
+                     weekly: it.monthly_impact / 4.345, band: 'over' });
+      });
+    }
+
     items.sort((a, b) => b.weekly - a.weekly);
     return { items: items, total: items.reduce((s, x) => s + x.weekly, 0) };
   },
@@ -748,6 +791,36 @@ S.Hub = {
           sev: 'warn',
           text: 'Review velocity is sliding: ' + latestT.new_reviews + ' new reviews this period against a ' + avg.toFixed(0) + ' average. Reviews drive local ranking.',
           screen: 't-reviews', mod: 'traffic'
+        });
+      }
+    }
+
+    // 3b. Review response rate below target — guests see unanswered reviews
+    // long after they're posted. Response rate is a Traffic target.
+    const tTar = (data.traffic_settings || {}).targets || {};
+    const respTarget = tTar.response_rate ?? 75;
+    if (tw.length) {
+      const latestT = tw[tw.length - 1];
+      if (latestT && latestT.response_rate != null && latestT.response_rate < respTarget) {
+        const gap = respTarget - latestT.response_rate;
+        out.push({
+          sev: gap > 20 ? 'bad' : 'warn',
+          text: 'Review response rate at ' + latestT.response_rate + '%, ' + gap.toFixed(0) + ' points under your ' + respTarget + '% target. Unanswered reviews are visible to every guest searching you.',
+          screen: 't-reviews', mod: 'traffic'
+        });
+      }
+    }
+
+    // 3c. Social posting frequency below benchmark — quiet feeds lose
+    // discovery on Instagram and Facebook fast.
+    const postTarget = tTar.social_posts_month ?? 12;
+    if (tw.length) {
+      const latestT = tw[tw.length - 1];
+      if (latestT && latestT.ig_posts_month != null && latestT.ig_posts_month < postTarget * 0.7) {
+        out.push({
+          sev: latestT.ig_posts_month < postTarget * 0.4 ? 'bad' : 'warn',
+          text: 'Instagram posting ran ' + latestT.ig_posts_month + ' posts this period vs your ' + postTarget + '/month target. Quiet feeds lose the discovery algorithm fast.',
+          screen: 't-social', mod: 'traffic'
         });
       }
     }
