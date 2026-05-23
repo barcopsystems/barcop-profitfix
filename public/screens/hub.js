@@ -285,21 +285,38 @@ S.Hub = {
     const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;">${metricCells}</div></div>`;
 
-    // Alerts panel
-    const alertsBody = alerts.length
-      ? alerts.map(a => `
-          <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border:1px solid rgba(255,255,255,0.05);border-radius:6px;">
-            <span style="width:7px;height:7px;border-radius:50%;background:${a.sev==='bad'?'var(--red)':'var(--gold)'};flex-shrink:0;"></span>
-            <div style="flex:1;font-size:11px;color:var(--t2);line-height:1.35;min-width:0;">${esc(a.text)}</div>
-            <button class="hd-btn" onclick="S.Hub._enter('${a.screen}','${a.mod}')">Fix It</button>
-          </div>`).join('')
-      : `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--gold)" stroke-width="1.4"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <div style="font-size:12px;font-weight:700;color:var(--t1);">All Clear</div>
-          <div style="font-size:10px;color:var(--t3);text-align:center;">No metrics are off target right now.</div>
-        </div>`;
-    const alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}
-      <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${alertsBody}</div></div>`;
+    // Alerts panel — focal headline up top (big red count if alerts exist,
+    // big green check + "All Clear" headline if not), then the alert rows
+    // below as a clean list. Row styling matches the Priority Action Items
+    // panel so the two list cards feel like a pair.
+    let alertsPanel;
+    if (alerts.length) {
+      const alertRows = alerts.map((a,i) => {
+        const isLast = i === alerts.length - 1;
+        const dotCol = a.sev === 'bad' ? 'var(--red)' : 'var(--gold)';
+        return '<div class="hd-row" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
+          + 'style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
+          + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+          + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
+          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
+          + '</div>';
+      }).join('');
+      const alertHead = '<div style="display:flex;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.35;">'
+        +   'metric' + (alerts.length===1?'':'s') + ' over target'
+        +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Address the worst-scoring first.</div>'
+        + '</div></div>';
+      alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${alertHead}
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${alertRows}</div></div>`;
+    } else {
+      const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
+        + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;">All Clear</div>'
+        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">No metrics are off target right now.</div>'
+        + '</div>';
+      alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${allClear}</div>`;
+    }
 
     // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
     // Check Average $, Prime Cost %. Each chart sits in its own bordered
@@ -418,14 +435,33 @@ S.Hub = {
     const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div></div>`;
 
-    // Priority action items panel
+    // Priority Action Items panel — dollar amount is the magnet (big gold
+    // Barlow Condensed on the left), then a small module badge above the
+    // action text on the right. Row styling matches the Alerts panel so the
+    // two list cards feel like a pair.
     const actionBody = topItems.length
-      ? topItems.map((it,i) => `
-          <div class="hd-row" onclick="S.Hub._enter('${it.screen}','${it.mod}')" style="display:flex;align-items:center;gap:9px;padding:7px 6px;${i<topItems.length-1?'border-bottom:1px solid rgba(255,255,255,0.05);':''}">
-            <span style="font-size:8px;font-weight:800;letter-spacing:0.06em;color:var(--gold);background:rgba(201,168,76,0.12);padding:3px 0;border-radius:3px;flex-shrink:0;width:56px;text-align:center;">${it.sys.toUpperCase()}</span>
-            <div style="flex:1;font-size:11px;color:var(--t2);line-height:1.35;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(it.action)}</div>
-            ${it.impact > 0 ? `<div style="font-size:11px;font-weight:800;color:var(--gold);flex-shrink:0;">${App.fmtCurrency(it.impact,0)}/mo</div>` : ''}
-          </div>`).join('')
+      ? topItems.map((it,i) => {
+          const isLast = i === topItems.length - 1;
+          const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '—';
+          const modBadgeColors = {
+            Profit:  { c: 'var(--gold)',  bg: 'var(--gold-bg)'  },
+            Revenue: { c: 'var(--green)', bg: 'var(--green-bg)' },
+            Traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
+          };
+          const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
+          return '<div class="hd-row" onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" '
+            + 'style="display:flex;align-items:center;gap:12px;padding:10px 4px;'
+            + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+            + '<div style="flex-shrink:0;min-width:78px;">'
+            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:var(--gold);line-height:1;">' + dollar + '</div>'
+            +   (it.impact > 0 ? '<div style="font-size:9px;color:var(--t3);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-top:2px;">Per Month</div>' : '')
+            + '</div>'
+            + '<div style="flex:1;min-width:0;">'
+            +   '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:' + mc.c + ';background:' + mc.bg + ';padding:3px 6px;border-radius:3px;margin-bottom:4px;">' + it.sys.toUpperCase() + '</span>'
+            +   '<div style="font-size:11px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.action) + '</div>'
+            + '</div>'
+            + '</div>';
+        }).join('')
       : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
     const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${actionBody}</div></div>`;
