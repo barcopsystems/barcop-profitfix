@@ -203,10 +203,10 @@ S.AuditTracker = {
     return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Profit Score History</div>'
       + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">`
-      + `<defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0.01"/></linearGradient></defs>`
+      + `<defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>`
       + ticks.map(v => `<line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${PAD.l-6}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${Math.round(v)}</text>`).join('')
       + (fillPath ? `<path d="${fillPath}" fill="url(#${uid})"/>` : '')
-      + (linePath ? `<path d="${linePath}" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')
+      + (linePath ? `<path d="${linePath}" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')
       + dots + xLabels
       + '</svg></div>';
   },
@@ -267,7 +267,7 @@ S.AuditTracker = {
         const y = H - PAD - ((v-minV)/range)*(H-PAD*2);
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).filter(Boolean);
-      return pts.length >= 2 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+      return pts.length >= 2 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
     };
 
     const tiles = allNames.map(name => {
@@ -290,7 +290,7 @@ S.AuditTracker = {
             const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
             const lx = PAD + ((values.length-1)/(values.length-1))*(W-PAD*2);
             const ly = H - PAD - ((values[values.length-1]-minV)/range)*(H-PAD*2);
-            return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#0A1520" stroke="#C9A84C" stroke-width="2"/>`;
+            return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>`;
           })() : '')
         + '</svg>'
         + '</div>';
@@ -587,7 +587,7 @@ S.AuditTracker = {
 
     const cd = this.buildControlData();
     const controlBanner = (cd && cd.sources && cd.sources.length)
-      ? '<div style="background:var(--gold-bg);border:1px solid rgba(201,168,76,0.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      ? '<div style="background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
         + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:5px;">Control Data Is Feeding This Audit</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Verified figures from ' + esc(cd.sources.join(', '))
         + ' go in automatically as ground truth. The uploads below only need to cover what your Control modules do not.</div>'
