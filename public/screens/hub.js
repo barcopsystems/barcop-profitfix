@@ -630,7 +630,7 @@ S.Hub = {
             </div>
           </header>
           <main class="content">
-            <div style="display:grid;grid-template-rows:auto minmax(360px,1fr) minmax(360px,1fr);gap:18px;min-height:calc(100vh - 56px);">
+            <div style="height:100%;display:grid;grid-template-rows:auto 1fr 1fr;gap:18px;min-height:0;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${auditPanel}${metricsPanel}${readoutPanel}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${alertsPanel}${chartPanel}${actionPanel}</div>
