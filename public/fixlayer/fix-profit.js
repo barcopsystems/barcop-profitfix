@@ -146,7 +146,7 @@ FIX.profit = [
       'Skipping the delivery inspection when the truck arrives mid-service. That is exactly when short counts happen and are hardest to dispute later.',
       'Having no written comp authorization policy. A comp that needs no manager sign-off is an unauthorized expense you approved by silence.',
       'Acting on a single incident with no documentation. It creates legal exposure and rarely survives a dispute with an employee who denies it.',
-      'Using behavioral indicators as an accusation framework. They direct attention. They are not evidence.'
+      'Using behavioral indicators to accuse someone. They direct attention. They are not evidence.'
     ],
 
     quickRef: {
@@ -203,7 +203,7 @@ FIX.profit = [
         id: 'tl-ai-4',
         title: 'Write a Corrective Action Summary',
         whatItDoes: 'Produces a factual, file-ready corrective action paragraph from the incident facts.',
-        prompt: 'I need to document a corrective action for an employee file. The facts: employee name [NAME], date of incident [DATE], shift [SHIFT], what was specifically observed [DESCRIPTION], which policy was violated [POLICY SECTION], prior written warnings [YES or NO and details]. Write a corrective action summary paragraph suitable for the employee file — factual and specific, with no editorializing or conclusions beyond what was directly observed.',
+        prompt: 'I need to document a corrective action for an employee file. The facts: employee name [NAME], date of incident [DATE], shift [SHIFT], what was specifically observed [DESCRIPTION], which policy was violated [POLICY SECTION], prior written warnings [YES or NO and details]. Write a corrective action summary paragraph suitable for the employee file. Keep it factual and specific, with no editorializing or conclusions beyond what was directly observed.',
         whatToPaste: 'Fill in each bracketed field with the incident facts.'
       }
     ]
