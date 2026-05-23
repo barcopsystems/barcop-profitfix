@@ -85,14 +85,31 @@ input,select,textarea{color-scheme:dark;}
   flex-shrink:0;
   overflow:hidden;
   height:52px;
-  display:flex;align-items:center;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
 }
 .sidebar-logo-full{height:24px;width:auto;display:block;flex-shrink:0;}
 .sidebar-logo-icon{
   height:26px;width:auto;display:none;flex-shrink:0;
 }
 .app.sidebar-collapsed .sidebar-logo-full{display:none;}
-.app.sidebar-collapsed .sidebar-logo-icon{display:block;}
+.app.sidebar-collapsed .sidebar-logo-icon{display:none;}
+/* Collapsed: the toggle button is the only visible child; center it where
+   the Bar Cop icon used to sit. */
+.app.sidebar-collapsed .sidebar-logo{justify-content:center;}
+
+/* The collapse toggle lives inside the sidebar-logo box, right-aligned when
+   expanded, centered when collapsed (replaces the old topbar-toggle). */
+.sidebar-logo-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:26px;height:26px;
+  background:transparent;
+  border:1px solid var(--b1);
+  border-radius:var(--r2);
+  color:var(--t3);cursor:pointer;
+  flex-shrink:0;
+  transition:border-color 0.1s,color 0.1s;
+}
+.sidebar-logo-toggle:hover{border-color:rgba(255,255,255,0.25);color:var(--t2);}
 
 /* Nav */
 .sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 0;scrollbar-width:none;}
