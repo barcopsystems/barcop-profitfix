@@ -414,6 +414,9 @@ S.Hub = {
           <div class="sidebar-logo">
             <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
             <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
+            <button class="sidebar-logo-toggle" id="hub-sidebar-toggle" title="Toggle sidebar">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
+            </button>
           </div>
           <nav class="sidebar-nav">${sidebarNav}</nav>
           <div class="sidebar-footer">
@@ -426,9 +429,6 @@ S.Hub = {
         <div class="main">
           <header class="topbar">
             <div class="topbar-left">
-              <button class="topbar-toggle" id="hub-sidebar-toggle" title="Toggle sidebar">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
-              </button>
               <h1 class="topbar-title">${esc(barName)}</h1>
               <span class="topbar-sub">${todayStr}</span>
             </div>
