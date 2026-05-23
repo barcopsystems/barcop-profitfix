@@ -4,6 +4,7 @@ S.Hub = {
 
   AUDIT_STALE: 35,
   WEEKLY_CUTOFF: 8,
+  _sidebarCollapsed: false,
 
   render(container) {
     this._stage = container;
@@ -204,7 +205,7 @@ S.Hub = {
     const metricCells = metrics.map(m => `
       <div class="hd-metric" onclick="S.Hub._enter('${m.screen}','${m.mod}')">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">${m.label}</div>
-        <div style="font-size:19px;font-weight:800;line-height:1;color:${bandColor(m.status)};">${m.disp || '—'}</div>
+        <div style="font-size:19px;font-weight:800;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
     const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
@@ -345,83 +346,128 @@ S.Hub = {
     }
     const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Money Readout')}${readoutBody}</div>`;
 
-    // Sidebar
-    const icons = {
+    // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
+    const navIcons = {
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      revenue: '<path d="M2 11l3.5-3.5 2.5 2.5L13 4M10 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      traffic: '<circle cx="7.5" cy="7.5" r="5.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 7.5h10.6M7.5 2.2c2.1 2.4 2.1 8.2 0 10.6M7.5 2.2c-2.1 2.4-2.1 8.2 0 10.6" stroke="currentColor" stroke-width="1.2"/>',
-      inv:     '<path d="M2.5 4.5L7.5 2l5 2.5v6L7.5 13l-5-2.5v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 4.5l5 2.5 5-2.5M7.5 7v6" stroke="currentColor" stroke-width="1.2"/>',
-      labor:   '<circle cx="5.5" cy="5" r="2.1" stroke="currentColor" stroke-width="1.2"/><circle cx="10.5" cy="5.6" r="1.7" stroke="currentColor" stroke-width="1.2"/><path d="M2 12c0-2 1.6-3.4 3.5-3.4S9 10 9 12M9.3 11.3c.1-1.7 1.3-2.7 2.9-2.7S15 9.7 15 11.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      shift:   '<circle cx="7.5" cy="7.5" r="5.3" stroke="currentColor" stroke-width="1.3"/><path d="M7.5 4.3v3.4l2.4 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      revenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      traffic: '<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      inv:     '<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
+      labor:   '<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      shift:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      getStart:'<path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
+      settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      signout: '<path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
     };
-    const navItems = [
-      { name:'Profit Recovery',  icon:icons.profit,  screen:'dashboard',   mod:'profit'  },
-      { name:'Revenue Recovery', icon:icons.revenue, screen:'r-dashboard', mod:'revenue' },
-      { name:'Traffic Recovery', icon:icons.traffic, screen:'t-dashboard', mod:'traffic' },
-      { name:'Inventory Control',icon:icons.inv,   screen:'ic-dashboard', mod:'inventory' },
-      { name:'Labor Control',    icon:icons.labor, screen:'lc-dashboard', mod:'labor' },
-      { name:'Shift Control',    icon:icons.shift, screen:'sc-dashboard', mod:'shift' },
-    ];
-    const navHtml = navItems.map(n => n.soon
-      ? `<div class="hd-nav soon"><svg width="15" height="15" viewBox="0 0 15 15" fill="none">${n.icon}</svg><span style="flex:1;">${n.name}</span><span style="font-size:7px;font-weight:800;letter-spacing:0.07em;color:var(--t4);border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:2px 4px;">SOON</span></div>`
-      : `<div class="hd-nav" onclick="S.Hub._enter('${n.screen}','${n.mod}')"><svg width="15" height="15" viewBox="0 0 15 15" fill="none">${n.icon}</svg><span>${n.name}</span></div>`
-    ).join('');
+
+    // Build one sidebar nav row. extra is an array of [attr, value] tuples
+    // for data-mod / data-screen on the module-enter rows.
+    const navItem = (action, name, iconKey, extra) => {
+      const attrs = (extra || []).map(([k,v]) => ' ' + k + '="' + v + '"').join('');
+      return '<div class="nav-item" data-hub-action="' + action + '"' + attrs + '>'
+        + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + navIcons[iconKey] + '</svg>'
+        + '<span class="nav-label">' + name + '</span></div>';
+    };
+
+    const sidebarNav = ''
+      + '<div class="nav-section">Recovery</div>'
+      + navItem('enter', 'Profit Recovery',  'profit',  [['data-mod','profit'],   ['data-screen','dashboard']])
+      + navItem('enter', 'Revenue Recovery', 'revenue', [['data-mod','revenue'],  ['data-screen','r-dashboard']])
+      + navItem('enter', 'Traffic Recovery', 'traffic', [['data-mod','traffic'],  ['data-screen','t-dashboard']])
+      + '<div class="nav-section">Control</div>'
+      + navItem('enter', 'Inventory Control','inv',     [['data-mod','inventory'],['data-screen','ic-dashboard']])
+      + navItem('enter', 'Labor Control',    'labor',   [['data-mod','labor'],    ['data-screen','lc-dashboard']])
+      + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
+      + '<div class="nav-section">Support</div>'
+      + navItem('getting-started', 'Getting Started', 'getStart', [])
+      + navItem('help',            'Help and FAQ',    'help',     [])
+      + '<div class="nav-section">Manage</div>'
+      + navItem('settings',  'Settings',   'settings', [])
+      + '<div class="nav-item nav-disabled" title="Coming soon">'
+      +   '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + navIcons.bug + '</svg>'
+      +   '<span class="nav-label">Report Bug</span></div>';
+
+    const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
     // ── Compose ──
+    // Reuses the same .app / .sidebar / .topbar / .content classes as the
+    // module shells so the Hub sidebar matches them exactly in width, logo
+    // area, collapse behavior, and visual styling. The .hub-app class adds
+    // hub-specific overrides for the fixed-viewport dashboard layout.
     container.innerHTML = `
       <style>
-        .hub-dash *{box-sizing:border-box;}
-        .hub-dash .hd-nav{display:flex;align-items:center;gap:9px;padding:9px 13px;cursor:pointer;color:var(--t3);font-size:12px;font-weight:600;border-left:2px solid transparent;}
-        .hub-dash .hd-nav:hover{background:rgba(255,255,255,0.03);color:var(--t1);border-left-color:var(--gold);}
-        .hub-dash .hd-nav.soon,.hub-dash .hd-nav.soon:hover{cursor:default;color:var(--t4);background:none;border-left-color:transparent;}
-        .hub-dash .hd-nav svg{flex-shrink:0;}
-        .hub-dash .hd-metric{padding:8px 11px;border:1px solid rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;}
-        .hub-dash .hd-metric:hover{border-color:rgba(201,168,76,0.4);background:rgba(255,255,255,0.02);}
-        .hub-dash .hd-row{cursor:pointer;}
-        .hub-dash .hd-row:hover{background:rgba(255,255,255,0.03);}
-        .hub-dash .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
-        .hub-dash .hd-btn:hover{border-color:var(--gold);color:var(--gold);}
+        .hub-app{height:100% !important;}
+        .hub-app .content{overflow:hidden !important;padding:12px;min-width:0;}
+        .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
+        .hub-app .nav-item.nav-disabled:hover{background:transparent;}
+        .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
+        .hub-app .hd-metric{padding:8px 11px;border:1px solid rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;}
+        .hub-app .hd-metric:hover{border-color:rgba(201,168,76,0.4);background:rgba(255,255,255,0.02);}
+        .hub-app .hd-row{cursor:pointer;}
+        .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
+        .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
+        .hub-app .hd-btn:hover{border-color:var(--gold);color:var(--gold);}
       </style>
-      <div class="hub-dash" style="height:100vh;display:grid;grid-template-columns:160px 1fr;grid-template-rows:48px 1fr 34px;background:var(--bg);overflow:hidden;">
-
-        <div style="grid-column:1/-1;grid-row:1;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid rgba(255,255,255,0.07);background:var(--surface);">
-          <div style="display:flex;align-items:center;gap:13px;flex:1;">
-            <img src="assets/logo.png" alt="Bar Cop" style="height:20px;opacity:0.93;"/>
-            <span style="font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--t3);">Recovery Platform</span>
+      <div class="app hub-app${collapsedClass}">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
+            <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
           </div>
-          <div style="font-size:14px;font-weight:800;color:var(--t1);">${esc(barName)}</div>
-          <div style="display:flex;align-items:center;gap:14px;flex:1;justify-content:flex-end;">
-            <span style="font-size:11px;color:var(--t3);">${todayStr}</span>
-            <button id="hub-getstarted" class="hd-btn">Getting Started</button>
-            <button id="hub-settings" class="hd-btn">Settings</button>
-            <button id="hub-signout" class="hd-btn">${App.demoMode ? 'Exit Demo' : 'Sign Out'}</button>
+          <nav class="sidebar-nav">${sidebarNav}</nav>
+          <div class="sidebar-footer">
+            <button class="sidebar-btn" id="hub-signout">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">${navIcons.signout}</svg>
+              <span class="sidebar-btn-label">${App.demoMode ? 'Exit Demo' : 'Sign Out'}</span>
+            </button>
           </div>
+        </aside>
+        <div class="main">
+          <header class="topbar">
+            <div class="topbar-left">
+              <button class="topbar-toggle" id="hub-sidebar-toggle" title="Toggle sidebar">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
+              </button>
+              <h1 class="topbar-title">${esc(barName)}</h1>
+              <span class="topbar-sub">${todayStr}</span>
+            </div>
+            <div class="topbar-right">
+              <span style="font-size:10px;color:var(--t4);">${lastUpdatedTxt}</span>
+            </div>
+          </header>
+          <main class="content">
+            <div style="height:100%;display:grid;grid-template-rows:78px 1fr 1fr;gap:12px;min-height:0;">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">${tiles}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}${scoreboardPanel}</div>
+              <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px;min-height:0;">${chartPanel}${readoutPanel}${actionPanel}</div>
+            </div>
+          </main>
         </div>
-
-        <div style="grid-column:1;grid-row:2;border-right:1px solid rgba(255,255,255,0.07);background:var(--surface);padding:8px 0;overflow:hidden;">
-          <div style="font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--t4);padding:6px 13px 8px;">Modules</div>
-          ${navHtml}
-        </div>
-
-        <div style="grid-column:2;grid-row:2;display:grid;grid-template-rows:78px 1fr 1fr;gap:12px;padding:12px;overflow:hidden;min-height:0;">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">${tiles}</div>
-          <div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 1fr;gap:12px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}${scoreboardPanel}</div>
-          <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px;min-height:0;">${chartPanel}${readoutPanel}${actionPanel}</div>
-        </div>
-
-        <div style="grid-column:1/-1;grid-row:3;display:flex;align-items:center;padding:0 18px;border-top:1px solid rgba(255,255,255,0.07);background:var(--surface);">
-          <span style="font-size:10px;color:var(--t4);">${lastUpdatedTxt}</span>
-        </div>
-
       </div>
     `;
 
+    // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
       if (App.demoMode) { window.location.href = '/'; return; }
       await DB.signOut();
     });
-    document.getElementById('hub-settings')?.addEventListener('click', () => S.HubSettings.open());
-    document.getElementById('hub-getstarted')?.addEventListener('click', () => S.HubGettingStarted.open());
+
+    document.getElementById('hub-sidebar-toggle')?.addEventListener('click', () => {
+      this._sidebarCollapsed = !this._sidebarCollapsed;
+      container.querySelector('.hub-app')?.classList.toggle('sidebar-collapsed');
+    });
+
+    const navEl = container.querySelector('.sidebar-nav');
+    if (navEl) navEl.addEventListener('click', (ev) => {
+      const item = ev.target.closest('.nav-item');
+      if (!item || item.classList.contains('nav-disabled')) return;
+      const action = item.dataset.hubAction;
+      if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
+      else if (action === 'getting-started') S.HubGettingStarted.open();
+      else if (action === 'help')            S.HubHelp.open();
+      else if (action === 'settings')        S.HubSettings.open();
+    });
 
     document.getElementById('hub-rec-set')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('hub-rec-target')?.value);
