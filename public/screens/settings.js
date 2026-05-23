@@ -1032,6 +1032,260 @@ S.HubSettings = {
     ];
 
     // ════════════════════════════════════════════════════════════════════
+    //  TRAFFIC RECOVERY — the Anchor's digital presence over 12 weeks plus
+    //  a three-audit recovery arc and a complete scorecard profile.
+    // ════════════════════════════════════════════════════════════════════
+    App.data.traffic_settings = App.data.traffic_settings || {};
+    App.data.traffic_settings.targets = { google_rating:4.3, review_velocity:8,
+      response_rate:75, monthly_sessions:2000, social_posts_month:12 };
+    App.data.traffic_settings._targets_saved = true;
+    App.data.traffic_settings.profile = {
+      // GBP scorecard
+      gbp_claimed:true, gbp_hours:true, gbp_phone:true, gbp_website:true,
+      gbp_menu:true, gbp_category:true, gbp_attributes:true, gbp_qa:false,
+      gbp_photos:138, gbp_posts:10, gbp_reviewed_at:daysAgoISO(4),
+      // Review tracker
+      rev_age:4, rev_patterns:'No recurring complaint pattern in the last 30 days. Earlier weekend-service mentions have dropped off.',
+      rev_reviewed_at:daysAgoISO(3),
+      // Search and SEO
+      search_maps_pack:true, search_nap:true, search_name:true, search_address:true,
+      search_phone:true, search_titles:true, search_keyword:'austin sports bar',
+      search_citations:42, search_reviewed_at:daysAgoISO(6),
+      // Website scorecard
+      web_exists:true, web_mobile:true, web_menu:true, web_online_order:true, web_reservations:true,
+      web_avg_duration:96, web_top_source:'Organic Search', web_reviewed_at:daysAgoISO(7),
+      // Social
+      social_stories:true, social_reels:true, social_ig_engagement:2.4, social_fb_posts:6,
+      social_content_mix:'Balanced', social_reviewed_at:daysAgoISO(5),
+      // Delivery
+      dd_photos:26, dd_menu:true, dd_promo:true,
+      ue_photos:22, ue_menu:true, ue_promo:false,
+      gh_photos:null, gh_menu:false, gh_promo:false,
+      delivery_reviewed_at:daysAgoISO(8),
+      // Email and loyalty
+      email_last_send:dateStr(5), email_frequency:'Weekly', email_growth:'WiFi login capture',
+      email_reviewed_at:daysAgoISO(5)
+    };
+
+    // ── Traffic weeks — recovery arc, oldest to newest ──
+    const tw = {
+      google_rating:    [3.9,3.9,4.0,4.0,4.1,4.1,4.2,4.3,4.3,4.4,4.5,4.5],
+      google_total:     [240,246,253,261,268,275,284,293,302,310,318,326],
+      new_reviews:      [3,4,4,5,5,6,8,9,9,10,11,11],
+      response_rate:    [38,42,48,54,60,68,74,78,82,84,86,88],
+      yelp_rating:      [3.7,3.7,3.8,3.8,3.8,3.9,3.9,4.0,4.0,4.0,4.1,4.1],
+      yelp_total:       [80,81,83,84,86,88,90,92,95,98,101,104],
+      monthly_sessions: [1180,1240,1300,1380,1480,1620,1780,1940,2080,2200,2320,2420],
+      bounce_rate:      [74,73,72,70,68,66,64,62,60,58,57,56],
+      ig_followers:     [1880,1920,1965,2010,2060,2120,2200,2280,2360,2440,2520,2600],
+      ig_posts_month:   [5,6,6,7,8,9,10,11,12,13,14,14],
+      fb_followers:     [1050,1060,1075,1085,1100,1115,1135,1155,1175,1195,1215,1240],
+      dd_rating:        [4.2,4.2,4.3,4.3,4.3,4.4,4.4,4.5,4.5,4.5,4.6,4.6],
+      ue_rating:        [4.0,4.0,4.1,4.1,4.1,4.2,4.2,4.3,4.3,4.3,4.4,4.4],
+      email_list_size:  [380,410,445,480,520,560,605,650,690,720,745,760],
+      emails_sent:      [1,1,2,2,2,3,3,3,4,4,4,4],
+      email_open_rate:  [18,19,20,21,22,24,25,26,27,27,28,28],
+      loyalty_members:  [0,0,0,0,0,0,60,140,220,300,370,420],
+    };
+    App.data.traffic_weeks = window.ANCHOR.weeks.map((a, i) => ({
+      id: Date.now() + i, week_num: a.wk, period_end: dateStr((12 - a.wk) * 7),
+      saved_at: new Date().toISOString(),
+      google_rating: tw.google_rating[i], google_total: tw.google_total[i],
+      new_reviews: tw.new_reviews[i], response_rate: tw.response_rate[i],
+      yelp_rating: tw.yelp_rating[i], yelp_total: tw.yelp_total[i],
+      monthly_sessions: tw.monthly_sessions[i], bounce_rate: tw.bounce_rate[i],
+      ig_followers: tw.ig_followers[i], ig_posts_month: tw.ig_posts_month[i],
+      fb_followers: tw.fb_followers[i],
+      dd_active: 'yes', dd_rating: tw.dd_rating[i],
+      ue_active: 'yes', ue_rating: tw.ue_rating[i],
+      gh_active: 'no',  gh_rating: null,
+      email_list_size: tw.email_list_size[i], emails_sent: tw.emails_sent[i],
+      email_open_rate: tw.email_open_rate[i],
+      loyalty_active: i >= 6 ? 'yes' : 'no', loyalty_members: tw.loyalty_members[i],
+      notes: ''
+    }));
+
+    // ── Traffic audits — three-audit recovery arc, Feb / Mar / Apr ──
+    const mkTrafficAudit = (date, generated_at, audit_id, period, score, tier, raw) => {
+      const sections = {
+        'Google Business Profile': raw.S1_SCORE, 'Website': raw.S2_SCORE,
+        'Reviews': raw.S3_SCORE, 'Search and SEO': raw.S4_SCORE,
+        'Social Media': raw.S5_SCORE, 'Delivery Platforms': raw.S6_SCORE,
+        'Email and Loyalty': raw.S7_SCORE
+      };
+      const items = [];
+      const push = (gap, label) => { if (gap > 0) items.push({ action:label + ' $' + Math.round(gap) + '/month opportunity.', monthly_impact:gap }); };
+      push(raw.S1_MONTHLY_GAP, 'Complete the Google Business Profile setup.');
+      push(raw.S2_MONTHLY_GAP, 'Lift website conversion and reduce bounce.');
+      push(raw.S3_MONTHLY_GAP, 'Close the review velocity and response gap.');
+      push(raw.S5_MONTHLY_GAP, 'Tighten social cadence and content mix.');
+      push(raw.S6_MONTHLY_GAP, 'Optimize delivery platform listings.');
+      push(raw.S7_MONTHLY_GAP, 'Activate the email list and loyalty program.');
+      items.sort((a, b) => (b.monthly_impact||0) - (a.monthly_impact||0));
+      const totalMo = items.reduce((s, it) => s + (it.monthly_impact||0), 0);
+      raw.OVERALL_SCORE = score;
+      raw.BAR_NAME = 'The Anchor Bar & Kitchen';
+      raw.AUDIT_ID = audit_id;
+      raw.AUDIT_PERIOD = period;
+      raw.DATA_TIER_LABEL = tier;
+      raw.INDUSTRY_AVG = 58;
+      raw.TARGET_SCORE = 65;
+      raw.WEEKLY_GAP_AMT = '$' + Math.round(totalMo/4.345).toLocaleString('en-US');
+      return { date:date, bar_name:raw.BAR_NAME, overall_score:score,
+        audit_id:audit_id, audit_period:period, grade:tier,
+        sections:sections, action_items:items, raw:raw, generated_at:generated_at };
+    };
+
+    App.data.traffic_audits = [
+      mkTrafficAudit(dateStr(74), daysAgoISO(74), 'TFA-2026-0008',
+        'February 2026, 4 weeks ending Feb 27', 31,
+        'Tier 2 Analysis, Standard Data Submitted', {
+        S1_SCORE:28, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Partial',
+        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'No', S1_PHOTO_COUNT:41,
+        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:2, S1_POSTS_BENCHMARK:8,
+        S1_PROFILE_COMPLETENESS_PCT:52, S1_MONTHLY_GAP:480,
+        S1_NARRATIVE:'The Google Business Profile is claimed but only half complete. Two posts in 30 days against an 8-post benchmark.',
+        S1_FINDING:'Photos are well below 100, the menu link is missing, and posts barely run. Listings this thin lose discovery clicks to nearby competitors.',
+        S1_TOOL:'Add the menu link, post weekly offers, and load 60 more photos this month.',
+        S2_SCORE:30, S2_MOBILE_OPTIMIZED:'No', S2_MONTHLY_SESSIONS:1180,
+        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:74, S2_BOUNCE_BENCHMARK:55,
+        S2_MENU_PAGE_IN_TOP_3:'No', S2_ONLINE_ORDERING_PRESENT:'No', S2_MONTHLY_GAP:720,
+        S2_NARRATIVE:'Site traffic of 1,180 monthly sessions is roughly 40% below benchmark, and the homepage is not mobile-optimized.',
+        S2_FINDING:'A 74% bounce rate means visitors leave from the homepage. No online ordering means delivery traffic flows entirely to third-party platforms.',
+        S2_TOOL:'Rebuild the homepage above-the-fold for mobile and add a menu page that loads fast.',
+        S3_SCORE:22, S3_GOOGLE_RATING:3.9, S3_GOOGLE_RATING_BENCHMARK:4.3,
+        S3_GOOGLE_REVIEW_COUNT:240, S3_RESPONSE_RATE:38, S3_RESPONSE_BENCHMARK:75,
+        S3_MOST_RECENT_REVIEW_DAYS:19, S3_YELP_RATING:3.7,
+        S3_UNANSWERED:148, S3_NEGATIVE_PATTERN:'Slow weekend service mentioned in 4 of the last 10 reviews.',
+        S3_MONTHLY_GAP:1280,
+        S3_NARRATIVE:'Google rating is 3.9 against a 4.3 benchmark, and the response rate is just 38%.',
+        S3_FINDING:'148 reviews sit unanswered. A pattern of slow weekend service appears in recent reviews and is now visible to every searching guest.',
+        S3_TOOL:'Respond to every unanswered review this week and address the weekend pacing issue on the floor.',
+        S4_SCORE:32, S4_MAPS_PACK_CONFIRMED:'No', S4_NAP_CONSISTENT:'No',
+        S4_NAP_BUSINESS_NAME:'Inconsistent across Yelp and Apple Maps',
+        S4_PRIMARY_KEYWORD:'austin sports bar',
+        S4_NARRATIVE:'The business does not appear in the Google Maps pack for its primary keyword.',
+        S4_FINDING:'Name, address and phone vary across Yelp, Apple Maps and the website footer. Inconsistent NAP signals depress local ranking.',
+        S4_TOOL:'Pick the canonical NAP and fix every directory listing to match it exactly.',
+        S5_SCORE:35, S5_IG_FOLLOWERS:1880, S5_IG_POSTS_LAST_30:5, S5_IG_POSTS_BENCHMARK:12,
+        S5_FB_FOLLOWERS:1050, S5_CONTENT_TYPE:'Mostly promotional', S5_MONTHLY_GAP:380,
+        S5_NARRATIVE:'Instagram posting cadence runs 5 per 30 days against a 12 benchmark.',
+        S5_FINDING:'Content is mostly promotional graphics. Food and people content drives the engagement that grows followers.',
+        S5_TOOL:'Move to a balanced mix of food, people and the room. Post three times a week.',
+        S6_SCORE:38, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
+        S6_DOORDASH_RATING:4.2, S6_UBEREATS_RATING:4.0,
+        S6_PHOTO_COUNT_DELIVERY:11, S6_MENU_COMPLETE:'Partial', S6_PROMO_ACTIVE:'No',
+        S6_MONTHLY_GAP:540,
+        S6_NARRATIVE:'Both delivery platforms are live but ratings sit below the 4.5 benchmark and photos are sparse.',
+        S6_FINDING:'No promo is active on either platform, so listings sit low in the feed against competitors running offers.',
+        S6_TOOL:'Add 15 more food photos per platform and run a first-order promo on DoorDash.',
+        S7_SCORE:30, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:380, S7_LIST_BENCHMARK:500,
+        S7_LAST_SEND_DAYS_AGO:42, S7_SEND_FREQUENCY:'Rarely', S7_OPEN_RATE:18, S7_OPEN_BENCHMARK:20,
+        S7_GROWTH_MECHANISM:'No active mechanism', S7_LOYALTY_PROGRAM:'None', S7_MONTHLY_GAP:420,
+        S7_NARRATIVE:'A 380-contact list has not been emailed in over six weeks. No loyalty program is in place.',
+        S7_FINDING:'The list is going cold, opens are below benchmark, and there is no way for new guests to opt in.',
+        S7_TOOL:'Send a monthly email starting this week and add a WiFi sign-up capture.'
+      }),
+      mkTrafficAudit(dateStr(42), daysAgoISO(42), 'TFA-2026-0012',
+        'March 2026, 4 weeks ending Mar 27', 48,
+        'Tier 2 Analysis, Standard Data Submitted', {
+        S1_SCORE:48, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
+        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:84,
+        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:6, S1_POSTS_BENCHMARK:8,
+        S1_PROFILE_COMPLETENESS_PCT:80, S1_MONTHLY_GAP:280,
+        S1_NARRATIVE:'GBP is now 80% complete with the menu link live and weekly posts running.',
+        S1_FINDING:'Photo count has doubled to 84 and weekly posts are landing. Two more posts a month and 16 more photos close the gap to benchmark.',
+        S1_TOOL:'Add two posts a week and finish loading the food photo library.',
+        S2_SCORE:46, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:1620,
+        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:66, S2_BOUNCE_BENCHMARK:55,
+        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'Yes', S2_MONTHLY_GAP:380,
+        S2_NARRATIVE:'Mobile rebuild lifted sessions to 1,620 and bounce rate dropped to 66%.',
+        S2_FINDING:'Online ordering is now live and the menu page is in the top three viewed. Sessions and bounce still trail benchmark, but the trend is solid.',
+        S2_TOOL:'Add a reservations link in the header and run a quick Lighthouse pass on page speed.',
+        S3_SCORE:44, S3_GOOGLE_RATING:4.1, S3_GOOGLE_RATING_BENCHMARK:4.3,
+        S3_GOOGLE_REVIEW_COUNT:275, S3_RESPONSE_RATE:68, S3_RESPONSE_BENCHMARK:75,
+        S3_MOST_RECENT_REVIEW_DAYS:8, S3_YELP_RATING:3.9,
+        S3_UNANSWERED:88, S3_NEGATIVE_PATTERN:'Weekend service mentions have dropped.',
+        S3_MONTHLY_GAP:640,
+        S3_NARRATIVE:'Google rating climbed to 4.1 and response rate is up to 68% as the reply routine took hold.',
+        S3_FINDING:'88 reviews remain unanswered. Hitting the 75% response benchmark closes the rest of this gap.',
+        S3_TOOL:'Clear the unanswered backlog and set a daily 10-minute response slot.',
+        S4_SCORE:50, S4_MAPS_PACK_CONFIRMED:'Sometimes', S4_NAP_CONSISTENT:'Yes',
+        S4_NAP_BUSINESS_NAME:'Consistent', S4_PRIMARY_KEYWORD:'austin sports bar',
+        S4_NARRATIVE:'NAP is now consistent across the major directories.',
+        S4_FINDING:'The business appears in the Maps pack on most keyword variations. Citation count is climbing.',
+        S4_TOOL:'Add the bar to ten more local-bar directories.',
+        S5_SCORE:52, S5_IG_FOLLOWERS:2120, S5_IG_POSTS_LAST_30:9, S5_IG_POSTS_BENCHMARK:12,
+        S5_FB_FOLLOWERS:1115, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:200,
+        S5_NARRATIVE:'Posting cadence is up to 9 per 30 days and content shifted to a balanced mix.',
+        S5_FINDING:'Follower growth followed the cadence change. Three more posts per month hits the benchmark.',
+        S5_TOOL:'Set a Tuesday and Friday content slot and stick to it.',
+        S6_SCORE:54, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
+        S6_DOORDASH_RATING:4.4, S6_UBEREATS_RATING:4.2,
+        S6_PHOTO_COUNT_DELIVERY:18, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'DoorDash',
+        S6_MONTHLY_GAP:280,
+        S6_NARRATIVE:'DoorDash promo is live and ratings are up. UberEats lags by two-tenths.',
+        S6_FINDING:'More photos and a UberEats promo would close the remaining gap.',
+        S6_TOOL:'Mirror the DoorDash promo on UberEats and add 8 more food photos to each.',
+        S7_SCORE:46, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:560, S7_LIST_BENCHMARK:500,
+        S7_LAST_SEND_DAYS_AGO:9, S7_SEND_FREQUENCY:'Monthly', S7_OPEN_RATE:24, S7_OPEN_BENCHMARK:20,
+        S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Started', S7_MONTHLY_GAP:220,
+        S7_NARRATIVE:'List grew past 500 and a loyalty program launched. Open rate of 24% beats the 20% benchmark.',
+        S7_FINDING:'A monthly cadence works. Moving to weekly during event months grows revenue per send.',
+        S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.'
+      }),
+      mkTrafficAudit(dateStr(8), daysAgoISO(8), 'TFA-2026-0017',
+        'April 2026, 4 weeks ending Apr 24', 64,
+        'Tier 3 Analysis, Full Data Submitted', {
+        S1_SCORE:66, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
+        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:138,
+        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:10, S1_POSTS_BENCHMARK:8,
+        S1_PROFILE_COMPLETENESS_PCT:95, S1_MONTHLY_GAP:0,
+        S1_NARRATIVE:'GBP is at 95% complete with 138 photos and 10 posts in the last 30 days, both above benchmark.',
+        S1_FINDING:'Only the Q and A section remains thin. The profile is now a strong discovery asset.',
+        S1_TOOL:'Seed the Q and A with the 8 questions guests ask most.',
+        S2_SCORE:60, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:2420,
+        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:56, S2_BOUNCE_BENCHMARK:55,
+        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'Yes', S2_MONTHLY_GAP:0,
+        S2_NARRATIVE:'Sessions cleared 2,400 and bounce rate is within a point of benchmark.',
+        S2_FINDING:'Online ordering and reservations are both live and visible above the fold on mobile.',
+        S2_TOOL:'Add a quarterly content refresh to the events page.',
+        S3_SCORE:64, S3_GOOGLE_RATING:4.5, S3_GOOGLE_RATING_BENCHMARK:4.3,
+        S3_GOOGLE_REVIEW_COUNT:326, S3_RESPONSE_RATE:88, S3_RESPONSE_BENCHMARK:75,
+        S3_MOST_RECENT_REVIEW_DAYS:4, S3_YELP_RATING:4.1,
+        S3_UNANSWERED:39, S3_NEGATIVE_PATTERN:'No recurring theme in the last 30 days.',
+        S3_MONTHLY_GAP:180,
+        S3_NARRATIVE:'Google rating sits at 4.5 with 88% response rate, both ahead of benchmark.',
+        S3_FINDING:'39 older reviews remain unanswered but no recurring complaint pattern surfaces in recent ones.',
+        S3_TOOL:'Sweep the older unanswered reviews and keep the daily response slot.',
+        S4_SCORE:66, S4_MAPS_PACK_CONFIRMED:'Yes', S4_NAP_CONSISTENT:'Yes',
+        S4_NAP_BUSINESS_NAME:'Consistent', S4_PRIMARY_KEYWORD:'austin sports bar',
+        S4_NARRATIVE:'The bar appears in the Maps pack for every tracked keyword.',
+        S4_FINDING:'NAP and citation count are above the local benchmark. Search is performing.',
+        S4_TOOL:'Audit citations quarterly and add new ones as new directories appear.',
+        S5_SCORE:66, S5_IG_FOLLOWERS:2600, S5_IG_POSTS_LAST_30:14, S5_IG_POSTS_BENCHMARK:12,
+        S5_FB_FOLLOWERS:1240, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:0,
+        S5_NARRATIVE:'Follower growth has compounded. Cadence is above benchmark with a balanced mix.',
+        S5_FINDING:'IG engagement rate is up to 2.4%. Reels are now in rotation.',
+        S5_TOOL:'Add one staff-introduction post a month to deepen the human side.',
+        S6_SCORE:68, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
+        S6_DOORDASH_RATING:4.6, S6_UBEREATS_RATING:4.4,
+        S6_PHOTO_COUNT_DELIVERY:48, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'Both platforms',
+        S6_MONTHLY_GAP:0,
+        S6_NARRATIVE:'Both delivery platforms run promos and DoorDash hit the 4.6 benchmark.',
+        S6_FINDING:'Photo and menu coverage are strong. Grubhub is still off, which is a deliberate choice given local mix.',
+        S6_TOOL:'Add a third promo type, free-delivery threshold, on DoorDash next month.',
+        S7_SCORE:62, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:760, S7_LIST_BENCHMARK:500,
+        S7_LAST_SEND_DAYS_AGO:5, S7_SEND_FREQUENCY:'Weekly', S7_OPEN_RATE:28, S7_OPEN_BENCHMARK:20,
+        S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Active, 420 members',
+        S7_MONTHLY_GAP:80,
+        S7_NARRATIVE:'List grew to 760, weekly sends with 28% opens, and 420 loyalty members enrolled.',
+        S7_FINDING:'The email channel is now a real revenue line. Loyalty redemption rate is the next thing to track.',
+        S7_TOOL:'Add a redemption-rate report to the monthly review and run a member-only event quarterly.'
+      })
+    ];
+
+    // ════════════════════════════════════════════════════════════════════
     //  INVENTORY CONTROL — The Anchor's stockroom. The last two counts feed
     //  the Profit This Week COGS, so the Capture-to-Diagnose chain computes.
     // ════════════════════════════════════════════════════════════════════
@@ -1325,7 +1579,7 @@ S.HubSettings = {
     // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
     // and 5, which is where both cost trends break downward.
     App.data.fix_log = (App.data.fix_log || [])
-      .filter(e => e.module !== 'profit' && e.module !== 'revenue')
+      .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
       .concat([
       { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
         date:dateStr(45), logged_at:daysAgoISO(45) },
@@ -1337,6 +1591,10 @@ S.HubSettings = {
         date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling',
         date:dateStr(38), logged_at:daysAgoISO(38) },
+      { id:uid(), module:'traffic', gap_id:'gbp', gap_name:'Google Business Profile',
+        date:dateStr(45), logged_at:daysAgoISO(45) },
+      { id:uid(), module:'traffic', gap_id:'reviews', gap_name:'Reviews',
+        date:dateStr(30), logged_at:daysAgoISO(30) },
     ]);
 
     // ── Variance Investigations ──
