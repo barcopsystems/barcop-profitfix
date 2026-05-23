@@ -502,10 +502,6 @@ S.TrafficAudit = {
   _intakeStep: 1,
   _intakeDraft: null,
 
-  // ── Stepped intake wizard ─────────────────────────────────────────────────
-  _intakeStep: 1,
-  _intakeDraft: null,
-
   showIntakeForm() {
     this._intakeStep = 1;
     this._intakeDraft = {};
