@@ -320,7 +320,7 @@ S.RevenueAudit = {
     const d = audit.raw || audit;
     const scoreColor = App.scoreColor(audit.overall_score||0);
 
-    const sectionBlock = (num, name, score, items) => {
+    const sectionBlock = (num, name, score, items, signals) => {
       const bar   = Math.min(100, Math.max(0, score||0));
       const color = App.scoreColor(score);
       const rows  = items.filter(([,v]) => v !== undefined && v !== null && v !== '').map(([label, val, highlight]) =>
@@ -329,6 +329,20 @@ S.RevenueAudit = {
         + '<td style="padding:7px 0;font-size:11px;color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';font-weight:600;">' + val + '</td>'
         + '</tr>'
       ).join('');
+      const sigRows = (signals||[]).map(sig => {
+        const sc = (sig.score||'').toUpperCase();
+        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'rgba(255,200,0,0.7)':'var(--gold)';
+        return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px;margin-top:10px;">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+          + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></div>'
+          + '<div style="font-size:11px;font-weight:700;color:var(--t1);">' + esc(sig.label||'') + '</div>'
+          + '<div style="margin-left:auto;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + dot + ';">' + esc(sig.score||'') + '</div>'
+          + '</div>'
+          + (sig.evidence ? '<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">' + esc(sig.evidence) + '</div>' : '')
+          + (sig.gap      ? '<div style="font-size:11px;color:var(--t2);margin-bottom:4px;">' + esc(sig.gap) + '</div>' : '')
+          + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
+          + '</div>';
+      }).join('');
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
@@ -338,6 +352,7 @@ S.RevenueAudit = {
         + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
         + '</div></div>'
         + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
+        + sigRows
         + '</div>';
     };
 
@@ -345,6 +360,13 @@ S.RevenueAudit = {
     const cur = v => v ? App.fmtCurrency(v) : '';
     const num = v => v != null ? String(v) : '';
     const yN  = v => v === true ? 'Yes' : v === false ? 'No' : '';
+
+    const signals6 = [
+      {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
+      {score:d.S6_SIG2_SCORE, label:d.S6_SIG2_LABEL, evidence:d.S6_SIG2_EVIDENCE, gap:d.S6_SIG2_GAP, tool:d.S6_SIG2_TOOL},
+      {score:d.S6_SIG3_SCORE, label:d.S6_SIG3_LABEL, evidence:d.S6_SIG3_EVIDENCE, gap:d.S6_SIG3_GAP, tool:d.S6_SIG3_TOOL},
+      {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL},
+    ].filter(s => s.label);
 
     const sections = [
       sectionBlock(1, 'Check Average and Revenue', d.S1_SCORE, [
@@ -395,6 +417,7 @@ S.RevenueAudit = {
         ['Annual Event Gap',             cur(d.S5_ANNUAL_EVENT_GAP), d.S5_ANNUAL_EVENT_GAP > 0 ? 'warn' : ''],
         ['Monthly Gap',                  cur(d.S5_MONTHLY_GAP), d.S5_MONTHLY_GAP > 0 ? 'warn' : ''],
       ]),
+      sectionBlock(6, 'Operational Risk Signals', d.S6_SIG1_SCORE ? null : 0, [], signals6),
     ].join('');
 
     const actionItems = (audit.action_items || []).map((a,i) =>
@@ -482,6 +505,7 @@ S.RevenueAudit = {
       { num:3, name:'Menu Performance',            fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
       { num:4, name:'Server Performance',          fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
       { num:5, name:'Events and Private Dining',   fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
+      { num:6, name:'Operational Risk Signals',     fields: ['S6_SIG1_EVIDENCE','S6_SIG1_GAP','S6_SIG1_TOOL','S6_SIG2_EVIDENCE','S6_SIG2_GAP','S6_SIG2_TOOL','S6_SIG3_EVIDENCE','S6_SIG3_GAP','S6_SIG3_TOOL','S6_SIG4_EVIDENCE','S6_SIG4_GAP','S6_SIG4_TOOL'] },
     ];
     const cards = sections.map(s => {
       const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
