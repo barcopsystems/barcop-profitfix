@@ -546,7 +546,7 @@ FIX.traffic = [
 
   {
     id: 'email-loyalty',
-    name: 'Email & Loyalty',
+    name: 'Email and Loyalty',
     module: 'traffic',
     summary: 'Email is the one channel where you own the audience. Build the list at every contact point, send a personal update every month, and write like the owner, not a marketing department.',
 
