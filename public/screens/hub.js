@@ -179,52 +179,98 @@ S.Hub = {
              wkOverdue.length ? 'var(--red)' : 'var(--t3)');
 
     // Audit Scores panel — three stacked rows, one per module.
-    // Each row: big score number (left) · name + date + trend (middle) ·
-    // action (right). The action mirrors the 30-day rolling rule each audit
-    // screen enforces: no audits yet → "Run First Audit"; 30+ days since the
-    // last one → "Run Audit"; inside the window → "Next in N days".
+    // Each row uses the PDF-cover layout: bold module name + action top-right,
+    // big score / 100 with the score bar full-width below it, then the red
+    // dollar statement (or green "On target") computed honestly from the
+    // audit's action_items, then audit date + trend in small subtext. The
+    // action mirrors the 30-day rolling rule the audit screens enforce.
     const auditDaysLeft = (a) => {
       if (!a || !a.date) return 0;
       const d = Math.floor((Date.now() - new Date(a.date + 'T00:00:00').getTime()) / 86400000);
       return Math.max(0, 30 - d);
     };
-    const auditRow = (name, audit, trend, screen, mod, isFirst) => {
+    const auditRow = (name, audit, trend, screen, mod, isFirst, indAvg) => {
       const score      = audit?.overall_score ?? null;
       const scoreColor = score != null ? App.scoreHex(score) : 'var(--t4)';
       const daysLeft   = auditDaysLeft(audit);
       const canRun     = daysLeft <= 0;
-      const noAudits   = !audit;
-      const btnLabel   = noAudits ? 'Run First Audit' : 'Run Audit';
+      const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
 
-      const trendHtml = trend == null
-        ? ''
-        : '<span style="color:' + (trend>=0?'var(--gold)':'var(--red)') + ';font-weight:700;">'
-          + (trend>=0?'+':'') + trend + ' pts</span> <span style="color:var(--t4);">·</span> ';
-      const dateHtml = audit?.date ? 'Audit ' + shortDate(audit.date) : 'No audit yet';
-
+      // Action area: button when ready, countdown otherwise
       const actionHtml = canRun
         ? '<button class="hd-btn" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
         : '<div style="text-align:right;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;line-height:1.3;">'
           + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow Condensed\',sans-serif;font-size:14px;letter-spacing:0;">in '
           + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
 
-      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 0;'
-        + (isFirst ? '' : 'border-top:1px solid var(--b2);') + '">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:'
-        + scoreColor + ';line-height:1;min-width:42px;text-align:right;">'
-        + (score != null ? score : '&#8212;') + '</div>'
-        + '<div style="flex:1;min-width:0;">'
-        +   '<div style="font-size:11px;font-weight:700;color:var(--t1);letter-spacing:0.04em;">' + name + '</div>'
-        +   '<div style="font-size:10px;color:var(--t3);margin-top:3px;">' + trendHtml + dateHtml + '</div>'
+      // Score block: big number / 100 + industry/target line + bar with marker
+      let scoreBlock;
+      if (score != null) {
+        const barPct = Math.max(0, Math.min(100, Math.round(score)));
+        scoreBlock = ''
+          + '<div style="display:flex;align-items:baseline;gap:12px;">'
+          +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
+          +     score + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
+          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Industry avg ' + indAvg + ' &middot; Your target 65+</div>'
+          + '</div>'
+          + '<div style="margin-top:7px;">'
+          +   '<div style="display:flex;height:6px;border-radius:4px;overflow:hidden;">'
+          +     '<div style="width:50%;background:var(--red);"></div>'
+          +     '<div style="width:20%;background:var(--t2);"></div>'
+          +     '<div style="width:30%;background:var(--green);"></div>'
+          +   '</div>'
+          +   '<div style="position:relative;height:0;">'
+          +     '<div style="position:absolute;top:-9px;left:' + barPct + '%;width:3px;height:11px;background:var(--w);border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 0 1.5px var(--surface);"></div>'
+          +   '</div>'
+          + '</div>';
+      } else {
+        scoreBlock = '<div style="display:flex;align-items:baseline;gap:12px;">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--t4);line-height:1;">&#8212;</div>'
+          + '<div style="flex:1;font-size:11px;color:var(--t3);">Run the first audit to score this module.</div>'
+          + '</div>';
+      }
+
+      // Honest dollar statement from action_items.monthly_impact
+      let dollarLine = '';
+      if (audit) {
+        const monthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
+        const weekly  = monthly / 4.345;
+        if (weekly > 0) {
+          dollarLine = '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:7px;">'
+            + 'Leaking an estimated ' + App.fmtCurrency(weekly, 0) + ' per week.</div>';
+        } else {
+          dollarLine = '<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:7px;">'
+            + 'On target. Holding the line.</div>';
+        }
+      }
+
+      // Subtext: trend + audit date
+      let subText = '';
+      if (audit) {
+        const trendHtml = trend == null
+          ? ''
+          : '<span style="color:' + (trend>=0?'var(--green)':'var(--red)') + ';font-weight:700;">'
+            + (trend>=0?'+':'') + trend + ' pts</span> &middot; ';
+        subText = '<div style="font-size:9px;color:var(--t4);margin-top:5px;">'
+          + trendHtml + (audit.date ? 'Audit ' + shortDate(audit.date) : '')
+          + '</div>';
+      }
+
+      return '<div style="padding:11px 0;' + (isFirst ? '' : 'border-top:1px solid var(--b2);') + '">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        +   '<div style="font-size:10px;font-weight:800;letter-spacing:0.18em;color:var(--t1);text-transform:uppercase;">' + name + '</div>'
+        +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
         + '</div>'
-        + '<div style="flex-shrink:0;">' + actionHtml + '</div>'
+        + scoreBlock
+        + dollarLine
+        + subText
         + '</div>';
     };
     const auditPanel = `<div style="${PANEL}">${panelTitle('Audit Scores')}
       <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;">
-        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
-        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
-        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
+        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true,  63)}
+        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false, 61)}
+        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
       </div></div>`;
 
     // Key metrics panel
