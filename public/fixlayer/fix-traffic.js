@@ -22,7 +22,7 @@ FIX.traffic = [
           title: 'Audit where your profile stands',
           detail: 'Open the Google Business Profile screen. It scores your profile completeness and tracks photo count, posts per month, and the weekly insight numbers. Start here, so you know which fields are costing you ranking before you change anything.' },
         { kind: 'reference', target: 'GBP_Optimization_Checklist.pdf', targetLabel: 'GBP Optimization Checklist',
-          title: 'Complete and optimize every field',
+          title: 'Complete every field',
           detail: 'Work the GBP Optimization Checklist on Google itself. Every field filled, the right primary and secondary categories, the full 750-character description, and ten seeded Q&A entries. Use your exact business name and do not stuff keywords into it, that risks a suspension.' },
         { kind: 'reference', target: 'GBP_Photo_Brief.pdf', targetLabel: 'GBP Photo Brief',
           title: 'Load a real, current photo set',
@@ -42,7 +42,7 @@ FIX.traffic = [
       'Ignoring the Q&A section. Anyone can answer a public question, including a competitor. Check it weekly and answer every question within 24 hours.',
       'Never posting. A profile with no posts in 90 days signals an inactive business. Two posts a month is the minimum to hold the prominence benefit.',
       'Using stock photos or the same photos for years. Photos older than 12 months reduce click-through. Reshoot real photos every six months.',
-      'Not tracking the weekly insight numbers. Profile views, call clicks, and direction requests tell you whether the optimization is working. Without them you are guessing.'
+      'Not tracking the weekly insight numbers. Profile views, call clicks, and direction requests tell you whether the work is paying off. Without them you are guessing.'
     ],
 
     quickRef: {
@@ -199,7 +199,7 @@ FIX.traffic = [
           detail: 'The Review Tracker counts new Google and Yelp reviews, the rolling 30-day rating, and your response rate. Velocity is what ranks you in the map results. A high rating with no recent reviews looks stale next to a competitor getting a steady flow.' },
         { kind: 'reference', target: 'Review_Response_Templates.docx', targetLabel: 'Review Response Templates',
           title: 'Respond to every review within 48 hours',
-          detail: 'Download the Review Response Templates. Negative reviews get the four-sentence framework: acknowledge, address the specific complaint, state your standard, invite them back, with your direct contact at the end so the next step happens off the public page. Positive reviews get a named, specific reply too. A generic thank-you signals you did not read it.' },
+          detail: 'Download the Review Response Templates. Negative reviews get the four-sentence pattern: acknowledge, address the specific complaint, state your standard, invite them back, with your direct contact at the end so the next step happens off the public page. Positive reviews get a named, specific reply too. A generic thank-you signals you did not read it.' },
         { kind: 'reference', target: 'Review_Request_Script.pdf', targetLabel: 'Review Request Script',
           title: 'Build the review ask into service',
           detail: 'Use the Review Request Script: a short compliment-moment ask for every server, a QR code on the bill presenter, framed as how the bar operates rather than a campaign. Never offer an incentive and never ask only happy guests. Both violate Google policy and risk a suspension.' },
@@ -252,8 +252,8 @@ FIX.traffic = [
       {
         id: 'rev-ai-1',
         title: 'Draft Responses to Reviews',
-        whatItDoes: 'Drafts a response to each review using the four-sentence framework, specific to the review and ready for a quick human edit.',
-        prompt: 'Here are five reviews I need to respond to. [PASTE EACH REVIEW WITH ITS STAR RATING]. My bar name: [NAME]. My concept: [BRIEF DESCRIPTION]. My neighborhood: [NEIGHBORHOOD]. For each review, write a response using the four-sentence framework: acknowledge, address specifically, state your standard, invite return. Use the guest\'s name if it appears. No generic openings like "Thank you so much for the kind words." No defensive language in negative responses. Each response under 100 words. For negative responses, include my direct contact at the end.',
+        whatItDoes: 'Drafts a response to each review using the four-sentence pattern, specific to the review and ready for a quick human edit.',
+        prompt: 'Here are five reviews I need to respond to. [PASTE EACH REVIEW WITH ITS STAR RATING]. My bar name: [NAME]. My concept: [BRIEF DESCRIPTION]. My neighborhood: [NEIGHBORHOOD]. For each review, write a response using the four-sentence pattern: acknowledge, address specifically, state your standard, invite return. Use the guest\'s name if it appears. No generic openings like "Thank you so much for the kind words." No defensive language in negative responses. Each response under 100 words. For negative responses, include my direct contact at the end.',
         whatToPaste: 'Paste each review with its star rating, and fill in your bar name, concept, and neighborhood.'
       },
       {
@@ -272,7 +272,7 @@ FIX.traffic = [
       },
       {
         id: 'rev-ai-4',
-        title: 'Respond to a Potentially Fake Review',
+        title: 'Respond to a Suspicious Review',
         whatItDoes: 'Drafts a factual public response to a suspected fake review that does not accuse the reviewer.',
         prompt: 'Here is a review I believe may be fake or inaccurate: [PASTE REVIEW]. Reason I believe it is inaccurate: [DESCRIBE: no record of this guest, experience described is impossible, etc.]. My bar name: [NAME]. My direct contact: [EMAIL OR PHONE]. Write a public response that acknowledges the review professionally, states factually that you have no record of this experience, invites them to contact you directly to resolve any genuine concern, and does not accuse them of fabricating the review. Under 80 words, factual and professional throughout.',
         whatToPaste: 'Paste the review, why you believe it is inaccurate, and your contact.'
@@ -384,7 +384,7 @@ FIX.traffic = [
           detail: 'Record your current follower count, profile visits, link clicks, and posts per month in the Social Media screen. Set the baseline before you change anything, so you can tell later whether the work moved the numbers.' },
         { kind: 'reference', target: 'Social_Content_Calendar.pdf', targetLabel: 'Social Content Calendar',
           title: 'Run on a content calendar',
-          detail: 'Plan the month on the Social Content Calendar. Post five times a week on the 3-1-1 framework: three experience posts, one promotional, one community. Make experience content the dominant type. A 60-second walkthrough of a busy night outperforms a polished promo, because the feel of the room is what drives a new guest\'s decision.' },
+          detail: 'Plan the month on the Social Content Calendar. Post five times a week on the 3-1-1 mix: three experience posts, one promotional, one community. Make experience content the dominant type. A 60-second walkthrough of a busy night outperforms a polished promo, because the feel of the room is what drives a new guest\'s decision.' },
         { kind: 'reference', target: 'Social_Media_Standards_Policy.docx', targetLabel: 'Social Media Standards Policy',
           title: 'Set the posting standard and the Sunday review',
           detail: 'The Social Media Standards Policy covers posting frequency, image quality, caption tone, and the approval workflow for staff posts. Protect the Sunday review: go through the week\'s captured content, pick five posts, schedule them, and flag one to cross-post to the Google profile.' },
@@ -436,8 +436,8 @@ FIX.traffic = [
       {
         id: 'soc-ai-2',
         title: 'Plan a 30-Day Content Calendar',
-        whatItDoes: 'Builds a 30-day calendar of 20 posts on the 3-1-1 framework, with type, description, and caption theme for each.',
-        prompt: 'My bar concept: [DESCRIBE]. My primary platform: [INSTAGRAM / FACEBOOK]. Upcoming events or specials this month: [LIST]. My team size: [NUMBER]. Build a 30-day content calendar using the 3-1-1 framework, three experience posts, one promotional post, and one community post per week. For each post include the date, content type, content description, caption theme, and whether it should also be posted to the Google profile. Promotional posts should correspond to actual events or specials listed above, and community posts should reference local seasonal or neighborhood context.',
+        whatItDoes: 'Builds a 30-day calendar of 20 posts on the 3-1-1 mix, with type, description, and caption theme for each.',
+        prompt: 'My bar concept: [DESCRIBE]. My primary platform: [INSTAGRAM / FACEBOOK]. Upcoming events or specials this month: [LIST]. My team size: [NUMBER]. Build a 30-day content calendar using the 3-1-1 mix, three experience posts, one promotional post, and one community post per week. For each post include the date, content type, content description, caption theme, and whether it should also be posted to the Google profile. Promotional posts should correspond to actual events or specials listed above, and community posts should reference local seasonal or neighborhood context.',
         whatToPaste: 'Fill in your concept, primary platform, this month\'s events, and team size.'
       },
       {
@@ -474,7 +474,7 @@ FIX.traffic = [
           detail: 'Record each platform\'s active status, rating, and photo count in the Delivery Platforms screen. Set the baseline so you can tell later whether the audit and the menu work moved the numbers.' },
         { kind: 'reference', target: 'Delivery_Menu_Builder_Worksheet.pdf', targetLabel: 'Delivery Menu Builder Worksheet',
           title: 'Curate the delivery menu',
-          detail: 'Use the Delivery Menu Builder Worksheet. The delivery menu is a curated product, not your whole in-house menu. Recalculate every item\'s margin at the platform commission rate, rate how well each item travels, and pull any item whose margin drops below 15%.' },
+          detail: 'Use the Delivery Menu Builder Worksheet. The delivery menu is a tight subset of your in-house menu, not the whole thing. Recalculate every item\'s margin at the platform commission rate, rate how well each item travels, and pull any item whose margin drops below 15%.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
           title: 'Log the weekly numbers',
           detail: 'Every Monday, in This Week, log each platform\'s rating and order volume. Answer every new platform review with the same standard you use for Google, and never blame the platform or the driver. Check the dashboards for any item the platform auto-flagged or removed.' },
@@ -487,7 +487,7 @@ FIX.traffic = [
     commonMistakes: [
       'Using photos from a previous menu or ownership era. A listing showing discontinued items produces the bad experience that generates a one-star review.',
       'Not updating platform hours when kitchen hours change. Wrong hours produce wrong-time orders that arrive cold or get cancelled.',
-      'Listing every in-house item on delivery. Items that travel poorly or lose margin at commission should not be on a curated delivery menu.',
+      'Listing every in-house item on delivery. Items that travel poorly or lose margin at commission should not be on a tight delivery menu.',
       'Ignoring delivery platform reviews. They affect platform ranking the way Google reviews affect your profile. The same response standard applies.',
       'Never logging into the platform dashboards. Ratings and order volume change weekly, and an operator who checks monthly misses problems that compound for weeks.',
       'Adding a third platform before optimizing the first two. A poor listing on two platforms is not fixed by adding a third.'
@@ -522,7 +522,7 @@ FIX.traffic = [
       },
       {
         id: 'del-ai-2',
-        title: 'Build a Curated Delivery Menu',
+        title: 'Build a Tight Delivery Menu',
         whatItDoes: 'Calculates each item\'s margin at the commission rate and recommends a 15 to 20 item delivery menu by margin and travel quality.',
         prompt: 'Here is my full in-house menu with food cost percentages. [PASTE MENU]. My delivery platform commission rate: [RATE]%. My minimum acceptable margin on delivery: 15%. For each item, calculate the effective margin at the commission rate and flag any item where margin falls below 15%. For items above 15%, assess travel quality as good, moderate, or poor based on item category. Recommend a delivery menu of 15 to 20 items that maximizes margin and travel quality, and explain any item removed from the recommendation.',
         whatToPaste: 'Paste your in-house menu with food cost percentages and fill in the commission rate.'
@@ -530,8 +530,8 @@ FIX.traffic = [
       {
         id: 'del-ai-3',
         title: 'Draft Delivery Review Responses',
-        whatItDoes: 'Drafts responses to delivery platform reviews using the four-sentence framework, with no blame on the platform or driver.',
-        prompt: 'Here are five reviews from my delivery platforms with star ratings. [PASTE REVIEWS]. My bar name: [NAME]. My direct contact for escalation: [EMAIL]. Apply the four-sentence response framework: acknowledge, address specifically, state your standard, invite return or escalate. For food quality or delivery time complaints, acknowledge without assigning blame to the platform or the driver. For wrong or missing item complaints, offer to resolve directly. Each response under 80 words.',
+        whatItDoes: 'Drafts responses to delivery platform reviews using the four-sentence pattern, with no blame on the platform or driver.',
+        prompt: 'Here are five reviews from my delivery platforms with star ratings. [PASTE REVIEWS]. My bar name: [NAME]. My direct contact for escalation: [EMAIL]. Apply the four-sentence response pattern: acknowledge, address specifically, state your standard, invite return or escalate. For food quality or delivery time complaints, acknowledge without assigning blame to the platform or the driver. For wrong or missing item complaints, offer to resolve directly. Each response under 80 words.',
         whatToPaste: 'Paste five delivery reviews with ratings and your bar name and contact.'
       },
       {
@@ -548,14 +548,14 @@ FIX.traffic = [
     id: 'email-loyalty',
     name: 'Email & Loyalty',
     module: 'traffic',
-    summary: 'Email is the one channel where you own the audience. Build the list at every touchpoint, send a personal update every month, and write like the owner, not a marketing department.',
+    summary: 'Email is the one channel where you own the audience. Build the list at every contact point, send a personal update every month, and write like the owner, not a marketing department.',
 
     process: {
       intro: 'Social platforms rent you an audience. Email is the one channel you own outright. A list that hears from you on a consistent monthly rhythm, in a real voice, brings guests back. A list that hears nothing goes cold within 30 days. The Email and Loyalty screen tracks your list and your sends. Each step below opens where the work happens.',
       steps: [
         { kind: 'reference', target: 'Email_List_Building_Playbook.pdf', targetLabel: 'Email List Building Playbook',
-          title: 'Build the list at every touchpoint',
-          detail: 'Work the Email List Building Playbook. Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the touchpoints two at a time so each one gets set up properly. A loyalty program sign-up is one of the strongest capture points, so run the two together.' },
+          title: 'Build the list at every contact point',
+          detail: 'Work the Email List Building Playbook. Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the contact points two at a time so each one gets set up properly. A loyalty program sign-up is one of the strongest capture points, so run the two together.' },
         { kind: 'reference', target: 'Email_Campaign_Templates.docx', targetLabel: 'Email Campaign Templates',
           title: 'Set up the three campaigns in owner voice',
           detail: 'Use the Email Campaign Templates for the three campaigns every bar needs: a welcome sequence, a monthly update, and an event announcement. Set up the welcome sequence before you collect a single address, it is the highest-opened email you will ever send. Write first person, with one specific detail, signed with a name. I wanted to tell you reads like a person. We are thrilled to announce reads like a chain.' },
