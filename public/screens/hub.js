@@ -8,7 +8,10 @@ S.Hub = {
 
   render(container) {
     this._stage = container;
-    container.style.overflowY = 'hidden';
+    // Outer wrapper scrolls when the dashboard content exceeds the viewport
+    // (tablets, small laptops). On a desktop monitor the min-heights on the
+    // grid rows fit naturally and the scrollbar never appears.
+    container.style.overflowY = 'auto';
     const data = App.data || {};
 
     // ── Data sources ──
@@ -102,31 +105,24 @@ S.Hub = {
       }));
     const alerts = metricAlerts.concat(this.forwardAlerts())
       .sort((a,b) => sevRank[a.sev] - sevRank[b.sev])
-      .slice(0, 5);
+      .slice(0, 50);
 
     // ── Priority action items ──
-    // Take the top 2 from each audited module by dollar impact, then fill
-    // remaining slots from the global top-by-impact pool. This guarantees
-    // every audited module is represented, while still ranking primarily
-    // by impact within the visible set.
-    const perModule = (audit, sysName, screen, mod) => {
-      if (!audit) return [];
-      return (audit.action_items || [])
-        .filter(it => it && it.action)
-        .map(it => ({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, screen, mod }))
-        .sort((a,b) => b.impact - a.impact);
+    // Show every action item from every audited module, ranked by dollar
+    // impact. Cap at 50 as a safety ceiling; the card scrolls internally
+    // when the list runs past its allotted height.
+    const itemRows = [];
+    const collect = (audit, sysName, screen, mod) => {
+      if (!audit) return;
+      (audit.action_items || []).forEach(it => {
+        if (it && it.action) itemRows.push({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, screen, mod });
+      });
     };
-    const profItems = perModule(pA, 'Profit',  'audit-tracker', 'profit');
-    const revItems  = perModule(rA, 'Revenue', 'r-audit',       'revenue');
-    const traItems  = perModule(tA, 'Traffic', 't-audit',       'traffic');
-    const CAP = 6, PER = 2;
-    const topItems = [];
-    [profItems, revItems, traItems].forEach(arr => topItems.push(...arr.slice(0, PER)));
-    const used = new Set(topItems.map(i => i.action));
-    [...profItems, ...revItems, ...traItems]
-      .sort((a,b) => b.impact - a.impact)
-      .forEach(it => { if (topItems.length < CAP && !used.has(it.action)) { topItems.push(it); used.add(it.action); } });
-    topItems.sort((a,b) => b.impact - a.impact);
+    collect(pA, 'Profit',  'audit-tracker', 'profit');
+    collect(rA, 'Revenue', 'r-audit',       'revenue');
+    collect(tA, 'Traffic', 't-audit',       'traffic');
+    itemRows.sort((a,b) => b.impact - a.impact);
+    const topItems = itemRows.slice(0, 50);
 
     // ── Last updated ──
     const stamps = [];
@@ -318,7 +314,7 @@ S.Hub = {
         +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Address the worst-scoring first.</div>'
         + '</div></div>';
       alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${alertHead}
-        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${alertRows}</div></div>`;
+        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div></div>`;
     } else {
       const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
         + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -474,7 +470,7 @@ S.Hub = {
         }).join('')
       : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
     const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
-      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${actionBody}</div></div>`;
+      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div></div>`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
     // ranked list of the gap areas producing it. Same emotional language as
@@ -510,7 +506,7 @@ S.Hub = {
         + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Every gap area with a weekly dollar metric is on target.</div>'
         + '</div>';
     } else {
-      const shown = readout.items.slice(0, 4);
+      const shown = readout.items.slice(0, 50);
       const roRows = shown.map((it, i) => {
         const isBiggest = i === 0;
         const isLast    = i === shown.length - 1;
@@ -531,7 +527,7 @@ S.Hub = {
         +   '<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ week</div>'
         + '</div>'
         + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">leaking across ' + readout.items.length + ' gap area' + (readout.items.length===1?'':'s') + '</div>'
-        + '<div style="margin-top:12px;flex:1;display:flex;flex-direction:column;overflow:hidden;">' + roRows + '</div>';
+        + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
     const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Money Readout')}${readoutBody}</div>`;
 
@@ -586,8 +582,8 @@ S.Hub = {
     // hub-specific overrides for the fixed-viewport dashboard layout.
     container.innerHTML = `
       <style>
-        .hub-app{height:100% !important;}
-        .hub-app .content{overflow:hidden !important;padding:24px;min-width:0;}
+        .hub-app{min-height:100% !important;}
+        .hub-app .content{padding:24px;min-width:0;}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
@@ -597,6 +593,14 @@ S.Hub = {
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
         .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
         .hub-app .hd-btn:hover{border-color:var(--gold);color:var(--gold);}
+        /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
+           when row count exceeds card height. Thin scrollbar so it does not
+           visually overwhelm the small lists. */
+        .hub-app .hd-scroll{overflow-y:auto;}
+        .hub-app .hd-scroll::-webkit-scrollbar{width:6px;}
+        .hub-app .hd-scroll::-webkit-scrollbar-track{background:transparent;}
+        .hub-app .hd-scroll::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
+        .hub-app .hd-scroll::-webkit-scrollbar-thumb:hover{background:var(--b1);}
       </style>
       <div class="app hub-app${collapsedClass}">
         <aside class="sidebar">
@@ -626,7 +630,7 @@ S.Hub = {
             </div>
           </header>
           <main class="content">
-            <div style="height:100%;display:grid;grid-template-rows:auto 1fr 1fr;gap:18px;min-height:0;">
+            <div style="display:grid;grid-template-rows:auto minmax(360px,1fr) minmax(360px,1fr);gap:18px;min-height:calc(100vh - 56px);">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${auditPanel}${metricsPanel}${readoutPanel}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${alertsPanel}${chartPanel}${actionPanel}</div>
