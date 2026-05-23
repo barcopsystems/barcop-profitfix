@@ -30,9 +30,9 @@ S.TheftRisk = {
   },
   ratingFor(score) {
     if (score == null) return 'Not Enough Data';
-    return score <= 30 ? 'Low Risk — Strong Controls'
-         : score <= 60 ? 'Moderate Risk — Tighten Controls'
-         : 'High Risk — Immediate Action';
+    return score <= 30 ? 'Low Risk: Strong Controls'
+         : score <= 60 ? 'Moderate Risk: Tighten Controls'
+         : 'High Risk: Immediate Action';
   },
 
   // ── Signals ─────────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ S.TheftRisk = {
         const st = this.VARIANCE_STEPS[idx];
         html += '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);">'
           + '<input type="checkbox" class="vi-step-check" data-inv="' + inv.id + '" data-step="' + idx + '"'
-          + (s.done ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;width:15px;height:15px;accent-color:#C9A84C;"/>'
+          + (s.done ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;width:15px;height:15px;accent-color:#DBAB46;"/>'
           + '<div style="flex:1;min-width:0;">'
           + '<div style="font-size:12px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
           + (idx + 1) + '. ' + esc(st.title) + '</div>'
@@ -189,7 +189,7 @@ S.TheftRisk = {
       + '<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;">'
       + '<div style="font-family:\'Barlow Condensed\';font-size:52px;font-weight:600;line-height:1;color:'
       + (sc === 'good' ? 'var(--gold)' : sc === 'warn' ? 'var(--red)' : 'var(--w)') + ';">'
-      + (overall != null ? overall : '—') + '</div>'
+      + (overall != null ? overall : '-') + '</div>'
       + '<div><div style="font-size:13px;font-weight:800;color:'
       + (sc === 'good' ? 'var(--gold)' : sc === 'warn' ? 'var(--red)' : 'var(--t2)') + ';text-transform:uppercase;letter-spacing:1px;">'
       + esc(this.ratingFor(overall)) + '</div>'
@@ -201,7 +201,7 @@ S.TheftRisk = {
     // ── Signal cards ──
     const signalCard = (title, sig, body) => {
       const cls = this.scoreClass(sig.score);
-      const scoreTxt = sig.score != null ? sig.score : '—';
+      const scoreTxt = sig.score != null ? sig.score : '-';
       return '<div class="card"><div class="card-title">' + title + '</div>'
         + '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">'
         + '<div style="font-family:\'Barlow Condensed\';font-size:34px;font-weight:600;color:'
@@ -221,7 +221,7 @@ S.TheftRisk = {
       ? 'No voids or comps logged yet. Shift Control\'s Void and Comp Log feeds this signal.'
       : voids.unauth + ' of ' + voids.count + ' voids/comps had no authorizing manager recorded. '
         + App.fmtCurrency(voids.total) + ' in total voids and comps. '
-        + (voids.rate > 0.3 ? 'Unauthorized voids are the most common theft vector — require manager sign-off.'
+        + (voids.rate > 0.3 ? 'Unauthorized voids are the most common theft vector. Require manager sign-off.'
            : 'Most voids and comps are authorized.');
     const cashBody = cash.score == null
       ? 'No cash variances logged yet. Shift Control\'s Variance Log feeds this signal.'
@@ -240,7 +240,7 @@ S.TheftRisk = {
     const manualCard = '<div class="card"><div class="card-title">Manual Judgment</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
       + 'Operational data does not see everything. Add your own read on cameras, policies, staffing, and '
-      + 'staff behavior — it is blended into the overall score.</div>'
+      + 'staff behavior. It is blended into the overall score.</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Your Assessment</label>'
       + '<select id="tr-manual">' + levelOpts + '</select></div></div>'
@@ -257,9 +257,9 @@ S.TheftRisk = {
       const rows = hist.map(s => {
         const ov = s.overall != null ? s.overall : s.total;
         const cls = this.scoreClass(ov);
-        return '<tr><td>' + (s.date ? String(s.date).slice(0, 10) : '—') + '</td>'
-          + '<td class="' + (cls === 'good' ? 'pos' : cls === 'warn' ? 'neg' : '') + ' val">' + (ov != null ? ov : '—') + '</td>'
-          + '<td>' + esc(s.rating || '—') + '</td></tr>';
+        return '<tr><td>' + (s.date ? String(s.date).slice(0, 10) : '-') + '</td>'
+          + '<td class="' + (cls === 'good' ? 'pos' : cls === 'warn' ? 'neg' : '') + ' val">' + (ov != null ? ov : '-') + '</td>'
+          + '<td>' + esc(s.rating || '-') + '</td></tr>';
       }).join('');
       histCard = '<div class="card"><div class="card-title">Recent Scorecards</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
