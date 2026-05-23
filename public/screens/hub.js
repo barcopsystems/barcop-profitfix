@@ -696,9 +696,10 @@ S.Hub = {
       });
     });
 
-    // Traffic — audit-based. Map each action item to the closest traffic
-    // gap-area for the deep-link. The action text from settings.js
-    // mkTrafficAudit gets the " $XXX/month opportunity." suffix stripped.
+    // Traffic — audit-based. Map each action item to its traffic gap-area
+    // and use the gap's short name as the label, so the readout stays
+    // consistent with the noun-phrase labels Profit and Revenue produce
+    // (e.g. "Reviews" not "Close the review velocity and response gap").
     const tA = ((App.data || {}).traffic_audits || []).slice(-1)[0];
     if (tA && Array.isArray(tA.action_items)) {
       const hints = [
@@ -710,14 +711,17 @@ S.Hub = {
         { rx: /delivery|doordash|uber/i,        id: 'delivery' },
         { rx: /email|loyalty/i,                 id: 'email-loyalty' }
       ];
+      const trafficGaps = (window.FIX && FIX.traffic) || [];
       tA.action_items.forEach(it => {
         if (!it || !(it.monthly_impact > 0)) return;
         const raw = it.action || '';
-        const label = raw.replace(/\s*\$[\d,]+\/month opportunity\.?$/, '').replace(/\.\s*$/, '');
-        if (!label || seen[label]) return;
-        seen[label] = true;
         const hint = hints.find(h => h.rx.test(raw));
-        items.push({ label, gapId: hint ? hint.id : 'gbp', module: 'traffic',
+        const gapId = hint ? hint.id : 'gbp';
+        const gap   = trafficGaps.find(g => g.id === gapId);
+        const label = gap ? gap.name : 'Traffic';
+        if (seen[label]) return;
+        seen[label] = true;
+        items.push({ label, gapId, module: 'traffic',
                      weekly: it.monthly_impact / 4.345, band: 'over' });
       });
     }
