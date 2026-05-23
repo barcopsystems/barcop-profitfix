@@ -34,7 +34,7 @@ S.TrafficDashboard = {
     // targets are unset. Settings live on the Hub, never on the dashboard.
     let startHere = '';
     if (!ts._targets_saved) {
-      startHere = '<div class="card t-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(201,168,76,0.35);">'
+      startHere = '<div class="card t-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(219,171,70,0.35);">'
         + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
         + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Traffic targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
         + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
@@ -285,12 +285,12 @@ S.TrafficDashboard = {
       + '<span style="font-size:10px;color:#4888A8;font-weight:600;">  Response % (÷10)</span>'
       + '</div></div>'
       + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
-      + '<defs><linearGradient id="grGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/></linearGradient></defs>'
+      + '<defs><linearGradient id="grGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0"/></linearGradient></defs>'
       + yTicks
-      + '<line x1="'+PAD.l+'" y1="'+ys(tGR).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tGR).toFixed(1)+'" stroke="rgba(201,168,76,0.25)" stroke-width="1" stroke-dasharray="4,4"/>'
+      + '<line x1="'+PAD.l+'" y1="'+ys(tGR).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tGR).toFixed(1)+'" stroke="rgba(219,171,70,0.25)" stroke-width="1" stroke-dasharray="4,4"/>'
       + fixMarkers
       + (areaPath(grS)?'<path d="'+areaPath(grS)+'" fill="url(#grGrad'+uid+')"/>':'')
-      + '<path d="'+smoothPath(grS)+'" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(grS)+'" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<path d="'+smoothPath(rvS)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<path d="'+smoothPath(rrS)+'" fill="none" stroke="#4888A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
       + grLabels + xLabels
