@@ -108,7 +108,7 @@ FIX.profit = [
 
   {
     id: 'theft-loss',
-    name: 'Theft & Loss',
+    name: 'Theft and Loss',
     module: 'profit',
     summary: 'Cash, product, and comp loss that never shows as a line item. Track voids and comps by employee, reconcile every drawer, audit shifts, and act on documented patterns.',
 
