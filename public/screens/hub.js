@@ -314,7 +314,7 @@ S.Hub = {
       const curDisp  = lastVal != null ? valFmt(lastVal) : '—';
       const tgtDisp  = valFmt(target);
 
-      const card = (inner) => '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
+      const card = (inner) => '<div style="border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
 
       const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
@@ -337,22 +337,35 @@ S.Hub = {
       const y = v => P.t + ch - ((v-mn)/(mx-mn||1))*ch;
 
       // Smooth path through non-null values; nulls keep their x slot so the
-      // time axis stays honest, the path just skips them.
-      let d = '';
-      let prev = -1;
+      // time axis stays honest, the path just skips them. Build the line
+      // path and the area path (line + closure down to chart floor) in the
+      // same pass; the area gets a vertical gradient fill that fades to
+      // transparent, matching the audit score chart style.
+      const baseY = (H-P.b).toFixed(1);
+      let d = '', area = '';
+      let prev = -1, firstX = null, lastX = null;
       for (let i = 0; i < series.length; i++) {
         const v = series[i];
         if (v == null) continue;
+        const xi = x(i), yi = y(v);
         if (prev < 0) {
-          d = 'M' + x(i).toFixed(1) + ',' + y(v).toFixed(1);
+          d    = 'M' + xi.toFixed(1) + ',' + yi.toFixed(1);
+          area = 'M' + xi.toFixed(1) + ',' + baseY + ' L' + xi.toFixed(1) + ',' + yi.toFixed(1);
+          firstX = xi;
         } else {
-          const cp = (x(i)-x(prev))*0.35;
-          d += ' C' + (x(prev)+cp).toFixed(1) + ',' + y(series[prev]).toFixed(1) + ' '
-            + (x(i)-cp).toFixed(1) + ',' + y(v).toFixed(1) + ' '
-            + x(i).toFixed(1) + ',' + y(v).toFixed(1);
+          const cp = (xi-x(prev))*0.35;
+          const seg = ' C' + (x(prev)+cp).toFixed(1) + ',' + y(series[prev]).toFixed(1) + ' '
+            + (xi-cp).toFixed(1) + ',' + yi.toFixed(1) + ' '
+            + xi.toFixed(1) + ',' + yi.toFixed(1);
+          d    += seg;
+          area += seg;
         }
+        lastX = xi;
         prev = i;
       }
+      if (area) area += ' L' + lastX.toFixed(1) + ',' + baseY + ' Z';
+
+      const gradId = 'hub-trend-' + label.replace(/[^a-z]/gi,'').toLowerCase();
 
       const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#C9A84C" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
       const dots = series.map((v,i) => v != null
@@ -373,8 +386,13 @@ S.Hub = {
 
       return card(head
         + '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" style="display:block;flex:1;min-height:0;">'
+        +   '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
+        +     '<stop offset="0%" stop-color="#C9A84C" stop-opacity="0.18"/>'
+        +     '<stop offset="100%" stop-color="#C9A84C" stop-opacity="0.01"/>'
+        +   '</linearGradient></defs>'
         +   markerSvg
         +   tgtLine
+        +   (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
         +   '<path d="'+d+'" fill="none" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>'
         +   dots
         + '</svg>');
