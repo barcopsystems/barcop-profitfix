@@ -560,7 +560,7 @@ S.HubSettings = {
         const actualPours = (cnt?.units_used||0) * p.pours_per_bottle;
         const theo = Math.round(actualPours * (0.95 + Math.random()*0.08));
         const varU = +(actualPours - theo).toFixed(1);
-        return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':'Over — Investigate' };
+        return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':'Over: Investigate' };
       });
       return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:new Date().toISOString(),
         bar:{ revenue:a.bar_rev, cogs:a.bar_cogs, labor:a.bar_labor, cost_pct:a.bar_pour_pct,
@@ -579,7 +579,7 @@ S.HubSettings = {
       const cogs = Math.round(rev * (0.22 + (Math.random()-0.5)*0.06));
       const pct  = cogs/rev*100;
       const diff = pct - 22;
-      const status = diff<=0?'ON TARGET':diff<=3?'WATCH — SLIGHTLY OVER':'INVESTIGATE — SIGNIFICANTLY OVER';
+      const status = diff<=0?'ON TARGET':diff<=3?'WATCH: SLIGHTLY OVER':'INVESTIGATE: SIGNIFICANTLY OVER';
       shifts.push({ id:uid(), date:dateStr(i*2), shift:['AM','PM','Late'][i%3], bartender:shiftNames[i%5], revenue:rev, cogs, pour_cost_pct:pct, variance_dollar:(diff/100)*rev, status, saved_at:new Date().toISOString() });
     }
     App.data.shifts = shifts;
@@ -603,9 +603,9 @@ S.HubSettings = {
 
     // ── Theft Scores ──
     App.data.theft_scores = [
-      { id:uid(), date:dateStr(60), scores:{0:3,1:4,2:3,3:4,4:3,5:4,6:3,7:4,8:3,9:3,10:4,11:4}, total:42, rating:'High Risk — Immediate Action' },
-      { id:uid(), date:dateStr(30), scores:{0:2,1:3,2:2,3:3,4:2,5:3,6:2,7:3,8:2,9:2,10:3,11:3}, total:30, rating:'Moderate Risk — Tighten Controls' },
-      { id:uid(), date:new Date().toISOString(),  scores:{0:1,1:2,2:1,3:2,4:1,5:2,6:1,7:2,8:1,9:2,10:2,11:2}, total:19, rating:'Low Risk — Strong Controls' },
+      { id:uid(), date:dateStr(60), scores:{0:3,1:4,2:3,3:4,4:3,5:4,6:3,7:4,8:3,9:3,10:4,11:4}, total:42, rating:'High Risk: Immediate Action' },
+      { id:uid(), date:dateStr(30), scores:{0:2,1:3,2:2,3:3,4:2,5:3,6:2,7:3,8:2,9:2,10:3,11:3}, total:30, rating:'Moderate Risk: Tighten Controls' },
+      { id:uid(), date:new Date().toISOString(),  scores:{0:1,1:2,2:1,3:2,4:1,5:2,6:1,7:2,8:1,9:2,10:2,11:2}, total:19, rating:'Low Risk: Strong Controls' },
     ];
     App.data.last_theft_score_date = new Date().toISOString();
 
@@ -837,7 +837,23 @@ S.HubSettings = {
         S5_MINIMUM_MET: false, S5_CATERING_REV_PERIOD: 0, S5_ANNUAL_EVENT_GAP: 64800, S5_MONTHLY_GAP: 5400,
         S5_NARRATIVE: 'Events brought in $2,400 from a single booking. There is no private dining minimum and no catering revenue at all.',
         S5_FINDING: 'For a venue this size, three to four events a month is realistic. The unbuilt event channel is the largest single opportunity in this audit at $5,400/month.',
-        S5_TOOL: 'Build a private dining package with a spend minimum and a rate card.'
+        S5_TOOL: 'Build a private dining package with a spend minimum and a rate card.',
+        S6_SIG1_SCORE: 'HIGH', S6_SIG1_LABEL: 'Server comp concentration',
+        S6_SIG1_EVIDENCE: 'One server accounts for 54% of comped checks over the audit period.',
+        S6_SIG1_GAP: 'Pattern is consistent with discount abuse, not service recovery.',
+        S6_SIG1_TOOL: 'Pull the comp report by employee and require manager approval on comps over $10.',
+        S6_SIG2_SCORE: 'HIGH', S6_SIG2_LABEL: 'Saturday floor overstaffed',
+        S6_SIG2_EVIDENCE: 'Saturday floor RPLH ran $48 against a $75 target while weeknight RPLH hit $72.',
+        S6_SIG2_GAP: 'About $720 per Saturday in excess labor.',
+        S6_SIG2_TOOL: 'Drop one server from the Saturday floor for two weeks and measure check times.',
+        S6_SIG3_SCORE: 'MEDIUM', S6_SIG3_LABEL: 'One menu item drives complaints',
+        S6_SIG3_EVIDENCE: 'House Burger appears in 41% of negative comments and 18% of comps.',
+        S6_SIG3_GAP: 'Build, portion, or price is off.',
+        S6_SIG3_TOOL: 'Spec-check the burger every shift for a week and review the build.',
+        S6_SIG4_SCORE: 'MEDIUM', S6_SIG4_LABEL: 'No pre-shift briefings',
+        S6_SIG4_EVIDENCE: 'No briefings logged in the audit period.',
+        S6_SIG4_GAP: 'Bottom-third servers get no daily coaching, which is where check average leaks.',
+        S6_SIG4_TOOL: 'Run a 5-minute pre-shift on every dinner shift, even when short-staffed.'
       }}),
       mkAudit('revenue', { date: dateStr(42), generated_at: daysAgoISO(42), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 42,
@@ -871,7 +887,19 @@ S.HubSettings = {
         S5_MINIMUM_MET: true, S5_CATERING_REV_PERIOD: 1500, S5_ANNUAL_EVENT_GAP: 38400, S5_MONTHLY_GAP: 3200,
         S5_NARRATIVE: 'Events grew to three bookings and $6,800, and a private dining minimum is now enforced.',
         S5_FINDING: 'Catering opened with $1,500. The channel is working but is still well below the venue’s realistic ceiling.',
-        S5_TOOL: 'List the private dining package on the website and the Google Business Profile.'
+        S5_TOOL: 'List the private dining package on the website and the Google Business Profile.',
+        S6_SIG1_SCORE: 'MEDIUM', S6_SIG1_LABEL: 'Weekend pre-shift gap',
+        S6_SIG1_EVIDENCE: 'Briefings now run 3 of 7 nights, weekends still missed.',
+        S6_SIG1_GAP: 'Weekend covers are the highest-revenue shifts and get no coaching.',
+        S6_SIG1_TOOL: 'Extend the briefing to Friday and Saturday close-out crews.',
+        S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Weeknight floor still loose',
+        S6_SIG2_EVIDENCE: 'Tuesday and Wednesday floor RPLH still under $60.',
+        S6_SIG2_GAP: 'Cross-training to cover the bar would tighten this.',
+        S6_SIG2_TOOL: 'Cross-train two servers to barback on slow nights.',
+        S6_SIG3_SCORE: 'LOW', S6_SIG3_LABEL: 'Bottom server gap closing',
+        S6_SIG3_EVIDENCE: 'Bottom-third check average up $4.70, spread now $13.70.',
+        S6_SIG3_GAP: 'On track. Spread under $10 is the target.',
+        S6_SIG3_TOOL: 'Keep the briefing cadence and add a monthly server-by-server review.'
       }}),
       mkAudit('revenue', { date: dateStr(8), generated_at: daysAgoISO(8), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 60,
@@ -905,7 +933,19 @@ S.HubSettings = {
         S5_MINIMUM_MET: true, S5_CATERING_REV_PERIOD: 3400, S5_ANNUAL_EVENT_GAP: 18000, S5_MONTHLY_GAP: 1500,
         S5_NARRATIVE: 'Events reached five bookings and $11,200, with catering adding $3,400.',
         S5_FINDING: 'The event channel is now a real revenue line. The remaining gap is peak-season capacity, not demand.',
-        S5_TOOL: 'Add a second private dining time slot on Fridays and Saturdays.'
+        S5_TOOL: 'Add a second private dining time slot on Fridays and Saturdays.',
+        S6_SIG1_SCORE: 'LOW', S6_SIG1_LABEL: 'Server spread tightened',
+        S6_SIG1_EVIDENCE: 'Top to bottom spread is $9.40, under the $10 benchmark.',
+        S6_SIG1_GAP: 'No action required.',
+        S6_SIG1_TOOL: 'Continue the pre-shift briefing cadence.',
+        S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Dessert attach lagging',
+        S6_SIG2_EVIDENCE: 'Dessert attach at 18% against a 25% target.',
+        S6_SIG2_GAP: 'Smallest remaining lift in the upsell program.',
+        S6_SIG2_TOOL: 'Run a one-month dessert-attach contest with a server prize.',
+        S6_SIG3_SCORE: 'LOW', S6_SIG3_LABEL: 'Events at venue ceiling',
+        S6_SIG3_EVIDENCE: 'Five events per month is near peak-season capacity.',
+        S6_SIG3_GAP: 'Growing further requires a second Saturday slot or off-site catering.',
+        S6_SIG3_TOOL: 'Add a Friday and Saturday early-dining slot and price it.'
       }})
     ];
 
@@ -1184,7 +1224,23 @@ S.HubSettings = {
         S7_GROWTH_MECHANISM:'No active mechanism', S7_LOYALTY_PROGRAM:'None', S7_MONTHLY_GAP:420,
         S7_NARRATIVE:'A 380-contact list has not been emailed in over six weeks. No loyalty program is in place.',
         S7_FINDING:'The list is going cold, opens are below benchmark, and there is no way for new guests to opt in.',
-        S7_TOOL:'Send a monthly email starting this week and add a WiFi sign-up capture.'
+        S7_TOOL:'Send a monthly email starting this week and add a WiFi sign-up capture.',
+        S8_SIG1_SCORE:'HIGH', S8_SIG1_LABEL:'Review velocity dead',
+        S8_SIG1_EVIDENCE:'Most recent review is 19 days old.',
+        S8_SIG1_GAP:'Listings without recent reviews lose discovery weight quickly.',
+        S8_SIG1_TOOL:'Drop QR table cards asking for a Google review at every check.',
+        S8_SIG2_SCORE:'HIGH', S8_SIG2_LABEL:'Unanswered reviews piling up',
+        S8_SIG2_EVIDENCE:'148 Google reviews sit with no response.',
+        S8_SIG2_GAP:'Response rate is a direct local-ranking signal and a trust signal to searching guests.',
+        S8_SIG2_TOOL:'Clear the backlog this week, then 10 minutes a day to stay current.',
+        S8_SIG3_SCORE:'MEDIUM', S8_SIG3_LABEL:'Email list going cold',
+        S8_SIG3_EVIDENCE:'Last email send was 42 days ago.',
+        S8_SIG3_GAP:'Open rates fall fast after 30 days dark, assets are bleeding.',
+        S8_SIG3_TOOL:'Send a monthly email this week, even a simple one.',
+        S8_SIG4_SCORE:'MEDIUM', S8_SIG4_LABEL:'No delivery promos',
+        S8_SIG4_EVIDENCE:'No promo active on DoorDash or UberEats.',
+        S8_SIG4_GAP:'Listings without promos sit lower in the feed against competitors who run them.',
+        S8_SIG4_TOOL:'Launch a first-order promo on DoorDash this week.'
       }),
       mkTrafficAudit(dateStr(42), daysAgoISO(42), 'TFA-2026-0012',
         'March 2026, 4 weeks ending Mar 27', 48,
@@ -1232,7 +1288,19 @@ S.HubSettings = {
         S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Started', S7_MONTHLY_GAP:220,
         S7_NARRATIVE:'List grew past 500 and a loyalty program launched. Open rate of 24% beats the 20% benchmark.',
         S7_FINDING:'A monthly cadence works. Moving to weekly during event months grows revenue per send.',
-        S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.'
+        S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.',
+        S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Posting cadence inconsistent',
+        S8_SIG1_EVIDENCE:'IG posts at 9 per 30 days, but clustered in two bursts.',
+        S8_SIG1_GAP:'Algorithms reward regular posting more than total volume.',
+        S8_SIG1_TOOL:'Lock a Tuesday and Friday content slot.',
+        S8_SIG2_SCORE:'MEDIUM', S8_SIG2_LABEL:'UberEats trails DoorDash',
+        S8_SIG2_EVIDENCE:'UberEats rating 4.2 vs DoorDash 4.4.',
+        S8_SIG2_GAP:'Lower rating means lower feed placement and fewer orders.',
+        S8_SIG2_TOOL:'Mirror the DoorDash photo and promo plan on UberEats.',
+        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Loyalty slow start',
+        S8_SIG3_EVIDENCE:'60 members in the first month.',
+        S8_SIG3_GAP:'Sign-up conversion needs a small incentive to accelerate.',
+        S8_SIG3_TOOL:'Offer a free appetizer for the first 100 sign-ups.'
       }),
       mkTrafficAudit(dateStr(8), daysAgoISO(8), 'TFA-2026-0017',
         'April 2026, 4 weeks ending Apr 24', 64,
@@ -1281,7 +1349,19 @@ S.HubSettings = {
         S7_MONTHLY_GAP:80,
         S7_NARRATIVE:'List grew to 760, weekly sends with 28% opens, and 420 loyalty members enrolled.',
         S7_FINDING:'The email channel is now a real revenue line. Loyalty redemption rate is the next thing to track.',
-        S7_TOOL:'Add a redemption-rate report to the monthly review and run a member-only event quarterly.'
+        S7_TOOL:'Add a redemption-rate report to the monthly review and run a member-only event quarterly.',
+        S8_SIG1_SCORE:'LOW', S8_SIG1_LABEL:'Photo library steady',
+        S8_SIG1_EVIDENCE:'138 photos current, with 54 added in the last 30 days.',
+        S8_SIG1_GAP:'On track. Consider a seasonal refresh.',
+        S8_SIG1_TOOL:'Replace the menu cover shots quarterly with current plating.',
+        S8_SIG2_SCORE:'LOW', S8_SIG2_LABEL:'Grubhub still inactive',
+        S8_SIG2_EVIDENCE:'Grubhub listing remains off.',
+        S8_SIG2_GAP:'Confirm this is intentional given local order mix.',
+        S8_SIG2_TOOL:'Review Grubhub local order share annually before deciding.',
+        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Loyalty trajectory strong',
+        S8_SIG3_EVIDENCE:'420 members in 90 days, redemption rate not yet measured.',
+        S8_SIG3_GAP:'Redemption rate is the next leading indicator to watch.',
+        S8_SIG3_TOOL:'Add a monthly redemption report and run a member-only event quarterly.'
       })
     ];
 
@@ -1785,7 +1865,7 @@ S.HubSettings = {
     await App.saveShift();
     App.updatePeriod();
 
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded — all six modules populated. Go test!'; }
+    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six modules populated. Go test!'; }
   },
 
   async clearAll() {
