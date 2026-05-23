@@ -622,8 +622,11 @@ S.Hub = {
            interaction reads as "this dot does something." */
         .hub-app .hd-chart-marker{transition:r 0.12s ease;}
         .hub-app .hd-chart-dot:hover .hd-chart-marker{r:2.4;}
-        /* Shared tooltip element used by all three mini charts. */
-        .hub-app #hd-chart-tip{
+        /* Shared tooltip element used by all three mini charts. Lives as a
+           sibling of .hub-app inside the wrapper, so the selector has no
+           ancestor — otherwise display:block would force the empty div into
+           flow and ratchet the dashboard. */
+        #hd-chart-tip{
           position:fixed;z-index:200;pointer-events:none;display:none;
           background:var(--surface);border:1px solid var(--b-edge);border-radius:5px;
           padding:8px 12px;min-width:140px;
