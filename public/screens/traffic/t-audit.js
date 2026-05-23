@@ -312,7 +312,7 @@ S.TrafficAudit = {
     const d = audit.raw || audit;
     const scoreColor = App.scoreColor(audit.overall_score||0);
 
-    const sectionBlock = (num, name, score, items) => {
+    const sectionBlock = (num, name, score, items, signals) => {
       const bar = Math.min(100, Math.max(0, score||0));
       const color = App.scoreColor(score);
       const rows = items.filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([label,val]) =>
@@ -321,6 +321,20 @@ S.TrafficAudit = {
         + '<td style="padding:7px 0;font-size:11px;color:var(--t1);font-weight:600;">' + val + '</td>'
         + '</tr>'
       ).join('');
+      const sigRows = (signals||[]).map(sig => {
+        const sc = (sig.score||'').toUpperCase();
+        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'rgba(255,200,0,0.7)':'var(--gold)';
+        return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px;margin-top:10px;">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+          + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></div>'
+          + '<div style="font-size:11px;font-weight:700;color:var(--t1);">' + esc(sig.label||'') + '</div>'
+          + '<div style="margin-left:auto;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + dot + ';">' + esc(sig.score||'') + '</div>'
+          + '</div>'
+          + (sig.evidence ? '<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">' + esc(sig.evidence) + '</div>' : '')
+          + (sig.gap      ? '<div style="font-size:11px;color:var(--t2);margin-bottom:4px;">' + esc(sig.gap) + '</div>' : '')
+          + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
+          + '</div>';
+      }).join('');
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
@@ -330,6 +344,7 @@ S.TrafficAudit = {
         + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
         + '</div></div>'
         + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
+        + sigRows
         + '</div>';
     };
 
@@ -337,6 +352,13 @@ S.TrafficAudit = {
     const pct = v => v != null ? v + '%' : '';
     const num = v => v != null ? String(v) : '';
     const dol = v => v ? App.fmtCurrency(v) : '';
+
+    const signals8 = [
+      {score:d.S8_SIG1_SCORE, label:d.S8_SIG1_LABEL, evidence:d.S8_SIG1_EVIDENCE, gap:d.S8_SIG1_GAP, tool:d.S8_SIG1_TOOL},
+      {score:d.S8_SIG2_SCORE, label:d.S8_SIG2_LABEL, evidence:d.S8_SIG2_EVIDENCE, gap:d.S8_SIG2_GAP, tool:d.S8_SIG2_TOOL},
+      {score:d.S8_SIG3_SCORE, label:d.S8_SIG3_LABEL, evidence:d.S8_SIG3_EVIDENCE, gap:d.S8_SIG3_GAP, tool:d.S8_SIG3_TOOL},
+      {score:d.S8_SIG4_SCORE, label:d.S8_SIG4_LABEL, evidence:d.S8_SIG4_EVIDENCE, gap:d.S8_SIG4_GAP, tool:d.S8_SIG4_TOOL},
+    ].filter(s => s.label);
 
     const sections = [
       sectionBlock(1, 'Google Business Profile', d.S1_SCORE, [
@@ -401,6 +423,7 @@ S.TrafficAudit = {
         ['Loyalty Program', yN(d.S7_LOYALTY_PROGRAM)],
         ['Monthly Gap', dol(d.S7_MONTHLY_GAP)],
       ]),
+      sectionBlock(8, 'Operational Risk Signals', d.S8_SIG1_SCORE ? null : 0, [], signals8),
     ].join('');
 
     const actionItems = (audit.action_items || []).map((a,i) =>
@@ -477,6 +500,7 @@ S.TrafficAudit = {
       { num:5, name:'Social Media',            fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
       { num:6, name:'Delivery Platforms',      fields: ['S6_EVIDENCE','S6_GAP','S6_TOOL','S6_NARRATIVE','S6_FINDING'] },
       { num:7, name:'Email and Loyalty',       fields: ['S7_EVIDENCE','S7_GAP','S7_TOOL','S7_NARRATIVE','S7_FINDING'] },
+      { num:8, name:'Operational Risk Signals',fields: ['S8_SIG1_EVIDENCE','S8_SIG1_GAP','S8_SIG1_TOOL','S8_SIG2_EVIDENCE','S8_SIG2_GAP','S8_SIG2_TOOL','S8_SIG3_EVIDENCE','S8_SIG3_GAP','S8_SIG3_TOOL','S8_SIG4_EVIDENCE','S8_SIG4_GAP','S8_SIG4_TOOL'] },
     ];
     const cards = sections.map(s => {
       const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
