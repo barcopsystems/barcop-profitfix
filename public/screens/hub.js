@@ -363,28 +363,62 @@ S.Hub = {
     const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${actionBody}</div></div>`;
 
-    // Weekly money readout panel — what is leaking this week, where, biggest first
+    // Weekly money readout panel — big red weekly leak total up top, then a
+    // ranked list of the gap areas producing it. Same emotional language as
+    // the Audit Scores card: lead with the dollar number, support with detail.
     const readout = this.weeklyReadout();
     const hasWeekData = pWeeks.length > 0 || rWeeks.length > 0;
+
+    // Per-module color-tinted badge (PROFIT gold, REVENUE green, TRAFFIC blue)
+    // — adds visual variation per module on each row.
+    const modBadge = (mod) => {
+      const map = {
+        profit:  { c: 'var(--gold)',  bg: 'var(--gold-bg)'  },
+        revenue: { c: 'var(--green)', bg: 'var(--green-bg)' },
+        traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
+      };
+      const m = map[mod] || map.profit;
+      return '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:'
+        + m.c + ';background:' + m.bg + ';padding:3px 6px;border-radius:3px;flex-shrink:0;min-width:62px;text-align:center;">'
+        + (mod || '').toUpperCase() + '</span>';
+    };
+
     let readoutBody;
     if (!hasWeekData) {
-      readoutBody = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 16px;">Enter this week's numbers in Profit and Revenue to see what is leaking and where.</div>`;
+      readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 16px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">&#8212; / wk</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:240px;">Enter this week\'s numbers in Profit and Revenue to see what is leaking and where.</div>'
+        + '</div>';
     } else if (readout.items.length === 0) {
-      readoutBody = `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;">
-          <svg width="24" height="24" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--gold)" stroke-width="1.4"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <div style="font-size:12px;font-weight:700;color:var(--t1);">Holding the Line</div>
-          <div style="font-size:10px;color:var(--t3);text-align:center;line-height:1.4;">Every gap area with a weekly dollar metric is on target.</div>
-        </div>`;
+      readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;">'
+        + '<svg width="34" height="34" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--green);line-height:1;">$0</div><div style="font-size:11px;color:var(--green);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ wk</div></div>'
+        + '<div style="font-size:11px;color:var(--green);font-weight:700;">Holding the line.</div>'
+        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Every gap area with a weekly dollar metric is on target.</div>'
+        + '</div>';
     } else {
-      const roRows = readout.items.slice(0, 4).map((it, i) => `
-          <div class="hd-row" onclick="S.Hub._enterFix('${it.module}','${esc(it.gapId)}')" style="display:flex;align-items:center;gap:8px;padding:6px;${i<Math.min(readout.items.length,4)-1?'border-bottom:1px solid rgba(255,255,255,0.05);':''}">
-            <div style="flex:1;min-width:0;font-size:11px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(it.label)}${i===0?' <span style="font-size:8px;font-weight:800;letter-spacing:0.06em;color:var(--gold);">BIGGEST</span>':''}</div>
-            <div style="flex-shrink:0;font-size:11px;font-weight:800;color:${it.band==='over'?'var(--red)':'var(--gold)'};">${App.fmtCurrency(it.weekly,0)}/wk</div>
-          </div>`).join('');
-      readoutBody = `
-          <div style="font-size:23px;font-weight:800;line-height:1;color:var(--red);">${App.fmtCurrency(readout.total,0)}</div>
-          <div style="font-size:10px;color:var(--t3);margin:6px 0 9px;">leaking this week across ${readout.items.length} gap area${readout.items.length===1?'':'s'}</div>
-          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">${roRows}</div>`;
+      const shown = readout.items.slice(0, 4);
+      const roRows = shown.map((it, i) => {
+        const isBiggest = i === 0;
+        const isLast    = i === shown.length - 1;
+        return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.module + '\',\'' + esc(it.gapId) + '\')"'
+          + ' style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
+          + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+          + modBadge(it.module)
+          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+          +   esc(it.label)
+          +   (isBiggest ? ' <span style="font-size:8px;font-weight:800;letter-spacing:0.08em;color:var(--red);background:var(--red-bg);padding:2px 5px;border-radius:3px;margin-left:4px;">BIGGEST</span>' : '')
+          + '</div>'
+          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--red);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-size:10px;color:var(--t3);font-weight:600;">/wk</span></div>'
+          + '</div>';
+      }).join('');
+      readoutBody = ''
+        + '<div style="display:flex;align-items:baseline;gap:10px;">'
+        +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + App.fmtCurrency(readout.total, 0) + '</div>'
+        +   '<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ week</div>'
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">leaking across ' + readout.items.length + ' gap area' + (readout.items.length===1?'':'s') + '</div>'
+        + '<div style="margin-top:12px;flex:1;display:flex;flex-direction:column;overflow:hidden;">' + roRows + '</div>';
     }
     const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Money Readout')}${readoutBody}</div>`;
 
