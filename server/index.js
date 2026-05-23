@@ -486,6 +486,7 @@ S2 Labor: labor% vs target — within 1pt=85, within 3=65, >5 over=35. RPLH trac
 S3 Menu: items in system >20=60 base, 10-20=50, <10=40. POS mix data +30, pricing data +10.
 S4 Server: no report=45 base. With report: score spread. Servers on roster >0 adds 5.
 S5 Events: no data=50. Score if data present.
+S6: 4 specific revenue-side risk signals with HIGH/MEDIUM/LOW ratings (server-level patterns, daypart staffing anomalies, menu-item complaint concentration, missing pre-shift, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
 OVERALL: weighted avg S1-S5.
 
 APP DATA:
@@ -508,7 +509,11 @@ Return this exact JSON (all values calculated):
 "S2_SCORE":[calc],"S2_LABOR_PCT":[from app:${avgLaborPct?avgLaborPct.toFixed(1):30}],"S2_LABOR_TARGET_PCT":${targets.floor_labor_pct||32},"S2_RPLH":[from app:${avgRPLH?avgRPLH.toFixed(2):0}],"S2_RPLH_TARGET":${targets.rplh_dinner||75},"S2_LABOR_PERIOD":[calc],"S2_SCHED_VS_ACTUAL":[obs],"S2_OVERTIME_HRS":[file or null],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],
 "S3_SCORE":[calc],"S3_STARS_COUNT":[file or 0],"S3_PLOWHORSES_COUNT":[file or 0],"S3_DOGS_COUNT":[file or 0],"S3_PUZZLES_COUNT":[file or 0],"S3_TOP_CATEGORY":[file or est],"S3_MONTHLY_GAP":[calc or 0],"S3_PRICING_OPPORTUNITY":[calc or 0],
 "S4_SCORE":[calc],"S4_SERVER_COUNT":${servers.length||0},"S4_TOP_CHECK_AVG":[file or 0],"S4_BOTTOM_CHECK_AVG":[file or 0],"S4_PERFORMANCE_SPREAD":[calc],"S4_APP_ATTACH_RATE":[file or null],"S4_DESSERT_ATTACH_RATE":[file or null],"S4_PRESHIFT_BRIEFING":[obs],"S4_MONTHLY_GAP":[calc or 0],"S4_ANNUAL_GAP":[calc],
-"S5_SCORE":50,"S5_EVENT_REV_PERIOD":[file or null],"S5_EVENTS_PER_MONTH":[file or null],"S5_AVG_EVENT_REVENUE":[file or null],"S5_MINIMUM_MET":[file or null],"S5_CATERING_REV_PERIOD":[file or null],"S5_ANNUAL_EVENT_GAP":[file or null],"S5_MONTHLY_GAP":[file or null]`
+"S5_SCORE":50,"S5_EVENT_REV_PERIOD":[file or null],"S5_EVENTS_PER_MONTH":[file or null],"S5_AVG_EVENT_REVENUE":[file or null],"S5_MINIMUM_MET":[file or null],"S5_CATERING_REV_PERIOD":[file or null],"S5_ANNUAL_EVENT_GAP":[file or null],"S5_MONTHLY_GAP":[file or null],
+"S6_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG1_LABEL":[specific title],"S6_SIG1_EVIDENCE":[specific with numbers],"S6_SIG1_GAP":[specific gap],"S6_SIG1_TOOL":[action],
+"S6_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG2_LABEL":[specific],"S6_SIG2_EVIDENCE":[specific],"S6_SIG2_GAP":[specific],"S6_SIG2_TOOL":[action],
+"S6_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG3_LABEL":[specific],"S6_SIG3_EVIDENCE":[specific],"S6_SIG3_GAP":[specific],"S6_SIG3_TOOL":[action],
+"S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
 }
 
 function getExtractionPrompt_Traffic(appData) {
@@ -550,6 +555,7 @@ S4 Search: maps pack=40, NAP consistent=30, primary keyword=20, citations=10.
 S5 Social: IG profile=20, followers scored, post freq vs 12/mo scored, engagement if available.
 S6 Delivery: active platforms 20pts each (max 3), ratings scored, photos>10=15, menu complete=15, promo=10.
 S7 Email: list exists=20, size vs 500 benchmark, frequency scored, open rate if available, loyalty=15.
+S8: 4 specific traffic-side risk signals with HIGH/MEDIUM/LOW ratings (review velocity drops, unanswered review backlog, GBP staleness, platform-specific issues, posting cadence gaps, email channel dormancy, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
 OVERALL: weighted avg S1-S7.
 
 APP DATA:
@@ -572,7 +578,11 @@ Return this exact JSON (all values calculated):
 "S4_SCORE":[calc],"S4_MAPS_PACK_CONFIRMED":[screenshot],"S4_RANKING_REPORT_SUBMITTED":false,"S4_NAP_CONSISTENT":[screenshots],"S4_NAP_BUSINESS_NAME":"${settings.bar_name||''}","S4_NAP_ADDRESS":[screenshot],"S4_NAP_PHONE":[screenshot],"S4_WEBSITE_TITLES_ASSESSED":false,"S4_CITATION_COUNT":null,"S4_PRIMARY_KEYWORD":"${settings.bar_name?(settings.bar_name.split(' ')[0]||'').toLowerCase()+' bar':'bar [city]'}","S4_SECONDARY_KEYWORDS":[],"S4_MONTHLY_GAP":null,
 "S5_SCORE":[calc],"S5_IG_PROFILE_SUBMITTED":[true if uploaded],"S5_IG_FOLLOWERS":[app:${avgIGF?Math.round(avgIGF):0}],"S5_IG_POSTS_LAST_30":[app:${avgIGP?Math.round(avgIGP):0}],"S5_IG_POSTS_BENCHMARK":12,"S5_IG_ENGAGEMENT_RATE":[analytics or null],"S5_FB_FOLLOWERS":[screenshot or 0],"S5_FB_POSTS_LAST_30":[screenshot or 0],"S5_CONTENT_TYPE":[screenshot obs],"S5_FOOD_PHOTO_RATIO":[screenshot or 0],"S5_MONTHLY_GAP":[est],"S5_ANNUAL_GAP":[calc],
 "S6_SCORE":[calc],"S6_DOORDASH_ACTIVE":[screenshot],"S6_UBEREATS_ACTIVE":[screenshot],"S6_GRUBHUB_ACTIVE":[screenshot],"S6_PLATFORM_COUNT":[count],"S6_DOORDASH_RATING":[screenshot or null],"S6_UBEREATS_RATING":[screenshot or null],"S6_PHOTO_COUNT_DELIVERY":[screenshot or 0],"S6_MENU_COMPLETE":[screenshot],"S6_PROMO_ACTIVE":[screenshot],"S6_MONTHLY_GAP":[est],"S6_ANNUAL_GAP":[calc],
-"S7_SCORE":[calc],"S7_EMAIL_LIST_EXISTS":[screenshot],"S7_LIST_SIZE":[screenshot or 0],"S7_LIST_BENCHMARK":500,"S7_LAST_SEND_DAYS_AGO":[screenshot or null],"S7_SEND_FREQUENCY":[screenshot],"S7_OPEN_RATE":[analytics or null],"S7_OPEN_BENCHMARK":35,"S7_GROWTH_MECHANISM":[obs],"S7_LOYALTY_PROGRAM":[screenshot],"S7_MONTHLY_GAP":[est],"S7_ANNUAL_GAP":[calc]`
+"S7_SCORE":[calc],"S7_EMAIL_LIST_EXISTS":[screenshot],"S7_LIST_SIZE":[screenshot or 0],"S7_LIST_BENCHMARK":500,"S7_LAST_SEND_DAYS_AGO":[screenshot or null],"S7_SEND_FREQUENCY":[screenshot],"S7_OPEN_RATE":[analytics or null],"S7_OPEN_BENCHMARK":35,"S7_GROWTH_MECHANISM":[obs],"S7_LOYALTY_PROGRAM":[screenshot],"S7_MONTHLY_GAP":[est],"S7_ANNUAL_GAP":[calc],
+"S8_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG1_LABEL":[specific title],"S8_SIG1_EVIDENCE":[specific with numbers],"S8_SIG1_GAP":[specific gap],"S8_SIG1_TOOL":[action],
+"S8_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG2_LABEL":[specific],"S8_SIG2_EVIDENCE":[specific],"S8_SIG2_GAP":[specific],"S8_SIG2_TOOL":[action],
+"S8_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG3_LABEL":[specific],"S8_SIG3_EVIDENCE":[specific],"S8_SIG3_GAP":[specific],"S8_SIG3_TOOL":[action],
+"S8_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG4_LABEL":[specific],"S8_SIG4_EVIDENCE":[specific],"S8_SIG4_GAP":[specific],"S8_SIG4_TOOL":[action]`
 }
 
 // ── Stripe checkout session ───────────────────────────────────────────────────
