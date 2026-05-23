@@ -456,15 +456,16 @@ S.Hub = {
           };
           const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
           return '<div class="hd-row" onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" '
-            + 'style="display:flex;align-items:center;gap:12px;padding:10px 4px;'
+            + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
             + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-            + '<div style="flex-shrink:0;min-width:78px;">'
-            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--red);line-height:1;">' + dollar + '</div>'
-            +   (it.impact > 0 ? '<div style="font-size:9px;color:var(--t3);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-top:2px;">Per Month</div>' : '')
+            + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
+            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--red);line-height:1;">' + dollar + '</span>'
+            +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
             + '</div>'
-            + '<div style="flex:1;min-width:0;">'
-            +   '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:' + mc.c + ';background:' + mc.bg + ';padding:3px 6px;border-radius:3px;margin-bottom:4px;">' + it.sys.toUpperCase() + '</span>'
-            +   '<div style="font-size:11px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.action) + '</div>'
+            + '<div style="flex:1;min-width:0;font-size:11px;line-height:1.45;">'
+            +   '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;color:' + mc.c + ';">' + it.sys.toUpperCase() + '</span>'
+            +   '<span style="color:var(--t3);"> &middot; </span>'
+            +   '<span style="color:var(--t1);">' + esc(it.action) + '</span>'
             + '</div>'
             + '</div>';
         }).join('')
