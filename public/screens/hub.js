@@ -153,11 +153,11 @@ S.Hub = {
     };
 
     const panelTitle = (t) => `<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;flex-shrink:0;">${t}</div>`;
-    const PANEL = `background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
+    const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
     // Stat tiles
     const tile = (label, big, bigColor, sub, subColor) => `
-      <div style="background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:11px 15px;display:flex;flex-direction:column;justify-content:center;">
+      <div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:11px 15px;display:flex;flex-direction:column;justify-content:center;">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">${label}</div>
         <div style="font-size:23px;font-weight:800;line-height:1;color:${bigColor};">${big}</div>
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:6px;">${sub}</div>
@@ -367,7 +367,7 @@ S.Hub = {
     container.innerHTML = `
       <style>
         .hub-app{height:100% !important;}
-        .hub-app .content{overflow:hidden !important;padding:24px;min-width:0;}
+        .hub-app .content{overflow:hidden !important;padding:12px;min-width:0;}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
