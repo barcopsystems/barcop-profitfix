@@ -17,8 +17,8 @@
   --green-bg:  rgba(81,138,121,0.12);
   --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
   --blue-bg:   rgba(76,142,171,0.10);
-  --amber:     #D5963A;                /* Warn/watch state: between red (bad) and green (good) */
-  --amber-bg:  rgba(213,150,58,0.12);
+  --amber:     #C76B2C;                /* Warn/watch state: burnt orange, between red (bad) and green (good) */
+  --amber-bg:  rgba(199,107,44,0.12);
 
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.88);
