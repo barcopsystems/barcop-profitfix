@@ -15,7 +15,7 @@ const TT = {
     'sh-bar-labor':   {t:'Bar Labor % Target',b:'Bar staff payroll divided by bar revenue. Includes bartenders, barbacks, and bar management. Does not include kitchen or floor staff. Industry benchmark is 25-30%.',e:'28% is the standard starting benchmark'},
     'sh-food-labor':  {t:'Food Labor % Target',b:'Kitchen and food staff payroll divided by food revenue. Includes cooks, prep, and kitchen management. Full-service kitchen benchmark is 28-32%.',e:'30% is the standard starting benchmark'},
     'sh-prime-cost':  {t:'Prime Cost % Target',b:'Combined COGS and labor as a percentage of total revenue. The single most important number in your operation. Below 60% is healthy. Above 65% and you have a problem that weekly data will surface fast.',e:'60% is the standard starting benchmark'},
-    'sh-cash-tol':    {t:'Cash Over/Short Tolerance',b:'The maximum dollar amount you consider acceptable for a drawer to be off before flagging it. Cash Reconciliation uses this threshold to show green or red on each shift count.',e:'$10 is typical. Anything over $10 over or short triggers a flag'},
+    'sh-cash-tol':    {t:'Cash Over/Short Tolerance',b:'The maximum dollar amount you treat as acceptable for a drawer to be off before flagging it. Cash Reconciliation uses this threshold to show green or red on each shift count.',e:'$10 is typical. Anything over $10 over or short triggers a flag'},
     'pours-bottle':   {t:'Pours Made',b:'Actual pours calculated from your inventory count. Bottles used × pours per bottle. This is what actually left the bar this week.',e:'3.4 bottles used × 16.9 pours per bottle = 57.5 pours made'},
     'cost-pour':      {t:'Cost Per Pour',b:'Unit Cost ÷ Pours Per Bottle. What one drink costs you. Calculated automatically.',e:'$15 bottle ÷ 16.9 pours = $0.89/pour'},
     'kitchen-unit':   {t:'Unit of Measure',b:'The unit you order and count this product in.',e:'Chicken: lb · Lime juice: each · Margarita mix: bag'},
@@ -44,7 +44,7 @@ const TT = {
     'shift-cogs':     {t:'Shift COGS (Product Only)',b:'Bar product cost for this shift   spirits, beer, wine. Do not include labor. Estimate from your weekly invoices divided by number of shifts, or use your POS cost report if available.',e:'Weekly $2,400 bar COGS ÷ 6 shifts = $400/shift'},
     'opening-bank':   {t:'Opening Bank',b:'Cash in the drawer at shift start. Your starting float   not counted as revenue.',e:'Standard opening bank: $200'},
     'expected-cash':  {t:'Expected Cash from POS',b:'Cash sales total from your POS for this shift.',e:'POS shows $840 in cash sales for the PM shift'},
-    'cash-tolerance': {t:'Over/Short Tolerance',b:'Max dollar amount you consider acceptable for a drawer to be off.',e:'$10 tolerance: $9 over or short = OK. $11 = flagged'},
+    'cash-tolerance': {t:'Over/Short Tolerance',b:'Max dollar amount you treat as acceptable for a drawer to be off.',e:'$10 tolerance: $9 over or short = OK. $11 = flagged'},
     // Revenue Recovery tooltips
     'r-bar-revenue':    {t:'Bar Revenue',b:'Total bar sales for the week from your POS. Include all drink and beverage sales from the bar department.',e:'Your POS end-of-week bar department total'},
     'r-floor-revenue':  {t:'Floor Revenue',b:'Total dining room or floor sales for the week. Food and beverage sold tableside by servers.',e:'Your POS end-of-week dining room or floor department total'},
@@ -134,7 +134,7 @@ const TT = {
     't-google-rating':  {t:'Google Rating',b:'Your current star rating on Google. The industry benchmark is 4.3 or higher. Below 4.0 is a direct revenue impact. Guests filter by rating before choosing a venue.',e:'4.6 stars from 312 reviews'},
     't-review-vel':     {t:'Review Velocity',b:'New reviews received per month. Consistent new reviews signal to Google that your business is active and relevant. Target 8 or more per month.',e:'12 new reviews this month'},
     't-response-rate':  {t:'Response Rate',b:'Percentage of reviews you have responded to. Industry benchmark is 75 percent or higher. Responding to every review, positive and negative, is a direct ranking signal.',e:'Responded to 38 of 50 reviews = 76%'},
-    't-monthly-sessions':{t:'Monthly Website Sessions',b:'Total visits to your website per month. Benchmark is 2,000 or more for a typical bar or restaurant. Under 500 means your digital presence is not driving meaningful discovery traffic.',e:'1,840 sessions last month'},
+    't-monthly-sessions':{t:'Monthly Website Sessions',b:'Total visits to your website per month. Benchmark is 2,000 or more for a typical bar or restaurant. Under 500 means your digital presence is not driving real discovery traffic.',e:'1,840 sessions last month'},
     't-bounce-rate':    {t:'Bounce Rate',b:'Percentage of visitors who leave without viewing a second page. Above 70 percent means your homepage is not converting visitors to menu, reservations, or contact.',e:'62% bounce rate'},
     't-social-posts':   {t:'Monthly Posts',b:'Total posts across Instagram and Facebook combined for the month. Benchmark is 12 or more. Consistency matters more than volume. Posting 3 times per week beats a burst of daily posts followed by silence.',e:'14 posts last month (10 IG, 4 FB)'},
     't-digital-score':  {t:'Digital Presence Score',b:'Composite score across all 7 traffic categories: Google Business Profile, website, reviews, search and SEO, social media, delivery platforms, and email. Industry average is 58. Target is 65 or higher.',e:'Score of 71 puts you in the top 30% of operators in your market'},
@@ -993,7 +993,7 @@ function reviewedNote(iso) {
   const stale = days > 30;
   return '<div style="font-size:11px;color:' + (stale ? 'var(--gold)' : 'var(--t3)')
     + ';margin-bottom:10px;">Last reviewed ' + when
-    + (stale ? ' — consider updating' : '') + '</div>';
+    + (stale ? ', update it' : '') + '</div>';
 }
 
 /* ── Auth UI ── */
