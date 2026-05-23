@@ -191,7 +191,7 @@ FIX.revenue = [
 
   {
     id: 'labor-scheduling',
-    name: 'Labor Cost & Scheduling',
+    name: 'Labor Cost and Scheduling',
     module: 'revenue',
     summary: 'Build the schedule from a revenue forecast, not from last week. Budget labor in hours per department, staff to the budget, and review actuals every Monday.',
 
@@ -369,7 +369,7 @@ FIX.revenue = [
 
   {
     id: 'check-average',
-    name: 'Check Average & Upsell',
+    name: 'Check Average and Upsell',
     module: 'revenue',
     summary: 'Check average per cover is the floor\'s biggest revenue lever. Brief it every shift, track it by server, and coach the few who are below average, not the whole team.',
 
@@ -459,7 +459,7 @@ FIX.revenue = [
 
   {
     id: 'events-catering',
-    name: 'Events & Catering',
+    name: 'Events and Catering',
     module: 'revenue',
     summary: 'Private dining and catering is revenue most independents leave on the table. Name an owner, publish a rate card, respond in two hours, and run the P&L before confirming.',
 
