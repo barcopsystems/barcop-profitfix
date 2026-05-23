@@ -184,7 +184,7 @@ S.Hub = {
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
       + tile('Weekly Status', `${wkCount} / 3 <span style="font-size:13px;color:var(--t3);font-weight:600;">this week</span>`,
-             wkCount === 3 ? 'var(--green)' : 'var(--t1)',
+             'var(--gold)',
              wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All modules entered this week',
              wkOverdue.length ? 'var(--red)' : 'var(--t3)');
 
@@ -592,7 +592,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
         .hub-app .hd-metric{background:var(--input);padding:10px 13px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
-        .hub-app .hd-metric:hover{border-color:var(--gold);}
+        .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
         .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
@@ -628,8 +628,8 @@ S.Hub = {
           <main class="content">
             <div style="height:100%;display:grid;grid-template-rows:auto 1fr 1fr;gap:18px;min-height:0;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:18px;min-height:0;">${auditPanel}${metricsPanel}${alertsPanel}</div>
-              <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:18px;min-height:0;">${chartPanel}${readoutPanel}${actionPanel}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${auditPanel}${metricsPanel}${readoutPanel}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${alertsPanel}${chartPanel}${actionPanel}</div>
             </div>
           </main>
         </div>
