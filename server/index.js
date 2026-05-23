@@ -555,7 +555,7 @@ S4 Search: maps pack=40, NAP consistent=30, primary keyword=20, citations=10.
 S5 Social: IG profile=20, followers scored, post freq vs 12/mo scored, engagement if available.
 S6 Delivery: active platforms 20pts each (max 3), ratings scored, photos>10=15, menu complete=15, promo=10.
 S7 Email: list exists=20, size vs 500 benchmark, frequency scored, open rate if available, loyalty=15.
-S8: 4 specific traffic-side risk signals with HIGH/MEDIUM/LOW ratings (review velocity drops, unanswered review backlog, GBP staleness, platform-specific issues, posting cadence gaps, email channel dormancy, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
+S8: 4 specific traffic-side risk signals with HIGH/MEDIUM/LOW ratings (review velocity drops, unanswered review backlog, GBP staleness, platform-specific issues, posting schedule gaps, email channel dormancy, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
 OVERALL: weighted avg S1-S7.
 
 APP DATA:
