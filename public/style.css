@@ -7,9 +7,9 @@
   --hover:     rgba(255,255,255,0.05);
   --nav-act:   #0d1e2e;
 
-  --gold:      #C9A84C;
-  --gold-h:    #b8943f;
-  --gold-bg:   rgba(201,168,76,0.10);
+  --gold:      #DBAB46;
+  --gold-h:    #C29638;
+  --gold-bg:   rgba(219,171,70,0.10);
   --red:       #C03828;
   --red-bg:    rgba(192,56,40,0.13);
   --steel:     #4888A8;
@@ -17,8 +17,8 @@
   --green-bg:  rgba(81,138,121,0.12);
   --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
   --blue-bg:   rgba(76,142,171,0.10);
-  --amber:     #C76B2C;                /* Warn/watch state: burnt orange, between red (bad) and green (good) */
-  --amber-bg:  rgba(199,107,44,0.12);
+  --amber:     #9A5D34;                /* Warn/watch state: muted burnt brown, between red (bad) and green (good) */
+  --amber-bg:  rgba(154,93,52,0.12);
 
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.88);
@@ -222,9 +222,9 @@ input,select,textarea{color-scheme:dark;}
 .topbar-sub{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-left:10px;}
 
 /* ══ CONTENT ══ */
-.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:rgba(201,168,76,0.18) transparent;}
+.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:rgba(219,171,70,0.18) transparent;}
 .content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:rgba(201,168,76,0.18);border-radius:2px;}
+.content::-webkit-scrollbar-thumb{background:rgba(219,171,70,0.18);border-radius:2px;}
 .screen{padding:24px var(--sp) 56px;max-width:980px;width:100%;}
 
 /* ══ BUTTONS ══ */
@@ -404,7 +404,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .ob-pips{display:flex;gap:4px;margin-bottom:22px;}
 .ob-pip{flex:1;height:3px;background:var(--b2);border-radius:2px;}
 .ob-pip.on{background:var(--gold);}
-.ob-pip.done{background:rgba(201,168,76,0.35);}
+.ob-pip.done{background:rgba(219,171,70,0.35);}
 .ob-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
 
 /* ══ AUTH ══ */
