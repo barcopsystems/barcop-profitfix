@@ -21,14 +21,21 @@ S.Reports={
     const histRows=weeks.length===0?'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--t4);">No weeks saved yet.</td></tr>'
       :weeks.map(w=>{
         const tRev=(w.bar?.revenue||0)+(w.food?.revenue||0);
-        const bT=t.bar_pour_cost_pct??22,pT=t.prime_cost_pct??60;
+        const bT=t.bar_pour_cost_pct??22,fT=t.food_cost_pct??32,pT=t.prime_cost_pct??60;
+        // Cost vs Target $: how many real dollars this week ran over (or under)
+        // the bar and food cost targets combined. Always computable from data
+        // every saved week carries, sample or operator-entered.
+        const barGap  = ((w.bar?.cost_pct  - bT)/100) * (w.bar?.revenue  || 0);
+        const foodGap = ((w.food?.cost_pct - fT)/100) * (w.food?.revenue || 0);
+        const costGap = (isFinite(barGap)?barGap:0) + (isFinite(foodGap)?foodGap:0);
+        const gapStr  = (costGap > 0 ? '+' : costGap < 0 ? '-' : '') + App.fmtCurrency(Math.abs(costGap));
         return '<tr style="cursor:pointer;" onclick="S.Reports.viewWeek(\''+w.id+'\')"><td>'+esc(w.period_end||'')+'</td><td class="val">Week '+w.week_num+'</td>'
           +'<td>'+App.fmtCurrency(w.bar?.revenue)+'</td>'
           +'<td class="'+(w.bar?.cost_pct>bT?'neg':'pos')+'">'+App.fmtPct(w.bar?.cost_pct)+'</td>'
           +'<td>'+App.fmtCurrency(w.food?.revenue)+'</td>'
-          +'<td class="'+(w.food?.cost_pct>32?'neg':'pos')+'">'+App.fmtPct(w.food?.cost_pct)+'</td>'
+          +'<td class="'+(w.food?.cost_pct>fT?'neg':'pos')+'">'+App.fmtPct(w.food?.cost_pct)+'</td>'
           +'<td class="'+(w.prime_cost_pct>pT?'neg':'pos')+'">'+App.fmtPct(w.prime_cost_pct)+'</td>'
-          +'<td>'+App.fmtCurrency((w.bar_variance||[]).reduce((s,r)=>s+(r.variance_dollar||0),0))+'</td></tr>';
+          +'<td class="'+(costGap>0?'neg':costGap<0?'pos':'')+'">'+gapStr+'</td></tr>';
       }).join('');
 
     const calcBlock=(label,revId,rev,costPct,target)=>{
@@ -61,7 +68,7 @@ S.Reports={
       +calcBlock('Prime Cost',null,annBarRev+annFoodRev,avgP,t.prime_cost_pct??60)
       +'<div class="sh" style="margin-top:24px;">Weekly History</div>'
       +'<div class="tbl-wrap" style="overflow-x:auto;margin-bottom:24px;"><table class="tbl"><thead><tr>'
-      +'<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Bar Cost %</th><th>Food Rev</th><th>Food Cost %</th><th>Prime %</th><th>Variance $</th>'
+      +'<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Bar Cost %</th><th>Food Rev</th><th>Food Cost %</th><th>Prime %</th><th>Cost vs Tgt $</th>'
       +'</tr></thead><tbody>'+histRows+'</tbody></table></div>'
       +'<div id="week-detail"></div>'
       +'</div>';
@@ -86,6 +93,8 @@ S.Reports={
   viewWeek(id){
     const w=(App.data.weeks||[]).find(w=>w.id===id);if(!w)return;
     const det=document.getElementById('week-detail');if(!det)return;
+    const t=App.data.settings.targets||{};
+    const bT=t.bar_pour_cost_pct??22,fT=t.food_cost_pct??32,pT=t.prime_cost_pct??60;
     const tRev=(w.bar?.revenue||0)+(w.food?.revenue||0);
     det.innerHTML='<div class="divider"></div>'
       +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">'
@@ -96,11 +105,11 @@ S.Reports={
       +'<tr><td>Bar Revenue</td><td class="val">'+App.fmtCurrency(w.bar?.revenue)+'</td></tr>'
       +'<tr><td>Bar COGS</td><td>'+App.fmtCurrency(w.bar?.cogs)+'</td></tr>'
       +'<tr><td>Bar Labor</td><td>'+App.fmtCurrency(w.bar?.labor)+'</td></tr>'
-      +'<tr><td>Bar Pour Cost %</td><td class="val '+(w.bar?.cost_pct>22?'neg':'pos')+'">'+App.fmtPct(w.bar?.cost_pct)+'</td></tr>'
+      +'<tr><td>Bar Pour Cost %</td><td class="val '+(w.bar?.cost_pct>bT?'neg':'pos')+'">'+App.fmtPct(w.bar?.cost_pct)+'</td></tr>'
       +'<tr><td>Food Revenue</td><td class="val">'+App.fmtCurrency(w.food?.revenue)+'</td></tr>'
-      +'<tr><td>Food Cost %</td><td class="val '+(w.food?.cost_pct>32?'neg':'pos')+'">'+App.fmtPct(w.food?.cost_pct)+'</td></tr>'
+      +'<tr><td>Food Cost %</td><td class="val '+(w.food?.cost_pct>fT?'neg':'pos')+'">'+App.fmtPct(w.food?.cost_pct)+'</td></tr>'
       +'<tr class="total"><td>Total Revenue</td><td class="val">'+App.fmtCurrency(tRev)+'</td></tr>'
-      +'<tr class="total"><td>Prime Cost %</td><td class="val '+(w.prime_cost_pct>60?'neg':'pos')+'">'+App.fmtPct(w.prime_cost_pct)+'</td></tr>'
+      +'<tr class="total"><td>Prime Cost %</td><td class="val '+(w.prime_cost_pct>pT?'neg':'pos')+'">'+App.fmtPct(w.prime_cost_pct)+'</td></tr>'
       +'</tbody></table></div>'
       +(w.notes?'<div style="margin-top:12px;font-size:12px;color:var(--t2);">Notes: '+esc(w.notes)+'</div>':'')
       +'</div>';
