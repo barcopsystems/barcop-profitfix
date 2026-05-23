@@ -87,7 +87,7 @@ FIX.revenue = [
         id: 'me-ai-3',
         title: 'Pick This Week\'s Pre-Shift Features',
         whatItDoes: 'Selects the two best Stars to feature this week and writes one line of server briefing language for each.',
-        prompt: 'Here is my current menu engineering quadrant output. [PASTE STARS LIST WITH MARGIN AND WEEKLY SALES]. My current team check average target is $[X]. Select the two best items to feature in this week\'s pre-shift briefing — criteria: highest contribution margin, reasonable server suggestion comfort, and a beverage pairing that supports the check average target. For each selected item, write one sentence of server briefing language.',
+        prompt: 'Here is my current menu engineering quadrant output. [PASTE STARS LIST WITH MARGIN AND WEEKLY SALES]. My current team check average target is $[X]. Select the two best items to feature in this week\'s pre-shift briefing. Criteria: highest contribution margin, reasonable server suggestion comfort, and a beverage pairing that supports the check average target. For each selected item, write one sentence of server briefing language.',
         whatToPaste: 'Paste your Stars list and fill in the check average target.'
       },
       {
@@ -605,9 +605,9 @@ FIX.revenue = [
     aiWorkflows: [
       {
         id: 'sp-ai-1',
-        title: 'Build a Coaching Conversation Framework',
-        whatItDoes: 'Drafts a data-first coaching framework for a below-average server: number opening, one diagnostic question, one behavior change, a follow-up date.',
-        prompt: 'I need to coach a server whose check average is below team average. Server details: [NAME], average check last 4 weeks: $[X]. Team average: $[X]. Weekly covers: approximately [X]. Annual revenue gap versus team average: $[X]. Table audit results for this server: [DESCRIBE WHAT YOU OBSERVED]. Draft a coaching conversation framework that opens with the specific numbers (not a general statement), asks one question to identify their weakest touch point, suggests one specific behavior change to try this week, and closes with a follow-up checkpoint date.',
+        title: 'Build a Coaching Conversation Routine',
+        whatItDoes: 'Drafts a data-first coaching routine for a below-average server: number opening, one diagnostic question, one behavior change, a follow-up date.',
+        prompt: 'I need to coach a server whose check average is below team average. Server details: [NAME], average check last 4 weeks: $[X]. Team average: $[X]. Weekly covers: approximately [X]. Annual revenue gap versus team average: $[X]. Table audit results for this server: [DESCRIBE WHAT YOU OBSERVED]. Draft a coaching conversation routine that opens with the specific numbers (not a general statement), asks one question to identify their weakest touch point, suggests one specific behavior change to try this week, and closes with a follow-up checkpoint date.',
         whatToPaste: 'Fill in the server\'s name, check average, the team average, weekly covers, annual gap, and audit notes.'
       },
       {
