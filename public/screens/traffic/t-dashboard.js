@@ -57,7 +57,7 @@ S.TrafficDashboard = {
           + '<span style="flex-shrink:0;font-size:12px;color:var(--t3);">&#9656;</span>'
           + '</div>').join('')
       : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Posting, reviews, and email are keeping pace. Nothing is slipping right now.</div>';
-    const cadenceHtml = '<div class="sh">Cadence Nudges</div>'
+    const cadenceHtml = '<div class="sh">Activity Reminders</div>'
       + '<div class="card" style="margin-bottom:18px;">' + nudgeBody + '</div>';
 
     // Priority Action Items — ranked by dollar impact from the latest Traffic audit
