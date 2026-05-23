@@ -81,13 +81,13 @@ S.RevenueRPLH = {
         const ticks = []; for (let v = Math.ceil(minY / tickStep) * tickStep; v <= maxY; v += tickStep) ticks.push(v);
         const yTicks = ticks.map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.04)"/><text x="' + (PAD.l - 6) + '" y="' + (ys(v) + 4).toFixed(1) + '" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">$' + v + '</text>').join('');
         const xLabels = chartWeeks.map((w, i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (w.period_end ? w.period_end.slice(5).replace('-', '/') : 'Wk' + w.week_num) + '</text>').join('');
-        const tgtLine = '<line x1="' + PAD.l + '" y1="' + ys(target).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(target).toFixed(1) + '" stroke="#C9A84C" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>';
-        const dots = valid.map(p => '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#070E15" stroke="#C9A84C" stroke-width="1.5"/>').join('');
+        const tgtLine = '<line x1="' + PAD.l + '" y1="' + ys(target).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(target).toFixed(1) + '" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>';
+        const dots = valid.map(p => '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#070E15" stroke="#DBAB46" stroke-width="1.5"/>').join('');
         chartHtml = '<div class="chart-card" style="padding:20px 24px 16px;margin-top:16px;">'
           + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;">8-Week Blended RPLH Trend</div>'
           + '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;" preserveAspectRatio="none">'
           + yTicks + tgtLine
-          + (line ? '<path d="' + line + '" fill="none" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' : '')
+          + (line ? '<path d="' + line + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' : '')
           + dots + xLabels
           + '</svg></div>';
       }
