@@ -510,6 +510,12 @@ window.FixPanel = {
   },
 
   // ── Event wiring ────────────────────────────────────────────────────────────
+  // renderInto() can be called many times against the same el (e.g. every time
+  // a step checkbox is toggled). The per-element .fp-head listeners must be
+  // re-attached each call because innerHTML replacement destroyed the old head
+  // nodes. The delegated click listener on `el` itself MUST be attached only
+  // once — otherwise every render adds another copy, and stacking copies cancel
+  // each other out (toggle then immediately untoggle), making clicks feel dead.
   wire(el) {
     el.querySelectorAll('.fp-head').forEach(head => {
       head.addEventListener('click', () => {
@@ -521,6 +527,8 @@ window.FixPanel = {
         if (chev) chev.style.transform = 'rotate(' + (open ? '0' : '90') + 'deg)';
       });
     });
+    if (el.dataset.fpWired) return;
+    el.dataset.fpWired = '1';
     el.addEventListener('click', ev => {
       const recHelp = ev.target.closest('.fp-rec-help');
       if (recHelp) { ev.stopPropagation(); this.showRecoveryHelp(); return; }
