@@ -721,7 +721,7 @@ S.Hub = {
             </div>
           </header>
           <main class="content">
-            <div style="display:grid;grid-template-rows:auto 520px 460px;gap:18px;padding-bottom:18px;">
+            <div style="display:grid;grid-template-rows:auto 470px 510px;gap:18px;padding-bottom:18px;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${actionPanel}</div>
