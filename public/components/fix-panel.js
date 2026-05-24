@@ -224,6 +224,48 @@ window.FixPanel = {
     box.querySelector('.fp-rec-close')?.addEventListener('click', () => m.remove());
   },
 
+  // ── "How this works" modal for The Fix Process header ──────────────────────
+  // Per-gap: explains the gap-card workflow (step kinds, checkboxes, Mark
+  // Implemented) and surfaces the top 3 "Watch Out For" warnings from the
+  // gap's commonMistakes — operator wisdom that the app itself cannot prevent.
+  showProcessHelp(g) {
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
+    const head = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">How The Fix Process Works</div>'
+      + '<button class="btn btn-ghost btn-sm fp-rec-close">Close</button>'
+      + '</div>';
+    const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 10px;">' + t + '</div>';
+    const p  = t => '<p style="margin:0 0 10px;">' + t + '</p>';
+    const badge = (label, color, bg) => '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:1px;'
+      + 'text-transform:uppercase;padding:2px 6px;border-radius:3px;background:' + bg + ';color:' + color + ';margin-right:8px;">' + label + '</span>';
+
+    const mistakes = (g && Array.isArray(g.commonMistakes)) ? g.commonMistakes.slice(0, 3) : [];
+    const watchOut = mistakes.length
+      ? sh('Watch Out For')
+        + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:13px;color:var(--t2);line-height:1.65;">'
+            + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:8px;"></span>'
+            + '<span>' + esc(t) + '</span></div>').join('')
+      : '';
+
+    const body = '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">'
+      + p('Each step below is a link into the part of Bar Cop that does the work. Three kinds:')
+      + '<div style="margin:0 0 8px;">' + badge('DO IT', 'var(--gold)', 'var(--gold-bg)') + 'opens the screen where the work happens.</div>'
+      + '<div style="margin:0 0 8px;">' + badge('SEE IT', 'var(--blue)', 'var(--blue-bg)') + 'opens where Bar Cop already shows the number.</div>'
+      + '<div style="margin:0 0 14px;">' + badge('DOCUMENT', 'var(--t3)', 'rgba(255,255,255,0.06)') + 'downloads a policy, standard, or template.</div>'
+      + p('Check the boxes as you go. Progress saves and shows on the dashboard.')
+      + p('When the whole process is in place, click Mark Implemented and lock in the date. Bar Cop measures the metric for 8 weeks before and after to show what the fix recovered.')
+      + watchOut
+      + '</div>';
+    box.innerHTML = head + body;
+    m.appendChild(box);
+    document.body.appendChild(m);
+    m.onclick = ev => { if (ev.target === m) m.remove(); };
+    box.querySelector('.fp-rec-close')?.addEventListener('click', () => m.remove());
+  },
+
   // Wire the Fix Areas rows and the Recovery card. Call after render.
   wireFixAreas(container) {
     if (!container) return;
@@ -293,9 +335,6 @@ window.FixPanel = {
       + '<div class="fp-body" style="display:' + (expanded ? 'block' : 'none') + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
       + this.processSection(g)
       + this.implementSection(g)
-      + this.mistakesSection(g)
-      + this.quickRefSection(g)
-      + this.aiSection(g)
       + '</div></div>';
   },
 
@@ -314,13 +353,18 @@ window.FixPanel = {
     if (!p) return '';
     const progress = (App.data && App.data.fix_progress && App.data.fix_progress[g.id]) || [];
     const checked = new Set(progress);
-    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i + 1, g.id, checked.has(i))).join('');
-    return this.sh('The Fix Process')
-      + (p.intro ? '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(p.intro) + '</div>' : '')
-      + steps;
+    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i, g.id, checked.has(i))).join('');
+    const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 12px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);">The Fix Process</div>'
+      + '<button class="fp-proc-help" data-gap="' + esc(g.id) + '" style="background:transparent;border:1px solid var(--b1);border-radius:3px;'
+      + 'color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 9px;cursor:pointer;">How this works</button>'
+      + '</div>';
+    return header + steps;
   },
 
-  stepRow(s, module, num, gapId, isChecked) {
+  // Step row: checkbox + content. Numbered circle removed since row order
+  // carries the sequence and the checkbox carries the action.
+  stepRow(s, module, stepIdx, gapId, isChecked) {
     const kind = s.kind || 'action';
     const meta = {
       action:    { label: 'DO IT',     color: 'var(--gold)',  bg: 'var(--gold-bg)' },
@@ -328,7 +372,6 @@ window.FixPanel = {
       reference: { label: 'DOCUMENT',  color: 'var(--t3)',    bg: 'rgba(255,255,255,0.06)' }
     }[kind] || {};
     const label = esc(s.targetLabel || '');
-    const stepIdx = num - 1;
 
     let link = '';
     if (kind === 'reference') {
@@ -348,18 +391,15 @@ window.FixPanel = {
       + 'aria-label="' + (isChecked ? 'Mark step incomplete' : 'Mark step complete') + '" '
       + 'style="flex-shrink:0;width:20px;height:20px;border-radius:4px;border:1px solid '
       + (isChecked ? 'var(--gold)' : 'var(--b1)') + ';background:' + (isChecked ? 'var(--gold-bg)' : 'transparent')
-      + ';cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin-top:1px;transition:border-color 0.12s,background 0.12s;">'
+      + ';cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin-top:3px;transition:border-color 0.12s,background 0.12s;">'
       + (isChecked ? '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5.5" stroke="var(--gold)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
       + '</button>';
 
     const titleColor  = isChecked ? 'var(--t3)' : 'var(--t1)';
     const detailColor = isChecked ? 'var(--t4)' : 'var(--t2)';
 
-    return '<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--b2);">'
+    return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);">'
       + checkbox
-      + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
-      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;'
-      + (isChecked ? 'opacity:0.45;' : '') + '">' + num + '</div>'
       + '<div style="flex:1;">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<span style="font-size:13px;font-weight:700;color:' + titleColor + ';">' + esc(s.title) + '</span>'
@@ -441,7 +481,7 @@ window.FixPanel = {
       : '';
 
     return '<div style="margin:20px 0;background:var(--panel);border:1px solid ' + borderColor + ';border-radius:4px;overflow:hidden;">'
-      + this.sectionHeader('Mark Fix Implemented', 'fp-rec-help')
+      + this.sectionHeader('Mark Fix Implemented')
       + logHtml
       + bannerHtml
       + formHtml
@@ -539,8 +579,15 @@ window.FixPanel = {
     if (el.dataset.fpWired) return;
     el.dataset.fpWired = '1';
     el.addEventListener('click', ev => {
-      const recHelp = ev.target.closest('.fp-rec-help');
-      if (recHelp) { ev.stopPropagation(); this.showRecoveryHelp(); return; }
+      const procHelp = ev.target.closest('.fp-proc-help');
+      if (procHelp) {
+        ev.stopPropagation();
+        const gapId = procHelp.dataset.gap;
+        const moduleKey = el.dataset.fixModule;
+        const gap = (window.FIX && FIX[moduleKey] || []).find(x => x.id === gapId);
+        if (gap) this.showProcessHelp(gap);
+        return;
+      }
       const stepCheck = ev.target.closest('.fp-step-check');
       if (stepCheck) {
         ev.stopPropagation();
