@@ -82,12 +82,12 @@ S.Dashboard = {
     }
 
     container.innerHTML = '<div class="screen">'
+      + FixPanel.recoveryCard('profit')
       + startHereHtml
       + alertHtml
       + FixPanel.fixAreasCard('profit')
       + chartHtml
       + actionHtml
-      + FixPanel.recoveryCard('profit')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       +'<button class="btn btn-primary" id="qa-week">Enter This Week</button>'
