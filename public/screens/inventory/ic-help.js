@@ -9,8 +9,8 @@ S.InventoryHelp = {
   FAQ: [
     ['Counts and the Bottle Slider', [
       ['How do inventory counts work?',
-        'You count what is physically on hand in Take Inventory. Pick a count type — Full, Bar Only, '
-        + 'Kitchen Only, or Custom locations — then step through each location. For every product you '
+        'You count what is physically on hand in Take Inventory. Pick a count type: Full, Bar Only, '
+        + 'Kitchen Only, or Custom locations. Then step through each location. For every product you '
         + 'record full units and how full any open bottle is. Submitting saves a dated snapshot to Count History.'],
       ['How do I use the bottle slider?',
         'Drag the liquid level up or down, or tap the top half of the bottle to add 0.1 and the bottom '
@@ -24,19 +24,19 @@ S.InventoryHelp = {
     ['Setup and Feeding Profit Recovery', [
       ['How do I set up products?',
         'Add every product you stock in the Products screen, under the right category. Container size, '
-        + 'pour size, unit cost, and menu price let the app calculate cost per pour and pour cost '
+        + 'pour size, unit cost, and menu price let Bar Cop calculate cost per pour and pour cost '
         + 'percentage automatically.'],
       ['What do par level and reorder point do?',
         'Par level is the quantity you want on hand. Reorder point is the level that should trigger an '
         + 'order. When a count drops a product below par it appears on the dashboard Below Par alert and '
         + 'on the Order Sheet.'],
       ['How does Inventory Control feed Profit Recovery?',
-        'Products here are the master list — Profit Recovery Bar Products and Kitchen Products read from '
+        'Products here are the master list, Profit Recovery Bar Products and Kitchen Products read from '
         + 'it. Deliveries update product costs and feed period COGS and Vendor Watch. Set inventory data '
         + 'once here and Recovery stays current.'],
       ['How do I import products or a POS file?',
-        'Use the Import button. Upload a CSV or Excel file, match your columns to the fields, and the '
-        + 'app remembers that mapping for next time. The same tool handles POS sales files in the '
+        'Use the Import button. Upload a CSV or Excel file, match your columns to the fields, and '
+        + 'Bar Cop remembers that mapping for next time. The same tool handles POS sales files in the '
         + 'Variance Report.']
     ]],
     ['Receiving and Ordering', [
@@ -45,7 +45,7 @@ S.InventoryHelp = {
         + 'the product master; if your invoice price differs, edit it and the line flags a price change. '
         + 'Saving updates those products\' costs and records the delivery for Vendor Watch and COGS.'],
       ['How does the Order Sheet work?',
-        'The Order Sheet is generated from your latest count against par levels — anything below par is '
+        'The Order Sheet is generated from your latest count against par levels, anything below par is '
         + 'suggested for reorder, grouped by vendor. The Order Sheet is part of a later build phase.']
     ]],
     ['Reports and Variance', [
@@ -58,7 +58,7 @@ S.InventoryHelp = {
         + 'waste, or theft.'],
       ['What is a Spot Check?',
         'A spot check is a fast count of a few high-risk products before and after a shift, compared to '
-        + 'POS sales for that shift — a quick read on variance without a full count. Spot Check is part '
+        + 'POS sales for that shift, a quick read on variance without a full count. Spot Check is part '
         + 'of a later build phase.']
     ]]
   ],
