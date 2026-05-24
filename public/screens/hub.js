@@ -112,15 +112,18 @@ S.Hub = {
     // impact. Cap at 50 as a safety ceiling; the card scrolls internally
     // when the list runs past its allotted height.
     const itemRows = [];
-    const collect = (audit, sysName, screen, mod) => {
+    const collect = (audit, sysName, mod) => {
       if (!audit) return;
       (audit.action_items || []).forEach(it => {
-        if (it && it.action) itemRows.push({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, screen, mod });
+        if (it && it.action) {
+          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, mod) : null);
+          itemRows.push({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, mod: mod, gap: gid });
+        }
       });
     };
-    collect(pA, 'Profit',  'audit-tracker', 'profit');
-    collect(rA, 'Revenue', 'r-audit',       'revenue');
-    collect(tA, 'Traffic', 't-audit',       'traffic');
+    collect(pA, 'Profit',  'profit');
+    collect(rA, 'Revenue', 'revenue');
+    collect(tA, 'Traffic', 'traffic');
     itemRows.sort((a,b) => b.impact - a.impact);
     const topItems = itemRows.slice(0, 50);
 
@@ -483,7 +486,7 @@ S.Hub = {
             Traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
           };
           const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
-          return '<div class="hd-row" onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" '
+          return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
             + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
             + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
             + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
