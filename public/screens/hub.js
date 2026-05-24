@@ -593,10 +593,8 @@ S.Hub = {
       + navItem('getting-started', 'Getting Started', 'getStart', [])
       + navItem('help',            'Help and FAQ',    'help',     [])
       + '<div class="nav-section">Manage</div>'
-      + navItem('settings',  'Global Settings',   'settings', [])
-      + '<div class="nav-item nav-disabled" title="Coming soon">'
-      +   '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + navIcons.bug + '</svg>'
-      +   '<span class="nav-label">Report Bug</span></div>';
+      + navItem('settings',   'Global Settings', 'settings', [])
+      + navItem('report-bug', 'Report a Bug',   'bug',      []);
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
@@ -701,6 +699,7 @@ S.Hub = {
       else if (action === 'getting-started') S.HubGettingStarted.open();
       else if (action === 'help')            S.HubHelp.open();
       else if (action === 'settings')        S.HubSettings.open();
+      else if (action === 'report-bug')      S.HubReportBug.open();
     });
 
     // Trend chart data point hover — populate and position the shared
