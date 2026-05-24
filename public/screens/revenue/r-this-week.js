@@ -104,13 +104,13 @@ S.RevenueThisWeek = {
   feedNote(kind) {
     if (kind === 'revenue') {
       return this.hasShifts()
-        ? 'Auto-filled from Shift Control — the weekly sum of shift revenue and covers. <a href="#" onclick="S.RevenueThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No shifts logged in Shift Control yet — log shifts there, or enter manually.';
+        ? 'Auto-filled from Shift Control: the weekly sum of shift revenue and covers. <a href="#" onclick="S.RevenueThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No shifts logged in Shift Control yet. Log shifts there, or enter manually.';
     }
     if (kind === 'labor') {
       return this.hasLabor()
-        ? 'Auto-filled from Labor Control — logged hours and cost for the week. <a href="#" onclick="S.RevenueThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No hours logged in Labor Control yet — log hours there, or enter manually.';
+        ? 'Auto-filled from Labor Control: logged hours and cost for the week. <a href="#" onclick="S.RevenueThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No hours logged in Labor Control yet. Log hours there, or enter manually.';
     }
     return '';
   },
@@ -140,10 +140,10 @@ S.RevenueThisWeek = {
       + this.moneyField('rw-cov', 'Total Covers', d.covers, 'revenue', '')
       + '</div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="rw-c-rev">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="rw-c-ca">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="rw-c-rev">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="rw-c-ca">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">$' + (this.targets().check_avg || 35) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val" id="rw-c-cagap">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val" id="rw-c-cagap">-</div></div>'
       + '</div></div>'
 
       + '<div class="card"><div class="card-title">Labor</div>'
@@ -152,9 +152,9 @@ S.RevenueThisWeek = {
       + this.moneyField('rw-lcost', 'Labor Cost', d.labor_cost, 'labor', '$')
       + '</div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val" id="rw-c-lpct">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val" id="rw-c-lpct">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + App.fmtPct(this.laborTarget()) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val" id="rw-c-rplh">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val" id="rw-c-rplh">-</div></div>'
       + '</div></div>'
 
       + '<div class="card"><div class="card-title">Review</div>'
@@ -209,16 +209,16 @@ S.RevenueThisWeek = {
     const covers = num('rw-cov');
     const checkAvg = covers > 0 ? totalRev / covers : null;
     const targetCA = this.targets().check_avg || 35;
-    set('rw-c-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '—');
-    set('rw-c-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '—', checkAvg != null ? (checkAvg >= targetCA ? 'good' : 'warn') : '');
+    set('rw-c-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '-');
+    set('rw-c-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg != null ? (checkAvg >= targetCA ? 'good' : 'warn') : '');
     const caGap = checkAvg != null ? checkAvg - targetCA : null;
-    set('rw-c-cagap', caGap != null ? (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) : '—', caGap != null ? (caGap >= 0 ? 'good' : 'warn') : '');
+    set('rw-c-cagap', caGap != null ? (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) : '-', caGap != null ? (caGap >= 0 ? 'good' : 'warn') : '');
 
     const laborCost = num('rw-lcost'), laborHrs = num('rw-lhrs');
     const laborPct = totalRev > 0 && laborCost > 0 ? laborCost / totalRev * 100 : null;
     const rplh = laborHrs > 0 && totalRev > 0 ? totalRev / laborHrs : null;
-    set('rw-c-lpct', laborPct != null ? App.fmtPct(laborPct) : '—', laborPct != null ? (laborPct > this.laborTarget() ? 'warn' : 'good') : '');
-    set('rw-c-rplh', rplh != null ? App.fmtCurrency(rplh) : '—');
+    set('rw-c-lpct', laborPct != null ? App.fmtPct(laborPct) : '-', laborPct != null ? (laborPct > this.laborTarget() ? 'warn' : 'good') : '');
+    set('rw-c-rplh', rplh != null ? App.fmtCurrency(rplh) : '-');
   },
 
   async saveWeek() {
@@ -265,6 +265,7 @@ S.RevenueThisWeek = {
     const ok = await App.saveKey('revenue_weeks');
     if (ok) {
       this.clearDraft();
+      App.markSetupDone('gs_r_week');
       App.navigate('r-dashboard');
     } else {
       App.data.revenue_weeks.pop();
