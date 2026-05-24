@@ -308,6 +308,10 @@ window.FixPanel = {
   renderInto(el, moduleKey, focusId) {
     if (!el) return;
     el.dataset.fixModule = moduleKey;
+    if (focusId) {
+      App._fixOpen = App._fixOpen || {};
+      App._fixOpen[moduleKey] = focusId;
+    }
     const gaps = this.gapAreas(moduleKey);
     if (gaps.length === 0) {
       el.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--t3);">'
@@ -323,14 +327,46 @@ window.FixPanel = {
   },
 
   // ── One gap-area collapsible card ───────────────────────────────────────────
+  // Header shows a toned-down status line on the right (t3, mixed case) so the
+  // operator can scan all gaps at a glance: "4 of 6 steps", "Implemented · $X /yr",
+  // "$X /yr", or nothing. Same data the dashboard surfaces in color, here muted
+  // so it reads as reference instead of headline.
   gapCard(g, expanded) {
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const isLogged = log.some(e => e.gap_id === g.id);
+    const fixProgress = (App.data && App.data.fix_progress) || {};
+    const stepsDone = (fixProgress[g.id] || []).length;
+    const stepsTotal = (g.process && g.process.steps) ? g.process.steps.length : 0;
+
+    let status = '';
+    if (isLogged) {
+      let recovered = 0;
+      log.filter(e => e.gap_id === g.id).forEach(e => {
+        const r = (window.Recovery) ? Recovery.compute(e) : null;
+        if (r && r.status === 'ok' && r.dollars > 0) recovered += r.dollars;
+      });
+      status = recovered > 0
+        ? 'Implemented · ' + App.fmtCurrency(recovered, 0) + ' /yr'
+        : 'Implemented';
+    } else if (stepsDone > 0 && stepsTotal > 0) {
+      status = stepsDone + ' of ' + stepsTotal + ' steps';
+    } else if (window.Recovery) {
+      const imp = Recovery.gapImpact(g.id);
+      if (imp && imp.dollars > 0) status = App.fmtCurrency(imp.dollars, 0) + ' /yr';
+    }
+
+    const statusHtml = status
+      ? '<div style="flex-shrink:0;font-size:11px;color:var(--t3);align-self:center;text-align:right;white-space:nowrap;">' + esc(status) + '</div>'
+      : '';
+
     return '<div class="card fp-gap" data-gap="' + esc(g.id) + '" style="padding:0;overflow:hidden;">'
-      + '<div class="fp-head" style="display:flex;align-items:flex-start;gap:12px;padding:18px 20px;cursor:pointer;">'
-      + '<div style="flex:1;">'
+      + '<div class="fp-head" style="display:flex;align-items:flex-start;gap:14px;padding:18px 20px;cursor:pointer;">'
+      + '<div style="flex:1;min-width:0;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:1px;">' + esc(g.name) + '</div>'
       + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:5px;">' + esc(g.summary || '') + '</div>'
       + '</div>'
-      + '<span class="fp-chev" style="flex-shrink:0;font-size:14px;color:var(--t3);transform:rotate(' + (expanded ? '90' : '0') + 'deg);transition:transform 0.15s;">&#9656;</span>'
+      + statusHtml
+      + '<span class="fp-chev" style="flex-shrink:0;font-size:14px;color:var(--t3);transform:rotate(' + (expanded ? '90' : '0') + 'deg);transition:transform 0.15s;align-self:center;">&#9656;</span>'
       + '</div>'
       + '<div class="fp-body" style="display:' + (expanded ? 'block' : 'none') + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
       + this.processSection(g)
@@ -488,74 +524,80 @@ window.FixPanel = {
       + '</div>';
   },
 
-  // ── Common mistakes ─────────────────────────────────────────────────────────
-  mistakesSection(g) {
-    if (!g.commonMistakes || !g.commonMistakes.length) return '';
-    const items = g.commonMistakes.map(m =>
-      '<div style="display:flex;gap:10px;padding:7px 0;">'
-      + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:6px;"></span>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.65;">' + esc(m) + '</div></div>').join('');
-    return this.sh('Common Mistakes', true) + items;
+  // ── Recent Activity card — module-scoped chronological feed of step checks
+  // Lives at the bottom of each Fix screen. Each row is clickable to re-open
+  // the gap at that step. Tones (t3 throughout) keep it as quiet reference —
+  // duplicates "X of N steps" from the gap-card status without screaming.
+  _timeAgo(ts) {
+    const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+    if (diff < 60)     return 'just now';
+    if (diff < 3600)   return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400)  return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 172800) return 'yesterday';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    if (diff < 2592000) return Math.floor(diff / 604800) + 'w ago';
+    return new Date(ts).toLocaleDateString();
   },
 
-  // ── Quick Reference card ────────────────────────────────────────────────────
-  quickRefSection(g) {
-    const q = g.quickRef;
-    if (!q) return '';
-    let html = this.sh('Quick Reference Card', true);
-    html += '<div class="fp-qr" style="background:var(--panel);border:1px solid var(--b1);border-radius:4px;padding:16px 18px;">';
+  recentActivityCard(moduleKey) {
+    const all = (App.data && Array.isArray(App.data.fix_activity)) ? App.data.fix_activity : [];
+    const mine = all.filter(a => a.module === moduleKey).slice(-10).reverse();
+    const titleBar = this.sectionHeader('Recent Activity');
 
-    if (q.rhythm && q.rhythm.length) {
-      html += '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Weekly Rhythm</div>'
-        + q.rhythm.map(r =>
-            '<div style="display:flex;gap:9px;padding:4px 0;font-size:12px;color:var(--t2);">'
-            + '<span style="flex-shrink:0;color:var(--t4);">&#9633;</span>' + esc(r) + '</div>').join('');
-    }
-    if (q.benchmarks && q.benchmarks.length) {
-      const rows = q.benchmarks.map(b =>
-        '<tr><td style="padding:5px 8px;font-size:12px;color:var(--t1);">' + esc(b.label) + '</td>'
-        + '<td style="padding:5px 8px;font-size:12px;color:var(--gold);">' + esc(b.target || '-') + '</td>'
-        + '<td style="padding:5px 8px;font-size:12px;color:var(--t2);">' + esc(b.warning || '-') + '</td>'
-        + '<td style="padding:5px 8px;font-size:12px;color:var(--red);">' + esc(b.critical || '-') + '</td></tr>').join('');
-      html += '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:14px 0 6px;">Benchmarks</div>'
-        + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
-        + '<thead><tr>'
-        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);"></th>'
-        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Target</th>'
-        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Watch</th>'
-        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Critical</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-    }
-    if (q.escalation && q.escalation.length) {
-      html += '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:14px 0 6px;">Investigation Steps</div>'
-        + q.escalation.map((e, i) =>
-            '<div style="display:flex;gap:9px;padding:4px 0;font-size:12px;color:var(--t2);line-height:1.6;">'
-            + '<span style="flex-shrink:0;color:var(--gold);font-weight:700;">' + (i + 1) + '.</span>' + esc(e) + '</div>').join('');
-    }
-    html += '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm fp-print">Print Card</button></div>';
-    html += '</div>';
-    return html;
-  },
-
-  // ── AI workflow cards ───────────────────────────────────────────────────────
-  aiSection(g) {
-    if (!g.aiWorkflows || !g.aiWorkflows.length) return '';
-    let html = this.sh('AI Workflow Cards', true)
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;">'
-      + 'Copy a prompt into your own AI tool. Run it on real, verified numbers. Bar Cop never sends these for you.</div>';
-    g.aiWorkflows.forEach((w, i) => {
-      html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:14px 16px;margin-bottom:10px;">'
-        + '<div style="display:flex;gap:10px;align-items:baseline;">'
-        + '<span style="font-family:\'Barlow Condensed\';font-size:20px;font-weight:600;color:var(--gold);">' + (i + 1) + '</span>'
-        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(w.title) + '</div></div>'
-        + (w.whatItDoes ? '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin:6px 0 10px;">' + esc(w.whatItDoes) + '</div>' : '')
-        + '<div class="fp-prompt" style="background:var(--input);border:1px solid var(--b2);border-radius:4px;'
-        + 'padding:12px 14px;font-size:12px;color:var(--t1);line-height:1.65;white-space:pre-wrap;">' + esc(w.prompt) + '</div>'
-        + (w.whatToPaste ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:8px;">' + esc(w.whatToPaste) + '</div>' : '')
-        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm fp-copy">Copy Prompt</button></div>'
+    if (!mine.length) {
+      return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+        + titleBar
+        + '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.6;">'
+        + 'No activity yet. Check off a step in any fix process above and it shows up here.</div>'
         + '</div>';
+    }
+
+    const badges = {
+      action:    { label: 'DO IT',    color: 'var(--gold)', bg: 'var(--gold-bg)' },
+      result:    { label: 'SEE IT',   color: 'var(--blue)', bg: 'var(--blue-bg)' },
+      reference: { label: 'DOCUMENT', color: 'var(--t3)',   bg: 'rgba(255,255,255,0.06)' }
+    };
+
+    const rows = mine.map((a, i) => {
+      const b = badges[a.step_kind] || badges.action;
+      return '<div class="fp-activity" data-gap="' + esc(a.gap_id) + '" '
+        + 'style="display:flex;align-items:center;gap:11px;padding:11px 20px;cursor:pointer;'
+        + (i < mine.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+        + '<span style="flex-shrink:0;font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
+        + 'padding:2px 6px;border-radius:3px;background:' + b.bg + ';color:' + b.color + ';">' + b.label + '</span>'
+        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t2);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+        + '<span style="color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:11px;">' + esc(a.gap_name) + '</span>'
+        + '<span style="color:var(--t4);"> · </span>' + esc(a.step_title) + '</div>'
+        + '<div style="flex-shrink:0;font-size:11px;color:var(--t3);">' + esc(this._timeAgo(a.ts)) + '</div>'
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+        + '</div>';
+    }).join('');
+
+    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + titleBar
+      + rows
+      + '</div>';
+  },
+
+  wireActivityCard(container, moduleKey) {
+    if (!container) return;
+    container.querySelectorAll('.fp-activity').forEach(row => {
+      row.addEventListener('click', () => {
+        const gapId = row.dataset.gap;
+        const mount = document.getElementById('fix-panel-mount');
+        if (mount) {
+          App._fixFocus = gapId;
+          this.renderInto(mount, moduleKey, gapId);
+        }
+      });
     });
-    return html;
+  },
+
+  _refreshActivity(moduleKey) {
+    const mount = document.getElementById('recent-activity-mount');
+    if (!mount) return;
+    mount.innerHTML = this.recentActivityCard(moduleKey);
+    this.wireActivityCard(mount, moduleKey);
   },
 
   // ── Event wiring ────────────────────────────────────────────────────────────
@@ -574,6 +616,10 @@ window.FixPanel = {
         const open = body.style.display !== 'none';
         body.style.display = open ? 'none' : 'block';
         if (chev) chev.style.transform = 'rotate(' + (open ? '0' : '90') + 'deg)';
+        // Persist which gap is open per module so navigating away and back
+        // (e.g., clicking a step deep-link, then breadcrumb back) reopens it.
+        App._fixOpen = App._fixOpen || {};
+        App._fixOpen[el.dataset.fixModule] = open ? null : card.dataset.gap;
       });
     });
     if (el.dataset.fpWired) return;
@@ -593,22 +639,62 @@ window.FixPanel = {
         ev.stopPropagation();
         const gapId = stepCheck.dataset.gap;
         const stepIdx = parseInt(stepCheck.dataset.step, 10);
+        const moduleKey = el.dataset.fixModule;
         App.data.fix_progress = App.data.fix_progress || {};
         App.data.fix_progress[gapId] = App.data.fix_progress[gapId] || [];
         const arr = App.data.fix_progress[gapId];
         const at = arr.indexOf(stepIdx);
-        if (at >= 0) arr.splice(at, 1); else arr.push(stepIdx);
+        const wasChecked = at >= 0;
+        if (wasChecked) arr.splice(at, 1); else arr.push(stepIdx);
         App.saveKey('fix_progress');
-        this.renderInto(el, el.dataset.fixModule, gapId);
+        // Update the activity feed: push on check, remove the most recent
+        // matching entry on uncheck (so the feed reflects current truth).
+        App.data.fix_activity = App.data.fix_activity || [];
+        if (wasChecked) {
+          for (let i = App.data.fix_activity.length - 1; i >= 0; i--) {
+            const a = App.data.fix_activity[i];
+            if (a.gap_id === gapId && a.step_index === stepIdx) {
+              App.data.fix_activity.splice(i, 1);
+              break;
+            }
+          }
+        } else {
+          const gap = (window.FIX && FIX[moduleKey] || []).find(x => x.id === gapId);
+          const step = gap && gap.process && gap.process.steps && gap.process.steps[stepIdx];
+          if (gap && step) {
+            App.data.fix_activity.push({
+              id: App.uid(),
+              module: moduleKey,
+              gap_id: gapId,
+              gap_name: gap.name,
+              step_index: stepIdx,
+              step_title: step.title || '',
+              step_kind: step.kind || 'action',
+              ts: new Date().toISOString()
+            });
+            // Cap at 100 entries per module to keep the array bounded.
+            const all = App.data.fix_activity;
+            const moduleCount = all.filter(a => a.module === moduleKey).length;
+            if (moduleCount > 100) {
+              for (let i = 0; i < all.length && moduleCount - 100 > 0; i++) {
+                if (all[i].module === moduleKey) {
+                  all.splice(i, 1);
+                  i--;
+                  if (all.filter(a => a.module === moduleKey).length <= 100) break;
+                }
+              }
+            }
+          }
+        }
+        App.saveKey('fix_activity');
+        this.renderInto(el, moduleKey, gapId);
+        this._refreshActivity(moduleKey);
         return;
       }
       const go = ev.target.closest('.fp-go');
-      const copy = ev.target.closest('.fp-copy');
-      const print = ev.target.closest('.fp-print');
       const implSave = ev.target.closest('.fp-impl-save');
       const unlog = ev.target.closest('.fp-unlog');
       if (go) { App.openScreen(go.dataset.target); return; }
-      if (print) { window.print(); return; }
       if (implSave) {
         const gapId = implSave.dataset.gap;
         const dateEl = el.querySelector('.fp-impl-date[data-gap="' + gapId + '"]');
@@ -637,15 +723,6 @@ window.FixPanel = {
         const card = unlog.closest('.fp-gap');
         this.renderInto(el, el.dataset.fixModule, card ? card.dataset.gap : null);
         return;
-      }
-      if (copy) {
-        const block = copy.closest('div').parentElement.querySelector('.fp-prompt');
-        if (block && navigator.clipboard) {
-          navigator.clipboard.writeText(block.textContent).then(() => {
-            copy.textContent = 'Copied';
-            setTimeout(() => { copy.textContent = 'Copy Prompt'; }, 1800);
-          });
-        }
       }
     });
   }
