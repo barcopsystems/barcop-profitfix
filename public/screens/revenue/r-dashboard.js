@@ -35,16 +35,8 @@ S.RevenueDashboard = {
       }
     }
 
-    // Setup pointer — a thin one-line nudge to the Hub Getting Started while
-    // targets are unset. Settings live on the Hub, never on the dashboard.
-    let startHere = '';
-    if (!rs._targets_saved) {
-      startHere = '<div class="card r-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(219,171,70,0.35);">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
-        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Revenue targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-        + '</div>';
-    }
+    // Setup nudging lives at the Hub level via the catch-up banner on the
+    // Hub Dashboard. Recovery dashboards stay purely operational.
 
     // Priority Action Items — ranked by dollar impact from the latest Revenue audit
     const rAudits = App.data.revenue_audits || [];
@@ -80,7 +72,6 @@ S.RevenueDashboard = {
 
     container.innerHTML = '<div class="screen">'
       + FixPanel.recoveryCard('revenue')
-      + startHere
       + alertHtml
       + this.buildChart(validWeeks.slice(-8), t)
       + actionHtml
@@ -104,7 +95,6 @@ S.RevenueDashboard = {
         App.navigate('r-fix');
       });
     });
-    container.querySelector('.r-gs-pointer')?.addEventListener('click', () => App.navigate('r-getting-started'));
     document.getElementById('r-insights-btn')?.addEventListener('click', () => this.showInsights());
     FixPanel.wireFixAreas(container);
   },
