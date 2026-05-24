@@ -85,6 +85,14 @@ window.FixPanel = {
       const latest = audits[audits.length - 1];
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
       const annual  = monthly * 12;
+      // Temporary diagnostic — remove after we confirm the empty-state branch works
+      console.log('[recoveryCard ' + moduleKey + ']',
+        'auditKey=' + auditKey,
+        'auditsLen=' + audits.length,
+        'latestExists=' + (latest ? 'yes' : 'no'),
+        'actionItemsLen=' + (latest && latest.action_items ? latest.action_items.length : 0),
+        'monthly=' + monthly,
+        'annual=' + annual);
       if (annual > 0) {
         body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
           + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr</span></div>'
