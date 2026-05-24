@@ -439,7 +439,7 @@ const App = {
     // Returning to Hub clears any pending cross-module back-chip — Hub IS
     // home, so there's no "origin" to return to.
     this._returnTo = null;
-    const loc = { mode: 'hub', module: null, screen: 'hub', label: 'Recovery Hub' };
+    const loc = { mode: 'hub', module: null, screen: 'hub', label: 'Hub' };
     this._captureLocationForReturn(loc);
     this._pushHistory(loc);
   },
