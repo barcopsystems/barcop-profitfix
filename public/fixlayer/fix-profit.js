@@ -40,11 +40,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Rounding bottle yield to a whole number. The 0.1-drink gap compounds across every product and quietly understates theoretical pour cost.',
       'Estimating partial bottles by eye instead of measuring them. A back bar with 40 open bottles builds a real error into every calculation.',
-      'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.',
       'Letting the count slip when a manager is out. The system dies from a missed cycle, not a bad number. Write the process down so it lives in paper, not people.',
-      'Starting a variance investigation with a conversation instead of the data. Verify the count first. Many spikes turn out to be a counting error, not a person.'
+      'Starting a variance investigation with a conversation instead of the data. Verify the count first. Many spikes turn out to be a counting error, not a person.',
+      'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.'
     ],
 
     quickRef: {
@@ -141,11 +140,10 @@ FIX.profit = [
 
     commonMistakes: [
       'Waiting until you are certain before documenting. By the time you are certain, the paper trail that makes action possible is gone.',
-      'Reviewing voids and comps as a blended total instead of by employee. A blended rate hides every individual pattern that matters.',
-      'Treating all comps the same. A manager comp for service recovery and a bartender comp for a regular are different things and must be tracked separately.',
+      'Acting on a single incident with no documentation. It creates legal exposure and rarely survives a dispute with an employee who denies it.',
       'Skipping the delivery inspection when the truck arrives mid-service. That is exactly when short counts happen and are hardest to dispute later.',
       'Having no written comp authorization policy. A comp that needs no manager sign-off is an unauthorized expense you approved by silence.',
-      'Acting on a single incident with no documentation. It creates legal exposure and rarely survives a dispute with an employee who denies it.',
+      'Treating all comps the same. A manager comp for service recovery and a bartender comp for a regular are different things and must be tracked separately.',
       'Using behavioral indicators to accuse someone. They direct attention. They are not evidence.'
     ],
 
@@ -243,13 +241,12 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Building recipe cards once and never updating them. A card built at January prices is wrong by March, and the error compounds with every price move since.',
-      'Costing proteins at purchase price without a yield adjustment. Every protein on the menu is understated until you cost on true cost per usable pound.',
-      'Running a blended food cost instead of by category. A 34% blended number can hide a 48% seafood cost that has been invisible for months.',
       'Treating portion audit findings as a disciplinary issue. Over-portioning is almost always a standards gap, not a character gap.',
       'Logging waste without reason codes. A count of what was thrown away tells you nothing about why it happened or what to change.',
       'Raising prices across the board when food cost spikes. A surgical increase on the specific items above target is less visible and more effective.',
-      'Having no written portion standards posted at stations. A verbal instruction given on day one is a memory that fades and drifts.'
+      'Building recipe cards once and never updating them. A card built at January prices is wrong by March, and the error compounds with every price move since.',
+      'Having no written portion standards posted at stations. A verbal instruction given on day one is a memory that fades and drifts.',
+      'Costing proteins at purchase price without a yield adjustment. Every protein on the menu is understated until you cost on true cost per usable pound.'
     ],
 
     quickRef: {
@@ -442,12 +439,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Calculating prime cost monthly instead of weekly. A 30-day lag means 30 days of compounding loss before you see it, and 30 more before you know the fix worked.',
-      'Excluding payroll taxes and benefits from labor. Real labor cost runs 10 to 15% above wages alone, and a wages-only number understates the problem every week.',
-      'Using gross sales instead of net sales as the denominator. Comps and discounts left in make prime cost look better than it is.',
-      'Not separating COGS into food and beverage. A blended COGS number hides which side is the problem and sends you looking in the wrong place.',
+      'Reading prime cost monthly instead of weekly. A 30-day lag means 30 days of compounding loss before you see it, and 30 more before you know the fix worked.',
       'Treating prime cost as a finance metric. It belongs in the weekly management meeting, not the monthly P&L review.',
-      'Acting on a single week\'s spike before checking the data. A miscoded payroll run or a one-time bulk purchase produces a false spike.'
+      'Acting on a single week\'s spike before checking the data. A miscoded payroll run or a one-time bulk purchase produces a false spike.',
+      'Excluding payroll taxes and benefits from labor. Real labor cost runs 10 to 15% above wages alone, and a wages-only number understates the problem every week.'
     ],
 
     quickRef: {
