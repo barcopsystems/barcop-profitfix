@@ -63,14 +63,7 @@ S.TrafficAudit = {
           + '</tr>';
       }).join('');
 
-      const actionItems = (latest.action_items || []).slice(0,5).map((a,i) =>
-        '<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:var(--t3);width:24px;flex-shrink:0;">' + (i+1) + '</div>'
-        + '<div style="flex:1;"><div style="font-size:12px;color:var(--t1);line-height:1.5;">' + esc(a.action||a) + '</div>'
-        + (a.monthly_impact ? '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:2px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
-        + '</div></div>'
-      ).join('');
-
+      // Top Action Items by Impact lives on the full audit view only.
       latestCard = '<div class="card" style="margin-bottom:16px;">'
         + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
         + '<div>'
@@ -92,7 +85,6 @@ S.TrafficAudit = {
           + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
           + (audits[1] ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
           + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
-        + (actionItems ? '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Top Action Items by Impact</div>' + actionItems : '')
         + '</div>';
     }
 
