@@ -153,14 +153,28 @@ S.HubReportBug = {
     };
 
     const result = await DB.submitBugReport(report);
-    this._submitting = false;
 
-    if (result.ok) {
-      this._state = 'success';
-      this.render(this._container);
-    } else {
+    if (!result.ok) {
+      this._submitting = false;
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Report'; }
       showError('Could not submit your report right now. Check your internet connection and try again. If it keeps failing, the server may be temporarily down.');
+      return;
     }
+
+    // DB record is saved — fire the notification email best-effort. We don't
+    // block the success state on this; if Resend is misconfigured or down,
+    // the bug is still in Supabase and the team will see it on next check.
+    try {
+      const payload = Object.assign({}, report, { user_email: (DB._user && DB._user.email) || '' });
+      await fetch('/api/report-bug-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) { /* notification failure is non-fatal */ }
+
+    this._submitting = false;
+    this._state = 'success';
+    this.render(this._container);
   }
 };
