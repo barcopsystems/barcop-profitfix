@@ -31,7 +31,7 @@ S.HubSupport = {
     this._container = container;
 
     const header = '<div style="display:flex;align-items:baseline;gap:10px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Contact Support</div>'
+      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Contact Bar Cop</div>'
       + '<span style="color:var(--t4);font-size:11px;font-weight:400;">|</span>'
       + '<a id="hs-sup-back" class="topbar-back-link">Back to Hub</a>'
       + '</div>';
