@@ -591,12 +591,12 @@ S.Hub = {
       + navItem('enter', 'Labor Control',    'labor',   [['data-mod','labor'],    ['data-screen','lc-dashboard']])
       + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
       + '<div class="nav-section">Support</div>'
-      + navItem('getting-started', 'Getting Started', 'getStart', [])
-      + navItem('help',            'Help and FAQ',    'help',     [])
-      + '<div class="nav-section">Manage</div>'
-      + navItem('settings',         'Global Settings',  'settings', [])
-      + navItem('contact-support',  'Contact Support',  'mail',     [])
-      + navItem('report-bug',       'Report a Bug',     'bug',      []);
+      + navItem('getting-started',  'Getting Started', 'getStart', [])
+      + navItem('help',             'Help and FAQ',    'help',     [])
+      + navItem('contact-support',  'Contact Us',      'mail',     [])
+      + '<div class="nav-section">System</div>'
+      + navItem('settings',         'App Settings',    'settings', [])
+      + navItem('report-bug',       'Report a Bug',    'bug',      []);
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
