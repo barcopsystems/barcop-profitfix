@@ -323,6 +323,39 @@ const DB = {
     }
   },
 
+  // ── Bug reports ──────────────────────────────────────────────────────────
+  // Operator-submitted bug reports land in the bug_reports Supabase table for
+  // the team to triage. In demo mode it's a no-op success — demo users should
+  // not be filing real bug reports. On any failure the operator sees an
+  // inline error and can retry.
+  async submitBugReport(report) {
+    if (this._demo) return { ok: true };
+    if (!this._sb || !this._user) return { ok: false, error: 'Not connected. Sign in and try again.' };
+    try {
+      const { error } = await this._sb.from('bug_reports').insert({
+        user_id:            this._user.id,
+        user_email:         this._user.email || '',
+        title:              report.title || '',
+        severity:           report.severity || 'moderate',
+        what_happened:      report.what_happened || '',
+        steps_to_reproduce: report.steps_to_reproduce || '',
+        expected_behavior:  report.expected_behavior || '',
+        previous_screen:    report.previous_screen || '',
+        user_agent:         report.user_agent || '',
+        viewport:           report.viewport || '',
+        status:             'open'
+      });
+      if (error) {
+        console.error('submitBugReport error:', error);
+        return { ok: false, error };
+      }
+      return { ok: true };
+    } catch (e) {
+      console.error('submitBugReport exception:', e);
+      return { ok: false, error: e };
+    }
+  },
+
   async readInventoryData()      { return await this._readControl('ic_data', 'pf_ic_data'); },
   async writeInventoryData(data) { return await this._writeControl('ic_data', 'pf_ic_data', data); },
   async readLaborData()          { return await this._readControl('lc_data', 'pf_lc_data'); },
