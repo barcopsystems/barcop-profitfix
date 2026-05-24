@@ -378,6 +378,13 @@ const App = {
     };
     if (!this.data.settings.onboarding_complete) {
       Onboarding.start();
+    } else if (!this.setupMeetsThreshold() && window.S && S.HubGettingStarted) {
+      // Returning user, onboarding done, but setup hasn't crossed the
+      // Foundation + 1 audit threshold yet. Default-land on Getting Started
+      // so the next action is one click away. They can still navigate to
+      // the Hub Dashboard manually via the sidebar.
+      S.HubGettingStarted.open();
+      this._promptSync();
     } else {
       this.showHub();
       this._promptSync();
@@ -588,6 +595,18 @@ const App = {
     if (this.data.hub_setup_progress[taskId]) return;
     this.data.hub_setup_progress[taskId] = new Date().toISOString();
     this.saveKey('hub_setup_progress');
+  },
+
+  // Is setup "meaningful enough" to default-land on the Hub Dashboard? Yes
+  // once Foundation is complete (profile + targets) AND at least one audit
+  // has run. Below that threshold, returning users default-land on Hub
+  // Getting Started so they have a clear next action. Catch-up banner on
+  // the Hub Dashboard handles the manual-navigation case for partial setups.
+  setupMeetsThreshold() {
+    if (!this.data) return false;
+    const p = this.data.hub_setup_progress || {};
+    if (!p.gs_profile || !p.gs_targets) return false;
+    return !!(p.gs_p_audit || p.gs_r_audit || p.gs_t_audit);
   },
 
   // Load Recovery data plus the three Control data stores (Rule 21)
