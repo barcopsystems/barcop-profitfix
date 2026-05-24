@@ -16,7 +16,7 @@ S.ShiftLogShift = {
     return App.shiftData.sc_shifts;
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -45,10 +45,10 @@ S.ShiftLogShift = {
     } else {
       const rows = shifts.map(s => '<tr class="ls-row" data-id="' + s.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-        + '<td>' + esc(s.shift_type || '—') + '</td>'
-        + '<td>' + esc(s.manager || '—') + '</td>'
+        + '<td>' + esc(s.shift_type || '-') + '</td>'
+        + '<td>' + esc(s.manager || '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-        + '<td>' + (s.covers != null ? s.covers : '—') + '</td>'
+        + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
         + '<td>' + (s.status === 'Open'
             ? '<span class="badge badge-ok">Open</span>'
             : '<span class="badge badge-dim">Closed</span>') + '</td>'
@@ -122,8 +122,8 @@ S.ShiftLogShift = {
       + '<textarea id="ls-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
 
       + '<div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="ls-total">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="ls-checkavg">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="ls-total">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="ls-checkavg">-</div></div>'
       + '</div>'
 
       + '<div class="card-actions">'
@@ -144,7 +144,7 @@ S.ShiftLogShift = {
     const covers = num('ls-covers');
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     set('ls-total', App.fmtCurrency(total));
-    set('ls-checkavg', covers > 0 ? App.fmtCurrency(total / covers) : '—');
+    set('ls-checkavg', covers > 0 ? App.fmtCurrency(total / covers) : '-');
   },
 
   async save() {
@@ -184,6 +184,7 @@ S.ShiftLogShift = {
     const ok = await App.saveShift();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_sc_shift');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Shift'; }
