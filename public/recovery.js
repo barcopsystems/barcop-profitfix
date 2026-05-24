@@ -142,7 +142,7 @@ window.Recovery = {
      summed annualized recovered dollars, how many produced a dollar figure,
      and how many are still in the measuring window. */
   moduleSummary(moduleKey) {
-    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.module === moduleKey);
     let recovered = 0, withFigure = 0, measuring = 0;
     mine.forEach(e => {
@@ -156,7 +156,7 @@ window.Recovery = {
   /* Cross-module recovery total for the Hub Scoreboard. Sums the annualized
      recovered dollars across every logged fix that has produced a figure. */
   total() {
-    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     let dollars = 0, fixes = 0;
     log.forEach(e => {
       const r = this.compute(e);
@@ -170,7 +170,7 @@ window.Recovery = {
      [{ index, label, date }], where index is the charted week the fix landed
      in. Used so a trend chart shows when a fix went in against the metric. */
   chartMarkers(weeks, moduleKey) {
-    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const dated = (weeks || []).filter(w => w && w.period_end);
     if (dated.length < 2) return [];
     const first = dated[0].period_end, last = dated[dated.length - 1].period_end;
