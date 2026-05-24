@@ -201,6 +201,7 @@ S.ShiftChecklistTemplates = {
     const ok = await App.saveShift();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_sc_checklists');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Template'; }
