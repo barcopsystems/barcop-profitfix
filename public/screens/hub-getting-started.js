@@ -146,7 +146,7 @@ S.HubGettingStarted = {
       +   '</div>'
       +   '<div class="prog"><div class="prog-fill" style="width:' + pct + '%;"></div></div>'
       +   (pct===100
-            ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:12px;">Setup complete. Every module is configured and feeding the platform.</div>'
+            ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:12px;">Setup complete. Every module is configured and feeding Bar Cop.</div>'
             : '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">Work top to bottom. The Capture modules (Inventory, Labor, Shift) feed the Recovery modules, so set them up first.</div>')
       + '</div>'
       + groups
