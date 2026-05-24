@@ -122,21 +122,30 @@ const Onboarding = {
       + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Here is how Bar Cop is laid out.</div>'
       + this._stepDots(3)
       + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
-      + 'Your <strong style="color:var(--t1);">Recovery Hub</strong> is the command center. Six modules sit under it. Inventory, Labor, and Shift Control capture your daily operation. Profit, Revenue, and Traffic Recovery diagnose where money is leaking and prescribe the fix. '
-      + '<strong style="color:var(--t1);">Getting Started</strong>, in the Hub top bar, walks you through configuring each one in order.'
+      + 'Your <strong style="color:var(--t1);">Hub</strong> is the command center. Six modules under it. Three Control modules capture daily operations: Inventory, Labor, Shift. Three Recovery modules diagnose what is leaking and prescribe the fix: Profit, Revenue, Traffic. '
+      + 'Next stop: <strong style="color:var(--t1);">Getting Started</strong> walks you through setup, top to bottom.'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
       + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
-      + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-finish">Enter Recovery Hub</button>'
+      + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-finish">Start Setup</button>'
       + '</div>';
 
     document.getElementById('ob-back')?.addEventListener('click', () => { this._step = 2; this.render(); });
 
     document.getElementById('ob-finish')?.addEventListener('click', async () => {
       App.data.settings.onboarding_complete = true;
+      // The operator just filled in bar name, location, type, and annual
+      // revenue — the gs_profile task is done by definition. Auto-complete
+      // it so Getting Started reflects that on first open.
+      App.data.hub_setup_progress = App.data.hub_setup_progress || {};
+      App.data.hub_setup_progress.gs_profile = new Date().toISOString();
       await App.saveKey('settings');
+      await App.saveKey('hub_setup_progress');
       document.getElementById('ob-overlay').classList.add('hidden');
-      App.showHub();
+      // Hand off to the unified setup checklist, not the empty Hub Dashboard.
+      // The dashboard becomes the natural landing once setup is meaningful.
+      if (window.S && S.HubGettingStarted) S.HubGettingStarted.open();
+      else App.showHub();
     });
   }
 };
