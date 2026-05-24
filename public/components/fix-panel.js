@@ -43,9 +43,18 @@ window.FixPanel = {
       + '</div>';
   },
 
-  // ── Compact "Fix Areas" card for a Recovery dashboard ───────────────────────
-  // Each row deep-links into the module's Fix screen at that gap-area.
+  // ── "Fix Areas" rows. _fixAreasInner returns just the header + rows so the
+  // combined recoveryCard can drop it in. fixAreasCard wraps that in a
+  // standalone .card for any caller that wants Fix Areas on its own.
   fixAreasCard(moduleKey) {
+    const inner = this._fixAreasInner(moduleKey);
+    if (!inner) return '';
+    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + inner
+      + '</div>';
+  },
+
+  _fixAreasInner(moduleKey) {
     const gaps = this.gapAreas(moduleKey);
     if (!gaps.length) return '';
     const BANDS = {
@@ -92,10 +101,7 @@ window.FixPanel = {
         + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
         + '</div>';
     }).join('');
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + this.sectionHeader('Fix Areas')
-      + rows
-      + '</div>';
+    return this.sectionHeader('Fix Areas') + rows;
   },
 
   // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
@@ -122,13 +128,17 @@ window.FixPanel = {
       + '</div>';
   },
 
+  // Combined Recovery Scoreboard + Fix Areas card. Scoreboard sits at the top
+  // (states 1-4 below), then a "Fix Areas" sub-header divides, then the gap
+  // rows. One title bar, one "How this works" button covering the whole flow.
   recoveryCard(moduleKey) {
     if (!window.Recovery) return '';
     const s = Recovery.moduleSummary(moduleKey);
     const fixScreen = this.fixScreen(moduleKey);
     const titleBar = this.sectionHeader('Recovery Scoreboard', 'fp-rec-help');
 
-    // States 1 and 2 — no fixes logged. Empty-state shows a numbered loop.
+    // ── Scoreboard portion (state-dependent) ─────────────────────────────────
+    let scoreboardHtml = '';
     if (s.logged === 0) {
       const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
       const audits = (App.data && App.data[auditKey]) || [];
@@ -139,48 +149,42 @@ window.FixPanel = {
 
       if (annual > 0) {
         // State 2 — audit done, no fixes yet.
-        const top = '<div style="padding:18px 20px;border-bottom:1px solid var(--b2);">'
+        scoreboardHtml = '<div style="padding:18px 20px;border-bottom:1px solid var(--b2);">'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
           + App.fmtCurrency(annual, 0)
           + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr opportunity</span></div>'
-          + '</div>';
-        return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-          + titleBar
-          + top
+          + '</div>'
           + this._stepRow(1, 'Pick a gap, work the fix', fixScreen, false)
-          + this._stepRow(2, 'Mark implemented', fixScreen, true)
-          + '</div>';
+          + this._stepRow(2, 'Mark implemented', fixScreen, true);
+      } else {
+        // State 1 — brand new, three steps.
+        scoreboardHtml = this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false)
+          + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false)
+          + this._stepRow(3, 'Mark implemented', fixScreen, true);
       }
-
-      // State 1 — brand new. Three steps.
-      return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-        + titleBar
-        + this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false)
-        + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false)
-        + this._stepRow(3, 'Mark implemented', fixScreen, true)
-        + '</div>';
-    }
-
-    // States 3 and 4 — fixes logged. Receipt or measuring state.
-    let body;
-    if (s.withFigure > 0) {
-      body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
+    } else if (s.withFigure > 0) {
+      // State 3 — recovered $ receipt.
+      scoreboardHtml = '<div style="padding:18px 20px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
         + App.fmtCurrency(s.recovered, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">across '
         + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
-        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '</div>';
+        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '</div>'
+        + '</div>';
     } else {
-      body = '<div style="font-size:13px;color:var(--t2);line-height:1.6;">'
+      // State 4 — logged, no figure yet.
+      scoreboardHtml = '<div style="padding:18px 20px;font-size:13px;color:var(--t2);line-height:1.6;">'
         + s.logged + ' fix' + (s.logged === 1 ? '' : 'es') + ' logged'
         + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '.</div>';
     }
+
+    // ── Fix Areas portion ────────────────────────────────────────────────────
+    const fixAreasHtml = this._fixAreasInner(moduleKey);
+
     return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
       + titleBar
-      + '<div class="fp-recovery-go" data-screen="' + esc(fixScreen) + '" '
-      + 'style="padding:18px 20px;display:flex;align-items:center;gap:16px;justify-content:space-between;cursor:pointer;">'
-      + '<div style="flex:1;min-width:0;">' + body + '</div>'
-      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-      + '</div>'
+      + scoreboardHtml
+      + fixAreasHtml
       + '</div>';
   },
 
@@ -197,7 +201,12 @@ window.FixPanel = {
     const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
     const p  = t => '<p style="margin:0 0 10px;">' + t + '</p>';
     const body = '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">'
-      + p('The Scoreboard tracks what Bar Cop puts back in your register, in dollars per year. No projections. No industry averages. Your own weekly numbers, measured before and after each fix.')
+      + p('Two pieces work together: the Scoreboard up top tracks what you have already recovered, and the Fix Areas list below shows where the operation is still leaking. Same workflow, opposite ends.')
+      + sh('The Scoreboard')
+      + p('Tracks what Bar Cop has put back in your register, in dollars per year. No projections. No industry averages. Your own weekly numbers, measured before and after each fix.')
+      + sh('Fix Areas')
+      + p('The current weekly status of each gap. The band (On Target, Watch, Over) and dollar figure read from the latest week of your data, scored against your target. The dollar is the annualized cost of being off target at this week\'s pace.')
+      + p('Once you check steps in The Fix Process for a gap, the row also shows your step progress. Once you mark the fix implemented, the progress hides and the Scoreboard up top is where to watch.')
       + sh('The Loop')
       + p('1. Run the audit. It scores your operation and lists every gap with a dollar figure on what it costs you per year.')
       + p('2. Pick a gap and open the fix process. Every step is a link into the part of Bar Cop that does the work.')
