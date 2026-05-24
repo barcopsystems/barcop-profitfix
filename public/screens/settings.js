@@ -1648,8 +1648,10 @@ S.HubSettings = {
     ];
 
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
-    // Pour Cost and Food Cost fixes landed five weeks back, between weeks 6
-    // and 5, which is where both cost trends break downward.
+    // Pour Cost, Food Cost, and Prime Cost fixes landed around weeks 6 and 5,
+    // which is where the trends break downward. RPLH fix follows. Each fix
+    // that maps to a Recovery.METRICS gap will produce a dollar figure on
+    // its module's Recovery Scoreboard card.
     App.data.fix_log = (App.data.fix_log || [])
       .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
       .concat([
@@ -1657,12 +1659,16 @@ S.HubSettings = {
         date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
         date:dateStr(45), logged_at:daysAgoISO(45) },
+      { id:uid(), module:'profit', gap_id:'prime-cost', gap_name:'Prime Cost',
+        date:dateStr(38), logged_at:daysAgoISO(38) },
       { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',
         date:dateStr(24), logged_at:daysAgoISO(24) },
       { id:uid(), module:'revenue', gap_id:'check-average', gap_name:'Check Average and Upsell',
         date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling',
         date:dateStr(38), logged_at:daysAgoISO(38) },
+      { id:uid(), module:'revenue', gap_id:'rplh', gap_name:'Labor Productivity (RPLH)',
+        date:dateStr(31), logged_at:daysAgoISO(31) },
       { id:uid(), module:'traffic', gap_id:'gbp', gap_name:'Google Business Profile',
         date:dateStr(45), logged_at:daysAgoISO(45) },
       { id:uid(), module:'traffic', gap_id:'reviews', gap_name:'Reviews',
