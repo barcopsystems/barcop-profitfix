@@ -37,7 +37,7 @@ S.LaborPositions = {
     let html;
     if (list.length === 0) {
       html = '<div class="empty"><div class="empty-title">No positions yet</div>'
-        + '<div class="empty-sub">Add the job positions you schedule — bartender, server, line cook, '
+        + '<div class="empty-sub">Add the job positions you schedule: bartender, server, line cook, '
         + 'and so on. Positions drive scheduling, hours, and labor cost.</div>'
         + '<button class="btn btn-primary" id="lp-add-first">Add Position</button></div>';
     } else {
@@ -48,9 +48,9 @@ S.LaborPositions = {
         + '<div class="calc-item"><div class="calc-label">Non-Tipped</div><div class="calc-val">' + (list.length - tipped) + '</div></div>'
         + '</div>';
       const rows = list.map(p => '<tr class="lp-row" data-id="' + p.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + esc(p.name || '—') + '</div></td>'
-        + '<td>' + esc(p.department || '—') + '</td>'
-        + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '—') + '</td>'
+        + '<td><div class="val">' + esc(p.name || '-') + '</div></td>'
+        + '<td>' + esc(p.department || '-') + '</td>'
+        + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-') + '</td>'
         + '<td>' + (p.tipped
             ? '<span class="badge badge-ok">Tipped</span>'
             : '<span class="badge badge-dim">Non-Tipped</span>') + '</td>'
@@ -151,6 +151,7 @@ S.LaborPositions = {
     const ok = await App.saveLabor();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_lc_positions');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Position'; }
