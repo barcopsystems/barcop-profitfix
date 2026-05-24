@@ -53,8 +53,14 @@ window.FixPanel = {
       watch: { label: 'Watch',     color: 'var(--w)' },
       over:  { label: 'Over',      color: 'var(--red)' }
     };
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const fixProgress = (App.data && App.data.fix_progress) || {};
     const rows = gaps.map((g, i) => {
       const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
+      const isLogged = log.some(e => e.gap_id === g.id);
+      const stepsDone = (fixProgress[g.id] || []).length;
+      const stepsTotal = (g.process && g.process.steps) ? g.process.steps.length : 0;
+      const showProgress = !isLogged && stepsTotal > 0 && stepsDone > 0;
       let impHtml = '';
       if (imp && BANDS[imp.band]) {
         const bm = BANDS[imp.band];
@@ -65,7 +71,15 @@ window.FixPanel = {
               ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;'
                 + 'color:' + bm.color + ';line-height:1.1;margin-top:2px;">' + App.fmtCurrency(imp.dollars)
                 + '<span style="font-size:9px;"> /yr</span></div>'
-              : '') + '</div>';
+              : '')
+          + (showProgress
+              ? '<div style="font-size:10px;color:var(--gold);margin-top:4px;font-weight:600;letter-spacing:0.04em;">'
+                + stepsDone + ' of ' + stepsTotal + ' steps</div>'
+              : '')
+          + '</div>';
+      } else if (showProgress) {
+        impHtml = '<div style="flex-shrink:0;text-align:right;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:0.04em;">'
+          + stepsDone + ' of ' + stepsTotal + ' steps</div>';
       }
       return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
         + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
@@ -282,16 +296,22 @@ window.FixPanel = {
   },
 
   // ── Fix process — every step is a link ──────────────────────────────────────
+  // Each step renders with a checkbox the operator ticks as they work through
+  // it. Progress persists per-gap in App.data.fix_progress[gap_id] = [idx,...].
+  // Checked steps dim visually. Recovery math still measures at gap-area level,
+  // gated by the Mark Implemented date — the checklist is operator-facing only.
   processSection(g) {
     const p = g.process;
     if (!p) return '';
-    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i + 1)).join('');
+    const progress = (App.data && App.data.fix_progress && App.data.fix_progress[g.id]) || [];
+    const checked = new Set(progress);
+    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i + 1, g.id, checked.has(i))).join('');
     return this.sh('The Fix Process')
       + (p.intro ? '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(p.intro) + '</div>' : '')
       + steps;
   },
 
-  stepRow(s, module, num) {
+  stepRow(s, module, num, gapId, isChecked) {
     const kind = s.kind || 'action';
     const meta = {
       action:    { label: 'DO IT',     color: 'var(--gold)',  bg: 'var(--gold-bg)' },
@@ -299,6 +319,7 @@ window.FixPanel = {
       reference: { label: 'DOCUMENT',  color: 'var(--t3)',    bg: 'rgba(255,255,255,0.06)' }
     }[kind] || {};
     const label = esc(s.targetLabel || '');
+    const stepIdx = num - 1;
 
     let link = '';
     if (kind === 'reference') {
@@ -314,17 +335,31 @@ window.FixPanel = {
         + verb + (label ? ': ' + label : '') + '</button>';
     }
 
-    return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);">'
+    const checkbox = '<button class="fp-step-check" data-gap="' + esc(gapId) + '" data-step="' + stepIdx + '" '
+      + 'aria-label="' + (isChecked ? 'Mark step incomplete' : 'Mark step complete') + '" '
+      + 'style="flex-shrink:0;width:20px;height:20px;border-radius:4px;border:1px solid '
+      + (isChecked ? 'var(--gold)' : 'var(--b1)') + ';background:' + (isChecked ? 'var(--gold-bg)' : 'transparent')
+      + ';cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin-top:1px;transition:border-color 0.12s,background 0.12s;">'
+      + (isChecked ? '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5.5" stroke="var(--gold)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
+      + '</button>';
+
+    const titleColor  = isChecked ? 'var(--t3)' : 'var(--t1)';
+    const detailColor = isChecked ? 'var(--t4)' : 'var(--t2)';
+
+    return '<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--b2);">'
+      + checkbox
       + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
-      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>'
+      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;'
+      + (isChecked ? 'opacity:0.45;' : '') + '">' + num + '</div>'
       + '<div style="flex:1;">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span>'
+      + '<span style="font-size:13px;font-weight:700;color:' + titleColor + ';">' + esc(s.title) + '</span>'
       + (meta.label ? '<span style="font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
-          + 'padding:2px 6px;border-radius:3px;background:' + meta.bg + ';color:' + meta.color + ';">' + meta.label + '</span>' : '')
+          + 'padding:2px 6px;border-radius:3px;background:' + meta.bg + ';color:' + meta.color
+          + (isChecked ? ';opacity:0.55' : '') + ';">' + meta.label + '</span>' : '')
       + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-top:4px;">' + esc(s.detail || '') + '</div>'
-      + (link ? '<div style="margin-top:8px;">' + link + '</div>' : '')
+      + '<div style="font-size:12px;color:' + detailColor + ';line-height:1.65;margin-top:4px;">' + esc(s.detail || '') + '</div>'
+      + (link ? '<div style="margin-top:8px;' + (isChecked ? 'opacity:0.55;' : '') + '">' + link + '</div>' : '')
       + '</div></div>';
   },
 
@@ -339,7 +374,16 @@ window.FixPanel = {
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const inputStyle = 'background:var(--bg);border:1px solid var(--b1);border-radius:3px;'
       + 'color:#fff;font-size:13px;padding:7px 10px;width:100%;color-scheme:dark;';
-    const borderColor = mine.length ? 'var(--b1)' : 'rgba(219,171,70,0.45)';
+
+    // Banner state: all steps in The Fix Process have been checked but no
+    // implementation has been logged yet. Border goes solid gold and a banner
+    // sits above the form prompting the operator to lock in the date.
+    const progress   = (App.data && App.data.fix_progress && App.data.fix_progress[g.id]) || [];
+    const totalSteps = (g.process && g.process.steps) ? g.process.steps.length : 0;
+    const allChecked = totalSteps > 0 && progress.length >= totalSteps;
+    const borderColor = mine.length
+      ? 'var(--b1)'
+      : (allChecked ? 'var(--gold)' : 'rgba(219,171,70,0.45)');
 
     let logHtml = '';
     if (mine.length) {
@@ -381,9 +425,16 @@ window.FixPanel = {
       + 'data-module="' + esc(g.module) + '" data-name="' + esc(g.name) + '">Mark Implemented</button>'
       + '</div>';
 
+    const bannerHtml = (allChecked && !mine.length)
+      ? '<div style="padding:12px 20px;background:var(--gold-bg);border-bottom:1px solid var(--b2);'
+        + 'font-size:12px;color:var(--gold);font-weight:700;letter-spacing:0.03em;line-height:1.5;">'
+        + 'All steps checked. Lock in the date so Bar Cop can start measuring.</div>'
+      : '';
+
     return '<div style="margin:20px 0;background:var(--panel);border:1px solid ' + borderColor + ';border-radius:4px;overflow:hidden;">'
       + this.sectionHeader('Mark Fix Implemented', 'fp-rec-help')
       + logHtml
+      + bannerHtml
       + formHtml
       + '</div>';
   },
@@ -473,6 +524,20 @@ window.FixPanel = {
     el.addEventListener('click', ev => {
       const recHelp = ev.target.closest('.fp-rec-help');
       if (recHelp) { ev.stopPropagation(); this.showRecoveryHelp(); return; }
+      const stepCheck = ev.target.closest('.fp-step-check');
+      if (stepCheck) {
+        ev.stopPropagation();
+        const gapId = stepCheck.dataset.gap;
+        const stepIdx = parseInt(stepCheck.dataset.step, 10);
+        App.data.fix_progress = App.data.fix_progress || {};
+        App.data.fix_progress[gapId] = App.data.fix_progress[gapId] || [];
+        const arr = App.data.fix_progress[gapId];
+        const at = arr.indexOf(stepIdx);
+        if (at >= 0) arr.splice(at, 1); else arr.push(stepIdx);
+        App.saveKey('fix_progress');
+        this.renderInto(el, el.dataset.fixModule, gapId);
+        return;
+      }
       const go = ev.target.closest('.fp-go');
       const copy = ev.target.closest('.fp-copy');
       const print = ev.target.closest('.fp-print');
