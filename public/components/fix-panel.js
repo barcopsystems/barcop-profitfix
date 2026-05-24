@@ -68,33 +68,84 @@ window.FixPanel = {
   },
 
   // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
-  // The module's running recovery from logged fixes. Dollar figure where the
-  // metric dollarizes, fix count otherwise. The empty state anchors on the
-  // latest audit's annualized opportunity instead of saying "nothing here" —
-  // so the card always carries a real number tied to the operator's data.
-  // Clicking opens the Fix screen.
+  // The module's running recovery from logged fixes. Lives at the top of the
+  // dashboard as the platform's headline number. Four states:
+  //   1) brand new (no audit, no fixes): 3-step explainer teaching the loop
+  //   2) audit ran, no fixes yet: opportunity $ + 2-step explainer
+  //   3) fixes logged, measured: recovered $ receipt
+  //   4) fixes logged, all still measuring: logged count + measuring count
+  auditScreen(moduleKey) {
+    return moduleKey === 'revenue' ? 'r-audit'
+         : moduleKey === 'traffic' ? 't-audit'
+         : 'audit-tracker';
+  },
+
+  _stepRow(num, title, detail, target, isLast) {
+    return '<div class="fp-step" data-screen="' + esc(target) + '" '
+      + 'style="display:flex;align-items:center;gap:13px;padding:14px 20px;cursor:pointer;'
+      + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+      + '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);'
+      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:12px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:var(--t1);">' + esc(title) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(detail) + '</div>'
+      + '</div>'
+      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+      + '</div>';
+  },
+
   recoveryCard(moduleKey) {
     if (!window.Recovery) return '';
     const s = Recovery.moduleSummary(moduleKey);
-    let body;
+    const fixScreen = this.fixScreen(moduleKey);
+    const header = '<div class="sh">Recovery Scoreboard</div>';
+
+    // States 1 and 2 — no fixes logged. Empty-state explainer card teaches
+    // the loop. Subtle gold-tinted border marks it as a guided panel.
     if (s.logged === 0) {
-      // Empty state — pull the latest audit's monthly opportunity total and
-      // annualize it. This shows the operator what is at stake, not nothing.
       const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
       const audits = (App.data && App.data[auditKey]) || [];
       const latest = audits[audits.length - 1];
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
       const annual  = monthly * 12;
+      const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
+
       if (annual > 0) {
-        body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
-          + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr</span></div>'
-          + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">opportunity from your latest audit. Mark fixes implemented to track what you recover against this.</div>';
-      } else {
-        body = '<div style="font-size:12px;color:var(--t3);line-height:1.65;">'
-          + 'Run an audit to surface your recovery opportunity, then mark each fix implemented as you put it in place.</div>';
+        // State 2 — audit done, no fixes yet. Lead with the opportunity $,
+        // then two steps left.
+        const top = '<div style="padding:18px 20px;border-bottom:1px solid var(--b2);">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
+          + App.fmtCurrency(annual, 0)
+          + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr opportunity</span></div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5;">'
+          + 'Surfaced by your latest audit. Two steps left to turn it into recovered dollars.</div>'
+          + '</div>';
+        return header
+          + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;border:1px solid rgba(219,171,70,0.35);">'
+          + top
+          + this._stepRow(1, 'Pick a gap, work the fix', 'Open ' + moduleName + ' Fix to start the process.', fixScreen, false)
+          + this._stepRow(2, 'Mark implemented', 'Recovery measures the metric for 8 weeks after the date.', fixScreen, true)
+          + '</div>';
       }
-    } else if (s.withFigure > 0) {
-      body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
+
+      // State 1 — brand new. Three steps with the audit as step 1.
+      const top = '<div style="padding:16px 20px;border-bottom:1px solid var(--b2);">'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.6;">'
+        + 'Three steps to start tracking what Bar Cop puts back in your register.</div>'
+        + '</div>';
+      return header
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;border:1px solid rgba(219,171,70,0.35);">'
+        + top
+        + this._stepRow(1, 'Run your ' + moduleName + ' Audit', 'Surfaces every gap and the dollars at stake.', this.auditScreen(moduleKey), false)
+        + this._stepRow(2, 'Pick a gap, work the fix', 'Each gap has a step-by-step process.', fixScreen, false)
+        + this._stepRow(3, 'Mark implemented', 'Recovery starts measuring at 2 weeks, settles at 8.', fixScreen, true)
+        + '</div>';
+    }
+
+    // States 3 and 4 — fixes logged. Receipt or measuring state.
+    let body;
+    if (s.withFigure > 0) {
+      body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
         + App.fmtCurrency(s.recovered, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">annualized across '
         + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
@@ -106,8 +157,8 @@ window.FixPanel = {
         + (s.measuring > 0 ? '<div style="font-size:11px;color:var(--t4);margin-top:4px;">'
             + s.measuring + ' still measuring.</div>' : '');
     }
-    return '<div class="sh">Recovery Scoreboard</div>'
-      + '<div class="card fp-recovery-go" data-screen="' + esc(this.fixScreen(moduleKey)) + '" '
+    return header
+      + '<div class="card fp-recovery-go" data-screen="' + esc(fixScreen) + '" '
       + 'style="margin-bottom:18px;display:flex;align-items:center;gap:16px;justify-content:space-between;cursor:pointer;">'
       + '<div style="flex:1;min-width:0;">' + body + '</div>'
       + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
@@ -125,6 +176,9 @@ window.FixPanel = {
     });
     container.querySelectorAll('.fp-recovery-go').forEach(card => {
       card.addEventListener('click', () => App.openScreen(card.dataset.screen));
+    });
+    container.querySelectorAll('.fp-step').forEach(step => {
+      step.addEventListener('click', () => App.openScreen(step.dataset.screen));
     });
   },
 
