@@ -4,6 +4,7 @@
   --bg:        #000000;
   --surface:   #070E15;
   --input:     #06111c;
+  --panel:     #141A21;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   --hover:     rgba(255,255,255,0.05);
   --nav-act:   #0d1e2e;
 
