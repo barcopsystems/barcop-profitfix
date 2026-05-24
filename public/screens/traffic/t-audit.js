@@ -578,7 +578,7 @@ S.TrafficAudit = {
     if (step === 1) {
       stepHtml = '<div class="card">' + header + barInfo
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile. The full profile view is required. GBP Insights unlocks Tier 3 scoring. Your app data is included automatically.</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile. The full profile view is required. GBP Insights unlocks Tier 3 scoring. Your Bar Cop data is included automatically.</div>'
         + this.renderFileSection('required', 'GBP Screenshot: Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Adds: Section 1 full. Completeness audit, photo count, post frequency, response rate')
         + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Adds: Section 1 Tier 3. Full funnel from impression to action')
         + nav(false, true, false) + '</div>';
