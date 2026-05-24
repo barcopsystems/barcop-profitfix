@@ -84,7 +84,6 @@ S.Dashboard = {
       + FixPanel.recoveryCard('profit')
       + startHereHtml
       + alertHtml
-      + FixPanel.fixAreasCard('profit')
       + chartHtml
       + actionHtml
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
