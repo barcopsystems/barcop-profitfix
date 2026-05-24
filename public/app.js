@@ -219,6 +219,27 @@ const App = {
       const el = document.getElementById('content-area');
       if (el) el.innerHTML = '<div class="screen" style="color:var(--red);font-family:monospace;font-size:12px;white-space:pre-wrap;">ERROR: ' + msg + '\nLine: ' + line + '\n' + (err ? err.stack : '') + '</div>';
     };
+
+    // Browser back/forward walks the in-app history stack instead of leaving
+    // the site. _navigationLock suppresses re-pushing while popstate handles
+    // the navigation; _isReturning suppresses re-capturing the current
+    // location as a "return-to" target since the user is moving backward.
+    window.addEventListener('popstate', (e) => {
+      if (!e.state) return;
+      this._navigationLock = true;
+      this._isReturning = true;
+      try {
+        if (e.state.mode === 'hub') {
+          this.showHub();
+        } else if (e.state.screen) {
+          if (e.state.module && e.state.module !== this._activeModule) this.showApp(e.state.module);
+          this.navigate(e.state.screen);
+        }
+      } finally {
+        this._navigationLock = false;
+        this._isReturning = false;
+      }
+    });
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
       await this.startDemo();
       return;
@@ -415,6 +436,12 @@ const App = {
     }
     hubWrap.style.display = 'block';
     S.Hub.render(hubWrap);
+    // Returning to Hub clears any pending cross-module back-chip — Hub IS
+    // home, so there's no "origin" to return to.
+    this._returnTo = null;
+    const loc = { mode: 'hub', module: null, screen: 'hub', label: 'Recovery Hub' };
+    this._captureLocationForReturn(loc);
+    this._pushHistory(loc);
   },
 
   showApp(module) {
@@ -472,6 +499,70 @@ const App = {
     const mod = this._moduleOf(id);
     if (mod !== this._activeModule) this.showApp(mod);
     this.navigate(id);
+  },
+
+  // ── Cross-module nav state ───────────────────────────────────────────────
+  // _lastLocation tracks where we are. When we cross a mode/module boundary,
+  // the previous location becomes _returnTo and a "← Back to X" chip appears
+  // in the topbar so the operator can jump back without going through the Hub
+  // and re-navigating. Browser back also walks the history stack pushed below.
+  _lastLocation: null,
+  _returnTo: null,
+  _isReturning: false,
+  _navigationLock: false,
+
+  _captureLocationForReturn(newLoc) {
+    const prev = this._lastLocation;
+    if (this._isReturning) { this._lastLocation = newLoc; return; }
+    if (prev) {
+      const crossed = prev.mode !== newLoc.mode || prev.module !== newLoc.module;
+      if (crossed) this._returnTo = prev;
+    }
+    this._lastLocation = newLoc;
+  },
+
+  _renderReturnChip() {
+    const actions = document.getElementById('topbar-actions');
+    if (!actions) return;
+    const existing = actions.querySelector('.topbar-back-chip');
+    if (existing) existing.remove();
+    if (!this._returnTo) return;
+    const chip = document.createElement('button');
+    chip.className = 'topbar-back-chip';
+    chip.textContent = '← Back to ' + this._returnTo.label;
+    chip.onclick = () => this._returnToOrigin();
+    actions.insertBefore(chip, actions.firstChild);
+  },
+
+  _returnToOrigin() {
+    if (!this._returnTo) return;
+    const t = this._returnTo;
+    this._returnTo = null;
+    this._isReturning = true;
+    try {
+      if (t.mode === 'hub') {
+        this.showHub();
+      } else {
+        if (t.module && t.module !== this._activeModule) this.showApp(t.module);
+        this.navigate(t.screen);
+      }
+    } finally {
+      this._isReturning = false;
+    }
+  },
+
+  _pushHistory(loc) {
+    if (this._navigationLock) return;
+    try { history.pushState({ screen: loc.screen, module: loc.module, mode: loc.mode }, ''); }
+    catch (e) { /* ignore history failures */ }
+  },
+
+  _afterNavigate(id) {
+    const title = document.getElementById('topbar-title')?.textContent || id;
+    const newLoc = { mode: 'app', module: this._activeModule, screen: id, label: title };
+    this._captureLocationForReturn(newLoc);
+    this._renderReturnChip();
+    this._pushHistory(newLoc);
   },
 
   showAuth() {
@@ -534,6 +625,7 @@ const App = {
       S.HubGettingStarted.open();
       return;
     }
+    try {
     this.updateNav(id);
     const content = document.getElementById('content-area');
     const actions = document.getElementById('topbar-actions');
@@ -812,6 +904,9 @@ const App = {
     const screen = screens[id];
     if (screen) screen.render(content, actions);
     else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+    } finally {
+      this._afterNavigate(id);
+    }
   },
 
   /* Report screens carry an Export to PDF button (Rule 10). The print
