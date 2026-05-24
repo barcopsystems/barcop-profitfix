@@ -415,7 +415,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .ob-panel{width:100%;max-width:540px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:32px;margin:auto;}
 .ob-logo{margin-bottom:22px;text-align:center;}
 .ob-heading{font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
-.ob-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;}
+.ob-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;max-width:350px;margin-left:auto;margin-right:auto;}
 .ob-pips{display:flex;gap:4px;margin-bottom:22px;}
 .ob-pip{flex:1;height:3px;background:var(--b2);border-radius:2px;}
 .ob-pip.on{background:var(--gold);}
