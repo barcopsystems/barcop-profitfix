@@ -239,9 +239,7 @@ input,select,textarea{color-scheme:dark;}
 .hs-tab:hover{color:var(--t1) !important;}
 
 /* ══ CONTENT ══ */
-.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:rgba(219,171,70,0.18) transparent;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:rgba(219,171,70,0.18);border-radius:2px;}
+.content{flex:1;overflow-y:auto;background:var(--bg);}
 .screen{padding:24px var(--sp) 56px;max-width:980px;width:100%;}
 
 /* ══ BUTTONS ══ */
@@ -443,7 +441,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
 
-/* ══ SCROLLBAR ══ */
-*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.05) transparent;}
-*::-webkit-scrollbar{width:4px;height:4px;}
-*::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:2px;}
+/* ══ SCROLLBAR ══
+   Unified across the app: subtle white-tinted thumb on transparent track,
+   slightly stronger on hover. Matches the Hub dashboard PAI scrollbar feel
+   so every scrollbar in Bar Cop reads as the same component. */
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.06) transparent;}
+*::-webkit-scrollbar{width:6px;height:6px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:3px;}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.11);}
