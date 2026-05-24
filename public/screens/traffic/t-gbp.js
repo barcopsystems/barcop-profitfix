@@ -74,8 +74,8 @@ S.TrafficGBP = {
     const tips = [];
     this.TOGGLES.forEach(([k, label]) => { if (!prof[k]) tips.push('Complete this profile item: ' + label + '.'); });
     if (rating != null && rating < tGR) tips.push('Google rating is ' + rating.toFixed(1) + '★, below the ' + tGR + '★ target. Ask satisfied guests for reviews.');
-    if (photos != null && photos < 100) tips.push('Photo count is ' + photos + '. Aim for 100 or more — listings with more photos get more clicks.');
-    if (posts != null && posts < 8) tips.push('Only ' + posts + ' GBP posts this month. Post at least 8 — offers, events, and updates keep the listing active.');
+    if (photos != null && photos < 100) tips.push('Photo count is ' + photos + '. Aim for 100 or more. Listings with more photos get more clicks.');
+    if (posts != null && posts < 8) tips.push('Only ' + posts + ' GBP posts this month. Post at least 8. Offers, events, and updates keep the listing active.');
     if (photos == null) tips.push('Enter your photo count above to score this section.');
     if (posts == null) tips.push('Enter your GBP posts this month above to score this section.');
 
@@ -109,6 +109,7 @@ S.TrafficGBP = {
     prof.gbp_posts  = isNaN(posts)  ? null : posts;
     prof.gbp_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
+    if (ok) App.markSetupDone('gs_t_gbp');
     this.draw();
     const msg = document.getElementById('gbp-msg');
     if (msg) {
