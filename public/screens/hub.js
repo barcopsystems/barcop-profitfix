@@ -181,7 +181,7 @@ S.Hub = {
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
       + tile('Weekly Status', `${wkCount} / 3 <span style="font-family:'Barlow',sans-serif;font-size:11px;color:var(--t3);font-weight:600;">this week</span>`,
              'var(--gold)',
-             wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All modules entered this week',
+             wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All systems updated this week',
              wkOverdue.length ? 'var(--red)' : 'var(--t3)');
 
     // Audit Scores panel — three stacked rows, one per module.
@@ -418,7 +418,7 @@ S.Hub = {
           + ' data-date="' + esc(wkDate) + '"'
           + ' data-band="' + dotBand + '">'
           + '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="transparent" style="cursor:pointer;"/>'
-          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="1.6" fill="#0A1520" stroke="' + stroke + '" stroke-width="1.3"/>'
+          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="2.4" fill="' + stroke + '"/>'
           + '</g>';
       }).join('');
 
@@ -629,7 +629,7 @@ S.Hub = {
         /* Trend chart data point hover — the marker grows on hover so the
            interaction reads as "this dot does something." */
         .hub-app .hd-chart-marker{transition:r 0.12s ease;}
-        .hub-app .hd-chart-dot:hover .hd-chart-marker{r:2.4;}
+        .hub-app .hd-chart-dot:hover .hd-chart-marker{r:3.4;}
         /* Shared tooltip element used by all three mini charts. Lives as a
            sibling of .hub-app inside the wrapper, so the selector has no
            ancestor — otherwise display:block would force the empty div into
