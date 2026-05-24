@@ -800,6 +800,7 @@ S.AuditTracker = {
       App.data.audits.push(auditRecord);
       if (App.data.audits.length > 12) App.data.audits = App.data.audits.slice(-12);
       await App.saveKey('audits');
+      App.markSetupDone('gs_p_audit');
 
       document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
