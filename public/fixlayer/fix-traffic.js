@@ -16,7 +16,7 @@ FIX.traffic = [
     summary: 'Your Google Business Profile is the listing that decides whether you show up in the local map results. Complete every field, keep it current, and it ranks. Leave gaps and it does not.',
 
     process: {
-      intro: 'Profile completeness is the single largest factor in local map ranking. Complete the profile once, maintain it weekly, audit it quarterly. Every field you fill is a field a competitor with a complete profile is not beating you on. The app scores your profile and tracks the numbers over time. Each step below opens where the work happens.',
+      intro: 'Profile completeness is the single largest factor in local map ranking. Complete the profile once, maintain it weekly, audit it quarterly. Every field you fill is a field a competitor with a complete profile is not beating you on. Bar Cop scores your profile and tracks the numbers over time. Each step below opens where the work happens.',
       steps: [
         { kind: 'result', target: 't-gbp', targetLabel: 'Google Business Profile',
           title: 'Audit where your profile stands',
@@ -104,7 +104,7 @@ FIX.traffic = [
     summary: 'Most guests reach your website on a phone, after a Google search, ready to act. If they cannot find your hours, your menu, and a way to book in a few seconds, they leave.',
 
     process: {
-      intro: 'A bar website has one job: turn a guest who is already looking for you into a visit. Audit it before you change anything so you can prove the fixes worked, then fix conversion in the order that returns the most per hour. The app scores the site and tracks the numbers over time. Each step below opens where the work happens.',
+      intro: 'A bar website has one job: turn a guest who is already looking for you into a visit. Audit it before you change anything so you can prove the fixes worked, then fix conversion in the order that returns the most per hour. Bar Cop scores the site and tracks the numbers over time. Each step below opens where the work happens.',
       steps: [
         { kind: 'reference', target: 'Restaurant_Website_Audit_Form.pdf', targetLabel: 'Restaurant Website Audit Form',
           title: 'Audit the site before you change anything',
@@ -192,7 +192,7 @@ FIX.traffic = [
     summary: 'A steady stream of recent reviews ranks you and reassures the guest who is deciding. Respond to every one, ask every satisfied guest, and track velocity every week.',
 
     process: {
-      intro: 'Review velocity matters more than the rating sitting on your profile today. A fresh stream of reviews tells Google the business is active and tells the guest other people went last week. Build the ask into service and respond to every review. The app tracks your velocity, rating, and response rate. Each step below opens where the work happens.',
+      intro: 'Review velocity matters more than the rating sitting on your profile today. A fresh stream of reviews tells Google the business is active and tells the guest other people went last week. Build the ask into service and respond to every review. Bar Cop tracks your velocity, rating, and response rate. Each step below opens where the work happens.',
       steps: [
         { kind: 'result', target: 't-reviews', targetLabel: 'Review Tracker',
           title: 'Track velocity, not just the rating',
