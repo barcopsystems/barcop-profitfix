@@ -460,7 +460,10 @@ const DB = {
       // Fix layer — implemented-fix events feeding the Recovery Scoreboard
       fix_log: [],
       // Fix layer — per-gap step checklist progress, shape: { gap_id: [step_index,...] }
-      fix_progress: {}
+      fix_progress: {},
+      // Fix layer — chronological step-check feed for the Recent Activity card.
+      // Shape: [{ id, module, gap_id, gap_name, step_index, step_title, step_kind, ts }]
+      fix_activity: []
     };
   }
 };
