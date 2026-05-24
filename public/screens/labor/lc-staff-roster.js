@@ -22,7 +22,7 @@ S.LaborStaffRoster = {
     return this.positions().find(p => p.id === id);
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -74,10 +74,10 @@ S.LaborStaffRoster = {
       const rows = list.map(s => {
         const pos = this.positionById(s.position_id);
         return '<tr class="sr-row" data-id="' + s.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + esc(s.name || '—') + '</div></td>'
-          + '<td>' + esc(pos ? pos.name : '—') + '</td>'
-          + '<td>' + esc(pos ? (pos.department || '—') : '—') + '</td>'
-          + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '—') + '</td>'
+          + '<td><div class="val">' + esc(s.name || '-') + '</div></td>'
+          + '<td>' + esc(pos ? pos.name : '-') + '</td>'
+          + '<td>' + esc(pos ? (pos.department || '-') : '-') + '</td>'
+          + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '-') + '</td>'
           + '<td>' + (s.status === 'Inactive'
               ? '<span class="badge badge-dim">Inactive</span>'
               : '<span class="badge badge-ok">Active</span>') + '</td>'
@@ -118,7 +118,7 @@ S.LaborStaffRoster = {
     const positions = this.positions();
     const posOpts = positions.map(p =>
       '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
-      + esc(p.name) + ' — ' + esc(p.department || '') + '</option>').join('');
+      + esc(p.name) + ', ' + esc(p.department || '') + '</option>').join('');
     const defaultPos = s ? this.positionById(s.position_id) : positions[0];
     const v = val => (val != null && val !== '') ? val : '';
     const wage = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
@@ -200,6 +200,7 @@ S.LaborStaffRoster = {
     const ok = await App.saveLabor();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_lc_roster');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Staff'; }
