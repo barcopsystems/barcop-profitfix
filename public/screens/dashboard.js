@@ -49,8 +49,9 @@ S.Dashboard = {
       .slice(0,5);
 
     const actionRows = actionItems.length
-      ? actionItems.map((it,i) =>
-          '<div class="db-action" data-screen="audit-tracker" '
+      ? actionItems.map((it,i) => {
+          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, 'profit') : null);
+          return '<div class="db-action" data-gap="' + esc(gid || '') + '" '
           + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
           + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
           + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
@@ -61,7 +62,8 @@ S.Dashboard = {
                 + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
               : '')
           + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-          + '</div>').join('')
+          + '</div>';
+        }).join('')
       : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">'
         + 'Run a Profit Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
     const actionHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
@@ -108,7 +110,10 @@ S.Dashboard = {
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
     document.getElementById('qa-recipes')?.addEventListener('click', ()=>App.navigate('recipe-library'));
     container.querySelectorAll('.db-action').forEach(row => {
-      row.addEventListener('click', () => App.navigate(row.dataset.screen));
+      row.addEventListener('click', () => {
+        if (row.dataset.gap) App._fixFocus = row.dataset.gap;
+        App.navigate('profit-fix');
+      });
     });
     FixPanel.wireFixAreas(container);
   },
