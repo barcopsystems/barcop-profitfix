@@ -65,15 +65,15 @@ window.FixPanel = {
       if (imp && BANDS[imp.band]) {
         const bm = BANDS[imp.band];
         impHtml = '<div style="flex-shrink:0;text-align:right;">'
-          + '<div style="font-size:8px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;'
-          + 'color:' + bm.color + ';">' + bm.label + '</div>'
+          + '<div style="display:flex;align-items:baseline;justify-content:flex-end;gap:10px;white-space:nowrap;">'
+          + '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:' + bm.color + ';">' + bm.label + '</span>'
           + (imp.dollars > 0
-              ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;'
-                + 'color:' + bm.color + ';line-height:1.1;margin-top:2px;">' + App.fmtCurrency(imp.dollars)
-                + '<span style="font-size:9px;"> /yr</span></div>'
+              ? '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:600;color:' + bm.color + ';line-height:1;">'
+                + App.fmtCurrency(imp.dollars) + '<span style="font-size:9px;"> /yr</span></span>'
               : '')
+          + '</div>'
           + (showProgress
-              ? '<div style="font-size:10px;color:var(--gold);margin-top:4px;font-weight:600;letter-spacing:0.04em;">'
+              ? '<div style="font-size:10px;color:var(--gold);margin-top:5px;font-weight:600;letter-spacing:0.04em;">'
                 + stepsDone + ' of ' + stepsTotal + ' steps</div>'
               : '')
           + '</div>';
@@ -82,7 +82,7 @@ window.FixPanel = {
           + stepsDone + ' of ' + stepsTotal + ' steps</div>';
       }
       return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
-        + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+        + 'style="display:flex;align-items:center;gap:24px;padding:13px 20px;cursor:pointer;'
         + (i < gaps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
         + '<div style="flex:1;min-width:0;">'
         + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
