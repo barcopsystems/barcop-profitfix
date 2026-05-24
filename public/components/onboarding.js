@@ -133,19 +133,81 @@ const Onboarding = {
     document.getElementById('ob-back')?.addEventListener('click', () => { this._step = 2; this.render(); });
 
     document.getElementById('ob-finish')?.addEventListener('click', async () => {
+      // ── DIAGNOSTIC BANNER (temporary) ─────────────────────────────────────
+      // Visible debug to trace why the handoff lands on Hub Dashboard.
+      // Remove this whole block once we know the cause.
+      const dbg = document.createElement('div');
+      dbg.id = 'ob-debug';
+      dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;'
+        + 'background:#000;color:#fff;font:13px/1.5 monospace;padding:10px 14px;'
+        + 'border-bottom:2px solid var(--gold);max-height:50vh;overflow-y:auto;';
+      document.body.appendChild(dbg);
+      const log = (msg) => {
+        const line = document.createElement('div');
+        line.textContent = '[' + new Date().toISOString().slice(11,19) + '] ' + msg;
+        dbg.appendChild(line);
+      };
+      log('STEP 3: Start Setup clicked');
+
       App.data.settings.onboarding_complete = true;
-      // The operator just filled in bar name, location, type, and annual
-      // revenue — the gs_profile task is done by definition. Auto-complete
-      // it so Getting Started reflects that on first open.
       App.data.hub_setup_progress = App.data.hub_setup_progress || {};
       App.data.hub_setup_progress.gs_profile = new Date().toISOString();
+      log('onboarding_complete=' + App.data.settings.onboarding_complete
+          + ', gs_profile set');
+
       await App.saveKey('settings');
+      log('settings saved');
       await App.saveKey('hub_setup_progress');
+      log('hub_setup_progress saved');
+
+      log('S exists: ' + (typeof S !== 'undefined')
+          + ' | S.HubGettingStarted: ' + (window.S && !!S.HubGettingStarted)
+          + ' | S.Hub: ' + (window.S && !!S.Hub));
+      log('hub_setup_progress keys: '
+          + Object.keys(App.data.hub_setup_progress || {}).join(',') || '(none)');
+      log('setupMeetsThreshold(): ' + App.setupMeetsThreshold());
+
+      const wrapBefore = document.getElementById('hub-wrapper');
+      log('hub-wrapper exists before open: ' + (!!wrapBefore)
+          + ' display=' + (wrapBefore ? wrapBefore.style.display : 'n/a'));
+
       document.getElementById('ob-overlay').classList.add('hidden');
-      // Hand off to the unified setup checklist, not the empty Hub Dashboard.
-      // The dashboard becomes the natural landing once setup is meaningful.
-      if (window.S && S.HubGettingStarted) S.HubGettingStarted.open();
-      else App.showHub();
+      log('ob-overlay hidden');
+
+      try {
+        if (window.S && S.HubGettingStarted) {
+          log('calling S.HubGettingStarted.open()');
+          S.HubGettingStarted.open();
+          log('open() returned');
+          const wrapAfter = document.getElementById('hub-wrapper');
+          log('hub-wrapper innerHTML length after open: '
+              + (wrapAfter ? wrapAfter.innerHTML.length : 'no wrap'));
+          log('first 80 chars: ' + (wrapAfter
+              ? wrapAfter.innerHTML.slice(0, 80).replace(/\s+/g, ' ')
+              : ''));
+        } else {
+          log('FALLBACK: S.HubGettingStarted missing, calling App.showHub()');
+          App.showHub();
+        }
+      } catch (err) {
+        log('ERROR: ' + (err && err.message ? err.message : err));
+        log((err && err.stack ? err.stack.split('\n').slice(0,3).join(' | ') : ''));
+      }
+
+      // Watch for anything that overwrites hub-wrapper in the next 3 seconds.
+      const wrap = document.getElementById('hub-wrapper');
+      if (wrap) {
+        const initial = wrap.innerHTML.slice(0, 80);
+        const obs = new MutationObserver(() => {
+          const now = wrap.innerHTML.slice(0, 80);
+          if (now !== initial) {
+            log('MUTATION: hub-wrapper changed. Now starts: '
+                + now.replace(/\s+/g, ' '));
+          }
+        });
+        obs.observe(wrap, { childList: true, subtree: true });
+        setTimeout(() => { obs.disconnect(); log('observer stopped'); }, 3000);
+      }
     });
   }
 };
