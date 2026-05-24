@@ -28,6 +28,49 @@ window.FixPanel = {
     return moduleKey === 'revenue' ? 'r-fix' : moduleKey === 'traffic' ? 't-fix' : 'profit-fix';
   },
 
+  // Infer which gap-area a Priority Action Item belongs to from its text.
+  // Used to route PAI clicks into the relevant Fix Process when the action
+  // item lacks an explicit gap_id (older audits, Claude-generated items). The
+  // sample-data and extractActionItems pipelines now tag gap_id explicitly,
+  // so this is a fallback. Returns the gap_id string or null if no match.
+  inferGapId(actionText, moduleKey) {
+    const text = (actionText || '').toLowerCase();
+    const maps = {
+      profit: [
+        { id: 'pour-cost',      k: ['pour cost', 'pour standard', 'jigger', 'bottle yield', 'liquor pour'] },
+        { id: 'theft-loss',     k: ['void', 'comp rate', 'drawer', 'theft', 'cash variance', 'shrinkage'] },
+        { id: 'food-cost',      k: ['food cost', 'recipe', 'portion', 'kitchen waste', 'waste'] },
+        { id: 'vendor-control', k: ['vendor', 'invoice', 'price drift', 'overcharge', 'short count'] },
+        { id: 'prime-cost',     k: ['prime cost', 'cogs gap', 'combined cogs'] }
+      ],
+      revenue: [
+        { id: 'check-average',      k: ['check average', 'upsell', 'cover average'] },
+        { id: 'labor-scheduling',   k: ['labor cost', 'labor over', 'schedule', 'staffing'] },
+        { id: 'menu-engineering',   k: ['menu mix', 'star', 'plowhorse', 'puzzle', 'dog', 'menu engineering'] },
+        { id: 'pricing',            k: ['pricing', 'reprice', 'menu price'] },
+        { id: 'rplh',               k: ['rplh', 'revenue per labor'] },
+        { id: 'server-performance', k: ['server performance', 'server spread', 'bottom third'] },
+        { id: 'events-catering',    k: ['event revenue', 'catering', 'private dining'] }
+      ],
+      traffic: [
+        { id: 'gbp',           k: ['google business', 'gbp', 'google profile', 'business profile'] },
+        { id: 'website',       k: ['website', 'web conversion', 'bounce', 'site conversion'] },
+        { id: 'reviews',       k: ['review velocity', 'review response', 'rating', 'reviews'] },
+        { id: 'search-seo',    k: ['search', 'seo', 'citation', 'ranking', 'nap'] },
+        { id: 'social',        k: ['social', 'instagram', 'facebook', 'tiktok', 'posting schedule'] },
+        { id: 'delivery',      k: ['delivery platform', 'doordash', 'ubereats', 'grubhub'] },
+        { id: 'email-loyalty', k: ['email', 'loyalty', 'list', 'newsletter'] }
+      ]
+    };
+    const list = maps[moduleKey] || [];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = 0; j < list[i].k.length; j++) {
+        if (text.indexOf(list[i].k[j]) !== -1) return list[i].id;
+      }
+    }
+    return null;
+  },
+
   // ── Card-internal section header. Title sits inside the card with a divider
   // below it. Optional helpClass adds a "How this works" button on the right
   // that the calling code wires to open a modal.
