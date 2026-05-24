@@ -578,6 +578,18 @@ const App = {
     return r.ok;
   },
 
+  // Mark a Hub Getting Started task as complete. Called from every save
+  // handler that corresponds to a setup task — saving targets, generating
+  // an audit, logging a shift, etc. Idempotent: re-calling on an already-
+  // done task is a no-op so callers can be liberal.
+  markSetupDone(taskId) {
+    if (!taskId || !this.data) return;
+    this.data.hub_setup_progress = this.data.hub_setup_progress || {};
+    if (this.data.hub_setup_progress[taskId]) return;
+    this.data.hub_setup_progress[taskId] = new Date().toISOString();
+    this.saveKey('hub_setup_progress');
+  },
+
   // Load Recovery data plus the three Control data stores (Rule 21)
   async loadAllData() {
     this.data          = await DB.readData();
