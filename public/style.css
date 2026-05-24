@@ -229,6 +229,12 @@ input,select,textarea{color-scheme:dark;}
   text-decoration:none;cursor:pointer;transition:color 0.12s;
 }
 .topbar-back-link:hover{color:var(--t1);}
+/* Global Settings tab strip — matches the breadcrumb link palette so the
+   tab affordances feel like part of the same nav system. Hover lifts an
+   inactive tab from t3 to t1; the active tab is held at t1 by JS plus the
+   gold underline indicator. */
+.hs-tab{outline:none;}
+.hs-tab:hover{color:var(--t1) !important;}
 
 /* ══ CONTENT ══ */
 .content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:rgba(219,171,70,0.18) transparent;}
