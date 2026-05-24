@@ -76,7 +76,7 @@ S.HubReportBug = {
       +       '<option value="minor">Minor (small glitch or visual issue)</option>'
       +       '<option value="moderate" selected>Moderate (feature works but has bugs)</option>'
       +       '<option value="major">Major (feature is broken)</option>'
-      +       '<option value="critical">Critical (app blocked or data at risk)</option>'
+      +       '<option value="critical">Critical (Bar Cop unusable or data at risk)</option>'
       +     '</select>'
       +   '</div>'
       +   '<div style="margin-bottom:18px;">'
