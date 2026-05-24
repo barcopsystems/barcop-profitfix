@@ -222,12 +222,10 @@ const App = {
 
     // Browser back/forward walks the in-app history stack instead of leaving
     // the site. _navigationLock suppresses re-pushing while popstate handles
-    // the navigation; _isReturning suppresses re-capturing the current
-    // location as a "return-to" target since the user is moving backward.
+    // the navigation so we don't grow the history stack on every back-step.
     window.addEventListener('popstate', (e) => {
       if (!e.state) return;
       this._navigationLock = true;
-      this._isReturning = true;
       try {
         if (e.state.mode === 'hub') {
           this.showHub();
@@ -237,7 +235,6 @@ const App = {
         }
       } finally {
         this._navigationLock = false;
-        this._isReturning = false;
       }
     });
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
@@ -436,12 +433,7 @@ const App = {
     }
     hubWrap.style.display = 'block';
     S.Hub.render(hubWrap);
-    // Returning to Hub clears any pending cross-module back-chip — Hub IS
-    // home, so there's no "origin" to return to.
-    this._returnTo = null;
-    const loc = { mode: 'hub', module: null, screen: 'hub', label: 'Hub' };
-    this._captureLocationForReturn(loc);
-    this._pushHistory(loc);
+    this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
   },
 
   showApp(module) {
@@ -501,55 +493,14 @@ const App = {
     this.navigate(id);
   },
 
-  // ── Cross-module nav state ───────────────────────────────────────────────
-  // _lastLocation tracks where we are. When we cross a mode/module boundary,
-  // the previous location becomes _returnTo and a "← Back to X" chip appears
-  // in the topbar so the operator can jump back without going through the Hub
-  // and re-navigating. Browser back also walks the history stack pushed below.
-  _lastLocation: null,
-  _returnTo: null,
-  _isReturning: false,
+  // ── Breadcrumb back-link state ───────────────────────────────────────────
+  // The topbar shows "[Page Title] | Back to [last page]" so the operator can
+  // jump back to the last location with a single click, no matter how deep
+  // the cross-module deep-link took them. Browser back also walks the
+  // history stack pushed below.
+  _currentLocation: null,
+  _previousLocation: null,
   _navigationLock: false,
-
-  _captureLocationForReturn(newLoc) {
-    const prev = this._lastLocation;
-    if (this._isReturning) { this._lastLocation = newLoc; return; }
-    if (prev) {
-      const crossed = prev.mode !== newLoc.mode || prev.module !== newLoc.module;
-      if (crossed) this._returnTo = prev;
-    }
-    this._lastLocation = newLoc;
-  },
-
-  _renderReturnChip() {
-    const actions = document.getElementById('topbar-actions');
-    if (!actions) return;
-    const existing = actions.querySelector('.topbar-back-chip');
-    if (existing) existing.remove();
-    if (!this._returnTo) return;
-    const chip = document.createElement('button');
-    chip.className = 'topbar-back-chip';
-    chip.textContent = '← Back to ' + this._returnTo.label;
-    chip.onclick = () => this._returnToOrigin();
-    actions.insertBefore(chip, actions.firstChild);
-  },
-
-  _returnToOrigin() {
-    if (!this._returnTo) return;
-    const t = this._returnTo;
-    this._returnTo = null;
-    this._isReturning = true;
-    try {
-      if (t.mode === 'hub') {
-        this.showHub();
-      } else {
-        if (t.module && t.module !== this._activeModule) this.showApp(t.module);
-        this.navigate(t.screen);
-      }
-    } finally {
-      this._isReturning = false;
-    }
-  },
 
   _pushHistory(loc) {
     if (this._navigationLock) return;
@@ -557,12 +508,46 @@ const App = {
     catch (e) { /* ignore history failures */ }
   },
 
+  _updateBackLink() {
+    const sub = document.getElementById('topbar-sub');
+    if (!sub) return;
+    if (!this._previousLocation) { sub.innerHTML = ''; return; }
+    const label = String(this._previousLocation.label || 'previous')
+      .replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    sub.innerHTML = '<span class="topbar-sep">|</span>'
+      + '<a class="topbar-back-link" id="topbar-back-link">Back to ' + label + '</a>';
+    document.getElementById('topbar-back-link')?.addEventListener('click', () => this._goBackOne());
+  },
+
+  _goBackOne() {
+    if (!this._previousLocation) return;
+    const t = this._previousLocation;
+    if (t.mode === 'hub') {
+      this.showHub();
+    } else {
+      if (t.module && t.module !== this._activeModule) this.showApp(t.module);
+      this.navigate(t.screen);
+    }
+  },
+
+  _recordLocation(newLoc) {
+    // Same location as before — just refresh the back link (label may have
+    // changed) without rotating previous/current.
+    const cur = this._currentLocation;
+    if (cur && cur.mode === newLoc.mode && cur.module === newLoc.module && cur.screen === newLoc.screen) {
+      this._currentLocation = newLoc;
+      this._updateBackLink();
+      return;
+    }
+    this._previousLocation = this._currentLocation;
+    this._currentLocation = newLoc;
+    this._updateBackLink();
+    this._pushHistory(newLoc);
+  },
+
   _afterNavigate(id) {
     const title = document.getElementById('topbar-title')?.textContent || id;
-    const newLoc = { mode: 'app', module: this._activeModule, screen: id, label: title };
-    this._captureLocationForReturn(newLoc);
-    this._renderReturnChip();
-    this._pushHistory(newLoc);
+    this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
   },
 
   showAuth() {
