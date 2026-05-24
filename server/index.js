@@ -804,6 +804,59 @@ app.post('/api/report-bug-notify', async (req, res) => {
   }
 });
 
+// ── Support message notification ─────────────────────────────────────────────
+// Email-only contact form from the Hub "Contact Support" screen. No DB row
+// is kept — the support inbox is the record. The user's email is set as
+// reply_to so the team can hit Reply and write back directly.
+app.post('/api/support-message-notify', async (req, res) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to     = process.env.SUPPORT_NOTIFY_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL;
+  const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
+  if (!apiKey || !to) {
+    console.warn('support-message-notify: RESEND_API_KEY or notify email not configured');
+    return res.json({ ok: false, emailed: false, reason: 'not_configured' });
+  }
+  try {
+    const r = req.body || {};
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    const subject = '[Bar Cop Support] [' + (r.topic || 'Other') + '] ' + (r.subject || '(no subject)');
+    const row = (label, value) => value
+      ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
+        + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
+      : '';
+    const html =
+        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#111;">'
+      +   '<div style="border-bottom:3px solid #4C8EAB;padding-bottom:14px;margin-bottom:18px;">'
+      +     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999;">Bar Cop Support Message</div>'
+      +     '<div style="font-size:18px;font-weight:700;color:#111;margin-top:4px;">' + esc(r.subject || '(no subject)') + '</div>'
+      +     '<div style="font-size:12px;color:#4C8EAB;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;">' + esc(r.topic || 'Other') + '</div>'
+      +   '</div>'
+      +   '<table style="width:100%;border-collapse:collapse;">'
+      +     row('Message',         r.message)
+      +     row('Reporter Email',  r.user_email)
+      +     row('From Screen',     r.previous_screen)
+      +     row('Submitted',       new Date().toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }))
+      +   '</table>'
+      +   '<div style="margin-top:18px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px;">Reply directly to this email to respond to the user.</div>'
+      + '</div>';
+
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, subject, html, reply_to: r.user_email || undefined })
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      console.error('Resend send failed:', resp.status, txt);
+      return res.json({ ok: false, emailed: false, reason: 'send_failed' });
+    }
+    res.json({ ok: true, emailed: true });
+  } catch (e) {
+    console.error('support-message-notify exception:', e);
+    res.json({ ok: false, emailed: false, reason: 'exception' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
