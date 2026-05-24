@@ -90,9 +90,14 @@ window.FixPanel = {
         impHtml = '<div style="flex-shrink:0;text-align:right;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:0.04em;">'
           + stepsDone + ' of ' + stepsTotal + ' steps</div>';
       }
+      // Last visible row in the card has no border-bottom. If we're appending
+      // a Labor row below for Profit, every gap row keeps its border-bottom
+      // and the Labor row becomes the bottomless one.
+      const hasLabor = moduleKey === 'profit';
+      const isLastVisible = !hasLabor && (i === gaps.length - 1);
       return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
         + 'style="display:flex;align-items:center;gap:24px;padding:13px 20px;cursor:pointer;'
-        + (i < gaps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+        + (isLastVisible ? '' : 'border-bottom:1px solid var(--b2);') + '">'
         + '<div style="flex:1;min-width:0;">'
         + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(g.summary || '') + '</div>'
@@ -101,7 +106,52 @@ window.FixPanel = {
         + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
         + '</div>';
     }).join('');
-    return this.sectionHeader('Fix Areas') + rows;
+
+    // Profit dashboard surfaces Labor as the third part of prime cost. The
+    // labor fix process lives in Revenue Recovery, so clicking routes there.
+    // Diagnosis stays on Profit; the workflow lives where it belongs.
+    let extraRow = '';
+    if (moduleKey === 'profit' && window.Recovery && window.FIX && FIX.revenue) {
+      const laborImp = Recovery.gapImpact('labor-scheduling');
+      const laborLogged = log.some(e => e.gap_id === 'labor-scheduling');
+      const laborSteps = (fixProgress['labor-scheduling'] || []).length;
+      const laborGap = FIX.revenue.find(x => x.id === 'labor-scheduling');
+      const laborStepsTotal = (laborGap && laborGap.process && laborGap.process.steps) ? laborGap.process.steps.length : 0;
+      const showLaborProgress = !laborLogged && laborStepsTotal > 0 && laborSteps > 0;
+
+      let labImp = '';
+      if (laborImp && BANDS[laborImp.band]) {
+        const bm = BANDS[laborImp.band];
+        labImp = '<div style="flex-shrink:0;text-align:right;">'
+          + '<div style="display:flex;align-items:baseline;justify-content:flex-end;gap:10px;white-space:nowrap;">'
+          + '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:' + bm.color + ';">' + bm.label + '</span>'
+          + (laborImp.dollars > 0
+              ? '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:600;color:' + bm.color + ';line-height:1;">'
+                + App.fmtCurrency(laborImp.dollars) + '<span style="font-size:9px;"> /yr</span></span>'
+              : '')
+          + '</div>'
+          + (showLaborProgress
+              ? '<div style="font-size:10px;color:var(--gold);margin-top:5px;font-weight:600;letter-spacing:0.04em;">'
+                + laborSteps + ' of ' + laborStepsTotal + ' steps</div>'
+              : '')
+          + '</div>';
+      } else if (showLaborProgress) {
+        labImp = '<div style="flex-shrink:0;text-align:right;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:0.04em;">'
+          + laborSteps + ' of ' + laborStepsTotal + ' steps</div>';
+      }
+
+      extraRow = '<div class="fp-fixarea" data-gap="labor-scheduling" data-module="revenue" '
+        + 'style="display:flex;align-items:center;gap:24px;padding:13px 20px;cursor:pointer;">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">Labor</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">Bar, kitchen, and floor staff as a share of revenue. The third part of prime cost, worked in Revenue Recovery.</div>'
+        + '</div>'
+        + labImp
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+        + '</div>';
+    }
+
+    return this.sectionHeader('Fix Areas') + rows + extraRow;
   },
 
   // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
