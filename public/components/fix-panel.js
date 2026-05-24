@@ -81,18 +81,10 @@ window.FixPanel = {
       // Empty state — pull the latest audit's monthly opportunity total and
       // annualize it. This shows the operator what is at stake, not nothing.
       const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
-      const audits = (window.App && App.data && App.data[auditKey]) || [];
+      const audits = (App.data && App.data[auditKey]) || [];
       const latest = audits[audits.length - 1];
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
       const annual  = monthly * 12;
-      // Temporary diagnostic — remove after we confirm the empty-state branch works
-      console.log('[recoveryCard ' + moduleKey + ']',
-        'auditKey=' + auditKey,
-        'auditsLen=' + audits.length,
-        'latestExists=' + (latest ? 'yes' : 'no'),
-        'actionItemsLen=' + (latest && latest.action_items ? latest.action_items.length : 0),
-        'monthly=' + monthly,
-        'annual=' + annual);
       if (annual > 0) {
         body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
           + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr</span></div>'
@@ -239,7 +231,7 @@ window.FixPanel = {
 
   // ── Recovery tracking — log when a fix went in ──────────────────────────────
   implementSection(g) {
-    const log = (window.App && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.gap_id === g.id)
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;'
