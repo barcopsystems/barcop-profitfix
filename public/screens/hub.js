@@ -721,10 +721,10 @@ S.Hub = {
             </div>
           </header>
           <main class="content">
-            <div style="height:100%;display:grid;grid-template-rows:auto 1fr 1fr;gap:18px;min-height:0;">
+            <div style="display:grid;grid-template-rows:auto 520px 460px;gap:18px;padding-bottom:18px;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${auditPanel}${middleColumn}${readoutPanel}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${alertsPanel}${chartPanel}${actionPanel}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${actionPanel}</div>
             </div>
           </main>
         </div>
