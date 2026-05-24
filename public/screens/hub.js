@@ -125,7 +125,10 @@ S.Hub = {
     collect(rA, 'Revenue', 'revenue');
     collect(tA, 'Traffic', 'traffic');
     itemRows.sort((a,b) => b.impact - a.impact);
-    const topItems = itemRows.slice(0, 50);
+    // Cap visible PAIs at 8 — top by impact — so the most important items are
+    // never hidden behind a scrollbar. Overflow flagged in a small footer.
+    const topItems = itemRows.slice(0, 8);
+    const overflowItems = Math.max(0, itemRows.length - topItems.length);
 
     // ── Last updated ──
     const stamps = [];
@@ -177,7 +180,7 @@ S.Hub = {
              overall != null ? App.scoreHex(overall) : 'var(--t4)',
              overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
-             anyAudit && totalOpp > 0 ? 'var(--red)' : 'var(--t4)',
+             anyAudit && totalOpp > 0 ? 'var(--gold)' : 'var(--t4)',
              anyAudit ? 'Recoverable across audited systems' : 'Run an audit to surface this')
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
@@ -285,15 +288,20 @@ S.Hub = {
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
       </div></div>`;
 
-    // Recovery Scoreboard panel — cross-module headline number. The receipt
-    // for the platform: total $ recovered across Profit, Revenue, and Traffic
-    // from every measured fix.
+    // Recovery Scoreboard panel — cross-module headline number, sized to be
+    // the visual hero of the dashboard. The receipt for the platform: total $
+    // recovered across Profit, Revenue, and Traffic from every measured fix.
     const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
+    const fixLog = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const oldestFix = fixLog.map(e => e.date).filter(Boolean).sort()[0];
+    const sinceTxt = oldestFix
+      ? ' since ' + new Date(oldestFix + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : '';
     const recoveryPanel = `<div style="${PANEL}">${panelTitle('Recovery Scoreboard')}
-      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;gap:5px;">
+      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;gap:6px;">
         ${recoveryTotal.dollars > 0
-          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:700;color:var(--gold);line-height:1;">${App.fmtCurrency(recoveryTotal.dollars, 0)}<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>
-             <div style="font-size:11px;color:var(--t3);">across ${recoveryTotal.fixes} measured fix${recoveryTotal.fixes === 1 ? '' : 'es'} in Profit, Revenue, and Traffic</div>`
+          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-0.01em;">${App.fmtCurrency(recoveryTotal.dollars, 0)}<span style="font-size:14px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>
+             <div style="font-size:11px;color:var(--t3);">across ${recoveryTotal.fixes} measured fix${recoveryTotal.fixes === 1 ? '' : 'es'} in Profit, Revenue, and Traffic${sinceTxt}</div>`
           : `<div style="font-size:12px;color:var(--t3);line-height:1.55;">Mark fixes implemented in any Recovery module and the running total recovered shows here.</div>`
         }
       </div></div>`;
@@ -336,8 +344,18 @@ S.Hub = {
         +   'metric' + (alerts.length===1?'':'s') + ' over target'
         +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Address the worst-scoring first.</div>'
         + '</div></div>';
+      // Holding-the-line counter: metrics tracked minus metrics flagged as
+      // alerts. Quiet positive counterpoint, fills the panel's empty space
+      // with productive context instead of dead air.
+      const holdingCount = metrics.length - metricAlerts.length;
+      const holdingHtml = holdingCount > 0
+        ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:8px;flex-shrink:0;">'
+          + '<span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;"></span>'
+          + '<div style="font-size:10px;color:var(--t3);line-height:1.4;">' + holdingCount + ' metric' + (holdingCount === 1 ? '' : 's') + ' holding the line.</div>'
+          + '</div>'
+        : '';
       alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${alertHead}
-        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div></div>`;
+        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div>${holdingHtml}</div>`;
     } else {
       const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
         + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -518,8 +536,11 @@ S.Hub = {
             + '</div>';
         }).join('')
       : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
+    const overflowFooter = overflowItems > 0
+      ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
+      : '';
     const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div></div>`;
+      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}</div>`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
     // ranked list of the gap areas producing it. Same emotional language as
@@ -574,7 +595,7 @@ S.Hub = {
         + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">leaking across ' + readout.items.length + ' gap area' + (readout.items.length===1?'':'s') + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
-    const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Money Readout')}${readoutBody}</div>`;
+    const readoutPanel = `<div style="${PANEL}">${panelTitle('Leaking This Week')}${readoutBody}</div>`;
 
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
