@@ -83,7 +83,7 @@ S.TrafficThisWeek = {
 
   yesNo(id, val) {
     return '<select id="' + id + '">'
-      + '<option value="">—</option>'
+      + '<option value="">-</option>'
       + '<option value="yes"' + (val === 'yes' ? ' selected' : '') + '>Yes</option>'
       + '<option value="no"'  + (val === 'no'  ? ' selected' : '') + '>No</option>'
       + '</select>';
@@ -345,7 +345,7 @@ S.TrafficThisWeek = {
     if (!gr && !rv && !ss) {
       const modal = document.getElementById('ttw-alert-modal');
       const msg = document.getElementById('ttw-alert-msg');
-      if (msg) msg.textContent = 'Enter at least one metric before saving — Google rating, new reviews, or monthly sessions.';
+      if (msg) msg.textContent = 'Enter at least one metric before saving: Google rating, new reviews, or monthly sessions.';
       if (modal) modal.style.display = 'flex';
       document.getElementById('ttw-alert-ok')?.addEventListener('click', () => { if (modal) modal.style.display = 'none'; });
       return;
@@ -387,6 +387,7 @@ S.TrafficThisWeek = {
 
     if (ok) {
       this.clearDraft();
+      App.markSetupDone('gs_t_week');
       App.navigate('t-dashboard');
     } else {
       const e = document.getElementById('ttw-err');
