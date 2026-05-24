@@ -2,14 +2,7 @@
 S.Dashboard = {
   _dismissed: false,
   render(container, actions) {
-    // Add Trend Insights button to topbar actions
     actions.innerHTML = '';
-    const insBtn = document.createElement('button');
-    insBtn.className = 'btn btn-ghost btn-sm';
-    insBtn.id = 'db-insights-btn';
-    insBtn.textContent = 'Trend Insights';
-    insBtn.addEventListener('click', () => this.showInsights());
-    actions.appendChild(insBtn);
     const data = App.data;
     const weeks = data.weeks || [];
     const targets = data.settings.targets || {};
@@ -109,6 +102,7 @@ S.Dashboard = {
     document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
     document.getElementById('qa-recipes')?.addEventListener('click', ()=>App.navigate('recipe-library'));
+    document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
     container.querySelectorAll('.db-action').forEach(row => {
       row.addEventListener('click', () => {
         if (row.dataset.gap) App._fixFocus = row.dataset.gap;
@@ -197,8 +191,11 @@ S.Dashboard = {
       ? FixPanel.markerSvg(Recovery.chartMarkers(weeks, 'profit'), xs, PAD.t, PAD.t + ch) : '';
 
     return `<div class="chart-card" style="padding:20px 24px 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>
+          <button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>
+        </div>
         <div style="display:flex;gap:20px;">
           <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
             <span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Bar Pour Cost</span>
