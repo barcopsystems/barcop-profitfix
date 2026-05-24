@@ -19,7 +19,7 @@ S.LaborLogHours = {
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -77,10 +77,10 @@ S.LaborLogHours = {
         + '</div>';
       const rows = list.slice(0, 100).map(a => '<tr class="lo-row" data-id="' + a.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
-        + '<td>' + esc(a.name || '—') + '</td>'
-        + '<td>' + esc(a.shift_type || '—') + '</td>'
-        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '—') + '</td>'
-        + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '—') + '</td>'
+        + '<td>' + esc(a.name || '-') + '</td>'
+        + '<td>' + esc(a.shift_type || '-') + '</td>'
+        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
+        + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm lo-edit" data-id="' + a.id + '">Edit</button>'
@@ -122,7 +122,7 @@ S.LaborLogHours = {
     this.editId = id || null;
     const a = id ? this.actuals().find(x => x.id === id) : null;
     const shiftOpts = this.SHIFTS.map(s =>
-      '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '—') + '</option>').join('');
+      '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
     const v = val => (val != null && val !== '') ? val : '';
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
@@ -143,8 +143,8 @@ S.LaborLogHours = {
       + '<textarea id="lo-notes" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div>'
       + '</div>'
       + '<div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Wage</div><div class="calc-val" id="lo-c-wage">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="lo-c-cost">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Wage</div><div class="calc-val" id="lo-c-wage">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="lo-c-cost">-</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lo-save">' + (id ? 'Update' : 'Save Hours') + '</button>'
@@ -164,8 +164,8 @@ S.LaborLogHours = {
     const wage = staff && staff.wage != null ? staff.wage : null;
     const hours = parseFloat(document.getElementById('lo-hours')?.value) || 0;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    set('lo-c-wage', wage != null ? App.fmtCurrency(wage) + '/hr' : '—');
-    set('lo-c-cost', wage != null ? App.fmtCurrency(hours * wage) : '—');
+    set('lo-c-wage', wage != null ? App.fmtCurrency(wage) + '/hr' : '-');
+    set('lo-c-cost', wage != null ? App.fmtCurrency(hours * wage) : '-');
   },
 
   async save() {
@@ -206,6 +206,7 @@ S.LaborLogHours = {
     const ok = await App.saveLabor();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_lc_hours');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Hours'; }
@@ -229,8 +230,8 @@ S.LaborLogHours = {
         { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked'] },
         { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type'] }
       ],
-      hint: 'Upload your timeclock or POS hours export. Staff names are matched to your roster — '
-        + 'rows that do not match a staff member are skipped.',
+      hint: 'Upload your timeclock or POS hours export. Staff names are matched to your roster. '
+        + 'Rows that do not match a staff member are skipped.',
       confirmLabel: 'Import',
       onComplete: rows => this.importRows(rows)
     });
@@ -270,7 +271,7 @@ S.LaborLogHours = {
     const result = document.getElementById('lo-imp-result');
     if (imported === 0) {
       if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">'
-        + 'No rows imported — no staff names matched the roster, or hours were missing.</div></div>';
+        + 'No rows imported. No staff names matched the roster, or hours were missing.</div></div>';
       return;
     }
     const ok = await App.saveLabor();
