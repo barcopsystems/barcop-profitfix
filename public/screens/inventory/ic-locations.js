@@ -39,7 +39,7 @@ S.InventoryLocations = {
 
     if (locs.length === 0) {
       html = '<div class="empty"><div class="empty-title">No locations yet</div>'
-        + '<div class="empty-sub">Add the storage areas where you keep product — bars, coolers, storerooms. '
+        + '<div class="empty-sub">Add the storage areas where you keep product: bars, coolers, storerooms. '
         + 'Products are assigned to these locations, and inventory counts are organized by them.</div>'
         + '<div style="display:flex;gap:10px;justify-content:center;">'
         + '<button class="btn btn-primary" id="il-add-first">Add Location</button>'
@@ -186,6 +186,7 @@ S.InventoryLocations = {
     const ok = await App.saveInventory();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_ic_locations');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
@@ -208,9 +209,9 @@ S.InventoryLocations = {
       const rows = prods.map(p => '<tr>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-        + '<td>' + esc(p.category || '—') + '</td>'
+        + '<td>' + esc(p.category || '-') + '</td>'
         + '<td>' + (p.primary_location === l.name ? 'Primary' : 'Secondary') + '</td>'
-        + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">—</span>') + '</td>'
+        + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '</tr>').join('');
       body = '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
         + '<th>Product</th><th>Category</th><th>Assigned As</th><th>Par</th>'
