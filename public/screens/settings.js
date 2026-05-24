@@ -306,6 +306,12 @@ S.HubSettings = {
     Promise.all(keys.map(k => App.saveKey(k))).then(() => {
       this._flashSaved(which);
       App.updatePeriod();
+      // Saving any target group counts as completing the Hub Getting Started
+      // targets task — Profit, Revenue, or Traffic. Profile is auto-completed
+      // by the onboarding wizard, so this is the second Foundation task.
+      if (which === 'profit' || which === 'revenue' || which === 'traffic') {
+        App.markSetupDone('gs_targets');
+      }
     });
   },
 
