@@ -64,20 +64,11 @@ S.Dashboard = {
       + actionRows
       + '</div>';
 
-    // Setup pointer — a thin one-line nudge to the Hub Getting Started while
-    // targets are unset. Settings live on the Hub, never on the dashboard.
-    let startHereHtml = '';
-    if (!App.data.settings._targets_saved) {
-      startHereHtml = '<div class="card db-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(219,171,70,0.35);">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
-        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Profit targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-        + '</div>';
-    }
+    // Setup nudging lives at the Hub level via the catch-up banner on the
+    // Hub Dashboard. Recovery dashboards stay purely operational.
 
     container.innerHTML = '<div class="screen">'
       + FixPanel.recoveryCard('profit')
-      + startHereHtml
       + alertHtml
       + chartHtml
       + actionHtml
@@ -97,7 +88,6 @@ S.Dashboard = {
       document.getElementById('db-alert')?.remove();
     });
 
-    container.querySelector('.db-gs-pointer')?.addEventListener('click', () => App.navigate('getting-started'));
     document.getElementById('qa-week')?.addEventListener('click', ()=>App.navigate('this-week'));
     document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
     document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
