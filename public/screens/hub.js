@@ -179,7 +179,7 @@ S.Hub = {
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
-      + tile('Weekly Status', `${wkCount} / 3 <span style="font-size:13px;color:var(--t3);font-weight:600;">this week</span>`,
+      + tile('Weekly Status', `${wkCount} / 3 <span style="font-family:'Barlow',sans-serif;font-size:11px;color:var(--t3);font-weight:600;">this week</span>`,
              'var(--gold)',
              wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All modules entered this week',
              wkOverdue.length ? 'var(--red)' : 'var(--t3)');
@@ -206,7 +206,7 @@ S.Hub = {
       const actionHtml = canRun
         ? '<button class="hd-btn" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
         : '<div style="text-align:right;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;line-height:1.3;">'
-          + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow Condensed\',sans-serif;font-size:14px;letter-spacing:0;">in '
+          + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow\',sans-serif;font-weight:700;font-size:12px;letter-spacing:0;text-transform:none;">in '
           + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
 
       // Score block: big number / 100 + industry/target line + bar with marker
@@ -216,7 +216,7 @@ S.Hub = {
         scoreBlock = ''
           + '<div style="display:flex;align-items:baseline;gap:12px;">'
           +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
-          +     score + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
+          +     score + '<span style="font-family:\'Barlow\',sans-serif;font-size:11px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
           +   '<div style="flex:1;font-size:10px;color:var(--t3);">Industry avg ' + indAvg + ' &middot; Your target 65+</div>'
           + '</div>'
           // Status bar shortened on the right so it clears the "Next Audit"
@@ -538,7 +538,7 @@ S.Hub = {
           + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
           + modBadge(it.module)
           + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.label) + '</div>'
-          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-size:10px;color:var(--t3);font-weight:600;">/wk</span></div>'
+          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
           + '</div>';
       }).join('');
       readoutBody = ''
