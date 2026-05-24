@@ -21,6 +21,10 @@ S.RevenueMenuEngineering = {
 
   renderMatrix(container) {
     const items = (App.data.revenue_menu_items||[]).filter(i=>i.price&&i.cost&&i.weekly_covers);
+    // Running Menu Engineering with enough data to actually classify items
+    // counts as completing the Getting Started task. No save action exists
+    // on this screen — the view itself is the work.
+    if (items.length >= 4) App.markSetupDone('gs_r_eng');
     if (items.length < 4) {
       container.innerHTML = '<div class="screen"><div class="card"><div class="empty">'
         + '<div class="empty-title">Not Enough Data</div>'
