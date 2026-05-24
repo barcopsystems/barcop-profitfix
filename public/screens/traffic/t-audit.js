@@ -759,6 +759,7 @@ S.TrafficAudit = {
         App.data.traffic_audits = App.data.traffic_audits.slice(-12);
       }
       await App.saveKey('traffic_audits');
+      App.markSetupDone('gs_t_audit');
 
       document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
