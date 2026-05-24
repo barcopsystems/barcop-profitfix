@@ -398,7 +398,11 @@ S.Hub = {
 
       // Each data point is wrapped in a <g.hd-chart-dot> with an invisible
       // hit circle (r=8) for easy hover and a visible marker (r=1.6) that
-      // grows to 2.4 on hover via CSS. Data attrs feed the shared tooltip.
+      // grows to 2.4 on hover via CSS. Marker stroke is colored by the
+      // point's band — green (good) / amber (watch) / red (bad) — so the
+      // chart visually flags problem weeks at a glance, matching the
+      // tooltip's status color when hovered.
+      const dotHex = { good: '#518A79', warn: '#9A5D34', bad: '#C03828' };
       const dots = series.map((v,i) => {
         if (v == null) return '';
         const cx = x(i).toFixed(1);
@@ -406,6 +410,7 @@ S.Hub = {
         const wkRaw = weeks[i] && weeks[i].period_end;
         const wkDate = wkRaw ? (shortDate(wkRaw) || '').toUpperCase() : '';
         const dotBand = band(v, target, dir);
+        const stroke  = dotHex[dotBand] || '#DBAB46';
         return '<g class="hd-chart-dot"'
           + ' data-label="' + esc(label) + '"'
           + ' data-disp="' + esc(valFmt(v)) + '"'
@@ -413,7 +418,7 @@ S.Hub = {
           + ' data-date="' + esc(wkDate) + '"'
           + ' data-band="' + dotBand + '">'
           + '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="transparent" style="cursor:pointer;"/>'
-          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="1.6" fill="#0A1520" stroke="#DBAB46" stroke-width="1.3"/>'
+          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="1.6" fill="#0A1520" stroke="' + stroke + '" stroke-width="1.3"/>'
           + '</g>';
       }).join('');
 
