@@ -54,7 +54,7 @@ const Onboarding = {
     const parts = (s.city_state || '').split(',').map(p => p.trim());
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Bar Cop recovers lost money in three layers. Capture your operation, diagnose where it is leaking, and fix it.</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Bar Cop captures the day, shows where money leaks, and prescribes the fix.</div>'
       + this._stepDots(1)
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
       + '<div class="f" style="flex:2;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
@@ -96,10 +96,9 @@ const Onboarding = {
       + '<div class="f" style="margin-bottom:14px;"><label>Operation Type</label>'
       + '<select id="ob-type" style="width:100%;">' + opt('bar_kitchen', 'Bar and Kitchen') + opt('bar_only', 'Bar Only') + '</select></div>'
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
-      + '<div class="f" style="flex:1;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + (s.annual_bar_revenue || '') + '" placeholder="480000"/></div></div>'
-      + '<div class="f" style="flex:1;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + (s.annual_food_revenue || '') + '" placeholder="320000"/></div></div>'
+      + '<div class="f" style="flex:1;"><label>Annual Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + (s.annual_bar_revenue || '') + '"/></div></div>'
+      + '<div class="f" style="flex:1;"><label>Annual Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + (s.annual_food_revenue || '') + '"/></div></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:8px;">Best estimate is fine. If you only know your total, split it roughly. The audit refines these later.</div>'
       + '<div class="ob-actions" style="margin-top:18px;display:flex;gap:10px;">'
       + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
       + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-next">Continue</button>'
@@ -118,16 +117,16 @@ const Onboarding = {
   // ── Step 3 — Orientation and handoff ────────────────────────────────────────
   renderOrientation() {
     document.getElementById('ob-content').innerHTML =
-      '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">You Are Set Up</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Here is how Bar Cop is laid out.</div>'
+      '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">How Bar Cop Works</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">A quick lay of the land before you dig in.</div>'
       + this._stepDots(3)
-      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
-      + 'Your <strong style="color:var(--t1);">Hub</strong> is the command center. Six modules under it. Three Control modules capture daily operations: Inventory, Labor, Shift. Three Recovery modules diagnose what is leaking and prescribe the fix: Profit, Revenue, Traffic. '
-      + 'Next stop: <strong style="color:var(--t1);">Getting Started</strong> walks you through setup, top to bottom.'
+      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
+      + 'Six modules under your <strong style="color:var(--t1);">Hub</strong>. Three <strong style="color:var(--t1);">Control</strong> modules log what happens at the bar. Three <strong style="color:var(--t1);">Recovery</strong> modules show where money leaks and how to fix it.'
+      + '<div style="margin-top:10px;">Next up: a short setup checklist. Top to bottom, picking up where this left off.</div>'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
       + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
-      + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-finish">Start Setup</button>'
+      + '<button class="btn btn-primary btn-lg" style="flex:1;" id="ob-finish">Continue</button>'
       + '</div>';
 
     document.getElementById('ob-back')?.addEventListener('click', () => { this._step = 2; this.render(); });
