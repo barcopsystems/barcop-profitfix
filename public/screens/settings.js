@@ -39,13 +39,16 @@ S.HubSettings = {
     ];
     container.scrollTop = 0;
 
-    const tabs = '<div class="hs-tabs" style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:24px;flex-wrap:wrap;">'
+    // Tab styles match the breadcrumb back-link palette (t3 default, t1 on
+    // hover and on the active tab). The gold underline marks the active tab
+    // visually so the text colors stay in the same family across the app.
+    const tabs = '<div class="hs-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:24px;">'
       + secs.map(s => {
           const on = s.id === this._activeTab;
           return '<button class="hs-tab" data-tab="' + s.id + '" '
             + 'style="background:none;border:none;border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
-            + 'color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';font-family:\'Barlow\',sans-serif;font-size:11px;font-weight:700;'
-            + 'letter-spacing:0.5px;text-transform:uppercase;padding:10px 16px;cursor:pointer;transition:color 0.12s;">'
+            + 'color:' + (on ? 'var(--t1)' : 'var(--t3)') + ';font-family:\'Barlow\',sans-serif;font-size:11px;font-weight:600;'
+            + 'letter-spacing:0.04em;padding:9px 12px;cursor:pointer;transition:color 0.12s;white-space:nowrap;">'
             + esc(s.title) + '</button>';
         }).join('')
       + '</div>';
@@ -63,7 +66,7 @@ S.HubSettings = {
       '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
       + '<div style="display:flex;align-items:center;gap:14px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
       +   '<button id="hs-back" class="btn btn-ghost btn-sm">&#8592; Back to Hub</button>'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Platform Settings</div>'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Global Settings</div>'
       + '</div>'
       + tabs
       + bodies
@@ -83,12 +86,12 @@ S.HubSettings = {
   // ── Section bodies ──────────────────────────────────────────────────────────
   secProfile() {
     const s = App.data.settings || {};
-    return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f w-lg"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
-      + '<div class="f" style="width:160px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
-      + '<div class="f" style="width:140px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
-      + '<div class="f" style="width:170px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||0) + '"/></div></div>'
-      + '<div class="f" style="width:170px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||0) + '"/></div></div>'
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:215px;"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="width:125px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
+      + '<div class="f" style="width:95px;"><label>State</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
+      + '<div class="f" style="width:150px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||0) + '"/></div></div>'
+      + '<div class="f" style="width:155px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||0) + '"/></div></div>'
       + '</div>' + this.saveRow('profile');
   },
 
@@ -146,7 +149,6 @@ S.HubSettings = {
     return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f" style="width:180px;"><label>Cash Variance Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-ct" value="' + (s.cash_tolerance ?? 10) + '"/></div></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">A drawer counted within this dollar amount of expected is treated as on target. This tolerance is shared by Shift Control and Profit Cash Reconciliation.</div>'
       + this.saveRow('shift');
   },
 
@@ -199,7 +201,7 @@ S.HubSettings = {
         container.querySelectorAll('.hs-tab').forEach(t => {
           const on = t.dataset.tab === newTab;
           t.style.borderBottomColor = on ? 'var(--gold)' : 'transparent';
-          t.style.color = on ? 'var(--gold)' : 'var(--t3)';
+          t.style.color = on ? 'var(--t1)' : 'var(--t3)';
         });
         container.querySelectorAll('.hs-body').forEach(b => {
           b.style.display = b.dataset.tab === newTab ? 'block' : 'none';
