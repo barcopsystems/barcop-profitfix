@@ -13,7 +13,7 @@ FIX.traffic = [
     id: 'gbp',
     name: 'Google Business Profile',
     module: 'traffic',
-    summary: 'Your Google Business Profile is the listing that decides whether you show up in the local map results. Complete every field, keep it current, and it ranks. Leave gaps and it does not.',
+    summary: 'Your Google Business Profile decides whether you show up in the local map results.',
 
     process: {
       intro: 'Profile completeness is the single largest factor in local map ranking. Complete the profile once, maintain it weekly, audit it quarterly. Every field you fill is a field a competitor with a complete profile is not beating you on. Bar Cop scores your profile and tracks the numbers over time. Each step below opens where the work happens.',
@@ -101,7 +101,7 @@ FIX.traffic = [
     id: 'website',
     name: 'Website',
     module: 'traffic',
-    summary: 'Most guests reach your website on a phone, after a Google search, ready to act. If they cannot find your hours, your menu, and a way to book in a few seconds, they leave.',
+    summary: 'Most guests hit your site on a phone, ready to act. Convert them or lose them.',
 
     process: {
       intro: 'A bar website has one job: turn a guest who is already looking for you into a visit. Audit it before you change anything so you can prove the fixes worked, then fix conversion in the order that returns the most per hour. Bar Cop scores the site and tracks the numbers over time. Each step below opens where the work happens.',
@@ -189,7 +189,7 @@ FIX.traffic = [
     id: 'reviews',
     name: 'Reviews',
     module: 'traffic',
-    summary: 'A steady stream of recent reviews ranks you and reassures the guest who is deciding. Respond to every one, ask every satisfied guest, and track velocity every week.',
+    summary: 'Recent reviews rank you and reassure the guest who is deciding tonight.',
 
     process: {
       intro: 'Review velocity matters more than the rating sitting on your profile today. A fresh stream of reviews tells Google the business is active and tells the guest other people went last week. Build the ask into service and respond to every review. Bar Cop tracks your velocity, rating, and response rate. Each step below opens where the work happens.',
@@ -284,7 +284,7 @@ FIX.traffic = [
     id: 'search-seo',
     name: 'Search and SEO',
     module: 'traffic',
-    summary: 'Local search ranking comes from a clean, consistent listing across the web. Fix your name, address, and phone everywhere first, then build citations and track the terms that bring walk-ins.',
+    summary: 'Local search ranking comes from a clean, consistent listing across the web.',
 
     process: {
       intro: 'Local-pack ranking is built on two things: a complete Google Business Profile and consistent business information across the web. Fix the foundation before you build on it, because a citation built on top of inconsistent information just creates another variant. Local-pack ranking and organic website ranking are two separate jobs, built differently. The Search and SEO screen tracks your keyword positions and citation count. Each step below opens where the work happens.',
@@ -371,7 +371,7 @@ FIX.traffic = [
     id: 'social',
     name: 'Social Media',
     module: 'traffic',
-    summary: 'Social media drives walk-ins when it shows what the bar feels like and runs on a calendar. Own one platform, post five times a week, and track visits and clicks, not likes.',
+    summary: 'Social drives walk-ins when it shows what the bar feels like and runs on a calendar.',
 
     process: {
       intro: 'Consistency beats quality for social reach. Pick one platform where your guests are and own it before spreading to a second. Post on a fixed weekly rhythm with content the floor team captures, and measure the numbers that mean a new guest is considering a visit, not the numbers that just count the audience you already have. The Social Media screen tracks your numbers over time. Each step below opens where the work happens.',
@@ -461,7 +461,7 @@ FIX.traffic = [
     id: 'delivery',
     name: 'Delivery Platforms',
     module: 'traffic',
-    summary: 'A delivery listing is a storefront most operators never check. Audit it, curate the menu for travel and margin, answer every review, and check the dashboards weekly.',
+    summary: 'A delivery listing is a storefront most operators never check.',
 
     process: {
       intro: 'Delivery platforms run on the same signals as Google: photos, accuracy, reviews, and activity. A listing left alone runs at about 60% of its potential and looks fine from the outside. You only see the gap after the audit. The Delivery Platforms screen tracks each listing over time. Each step below opens where the work happens.',
@@ -548,7 +548,7 @@ FIX.traffic = [
     id: 'email-loyalty',
     name: 'Email and Loyalty',
     module: 'traffic',
-    summary: 'Email is the one channel where you own the audience. Build the list at every contact point, send a personal update every month, and write like the owner, not a marketing department.',
+    summary: 'Email is the one channel where you own the audience.',
 
     process: {
       intro: 'Social platforms rent you an audience. Email is the one channel you own outright. A list that hears from you on a consistent monthly rhythm, in a real voice, brings guests back. A list that hears nothing goes cold within 30 days. The Email and Loyalty screen tracks your list and your sends. Each step below opens where the work happens.',
