@@ -48,7 +48,7 @@ S.TrafficReviews = {
     // ── Trend charts ──
     const recent = weeks.slice(-8);
     const velChart = App.trendChart({
-      title: 'Review Velocity — New Reviews per Month',
+      title: 'Review Velocity: New Reviews per Month',
       target: tRV,
       points: recent.map(w => ({ label: 'Wk ' + w.week_num, value: w.new_reviews ?? null }))
     });
@@ -67,7 +67,7 @@ S.TrafficReviews = {
       + '<div class="f" style="width:200px;"><label>Most Recent Review Age ' + tt('t-review-age') + '</label><div class="fw"><input class="suf" type="number" id="rev-age" value="' + esc(String(age)) + '" min="0"/><span class="suf">days ago</span></div></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Negative Patterns Noted ' + tt('t-review-patterns') + '</label>'
-      + '<textarea id="rev-patterns" rows="2" placeholder="Recurring complaints or themes across recent reviews — slow service, noise, a specific dish.">' + esc(prof.rev_patterns || '') + '</textarea></div>'
+      + '<textarea id="rev-patterns" rows="2" placeholder="Recurring complaints or themes across recent reviews: slow service, noise, a specific dish.">' + esc(prof.rev_patterns || '') + '</textarea></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="rev-save">Save</button>'
       + '<span id="rev-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;margin-left:8px;">Saved.</span>'
@@ -79,7 +79,7 @@ S.TrafficReviews = {
     if (yr != null && yr < tYR) tips.push('Yelp rating is ' + yr.toFixed(1) + '★, below the ' + tYR + '★ benchmark. Yelp runs lower than Google, but under 4.0 hurts.');
     if (nr != null && nr < tRV) tips.push('Only ' + nr + ' new reviews this month, below the ' + tRV + '/month target. A steady stream of fresh reviews matters more than the all-time count.');
     if (rr != null && rr < tRR) tips.push('Response rate is ' + Math.round(rr) + '%, below the ' + tRR + '% target. Reply to every review, positive and negative.');
-    if (age !== '' && Number(age) > 14) tips.push('Most recent review is ' + age + ' days old. Reviews have gone quiet — prompt guests this week.');
+    if (age !== '' && Number(age) > 14) tips.push('Most recent review is ' + age + ' days old. Reviews have gone quiet. Prompt guests this week.');
     if (prof.rev_patterns && prof.rev_patterns.trim()) tips.push('Negative pattern on file: "' + prof.rev_patterns.trim() + '". Fix the root cause, not just the reply.');
     if (!latest) tips.push('No weekly data yet. Enter a week in This Week to score this section.');
 
@@ -112,6 +112,7 @@ S.TrafficReviews = {
     prof.rev_patterns = document.getElementById('rev-patterns')?.value || '';
     prof.rev_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
+    if (ok) App.markSetupDone('gs_t_reviews');
     this.draw();
     const msg = document.getElementById('rev-msg');
     if (msg) {
