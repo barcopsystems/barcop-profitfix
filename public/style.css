@@ -220,6 +220,20 @@ input,select,textarea{color-scheme:dark;}
 .topbar-right{display:flex;align-items:center;gap:8px;}
 .topbar-title{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);}
 .topbar-sub{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-left:10px;}
+/* Back-to-origin chip in topbar — appears only when crossing module
+   boundaries via a deep-link, e.g. Revenue Fix → Inventory Products. */
+.topbar-back-chip{
+  background:var(--input);
+  border:1px solid var(--b1);
+  border-radius:var(--r2);
+  color:var(--t2);
+  font-family:'Barlow',sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:0.04em;
+  padding:6px 10px;cursor:pointer;
+  transition:border-color 0.12s,color 0.12s;
+  white-space:nowrap;
+}
+.topbar-back-chip:hover{border-color:var(--gold);color:var(--gold);}
 
 /* ══ CONTENT ══ */
 .content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:rgba(219,171,70,0.18) transparent;}
