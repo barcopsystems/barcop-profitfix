@@ -27,7 +27,7 @@ S.HubHelp = {
 
   render(container) {
     const sections = [
-      { t: 'The Platform', qa: [
+      { t: 'About Bar Cop', qa: [
         { q: 'What is Bar Cop?',
           a: 'A three-layer operating platform for bars and restaurants. Capture: the Control modules (Inventory, Labor, Shift) where you log operational reality. Diagnose: the Recovery modules (Profit, Revenue, Traffic) and the monthly Audit. Fix: the Fix Layer that prescribes what to do about each gap. The flow runs in that order. Control feeds Recovery, the Audit scores what you have, and the Fix Layer tells you the next step.' },
         { q: 'How do the modules fit together?',
