@@ -1,70 +1,46 @@
 'use strict';
-S.TrafficDashboard = {
+S.RevenueDashboard = {
   _dismissed: false,
 
   render(container, actions) {
     actions.innerHTML = '';
-    const ts     = App.data.traffic_settings || {};
-    const t      = ts.targets || {};
-    const weeks  = App.data.traffic_weeks || [];
-    const latest = weeks.length ? weeks[weeks.length - 1] : null;
-
-    const googleRating  = latest?.google_rating ?? null;
-    const responseRate  = latest?.response_rate ?? null;
-
-    // Trend Insights button
     const insBtn = document.createElement('button');
     insBtn.className = 'btn btn-ghost btn-sm';
-    insBtn.id = 't-insights-btn';
+    insBtn.id = 'r-insights-btn';
     insBtn.textContent = 'Trend Insights';
     insBtn.addEventListener('click', () => this.showInsights());
     actions.appendChild(insBtn);
+    const rs     = App.data.revenue_settings || {};
+    const t      = rs.targets || {};
+    const weeks  = App.data.revenue_weeks || [];
+    const validWeeks = weeks.filter(w => (w.bar_revenue||0) + (w.floor_revenue||0) > 0);
+    const latest = validWeeks.length ? validWeeks[validWeeks.length - 1] : null;
+
+    const checkAvg   = latest?.check_avg ?? null;
+    const laborPct   = latest?.labor_pct_blended ?? null;
+    const totalRev   = latest ? (latest.bar_revenue||0) + (latest.floor_revenue||0) : null;
+    const covers     = latest?.covers ?? null;
+    const targetCA   = t.check_avg ?? 35;
+    const targetLP   = ((t.bar_labor_pct||28) + (t.kitchen_labor_pct||30) + (t.floor_labor_pct||32)) / 3;
 
     // Alert
     let alertHtml = '';
     if (latest && !this._dismissed) {
-      if (googleRating != null && googleRating < 4.0) {
-        alertHtml = '<div class="alert-bar" id="t-alert"><div class="alert-text">Google rating is ' + googleRating.toFixed(1) + '. Ratings below 4.0 cause guests to filter you out of search results. Review recovery is the first priority.</div><button class="alert-dismiss" id="t-dismiss">Close</button></div>';
-      } else if (responseRate != null && responseRate < 50) {
-        alertHtml = '<div class="alert-bar" id="t-alert"><div class="alert-text">Review response rate is ' + responseRate.toFixed(0) + '%. Target is 75%. Responding to reviews is a direct Google ranking signal.</div><button class="alert-dismiss" id="t-dismiss">Close</button></div>';
+      if (checkAvg != null && (targetCA - checkAvg) > 2) {
+        const annualGap = (targetCA - checkAvg) * (covers||0) * 52;
+        alertHtml = '<div class="alert-bar" id="r-alert"><div class="alert-text">Check average is ' + App.fmtCurrency(targetCA - checkAvg) + ' below target. That is ' + App.fmtCurrency(Math.abs(annualGap)) + ' in lost annual revenue at your current cover count.</div><button class="alert-dismiss" id="r-dismiss">Close</button></div>';
+      } else if (laborPct != null && laborPct - targetLP > 2) {
+        const wkOver = ((laborPct - targetLP) / 100) * (totalRev||0);
+        alertHtml = '<div class="alert-bar" id="r-alert"><div class="alert-text">Labor is ' + (laborPct - targetLP).toFixed(1) + ' points over target this week. That is ' + App.fmtCurrency(wkOver) + ' over budget.</div><button class="alert-dismiss" id="r-dismiss">Close</button></div>';
       }
     }
 
-    // Setup pointer — a thin one-line nudge to the Hub Getting Started while
-    // targets are unset. Settings live on the Hub, never on the dashboard.
-    let startHere = '';
-    if (!ts._targets_saved) {
-      startHere = '<div class="card t-gs-pointer" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(219,171,70,0.35);">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
-        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">Your Traffic targets are not set yet. Finish setup in Getting Started so your scores and dollar figures are accurate.</div>'
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-        + '</div>';
-    }
+    // Setup nudging lives at the Hub level via the catch-up banner on the
+    // Hub Dashboard. Recovery dashboards stay purely operational.
 
-    // Chart — annotated 8-week trend
-    const chartHtml = this.buildChart(weeks, t);
-
-    // Cadence nudges
-    const nudges = this.cadence();
-    const shown = nudges.slice(0, 4);
-    const nudgeBody = shown.length
-      ? shown.map((n, i) =>
-          '<div onclick="App.navigate(\'' + n.screen + '\')" style="display:flex;align-items:center;gap:10px;'
-          + 'padding:9px 0;cursor:pointer;' + (i < shown.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-          + '<span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:'
-          + (n.sev === 'warn' ? 'var(--gold)' : 'var(--t3)') + ';"></span>'
-          + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">' + esc(n.text) + '</div>'
-          + '<span style="flex-shrink:0;font-size:12px;color:var(--t3);">&#9656;</span>'
-          + '</div>').join('')
-      : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Posting, reviews, and email are keeping pace. Nothing is slipping right now.</div>';
-    const cadenceHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + FixPanel.sectionHeader('Activity Reminders')
-      + '<div style="padding:18px 20px;">' + nudgeBody + '</div>'
-      + '</div>';
-
-    // Priority Action Items — ranked by dollar impact from the latest Traffic audit
-    const tAudits = App.data.traffic_audits || [];
-    const latestAudit = tAudits.length ? tAudits[tAudits.length-1] : null;
+    // Priority Action Items — ranked by dollar impact from the latest Revenue audit
+    const rAudits = App.data.revenue_audits || [];
+    const latestAudit = rAudits.length ? rAudits[rAudits.length-1] : null;
     const actionItems = (latestAudit?.action_items || [])
       .filter(it => it && it.action)
       .slice()
@@ -73,8 +49,8 @@ S.TrafficDashboard = {
 
     const actionRows = actionItems.length
       ? actionItems.map((it,i) => {
-          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, 'traffic') : null);
-          return '<div class="t-db-action" data-gap="' + esc(gid || '') + '" '
+          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, 'revenue') : null);
+          return '<div class="r-db-action" data-gap="' + esc(gid || '') + '" '
           + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
           + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
           + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
@@ -88,52 +64,46 @@ S.TrafficDashboard = {
           + '</div>';
         }).join('')
       : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">'
-        + 'Run a Traffic Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
+        + 'Run a Revenue Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
     const actionHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
       + FixPanel.sectionHeader('Priority Action Items')
       + actionRows
       + '</div>';
 
     container.innerHTML = '<div class="screen">'
-      + FixPanel.recoveryCard('traffic')
-      + startHere
+      + FixPanel.recoveryCard('revenue')
       + alertHtml
-      + chartHtml
-      + cadenceHtml
+      + this.buildChart(validWeeks.slice(-8), t)
       + actionHtml
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
       + FixPanel.sectionHeader('Quick Actions')
       + '<div class="qa" style="padding:18px 20px;">'
-      + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
-      + '<button class="btn btn-ghost" id="t-qa-audit">Traffic Audit</button>'
-      + '<button class="btn btn-ghost" id="t-qa-reports">View Reports</button>'
+      + '<button class="btn btn-primary" id="r-qa-week">Enter This Week</button>'
+      + '<button class="btn btn-ghost" id="r-qa-server">Revenue Audit</button>'
+      + '<button class="btn btn-ghost" id="r-qa-reports">View Reports</button>'
       + '</div>'
       + '</div>'
       + '</div>';
 
-    document.getElementById('t-dismiss')?.addEventListener('click', () => {
-      this._dismissed = true;
-      document.getElementById('t-alert')?.remove();
-    });
-
-    container.querySelector('.t-gs-pointer')?.addEventListener('click', () => App.navigate('t-getting-started'));
-
-    document.getElementById('t-qa-week')?.addEventListener('click',    () => App.navigate('t-this-week'));
-    document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
-    document.getElementById('t-qa-reports')?.addEventListener('click', () => App.navigate('t-reports'));
-    container.querySelectorAll('.t-db-action').forEach(row => {
+    document.getElementById('r-dismiss')?.addEventListener('click', () => { this._dismissed=true; document.getElementById('r-alert')?.remove(); });
+    document.getElementById('r-qa-week')?.addEventListener('click', () => App.navigate('r-this-week'));
+    document.getElementById('r-qa-server')?.addEventListener('click', () => App.navigate('r-audit'));
+    document.getElementById('r-qa-reports')?.addEventListener('click', () => App.navigate('r-reports'));
+    container.querySelectorAll('.r-db-action').forEach(row => {
       row.addEventListener('click', () => {
         if (row.dataset.gap) App._fixFocus = row.dataset.gap;
-        App.navigate('t-fix');
+        App.navigate('r-fix');
       });
     });
-    document.getElementById('t-insights-btn')?.addEventListener('click', () => this.showInsights());
+    document.getElementById('r-insights-btn')?.addEventListener('click', () => this.showInsights());
     FixPanel.wireFixAreas(container);
   },
 
   showInsights() {
     if (App.demoBlock('AI Trend Insights')) return;
-    const weeks = (App.data.traffic_weeks || []).slice(-8);
+    const weeks = (App.data.revenue_weeks || [])
+      .filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0)
+      .slice(-8);
     const showModal = (html) => {
       const m = document.createElement('div');
       m.className = 'ins-modal';
@@ -147,33 +117,35 @@ S.TrafficDashboard = {
       box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
     };
     if (weeks.length < 2) {
-      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of traffic data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of revenue data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
       return;
     }
-    const btn = document.getElementById('t-insights-btn');
+    const btn = document.getElementById('r-insights-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
-    const t = (App.data.traffic_settings || {}).targets || {};
-    const grT  = t.google_rating ?? 4.3;
-    const rrT  = t.response_rate ?? 80;
+    const t = (App.data.revenue_settings || {}).targets || {};
+    const caT    = t.check_avg ?? 35;
+    const laborT = ((t.bar_labor_pct ?? 28) + (t.kitchen_labor_pct ?? 30) + (t.floor_labor_pct ?? 32)) / 3;
+    const rplhT  = ((t.rplh_lunch ?? 50) + (t.rplh_dinner ?? 75) + (t.rplh_bar ?? 65)) / 3;
     const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
-    const grS = weeks.map(w => w.google_rating).filter(v => v != null);
-    const rvS = weeks.map(w => w.new_reviews).filter(v => v != null);
-    const rrS = weeks.map(w => w.response_rate).filter(v => v != null);
-    const aGR = avg(grS).toFixed(2);
-    const aRV = avg(rvS).toFixed(1);
-    const aRR = avg(rrS).toFixed(0);
-    const trend = grS.length >= 3
-      ? (grS[grS.length-1] - grS[0] > 0.1 ? 'rating climbing'
-        : grS[0] - grS[grS.length-1] > 0.1 ? 'rating slipping'
-        : 'rating flat')
+    const caS    = weeks.map(w => w.check_avg).filter(v => v != null);
+    const labS   = weeks.map(w => w.labor_pct_blended).filter(v => v != null);
+    const rplhS  = weeks.map(w => w.rplh_blended).filter(v => v != null);
+    const aCA    = avg(caS).toFixed(2);
+    const aLab   = avg(labS).toFixed(1);
+    const aRplh  = avg(rplhS).toFixed(0);
+    const trend  = caS.length >= 3
+      ? (caS[caS.length-1] - caS[0] > 1 ? 'trending higher (improving)'
+        : caS[0] - caS[caS.length-1] > 1 ? 'trending lower (worsening)'
+        : 'holding steady')
       : 'early data';
     const lines = [
-      'Google Rating: ' + weeks.map(w => (w.google_rating||0).toFixed(2) + '★').join(', ') + ' (target: ' + grT + '★, avg: ' + aGR + '★)',
-      'New Reviews per week: ' + weeks.map(w => Math.round(w.new_reviews||0)).join(', ') + ' (avg: ' + aRV + ')',
-      'Response Rate: ' + weeks.map(w => (w.response_rate||0).toFixed(0) + '%').join(', ') + ' (target: ' + rrT + '%, avg: ' + aRR + '%)',
-      'Rating trend: ' + trend
+      'Check Average: ' + weeks.map(w => '$' + (w.check_avg||0).toFixed(2)).join(', ') + ' (target: $' + caT + ', avg: $' + aCA + ')',
+      'Labor Cost %: ' + weeks.map(w => (w.labor_pct_blended||0).toFixed(1) + '%').join(', ') + ' (target: ' + laborT.toFixed(1) + '%, avg: ' + aLab + '%)',
+      'RPLH: ' + weeks.map(w => '$' + (w.rplh_blended||0).toFixed(0)).join(', ') + ' (target: $' + rplhT.toFixed(0) + ', avg: $' + aRplh + ')',
+      'Covers: ' + weeks.map(w => Math.round(w.covers||0)).join(', '),
+      'Check average trend: ' + trend
     ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with what the rating and review velocity are saying about how the bar shows up in local search, then response rate as a coachable habit, then the single action that will matter most this week.';
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with the biggest revenue lever (check average gap, labor productivity, or cover count), then the trend that matters, then the single action that will matter most this week.';
     fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -191,108 +163,6 @@ S.TrafficDashboard = {
       });
   },
 
-  /* Cadence nudges (Section 10) — advisory signals on whether the digital
-     presence routines are keeping pace. Each is computed from real weekly
-     data; no nudge fires on a number the app does not hold. */
-  cadence() {
-    const weeks = App.data.traffic_weeks || [];
-    const ts = (App.data.traffic_settings || {}).targets || {};
-    const nudges = [];
-    if (!weeks.length) {
-      nudges.push({ text: 'No traffic data logged yet. Enter your first week in This Week.', sev: 'warn', screen: 't-this-week' });
-      return nudges;
-    }
-    const latest = weeks[weeks.length - 1];
-    const daysSince = (str) => {
-      if (!str) return null;
-      const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-      return isNaN(d.getTime()) ? null : Math.floor((Date.now() - d.getTime()) / 86400000);
-    };
-    const age = daysSince(latest.period_end);
-    if (age != null && age > 10) {
-      nudges.push({ text: 'Traffic data is ' + age + ' days old. Log this week so the trend stays current.', sev: 'warn', screen: 't-this-week' });
-    }
-    const velT = ts.review_velocity ?? 8;
-    if (latest.new_reviews != null && latest.new_reviews < velT) {
-      nudges.push({ text: 'New reviews running at ' + latest.new_reviews + ' a month, below your target of ' + velT + '. Ask satisfied guests this week.', sev: 'warn', screen: 't-reviews' });
-    }
-    const priorRev = weeks.slice(-5, -1).map(w => w.new_reviews).filter(v => v != null);
-    if (priorRev.length >= 2 && latest.new_reviews != null) {
-      const avg = priorRev.reduce((a, b) => a + b, 0) / priorRev.length;
-      if (avg > 0 && latest.new_reviews < avg * 0.8) {
-        nudges.push({ text: 'Review velocity is down. ' + latest.new_reviews + ' this period against a ' + avg.toFixed(0) + ' average.', sev: 'info', screen: 't-reviews' });
-      }
-    }
-    const rrT = ts.response_rate ?? 75;
-    if (latest.response_rate != null && latest.response_rate < rrT) {
-      nudges.push({ text: 'Review response rate at ' + latest.response_rate.toFixed(0) + '%, below the ' + rrT + '% target. Respond to every open review.', sev: 'warn', screen: 't-reviews' });
-    }
-    const postT = ts.social_posts_month ?? 12;
-    if (latest.ig_posts_month != null && latest.ig_posts_month < postT) {
-      nudges.push({ text: 'Social posting at ' + latest.ig_posts_month + ' for the month, below the ' + postT + ' benchmark. Get on a posting calendar.', sev: 'info', screen: 't-social' });
-    }
-    if (!latest.emails_sent) {
-      nudges.push({ text: 'No marketing emails logged this period. A list you never email goes cold. Send at least one a month.', sev: 'info', screen: 't-email' });
-    }
-    return nudges.sort((a, b) => (a.sev === 'warn' ? 0 : 1) - (b.sev === 'warn' ? 0 : 1));
-  },
-
-  showInsights() {
-    if (App.demoBlock('AI Trend Insights')) return;
-    const weeks = App.data.traffic_weeks || [];
-    const showModal = (html) => {
-      const m = document.createElement('div');
-      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-      const box = document.createElement('div');
-      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
-      box.innerHTML = html;
-      m.appendChild(box);
-      document.body.appendChild(m);
-      m.onclick = ev => { if(ev.target===m) m.remove(); };
-      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
-    };
-    if (weeks.length < 2) {
-      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-      return;
-    }
-    const btn = document.getElementById('t-insights-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
-    const ts  = App.data.traffic_settings?.targets || {};
-    const avg = arr => { const v = arr.filter(x=>x!=null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
-    const recent = weeks.slice(-8);
-    const grVals = recent.map(w=>w.google_rating).filter(v=>v!=null);
-    const rvVals = recent.map(w=>w.new_reviews).filter(v=>v!=null);
-    const rrVals = recent.map(w=>w.response_rate).filter(v=>v!=null);
-    const ssVals = recent.map(w=>w.monthly_sessions).filter(v=>v!=null);
-    const aGR = avg(grVals).toFixed(2);
-    const aRV = avg(rvVals).toFixed(1);
-    const aRR = avg(rrVals).toFixed(1);
-    const aSS = Math.round(avg(ssVals));
-    const grTrend = grVals.length>=3 ? (grVals[grVals.length-1]-grVals[0]>0.1?'trending up':grVals[0]-grVals[grVals.length-1]>0.1?'trending down':'holding steady') : 'early data';
-    const lines = [
-      'Google Rating: '+recent.map(w=>w.google_rating?w.google_rating.toFixed(1)+'\u2605':'n/a').join(', ')+' (target:'+ts.google_rating+'\u2605 avg:'+aGR+'\u2605)',
-      'Rating trend: '+grTrend,
-      'New reviews/mo: '+recent.map(w=>w.new_reviews??'n/a').join(', ')+' (target:'+ts.review_velocity+'/mo avg:'+aRV+')',
-      'Response rate: '+recent.map(w=>w.response_rate?w.response_rate.toFixed(0)+'%':'n/a').join(', ')+' (target:'+ts.response_rate+'% avg:'+aRR+'%)',
-      'Monthly sessions: '+recent.map(w=>w.monthly_sessions??'n/a').join(', ')+' (target:'+ts.monthly_sessions+' avg:'+aSS+')',
-    ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner about their digital presence. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n'+lines.join('\n')+'\n\nLead with Google rating and review velocity, then website traffic, then the single action that will have the most impact on local digital visibility this week.';
-    fetch('/api/claude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:'claude-sonnet-4-5', max_tokens:600, messages:[{role:'user', content:prompt}]})})
-    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(data => {
-      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
-      if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: '+data.error.message+'</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
-      const text = data.content?.[0]?.text;
-      if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
-      const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+recent.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
-      const body   = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
-      showModal(header+body);
-    }).catch(err => {
-      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
-      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: '+err.message+'. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-    });
-  },
-
   buildChart(weeks, t) {
     if (weeks.length < 2) return '<div class="chart-card" style="padding:24px 24px 20px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:32px;">8-Week Trend</div>'
@@ -300,17 +170,16 @@ S.TrafficDashboard = {
 
     const W=800, H=220, PAD={t:28,r:60,b:40,l:48};
     const cw=W-PAD.l-PAD.r, ch=H-PAD.t-PAD.b;
-    const last8 = weeks.slice(-8);
 
-    const grS   = last8.map(w=>w.google_rating??null);
-    const rvS   = last8.map(w=>w.new_reviews??null);
-    const rrS   = last8.map(w=>w.response_rate!=null?w.response_rate/10:null); // scale /10 to plot alongside rating
-    const allV  = [...grS,...rvS,...rrS].filter(v=>v!=null);
+    const caS   = weeks.map(w=>w.check_avg??null);
+    const labS  = weeks.map(w=>w.labor_pct_blended??null);
+    const rplhS = weeks.map(w=>w.rplh_blended??null);
+    const allV  = [...caS,...labS,...rplhS].filter(v=>v!=null);
     if (!allV.length) return '';
 
-    const minY = Math.max(0, Math.floor(Math.min(...allV)-1));
-    const maxY = Math.ceil(Math.max(...allV)+2);
-    const xs = i => PAD.l + (last8.length>1 ? (i/(last8.length-1))*cw : cw/2);
+    const minY = Math.max(0, Math.floor(Math.min(...allV)-4));
+    const maxY = Math.ceil(Math.max(...allV)+6);
+    const xs = i => PAD.l + (weeks.length>1 ? (i/(weeks.length-1))*cw : cw/2);
     const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY))*ch;
 
     const smoothPath = pts => {
@@ -330,40 +199,101 @@ S.TrafficDashboard = {
       return d;
     };
 
-    const range=maxY-minY, tickStep=range<=6?1:range<=12?2:range<=24?4:8;
+    const range=maxY-minY, tickStep=range<=12?2:range<=24?4:8;
     const ticks=[]; for(let v=Math.ceil(minY/tickStep)*tickStep;v<=maxY;v+=tickStep)ticks.push(v);
-    const yTicks=ticks.map(v=>'<line x1="'+PAD.l+'" y1="'+ys(v).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(v).toFixed(1)+'" stroke="rgba(255,255,255,0.04)"/><text x="'+(PAD.l-6)+'" y="'+(ys(v)+4).toFixed(1)+'" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">'+v+'</text>').join('');
-    const xLabels=last8.map((w,i)=>'<text x="'+xs(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'+(w.period_end?w.period_end.slice(5).replace('-','/'):'Wk'+w.week_num)+'</text>').join('');
+    const yTicks=ticks.map(v=>'<line x1="'+PAD.l+'" y1="'+ys(v).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(v).toFixed(1)+'" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="'+(PAD.l-8)+'" y="'+(ys(v)+4).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'+v+'</text>').join('');
+    const xLabels=weeks.map((w,i)=>'<text x="'+xs(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">'+(w.period_end?w.period_end.slice(5).replace('-','/'):'Wk'+w.week_num)+'</text>').join('');
 
-    const grLabels=grS.map((v,i)=>{if(v==null)return '';const x=xs(i),y=ys(v);const above=y>PAD.t+16;return '<text x="'+x.toFixed(1)+'" y="'+(above?y-10:y+18).toFixed(1)+'" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">'+v.toFixed(1)+'★</text>';}).join('');
+    const caLabels=caS.map((v,i)=>{if(v==null)return '';const x=xs(i),y=ys(v);const above=y>PAD.t+16;return '<text x="'+x.toFixed(1)+'" y="'+(above?y-10:y+18).toFixed(1)+'" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">$'+v.toFixed(0)+'</text>';}).join('');
 
-    const tGR  = (t.google_rating||4.3);
-    const uid  = 'tg'+Math.random().toString(36).slice(2,6);
+    const tCA  = t.check_avg||35;
+    const uid  = 'rg'+Math.random().toString(36).slice(2,6);
 
     const fixMarkers = (window.Recovery && window.FixPanel)
-      ? FixPanel.markerSvg(Recovery.chartMarkers(last8, 'traffic'), xs, PAD.t, PAD.t + ch) : '';
+      ? FixPanel.markerSvg(Recovery.chartMarkers(weeks, 'revenue'), xs, PAD.t, PAD.t + ch) : '';
 
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">'
       + '<div style="display:flex;align-items:center;gap:14px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
-      + '<button class="btn btn-ghost btn-sm" id="t-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
+      + '<button class="btn btn-ghost btn-sm" id="r-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
       + '</div>'
-      + '<div style="display:flex;gap:16px;">'
-      + '<span style="font-size:10px;color:var(--gold);font-weight:600;">  Google Rating</span>'
-      + '<span style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:600;">  Reviews/mo (÷10)</span>'
-      + '<span style="font-size:10px;color:#4888A8;font-weight:600;">  Response % (÷10)</span>'
+      + '<div style="display:flex;gap:20px;">'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Check Avg</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.4);display:inline-block;border-radius:1px;"></span>Labor %</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.2);display:inline-block;border-radius:1px;"></span>RPLH</span>'
       + '</div></div>'
-      + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
-      + '<defs><linearGradient id="grGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0"/></linearGradient></defs>'
+      + '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
+      + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
       + yTicks
-      + '<line x1="'+PAD.l+'" y1="'+ys(tGR).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tGR).toFixed(1)+'" stroke="rgba(219,171,70,0.25)" stroke-width="1" stroke-dasharray="4,4"/>'
+      + '<line x1="'+PAD.l+'" y1="'+ys(tCA).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(tCA).toFixed(1)+'" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>'
+      + '<text x="'+(W-PAD.r+6)+'" y="'+(ys(tCA)+4).toFixed(1)+'" fill="rgba(219,171,70,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
       + fixMarkers
-      + (areaPath(grS)?'<path d="'+areaPath(grS)+'" fill="url(#grGrad'+uid+')"/>':'')
-      + '<path d="'+smoothPath(grS)+'" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+smoothPath(rvS)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+smoothPath(rrS)+'" fill="none" stroke="#4888A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-      + grLabels + xLabels
+      + (areaPath(caS)?'<path d="'+areaPath(caS)+'" fill="url(#caGrad'+uid+')"/>':'')
+      + '<path d="'+smoothPath(rplhS)+'" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(labS)+'" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(caS)+'" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + caS.map((v,i)=>v!=null?'<circle cx="'+xs(i).toFixed(1)+'" cy="'+ys(v).toFixed(1)+'" r="4" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>':'').join('')
+      + caLabels + xLabels
       + '</svg></div>';
+  },
+
+  showInsights() {
+    if (App.demoBlock('AI Trend Insights')) return;
+    const weeks = (App.data.revenue_weeks||[]).filter(w=>(w.bar_revenue||0)+(w.floor_revenue||0)>0).slice(-8);
+    const showModal = (html) => {
+      const m = document.createElement('div');
+      m.className = 'ins-modal';
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
+      box.innerHTML = html;
+      m.appendChild(box);
+      document.body.appendChild(m);
+      m.onclick = ev => { if(ev.target===m) m.remove(); };
+      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
+    };
+    if (weeks.length < 2) {
+      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      return;
+    }
+    const btn = document.getElementById('r-insights-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
+    const t  = App.data.revenue_settings?.targets || {};
+    const avg = arr => { const v = arr.filter(x=>x!=null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
+    const caT = t.check_avg || 35;
+    const lpT = ((t.bar_labor_pct||28)+(t.kitchen_labor_pct||30)+(t.floor_labor_pct||32))/3;
+    const caVals  = weeks.map(w=>w.check_avg).filter(v=>v!=null);
+    const lpVals  = weeks.map(w=>w.labor_pct_blended).filter(v=>v!=null);
+    const revVals = weeks.map(w=>(w.bar_revenue||0)+(w.floor_revenue||0));
+    const covVals = weeks.map(w=>w.covers).filter(v=>v!=null);
+    const aCA = avg(caVals).toFixed(2);
+    const aLP = avg(lpVals).toFixed(1);
+    const aRev = avg(revVals).toFixed(0);
+    const aCov = avg(covVals).toFixed(0);
+    const caTrend = caVals.length>=3 ? (caVals[caVals.length-1]-caVals[0]>1 ? 'trending up (improving)' : caVals[0]-caVals[caVals.length-1]>1 ? 'trending down (worsening)' : 'holding steady') : 'early data';
+    const lines = [
+      'Check Average: '+weeks.map(w=>w.check_avg?'$'+w.check_avg.toFixed(2):'n/a').join(', ')+' (target:$'+caT+' avg:$'+aCA+')',
+      'Check average trend: '+caTrend,
+      'Labor %: '+weeks.map(w=>w.labor_pct_blended?w.labor_pct_blended.toFixed(1)+'%':'n/a').join(', ')+' (target:'+lpT.toFixed(1)+'% avg:'+aLP+'%)',
+      'Avg weekly revenue: $'+aRev,
+      'Avg covers/week: '+aCov,
+      'Weekly check avg gap vs target: $'+Math.abs((parseFloat(aCA)-caT)*parseFloat(aCov)).toFixed(0)+' '+(parseFloat(aCA)<caT?'below target':'above target'),
+    ];
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the revenue and labor data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n'+lines.join('\n')+'\n\nLead with check average performance, then labor efficiency, then the single action that will move revenue most this week.';
+    fetch('/api/claude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:'claude-sonnet-4-5', max_tokens:600, messages:[{role:'user', content:prompt}]})})
+    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data => {
+      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
+      if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: '+data.error.message+'</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+      const text = data.content?.[0]?.text;
+      if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+      const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
+      const body   = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
+      showModal(header+body);
+    }).catch(err => {
+      if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
+      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: '+err.message+'. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+    });
   }
 };
