@@ -16,17 +16,17 @@ FIX.profit = [
     summary: 'The gap between what you spent on bar product and what you sold. Measure it weekly, investigate variance, and hold the line with a written pour standard.',
 
     process: {
-      intro: 'A working pour cost system has four parts that all have to run: a count on the same day every week, the pour cost calculated right after it, a variance report reviewed within 48 hours, and a written pour standard. The app does the counting and the math. Each step below opens the screen where that happens.',
+      intro: 'A working pour cost system has four parts that all have to run: a count on the same day every week, the pour cost calculated right after it, a variance report reviewed within 48 hours, and a written pour standard. Bar Cop does the counting and the math. Each step below opens the screen where that happens.',
       steps: [
         { kind: 'action', target: 'ic-product-setup', targetLabel: 'Products',
           title: 'Set accurate bottle yields',
-          detail: 'In Inventory Control Products, enter every active product with its container size, pour size, and unit cost. The app turns that into pours per container and cost per pour, and pour cost is only as accurate as those numbers.' },
+          detail: 'In Inventory Control Products, enter every active product with its container size, pour size, and unit cost. Bar Cop turns that into pours per container and cost per pour, and pour cost is only as accurate as those numbers.' },
         { kind: 'action', target: 'ic-take-inventory', targetLabel: 'Take Inventory',
           title: 'Count on the same day every week',
           detail: 'Run a full count in Take Inventory on the same day each week. Count partial bottles with the bottle slider instead of estimating by eye. The count is what every pour cost number is built from.' },
         { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
           title: 'Read your actual pour cost',
-          detail: 'There is nothing for you to calculate. The app works out pour cost from your counts and deliveries and shows it on the Profit dashboard, by category, against your target.' },
+          detail: 'There is nothing for you to calculate. Bar Cop works out pour cost from your counts and deliveries and shows it on the Profit dashboard, by category, against your target.' },
         { kind: 'action', target: 'ic-report-variance', targetLabel: 'Variance Report',
           title: 'Run the variance report',
           detail: 'The Variance Report compares what your count says you used against what the POS says you sold. Anything above the flag threshold is over-pouring, waste, theft, or unrecorded comps.' },
@@ -126,7 +126,7 @@ FIX.profit = [
           detail: 'In the Variance Log, count each drawer against expected POS cash at end of shift and log the direction. Consistent shorts and consistent overs are both signals.' },
         { kind: 'action', target: 'ic-receive-delivery', targetLabel: 'Receive Delivery',
           title: 'Inspect every delivery against the invoice',
-          detail: 'Log each delivery in Receive Delivery and check it against the invoice before the driver leaves. The app flags price changes, and you catch short counts and substitutions.' },
+          detail: 'Log each delivery in Receive Delivery and check it against the invoice before the driver leaves. Bar Cop flags price changes, and you catch short counts and substitutions.' },
         { kind: 'action', target: 'ic-spot-check', targetLabel: 'Spot Check',
           title: 'Run unannounced shift audits',
           detail: 'Use Spot Check for a fast pre and post shift count on your high-risk products, on different shifts at varied times. The audit is a deterrent as much as a detection tool.' },
@@ -216,7 +216,7 @@ FIX.profit = [
     summary: 'What the kitchen spends on product against what it sells. Cost every recipe on real prices, count weekly, track waste with reasons, and price surgically.',
 
     process: {
-      intro: 'Food cost is set before service on the cost card and held during service at the station. The app costs the recipes and computes the number. The count, the waste sheet, and the portion audit tell you why it moved. Each step opens where the work happens.',
+      intro: 'Food cost is set before service on the cost card and held during service at the station. Bar Cop costs the recipes and computes the number. The count, the waste sheet, and the portion audit tell you why it moved. Each step opens where the work happens.',
       steps: [
         { kind: 'action', target: 'recipe-library', targetLabel: 'Recipe Library',
           title: 'Build yield-adjusted recipe cost cards',
@@ -226,7 +226,7 @@ FIX.profit = [
           detail: 'Run a Kitchen or Full count in Take Inventory, the same day every week, valued at cost. The count is the foundation every food cost number depends on.' },
         { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
           title: 'Read your actual food cost',
-          detail: 'The app works out food cost from your counts and deliveries and shows it on the Profit dashboard, by category, against target. There is nothing for you to calculate.' },
+          detail: 'Bar Cop works out food cost from your counts and deliveries and shows it on the Profit dashboard, by category, against target. There is nothing for you to calculate.' },
         { kind: 'reference', target: 'Daily_Food_Waste_Tracking.pdf', targetLabel: 'Daily Food Waste Sheet',
           title: 'Track waste daily with reason codes',
           detail: 'Print the Daily Food Waste Sheet and have every station log discarded product with a reason code. A count of what was thrown away tells you nothing. The reason code tells you what to change.' },
@@ -318,7 +318,7 @@ FIX.profit = [
     summary: 'Price drift, short counts, and quiet substitutions on every invoice. Audit each delivery against the PO, track prices monthly, and renegotiate quarterly with the data.',
 
     process: {
-      intro: 'Vendor overcharge recovery is an ongoing weekly job, not a one-time audit. Every discrepancy you document at delivery is a credit you can request. Every one you miss is a cost you absorbed. The app flags price changes the moment you receive a delivery and tracks the drift over time. Each step below opens the screen where that happens.',
+      intro: 'Vendor overcharge recovery is an ongoing weekly job, not a one-time audit. Every discrepancy you document at delivery is a credit you can request. Every one you miss is a cost you absorbed. Bar Cop flags price changes the moment you receive a delivery and tracks the drift over time. Each step below opens the screen where that happens.',
       steps: [
         { kind: 'action', target: 'ic-order-history', targetLabel: 'Order History',
           title: 'Know what you ordered before the truck arrives',
@@ -328,12 +328,12 @@ FIX.profit = [
           detail: 'Log the delivery in Receive Delivery and count it against the order, line by line. A short count not caught at the door is a loss you already accepted. It does not get recovered later.' },
         { kind: 'action', target: 'ic-receive-delivery', targetLabel: 'Receive Delivery',
           title: 'Check the invoiced prices as you receive',
-          detail: 'As you receive, the app compares each invoiced price against the last price you paid and flags anything that moved. Note any substitution before you sign. A lower-tier product billed at the premium price is an overcharge, not a substitution.' },
+          detail: 'As you receive, Bar Cop compares each invoiced price against the last price you paid and flags anything that moved. Note any substitution before you sign. A lower-tier product billed at the premium price is an overcharge, not a substitution.' },
         { kind: 'action', target: 'vendor-discrepancy', targetLabel: 'Vendor Discrepancies',
           title: 'File a discrepancy on any variance',
           detail: 'When a delivery is short or a price is wrong, open Vendor Discrepancies and file it: vendor, type, product, agreed price, invoiced price, and the total overcharge. Get it to your rep within 24 hours, discrepancies age out fast. The screen tracks each one from open to credit requested to resolved, and totals what is still owed to you.' },
         { kind: 'result', target: 'vendor-watch', targetLabel: 'Vendor Watch',
-          title: 'Read the price drift the app is tracking',
+          title: 'Read the price drift Bar Cop is tracking',
           detail: 'Vendor Watch reads every delivery you receive and surfaces which vendor prices have drifted up and what that drift costs you per year. There is no price tracker to keep by hand. Check it once a month.' },
         { kind: 'result', target: 'vendor-watch', targetLabel: 'Vendor Watch',
           title: 'Bring the data to a quarterly vendor review',
@@ -358,7 +358,7 @@ FIX.profit = [
         'Every delivery: pull the order, count every case, check the invoiced prices',
         'Every delivery: log the delivery and inspection in Receive Delivery before the driver leaves',
         'On any variance: file a discrepancy report and contact the rep within 24 hours',
-        'Monthly: review the price drift the app surfaced in Vendor Watch',
+        'Monthly: review the price drift Bar Cop surfaced in Vendor Watch',
         'Monthly: flag any item up more than 5% since last quarter or cheaper elsewhere',
         'Quarterly: run the vendor review with the documented drift data in hand',
         'Quarterly: confirm pricing and substitution terms in writing within 48 hours'
@@ -418,14 +418,14 @@ FIX.profit = [
     summary: 'COGS plus labor as a share of sales. The single number that confirms whether your other cost systems are working. Read it weekly, find the driver when it moves, act before the next week starts.',
 
     process: {
-      intro: 'Prime cost is an operations metric, not a finance metric. It is the one number that tells you whether pour cost, food cost, and labor control are actually working. The app pulls the inputs from your Control modules and computes it for you. Read it weekly, on Monday, in fifteen minutes. Each step below opens where that happens.',
+      intro: 'Prime cost is an operations metric, not a finance metric. It is the one number that tells you whether pour cost, food cost, and labor control are actually working. Bar Cop pulls the inputs from your Control modules and computes it for you. Read it weekly, on Monday, in fifteen minutes. Each step below opens where that happens.',
       steps: [
         { kind: 'action', target: 'this-week', targetLabel: 'This Week',
           title: 'Confirm the week\'s inputs',
           detail: 'Open This Week. Net sales come from Shift Control, labor from Labor Control, and COGS from Inventory Control, already filled in. Confirm them. Prime cost is only as honest as the numbers feeding it, so an unconfirmed week is a prime cost you cannot trust.' },
         { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
           title: 'Read prime cost every Monday',
-          detail: 'The app works out prime cost as total COGS plus total labor over net sales, food and beverage kept separate, and shows it on the Profit dashboard against your concept target. There is nothing for you to calculate. Read it weekly, not monthly. A 30-day lag is 30 days of loss before you see it.' },
+          detail: 'Bar Cop works out prime cost as total COGS plus total labor over net sales, food and beverage kept separate, and shows it on the Profit dashboard against your concept target. There is nothing for you to calculate. Read it weekly, not monthly. A 30-day lag is 30 days of loss before you see it.' },
         { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
           title: 'Find which part moved when it is over',
           detail: 'The dashboard breaks prime cost into its parts: bar pour cost, food cost, and labor, each dollar-quantified. The number tells you it moved. The parts tell you where. Decide before the week starts whether the gap is enough to open an investigation or a corrective action today.' },
