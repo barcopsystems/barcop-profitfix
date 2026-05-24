@@ -78,6 +78,7 @@ S.RevenueMenuItems = {
       if (!App.data.revenue_menu_items) App.data.revenue_menu_items = [];
       App.data.revenue_menu_items.push(...imported);
       await App.saveKey('revenue_menu_items');
+      App.markSetupDone('gs_r_menu');
       status.textContent = imported.length + ' items imported.';
       setTimeout(() => this.render(container, actions), 1000);
     });
@@ -216,6 +217,7 @@ S.RevenueMenuItems = {
       if (idx !== null) App.data.revenue_menu_items[idx] = entry;
       else App.data.revenue_menu_items.push(entry);
       await App.saveKey('revenue_menu_items');
+      App.markSetupDone('gs_r_menu');
       this.render(container, actions);
     });
   }
