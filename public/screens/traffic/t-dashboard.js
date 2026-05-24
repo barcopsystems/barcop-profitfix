@@ -127,9 +127,69 @@ S.TrafficDashboard = {
         App.navigate('t-fix');
       });
     });
+    document.getElementById('t-insights-btn')?.addEventListener('click', () => this.showInsights());
     FixPanel.wireFixAreas(container);
   },
 
+  showInsights() {
+    if (App.demoBlock('AI Trend Insights')) return;
+    const weeks = (App.data.traffic_weeks || []).slice(-8);
+    const showModal = (html) => {
+      const m = document.createElement('div');
+      m.className = 'ins-modal';
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
+      box.innerHTML = html;
+      m.appendChild(box);
+      document.body.appendChild(m);
+      m.onclick = ev => { if (ev.target === m) m.remove(); };
+      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
+    };
+    if (weeks.length < 2) {
+      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of traffic data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      return;
+    }
+    const btn = document.getElementById('t-insights-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
+    const t = (App.data.traffic_settings || {}).targets || {};
+    const grT  = t.google_rating ?? 4.3;
+    const rrT  = t.response_rate ?? 80;
+    const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
+    const grS = weeks.map(w => w.google_rating).filter(v => v != null);
+    const rvS = weeks.map(w => w.new_reviews).filter(v => v != null);
+    const rrS = weeks.map(w => w.response_rate).filter(v => v != null);
+    const aGR = avg(grS).toFixed(2);
+    const aRV = avg(rvS).toFixed(1);
+    const aRR = avg(rrS).toFixed(0);
+    const trend = grS.length >= 3
+      ? (grS[grS.length-1] - grS[0] > 0.1 ? 'rating climbing'
+        : grS[0] - grS[grS.length-1] > 0.1 ? 'rating slipping'
+        : 'rating flat')
+      : 'early data';
+    const lines = [
+      'Google Rating: ' + weeks.map(w => (w.google_rating||0).toFixed(2) + '★').join(', ') + ' (target: ' + grT + '★, avg: ' + aGR + '★)',
+      'New Reviews per week: ' + weeks.map(w => Math.round(w.new_reviews||0)).join(', ') + ' (avg: ' + aRV + ')',
+      'Response Rate: ' + weeks.map(w => (w.response_rate||0).toFixed(0) + '%').join(', ') + ' (target: ' + rrT + '%, avg: ' + aRR + '%)',
+      'Rating trend: ' + trend
+    ];
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with what the rating and review velocity are saying about how the bar shows up in local search, then response rate as a coachable habit, then the single action that will matter most this week.';
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (btn) { btn.disabled = false; btn.textContent = 'Trend Insights'; }
+        if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: ' + data.error.message + '</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+        const text = data.content?.[0]?.text;
+        if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
+        const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last ' + weeks.length + ' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
+        const body = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">') + '</div>';
+        showModal(header + body);
+      }).catch(err => {
+        if (btn) { btn.disabled = false; btn.textContent = 'Trend Insights'; }
+        showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: ' + err.message + '. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
+      });
+  },
 
   /* Cadence nudges (Section 10) — advisory signals on whether the digital
      presence routines are keeping pace. Each is computed from real weekly
@@ -284,8 +344,11 @@ S.TrafficDashboard = {
       ? FixPanel.markerSvg(Recovery.chartMarkers(last8, 'traffic'), xs, PAD.t, PAD.t + ch) : '';
 
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">'
+      + '<div style="display:flex;align-items:center;gap:14px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
+      + '<button class="btn btn-ghost btn-sm" id="t-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
+      + '</div>'
       + '<div style="display:flex;gap:16px;">'
       + '<span style="font-size:10px;color:var(--gold);font-weight:600;">  Google Rating</span>'
       + '<span style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:600;">  Reviews/mo (÷10)</span>'
