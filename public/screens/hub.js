@@ -568,6 +568,7 @@ S.Hub = {
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      mail:    '<rect x="2.2" y="4" width="12.6" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 4.5l6.3 4.5 6.3-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       signout: '<path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
     };
 
@@ -593,8 +594,9 @@ S.Hub = {
       + navItem('getting-started', 'Getting Started', 'getStart', [])
       + navItem('help',            'Help and FAQ',    'help',     [])
       + '<div class="nav-section">Manage</div>'
-      + navItem('settings',   'Global Settings', 'settings', [])
-      + navItem('report-bug', 'Report a Bug',   'bug',      []);
+      + navItem('settings',         'Global Settings',  'settings', [])
+      + navItem('contact-support',  'Contact Support',  'mail',     [])
+      + navItem('report-bug',       'Report a Bug',     'bug',      []);
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
@@ -699,6 +701,7 @@ S.Hub = {
       else if (action === 'getting-started') S.HubGettingStarted.open();
       else if (action === 'help')            S.HubHelp.open();
       else if (action === 'settings')        S.HubSettings.open();
+      else if (action === 'contact-support') S.HubSupport.open();
       else if (action === 'report-bug')      S.HubReportBug.open();
     });
 
