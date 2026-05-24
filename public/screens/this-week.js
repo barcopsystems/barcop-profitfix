@@ -118,17 +118,17 @@ S.ThisWeek = {
     if (kind === 'cogs') {
       return this.hasIC()
         ? 'Auto-filled from Inventory Control. <a href="#" onclick="S.ThisWeek.pullCOGS();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No inventory counts yet — count in Inventory Control, or enter manually.';
+        : 'No inventory counts yet, count in Inventory Control, or enter manually.';
     }
     if (kind === 'revenue') {
       return this.hasShifts()
-        ? 'Auto-filled from Shift Control — the weekly sum of logged shift revenue. <a href="#" onclick="S.ThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No shifts logged in Shift Control yet — log shifts there, or enter manually.';
+        ? 'Auto-filled from Shift Control, the weekly sum of logged shift revenue. <a href="#" onclick="S.ThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No shifts logged in Shift Control yet, log shifts there, or enter manually.';
     }
     if (kind === 'labor') {
       return this.hasLabor()
-        ? 'Auto-filled from Labor Control — logged hours costed and split Bar vs Food. <a href="#" onclick="S.ThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No hours logged in Labor Control yet — log hours there, or enter manually.';
+        ? 'Auto-filled from Labor Control, logged hours costed and split Bar vs Food. <a href="#" onclick="S.ThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
+        : 'No hours logged in Labor Control yet, log hours there, or enter manually.';
     }
     return '';
   },
@@ -147,10 +147,10 @@ S.ThisWeek = {
       + this.moneyField('tw-' + prefix + 'c', title + ' COGS ' + tt('bar-cogs'), data.cogs, 'cogs')
       + '</div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">' + title + ' Cost %</div><div class="calc-val" id="tw-' + prefix + 'pct">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">' + title + ' Labor %</div><div class="calc-val" id="tw-' + prefix + 'lpct">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target %</div><div class="calc-val" id="tw-' + prefix + 'vpct">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target $</div><div class="calc-val" id="tw-' + prefix + 'vdol">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">' + title + ' Cost %</div><div class="calc-val" id="tw-' + prefix + 'pct">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">' + title + ' Labor %</div><div class="calc-val" id="tw-' + prefix + 'lpct">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Target %</div><div class="calc-val" id="tw-' + prefix + 'vpct">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Target $</div><div class="calc-val" id="tw-' + prefix + 'vdol">-</div></div>'
       + '</div></div>';
   },
 
@@ -166,7 +166,7 @@ S.ThisWeek = {
       + this.sectionCard('Food', 'f', d.food)
       + '<div class="card"><div class="card-title">Review</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Prime Cost %</div><div class="calc-val" id="tw-prime">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Prime Cost %</div><div class="calc-val" id="tw-prime">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + (App.data.settings.targets?.prime_cost_pct ?? 60) + '%</div></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label><textarea id="tw-notes" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
@@ -232,10 +232,10 @@ S.ThisWeek = {
       const lpct = rev > 0 ? labor / rev * 100 : null;
       const vp = pct != null ? pct - target : null;
       const vd = pct != null ? ((pct - target) / 100) * rev : null;
-      set('tw-' + prefix + 'pct', pct != null ? App.fmtPct(pct) : '—', pct != null ? (pct > target ? 'warn' : 'good') : '');
-      set('tw-' + prefix + 'lpct', lpct != null ? App.fmtPct(lpct) : '—');
-      set('tw-' + prefix + 'vpct', vp != null ? (vp > 0 ? '+' : '') + App.fmtPct(vp) : '—', vp != null ? (vp > 0 ? 'warn' : 'good') : '');
-      set('tw-' + prefix + 'vdol', vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '—', vd != null ? (vd > 0 ? 'warn' : 'good') : '');
+      set('tw-' + prefix + 'pct', pct != null ? App.fmtPct(pct) : '-', pct != null ? (pct > target ? 'warn' : 'good') : '');
+      set('tw-' + prefix + 'lpct', lpct != null ? App.fmtPct(lpct) : '-');
+      set('tw-' + prefix + 'vpct', vp != null ? (vp > 0 ? '+' : '') + App.fmtPct(vp) : '-', vp != null ? (vp > 0 ? 'warn' : 'good') : '');
+      set('tw-' + prefix + 'vdol', vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-', vd != null ? (vd > 0 ? 'warn' : 'good') : '');
     };
     section('b', t.bar_pour_cost_pct ?? 22);
     section('f', t.food_cost_pct ?? 32);
@@ -244,7 +244,7 @@ S.ThisWeek = {
     const tCost = num('tw-bc') + num('tw-fc') + num('tw-bl') + num('tw-fl');
     const prime = tRev > 0 ? tCost / tRev * 100 : null;
     const pTarget = t.prime_cost_pct ?? 60;
-    set('tw-prime', prime != null ? App.fmtPct(prime) : '—', prime != null ? (prime > pTarget ? 'warn' : 'good') : '');
+    set('tw-prime', prime != null ? App.fmtPct(prime) : '-', prime != null ? (prime > pTarget ? 'warn' : 'good') : '');
   },
 
   async saveWeek() {
@@ -291,6 +291,7 @@ S.ThisWeek = {
     if (ok) {
       this.clearDraft();
       if (App.updatePeriod) App.updatePeriod();
+      App.markSetupDone('gs_p_week');
       App.navigate('dashboard');
     } else {
       App.data.weeks.pop();
