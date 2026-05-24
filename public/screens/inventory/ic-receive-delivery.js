@@ -158,7 +158,7 @@ S.InventoryReceiveDelivery = {
       flag.style.display = '';
       flag.style.color = 'var(--gold)';
       flag.textContent = 'Price change: ' + (up ? 'up' : 'down') + ' from '
-        + App.fmtCurrency(p.unit_cost) + ' — the product master will update to ' + App.fmtCurrency(price);
+        + App.fmtCurrency(p.unit_cost) + '. The product master will update to ' + App.fmtCurrency(price);
     } else {
       flag.style.display = 'none';
     }
@@ -251,6 +251,7 @@ S.InventoryReceiveDelivery = {
     this.deliveries().push(record);
     const ok = await App.saveInventory();
     if (ok) {
+      App.markSetupDone('gs_ic_delivery');
       this.renderDone(record);
     } else {
       this.deliveries().pop();
