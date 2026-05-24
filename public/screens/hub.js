@@ -593,7 +593,7 @@ S.Hub = {
       + navItem('getting-started', 'Getting Started', 'getStart', [])
       + navItem('help',            'Help and FAQ',    'help',     [])
       + '<div class="nav-section">Manage</div>'
-      + navItem('settings',  'Settings',   'settings', [])
+      + navItem('settings',  'Global Settings',   'settings', [])
       + '<div class="nav-item nav-disabled" title="Coming soon">'
       +   '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + navIcons.bug + '</svg>'
       +   '<span class="nav-label">Report Bug</span></div>';
