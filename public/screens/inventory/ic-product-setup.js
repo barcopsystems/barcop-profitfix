@@ -113,7 +113,7 @@ S.InventoryProducts = {
       const rows = prods.map(p => {
         const complete = this.isComplete(p);
         const sz  = this.SIZES.find(s => s.oz === p.container_size_oz);
-        const szL = sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '—');
+        const szL = sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '-');
         const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
         const dim = p.active === false ? 'opacity:0.5;' : '';
         return '<tr style="' + dim + '">'
@@ -122,13 +122,13 @@ S.InventoryProducts = {
           + (p.active === false ? ' <span class="badge badge-dim">Inactive</span>' : '') + '</div>'
           + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
           + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '') + '</td>'
-          + '<td>' + esc(p.vendor || '—') + '</td>'
-          + '<td>' + (pourable ? esc(szL) : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '—') : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td>' + (pourable && p.cost_per_pour != null ? App.fmtCurrency(p.cost_per_pour) : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">—</span>') + '</td>'
+          + '<td>' + esc(p.vendor || '-') + '</td>'
+          + '<td>' + (pourable ? esc(szL) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (pourable && p.cost_per_pour != null ? App.fmtCurrency(p.cost_per_pour) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm ip-edit" data-id="' + p.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm ip-del" data-id="' + p.id + '">Delete</button>'
@@ -138,7 +138,7 @@ S.InventoryProducts = {
       const alertBar = incomplete.length > 0
         ? '<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'
           + incomplete.length + ' product' + (incomplete.length > 1 ? 's have' : ' has')
-          + ' incomplete data — highlighted red in the Product column.</div></div>'
+          + ' incomplete data, highlighted red in the Product column.</div></div>'
         : '';
 
       body = syncNote + alertBar
@@ -264,9 +264,9 @@ S.InventoryProducts = {
       + '</div>'
 
       + '<div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Pours/Container ' + tt('ic-pours-container') + '</div><div class="calc-val" id="ip-pours">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Cost/Pour ' + tt('cost-pour') + '</div><div class="calc-val" id="ip-cpp">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Pour Cost % ' + tt('pour-cost-pct') + '</div><div class="calc-val" id="ip-pct">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Pours/Container ' + tt('ic-pours-container') + '</div><div class="calc-val" id="ip-pours">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Cost/Pour ' + tt('cost-pour') + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Pour Cost % ' + tt('pour-cost-pct') + '</div><div class="calc-val" id="ip-pct">-</div></div>'
       + '</div>'
 
       + '<div class="card-actions">'
@@ -305,9 +305,9 @@ S.InventoryProducts = {
     const cpp   = pours ? cost / pours : null;
     const pct   = cpp && price ? cpp / price * 100 : null;
     const set   = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
-    set('ip-pours', pours ? pours.toFixed(1) : '—');
-    set('ip-cpp',   cpp   ? App.fmtCurrency(cpp) : '—');
-    set('ip-pct',   pct   ? App.fmtPct(pct) : '—', pct ? (pct > target ? 'warn' : 'good') : '');
+    set('ip-pours', pours ? pours.toFixed(1) : '-');
+    set('ip-cpp',   cpp   ? App.fmtCurrency(cpp) : '-');
+    set('ip-pct',   pct   ? App.fmtPct(pct) : '-', pct ? (pct > target ? 'warn' : 'good') : '');
   },
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -400,8 +400,8 @@ S.InventoryProducts = {
       + '<div class="card-title">Import Products from File</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">'
       + 'Upload a CSV or Excel file exported from your POS system or distributor price list. '
-      + 'The app reads your columns and shows a mapping screen so you can match them to the right fields. '
-      + 'Products import into the category you map — any missing data shows as Incomplete and can be filled in afterwards.</div>'
+      + 'Bar Cop reads your columns and shows a mapping screen so you can match them to the right fields. '
+      + 'Products import into the category you map, any missing data shows as Incomplete and can be filled in afterwards.</div>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Accepted formats: CSV, XLSX, XLS</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f"><label>Select File</label><input type="file" id="ip-imp-file" accept=".csv,.xlsx,.xls" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:8px;font-size:12px;cursor:pointer;"/></div>'
