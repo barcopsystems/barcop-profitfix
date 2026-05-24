@@ -92,13 +92,13 @@ S.TrafficDashboard = {
     }
 
     container.innerHTML = '<div class="screen">'
+      + FixPanel.recoveryCard('traffic')
       + startHere
       + alertHtml
       + FixPanel.fixAreasCard('traffic')
       + chartHtml
       + cadenceHtml
       + actionHtml
-      + FixPanel.recoveryCard('traffic')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
