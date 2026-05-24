@@ -57,8 +57,10 @@ S.TrafficDashboard = {
           + '<span style="flex-shrink:0;font-size:12px;color:var(--t3);">&#9656;</span>'
           + '</div>').join('')
       : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Posting, reviews, and email are keeping pace. Nothing is slipping right now.</div>';
-    const cadenceHtml = '<div class="sh">Activity Reminders</div>'
-      + '<div class="card" style="margin-bottom:18px;">' + nudgeBody + '</div>';
+    const cadenceHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + FixPanel.sectionHeader('Activity Reminders')
+      + '<div style="padding:18px 20px;">' + nudgeBody + '</div>'
+      + '</div>';
 
     // Priority Action Items — ranked by dollar impact from the latest Traffic audit
     const tAudits = App.data.traffic_audits || [];
@@ -69,27 +71,26 @@ S.TrafficDashboard = {
       .sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0))
       .slice(0,5);
 
-    let actionHtml = '<div class="sh">Priority Action Items</div>';
-    if (actionItems.length) {
-      actionHtml += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-        + actionItems.map((it,i) =>
-            '<div class="t-db-action" data-screen="t-audit" '
-            + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
-            + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-            + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
-            + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</div>'
-            + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.5;">'+esc(it.action)+'</div>'
-            + (it.monthly_impact > 0
-                ? '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;color:var(--gold);">'
-                  + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
-                : '')
-            + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-            + '</div>').join('')
-        + '</div>';
-    } else {
-      actionHtml += '<div class="card" style="margin-bottom:18px;"><div style="font-size:12px;color:var(--t3);line-height:1.65;">'
-        + 'Run a Traffic Audit and your highest-impact opportunities will be ranked here by dollar impact.</div></div>';
-    }
+    const actionRows = actionItems.length
+      ? actionItems.map((it,i) =>
+          '<div class="t-db-action" data-screen="t-audit" '
+          + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+          + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+          + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
+          + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</div>'
+          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.5;">'+esc(it.action)+'</div>'
+          + (it.monthly_impact > 0
+              ? '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;color:var(--gold);">'
+                + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
+              : '')
+          + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+          + '</div>').join('')
+      : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">'
+        + 'Run a Traffic Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
+    const actionHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + FixPanel.sectionHeader('Priority Action Items')
+      + actionRows
+      + '</div>';
 
     container.innerHTML = '<div class="screen">'
       + FixPanel.recoveryCard('traffic')
@@ -99,11 +100,13 @@ S.TrafficDashboard = {
       + chartHtml
       + cadenceHtml
       + actionHtml
-      + '<div class="sh">Quick Actions</div>'
-      + '<div class="qa">'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + FixPanel.sectionHeader('Quick Actions')
+      + '<div class="qa" style="padding:18px 20px;">'
       + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
       + '<button class="btn btn-ghost" id="t-qa-audit">Traffic Audit</button>'
       + '<button class="btn btn-ghost" id="t-qa-reports">View Reports</button>'
+      + '</div>'
       + '</div>'
       + '</div>';
 
