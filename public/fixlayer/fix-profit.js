@@ -13,7 +13,7 @@ FIX.profit = [
     id: 'pour-cost',
     name: 'Pour Cost',
     module: 'profit',
-    summary: 'The gap between what you spent on bar product and what you sold. Measure it weekly, investigate variance, and hold the line with a written pour standard.',
+    summary: 'The gap between what you spent on bar product and what you sold.',
 
     process: {
       intro: 'A working pour cost system has four parts that all have to run: a count on the same day every week, the pour cost calculated right after it, a variance report reviewed within 48 hours, and a written pour standard. Bar Cop does the counting and the math. Each step below opens the screen where that happens.',
@@ -110,7 +110,7 @@ FIX.profit = [
     id: 'theft-loss',
     name: 'Theft and Loss',
     module: 'profit',
-    summary: 'Cash, product, and comp loss that never shows as a line item. Track voids and comps by employee, reconcile every drawer, audit shifts, and act on documented patterns.',
+    summary: 'Cash, product, and comp loss that never shows as a line item.',
 
     process: {
       intro: 'Theft is caught by accountability, not suspicion. Daily logging creates the data, the weekly review reads it, and a written policy plus a paper trail make action possible when you need it. Each step opens the screen where it happens.',
@@ -213,7 +213,7 @@ FIX.profit = [
     id: 'food-cost',
     name: 'Food Cost',
     module: 'profit',
-    summary: 'What the kitchen spends on product against what it sells. Cost every recipe on real prices, count weekly, track waste with reasons, and price surgically.',
+    summary: 'What the kitchen spends on product against what it sells.',
 
     process: {
       intro: 'Food cost is set before service on the cost card and held during service at the station. Bar Cop costs the recipes and computes the number. The count, the waste sheet, and the portion audit tell you why it moved. Each step opens where the work happens.',
@@ -315,7 +315,7 @@ FIX.profit = [
     id: 'vendor-control',
     name: 'Vendor Control',
     module: 'profit',
-    summary: 'Price drift, short counts, and quiet substitutions on every invoice. Audit each delivery against the PO, track prices monthly, and renegotiate quarterly with the data.',
+    summary: 'Price drift, short counts, and quiet substitutions on every invoice.',
 
     process: {
       intro: 'Vendor overcharge recovery is an ongoing weekly job, not a one-time audit. Every discrepancy you document at delivery is a credit you can request. Every one you miss is a cost you absorbed. Bar Cop flags price changes the moment you receive a delivery and tracks the drift over time. Each step below opens the screen where that happens.',
@@ -415,7 +415,7 @@ FIX.profit = [
     id: 'prime-cost',
     name: 'Prime Cost',
     module: 'profit',
-    summary: 'COGS plus labor as a share of sales. The single number that confirms whether your other cost systems are working. Read it weekly, find the driver when it moves, act before the next week starts.',
+    summary: 'COGS plus labor as a share of sales. The one number that confirms your cost systems are working.',
 
     process: {
       intro: 'Prime cost is an operations metric, not a finance metric. It is the one number that tells you whether pour cost, food cost, and labor control are actually working. Bar Cop pulls the inputs from your Control modules and computes it for you. Read it weekly, on Monday, in fifteen minutes. Each step below opens where that happens.',
