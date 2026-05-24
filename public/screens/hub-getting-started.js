@@ -10,73 +10,75 @@ S.HubGettingStarted = {
 
   _open: {},
 
+  // Four-phase setup: Foundation makes the numbers honest, Baseline Diagnosis
+  // gives the operator a scored picture on day one without needing any Control
+  // data, Capture System builds the operational engine that feeds live metrics,
+  // and Weekly Work is the recurring operational rhythm from then on.
   GROUPS: [
     { id:'foundation', title:'Foundation' },
-    { id:'inventory',  title:'Inventory Control' },
-    { id:'labor',      title:'Labor Control' },
-    { id:'shift',      title:'Shift Control' },
-    { id:'profit',     title:'Profit Recovery' },
-    { id:'revenue',    title:'Revenue Recovery' },
-    { id:'traffic',    title:'Traffic Recovery' }
+    { id:'baseline',   title:'Baseline Diagnosis' },
+    { id:'capture',    title:'Capture System' },
+    { id:'weekly',     title:'Weekly Work' }
   ],
 
   TASKS: [
+    // ── Phase 1: Foundation ──────────────────────────────────────────────
     { group:'foundation', id:'gs_profile', screen:'settings',
       label:'Set your operation profile in Settings: bar name, location, and annual bar and food revenue.' },
     { group:'foundation', id:'gs_targets', screen:'settings',
       label:'Set your Profit, Revenue, and Traffic targets in Settings. Industry benchmarks are pre-filled; adjust them to your operation.' },
 
-    { group:'inventory', id:'gs_ic_products', screen:'ic-product-setup',
+    // ── Phase 2: Baseline Diagnosis — three audits give immediate scored value
+    { group:'baseline', id:'gs_p_audit', screen:'audit-tracker',
+      label:'Run your first Profit Audit for a baseline score.' },
+    { group:'baseline', id:'gs_r_audit', screen:'r-audit',
+      label:'Run your first Revenue Audit for a baseline score.' },
+    { group:'baseline', id:'gs_t_audit', screen:'t-audit',
+      label:'Run your first Traffic Audit for a baseline score.' },
+
+    // ── Phase 3: Capture System — operational setup. Control feeds Recovery.
+    { group:'capture', id:'gs_ic_products', screen:'ic-product-setup',
       label:'Add your bar and kitchen products in Inventory Control. This is the product master the whole platform reads.' },
-    { group:'inventory', id:'gs_ic_locations', screen:'ic-locations',
+    { group:'capture', id:'gs_ic_locations', screen:'ic-locations',
       label:'Set your storage locations, then add your vendors.' },
-    { group:'inventory', id:'gs_ic_count', screen:'ic-take-inventory',
+    { group:'capture', id:'gs_ic_count', screen:'ic-take-inventory',
       label:'Run your first inventory count in Take Inventory.' },
-    { group:'inventory', id:'gs_ic_delivery', screen:'ic-receive-delivery',
+    { group:'capture', id:'gs_ic_delivery', screen:'ic-receive-delivery',
       label:'Receive your first delivery so vendor pricing starts tracking.' },
-
-    { group:'labor', id:'gs_lc_positions', screen:'lc-positions',
+    { group:'capture', id:'gs_lc_positions', screen:'lc-positions',
       label:'Set up your positions and wage rates in Labor Control.' },
-    { group:'labor', id:'gs_lc_roster', screen:'lc-staff-roster',
+    { group:'capture', id:'gs_lc_roster', screen:'lc-staff-roster',
       label:'Add every staff member to the Staff Roster.' },
-    { group:'labor', id:'gs_lc_schedule', screen:'lc-build-schedule',
+    { group:'capture', id:'gs_lc_schedule', screen:'lc-build-schedule',
       label:'Build your first weekly schedule in Build Schedule.' },
-    { group:'labor', id:'gs_lc_hours', screen:'lc-log-hours',
+    { group:'capture', id:'gs_lc_hours', screen:'lc-log-hours',
       label:'Log a week of actual hours in Log Hours.' },
-
-    { group:'shift', id:'gs_sc_checklists', screen:'sc-checklist-templates',
-      label:'Set your opening and closing checklist templates.' },
-    { group:'shift', id:'gs_sc_shift', screen:'sc-log-shift',
+    { group:'capture', id:'gs_sc_checklists', screen:'sc-checklist-templates',
+      label:'Set your opening and closing checklist templates in Shift Control.' },
+    { group:'capture', id:'gs_sc_shift', screen:'sc-log-shift',
       label:'Log your first shift. Shift revenue and covers feed Profit and Revenue Recovery.' },
-    { group:'shift', id:'gs_sc_cash', screen:'sc-cash-drop',
+    { group:'capture', id:'gs_sc_cash', screen:'sc-cash-drop',
       label:'Record a cash drop and a drawer count so cash data starts flowing.' },
 
-    { group:'profit', id:'gs_p_week', screen:'this-week',
+    // ── Phase 4: Weekly Work — the operational rhythm from week one onward
+    { group:'weekly', id:'gs_p_week', screen:'this-week',
       label:'Confirm your first week in Profit This Week. Most figures auto-fill from your Control modules.' },
-    { group:'profit', id:'gs_p_recipes', screen:'recipe-library',
+    { group:'weekly', id:'gs_p_recipes', screen:'recipe-library',
       label:'Cost your top recipes in Recipe Library.' },
-    { group:'profit', id:'gs_p_audit', screen:'audit-tracker',
-      label:'Run your first Profit Audit for a baseline score.' },
-    { group:'profit', id:'gs_p_fix', screen:'profit-fix',
+    { group:'weekly', id:'gs_p_fix', screen:'profit-fix',
       label:'Open Profit Fix and walk the fix process for your biggest gap area.' },
-
-    { group:'revenue', id:'gs_r_menu', screen:'r-menu-items',
+    { group:'weekly', id:'gs_r_menu', screen:'r-menu-items',
       label:'Add your menu items and pricing in Menu Items.' },
-    { group:'revenue', id:'gs_r_week', screen:'r-this-week',
+    { group:'weekly', id:'gs_r_week', screen:'r-this-week',
       label:'Confirm your first week in Revenue This Week.' },
-    { group:'revenue', id:'gs_r_eng', screen:'r-menu-engineering',
+    { group:'weekly', id:'gs_r_eng', screen:'r-menu-engineering',
       label:'Run Menu Engineering to see your Stars, Plowhorses, Puzzles, and Dogs.' },
-    { group:'revenue', id:'gs_r_audit', screen:'r-audit',
-      label:'Run your first Revenue Audit for a baseline score.' },
-
-    { group:'traffic', id:'gs_t_gbp', screen:'t-gbp',
+    { group:'weekly', id:'gs_t_gbp', screen:'t-gbp',
       label:'Audit your Google Business Profile in the GBP section.' },
-    { group:'traffic', id:'gs_t_reviews', screen:'t-reviews',
+    { group:'weekly', id:'gs_t_reviews', screen:'t-reviews',
       label:'Log your current ratings and review counts in Review Tracker.' },
-    { group:'traffic', id:'gs_t_week', screen:'t-this-week',
-      label:'Enter your first week of digital metrics in Traffic This Week.' },
-    { group:'traffic', id:'gs_t_audit', screen:'t-audit',
-      label:'Run your first Traffic Audit for a baseline score.' }
+    { group:'weekly', id:'gs_t_week', screen:'t-this-week',
+      label:'Enter your first week of digital metrics in Traffic This Week.' }
   ],
 
   progress() { return App.data.hub_setup_progress || {}; },
@@ -147,7 +149,7 @@ S.HubGettingStarted = {
       +   '<div class="prog"><div class="prog-fill" style="width:' + pct + '%;"></div></div>'
       +   (pct===100
             ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:12px;">Setup complete. Every module is configured and feeding Bar Cop.</div>'
-            : '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">Work top to bottom. The Capture modules (Inventory, Labor, Shift) feed the Recovery modules, so set them up first.</div>')
+            : '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">Work top to bottom. Each phase builds on the one above it.</div>')
       + '</div>'
       + groups
       + '</div>';
