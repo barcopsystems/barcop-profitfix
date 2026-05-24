@@ -463,7 +463,7 @@ S.Hub = {
       trendBody = ''
         + miniChart('Bar Pour Cost %', w8p, w => w?.bar?.cost_pct ?? null,    pourT,  v => v.toFixed(1) + '%', 'low',  false)
         + miniChart('Check Average',   w8r, w => w?.check_avg ?? null,        caT,    v => App.fmtCurrency(v), 'high', false)
-        + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  true);
+        + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  false);
     }
     const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:6px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
     const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
@@ -612,7 +612,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--input);padding:10px 13px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--panel);padding:10px 13px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
