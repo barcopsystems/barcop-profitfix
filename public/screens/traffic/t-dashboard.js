@@ -72,8 +72,9 @@ S.TrafficDashboard = {
       .slice(0,5);
 
     const actionRows = actionItems.length
-      ? actionItems.map((it,i) =>
-          '<div class="t-db-action" data-screen="t-audit" '
+      ? actionItems.map((it,i) => {
+          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, 'traffic') : null);
+          return '<div class="t-db-action" data-gap="' + esc(gid || '') + '" '
           + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
           + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
           + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
@@ -84,7 +85,8 @@ S.TrafficDashboard = {
                 + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
               : '')
           + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-          + '</div>').join('')
+          + '</div>';
+        }).join('')
       : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">'
         + 'Run a Traffic Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
     const actionHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
@@ -120,7 +122,10 @@ S.TrafficDashboard = {
     document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
     document.getElementById('t-qa-reports')?.addEventListener('click', () => App.navigate('t-reports'));
     container.querySelectorAll('.t-db-action').forEach(row => {
-      row.addEventListener('click', () => App.navigate(row.dataset.screen));
+      row.addEventListener('click', () => {
+        if (row.dataset.gap) App._fixFocus = row.dataset.gap;
+        App.navigate('t-fix');
+      });
     });
     FixPanel.wireFixAreas(container);
   },
