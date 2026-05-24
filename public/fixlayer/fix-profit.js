@@ -425,7 +425,7 @@ FIX.profit = [
           detail: 'Bar Cop calculates prime cost as total COGS plus total labor over net sales and shows it on the Profit dashboard against your concept target. There is nothing for you to calculate. Read it weekly, not monthly. A 30-day lag is 30 days of loss before you see it.' },
         { kind: 'result', target: 'dashboard', targetLabel: 'Profit Dashboard',
           title: 'Find which part moved when it is over',
-          detail: 'When prime cost is over, the Profit dashboard tells you the COGS side: the Fix Areas card shows the dollar gap on Bar Pour Cost and Food Cost. If both are on target but prime cost is still over, the driver is labor, which lives on the Revenue dashboard. Decide whether the gap calls for an investigation today or a corrective action this week.' },
+          detail: 'When prime cost is over, the Fix Areas card tells you where. Bar Pour Cost, Food Cost, and Labor each carry their own status band and dollar gap. The number tells you it moved. The parts tell you where. Decide whether the gap calls for an investigation today or a corrective action this week.' },
         { kind: 'result', target: 'reports', targetLabel: 'Reports and History',
           title: 'Check spike against trend',
           detail: 'Reports and History shows prime cost across the past weeks. Before you act, look at whether this is a one-week spike from a bulk purchase or a payroll correction, or a real trend that has been building.' },
