@@ -20,11 +20,11 @@ S.RevenueMenuItems = {
   showImport(container, actions) {
     container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">Import Menu Items from File</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">Upload a CSV or Excel file with your menu items. The app reads your columns and maps them to the right fields. Items import instantly   any missing data shows as Incomplete and can be filled in afterwards.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">Upload a CSV or Excel file with your menu items. Bar Cop reads your columns and maps them to the right fields. Items import instantly   any missing data shows as Incomplete and can be filled in afterwards.</div>'
       + '<details style="margin-bottom:16px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'
       + '<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'
       + '<strong style="color:var(--t1);">First row must be column headers.</strong> One row per item.<br><br>'
-      + '<strong style="color:var(--t1);">Columns the app recognizes:</strong><br>'
+      + '<strong style="color:var(--t1);">Columns Bar Cop recognizes:</strong><br>'
       + '&bull; <strong>Name / Item / Product / Description</strong>   required<br>'
       + '&bull; <strong>Category / Type / Group</strong>   optional<br>'
       + '&bull; <strong>Price / Menu Price / Sell Price</strong>   optional<br>'
