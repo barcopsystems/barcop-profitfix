@@ -266,7 +266,7 @@ S.RecipeLibrary={
     if(!App.data.recipes)App.data.recipes=[];
     if(this.editId){const i=App.data.recipes.findIndex(r=>r.id===this.editId);if(i>-1)App.data.recipes[i]={...App.data.recipes[i],...recipe};}
     else App.data.recipes.push(recipe);
-    App.saveKey('recipes').then(()=>{this.editId=null;this.rows=[];this.mode=null;this.renderList();});
+    App.saveKey('recipes').then(()=>{this.editId=null;this.rows=[];this.mode=null;this.renderList();App.markSetupDone('gs_p_recipes');});
   },
   del(id){this._pendingDelIds=[id];const modal=document.getElementById('rl-del-modal');const msgEl=document.getElementById('rl-del-msg');if(msgEl)msgEl.textContent='Delete this recipe?';if(modal)modal.style.display='flex';document.getElementById('rl-del-cancel').onclick=()=>{modal.style.display='none';this._pendingDelIds=null;};document.getElementById('rl-del-confirm').onclick=()=>{modal.style.display='none';const ids=this._pendingDelIds||[];App.data.recipes=(App.data.recipes||[]).filter(r=>!ids.includes(r.id));App.saveKey('recipes').then(()=>this.renderList());this._pendingDelIds=null;};}
 };
