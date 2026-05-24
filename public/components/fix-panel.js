@@ -69,19 +69,34 @@ window.FixPanel = {
 
   // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
   // The module's running recovery from logged fixes. Dollar figure where the
-  // metric dollarizes, fix count otherwise. Clicking opens the Fix screen.
+  // metric dollarizes, fix count otherwise. The empty state anchors on the
+  // latest audit's annualized opportunity instead of saying "nothing here" —
+  // so the card always carries a real number tied to the operator's data.
+  // Clicking opens the Fix screen.
   recoveryCard(moduleKey) {
     if (!window.Recovery) return '';
     const s = Recovery.moduleSummary(moduleKey);
     let body;
     if (s.logged === 0) {
-      body = '<div style="font-size:12px;color:var(--t3);line-height:1.65;">'
-        + 'No fixes logged yet. When you put a fix in place, mark it implemented on the Fix screen '
-        + 'and the app measures what it recovered.</div>';
+      // Empty state — pull the latest audit's monthly opportunity total and
+      // annualize it. This shows the operator what is at stake, not nothing.
+      const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
+      const audits = (window.App && App.data && App.data[auditKey]) || [];
+      const latest = audits[audits.length - 1];
+      const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
+      const annual  = monthly * 12;
+      if (annual > 0) {
+        body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
+          + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr</span></div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">opportunity from your latest audit. Mark fixes implemented to track what you recover against this.</div>';
+      } else {
+        body = '<div style="font-size:12px;color:var(--t3);line-height:1.65;">'
+          + 'Run an audit to surface your recovery opportunity, then mark each fix implemented as you put it in place.</div>';
+      }
     } else if (s.withFigure > 0) {
       body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--gold);">'
-        + App.fmtCurrency(s.recovered) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">annualized recovery across '
+        + App.fmtCurrency(s.recovered, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">annualized across '
         + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
         + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '</div>';
     } else {
