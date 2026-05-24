@@ -245,29 +245,28 @@ S.Hub = {
           + '</div>';
       }
 
-      // Honest dollar statement from action_items.monthly_impact
-      let dollarLine = '';
+      // Combined summary line: leak status, trend vs last audit, audit date.
+      // Was three stacked rows; now one inline row to free vertical space and
+      // let the card breathe.
+      let summaryLine = '';
       if (audit) {
         const monthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
         const weekly  = monthly / 4.345;
+        const parts = [];
         if (weekly > 0) {
-          dollarLine = '<div style="font-size:11px;color:var(--t3);font-weight:700;margin-top:7px;">'
-            + 'Leaking an estimated ' + App.fmtCurrency(weekly, 0) + ' per week.</div>';
+          parts.push('<span style="color:var(--red);font-weight:700;">Leaking ~' + App.fmtCurrency(weekly, 0) + ' /wk</span>');
         } else {
-          dollarLine = '<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:7px;">'
-            + 'On target. Holding the line.</div>';
+          parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
         }
-      }
-
-      // Subtext: trend + audit date
-      let subText = '';
-      if (audit) {
-        const trendHtml = trend == null
-          ? ''
-          : '<span style="color:' + (trend>=0?'var(--green)':'var(--red)') + ';font-weight:700;">'
-            + (trend>=0?'+':'') + trend + ' pts</span> &middot; ';
-        subText = '<div style="font-size:9px;color:var(--t4);margin-top:5px;">'
-          + trendHtml + (audit.date ? 'Audit ' + shortDate(audit.date) : '')
+        if (trend != null) {
+          parts.push('<span style="color:' + (trend>=0?'var(--green)':'var(--red)') + ';font-weight:700;">'
+            + (trend>=0?'+':'') + trend + ' pts</span>');
+        }
+        if (audit.date) {
+          parts.push('<span style="color:var(--t3);">since ' + shortDate(audit.date) + ' audit</span>');
+        }
+        summaryLine = '<div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.4;">'
+          + parts.join(' <span style="color:var(--t4);">&middot;</span> ')
           + '</div>';
       }
 
@@ -277,8 +276,7 @@ S.Hub = {
         +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
         + '</div>'
         + scoreBlock
-        + dollarLine
-        + subText
+        + summaryLine
         + '</div>';
     };
     const auditPanel = `<div style="${PANEL}">${panelTitle('Audit Scores')}
@@ -592,7 +590,11 @@ S.Hub = {
         +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + App.fmtCurrency(readout.total, 0) + '</div>'
         +   '<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ week</div>'
         + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">leaking across ' + readout.items.length + ' gap area' + (readout.items.length===1?'':'s') + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">'
+        +   App.fmtCurrency(readout.total * 52, 0) + ' annualized at this pace '
+        +   '<span style="color:var(--t4);">&middot;</span> '
+        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's')
+        + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
     const readoutPanel = `<div style="${PANEL}">${panelTitle('Leaking This Week')}${readoutBody}</div>`;
