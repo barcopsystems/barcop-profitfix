@@ -96,7 +96,6 @@ S.TrafficDashboard = {
       + FixPanel.recoveryCard('traffic')
       + startHere
       + alertHtml
-      + FixPanel.fixAreasCard('traffic')
       + chartHtml
       + cadenceHtml
       + actionHtml
