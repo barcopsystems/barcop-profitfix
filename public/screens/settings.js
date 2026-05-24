@@ -86,12 +86,12 @@ S.HubSettings = {
   // ── Section bodies ──────────────────────────────────────────────────────────
   secProfile() {
     const s = App.data.settings || {};
-    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:215px;"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
-      + '<div class="f" style="width:125px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
-      + '<div class="f" style="width:95px;"><label>State</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
+    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:200px;"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="width:120px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
+      + '<div class="f" style="width:80px;"><label>State</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
       + '<div class="f" style="width:150px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||0) + '"/></div></div>'
-      + '<div class="f" style="width:155px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||0) + '"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||0) + '"/></div></div>'
       + '</div>' + this.saveRow('profile');
   },
 
@@ -159,7 +159,13 @@ S.HubSettings = {
   secAccount() {
     const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
     const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 12px;">' + txt + '</div>';
-    return sh('Password').replace('margin:18px', 'margin:2px')
+    const userEmail = DB._user?.email || (App.demoMode ? 'Demo Account' : '');
+    const accountInfo = userEmail
+      ? sh('Account').replace('margin:18px', 'margin:2px')
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:4px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>'
+      : '';
+    return accountInfo
+      + sh('Password')
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f" style="width:220px;"><label>New Password</label><div class="fw"><input class="suf" type="password" id="s-pw1" placeholder="Enter new password" autocomplete="new-password"/>' + eye('s-pw1') + '</div></div>'
       + '<div class="f" style="width:220px;"><label>Confirm Password</label><div class="fw"><input class="suf" type="password" id="s-pw2" placeholder="Confirm new password" autocomplete="new-password"/>' + eye('s-pw2') + '</div></div>'
