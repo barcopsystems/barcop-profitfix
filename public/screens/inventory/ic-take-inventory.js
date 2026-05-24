@@ -281,11 +281,11 @@ S.InventoryTakeInventory = {
     const tbody = rows.map(r => '<tr>'
       + '<td><div class="val">' + esc(r.p.name) + '</div>'
       + (r.p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.p.brand) + '</div>' : '') + '</td>'
-      + '<td>' + esc(r.p.category || '—') + '</td>'
+      + '<td>' + esc(r.p.category || '-') + '</td>'
       + '<td>' + (r.c.fulls || 0) + '</td>'
       + '<td>' + (r.c.value || 0).toFixed(1) + '</td>'
       + '<td class="val">' + r.total.toFixed(1) + '</td>'
-      + '<td>' + (r.value != null ? App.fmtCurrency(r.value) : '<span style="color:var(--t4);">—</span>') + '</td>'
+      + '<td>' + (r.value != null ? App.fmtCurrency(r.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '</tr>').join('');
 
     this.container.innerHTML = '<div class="screen">'
@@ -343,6 +343,7 @@ S.InventoryTakeInventory = {
     this.counts().push(record);
     const ok = await App.saveInventory();
     if (ok) {
+      App.markSetupDone('gs_ic_count');
       this.clearDraft();
       this.renderDone(record);
     } else {
