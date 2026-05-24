@@ -806,6 +806,10 @@ window.FixPanel = {
           logged_at: new Date().toISOString()
         });
         App.saveKey('fix_log');
+        // Mark Implemented on a Profit gap counts as the Profit Fix
+        // Getting Started task. Revenue and Traffic Fix tasks don't exist
+        // in the current checklist, but if they're added later, extend here.
+        if (implSave.dataset.module === 'profit') App.markSetupDone('gs_p_fix');
         this.renderInto(el, el.dataset.fixModule, gapId);
         return;
       }
