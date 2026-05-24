@@ -743,6 +743,67 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
   }
 });
 
+// ── Bug report notification ──────────────────────────────────────────────────
+// Fires after the client successfully writes a bug report row to Supabase.
+// The DB record is the source of truth; this endpoint just sends a courtesy
+// email so the team gets pinged without polling the table. If Resend fails
+// or the env vars are missing, we still return ok=true — the report itself
+// is safely persisted, the email is best-effort.
+app.post('/api/report-bug-notify', async (req, res) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to     = process.env.BUG_REPORT_NOTIFY_EMAIL;
+  const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
+  if (!apiKey || !to) {
+    console.warn('report-bug-notify: RESEND_API_KEY or BUG_REPORT_NOTIFY_EMAIL not configured; skipping email');
+    return res.json({ ok: true, emailed: false, reason: 'not_configured' });
+  }
+  try {
+    const r = req.body || {};
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    const sevLabel = { minor:'Minor', moderate:'Moderate', major:'Major', critical:'Critical' }[r.severity] || 'Moderate';
+    const sevColor = { minor:'#888', moderate:'#9A5D34', major:'#C03828', critical:'#C03828' }[r.severity] || '#9A5D34';
+    const subject  = '[Bar Cop Bug] [' + sevLabel + '] ' + (r.title || 'Untitled report');
+    const row = (label, value) => value
+      ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
+        + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
+      : '';
+    const html =
+        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#111;">'
+      +   '<div style="border-bottom:3px solid ' + sevColor + ';padding-bottom:14px;margin-bottom:18px;">'
+      +     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999;">Bar Cop Bug Report</div>'
+      +     '<div style="font-size:18px;font-weight:700;color:#111;margin-top:4px;">' + esc(r.title || 'Untitled report') + '</div>'
+      +     '<div style="font-size:12px;color:' + sevColor + ';font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;">' + sevLabel + ' severity</div>'
+      +   '</div>'
+      +   '<table style="width:100%;border-collapse:collapse;">'
+      +     row('What Happened',      r.what_happened)
+      +     row('Steps to Reproduce', r.steps_to_reproduce)
+      +     row('Expected Behavior',  r.expected_behavior)
+      +     row('Reporter Email',     r.user_email)
+      +     row('From Screen',        r.previous_screen)
+      +     row('Browser',            r.user_agent)
+      +     row('Viewport',           r.viewport)
+      +     row('Submitted',          new Date().toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }))
+      +   '</table>'
+      +   '<div style="margin-top:18px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px;">Full report is also in your Supabase bug_reports table.</div>'
+      + '</div>';
+
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, subject, html, reply_to: r.user_email || undefined })
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      console.error('Resend send failed:', resp.status, txt);
+      return res.json({ ok: true, emailed: false, reason: 'send_failed' });
+    }
+    res.json({ ok: true, emailed: true });
+  } catch (e) {
+    console.error('report-bug-notify exception:', e);
+    res.json({ ok: true, emailed: false, reason: 'exception' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
