@@ -1,10 +1,12 @@
 'use strict';
 /* ── Hub Settings — the single platform-wide settings view ────────────────────
    A Hub-owned view, not a module screen. Opens from the Hub into the Hub
-   container (never the module app shell), with a Back to Hub control. Nine
-   collapsible sections (map Section 1, item 8), each saving on its own. Reads
-   and writes the existing settings keys; this is purely a UI consolidation. */
+   container (never the module app shell), with a Back to Hub control. Tab
+   navigation across the seven settings sections; each section saves on its
+   own. Reads and writes the existing settings keys; purely a UI consolidation. */
 S.HubSettings = {
+
+  _activeTab: 'profile',
 
   // Open the Hub Settings view inside the Hub container. Mirrors App.showHub().
   open() {
@@ -27,39 +29,48 @@ S.HubSettings = {
 
   render(container) {
     const secs = [
-      { id:'profile',   title:'Operation Profile',     body:this.secProfile() },
-      { id:'profit',    title:'Profit Targets',        body:this.secProfit() },
-      { id:'revenue',   title:'Revenue Targets',       body:this.secRevenue() },
-      { id:'traffic',   title:'Traffic Targets',       body:this.secTraffic() },
-      { id:'team',      title:'Team and Wages',        body:this.secTeam() },
-      { id:'inventory', title:'Inventory Preferences', body:this.secInventory() },
-      { id:'shift',     title:'Shift Preferences',     body:this.secShift() },
-      { id:'notif',     title:'Notifications',         body:this.secNotifications() },
-      { id:'account',   title:'Account',               body:this.secAccount() }
+      { id:'profile', title:'Profile',           body:this.secProfile() },
+      { id:'profit',  title:'Profit Targets',    body:this.secProfit() },
+      { id:'revenue', title:'Revenue Targets',   body:this.secRevenue() },
+      { id:'traffic', title:'Traffic Targets',   body:this.secTraffic() },
+      { id:'team',    title:'Team and Wages',    body:this.secTeam() },
+      { id:'shift',   title:'Shift Preferences', body:this.secShift() },
+      { id:'account', title:'Account',           body:this.secAccount() }
     ];
     container.scrollTop = 0;
+
+    const tabs = '<div class="hs-tabs" style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:24px;flex-wrap:wrap;">'
+      + secs.map(s => {
+          const on = s.id === this._activeTab;
+          return '<button class="hs-tab" data-tab="' + s.id + '" '
+            + 'style="background:none;border:none;border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
+            + 'color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';font-family:\'Barlow\',sans-serif;font-size:11px;font-weight:700;'
+            + 'letter-spacing:0.5px;text-transform:uppercase;padding:10px 16px;cursor:pointer;transition:color 0.12s;">'
+            + esc(s.title) + '</button>';
+        }).join('')
+      + '</div>';
+
+    // Render every section body up front so unsaved input survives tab switches.
+    // Only the active section is visible; the rest are display:none.
+    const bodies = secs.map(s =>
+      '<div class="hs-body" data-tab="' + s.id + '" '
+      + 'style="display:' + (s.id === this._activeTab ? 'block' : 'none') + ';'
+      + 'background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+      + s.body + '</div>'
+    ).join('');
+
     container.innerHTML =
       '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
       + '<div style="display:flex;align-items:center;gap:14px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
       +   '<button id="hs-back" class="btn btn-ghost btn-sm">&#8592; Back to Hub</button>'
       +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Platform Settings</div>'
       + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:16px;">Every platform setting in one place. Open a section, make your changes, and save that section. Each section saves on its own.</div>'
-      + secs.map(sec => this.card(sec)).join('')
+      + tabs
+      + bodies
       + '</div>';
     document.getElementById('hs-back').addEventListener('click', () => App.showHub());
     this.wire(container);
     this.renderSubscription();
-  },
-
-  card(sec) {
-    return '<div class="hs-card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;margin-bottom:10px;overflow:hidden;">'
-      + '<div class="hs-head" style="display:flex;align-items:center;gap:12px;padding:15px 20px;cursor:pointer;">'
-      +   '<div style="flex:1;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);">' + esc(sec.title) + '</div>'
-      +   '<span class="hs-chev" style="font-size:13px;color:var(--t3);transition:transform .15s;">&#9656;</span>'
-      + '</div>'
-      + '<div class="hs-body" style="display:none;padding:6px 20px 20px;border-top:1px solid var(--b2);">' + sec.body + '</div>'
-      + '</div>';
   },
 
   saveRow(id) {
@@ -178,13 +189,22 @@ S.HubSettings = {
 
   // ── Wiring ──────────────────────────────────────────────────────────────────
   wire(container) {
-    container.querySelectorAll('.hs-head').forEach(head => {
-      head.addEventListener('click', () => {
-        const body = head.nextElementSibling;
-        const chev = head.querySelector('.hs-chev');
-        const isOpen = body.style.display !== 'none';
-        body.style.display = isOpen ? 'none' : 'block';
-        if (chev) chev.style.transform = 'rotate(' + (isOpen ? '0' : '90') + 'deg)';
+    // Tab switching — toggle display rather than re-render so any unsaved
+    // input in a tab survives a switch away and back.
+    container.querySelectorAll('.hs-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newTab = btn.dataset.tab;
+        if (newTab === this._activeTab) return;
+        this._activeTab = newTab;
+        container.querySelectorAll('.hs-tab').forEach(t => {
+          const on = t.dataset.tab === newTab;
+          t.style.borderBottomColor = on ? 'var(--gold)' : 'transparent';
+          t.style.color = on ? 'var(--gold)' : 'var(--t3)';
+        });
+        container.querySelectorAll('.hs-body').forEach(b => {
+          b.style.display = b.dataset.tab === newTab ? 'block' : 'none';
+        });
+        container.scrollTop = 0;
       });
     });
     container.querySelectorAll('.hs-save').forEach(btn => {
@@ -285,40 +305,24 @@ S.HubSettings = {
     if (!el) return;
     const sub = App.subscription || {};
     const status = sub.status || 'inactive';
-    const plan = sub.plan || null;
-    const modules = sub.active_modules || [];
     const periodEnd = sub.period_end ? new Date(sub.period_end) : null;
 
-    const planLabels = { tier_1: '1 Module', tier_2: '2 Modules', tier_3: '3 Modules (Full Access)' };
-    const moduleLabels = { profit: 'Profit Recovery', revenue: 'Revenue Recovery', traffic: 'Traffic Recovery' };
-    const statusColor = { active: 'var(--gold)', past_due: 'var(--red)', canceled: 'var(--red)', inactive: 'var(--t2)' };
-    const statusLabel = { active: 'Active', past_due: 'Past Due', canceled: 'Canceled', inactive: 'No Active Subscription' };
-    const allModules = ['profit', 'revenue', 'traffic'];
-    const hasAll = allModules.every(m => modules.includes(m));
-
-    let moduleRows = allModules.map(m => {
-      const on = modules.includes(m);
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
-        + '<div style="width:8px;height:8px;border-radius:50%;background:' + (on ? 'var(--gold)' : 'var(--t2)') + ';flex-shrink:0;"></div>'
-        + '<div style="font-size:13px;color:' + (on ? 'var(--t1)' : 'var(--t2)') + ';">' + moduleLabels[m] + '</div>'
-        + '<div style="margin-left:auto;font-size:11px;font-weight:700;letter-spacing:1px;color:' + (on ? 'var(--gold)' : 'var(--t2)') + ';">' + (on ? 'ACTIVE' : 'AVAILABLE') + '</div>'
-        + '</div>';
-    }).join('');
+    // Single-tier subscription (Section 13 of platform map: "One price.
+    // Everything included.") — no more module/tier breakdown.
+    const planName = 'Bar Cop Recovery Platform';
+    const statusMeta = {
+      active:   { color: 'var(--green)', label: 'Active' },
+      past_due: { color: 'var(--red)',   label: 'Past Due' },
+      canceled: { color: 'var(--red)',   label: 'Canceled' },
+      inactive: { color: 'var(--t2)',    label: 'No Active Subscription' }
+    };
+    const meta = statusMeta[status] || statusMeta.inactive;
 
     let billingLine = '';
-    if (periodEnd && status === 'active') {
+    if (status === 'active' && periodEnd) {
       billingLine = '<div style="font-size:12px;color:var(--t2);margin-top:4px;">Renews ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
-    } else if (periodEnd && status === 'canceled') {
+    } else if (status === 'canceled' && periodEnd) {
       billingLine = '<div style="font-size:12px;color:var(--red);margin-top:4px;">Access ends ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
-    }
-
-    let upgradeBlock = '';
-    if (status === 'active' && !hasAll) {
-      upgradeBlock = '<div class="card" style="margin-top:0;">'
-        + '<div class="settings-title" style="margin-bottom:12px;">Add More Modules</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Add Revenue Recovery or Traffic Recovery to get a full picture of where your bar is bleeding money.</div>'
-        + '<button class="btn btn-primary" id="s-upgrade-btn">View Upgrade Options</button>'
-        + '</div>';
     }
 
     // 30-day cancellation retention (Section 15) — after a subscription is
@@ -331,46 +335,24 @@ S.HubSettings = {
         removalLine = 'Your data is kept until ' + removal.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
           + ', 30 days after your access ends, so you have time to export it. After that it is removed.';
       }
-      retentionBlock = '<div class="card" style="margin-top:0;border:1px solid rgba(192,56,40,0.35);">'
-        + '<div class="settings-title" style="margin-bottom:10px;">Export Your Data Before It Is Removed</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">' + removalLine + ' Download a full backup now so you keep your records.</div>'
+      retentionBlock = '<div style="border:1px solid rgba(192,56,40,0.35);border-radius:4px;padding:14px 16px;margin-top:16px;">'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--red);margin-bottom:8px;text-transform:uppercase;">Export Your Data Before It Is Removed</div>'
+        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">' + removalLine + ' Download a full backup now so you keep your records.</div>'
         + '<button class="btn btn-primary" id="s-retain-export">Export a Backup</button>'
         + '</div>';
     }
 
-    let noSubBlock = '';
-    if (status === 'inactive' || status === 'canceled') {
-      noSubBlock = '<div class="card" style="margin-top:0;">'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6;">You do not have an active subscription. Return to the Recovery Hub to choose a plan.</div>'
-        + '<button class="btn btn-primary" id="s-go-hub-btn">Go to Recovery Hub</button>'
-        + '</div>';
-    }
-
-    el.innerHTML = '<div class="settings-section" style="display:flex;flex-direction:column;gap:16px;">'
-      + '<div class="card">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+    el.innerHTML = '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div>'
-      + '<div style="font-size:18px;font-weight:700;color:var(--t1);">' + (plan ? planLabels[plan] : 'No Plan') + '</div>'
-      + '<div style="font-size:12px;font-weight:700;letter-spacing:1px;color:' + (statusColor[status] || 'var(--t2)') + ';margin-top:4px;text-transform:uppercase;">' + (statusLabel[status] || status) + '</div>'
+      + '<div style="font-size:16px;font-weight:700;color:var(--t1);">' + planName + '</div>'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + meta.color + ';margin-top:4px;text-transform:uppercase;">' + meta.label + '</div>'
       + billingLine
       + '</div>'
-      + (status === 'active'
-        ? '<button class="btn btn-ghost" id="s-portal-btn" style="flex-shrink:0;">Manage Billing</button>'
-        : '')
+      + (status === 'active' ? '<button class="btn btn-ghost" id="s-portal-btn" style="flex-shrink:0;">Manage Billing</button>' : '')
       + '</div>'
-      + '<div style="margin-top:20px;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--t2);margin-bottom:8px;text-transform:uppercase;">Recovery Modules</div>'
-      + moduleRows
-      + '</div>'
-      + '</div>'
-      + upgradeBlock
-      + retentionBlock
-      + noSubBlock
-      + '</div>';
+      + retentionBlock;
 
     document.getElementById('s-portal-btn')?.addEventListener('click', () => this.openBillingPortal());
-    document.getElementById('s-upgrade-btn')?.addEventListener('click', () => App.showHub());
-    document.getElementById('s-go-hub-btn')?.addEventListener('click', () => App.showHub());
     document.getElementById('s-retain-export')?.addEventListener('click', () => this.exportBackup());
   },
 
