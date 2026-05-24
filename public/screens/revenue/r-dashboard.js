@@ -78,12 +78,12 @@ S.RevenueDashboard = {
     }
 
     container.innerHTML = '<div class="screen">'
+      + FixPanel.recoveryCard('revenue')
       + startHere
       + alertHtml
       + FixPanel.fixAreasCard('revenue')
       + this.buildChart(validWeeks.slice(-8), t)
       + actionHtml
-      + FixPanel.recoveryCard('revenue')
       + '<div class="sh">Quick Actions</div>'
       + '<div class="qa">'
       + '<button class="btn btn-primary" id="r-qa-week">Enter This Week</button>'
