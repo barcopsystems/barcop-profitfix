@@ -328,20 +328,22 @@ window.FixPanel = {
       + '</div></div>';
   },
 
-  // ── Recovery tracking — log when a fix went in ──────────────────────────────
+  // ── Mark Fix Implemented — the action card ──────────────────────────────────
+  // Rendered as a prominent sub-card inside the expanded gap card. Gold border
+  // when nothing has been logged yet (draws the eye to the action). Neutral
+  // border once a fix has been logged. The "How this works" button opens the
+  // shared Recovery Scoreboard modal so all instruction lives there.
   implementSection(g) {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.gap_id === g.id)
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;'
+    const inputStyle = 'background:var(--bg);border:1px solid var(--b1);border-radius:3px;'
       + 'color:#fff;font-size:13px;padding:7px 10px;width:100%;color-scheme:dark;';
+    const borderColor = mine.length ? 'var(--b1)' : 'rgba(219,171,70,0.45)';
 
-    let html = this.sh('Recovery Tracking');
-    html += '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-bottom:10px;">'
-      + 'When you have this fix in place, log the date. The Recovery Scoreboard measures the metric before and after to show what the fix recovered.</div>';
-
+    let logHtml = '';
     if (mine.length) {
-      html += mine.map(e => {
+      logHtml = mine.map(e => {
         const r = (window.Recovery) ? Recovery.compute(e) : { status: 'untracked' };
         let result = '', good = false;
         if (r.status === 'ok') {
@@ -358,27 +360,32 @@ window.FixPanel = {
         } else if (r.status === 'no-baseline') {
           result = 'No weeks logged before this date to measure recovery against.';
         }
-        return '<div style="padding:8px 0;border-bottom:1px solid var(--b2);">'
+        return '<div style="padding:12px 20px;border-bottom:1px solid var(--b2);">'
           + '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);">'
-          + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);"></span>'
+          + '<span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:var(--gold);"></span>'
           + 'Implemented ' + esc(e.date)
           + '<button class="btn btn-ghost btn-sm fp-unlog" data-log="' + esc(e.id) + '" style="margin-left:auto;">Remove</button>'
           + '</div>'
-          + (result ? '<div style="font-size:12px;line-height:1.6;margin:4px 0 0 14px;color:'
+          + (result ? '<div style="font-size:12px;line-height:1.6;margin:5px 0 0 15px;color:'
               + (good ? 'var(--gold)' : 'var(--t3)') + ';">' + esc(result) + '</div>' : '')
           + '</div>';
       }).join('');
     }
 
-    html += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;">'
-      + '<div class="f" style="width:150px;">'
-      + '<label>Implemented On</label>'
+    const formHtml = '<div style="padding:16px 20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;">'
+      + '<label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:5px;">Implemented On</label>'
       + '<input type="date" class="fp-impl-date" data-gap="' + esc(g.id) + '" style="' + inputStyle + '"/>'
       + '</div>'
-      + '<button class="btn btn-primary btn-sm fp-impl-save" data-gap="' + esc(g.id) + '" '
+      + '<button class="btn btn-primary fp-impl-save" data-gap="' + esc(g.id) + '" '
       + 'data-module="' + esc(g.module) + '" data-name="' + esc(g.name) + '">Mark Implemented</button>'
       + '</div>';
-    return html;
+
+    return '<div style="margin:20px 0;background:var(--input);border:1px solid ' + borderColor + ';border-radius:4px;overflow:hidden;">'
+      + this.sectionHeader('Mark Fix Implemented', 'fp-rec-help')
+      + logHtml
+      + formHtml
+      + '</div>';
   },
 
   // ── Common mistakes ─────────────────────────────────────────────────────────
@@ -464,6 +471,8 @@ window.FixPanel = {
       });
     });
     el.addEventListener('click', ev => {
+      const recHelp = ev.target.closest('.fp-rec-help');
+      if (recHelp) { ev.stopPropagation(); this.showRecoveryHelp(); return; }
       const go = ev.target.closest('.fp-go');
       const copy = ev.target.closest('.fp-copy');
       const print = ev.target.closest('.fp-print');
