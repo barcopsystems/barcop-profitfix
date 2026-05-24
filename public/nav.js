@@ -6,8 +6,8 @@ const ProfitNav = {
     return `
       <div class="nav-section">Overview</div>
       <div class="nav-item" id="nav-hub" data-nav="hub">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 8.5L8.5 2 15 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 7v6.5a.5.5 0 0 0 .5.5H7v-4h3v4h2.5a.5.5 0 0 0 .5-.5V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Recovery Hub</span>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M11 3.5L5 8.5l6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Back to Hub</span>
       </div>
       <div class="nav-item" data-screen="dashboard" id="nav-dashboard">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
@@ -82,8 +82,8 @@ const Revenue = {
     return `
       <div class="nav-section">Overview</div>
       <div class="nav-item" id="nav-hub" data-nav="hub">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 8.5L8.5 2 15 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 7v6.5a.5.5 0 0 0 .5.5H7v-4h3v4h2.5a.5.5 0 0 0 .5-.5V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Recovery Hub</span>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M11 3.5L5 8.5l6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Back to Hub</span>
       </div>
       <div class="nav-item" data-screen="r-dashboard" id="nav-r-dashboard">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
@@ -162,8 +162,8 @@ const Traffic = {
     return `
       <div class="nav-section">Overview</div>
       <div class="nav-item" id="nav-hub" data-nav="hub">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 8.5L8.5 2 15 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 7v6.5a.5.5 0 0 0 .5.5H7v-4h3v4h2.5a.5.5 0 0 0 .5-.5V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Recovery Hub</span>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M11 3.5L5 8.5l6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Back to Hub</span>
       </div>
       <div class="nav-item" data-screen="t-dashboard" id="nav-t-dashboard">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
