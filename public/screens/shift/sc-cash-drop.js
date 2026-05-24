@@ -26,7 +26,7 @@ S.ShiftCashDrop = {
     return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -60,9 +60,9 @@ S.ShiftCashDrop = {
         + '</div>';
       const rows = drops.map(d => '<tr class="cd-row" data-id="' + d.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
-        + '<td>' + esc(d.shift_type || '—') + '</td>'
-        + '<td>' + esc(d.drawer || '—') + '</td>'
-        + '<td>' + esc(d.performed_by || '—') + '</td>'
+        + '<td>' + esc(d.shift_type || '-') + '</td>'
+        + '<td>' + esc(d.drawer || '-') + '</td>'
+        + '<td>' + esc(d.performed_by || '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm cd-edit" data-id="' + d.id + '">Edit</button>'
@@ -233,6 +233,7 @@ S.ShiftCashDrop = {
     const ok = await App.saveShift();
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_sc_cash');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Drop'; }
