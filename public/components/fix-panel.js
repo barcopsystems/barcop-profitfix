@@ -324,7 +324,7 @@ window.FixPanel = {
     const kind = s.kind || 'action';
     const meta = {
       action:    { label: 'DO IT',     color: 'var(--gold)',  bg: 'var(--gold-bg)' },
-      result:    { label: 'SEE IT',    color: 'var(--steel)', bg: 'rgba(72,136,168,0.12)' },
+      result:    { label: 'SEE IT',    color: 'var(--blue)',  bg: 'var(--blue-bg)' },
       reference: { label: 'DOCUMENT',  color: 'var(--t3)',    bg: 'rgba(255,255,255,0.06)' }
     }[kind] || {};
     const label = esc(s.targetLabel || '');
