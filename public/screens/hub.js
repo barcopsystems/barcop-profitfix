@@ -76,7 +76,11 @@ S.Hub = {
       if (dir === 'low')  return val <= target ? 'good' : val <= target*1.1 ? 'warn' : 'bad';
       return val >= target ? 'good' : val >= target*0.9 ? 'warn' : 'bad';
     };
-    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red)' : 'var(--t4)';
+    // Hub uses tier-2 (soft) red for status indicators so the few real
+    // attention reds (Leaking This Week headline, Alerts count) carry more
+    // visual weight than the supporting status data.
+    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red-soft)' : 'var(--t4)';
+    const softScore = s => { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red-soft)'; };
 
     const pourT = pt.bar_pour_cost_pct ?? 22;
     const foodT = pt.food_cost_pct ?? 32;
@@ -158,7 +162,7 @@ S.Hub = {
     // ── UI builders ──
     const ring = (score, size) => {
       if (score == null) return `<div style="width:${size}px;height:${size}px;border-radius:50%;border:3px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;"><span style="font-size:8px;color:var(--t4);text-align:center;line-height:1.2;">No<br>Data</span></div>`;
-      const r = (size/2)-5, circ = 2*Math.PI*r, dash = (Math.min(score,100)/100)*circ, col = App.scoreHex(score);
+      const r = (size/2)-5, circ = 2*Math.PI*r, dash = (Math.min(score,100)/100)*circ, col = softScore(score);
       return `<div style="position:relative;width:${size}px;height:${size}px;"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3.5"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="3.5" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><span style="font-size:15px;font-weight:800;color:${col};">${score}</span></div></div>`;
     };
 
@@ -177,7 +181,7 @@ S.Hub = {
 
     const tiles =
         tile('Overall Recovery Score', overall != null ? overall : 'None',
-             overall != null ? App.scoreHex(overall) : 'var(--t4)',
+             overall != null ? softScore(overall) : 'var(--t4)',
              overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--gold)' : 'var(--t4)',
@@ -203,7 +207,7 @@ S.Hub = {
     };
     const auditRow = (name, audit, trend, screen, mod, isFirst, indAvg) => {
       const score      = audit?.overall_score ?? null;
-      const scoreColor = score != null ? App.scoreHex(score) : 'var(--t4)';
+      const scoreColor = score != null ? softScore(score) : 'var(--t4)';
       const daysLeft   = auditDaysLeft(audit);
       const canRun     = daysLeft <= 0;
       const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
@@ -254,7 +258,7 @@ S.Hub = {
         const weekly  = monthly / 4.345;
         const parts = [];
         if (weekly > 0) {
-          parts.push('<span style="color:var(--red);font-weight:700;">Leaking ~' + App.fmtCurrency(weekly, 0) + ' /wk</span>');
+          parts.push('<span style="color:var(--red-soft);font-weight:700;">Leaking ~' + App.fmtCurrency(weekly, 0) + ' /wk</span>');
         } else {
           parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
         }
@@ -523,7 +527,7 @@ S.Hub = {
             + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
             + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
             + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
-            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--red);line-height:1;">' + dollar + '</span>'
+            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--gold);line-height:1;">' + dollar + '</span>'
             +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
             + '</div>'
             + '<div style="flex:1;min-width:0;font-size:11px;line-height:1.45;">'
