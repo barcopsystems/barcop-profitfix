@@ -5,7 +5,7 @@ const TT = {
   _cur: null,
   _box: document.getElementById('tt-box'),
   defs: {
-    'container-size': {t:'Container Size',b:'The total size of the bottle, can, or keg you purchase. Pick from the list   the app converts to ounces automatically.',e:'750ml bottle of vodka = 25.4 oz'},
+    'container-size': {t:'Container Size',b:'The total size of the bottle, can, or keg you purchase. Pick from the list, Bar Cop converts to ounces automatically.',e:'750ml bottle of vodka = 25.4 oz'},
     'std-pour':       {t:'Standard Pour',b:'How many ounces you pour per drink. Used to calculate Cost Per Pour and track inventory variance.',e:'Spirits: 1.5 oz · Wine: 5 oz · Draft: 16 oz'},
     'unit-cost':      {t:'Unit Cost',b:'What you pay per bottle, can, or keg. Use your invoice price.',e:'Case of Tito\'s 750ml costs $180 = $15/bottle'},
     'menu-price':     {t:'Menu Price',b:'What you charge the guest per drink or serving.',e:'$10 for a cocktail · $6 for a draft beer'},
@@ -24,8 +24,8 @@ const TT = {
     'kitchen-cost':   {t:'Unit Cost',b:'What you pay per unit of this product.',e:'Chicken: $3.20/lb · Lime carton: $4.50/each'},
     'recipe-pours':   {t:'Pours',b:'How many standard pours of this spirit go in this drink. 1 = one standard pour.',e:'1 pour rum + 0.5 pour triple sec'},
     'recipe-bottles': {t:'Bottles',b:'How many full bottles go into the batch. Use decimals for partial bottles.',e:'2 bottles tequila + 0.5 bottle triple sec'},
-    'batch-yield':    {t:'Batch Yield',b:'Total amount this batch makes. Pick the unit   app converts to oz to calculate servings.',e:'1 gallon frozen margarita mix = 128 oz'},
-    'serving-size':   {t:'Serving Size',b:'How much goes in one drink. App divides yield by serving size to get servings per batch.',e:'5 oz per drink from 128 oz batch = 25.6 drinks'},
+    'batch-yield':    {t:'Batch Yield',b:'Total amount this batch makes. Pick the unit, Bar Cop converts to oz to calculate servings.',e:'1 gallon frozen margarita mix = 128 oz'},
+    'serving-size':   {t:'Serving Size',b:'How much goes in one drink. Bar Cop divides yield by serving size to get servings per batch.',e:'5 oz per drink from 128 oz batch = 25.6 drinks'},
     'servings-batch': {t:'Servings Per Batch',b:'Batch Yield ÷ Serving Size. Calculated automatically. Verify this makes sense.',e:'128 oz ÷ 5 oz = 25.6 drinks'},
     'recipe-cost-pct':{t:'Recipe Cost %',b:'Total ingredient cost ÷ Menu Price.',e:'$1.20 cost ÷ $8 menu price = 15%'},
     'plate-yield':    {t:'Plates Per Batch',b:'How many plates this recipe produces. Most single-plate recipes are 1.',e:'A pot of chili serving 10 = plate yield of 10'},
@@ -63,7 +63,7 @@ const TT = {
     'r-wage-kitchen':   {t:'Kitchen Staff Hourly Wage',b:'Average hourly rate for kitchen staff including line cooks, prep cooks, and dishwashers. Used to calculate your kitchen labor budget in hours. Does not include salaried kitchen management.',e:'Line cooks at $16, prep at $13, dish at $11 = $13.50 blended average'},
     'r-wage-floor':     {t:'Floor Staff Hourly Wage',b:'Average hourly rate for front-of-house staff including servers, food runners, and hosts. Used to calculate your floor labor budget in hours. Enter your tipped staff base wage, not their total compensation with tips.',e:'Servers at $2.13 base plus tip credit, or $12 if non-tipped market'},
     // This Week shared tooltips
-    'tw-week-num':      {t:'Week Number',b:'Sequential week number for your records. Week 1 is your first week entering data. The system carries this forward automatically each week. Only adjust if you are entering a catch-up week out of sequence.',e:'Week 12 means you have 12 weeks of data in the system'},
+    'tw-week-num':      {t:'Week Number',b:'Sequential week number for your records. Week 1 is your first week entering data. Bar Cop carries this forward automatically each week. Only adjust if you are entering a catch-up week out of sequence.',e:'Week 12 means you have 12 weeks of data in Bar Cop'},
     'tw-period-end':    {t:'Period End Date',b:'The last day of the week you are entering. Most operations close their week on Sunday. Be consistent week over week so your trend data lines up correctly.',e:'Sunday October 13 closes a Monday through Sunday accounting week'},
     'r-sv-covers':      {t:'Server Covers',b:'Total guests this server personally served during the week. Pull from your POS server sales report. This is the denominator in check average, so it must be guest count, not table count.',e:'Server handled 148 guests this week'},
     'r-sv-sales':       {t:'Server Total Sales',b:'Total dollar sales this server rang during the week. Pull from your POS server sales report. Food and beverage combined.',e:'Server rang $5,340 in total sales this week = $36.08 check average'},
