@@ -299,9 +299,9 @@ window.FixPanel = {
       + '</div></div>';
   },
 
-  sh(text) {
+  sh(text, subdued) {
     return '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;'
-      + 'color:var(--gold);margin:20px 0 12px;">' + esc(text) + '</div>';
+      + 'color:' + (subdued ? 'var(--t3)' : 'var(--gold)') + ';margin:20px 0 12px;">' + esc(text) + '</div>';
   },
 
   // ── Fix process — every step is a link ──────────────────────────────────────
@@ -455,14 +455,14 @@ window.FixPanel = {
       '<div style="display:flex;gap:10px;padding:7px 0;">'
       + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:6px;"></span>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.65;">' + esc(m) + '</div></div>').join('');
-    return this.sh('Common Mistakes') + items;
+    return this.sh('Common Mistakes', true) + items;
   },
 
   // ── Quick Reference card ────────────────────────────────────────────────────
   quickRefSection(g) {
     const q = g.quickRef;
     if (!q) return '';
-    let html = this.sh('Quick Reference Card');
+    let html = this.sh('Quick Reference Card', true);
     html += '<div class="fp-qr" style="background:var(--panel);border:1px solid var(--b1);border-radius:4px;padding:16px 18px;">';
 
     if (q.rhythm && q.rhythm.length) {
@@ -500,7 +500,7 @@ window.FixPanel = {
   // ── AI workflow cards ───────────────────────────────────────────────────────
   aiSection(g) {
     if (!g.aiWorkflows || !g.aiWorkflows.length) return '';
-    let html = this.sh('AI Workflow Cards')
+    let html = this.sh('AI Workflow Cards', true)
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;">'
       + 'Copy a prompt into your own AI tool. Run it on real, verified numbers. Bar Cop never sends these for you.</div>';
     g.aiWorkflows.forEach((w, i) => {
