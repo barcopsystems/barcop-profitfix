@@ -99,7 +99,7 @@ S.LaborBuildSchedule = {
       + '<div class="f" style="width:104px;flex-shrink:0;"><label>End</label>'
       + '<input type="time" class="bs-end" value="' + esc(sh.end || '') + '"/></div>'
       + '<div class="f" style="flex:1;min-width:150px;"><label>&nbsp;</label>'
-      + '<div class="bs-rowcalc" style="font-size:12px;color:var(--t3);padding-bottom:8px;">—</div></div>'
+      + '<div class="bs-rowcalc" style="font-size:12px;color:var(--t3);padding-bottom:8px;">-</div></div>'
       + '<button class="btn btn-ghost btn-sm bs-remove" style="margin-bottom:6px;">Remove</button>'
       + '</div>';
   },
@@ -124,11 +124,11 @@ S.LaborBuildSchedule = {
       + '<div id="bs-rows">' + rows + '</div>'
       + '<button class="btn btn-ghost btn-sm" id="bs-add">+ Add Shift</button>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val" id="bs-hours">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="bs-cost">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val" id="bs-pct">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val" id="bs-hours">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="bs-cost">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val" id="bs-pct">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + App.fmtPct(this.laborTarget()) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val" id="bs-rplh">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val" id="bs-rplh">-</div></div>'
       + '</div></div>'
 
       + '<div class="card"><div class="card-title">Review</div>'
@@ -219,8 +219,8 @@ S.LaborBuildSchedule = {
     const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
     set('bs-hours', totalHours.toFixed(1));
     set('bs-cost', App.fmtCurrency(totalCost));
-    set('bs-pct', pct != null ? App.fmtPct(pct) : '—', pct != null ? (pct > target ? 'warn' : 'good') : '');
-    set('bs-rplh', rplh != null ? App.fmtCurrency(rplh) : '—');
+    set('bs-pct', pct != null ? App.fmtPct(pct) : '-', pct != null ? (pct > target ? 'warn' : 'good') : '');
+    set('bs-rplh', rplh != null ? App.fmtCurrency(rplh) : '-');
   },
 
   async save() {
@@ -273,6 +273,7 @@ S.LaborBuildSchedule = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveLabor();
     if (ok) {
+      App.markSetupDone('gs_lc_schedule');
       this.editId = null;
       this.clearDraft();
       App.navigate('lc-schedule-history');
