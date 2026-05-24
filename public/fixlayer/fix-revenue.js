@@ -16,7 +16,7 @@ FIX.revenue = [
     summary: 'Every menu item is a Star, Plowhorse, Puzzle, or Dog. Classify them by contribution margin and volume, then reposition, reprice, and brief servers off the result.',
 
     process: {
-      intro: 'Menu engineering plots every item on two axes: contribution margin in dollars, not food cost percent, and sales volume. That puts every item in one of four quadrants. Stars are high margin and high volume. Plowhorses are low margin and high volume. Puzzles are high margin and low volume. Dogs are low margin and low volume. Each quadrant gets a different action. The app plots the quadrant for you. Each step below opens where the work happens.',
+      intro: 'Menu engineering plots every item on two axes: contribution margin in dollars, not food cost percent, and sales volume. That puts every item in one of four quadrants. Stars are high margin and high volume. Plowhorses are low margin and high volume. Puzzles are high margin and low volume. Dogs are low margin and low volume. Each quadrant gets a different action. Bar Cop plots the quadrant for you. Each step below opens where the work happens.',
       steps: [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Set up the menu data',
@@ -107,7 +107,7 @@ FIX.revenue = [
     summary: 'Most menus are priced by feel and drift below cost as ingredients rise. Build every price from a cost floor, flag below-floor items, and correct them surgically each quarter.',
 
     process: {
-      intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be. The competition tells you what the market accepts. Those are two different numbers for two different decisions. A menu priced once at opening drifts below floor inside 18 months, so this is a quarterly job. The app holds your costs and prices and shows you cost percent per item. Each step below opens where the work happens.',
+      intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be. The competition tells you what the market accepts. Those are two different numbers for two different decisions. A menu priced once at opening drifts below floor inside 18 months, so this is a quarterly job. Bar Cop holds your costs and prices and shows you cost percent per item. Each step below opens where the work happens.',
       steps: [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Keep ingredient costs current',
@@ -374,7 +374,7 @@ FIX.revenue = [
     summary: 'Check average per cover is the floor\'s biggest revenue lever. Brief it every shift, track it by server, and coach the few who are below average, not the whole team.',
 
     process: {
-      intro: 'The pre-shift briefing and the weekly review are two halves of one system. The briefing sets the behavior. The review tells you whether it worked. The system compounds. It feels like process for no result until about week four, then the data starts moving. The app tracks check average by server and shows you the spread. Each step below opens where the work happens.',
+      intro: 'The pre-shift briefing and the weekly review are two halves of one system. The briefing sets the behavior. The review tells you whether it worked. The system compounds. It feels like process for no result until about week four, then the data starts moving. Bar Cop tracks check average by server and shows you the spread. Each step below opens where the work happens.',
       steps: [
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Track check average by server',
@@ -557,7 +557,7 @@ FIX.revenue = [
     summary: 'A written standard turns serving from personal style into a trained, measurable system. Roll it out signed, measure by individual check average, and coach from data.',
 
     process: {
-      intro: 'A briefing tells servers what to suggest today. A written standard tells them how to suggest it at every touch point. The standard is what makes performance trainable, measurable, and enforceable. Coaching has to run on data, not impression, and the app tracks check average by server so the data is there. Each step below opens where the work happens.',
+      intro: 'A briefing tells servers what to suggest today. A written standard tells them how to suggest it at every touch point. The standard is what makes performance trainable, measurable, and enforceable. Coaching has to run on data, not impression, and Bar Cop tracks check average by server so the data is there. Each step below opens where the work happens.',
       steps: [
         { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Write and roll out the server standard',
