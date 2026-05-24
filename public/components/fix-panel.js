@@ -1,448 +1,523 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap');
+'use strict';
 
-:root {
-  --bg:        #000000;
-  --surface:   #070E15;
-  --input:     #06111c;
-  --panel:     #141A21;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
-  --hover:     rgba(255,255,255,0.05);
-  --nav-act:   #0d1e2e;
+/* ── Fix Panel — the Fix Layer renderer (v2) ──────────────────────────────────
+   Renders a Recovery module's gap-areas from the static FIX content. The Fix
+   Layer is the connective spine of the platform: each fix-process step is a
+   deep-link into the feature that performs it, never manual instruction text.
 
-  --gold:      #DBAB46;
-  --gold-h:    #C29638;
-  --gold-bg:   rgba(219,171,70,0.10);
-  --red:       #C03828;
-  --red-bg:    rgba(192,56,40,0.13);
-  --steel:     #4888A8;
-  --green:     #518A79;                /* Success: on-target, strong scores, positive trend */
-  --green-bg:  rgba(81,138,121,0.12);
-  --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
-  --blue-bg:   rgba(76,142,171,0.10);
-  --amber:     #9A5D34;                /* Warn/watch state: muted burnt brown, between red (bad) and green (good) */
-  --amber-bg:  rgba(154,93,52,0.12);
+   Step kinds:
+     action    — deep-link to the Control/Recovery feature that does the task
+     result    — deep-link to where the app already shows the computed number
+     reference — a downloadable PDF/Word document (policies, standards)
 
-  --w:         #ffffff;
-  --t1:        rgba(200,216,232,0.94);
-  --t2:        rgba(200,216,232,0.66);
-  --t3:        rgba(255,255,255,0.38);
-  --t4:        rgba(255,255,255,0.22);
-  --b1:        rgba(255,255,255,0.11);
-  --b2:        rgba(255,255,255,0.06);
-  --b-edge:    #22282F;                /* Outer borders that touch the black page bg */
+   FixPanel.renderInto(el, moduleKey, focusId) — el container, module key,
+   optional gap-area id to auto-expand and scroll to. 100% static, zero API. */
 
-  --r:  4px;
-  --r2: 3px;
-  --sp: 28px;
+window.FixPanel = {
+  RESOURCE_ROOT: 'assets/resources/',
 
-  --sidebar-w:      220px;
-  --sidebar-w-coll: 52px;
-}
+  gapAreas(moduleKey) {
+    return (window.FIX && Array.isArray(FIX[moduleKey])) ? FIX[moduleKey] : [];
+  },
+  docPath(module, file) {
+    return this.RESOURCE_ROOT + (module === 'profit' ? '' : module + '/') + encodeURIComponent(file);
+  },
 
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
-body{background:var(--bg);color:var(--w);font-family:'Barlow',-apple-system,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;}
+  // The per-module Fix screen id a gap-area deep-links into.
+  fixScreen(moduleKey) {
+    return moduleKey === 'revenue' ? 'r-fix' : moduleKey === 'traffic' ? 't-fix' : 'profit-fix';
+  },
 
-/* ── Dark all inputs everywhere ── */
-input,select,textarea{color-scheme:dark;}
-.app input:not([type=file]),.app select,.app textarea{
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
-  color:var(--w);font-family:'Barlow',sans-serif;color-scheme:dark;
-}
-.app input:not([type=file]):focus,.app select:focus,.app textarea:focus{border-color:var(--gold);outline:none;}
-.form-input{
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
-  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
-  padding:7px 9px;outline:none;appearance:none;-webkit-appearance:none;
-  transition:border-color 0.12s;color-scheme:dark;width:100%;
-}
-.form-input:focus{border-color:var(--gold);}
-.form-input[type=number]{-moz-appearance:textfield;}
-.form-input[type=number]::-webkit-inner-spin-button,
-.form-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+  // ── Card-internal section header. Title sits inside the card with a divider
+  // below it. Optional helpClass adds a "How this works" button on the right
+  // that the calling code wires to open a modal.
+  sectionHeader(title, helpClass) {
+    const help = helpClass
+      ? '<button class="' + helpClass + '" style="background:transparent;border:1px solid var(--b1);border-radius:3px;'
+        + 'color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;'
+        + 'padding:4px 9px;cursor:pointer;">How this works</button>'
+      : '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
+      + help
+      + '</div>';
+  },
 
-/* ── Utility ── */
-.hidden{display:none!important;}
-.pos{color:var(--gold);}
-.neg{color:var(--red);}
-.val{color:var(--w);}
-.dim{color:var(--t3);}
+  // ── Compact "Fix Areas" card for a Recovery dashboard ───────────────────────
+  // Each row deep-links into the module's Fix screen at that gap-area.
+  fixAreasCard(moduleKey) {
+    const gaps = this.gapAreas(moduleKey);
+    if (!gaps.length) return '';
+    const BANDS = {
+      ok:    { label: 'On Target', color: 'var(--gold)' },
+      watch: { label: 'Watch',     color: 'var(--w)' },
+      over:  { label: 'Over',      color: 'var(--red)' }
+    };
+    const rows = gaps.map((g, i) => {
+      const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
+      let impHtml = '';
+      if (imp && BANDS[imp.band]) {
+        const bm = BANDS[imp.band];
+        impHtml = '<div style="flex-shrink:0;text-align:right;">'
+          + '<div style="font-size:8px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;'
+          + 'color:' + bm.color + ';">' + bm.label + '</div>'
+          + (imp.dollars > 0
+              ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;'
+                + 'color:' + bm.color + ';line-height:1.1;margin-top:2px;">' + App.fmtCurrency(imp.dollars)
+                + '<span style="font-size:9px;"> /yr</span></div>'
+              : '') + '</div>';
+      }
+      return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
+        + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
+        + (i < gaps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(g.summary || '') + '</div>'
+        + '</div>'
+        + impHtml
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+        + '</div>';
+    }).join('');
+    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + this.sectionHeader('Fix Areas')
+      + rows
+      + '</div>';
+  },
 
-/* ══ APP SHELL ══ */
-.app{display:flex;height:100vh;overflow:hidden;}
+  // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
+  // The module's running recovery from logged fixes. Lives at the top of the
+  // dashboard as the platform's headline number. Four states:
+  //   1) brand new (no audit, no fixes): 3-step explainer teaching the loop
+  //   2) audit ran, no fixes yet: opportunity $ + 2-step explainer
+  //   3) fixes logged, measured: recovered $ receipt
+  //   4) fixes logged, all still measuring: logged count + measuring count
+  auditScreen(moduleKey) {
+    return moduleKey === 'revenue' ? 'r-audit'
+         : moduleKey === 'traffic' ? 't-audit'
+         : 'audit-tracker';
+  },
 
-/* ══ SIDEBAR ══ */
-.sidebar{
-  width:var(--sidebar-w);
-  min-width:var(--sidebar-w);
-  height:100vh;
-  background:var(--surface);
-  border-right:1px solid var(--b-edge);
-  display:flex;flex-direction:column;
-  overflow:hidden;flex-shrink:0;
-  transition:width 0.2s ease,min-width 0.2s ease;
-}
-.app.sidebar-collapsed .sidebar{
-  width:var(--sidebar-w-coll);
-  min-width:var(--sidebar-w-coll);
-}
+  _stepRow(num, title, target, isLast) {
+    return '<div class="fp-step" data-screen="' + esc(target) + '" '
+      + 'style="display:flex;align-items:center;gap:13px;padding:14px 20px;cursor:pointer;'
+      + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+      + '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);'
+      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>'
+      + '<div style="flex:1;min-width:0;font-size:12px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:var(--t1);">' + esc(title) + '</div>'
+      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+      + '</div>';
+  },
 
-/* Logo area */
-.sidebar-logo{
-  padding:14px 12px 12px;
-  border-bottom:1px solid var(--b2);
-  flex-shrink:0;
-  overflow:hidden;
-  height:52px;
-  display:flex;align-items:center;justify-content:space-between;gap:8px;
-}
-.sidebar-logo-full{height:24px;width:auto;display:block;flex-shrink:0;}
-.sidebar-logo-icon{
-  height:26px;width:auto;display:none;flex-shrink:0;
-}
-.app.sidebar-collapsed .sidebar-logo-full{display:none;}
-.app.sidebar-collapsed .sidebar-logo-icon{display:none;}
-/* Collapsed: the toggle button is the only visible child; center it where
-   the Bar Cop icon used to sit. */
-.app.sidebar-collapsed .sidebar-logo{justify-content:center;}
+  recoveryCard(moduleKey) {
+    if (!window.Recovery) return '';
+    const s = Recovery.moduleSummary(moduleKey);
+    const fixScreen = this.fixScreen(moduleKey);
+    const titleBar = this.sectionHeader('Recovery Scoreboard', 'fp-rec-help');
 
-/* The collapse toggle lives inside the sidebar-logo box, right-aligned when
-   expanded, centered when collapsed (replaces the old topbar-toggle). */
-.sidebar-logo-toggle{
-  display:flex;align-items:center;justify-content:center;
-  width:26px;height:26px;
-  background:transparent;
-  border:1px solid var(--b1);
-  border-radius:var(--r2);
-  color:var(--t3);cursor:pointer;
-  flex-shrink:0;
-  transition:border-color 0.1s,color 0.1s;
-}
-.sidebar-logo-toggle:hover{border-color:rgba(255,255,255,0.25);color:var(--t2);}
+    // States 1 and 2 — no fixes logged. Empty-state shows a numbered loop.
+    if (s.logged === 0) {
+      const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
+      const audits = (App.data && App.data[auditKey]) || [];
+      const latest = audits[audits.length - 1];
+      const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
+      const annual  = monthly * 12;
+      const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
 
-/* Nav */
-.sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 0;scrollbar-width:none;}
-.sidebar-nav::-webkit-scrollbar{display:none;}
+      if (annual > 0) {
+        // State 2 — audit done, no fixes yet.
+        const top = '<div style="padding:18px 20px;border-bottom:1px solid var(--b2);">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
+          + App.fmtCurrency(annual, 0)
+          + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr opportunity</span></div>'
+          + '</div>';
+        return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+          + titleBar
+          + top
+          + this._stepRow(1, 'Pick a gap, work the fix', fixScreen, false)
+          + this._stepRow(2, 'Mark implemented', fixScreen, true)
+          + '</div>';
+      }
 
-.nav-section{
-  padding:10px 14px 2px;
-  font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
-  color:var(--t4);white-space:nowrap;overflow:hidden;
-  transition:opacity 0.15s;
-}
-.app.sidebar-collapsed .nav-section{opacity:0;height:0;padding:0;margin:0;}
+      // State 1 — brand new. Three steps.
+      return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+        + titleBar
+        + this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false)
+        + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false)
+        + this._stepRow(3, 'Mark implemented', fixScreen, true)
+        + '</div>';
+    }
 
-.nav-item{
-  display:flex;align-items:center;
-  gap:10px;
-  padding:7px 14px;
-  cursor:pointer;
-  border-radius:0;
-  transition:background 0.12s;
-  user-select:none;
-  white-space:nowrap;
-  overflow:hidden;
-}
-.nav-item:hover{background:var(--hover);}
-.nav-item.active{background:var(--nav-act);}
+    // States 3 and 4 — fixes logged. Receipt or measuring state.
+    let body;
+    if (s.withFigure > 0) {
+      body = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
+        + App.fmtCurrency(s.recovered, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">across '
+        + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
+        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '</div>';
+    } else {
+      body = '<div style="font-size:13px;color:var(--t2);line-height:1.6;">'
+        + s.logged + ' fix' + (s.logged === 1 ? '' : 'es') + ' logged'
+        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '.</div>';
+    }
+    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      + titleBar
+      + '<div class="fp-recovery-go" data-screen="' + esc(fixScreen) + '" '
+      + 'style="padding:18px 20px;display:flex;align-items:center;gap:16px;justify-content:space-between;cursor:pointer;">'
+      + '<div style="flex:1;min-width:0;">' + body + '</div>'
+      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+      + '</div>'
+      + '</div>';
+  },
 
-/* In collapsed mode center the icon */
-.app.sidebar-collapsed .nav-item{
-  padding:8px 0;
-  justify-content:center;
-  gap:0;
-}
+  // ── "How this works" modal for the Recovery Scoreboard ─────────────────────
+  showRecoveryHelp() {
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
+    const head = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">How the Recovery Scoreboard Works</div>'
+      + '<button class="btn btn-ghost btn-sm fp-rec-close">Close</button>'
+      + '</div>';
+    const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
+    const p  = t => '<p style="margin:0 0 10px;">' + t + '</p>';
+    const body = '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">'
+      + p('The Scoreboard tracks what Bar Cop puts back in your register, in dollars per year. No projections. No industry averages. Your own weekly numbers, measured before and after each fix.')
+      + sh('The Loop')
+      + p('1. Run the audit. It scores your operation and lists every gap with a dollar figure on what it costs you per year.')
+      + p('2. Pick a gap and open the fix process. Every step is a link into the part of Bar Cop that does the work.')
+      + p('3. When the fix is in place, click Mark Implemented and lock in the date.')
+      + sh('What Happens Next')
+      + p('Bar Cop watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after, multiplies the improvement by your revenue base, and annualizes it.')
+      + p('You see a preliminary figure once 2 weeks of after-data exist. It firms up over the next 6 weeks and settles at 8.')
+      + sh('The Honest Rule')
+      + p('A dollar figure only shows when the math comes from real data Bar Cop already holds. If a fix cannot be dollarized honestly (most Traffic fixes), it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
+      + '</div>';
+    box.innerHTML = head + body;
+    m.appendChild(box);
+    document.body.appendChild(m);
+    m.onclick = ev => { if (ev.target === m) m.remove(); };
+    box.querySelector('.fp-rec-close')?.addEventListener('click', () => m.remove());
+  },
 
-.nav-icon{
-  width:17px;height:17px;flex-shrink:0;
-  color:var(--t3);
-  transition:color 0.12s;
-}
-.nav-item:hover  .nav-icon{color:var(--t1);}
-.nav-item.active .nav-icon{color:var(--gold);}
+  // Wire the Fix Areas rows and the Recovery card. Call after render.
+  wireFixAreas(container) {
+    if (!container) return;
+    container.querySelectorAll('.fp-fixarea').forEach(row => {
+      row.addEventListener('click', () => {
+        App._fixFocus = row.dataset.gap;
+        App.openScreen(this.fixScreen(row.dataset.module));
+      });
+    });
+    container.querySelectorAll('.fp-recovery-go').forEach(card => {
+      card.addEventListener('click', () => App.openScreen(card.dataset.screen));
+    });
+    container.querySelectorAll('.fp-step').forEach(step => {
+      step.addEventListener('click', () => App.openScreen(step.dataset.screen));
+    });
+    container.querySelectorAll('.fp-rec-help').forEach(btn => {
+      btn.addEventListener('click', ev => { ev.stopPropagation(); this.showRecoveryHelp(); });
+    });
+  },
 
-.nav-label{
-  font-size:11px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;
-  color:var(--t2);transition:color 0.12s,opacity 0.15s,width 0.2s;
-  overflow:hidden;white-space:nowrap;
-}
-.nav-item:hover  .nav-label{color:var(--w);}
-.nav-item.active .nav-label{color:var(--w);}
-.app.sidebar-collapsed .nav-label{width:0;opacity:0;overflow:hidden;}
+  // Vertical fix-event markers for an annotated trend chart. xFn maps a week
+  // index to an x coordinate; top/bottom are the plot edges.
+  // Disabled for now — full-height dashed lines + gold dots were too visually
+  // loud against the trend lines on every chart they appeared in. Restore by
+  // removing the early return below if a softer style is added later.
+  markerSvg(markers, xFn, top, bottom) {
+    return '';
+    /* eslint-disable */
+    if (!markers || !markers.length) return '';
+    return markers.map(m => {
+      const x = xFn(m.index).toFixed(1);
+      return '<line x1="' + x + '" y1="' + top.toFixed(1) + '" x2="' + x + '" y2="' + bottom.toFixed(1) + '" '
+        + 'stroke="rgba(219,171,70,0.5)" stroke-width="1" stroke-dasharray="2,3"/>'
+        + '<circle cx="' + x + '" cy="' + top.toFixed(1) + '" r="3" fill="#DBAB46">'
+        + '<title>' + esc(m.label) + ' implemented ' + esc(m.date) + '</title></circle>';
+    }).join('');
+    /* eslint-enable */
+  },
 
-/* Footer */
-.sidebar-footer{
-  padding:10px 12px 12px;
-  border-top:1px solid var(--b2);
-  flex-shrink:0;overflow:hidden;
-}
-.period-label{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t4);margin-bottom:2px;white-space:nowrap;}
-.period-val{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;white-space:nowrap;}
-.app.sidebar-collapsed .period-label,
-.app.sidebar-collapsed .period-val{display:none;}
+  renderInto(el, moduleKey, focusId) {
+    if (!el) return;
+    el.dataset.fixModule = moduleKey;
+    const gaps = this.gapAreas(moduleKey);
+    if (gaps.length === 0) {
+      el.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--t3);">'
+        + 'Fix content for this module is on the way.</div></div>';
+      return;
+    }
+    el.innerHTML = gaps.map(g => this.gapCard(g, g.id === focusId)).join('');
+    this.wire(el);
+    if (focusId) {
+      const card = el.querySelector('.fp-gap[data-gap="' + focusId + '"]');
+      if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    }
+  },
 
-.sidebar-btn{
-  display:flex;align-items:center;gap:8px;
-  background:transparent;
-  border:none;
-  color:var(--t3);
-  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  padding:6px 2px;cursor:pointer;
-  width:100%;margin-bottom:4px;
-  transition:color 0.12s;
-  white-space:nowrap;overflow:hidden;
-}
-.sidebar-btn:hover{color:var(--t1);}
-.sidebar-btn.active{color:var(--gold);}
-.sidebar-btn .nav-icon{width:16px;height:16px;flex-shrink:0;}
-.app.sidebar-collapsed .sidebar-btn{justify-content:center;padding:6px 0;}
-.app.sidebar-collapsed .sidebar-btn-label{display:none;}
+  // ── One gap-area collapsible card ───────────────────────────────────────────
+  gapCard(g, expanded) {
+    return '<div class="card fp-gap" data-gap="' + esc(g.id) + '" style="padding:0;overflow:hidden;">'
+      + '<div class="fp-head" style="display:flex;align-items:flex-start;gap:12px;padding:18px 20px;cursor:pointer;">'
+      + '<div style="flex:1;">'
+      + '<div style="font-size:13px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:1px;">' + esc(g.name) + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:5px;">' + esc(g.summary || '') + '</div>'
+      + '</div>'
+      + '<span class="fp-chev" style="flex-shrink:0;font-size:14px;color:var(--t3);transform:rotate(' + (expanded ? '90' : '0') + 'deg);transition:transform 0.15s;">&#9656;</span>'
+      + '</div>'
+      + '<div class="fp-body" style="display:' + (expanded ? 'block' : 'none') + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
+      + this.processSection(g)
+      + this.implementSection(g)
+      + this.mistakesSection(g)
+      + this.quickRefSection(g)
+      + this.aiSection(g)
+      + '</div></div>';
+  },
 
-/* Toggle button */
-.topbar-toggle{
-  display:flex;align-items:center;justify-content:center;
-  width:32px;height:32px;
-  background:transparent;
-  border:1px solid var(--b1);
-  border-radius:var(--r2);
-  color:var(--t3);cursor:pointer;
-  transition:all 0.1s;
-  flex-shrink:0;margin-right:10px;
-}
-.topbar-toggle:hover{border-color:rgba(255,255,255,0.25);color:var(--t2);}
+  sh(text) {
+    return '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;'
+      + 'color:var(--gold);margin:20px 0 12px;">' + esc(text) + '</div>';
+  },
 
-/* ══ MAIN ══ */
-.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
-.topbar{
-  height:50px;min-height:50px;
-  background:var(--surface);border-bottom:1px solid var(--b-edge);
-  display:flex;align-items:center;padding:0 var(--sp);flex-shrink:0;
-}
-.topbar-left{flex:1;display:flex;align-items:center;gap:0;}
-.topbar-right{display:flex;align-items:center;gap:8px;}
-.topbar-title{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);}
-/* topbar-sub holds the "| Back to [last page]" breadcrumb link after the
-   white title. Resets letter-spacing/text-transform so the inline link
-   reads cleanly in mixed case. */
-.topbar-sub{font-size:11px;font-weight:600;color:var(--t3);margin-left:10px;display:flex;align-items:center;gap:8px;}
-.topbar-sep{color:var(--t4);font-weight:400;}
-.topbar-back-link{
-  color:var(--t3);font-family:'Barlow',sans-serif;font-size:11px;font-weight:600;
-  text-decoration:none;cursor:pointer;transition:color 0.12s;
-}
-.topbar-back-link:hover{color:var(--t1);}
-/* Global Settings tab strip — matches the breadcrumb link palette so the
-   tab affordances feel like part of the same nav system. Hover lifts an
-   inactive tab from t3 to t1; the active tab is held at t1 by JS plus the
-   gold underline indicator. */
-.hs-tab{outline:none;}
-.hs-tab:hover{color:var(--t1) !important;}
+  // ── Fix process — every step is a link ──────────────────────────────────────
+  processSection(g) {
+    const p = g.process;
+    if (!p) return '';
+    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i + 1)).join('');
+    return this.sh('The Fix Process')
+      + (p.intro ? '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(p.intro) + '</div>' : '')
+      + steps;
+  },
 
-/* ══ CONTENT ══ */
-.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:rgba(219,171,70,0.18) transparent;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:rgba(219,171,70,0.18);border-radius:2px;}
-.screen{padding:24px var(--sp) 56px;max-width:980px;width:100%;}
+  stepRow(s, module, num) {
+    const kind = s.kind || 'action';
+    const meta = {
+      action:    { label: 'DO IT',     color: 'var(--gold)',  bg: 'var(--gold-bg)' },
+      result:    { label: 'SEE IT',    color: 'var(--steel)', bg: 'rgba(72,136,168,0.12)' },
+      reference: { label: 'DOCUMENT',  color: 'var(--t3)',    bg: 'rgba(255,255,255,0.06)' }
+    }[kind] || {};
+    const label = esc(s.targetLabel || '');
 
-/* ══ BUTTONS ══ */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;padding:8px 18px;line-height:1;white-space:nowrap;transition:background 0.12s,color 0.12s,border-color 0.12s;}
-.btn-primary{background:var(--gold);color:#fff;}
-.btn-primary:hover{background:var(--gold-h);}
-.btn-ghost{background:transparent;border:1px solid var(--b1);color:var(--t2);}
-.btn-ghost:hover{border-color:rgba(255,255,255,0.28);color:var(--w);}
-.btn-danger{background:transparent;border:1px solid rgba(192,56,40,0.4);color:var(--red);}
-.btn-danger:hover{background:var(--red-bg);}
-.btn-sm{padding:5px 12px;font-size:10px;}
-.btn-lg{padding:10px 24px;font-size:12px;}
+    let link = '';
+    if (kind === 'reference') {
+      if (s.target) {
+        link = '<a class="btn btn-ghost btn-sm" href="' + this.docPath(module, s.target) + '" download '
+          + 'style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">'
+          + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M2.5 5l3 3 3-3M1 9.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+          + 'Download' + (label ? ': ' + label : '') + '</a>';
+      }
+    } else if (s.target) {
+      const verb = kind === 'result' ? 'View' : 'Open';
+      link = '<button class="btn btn-ghost btn-sm fp-go" data-target="' + esc(s.target) + '">'
+        + verb + (label ? ': ' + label : '') + '</button>';
+    }
 
-/* ══ CARD ══ */
-.card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:20px;margin-bottom:16px;}
-.card:last-child{margin-bottom:0;}
-.card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);}
-.card-actions{display:flex;gap:8px;padding-top:14px;margin-top:14px;border-top:1px solid var(--b2);align-items:center;}
-.tw-nav{display:flex;gap:12px;justify-content:space-between;margin-top:16px;align-items:center;}
+    return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);">'
+      + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
+      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span>'
+      + (meta.label ? '<span style="font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
+          + 'padding:2px 6px;border-radius:3px;background:' + meta.bg + ';color:' + meta.color + ';">' + meta.label + '</span>' : '')
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin-top:4px;">' + esc(s.detail || '') + '</div>'
+      + (link ? '<div style="margin-top:8px;">' + link + '</div>' : '')
+      + '</div></div>';
+  },
 
-/* ══ FORM SYSTEM ══ */
-/* All form rows: flex, wrap allowed, consistent gap */
-.form-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
-.form-row:last-of-type{margin-bottom:0;}
+  // ── Mark Fix Implemented — the action card ──────────────────────────────────
+  // Rendered as a prominent sub-card inside the expanded gap card. Gold border
+  // when nothing has been logged yet (draws the eye to the action). Neutral
+  // border once a fix has been logged. The "How this works" button opens the
+  // shared Recovery Scoreboard modal so all instruction lives there.
+  implementSection(g) {
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const mine = log.filter(e => e.gap_id === g.id)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const inputStyle = 'background:var(--bg);border:1px solid var(--b1);border-radius:3px;'
+      + 'color:#fff;font-size:13px;padding:7px 10px;width:100%;color-scheme:dark;';
+    const borderColor = mine.length ? 'var(--b1)' : 'rgba(219,171,70,0.45)';
 
-/* Individual field */
-.f{display:flex;flex-direction:column;gap:5px;}
-.f label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);white-space:nowrap;display:flex;align-items:center;gap:5px;}
-.f input,.f select,.f textarea{
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
-  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
-  padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;
-  transition:border-color 0.12s;color-scheme:dark;width:100%;
-}
-.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--gold);}
-.f input[type=number]{-moz-appearance:textfield;}
-.f input[type=number]::-webkit-inner-spin-button,
-.f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
-/* Date inputs: color-scheme:dark makes the native calendar icon render light
-   on its own. Do NOT add filter:invert() here — that would flip the already
-   light icon back to black and make it invisible on the dark field. */
-input[type="date"]{color-scheme:dark;}
-input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
-.f select{
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 8px center;padding-right:26px;cursor:pointer;
-}
-.f textarea{resize:vertical;min-height:72px;}
+    let logHtml = '';
+    if (mine.length) {
+      logHtml = mine.map(e => {
+        const r = (window.Recovery) ? Recovery.compute(e) : { status: 'untracked' };
+        let result = '', good = false;
+        if (r.status === 'ok') {
+          const move = r.fmt(r.before) + ' to ' + r.fmt(r.after);
+          if (r.dollars != null && r.dollars > 0) {
+            good = true;
+            result = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' a year. ' + r.label + ' ' + move + '.'
+              + (r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data so far.');
+          } else {
+            result = r.label + ' has not improved since this fix. ' + move + '.';
+          }
+        } else if (r.status === 'pending') {
+          result = 'Measuring. ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data since this fix.';
+        } else if (r.status === 'no-baseline') {
+          result = 'No weeks logged before this date to measure recovery against.';
+        }
+        return '<div style="padding:12px 20px;border-bottom:1px solid var(--b2);">'
+          + '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);">'
+          + '<span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:var(--gold);"></span>'
+          + 'Implemented ' + esc(e.date)
+          + '<button class="btn btn-ghost btn-sm fp-unlog" data-log="' + esc(e.id) + '" style="margin-left:auto;">Remove</button>'
+          + '</div>'
+          + (result ? '<div style="font-size:12px;line-height:1.6;margin:5px 0 0 15px;color:'
+              + (good ? 'var(--gold)' : 'var(--t3)') + ';">' + esc(result) + '</div>' : '')
+          + '</div>';
+      }).join('');
+    }
 
-/* Dollar/percent wrappers */
-.fw{position:relative;display:flex;align-items:center;width:100%;}
-.fw span.pre,.fw span.suf{position:absolute;font-size:12px;font-weight:600;color:var(--t3);pointer-events:none;z-index:1;}
-.fw span.pre{left:9px;} .fw span.suf{right:9px;}
-.fw input.pre{padding-left:22px;} .fw input.suf{padding-right:22px;}
+    const formHtml = '<div style="padding:16px 20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;">'
+      + '<label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:5px;">Implemented On</label>'
+      + '<input type="date" class="fp-impl-date" data-gap="' + esc(g.id) + '" style="' + inputStyle + '"/>'
+      + '</div>'
+      + '<button class="btn btn-primary fp-impl-save" data-gap="' + esc(g.id) + '" '
+      + 'data-module="' + esc(g.module) + '" data-name="' + esc(g.name) + '">Mark Implemented</button>'
+      + '</div>';
 
-/* Joined input+select */
-.fj{display:flex;}
-.fj input:first-child{border-radius:var(--r2) 0 0 var(--r2);border-right:none;flex:1;}
-.fj select:last-child{border-radius:0 var(--r2) var(--r2) 0;width:90px;flex-shrink:0;}
+    return '<div style="margin:20px 0;background:var(--panel);border:1px solid ' + borderColor + ';border-radius:4px;overflow:hidden;">'
+      + this.sectionHeader('Mark Fix Implemented', 'fp-rec-help')
+      + logHtml
+      + formHtml
+      + '</div>';
+  },
 
-/* Read-only display */
-.f-display{background:var(--input);border:1px solid var(--b2);border-radius:var(--r2);padding:8px 10px;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:var(--gold);line-height:1;min-height:36px;display:flex;align-items:center;}
+  // ── Common mistakes ─────────────────────────────────────────────────────────
+  mistakesSection(g) {
+    if (!g.commonMistakes || !g.commonMistakes.length) return '';
+    const items = g.commonMistakes.map(m =>
+      '<div style="display:flex;gap:10px;padding:7px 0;">'
+      + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:6px;"></span>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.65;">' + esc(m) + '</div></div>').join('');
+    return this.sh('Common Mistakes') + items;
+  },
 
-/* Semantic widths */
-.w-date{width:150px;} .w-xs{width:72px;} .w-sm{width:115px;} .w-md{width:170px;} .w-lg{width:230px;} .w-xl{width:310px;} .w-grow{flex:1;min-width:130px;}
+  // ── Quick Reference card ────────────────────────────────────────────────────
+  quickRefSection(g) {
+    const q = g.quickRef;
+    if (!q) return '';
+    let html = this.sh('Quick Reference Card');
+    html += '<div class="fp-qr" style="background:var(--panel);border:1px solid var(--b1);border-radius:4px;padding:16px 18px;">';
 
-/* ══ SECTION HEADING ══ */
-.sh{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;}
+    if (q.rhythm && q.rhythm.length) {
+      html += '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Weekly Rhythm</div>'
+        + q.rhythm.map(r =>
+            '<div style="display:flex;gap:9px;padding:4px 0;font-size:12px;color:var(--t2);">'
+            + '<span style="flex-shrink:0;color:var(--t4);">&#9633;</span>' + esc(r) + '</div>').join('');
+    }
+    if (q.benchmarks && q.benchmarks.length) {
+      const rows = q.benchmarks.map(b =>
+        '<tr><td style="padding:5px 8px;font-size:12px;color:var(--t1);">' + esc(b.label) + '</td>'
+        + '<td style="padding:5px 8px;font-size:12px;color:var(--gold);">' + esc(b.target || '-') + '</td>'
+        + '<td style="padding:5px 8px;font-size:12px;color:var(--t2);">' + esc(b.warning || '-') + '</td>'
+        + '<td style="padding:5px 8px;font-size:12px;color:var(--red);">' + esc(b.critical || '-') + '</td></tr>').join('');
+      html += '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:14px 0 6px;">Benchmarks</div>'
+        + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr>'
+        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);"></th>'
+        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Target</th>'
+        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Watch</th>'
+        + '<th style="text-align:left;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Critical</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+    if (q.escalation && q.escalation.length) {
+      html += '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:14px 0 6px;">Investigation Steps</div>'
+        + q.escalation.map((e, i) =>
+            '<div style="display:flex;gap:9px;padding:4px 0;font-size:12px;color:var(--t2);line-height:1.6;">'
+            + '<span style="flex-shrink:0;color:var(--gold);font-weight:700;">' + (i + 1) + '.</span>' + esc(e) + '</div>').join('');
+    }
+    html += '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm fp-print">Print Card</button></div>';
+    html += '</div>';
+    return html;
+  },
 
-/* ══ CALC PANEL ══ */
-.calc{background:var(--input);border:1px solid var(--b2);border-radius:var(--r);padding:14px 18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
-.calc-item{display:flex;flex-direction:column;gap:4px;}
-.calc-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:4px;white-space:nowrap;}
-.calc-val{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;color:var(--w);line-height:1;}
-.calc-val.good{color:var(--gold);} .calc-val.warn{color:var(--red);} .calc-val.dim{color:var(--t3);}
+  // ── AI workflow cards ───────────────────────────────────────────────────────
+  aiSection(g) {
+    if (!g.aiWorkflows || !g.aiWorkflows.length) return '';
+    let html = this.sh('AI Workflow Cards')
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;">'
+      + 'Copy a prompt into your own AI tool. Run it on real, verified numbers. Bar Cop never sends these for you.</div>';
+    g.aiWorkflows.forEach((w, i) => {
+      html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:14px 16px;margin-bottom:10px;">'
+        + '<div style="display:flex;gap:10px;align-items:baseline;">'
+        + '<span style="font-family:\'Barlow Condensed\';font-size:20px;font-weight:600;color:var(--gold);">' + (i + 1) + '</span>'
+        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(w.title) + '</div></div>'
+        + (w.whatItDoes ? '<div style="font-size:12px;color:var(--t2);line-height:1.65;margin:6px 0 10px;">' + esc(w.whatItDoes) + '</div>' : '')
+        + '<div class="fp-prompt" style="background:var(--input);border:1px solid var(--b2);border-radius:4px;'
+        + 'padding:12px 14px;font-size:12px;color:var(--t1);line-height:1.65;white-space:pre-wrap;">' + esc(w.prompt) + '</div>'
+        + (w.whatToPaste ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:8px;">' + esc(w.whatToPaste) + '</div>' : '')
+        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm fp-copy">Copy Prompt</button></div>'
+        + '</div>';
+    });
+    return html;
+  },
 
-/* ══ METRIC CARDS ══ */
-.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
-.metric-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px;text-align:center;}
-.metric-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;}
-.metric-val{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:600;letter-spacing:-0.5px;line-height:1;margin-bottom:6px;color:var(--w);}
-.metric-val.on-target{color:var(--w);} .metric-val.over-target{color:var(--red);}
-/* Supporting lines all share the quiet uppercase label treatment, so the
-   metric number stays the only colored element in the card. */
-.metric-target,.metric-impact,.metric-trend{
-  font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
-  color:var(--t3);margin-bottom:4px;
-}
-.metric-trend{margin-bottom:0;}
-.metric-impact.neg,.metric-impact.pos,
-.metric-trend.trend-up,.metric-trend.trend-dn{color:var(--t3);}
-.trend-up{color:var(--gold);} .trend-dn{color:var(--red);}
-
-/* ══ ALERT ══ */
-.alert-bar{background:var(--red);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;}
-.alert-text{flex:1;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--w);line-height:1.5;}
-.alert-dismiss{display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.2);border:none;border-radius:var(--r);color:var(--w);font-family:'Barlow',-apple-system,sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;padding:8px 18px;line-height:1;white-space:nowrap;flex-shrink:0;}
-
-/* ══ TABLE ══ */
-.tbl-wrap{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;}
-.tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:9px 12px;border-bottom:1px solid var(--b2);white-space:nowrap;background:var(--surface);}
-.tbl td{padding:10px 12px;border-bottom:1px solid var(--b2);color:var(--t2);vertical-align:middle;}
-.tbl tr:last-child td{border-bottom:none;}
-.tbl tr:hover td{background:var(--hover);}
-.row-actions{display:flex;gap:6px;}
-
-/* ══ SUMMARY TABLE ══ */
-.sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
-
-.sum-tbl td{padding:8px 12px;text-align:left;color:var(--t2);border-bottom:1px solid rgba(255,255,255,0.03);}
-.lb-tbl td{padding:14px 12px !important;}
-.sum-tbl td:first-child{text-align:left;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.38);}
-.sum-tbl .total td{color:var(--w);font-weight:600;border-top:1px solid var(--b1);}
-
-/* ══ BADGE ══ */
-.badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:var(--r2);white-space:nowrap;}
-.badge-ok{background:var(--gold-bg);color:var(--gold);}
-.badge-warn{background:var(--red-bg);color:var(--red);}
-.badge-dim{background:rgba(255,255,255,0.06);color:var(--t3);}
-
-/* ══ DIVIDER ══ */
-.divider{height:1px;background:var(--b2);margin:18px 0;}
-
-/* ══ QUICK ACTIONS ══ */
-.qa{display:flex;gap:10px;flex-wrap:wrap;}
-
-/* ══ STEP INDICATOR ══ */
-.steps{display:flex;align-items:center;margin-bottom:22px;max-width:460px;}
-.step-dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--b1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--t3);flex-shrink:0;transition:all 0.15s;}
-.step-dot.active{border-color:var(--gold);background:var(--gold);color:#000;}
-.step-dot.done{border-color:var(--t3);}
-.step-line{flex:1;height:1px;background:var(--b2);}
-.step-line.done{background:var(--t3);}
-
-/* ══ CHART ══ */
-.chart-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px;margin-bottom:18px;}
-.chart-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;}
-.legend-item{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t2);}
-.legend-line{width:18px;height:2px;}
-
-/* ══ EMPTY STATE ══ */
-.empty{text-align:center;padding:48px 20px;}
-.empty-title{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
-.empty-sub{font-size:13px;color:var(--t4);margin-bottom:20px;line-height:1.6;max-width:380px;margin-left:auto;margin-right:auto;}
-
-/* ══ SCORE ROWS ══ */
-.score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
-.score-num{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--t3);width:20px;flex-shrink:0;text-align:center;padding-top:2px;}
-.score-body{flex:1;}
-.score-main{font-size:12px;color:var(--t1);margin-bottom:3px;}
-.score-sub{font-size:11px;color:var(--t3);}
-.score-btns{display:flex;gap:4px;flex-shrink:0;}
-.sc-btn{width:26px;height:26px;border-radius:var(--r2);border:1px solid var(--b1);background:transparent;color:var(--t3);font-size:10px;font-weight:800;cursor:pointer;transition:all 0.1s;display:flex;align-items:center;justify-content:center;}
-.sc-btn.sel{background:var(--gold);border-color:var(--gold);color:#000;}
-
-/* ══ TOOLTIP ══ */
-.tt{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.3);font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:border-color 0.1s,color 0.1s;user-select:none;vertical-align:middle;}
-.tt:hover{border-color:var(--gold);color:var(--gold);}
-.tt-box{position:fixed;z-index:9999;background:#0d1c2c;border:1px solid var(--b1);border-radius:var(--r);padding:11px 14px;max-width:260px;box-shadow:0 8px 28px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity 0.15s;display:none;}
-.tt-box.on{opacity:1;}
-.tt-title{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}
-.tt-body{font-size:12px;color:var(--t2);line-height:1.6;}
-.tt-eg{font-size:11px;color:var(--t3);margin-top:6px;font-style:italic;}
-
-/* ══ SETTINGS ══ */
-.settings-section{margin-bottom:26px;}
-.settings-title{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--b2);}
-
-/* ══ ONBOARDING ══ */
-.ob-overlay{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
-.ob-panel{width:100%;max-width:540px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:32px;margin:auto;}
-.ob-logo{margin-bottom:22px;text-align:center;}
-.ob-heading{font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
-.ob-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;}
-.ob-pips{display:flex;gap:4px;margin-bottom:22px;}
-.ob-pip{flex:1;height:3px;background:var(--b2);border-radius:2px;}
-.ob-pip.on{background:var(--gold);}
-.ob-pip.done{background:rgba(219,171,70,0.35);}
-.ob-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
-
-/* ══ AUTH ══ */
-.auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;}
-.auth-panel{width:400px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:36px;}
-.auth-logo{display:flex;justify-content:center;margin-bottom:24px;}
-.auth-heading{font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
-.auth-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.5;}
-.auth-link{background:none;border:none;color:var(--steel);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
-.auth-link:hover{color:var(--w);}
-
-/* ══ ING TABLE ══ */
-.ing-tbl{width:100%;border-collapse:collapse;}
-.ing-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--b2);white-space:nowrap;}
-.ing-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;color:var(--t2);}
-.ing-tbl tr:last-child td{border-bottom:none;}
-
-/* ══ PROG BAR ══ */
-.prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
-.prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
-
-/* ══ SCROLLBAR ══ */
-*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.05) transparent;}
-*::-webkit-scrollbar{width:4px;height:4px;}
-*::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:2px;}
+  // ── Event wiring ────────────────────────────────────────────────────────────
+  wire(el) {
+    el.querySelectorAll('.fp-head').forEach(head => {
+      head.addEventListener('click', () => {
+        const card = head.closest('.fp-gap');
+        const body = card.querySelector('.fp-body');
+        const chev = head.querySelector('.fp-chev');
+        const open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        if (chev) chev.style.transform = 'rotate(' + (open ? '0' : '90') + 'deg)';
+      });
+    });
+    el.addEventListener('click', ev => {
+      const recHelp = ev.target.closest('.fp-rec-help');
+      if (recHelp) { ev.stopPropagation(); this.showRecoveryHelp(); return; }
+      const go = ev.target.closest('.fp-go');
+      const copy = ev.target.closest('.fp-copy');
+      const print = ev.target.closest('.fp-print');
+      const implSave = ev.target.closest('.fp-impl-save');
+      const unlog = ev.target.closest('.fp-unlog');
+      if (go) { App.openScreen(go.dataset.target); return; }
+      if (print) { window.print(); return; }
+      if (implSave) {
+        const gapId = implSave.dataset.gap;
+        const dateEl = el.querySelector('.fp-impl-date[data-gap="' + gapId + '"]');
+        const date = dateEl ? dateEl.value : '';
+        if (!date) {
+          if (dateEl) dateEl.style.borderColor = 'var(--red)';
+          return;
+        }
+        App.data.fix_log = App.data.fix_log || [];
+        App.data.fix_log.push({
+          id: App.uid(),
+          module: implSave.dataset.module,
+          gap_id: gapId,
+          gap_name: implSave.dataset.name,
+          date: date,
+          logged_at: new Date().toISOString()
+        });
+        App.saveKey('fix_log');
+        this.renderInto(el, el.dataset.fixModule, gapId);
+        return;
+      }
+      if (unlog) {
+        const logId = unlog.dataset.log;
+        App.data.fix_log = (App.data.fix_log || []).filter(e => e.id !== logId);
+        App.saveKey('fix_log');
+        const card = unlog.closest('.fp-gap');
+        this.renderInto(el, el.dataset.fixModule, card ? card.dataset.gap : null);
+        return;
+      }
+      if (copy) {
+        const block = copy.closest('div').parentElement.querySelector('.fp-prompt');
+        if (block && navigator.clipboard) {
+          navigator.clipboard.writeText(block.textContent).then(() => {
+            copy.textContent = 'Copied';
+            setTimeout(() => { copy.textContent = 'Copy Prompt'; }, 1800);
+          });
+        }
+      }
+    });
+  }
+};
