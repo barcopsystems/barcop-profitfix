@@ -80,7 +80,6 @@ S.RevenueDashboard = {
       + FixPanel.recoveryCard('revenue')
       + startHere
       + alertHtml
-      + FixPanel.fixAreasCard('revenue')
       + this.buildChart(validWeeks.slice(-8), t)
       + actionHtml
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
