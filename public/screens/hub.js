@@ -258,7 +258,7 @@ S.Hub = {
         const weekly  = monthly / 4.345;
         const parts = [];
         if (weekly > 0) {
-          parts.push('<span style="color:var(--red-soft);font-weight:700;">Leaking ~' + App.fmtCurrency(weekly, 0) + ' /wk</span>');
+          parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--red-soft);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
         } else {
           parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
         }
@@ -437,12 +437,10 @@ S.Hub = {
       const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#DBAB46" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
 
       // Each data point is wrapped in a <g.hd-chart-dot> with an invisible
-      // hit circle (r=8) for easy hover and a visible marker (r=1.6) that
-      // grows to 2.4 on hover via CSS. Marker stroke is colored by the
-      // point's band — green (good) / amber (watch) / red (bad) — so the
-      // chart visually flags problem weeks at a glance, matching the
-      // tooltip's status color when hovered.
-      const dotHex = { good: '#518A79', warn: '#9A5D34', bad: '#C03828' };
+      // hit circle (r=8) for easy hover and a visible marker (r=2.4) in a
+      // single muted tone. The point's band is preserved in the data-band
+      // attribute so the hover tooltip still shows status — but the dot
+      // color no longer screams it, letting the chart read as a calm shape.
       const dots = series.map((v,i) => {
         if (v == null) return '';
         const cx = x(i).toFixed(1);
@@ -450,7 +448,6 @@ S.Hub = {
         const wkRaw = weeks[i] && weeks[i].period_end;
         const wkDate = wkRaw ? (shortDate(wkRaw) || '').toUpperCase() : '';
         const dotBand = band(v, target, dir);
-        const stroke  = dotHex[dotBand] || '#DBAB46';
         return '<g class="hd-chart-dot"'
           + ' data-label="' + esc(label) + '"'
           + ' data-disp="' + esc(valFmt(v)) + '"'
@@ -458,7 +455,7 @@ S.Hub = {
           + ' data-date="' + esc(wkDate) + '"'
           + ' data-band="' + dotBand + '">'
           + '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="transparent" style="cursor:pointer;"/>'
-          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="2.4" fill="' + stroke + '"/>'
+          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="2.4" fill="rgba(219,171,70,0.5)"/>'
           + '</g>';
       }).join('');
 
@@ -473,16 +470,20 @@ S.Hub = {
         }
       }
 
+      // Trend chart is the dashboard's visual rest zone — muted gold line and
+      // a barely-there area fill so the shape carries the story without
+      // adding to the color noise. Status still comes through via the head
+      // (current value in band color) and per-dot hover tooltips.
       return card(head
         + '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" style="display:block;flex:1;min-height:0;">'
         +   '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +     '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/>'
-        +     '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/>'
+        +     '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.08"/>'
+        +     '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.005"/>'
         +   '</linearGradient></defs>'
         +   markerSvg
         +   tgtLine
         +   (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +   '<path d="'+d+'" fill="none" stroke="#DBAB46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+        +   '<path d="'+d+'" fill="none" stroke="rgba(219,171,70,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
         +   dots
         + '</svg>');
     };
