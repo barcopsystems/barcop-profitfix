@@ -762,7 +762,7 @@ app.post('/api/report-bug-notify', async (req, res) => {
     const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
     const sevLabel = { minor:'Minor', moderate:'Moderate', major:'Major', critical:'Critical' }[r.severity] || 'Moderate';
     const sevColor = { minor:'#888', moderate:'#9A5D34', major:'#C03828', critical:'#C03828' }[r.severity] || '#9A5D34';
-    const subject  = '[Bar Cop Bug] [' + sevLabel + '] ' + (r.title || 'Untitled report');
+    const subject  = 'Bar Cop Bug: ' + (r.title || 'Untitled report');
     const row = (label, value) => value
       ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
         + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
@@ -819,7 +819,7 @@ app.post('/api/support-message-notify', async (req, res) => {
   try {
     const r = req.body || {};
     const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    const subject = '[Bar Cop Support] [' + (r.topic || 'Other') + '] ' + (r.subject || '(no subject)');
+    const subject = 'Bar Cop Support: ' + (r.subject || '(no subject)');
     const row = (label, value) => value
       ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
         + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
