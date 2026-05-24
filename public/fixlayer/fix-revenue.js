@@ -13,7 +13,7 @@ FIX.revenue = [
     id: 'menu-engineering',
     name: 'Menu Engineering',
     module: 'revenue',
-    summary: 'Every menu item is a Star, Plowhorse, Puzzle, or Dog. Classify them by contribution margin and volume, then reposition, reprice, and brief servers off the result.',
+    summary: 'Every menu item is a Star, Plowhorse, Puzzle, or Dog. Each quadrant gets a different action.',
 
     process: {
       intro: 'Menu engineering plots every item on two axes: contribution margin in dollars, not food cost percent, and sales volume. That puts every item in one of four quadrants. Stars are high margin and high volume. Plowhorses are low margin and high volume. Puzzles are high margin and low volume. Dogs are low margin and low volume. Each quadrant gets a different action. Bar Cop plots the quadrant for you. Each step below opens where the work happens.',
@@ -104,7 +104,7 @@ FIX.revenue = [
     id: 'pricing',
     name: 'Pricing',
     module: 'revenue',
-    summary: 'Most menus are priced by feel and drift below cost as ingredients rise. Build every price from a cost floor, flag below-floor items, and correct them surgically each quarter.',
+    summary: 'Menus priced by feel drift below cost as ingredients rise.',
 
     process: {
       intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be. The competition tells you what the market accepts. Those are two different numbers for two different decisions. A menu priced once at opening drifts below floor inside 18 months, so this is a quarterly job. Bar Cop holds your costs and prices and shows you cost percent per item. Each step below opens where the work happens.',
@@ -193,7 +193,7 @@ FIX.revenue = [
     id: 'labor-scheduling',
     name: 'Labor Cost and Scheduling',
     module: 'revenue',
-    summary: 'Build the schedule from a revenue forecast, not from last week. Budget labor in hours per department, staff to the budget, and review actuals every Monday.',
+    summary: 'Build the schedule from a revenue forecast, not from last week.',
 
     process: {
       intro: 'A schedule built before the revenue number is checked is built on habit. A schedule built from a revenue forecast is a plan. The difference shows up in your labor percentage every week. Build Schedule in Labor Control turns a forecast into a labor budget in hours, so the math is done before you write a single name. Each step below opens where the work happens.',
@@ -280,7 +280,7 @@ FIX.revenue = [
     id: 'rplh',
     name: 'Labor Productivity (RPLH)',
     module: 'revenue',
-    summary: 'Revenue per labor hour measures what the schedule produces, not just what it costs. Track it by shift, set targets off your own baseline, and diagnose every miss.',
+    summary: 'Revenue per labor hour measures what the schedule produces, not just what it costs.',
 
     process: {
       intro: 'Labor cost percentage tells you the ratio of labor to revenue. RPLH tells you the return on each scheduled hour. You need both. A schedule decision made with only one is missing half the picture. The RPLH Tracker pulls your labor hours straight from Labor Control and does the math. Each step below opens where the work happens.',
@@ -371,7 +371,7 @@ FIX.revenue = [
     id: 'check-average',
     name: 'Check Average and Upsell',
     module: 'revenue',
-    summary: 'Check average per cover is the floor\'s biggest revenue lever. Brief it every shift, track it by server, and coach the few who are below average, not the whole team.',
+    summary: 'Check average per cover is the floor\'s biggest revenue lever.',
 
     process: {
       intro: 'The pre-shift briefing and the weekly review are two halves of one system. The briefing sets the behavior. The review tells you whether it worked. The system compounds. It feels like process for no result until about week four, then the data starts moving. Bar Cop tracks check average by server and shows you the spread. Each step below opens where the work happens.',
@@ -461,7 +461,7 @@ FIX.revenue = [
     id: 'events-catering',
     name: 'Events and Catering',
     module: 'revenue',
-    summary: 'Private dining and catering is revenue most independents leave on the table. Name an owner, publish a rate card, respond in two hours, and run the P&L before confirming.',
+    summary: 'Private dining and catering is revenue most independents leave on the table.',
 
     process: {
       intro: 'An events business runs on speed and process. A published rate card so pricing is instant, a two-hour response standard so the client stays engaged, and a pipeline so nothing goes cold. Name one person to own all of it. Everyone responsible means nobody responsible. Margin varies widely by event, so run the P&L before you confirm, not after. Each step below opens where the work happens.',
@@ -554,7 +554,7 @@ FIX.revenue = [
     id: 'server-performance',
     name: 'Server Performance',
     module: 'revenue',
-    summary: 'A written standard turns serving from personal style into a trained, measurable system. Roll it out signed, measure by individual check average, and coach from data.',
+    summary: 'A written standard turns serving from personal style into a trained, measurable job.',
 
     process: {
       intro: 'A briefing tells servers what to suggest today. A written standard tells them how to suggest it at every touch point. The standard is what makes performance trainable, measurable, and enforceable. Coaching has to run on data, not impression, and Bar Cop tracks check average by server so the data is there. Each step below opens where the work happens.',
