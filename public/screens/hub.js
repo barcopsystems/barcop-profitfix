@@ -285,17 +285,34 @@ S.Hub = {
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
       </div></div>`;
 
-    // Key metrics panel — 6 tiles in a 2x3 grid (reduced from 8). Left-aligned
-    // big number in Barlow Condensed, colored by status band, default blue
-    // tinted background, hover swaps border to gold.
+    // Recovery Scoreboard panel — cross-module headline number. The receipt
+    // for the platform: total $ recovered across Profit, Revenue, and Traffic
+    // from every measured fix.
+    const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
+    const recoveryPanel = `<div style="${PANEL}">${panelTitle('Recovery Scoreboard')}
+      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;gap:5px;">
+        ${recoveryTotal.dollars > 0
+          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:700;color:var(--gold);line-height:1;">${App.fmtCurrency(recoveryTotal.dollars, 0)}<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>
+             <div style="font-size:11px;color:var(--t3);">across ${recoveryTotal.fixes} measured fix${recoveryTotal.fixes === 1 ? '' : 'es'} in Profit, Revenue, and Traffic</div>`
+          : `<div style="font-size:12px;color:var(--t3);line-height:1.55;">Mark fixes implemented in any Recovery module and the running total recovered shows here.</div>`
+        }
+      </div></div>`;
+
+    // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
+    // and a 22px number so each tile fits in the shorter container that now
+    // shares the middle column with the Recovery Scoreboard above it.
     const metricCells = metrics.map(m => `
       <div class="hd-metric" onclick="S.Hub._enter('${m.screen}','${m.mod}')">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">${m.label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
     const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;">${metricCells}</div></div>`;
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div></div>`;
+
+    // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
+    // 50/50 split so the metric tiles get a usable but compact footprint.
+    const middleColumn = `<div style="display:grid;grid-template-rows:1fr 1fr;gap:18px;min-height:0;">${recoveryPanel}${metricsPanel}</div>`;
 
     // Alerts panel — focal headline up top (big red count if alerts exist,
     // big green check + "All Clear" headline if not), then the alert rows
@@ -615,7 +632,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--panel);padding:10px 13px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--panel);padding:8px 10px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
@@ -676,7 +693,7 @@ S.Hub = {
           <main class="content">
             <div style="height:100%;display:grid;grid-template-rows:auto 1fr 1fr;gap:18px;min-height:0;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${auditPanel}${metricsPanel}${readoutPanel}</div>
+              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${auditPanel}${middleColumn}${readoutPanel}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;min-height:0;">${alertsPanel}${chartPanel}${actionPanel}</div>
             </div>
           </main>
