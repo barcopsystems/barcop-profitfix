@@ -786,6 +786,7 @@ S.RevenueAudit = {
       App.data.revenue_audits.push(auditRecord);
       if (App.data.revenue_audits.length > 12) App.data.revenue_audits = App.data.revenue_audits.slice(-12);
       await App.saveKey('revenue_audits');
+      App.markSetupDone('gs_r_audit');
 
       document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
