@@ -436,27 +436,27 @@ S.Hub = {
 
       const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#DBAB46" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
 
-      // Each data point is wrapped in a <g.hd-chart-dot> with an invisible
-      // hit circle (r=8) for easy hover and a visible marker (r=2.4) in a
-      // single muted tone. The point's band is preserved in the data-band
-      // attribute so the hover tooltip still shows status — but the dot
-      // color no longer screams it, letting the chart read as a calm shape.
+      // Dots render as HTML <div>s positioned absolutely over the SVG
+      // (instead of <circle>s inside the SVG). The SVG uses
+      // preserveAspectRatio="none" so the line stretches to fill the card,
+      // but that same stretching squishes SVG circles into vertical ovals.
+      // CSS-sized divs stay round regardless of how the SVG is scaled.
       const dots = series.map((v,i) => {
         if (v == null) return '';
-        const cx = x(i).toFixed(1);
-        const cy = y(v).toFixed(1);
+        const xPct = (x(i) / W * 100).toFixed(2);
+        const yPct = (y(v) / H * 100).toFixed(2);
         const wkRaw = weeks[i] && weeks[i].period_end;
         const wkDate = wkRaw ? (shortDate(wkRaw) || '').toUpperCase() : '';
         const dotBand = band(v, target, dir);
-        return '<g class="hd-chart-dot"'
+        return '<div class="hd-chart-dot"'
           + ' data-label="' + esc(label) + '"'
           + ' data-disp="' + esc(valFmt(v)) + '"'
           + ' data-tgt="' + esc(tgtDisp) + '"'
           + ' data-date="' + esc(wkDate) + '"'
-          + ' data-band="' + dotBand + '">'
-          + '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="transparent" style="cursor:pointer;"/>'
-          + '<circle class="hd-chart-marker" cx="' + cx + '" cy="' + cy + '" r="2.4" fill="rgba(219,171,70,0.5)"/>'
-          + '</g>';
+          + ' data-band="' + dotBand + '"'
+          + ' style="position:absolute;left:' + xPct + '%;top:' + yPct + '%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;">'
+          + '<div class="hd-chart-marker"></div>'
+          + '</div>';
       }).join('');
 
       let markerSvg = '';
@@ -475,17 +475,19 @@ S.Hub = {
       // adding to the color noise. Status still comes through via the head
       // (current value in band color) and per-dot hover tooltips.
       return card(head
-        + '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" style="display:block;flex:1;min-height:0;">'
-        +   '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +     '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.08"/>'
-        +     '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.005"/>'
-        +   '</linearGradient></defs>'
-        +   markerSvg
-        +   tgtLine
-        +   (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +   '<path d="'+d+'" fill="none" stroke="rgba(219,171,70,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '<div style="position:relative;flex:1;min-height:0;">'
+        +   '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" height="100%" style="display:block;position:absolute;inset:0;">'
+        +     '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
+        +       '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.08"/>'
+        +       '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.005"/>'
+        +     '</linearGradient></defs>'
+        +     markerSvg
+        +     tgtLine
+        +     (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
+        +     '<path d="'+d+'" fill="none" stroke="rgba(219,171,70,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        +   '</svg>'
         +   dots
-        + '</svg>');
+        + '</div>');
     };
 
     const w8p = pWeeks.slice(-8);
@@ -676,8 +678,8 @@ S.Hub = {
         .hub-app .hd-scroll::-webkit-scrollbar-thumb:hover{background:var(--b1);}
         /* Trend chart data point hover — the marker grows on hover so the
            interaction reads as "this dot does something." */
-        .hub-app .hd-chart-marker{transition:r 0.12s ease;}
-        .hub-app .hd-chart-dot:hover .hd-chart-marker{r:3.4;}
+        .hub-app .hd-chart-marker{width:5px;height:5px;border-radius:50%;background:rgba(219,171,70,0.55);transition:width 0.12s ease,height 0.12s ease,background 0.12s ease;}
+        .hub-app .hd-chart-dot:hover .hd-chart-marker{width:8px;height:8px;background:rgba(219,171,70,0.9);}
         /* Shared tooltip element used by all three mini charts. Lives as a
            sibling of .hub-app inside the wrapper, so the selector has no
            ancestor — otherwise display:block would force the empty div into
