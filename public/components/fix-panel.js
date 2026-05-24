@@ -186,13 +186,13 @@ window.FixPanel = {
       + p('The Scoreboard tracks what Bar Cop puts back in your register, in dollars per year. No projections. No industry averages. Your own weekly numbers, measured before and after each fix.')
       + sh('The Loop')
       + p('1. Run the audit. It scores your operation and lists every gap with a dollar figure on what it costs you per year.')
-      + p('2. Pick a gap and open the fix process. Every step is a link into the part of the app that does the work.')
+      + p('2. Pick a gap and open the fix process. Every step is a link into the part of Bar Cop that does the work.')
       + p('3. When the fix is in place, click Mark Implemented and lock in the date.')
       + sh('What Happens Next')
-      + p('The app watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after, multiplies the improvement by your revenue base, and annualizes it.')
+      + p('Bar Cop watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after, multiplies the improvement by your revenue base, and annualizes it.')
       + p('You see a preliminary figure once 2 weeks of after-data exist. It firms up over the next 6 weeks and settles at 8.')
       + sh('The Honest Rule')
-      + p('A dollar figure only shows when the math comes from real data the app already holds. If a fix cannot be dollarized honestly (most Traffic fixes), it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
+      + p('A dollar figure only shows when the math comes from real data Bar Cop already holds. If a fix cannot be dollarized honestly (most Traffic fixes), it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
       + '</div>';
     box.innerHTML = head + body;
     m.appendChild(box);
@@ -435,7 +435,7 @@ window.FixPanel = {
     if (!g.aiWorkflows || !g.aiWorkflows.length) return '';
     let html = this.sh('AI Workflow Cards')
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;">'
-      + 'Copy a prompt into your own AI tool. Run it on real, verified numbers. The app never sends these for you.</div>';
+      + 'Copy a prompt into your own AI tool. Run it on real, verified numbers. Bar Cop never sends these for you.</div>';
     g.aiWorkflows.forEach((w, i) => {
       html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:14px 16px;margin-bottom:10px;">'
         + '<div style="display:flex;gap:10px;align-items:baseline;">'
