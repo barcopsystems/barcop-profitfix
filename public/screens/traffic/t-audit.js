@@ -434,13 +434,20 @@ S.TrafficAudit = {
       ...(signals8.length ? [sectionBlock(8, 'Operational Risk Signals', null, [], signals8)] : []),
     ].join('');
 
-    const actionItems = (audit.action_items || []).map((a,i) =>
-      '<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;">' + (i+1) + '</div>'
-      + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(a.action||a) + '</div>'
-      + (a.monthly_impact ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:4px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
-      + '</div></div>'
-    ).join('');
+    const actionItems = (audit.action_items || []).map((a,i) => {
+      const txt = a.action || a || '';
+      const gid = a.gap_id || (window.FixPanel ? FixPanel.inferGapId(txt, 'traffic') : null);
+      const btn = gid
+        ? '<button class="ta-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This &#9656;</button>'
+        : '';
+      return '<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
+        + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(txt) + '</div>'
+        + (a.monthly_impact ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:4px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
+        + '</div>'
+        + btn
+        + '</div>';
+    }).join('');
 
     this.container.innerHTML = '<div class="screen" id="ta-audit-view">'
       + '<div class="card" style="margin-bottom:16px;">'
@@ -496,6 +503,12 @@ S.TrafficAudit = {
       document.getElementById('ta-tab-narrative').style.color = 'var(--t1)';
       document.getElementById('ta-tab-scores').style.borderBottomColor = 'transparent';
       document.getElementById('ta-tab-scores').style.color = 'var(--t3)';
+    });
+    this.container.querySelectorAll('.ta-fix-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        App._fixFocus = btn.dataset.gap;
+        App.navigate('t-fix');
+      });
     });
   },
 
@@ -740,9 +753,11 @@ S.TrafficAudit = {
           'Delivery Platforms':      d.S6_SCORE || 0,
           'Email and Loyalty':       d.S7_SCORE || 0,
         },
-        action_items: (Array.isArray(d.action_items) ? d.action_items : []).map(a =>
-          typeof a === 'string' ? { action: a, monthly_impact: 0 } : a
-        ),
+        action_items: (Array.isArray(d.action_items) ? d.action_items : []).map(a => {
+          const obj = typeof a === 'string' ? { action: a, monthly_impact: 0 } : a;
+          if (!obj.gap_id && window.FixPanel) obj.gap_id = FixPanel.inferGapId(obj.action, 'traffic');
+          return obj;
+        }),
         raw: d
       };
 
