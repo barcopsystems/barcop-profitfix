@@ -545,7 +545,7 @@ window.FixPanel = {
     const titleBar = this.sectionHeader('Recent Activity');
 
     if (!mine.length) {
-      return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+      return '<div class="card" style="padding:0;overflow:hidden;margin:18px 0;">'
         + titleBar
         + '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.6;">'
         + 'No activity yet. Check off a step in any fix process above and it shows up here.</div>'
@@ -573,7 +573,7 @@ window.FixPanel = {
         + '</div>';
     }).join('');
 
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
+    return '<div class="card" style="padding:0;overflow:hidden;margin:18px 0;">'
       + titleBar
       + rows
       + '</div>';
