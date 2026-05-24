@@ -130,7 +130,12 @@ window.FixPanel = {
 
   // Vertical fix-event markers for an annotated trend chart. xFn maps a week
   // index to an x coordinate; top/bottom are the plot edges.
+  // Disabled for now — full-height dashed lines + gold dots were too visually
+  // loud against the trend lines on every chart they appeared in. Restore by
+  // removing the early return below if a softer style is added later.
   markerSvg(markers, xFn, top, bottom) {
+    return '';
+    /* eslint-disable */
     if (!markers || !markers.length) return '';
     return markers.map(m => {
       const x = xFn(m.index).toFixed(1);
@@ -139,6 +144,7 @@ window.FixPanel = {
         + '<circle cx="' + x + '" cy="' + top.toFixed(1) + '" r="3" fill="#DBAB46">'
         + '<title>' + esc(m.label) + ' implemented ' + esc(m.date) + '</title></circle>';
     }).join('');
+    /* eslint-enable */
   },
 
   renderInto(el, moduleKey, focusId) {
