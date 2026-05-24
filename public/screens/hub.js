@@ -294,6 +294,24 @@ S.Hub = {
     // the visual hero of the dashboard. The receipt for the platform: total $
     // recovered across Profit, Revenue, and Traffic from every measured fix.
     const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
+
+    // Setup catch-up banner — shows above the dashboard whenever the Hub
+    // Getting Started checklist is incomplete. One click opens the checklist
+    // so the operator can pick up where they left off. Hides at 100% done.
+    const setupTasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
+    const setupProg  = data.hub_setup_progress || {};
+    const setupDone  = setupTasks.filter(t => setupProg[t.id]).length;
+    const setupTotal = setupTasks.length;
+    const catchupBanner = (setupTotal > 0 && setupDone < setupTotal)
+      ? '<div class="hub-catchup" style="background:rgba(219,171,70,0.10);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
+        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
+        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">'
+        +   setupDone + ' of ' + setupTotal + ' setup tasks done. '
+        +   '<span style="color:var(--gold);font-weight:700;">Continue setup</span>'
+        + '</div>'
+        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+        + '</div>'
+      : '';
     const fixLog = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const oldestFix = fixLog.map(e => e.date).filter(Boolean).sort()[0];
     const sinceTxt = oldestFix
@@ -721,6 +739,7 @@ S.Hub = {
             </div>
           </header>
           <main class="content">
+            ${catchupBanner}
             <div style="display:grid;grid-template-rows:auto 470px 510px;gap:18px;padding-bottom:18px;">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
               <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
@@ -735,6 +754,10 @@ S.Hub = {
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
       if (App.demoMode) { window.location.href = '/'; return; }
       await DB.signOut();
+    });
+
+    container.querySelector('.hub-catchup')?.addEventListener('click', () => {
+      if (window.S && S.HubGettingStarted) S.HubGettingStarted.open();
     });
 
     document.getElementById('hub-sidebar-toggle')?.addEventListener('click', () => {
