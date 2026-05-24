@@ -367,6 +367,7 @@ S.InventoryProducts = {
     this._saving = false;
     this.editId = null;
     if (ok) {
+      App.markSetupDone('gs_ic_products');
       this.activeCat = prod.category;
       this.renderList();
     } else if (btn) {
