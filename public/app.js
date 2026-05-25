@@ -842,11 +842,20 @@ const App = {
   },
 
   // Navigate to any screen, switching the active module first if needed.
-  // The deep-link target of every Fix Layer step.
+  // The deep-link target of every Fix Layer step and every Getting Started Go button.
   openScreen(id) {
     if (!id) return;
+    // Hub-owned screens open as modal overlays, not as module screens.
+    // navigate() already handles these but we still need to short-circuit so
+    // showApp isn't called (which would briefly flash a module shell).
+    if (id === 'settings') { S.HubSettings.open(); return; }
+    if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
     const mod = this._moduleOf(id);
-    if (mod !== this._activeModule) this.showApp(mod);
+    // Show the app shell if we're not already in it (e.g., coming from a Hub
+    // overlay modal, where the app shell is hidden). showApp also closes any
+    // open overlay so the user actually sees the navigated screen.
+    const appHidden = document.getElementById('app')?.classList.contains('hidden');
+    if (mod !== this._activeModule || appHidden) this.showApp(mod);
     this.navigate(id);
   },
 
