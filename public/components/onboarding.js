@@ -117,8 +117,7 @@ const Onboarding = {
       + this._stepDots(3)
       + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
       + 'Three <strong style="color:var(--t1);">Control</strong> systems run the day: Inventory, Labor, Shift. Three <strong style="color:var(--t1);">Recovery</strong> systems run the diagnosis: Profit, Revenue, Traffic. Each Recovery system gives you a scored monthly <strong style="color:var(--t1);">Audit</strong>, a <strong style="color:var(--t1);">Fix Process</strong> that walks you through closing every gap step by step, and a <strong style="color:var(--t1);">Recovery Scoreboard</strong> that tallies every dollar you put back into the business.'
-      + '<div style="margin-top:10px;">Next up: complete the short setup list.</div>'
-      + '<div style="margin-top:4px;">Once your numbers are in, the systems start tracking, scoring, and measuring recovery automatically.</div>'
+      + '<div style="margin-top:10px;">Next up: complete the short setup list. Once your numbers are in, the systems start tracking, scoring, and measuring recovery automatically.</div>'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
       + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
