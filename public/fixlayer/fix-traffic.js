@@ -144,12 +144,12 @@ FIX.traffic = [
     },
 
     commonMistakes: [
-      'Optimizing for broad city-level terms instead of neighborhood and occasion terms. "Best bar Chicago" drives almost no new traffic; "bar Wicker Park" drives walk-ins.',
+      'Optimizing for broad city-level terms instead of neighborhood and occasion terms. "Best bar Chicago" drives almost no new traffic. "Bar Wicker Park" drives walk-ins.',
       'Inconsistent name, address, and phone across platforms. A business name that appears three different ways splits citation authority three ways.',
       'Not claiming listings on secondary directories. An unclaimed Foursquare listing produces variants on every downstream directory it feeds.',
       'Ignoring duplicate listings. A bar with two Google listings splits its review count and its authority. Merge them before building more reviews.',
-      'Never checking keyword ranking position. Without weekly rank tracking you cannot know whether the work is producing a position improvement.',
-      'Treating organic SEO and local-pack SEO as the same thing. Local pack needs profile completeness and citations; organic needs website content.'
+      'Never checking keyword ranking position. Without weekly rank tracking you cannot know whether the work is moving you up.',
+      'Treating organic SEO and local-pack SEO as the same thing. Local pack needs profile completeness and citations. Organic needs website content.'
     ]
   },
 
@@ -260,7 +260,7 @@ FIX.traffic = [
       'Writing in marketing voice instead of owner voice. "We are thrilled to announce" reads like a chain. "I wanted to tell you" reads like a person.',
       'No welcome sequence, so new subscribers never hear from you after signing up. The welcome email is the highest-opened email in any sequence.',
       'Sending the same message to the whole list. Regulars and new guests have different relationships with the bar and convert from different messages.',
-      'Not tracking estimated visit conversion. Open rate tells you who read it; visit conversion tells you whether it drove anyone in.'
+      'Not tracking estimated visit conversion. Open rate tells you who read it. Visit conversion tells you whether it drove anyone in.'
     ]
   }
 
