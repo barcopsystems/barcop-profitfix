@@ -73,8 +73,8 @@ S.LaborTipLog = {
         + '<td>' + App.fmtCurrency(x.card_tips || 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(x.total_tips || 0) + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm tl-edit" data-id="' + x.id + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>'
+        + (App.canEdit('lc-tip-log') ? '<button class="btn btn-ghost btn-sm tl-edit" data-id="' + x.id + '">Edit</button>' : '')
+        + (App.canEdit('lc-tip-log') ? '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
