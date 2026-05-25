@@ -116,8 +116,8 @@ const Onboarding = {
       + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">A quick lay of the land before you dig in.</div>'
       + this._stepDots(3)
       + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
-      + 'Six systems under your <strong style="color:var(--t1);">Hub</strong>. Three <strong style="color:var(--t1);">Control</strong> systems log what happens at the bar. Three <strong style="color:var(--t1);">Recovery</strong> systems show where money leaks and how to fix it.'
-      + '<div style="margin-top:10px;">Next up: a short setup checklist. Top to bottom, picking up where this left off.</div>'
+      + 'Three <strong style="color:var(--t1);">Control</strong> systems run the day: Inventory, Labor, Shift. Three <strong style="color:var(--t1);">Recovery</strong> systems run the diagnosis: Profit, Revenue, Traffic. Each Recovery system gives you a scored monthly <strong style="color:var(--t1);">Audit</strong>, a <strong style="color:var(--t1);">Fix Process</strong> that walks you through closing every gap step by step, and a <strong style="color:var(--t1);">Recovery Scoreboard</strong> that tallies every dollar you put back into the business.'
+      + '<div style="margin-top:10px;">Next up: a short setup list. Knock it out top to bottom and Bar Cop starts paying for itself.</div>'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
       + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
