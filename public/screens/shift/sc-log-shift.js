@@ -53,8 +53,8 @@ S.ShiftLogShift = {
             ? '<span class="badge badge-ok">Open</span>'
             : '<span class="badge badge-dim">Closed</span>') + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm ls-edit" data-id="' + s.id + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm ls-del" data-id="' + s.id + '">Delete</button>'
+        + (App.canEdit('sc-log-shift') ? '<button class="btn btn-ghost btn-sm ls-edit" data-id="' + s.id + '">Edit</button>' : '')
+        + (App.canEdit('sc-log-shift') ? '<button class="btn btn-danger btn-sm ls-del" data-id="' + s.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
       html = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Covers</th><th>Status</th><th></th>'
