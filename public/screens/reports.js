@@ -1,9 +1,13 @@
 'use strict';
 S.Reports={
   render(container,actions){
-    this.container=container;this.renderMain();
+    this.container=container;this.actions=actions;this.renderMain();
   },
   renderMain(){
+    if(this.actions){
+      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
+      document.getElementById('pr-export')?.addEventListener('click',()=>window.print());
+    }
     const weeks=(App.data.weeks||[]).slice().reverse();
     const t=App.data.settings.targets||{};
     const allW=App.data.weeks||[];
