@@ -6,8 +6,6 @@
    own. Reads and writes the existing settings keys; purely a UI consolidation. */
 S.HubSettings = {
 
-  _activeTab: 'profile',
-
   // Open the Hub Settings view inside the Hub container. Mirrors App.showHub().
   open() {
     document.getElementById('auth-screen').style.display = 'none';
@@ -29,36 +27,21 @@ S.HubSettings = {
 
   render(container) {
     const secs = [
-      { id:'profile', title:'Profile',           body:this.secProfile() },
-      { id:'profit',  title:'Profit Targets',    body:this.secProfit() },
-      { id:'revenue', title:'Revenue Targets',   body:this.secRevenue() },
-      { id:'traffic', title:'Traffic Targets',   body:this.secTraffic() },
-      { id:'shift',   title:'Shift Preferences', body:this.secShift() },
-      { id:'account', title:'Account',           body:this.secAccount() }
+      { id:'profile', title:'Profile',           body:this.secProfile(), save:true },
+      { id:'profit',  title:'Profit Targets',    body:this.secProfit(),  save:true },
+      { id:'revenue', title:'Revenue Targets',   body:this.secRevenue(), save:true },
+      { id:'traffic', title:'Traffic Targets',   body:this.secTraffic(), save:true },
+      { id:'shift',   title:'Shift Preferences', body:this.secShift(),   save:true },
+      { id:'account', title:'Account',           body:this.secAccount(), save:false }
     ];
     container.scrollTop = 0;
 
-    // Tab styles match the breadcrumb back-link palette (t3 default, t1 on
-    // hover and on the active tab). The gold underline marks the active tab
-    // visually so the text colors stay in the same family across the app.
-    const tabs = '<div class="hs-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:24px;">'
-      + secs.map(s => {
-          const on = s.id === this._activeTab;
-          return '<button class="hs-tab" data-tab="' + s.id + '" '
-            + 'style="background:none;border:none;border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
-            + 'color:' + (on ? 'var(--t1)' : 'var(--t3)') + ';font-family:\'Barlow\',sans-serif;font-size:11px;font-weight:600;'
-            + 'letter-spacing:0.04em;padding:9px 12px;cursor:pointer;transition:color 0.12s;white-space:nowrap;">'
-            + esc(s.title) + '</button>';
-        }).join('')
-      + '</div>';
-
-    // Render every section body up front so unsaved input survives tab switches.
-    // Only the active section is visible; the rest are display:none.
-    const bodies = secs.map(s =>
-      '<div class="hs-body" data-tab="' + s.id + '" '
-      + 'style="display:' + (s.id === this._activeTab ? 'block' : 'none') + ';'
-      + 'background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
-      + s.body + '</div>'
+    const cards = secs.map(s =>
+      '<div class="hs-card" data-section="' + s.id + '" '
+      + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
+      + this.sectionHead(s.id, s.title, s.save)
+      + s.body
+      + '</div>'
     ).join('');
 
     container.innerHTML =
@@ -68,18 +51,22 @@ S.HubSettings = {
       +   '<span style="color:var(--t4);font-size:11px;font-weight:400;">|</span>'
       +   '<a id="hs-back" class="topbar-back-link">Back to Hub</a>'
       + '</div>'
-      + tabs
-      + bodies
+      + cards
       + '</div>';
     document.getElementById('hs-back').addEventListener('click', () => App.showHub());
     this.wire(container);
     this.renderSubscription();
   },
 
-  saveRow(id) {
-    return '<div style="display:flex;align-items:center;gap:12px;margin-top:18px;">'
-      + '<button class="btn btn-primary hs-save" data-save="' + id + '">Save</button>'
-      + '<span class="hs-msg" data-msg="' + id + '" style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
+  // Card header: title left, Saved indicator + Save Data button right.
+  // Save button styled like the "Go" buttons in Getting Started (ghost, small).
+  sectionHead(id, title, hasSave) {
+    return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
+      + '<div style="flex:1;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
+      + (hasSave
+          ? '<span class="hs-msg" data-msg="' + id + '" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
+            + '<button class="btn btn-ghost btn-sm hs-save" data-save="' + id + '" style="flex-shrink:0;font-size:10px;padding:4px 10px;">Save Data</button>'
+          : '')
       + '</div>';
   },
 
@@ -92,7 +79,7 @@ S.HubSettings = {
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
       + '<div class="f" style="width:145px;"><label>Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Revenue"/></div></div>'
       + '<div class="f" style="width:145px;"><label>Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Revenue"/></div></div>'
-      + '</div>' + this.saveRow('profile');
+      + '</div>';
   },
 
   secProfit() {
@@ -103,7 +90,7 @@ S.HubSettings = {
       + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '</div>' + this.saveRow('profit');
+      + '</div>';
   },
 
   secRevenue() {
@@ -117,7 +104,7 @@ S.HubSettings = {
       + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
-      + '</div>' + this.saveRow('revenue');
+      + '</div>';
   },
 
   secTraffic() {
@@ -128,7 +115,7 @@ S.HubSettings = {
       + '<div class="f" style="width:140px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:140px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
       + '<div class="f" style="width:140px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
-      + '</div>' + this.saveRow('traffic');
+      + '</div>';
   },
 
   secInventory() {
@@ -139,8 +126,7 @@ S.HubSettings = {
     const s = App.data.settings || {};
     return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f" style="width:180px;"><label>Cash Variance Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-ct" value="' + (s.cash_tolerance ?? 10) + '"/></div></div>'
-      + '</div>'
-      + this.saveRow('shift');
+      + '</div>';
   },
 
   secNotifications() {
@@ -188,24 +174,6 @@ S.HubSettings = {
 
   // ── Wiring ──────────────────────────────────────────────────────────────────
   wire(container) {
-    // Tab switching — toggle display rather than re-render so any unsaved
-    // input in a tab survives a switch away and back.
-    container.querySelectorAll('.hs-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const newTab = btn.dataset.tab;
-        if (newTab === this._activeTab) return;
-        this._activeTab = newTab;
-        container.querySelectorAll('.hs-tab').forEach(t => {
-          const on = t.dataset.tab === newTab;
-          t.style.borderBottomColor = on ? 'var(--gold)' : 'transparent';
-          t.style.color = on ? 'var(--t1)' : 'var(--t3)';
-        });
-        container.querySelectorAll('.hs-body').forEach(b => {
-          b.style.display = b.dataset.tab === newTab ? 'block' : 'none';
-        });
-        container.scrollTop = 0;
-      });
-    });
     container.querySelectorAll('.hs-save').forEach(btn => {
       btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
     });
