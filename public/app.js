@@ -252,18 +252,24 @@ const App = {
       this.boot();
       return;
     }
-    // Check if this is a password recovery link before checking session
+    // Check if this is a password recovery OR invite link before checking session.
+    // Recovery: Supabase fires PASSWORD_RECOVERY. Invite: Supabase fires SIGNED_IN
+    // (but the user has no password yet, so we still show the set-password panel
+    // so they can sign in normally next time).
     const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-    const isRecovery = hashParams.get('type') === 'recovery';
-    if (isRecovery) {
-      // Show set password screen immediately   onAuthChange will fire PASSWORD_RECOVERY
+    const linkType = hashParams.get('type');
+    const needsPasswordSetup = linkType === 'recovery' || linkType === 'invite';
+    if (needsPasswordSetup) {
       this.showAuth();
+      let inviteSetupArmed = linkType === 'invite';
       DB.onAuthChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
+        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && inviteSetupArmed)) {
+          // Show the set-password panel (used by both recovery and first-invite flows)
           ['auth-login','auth-reset','auth-set-password'].forEach(x => {
             const el = document.getElementById(x);
             if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
           });
+          inviteSetupArmed = false;  // consume the one invite SIGNED_IN event
         } else if (event === 'SIGNED_IN' && session) {
           await this.loadAllData();
           this.subscription = await DB.getSubscription();
