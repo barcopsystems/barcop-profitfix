@@ -546,50 +546,66 @@ const App = {
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
   },
 
-  // ── Role-based access (Phase 2 Item 25) ───────────────────────────────────
-  // Staff role: operational screens only. Anything not in the whitelist is
-  // hidden from the sidebar, blocked by navigate, and skipped by showApp.
-  // Admin and Viewer roles see all screens; Viewer writes are blocked at the
-  // DB layer (db.js writeData / _writeControl).
-  STAFF_SCREENS: new Set([
-    // Inventory Control — operational
-    'ic-dashboard', 'ic-take-inventory', 'ic-receive-delivery', 'ic-order-sheet',
-    'ic-spot-check', 'ic-count-history', 'ic-delivery-history', 'ic-order-history',
-    'ic-help',
-    // Labor Control — operational
-    'lc-dashboard', 'lc-log-hours', 'lc-tip-log', 'lc-daily-view',
-    'lc-schedule-history', 'lc-tip-history', 'lc-callout-log',
-    'lc-help',
-    // Shift Control — operational
-    'sc-dashboard', 'sc-active-shift', 'sc-log-shift', 'sc-cash-drop', 'sc-safe-log',
-    'sc-opening-checklist', 'sc-closing-checklist', 'sc-86-list', 'sc-void-comp',
-    'sc-variance-log', 'sc-maintenance', 'sc-shift-history',
-    'sc-help',
-    // Hub support (always allowed)
-    'hub-help', 'hub-support', 'hub-report-bug'
-  ]),
-  STAFF_MODULES: new Set(['inventory', 'labor', 'shift']),
+  // ── Role-based access (Phase 2 Items 25 + 25b) ─────────────────────────────
+  // Per-screen access goes through DB's granular permission system. Each
+  // screen maps to a permission group (DB.SCREEN_GROUPS). Each non-admin user
+  // has a permissions object stored on their membership: { groupKey: 'add' |
+  // 'edit' }. Helpers here just delegate to DB. Admin sees all; Viewer sees
+  // all read-only; Staff sees only what their permissions grant.
+  // Hub-level always-accessible screens (settings, getting-started, etc.) are
+  // listed separately because they're not in SCREEN_GROUPS.
+  HUB_ALWAYS: new Set(['hub-help', 'hub-support', 'hub-report-bug']),
 
   canAccess(screenId) {
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (!role || role === 'admin' || role === 'viewer') return true;
-    if (role === 'staff') return this.STAFF_SCREENS.has(screenId);
-    return true;
+    if (this.HUB_ALWAYS.has(screenId)) return true;
+    return (window.DB && DB.screenAllowed) ? DB.screenAllowed(screenId) : true;
   },
 
   canSeeModule(module) {
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (!role || role === 'admin' || role === 'viewer') return true;
-    if (role === 'staff') return this.STAFF_MODULES.has(module);
-    return true;
+    // A module is visible if the user has access to at least one screen in it.
+    if (!window.DB || !DB.SCREEN_GROUPS) return true;
+    for (const [screen, group] of Object.entries(DB.SCREEN_GROUPS)) {
+      const prefix = screen.split('-')[0];
+      const moduleOfScreen = (prefix === 'ic') ? 'inventory'
+        : (prefix === 'lc') ? 'labor'
+        : (prefix === 'sc') ? 'shift'
+        : (prefix === 'r') ? 'revenue'
+        : (prefix === 't') ? 'traffic'
+        : 'profit';
+      if (moduleOfScreen === module && DB.screenAllowed(screen)) return true;
+    }
+    return false;
   },
 
   canWrite() {
     return !(window.DB && DB.role && DB.role() === 'viewer');
   },
 
-  // For staff, a sensible landing screen when they sign in or click "Hub"
-  staffLanding() { return { module: 'shift', screen: 'sc-active-shift' }; },
+  canEdit(screen) {
+    return (window.DB && DB.screenCanEdit) ? DB.screenCanEdit(screen) : true;
+  },
+
+  canAdd(screen) {
+    return (window.DB && DB.screenCanAdd) ? DB.screenCanAdd(screen) : true;
+  },
+
+  // Pick the first accessible screen as a non-admin user's landing.
+  // Order matters: try the common bartender/staff defaults first.
+  staffLanding() {
+    const order = [
+      { screen: 'ic-take-inventory', module: 'inventory' },
+      { screen: 'sc-86-list',        module: 'shift' },
+      { screen: 'lc-log-hours',      module: 'labor' },
+      { screen: 'lc-tip-log',        module: 'labor' },
+      { screen: 'sc-log-shift',      module: 'shift' },
+      { screen: 'sc-active-shift',   module: 'shift' },
+      { screen: 'ic-receive-delivery', module: 'inventory' }
+    ];
+    for (const candidate of order) {
+      if (this.canAccess(candidate.screen)) return candidate;
+    }
+    return { screen: 'ic-take-inventory', module: 'inventory' };
+  },
 
   showApp(module) {
     if (!this.canSeeModule(module)) {
