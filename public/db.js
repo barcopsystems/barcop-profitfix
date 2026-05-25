@@ -163,7 +163,7 @@ const DB = {
     'ic-product-setup':'manage-products','ic-locations':'manage-products','ic-vendors':'manage-products',
     'ic-report-stock':'inventory-reports','ic-report-movers':'inventory-reports',
     'ic-report-usage':'inventory-reports','ic-report-variance':'inventory-reports',
-    'ic-dashboard':'inventory-reports','ic-help':'_always',
+    'ic-dashboard':'inventory-dashboard','ic-help':'_always',
     // Labor Control
     'lc-log-hours':'log-hours','lc-daily-view':'log-hours',
     'lc-tip-log':'log-tips','lc-tip-history':'log-tips','lc-tip-pool':'log-tips',
@@ -172,7 +172,7 @@ const DB = {
     'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
     'lc-callout-log':'call-out-log',
     'lc-reports':'labor-reports','lc-weekly-summary':'labor-reports','lc-overtime-watch':'labor-reports',
-    'lc-dashboard':'labor-reports','lc-help':'_always',
+    'lc-dashboard':'labor-dashboard','lc-help':'_always',
     // Shift Control
     'sc-log-shift':'log-shift','sc-shift-history':'log-shift',
     'sc-active-shift':'active-shift',
@@ -182,7 +182,7 @@ const DB = {
     'sc-void-comp':'void-comp',
     'sc-maintenance':'maintenance',
     'sc-reports-shift':'shift-reports','sc-reports-cash':'shift-reports','sc-reports-ops':'shift-reports',
-    'sc-dashboard':'shift-reports','sc-help':'_always',
+    'sc-dashboard':'shift-dashboard','sc-help':'_always',
     // Profit Recovery (root + profit module screens)
     'dashboard':'profit-recovery','this-week':'profit-recovery',
     'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
