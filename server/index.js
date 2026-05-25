@@ -110,6 +110,12 @@ app.post('/api/generate-traffic-audit', (req, res) => {
     let appData = {};
     try { appData = JSON.parse(appDataStr); } catch(e) {}
 
+    // Operator's saved URLs from traffic_settings.urls. Server fetches public
+    // data from these (PageSpeed Insights for website, HTML for GBP) so the
+    // audit does not require screenshots for sections we can read live.
+    let urls = null;
+    try { urls = JSON.parse(fields.urls?.[0] || 'null'); } catch(e) {}
+
     const uploadedFiles = [];
     for (const [key, fileArr] of Object.entries(files)) {
       for (const f of fileArr) {
@@ -118,7 +124,8 @@ app.post('/api/generate-traffic-audit', (req, res) => {
     }
 
     try {
-      const auditData = await extractAuditData(apiKey, 'traffic', uploadedFiles, appData, notes);
+      const urlData = await fetchTrafficUrlData(urls);
+      const auditData = await extractAuditData(apiKey, 'traffic', uploadedFiles, appData, notes, null, urlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Traffic audit error:', e);
@@ -165,6 +172,123 @@ app.post('/api/generate-revenue-audit', (req, res) => {
   });
 });
 
+// ── Fetch public URL data for the Traffic Audit ───────────────────────────────
+// Pulls live data from the operator's saved URLs in traffic_settings.urls so
+// the audit can score what is publicly visible without requiring a screenshot.
+//
+// Two sources currently:
+//   1) Website  — calls Google PageSpeed Insights API (free, sanctioned). Returns
+//                 performance, accessibility, SEO, and best-practices scores.
+//                 Requires PAGESPEED_API_KEY env var to be set. If missing or the
+//                 call fails, returns null and the audit falls back to operator
+//                 screenshot uploads.
+//   2) GBP      — plain HTML fetch of the operator's Google Business Profile URL.
+//                 Returns the rendered listing HTML which Claude can read for
+//                 rating, review count, photo count, hours, categories, recent
+//                 reviews. No API key needed. Best-effort — some GBP URLs may be
+//                 blocked or rate-limited.
+//
+// Both fetches have short timeouts and fail-safe: any error returns null and
+// the rest of the audit continues normally.
+async function fetchTrafficUrlData(urls) {
+  if (!urls || typeof urls !== 'object') return null;
+  const out = { website: null, gbp: null };
+
+  // PageSpeed Insights for the operator's website (mobile strategy)
+  const psKey = process.env.PAGESPEED_API_KEY;
+  if (urls.website && psKey) {
+    try {
+      const target = encodeURIComponent(urls.website);
+      const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed'
+        + '?url=' + target
+        + '&strategy=mobile'
+        + '&category=performance&category=accessibility&category=seo&category=best-practices'
+        + '&key=' + psKey;
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), 30000);
+      const r = await fetch(apiUrl, { signal: ctrl.signal });
+      clearTimeout(tmo);
+      if (r.ok) {
+        const data = await r.json();
+        const lh = data.lighthouseResult || {};
+        const cats = lh.categories || {};
+        const audits = lh.audits || {};
+        const pct = (id) => cats[id] && typeof cats[id].score === 'number' ? Math.round(cats[id].score * 100) : null;
+        const ms  = (id) => audits[id] && audits[id].numericValue != null ? Math.round(audits[id].numericValue) : null;
+        out.website = {
+          url: urls.website,
+          performance:    pct('performance'),
+          accessibility:  pct('accessibility'),
+          seo:            pct('seo'),
+          bestPractices:  pct('best-practices'),
+          firstContentfulPaintMs: ms('first-contentful-paint'),
+          largestContentfulPaintMs: ms('largest-contentful-paint'),
+          totalBlockingTimeMs: ms('total-blocking-time'),
+          cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue ?? null,
+          speedIndexMs:  ms('speed-index'),
+          fetchedAt: new Date().toISOString()
+        };
+      }
+    } catch (e) {
+      console.warn('[audit] PageSpeed Insights fetch failed:', e.message);
+    }
+  }
+
+  // Public Google Business Profile HTML fetch
+  if (urls.gbp) {
+    try {
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), 20000);
+      const r = await fetch(urls.gbp, {
+        signal: ctrl.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
+      clearTimeout(tmo);
+      if (r.ok) {
+        const html = await r.text();
+        // Cap to 80KB to keep prompt cost sane. Most GBP HTML well under this.
+        out.gbp = { url: urls.gbp, html: html.slice(0, 80000), fetchedAt: new Date().toISOString() };
+      }
+    } catch (e) {
+      console.warn('[audit] GBP HTML fetch failed:', e.message);
+    }
+  }
+
+  return (out.website || out.gbp) ? out : null;
+}
+
+function formatTrafficUrlDataForPrompt(urlData) {
+  if (!urlData) return '';
+  const lines = ['FETCHED LIVE URL DATA — Use this as primary input for the sections it covers:'];
+  if (urlData.website) {
+    const w = urlData.website;
+    lines.push('');
+    lines.push('WEBSITE (Google PageSpeed Insights, mobile): ' + w.url);
+    lines.push('  Performance score: '   + (w.performance   != null ? w.performance + '/100'   : 'unavailable'));
+    lines.push('  Accessibility:     '   + (w.accessibility != null ? w.accessibility + '/100' : 'unavailable'));
+    lines.push('  SEO:               '   + (w.seo           != null ? w.seo + '/100'           : 'unavailable'));
+    lines.push('  Best Practices:    '   + (w.bestPractices != null ? w.bestPractices + '/100' : 'unavailable'));
+    if (w.firstContentfulPaintMs   != null) lines.push('  First Contentful Paint: '   + w.firstContentfulPaintMs   + ' ms');
+    if (w.largestContentfulPaintMs != null) lines.push('  Largest Contentful Paint: ' + w.largestContentfulPaintMs + ' ms');
+    if (w.totalBlockingTimeMs      != null) lines.push('  Total Blocking Time: '      + w.totalBlockingTimeMs      + ' ms');
+    if (w.cumulativeLayoutShift    != null) lines.push('  Cumulative Layout Shift: '  + w.cumulativeLayoutShift.toFixed(3));
+    if (w.speedIndexMs             != null) lines.push('  Speed Index: '              + w.speedIndexMs             + ' ms');
+  }
+  if (urlData.gbp) {
+    lines.push('');
+    lines.push('GOOGLE BUSINESS PROFILE (public page HTML): ' + urlData.gbp.url);
+    lines.push('--- BEGIN GBP HTML ---');
+    lines.push(urlData.gbp.html);
+    lines.push('--- END GBP HTML ---');
+  }
+  return lines.join('\n');
+}
+
 // ── Parse spreadsheet/CSV file into readable text for Claude ──────────────────
 function parseSpreadsheetToText(filePath, fileName) {
   const ext = path.extname(fileName).toLowerCase();
@@ -198,11 +322,11 @@ function parseSpreadsheetToText(filePath, fileName) {
 }
 
 // ── Extract audit data from uploaded files ────────────────────────────────────
-async function extractAuditData(apiKey, auditType, files, appData, notes='', controlData=null) {
+async function extractAuditData(apiKey, auditType, files, appData, notes='', controlData=null, urlData=null) {
   const prompts = {
     profit:  getExtractionPrompt_Profit(appData, controlData),
     revenue: getExtractionPrompt_Revenue(appData, controlData),
-    traffic: getExtractionPrompt_Traffic(appData),
+    traffic: getExtractionPrompt_Traffic(appData, urlData),
   };
 
   const prompt = prompts[auditType] || prompts.profit;
@@ -516,13 +640,14 @@ Return this exact JSON (all values calculated):
 "S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
 }
 
-function getExtractionPrompt_Traffic(appData) {
+function getExtractionPrompt_Traffic(appData, urlData=null) {
   const settings      = appData.settings || {};
   const targets       = (appData.traffic_settings && appData.traffic_settings.targets) || {};
   const weeks         = appData.traffic_weeks || [];
   const recentWeeks   = weeks.slice(-4);
   const avg = (fn) => { const v = recentWeeks.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
   const avgGR  = avg(w=>w.google_rating);
+  const urlBlock = formatTrafficUrlDataForPrompt(urlData);
   const avgRV  = avg(w=>w.new_reviews);
   const avgRR  = avg(w=>w.response_rate);
   const avgSS  = avg(w=>w.monthly_sessions);
@@ -545,7 +670,10 @@ function getExtractionPrompt_Traffic(appData) {
       }).join('\n')
     : '  No weekly traffic data entered yet';
 
-  return `TRAFFIC AUDIT — respond with a single JSON object, no other text. Use app data + screenshots. Never output 0 for a score.
+  return `TRAFFIC AUDIT — respond with a single JSON object, no other text. Use app data, fetched live URL data when present, and any uploaded screenshots. Never output 0 for a score.
+
+${urlBlock}
+
 
 SCORING (out of 100 each):
 S1 GBP: claimed+verified=20, hours+phone+website=15, menu linked=10, photos>50=15, posts>4/mo=15, response>75%=15, Q&A=10.
