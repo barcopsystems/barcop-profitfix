@@ -54,7 +54,7 @@ const Onboarding = {
     const parts = (s.city_state || '').split(',').map(p => p.trim());
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Bar Cop captures the day, shows where money leaks, and prescribes the fix.</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Bar Cop captures the operation, identifies where profit leaks, and shows you exactly what to fix.</div>'
       + this._stepDots(1)
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
       + '<div class="f" style="flex:2;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
@@ -91,7 +91,7 @@ const Onboarding = {
     const opt = (v, label) => '<option value="' + v + '"' + (bt === v ? ' selected' : '') + '>' + label + '</option>';
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Your Operation</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">These set the dollar baselines for every calculation and audit. You can change them any time in Settings.</div>'
+      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">These numbers set the dollar baselines for every calculation and audit. You can change them any time in Settings.</div>'
       + this._stepDots(2)
       + '<div class="f" style="margin-bottom:14px;"><label>Operation Type</label>'
       + '<select id="ob-type" style="width:100%;">' + opt('bar_kitchen', 'Bar and Kitchen') + opt('bar_only', 'Bar Only') + '</select></div>'
@@ -121,7 +121,7 @@ const Onboarding = {
       + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">A quick lay of the land before you dig in.</div>'
       + this._stepDots(3)
       + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
-      + 'Six modules under your <strong style="color:var(--t1);">Hub</strong>. Three <strong style="color:var(--t1);">Control</strong> modules log what happens at the bar. Three <strong style="color:var(--t1);">Recovery</strong> modules show where money leaks and how to fix it.'
+      + 'Six systems under your <strong style="color:var(--t1);">Hub</strong>. Three <strong style="color:var(--t1);">Control</strong> systems log what happens at the bar. Three <strong style="color:var(--t1);">Recovery</strong> systems show where money leaks and how to fix it.'
       + '<div style="margin-top:10px;">Next up: a short setup checklist. Top to bottom, picking up where this left off.</div>'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
