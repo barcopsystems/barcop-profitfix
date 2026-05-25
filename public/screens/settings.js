@@ -33,9 +33,7 @@ S.HubSettings = {
       { id:'traffic', title:'Traffic Targets',           body:this.secTraffic(),       save:true },
       { id:'links',   title:'Operation Links',           body:this.secLinks(),         save:true },
       { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true },
-      { id:'shift',   title:'Shift Preferences',         body:this.secShift(),         save:true },
-      { id:'team',    title:'Team',                      body:this.secTeam(),          save:false },
-      { id:'account', title:'Account',                   body:this.secAccount(),       save:false }
+      { id:'shift',   title:'Shift Preferences',         body:this.secShift(),         save:true }
     ];
     container.scrollTop = 0;
 
@@ -674,7 +672,7 @@ S.HubSettings = {
   // A full, self-contained backup: the Recovery data blob plus all three
   // Control stores. Plain JSON the operator keeps offsite.
   _backupMsg(text, color) {
-    const m = document.getElementById('s-backup-msg');
+    const m = document.getElementById('s-backup-msg') || document.getElementById('ua-backup-msg');
     if (m) { m.style.color = color || 'var(--gold)'; m.textContent = text; m.style.display = 'block'; }
   },
 
@@ -745,7 +743,7 @@ S.HubSettings = {
   },
 
   async loadSample() {
-    const msg = document.getElementById('s-test-msg');
+    const msg = document.getElementById('s-test-msg') || document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
 
     const uid = () => App.uid();
@@ -2154,7 +2152,7 @@ S.HubSettings = {
 
   async clearAll() {
     if (!confirm('This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.\n\nClear all data?')) return;
-    const msg = document.getElementById('s-test-msg');
+    const msg = document.getElementById('s-test-msg') || document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--t3)'; msg.textContent = 'Clearing...'; msg.style.display = 'block'; }
 
     // Reset every data key to its default. App.data.settings (bar name,
