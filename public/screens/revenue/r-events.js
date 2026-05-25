@@ -2,6 +2,24 @@
 S.RevenueEvents = {
   activeTab: 'pipeline',
 
+  // Catering calc default wage. Pulls Front of House staff from Labor Control
+  // and averages their hourly wages. Falls back to overall staff average, then
+  // to a sensible default if Labor Control has no roster yet.
+  _defaultEventsWage() {
+    const staff = (App.laborData && App.laborData.lc_staff) || [];
+    const positions = (App.laborData && App.laborData.lc_positions) || [];
+    const fohIds = new Set(positions.filter(p => p.department === 'Front of House').map(p => p.id));
+    const fohStaff = staff.filter(s => fohIds.has(s.position_id) && s.wage != null);
+    if (fohStaff.length) {
+      return Math.round((fohStaff.reduce((sum, s) => sum + s.wage, 0) / fohStaff.length) * 100) / 100;
+    }
+    const anyWaged = staff.filter(s => s.wage != null);
+    if (anyWaged.length) {
+      return Math.round((anyWaged.reduce((sum, s) => sum + s.wage, 0) / anyWaged.length) * 100) / 100;
+    }
+    return 13;
+  },
+
   render(container, actions) {
     actions.innerHTML = '';
     const addBtn = document.createElement('button');
@@ -166,7 +184,7 @@ S.RevenueEvents = {
       + '<div class="f w-md"><label>Staff Hours</label><input type="number" id="rcc-hrs" placeholder=""/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Avg Staff Wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-wage" value="' + (App.data.revenue_settings?.avg_hourly_wage?.floor || 13) + '"/></div></div>'
+      + '<div class="f w-md"><label>Avg Staff Wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-wage" value="' + this._defaultEventsWage() + '"/></div></div>'
       + '<div class="f w-md"><label>Other Costs</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rcc-other" placeholder=""/></div></div>'
       + '<div class="f w-md"><label>Target Food Cost %</label><div class="fw"><input class="suf" type="number" id="rcc-tgt" value="28" step="1"/><span class="suf">%</span></div></div>'
       + '</div>'
