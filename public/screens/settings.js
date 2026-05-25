@@ -356,6 +356,31 @@ S.HubSettings = {
     setTimeout(() => { el.style.display = 'none'; }, 4500);
   },
 
+  // In-app modal — replaces browser confirm/alert for Team actions
+  _teamModal(opts) {
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:420px;width:100%;';
+    const msgColor = opts.tone === 'error' ? 'var(--red)' : 'var(--t1)';
+    const buttons = (opts.buttons || [{ label: 'OK', act: 'ok', kind: 'ghost' }])
+      .map(b => '<button class="btn btn-' + (b.kind || 'ghost') + '" data-act="' + esc(b.act) + '">' + esc(b.label) + '</button>')
+      .join('');
+    box.innerHTML = '<div style="font-size:13px;color:' + msgColor + ';line-height:1.6;margin-bottom:20px;">' + esc(opts.message) + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;">' + buttons + '</div>';
+    m.appendChild(box);
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    box.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        close();
+        if (opts.onAction) opts.onAction(act);
+      });
+    });
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+  },
+
   async _teamInvite() {
     const emailInput = document.getElementById('hs-team-email');
     const roleSelect = document.getElementById('hs-team-role');
@@ -384,6 +409,10 @@ S.HubSettings = {
       const data = await r.json();
       if (!r.ok || !data.ok) {
         this._teamMsg(data.error || 'Invite failed.', 'var(--red)');
+      } else if (data.addedDirectly) {
+        this._teamMsg('Added ' + email + ' to your team. They already have a Bar Cop account.', 'var(--gold)');
+        if (emailInput) emailInput.value = '';
+        this._teamRefresh();
       } else {
         this._teamMsg('Invite sent to ' + email + '.', 'var(--gold)');
         if (emailInput) emailInput.value = '';
@@ -406,31 +435,44 @@ S.HubSettings = {
         body: JSON.stringify({ accountId, membershipId, newRole })
       });
       const data = await r.json();
-      if (!r.ok || !data.ok) alert(data.error || 'Could not change role.');
+      if (!r.ok || !data.ok) {
+        this._teamModal({ message: data.error || 'Could not change role.', tone: 'error' });
+      }
       this._teamRefresh();
     } catch (e) {
-      alert('Connection error.');
+      this._teamModal({ message: 'Connection error.', tone: 'error' });
       this._teamRefresh();
     }
   },
 
   async _teamRemove(membershipId) {
-    if (!confirm('Remove this member from the account?')) return;
-    const accountId = await DB._ensureAccountId();
-    if (!accountId) return;
-    try {
-      const headers = await this._teamAuthHeaders();
-      const r = await fetch('/api/remove-member', {
-        method: 'POST', headers,
-        body: JSON.stringify({ accountId, membershipId })
-      });
-      const data = await r.json();
-      if (!r.ok || !data.ok) alert(data.error || 'Could not remove member.');
-      this._teamRefresh();
-    } catch (e) {
-      alert('Connection error.');
-      this._teamRefresh();
-    }
+    this._teamModal({
+      message: 'Remove this member from your account? They will lose access immediately.',
+      buttons: [
+        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
+        { label: 'Remove', act: 'ok', kind: 'danger' }
+      ],
+      onAction: async (act) => {
+        if (act !== 'ok') return;
+        const accountId = await DB._ensureAccountId();
+        if (!accountId) return;
+        try {
+          const headers = await this._teamAuthHeaders();
+          const r = await fetch('/api/remove-member', {
+            method: 'POST', headers,
+            body: JSON.stringify({ accountId, membershipId })
+          });
+          const data = await r.json();
+          if (!r.ok || !data.ok) {
+            this._teamModal({ message: data.error || 'Could not remove member.', tone: 'error' });
+          }
+          this._teamRefresh();
+        } catch (e) {
+          this._teamModal({ message: 'Connection error.', tone: 'error' });
+          this._teamRefresh();
+        }
+      }
+    });
   },
 
   // ── Per-section save — writes only that section's existing keys ─────────────
