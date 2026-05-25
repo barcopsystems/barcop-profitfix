@@ -424,7 +424,6 @@ const DB = {
           rplh_bar: 65,
           event_close_rate: 40
         },
-        avg_hourly_wage: { bar: 15, kitchen: 14, floor: 13 },
         servers: [],
         _targets_saved: false
       },
