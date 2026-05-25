@@ -518,7 +518,18 @@ const App = {
     }
   },
 
-  showHub() {
+  showHub(opts) {
+    opts = opts || {};
+    // If a Hub overlay modal is currently open, close it (returns user to
+    // the dashboard already rendered underneath). Skip when called via
+    // {fromOverlayClose: true} so we don't recurse.
+    if (!opts.fromOverlayClose) {
+      const modal = document.getElementById('hub-modal');
+      if (modal && modal.style.display === 'flex') {
+        this.closeHubOverlay();
+        return;
+      }
+    }
     // Staff role: real Hub shows financial data they shouldn't see. Redirect
     // to the Staff Hub (tile view of their accessible tasks).
     const role = (window.DB && DB.role && DB.role()) || null;
@@ -539,8 +550,70 @@ const App = {
       document.body.appendChild(hubWrap);
     }
     hubWrap.style.display = 'block';
+    // Clear any blur from a prior overlay open
+    hubWrap.style.filter = '';
+    hubWrap.style.pointerEvents = '';
     S.Hub.render(hubWrap);
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
+  },
+
+  // ── Hub overlay modal (Phase 2 polish) ──────────────────────────────────────
+  // Open a Hub-owned screen (Settings, Help, Getting Started, etc.) as a modal
+  // overlay on top of the Hub Dashboard instead of replacing the dashboard
+  // entirely. The dashboard stays visible underneath with a blur filter so the
+  // operator never loses their context.
+  openHubOverlay(renderFn) {
+    // Ensure Hub Dashboard is rendered first (showing the user the layout
+    // behind the modal). If we're in a module view or auth, call showHub first.
+    const wrap = document.getElementById('hub-wrapper');
+    const wrapVisible = wrap && wrap.style.display !== 'none';
+    if (!wrapVisible) this.showHub();
+    const hubWrap = document.getElementById('hub-wrapper');
+    // Apply blur to dashboard behind
+    if (hubWrap) {
+      hubWrap.style.filter = 'blur(5px)';
+      hubWrap.style.pointerEvents = 'none';
+    }
+    // Create or reuse modal
+    let modal = document.getElementById('hub-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'hub-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.55);';
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (ev) => {
+        if (ev.target === modal) this.closeHubOverlay();
+      });
+    }
+    // Build a fresh panel each open so prior content is cleared
+    modal.innerHTML = '<div class="hub-modal-panel" style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:920px;width:100%;max-height:calc(100vh - 80px);overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.55);"></div>';
+    const panel = modal.querySelector('.hub-modal-panel');
+    modal.style.display = 'flex';
+    // Install Esc-to-close once
+    if (!this._hubOverlayEscWired) {
+      document.addEventListener('keydown', (ev) => {
+        const m = document.getElementById('hub-modal');
+        if (ev.key === 'Escape' && m && m.style.display === 'flex') {
+          this.closeHubOverlay();
+        }
+      });
+      this._hubOverlayEscWired = true;
+    }
+    // Render the screen content into the panel
+    if (typeof renderFn === 'function') renderFn(panel);
+  },
+
+  closeHubOverlay() {
+    const modal = document.getElementById('hub-modal');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.innerHTML = '';
+    }
+    const wrap = document.getElementById('hub-wrapper');
+    if (wrap) {
+      wrap.style.filter = '';
+      wrap.style.pointerEvents = '';
+    }
   },
 
   // ── Role-based access (Phase 2 Items 25 + 25b) ─────────────────────────────
@@ -692,6 +765,8 @@ const App = {
   },
 
   showApp(module) {
+    // Close any open Hub overlay modal before entering a module view
+    this.closeHubOverlay && this.closeHubOverlay();
     if (!this.canSeeModule(module)) {
       // Staff trying to enter a non-operational module — bounce to their landing
       const land = this.staffLanding();
@@ -877,7 +952,16 @@ const App = {
   // the Hub Dashboard handles the manual-navigation case for partial setups.
   setupMeetsThreshold() {
     if (!this.data) return false;
+    // Operator explicitly dismissed the Getting Started auto-redirect.
+    if (this.data.settings && this.data.settings.gs_dismissed) return true;
     const p = this.data.hub_setup_progress || {};
+    // Count how many setup items the operator has actually checked off.
+    const checkedCount = Object.keys(p).filter(k => k.indexOf('gs_') === 0 && p[k]).length;
+    // Lenient path: 3+ items checked = operator is engaged, stop forcing them
+    // back to Getting Started on every signin. (Onboarding auto-checks one
+    // item on landing, so this is really "2 more clicks" to dismiss.)
+    if (checkedCount >= 3) return true;
+    // Strict path: Profile + Targets + at least one Audit (the original rule).
     if (!p.gs_profile || !p.gs_targets) return false;
     return !!(p.gs_p_audit || p.gs_r_audit || p.gs_t_audit);
   },
