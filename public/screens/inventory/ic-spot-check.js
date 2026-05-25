@@ -36,7 +36,7 @@ S.InventorySpotCheck = {
     return 0;
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -71,7 +71,7 @@ S.InventorySpotCheck = {
       + 'style="border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:10px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
       + '<span style="flex:1;font-size:15px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
-      + '<span class="badge badge-dim">' + esc(p.category || '—') + '</span>'
+      + '<span class="badge badge-dim">' + esc(p.category || '-') + '</span>'
       + '<button type="button" class="btn btn-ghost btn-sm sp-remove">Remove</button>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:10px;">'
@@ -83,7 +83,7 @@ S.InventorySpotCheck = {
       + '<input type="number" class="sp-sold" min="0" step="0.1" inputmode="decimal" placeholder="pours" style="height:44px;font-size:16px;"/></div>'
       + '</div>'
       + '<div class="sp-result" style="font-size:12px;color:var(--t3);">'
-      + 'Enter counts — ' + (pp ? pp.toFixed(1) : '1') + ' pours per container.</div>'
+      + 'Enter counts. ' + (pp ? pp.toFixed(1) : '1') + ' pours per container.</div>'
       + '</div>';
   },
 
@@ -283,13 +283,13 @@ S.InventorySpotCheck = {
       const vd = c.total_variance_dollar || 0;
       return '<tr class="sp-hrow" data-id="' + c.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
-        + '<td>' + esc(c.shift || '—') + '</td>'
-        + '<td>' + esc(c.checked_by || '—') + '</td>'
+        + '<td>' + esc(c.shift || '-') + '</td>'
+        + '<td>' + esc(c.checked_by || '-') + '</td>'
         + '<td>' + (c.product_count || 0) + '</td>'
         + '<td class="' + (c.flagged_count ? 'neg' : '') + '">' + (c.flagged_count || 0) + '</td>'
         + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd) + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>'
+        + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
     return '<div class="card"><div class="card-title">Spot Check History</div>'
@@ -307,23 +307,23 @@ S.InventorySpotCheck = {
     const rows = (c.items || []).map(it => {
       const vd = it.variance_dollar;
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td>' + esc(it.category || '—') + '</td>'
-        + '<td>' + (it.pre != null ? it.pre.toFixed(1) : '—') + '</td>'
-        + '<td>' + (it.post != null ? it.post.toFixed(1) : '—') + '</td>'
-        + '<td>' + (it.poured != null ? it.poured.toFixed(1) : '—') + '</td>'
-        + '<td>' + (it.pos_sold != null ? it.pos_sold.toFixed(1) : '—') + '</td>'
+        + '<td>' + esc(it.category || '-') + '</td>'
+        + '<td>' + (it.pre != null ? it.pre.toFixed(1) : '-') + '</td>'
+        + '<td>' + (it.post != null ? it.post.toFixed(1) : '-') + '</td>'
+        + '<td>' + (it.poured != null ? it.poured.toFixed(1) : '-') + '</td>'
+        + '<td>' + (it.pos_sold != null ? it.pos_sold.toFixed(1) : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
-        + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) : '—') + '</td>'
+        + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
-        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '—') + '</td></tr>';
+        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-') + '</td></tr>';
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sp-back">&#8592; Back to Spot Check</button></div>'
       + '<div class="card"><div class="card-title">Spot Check &middot; ' + this.fmtDate(c.date) + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Shift</div><div class="calc-val">' + esc(c.shift || '—') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Checked By</div><div class="calc-val">' + esc(c.checked_by || '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Shift</div><div class="calc-val">' + esc(c.shift || '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Checked By</div><div class="calc-val">' + esc(c.checked_by || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val ' + (c.flagged_count ? 'warn' : '') + '">' + (c.flagged_count || 0) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val ' + ((c.total_variance_dollar || 0) > 0 ? 'warn' : '') + '">'
       + ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtCurrency(c.total_variance_dollar || 0) + '</div></div>'
