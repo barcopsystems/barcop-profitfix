@@ -114,12 +114,13 @@ S.LaborCalloutLog = {
       const addF = ev.target.closest('#co-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row && App.canEdit('lc-callout-log')) this.showForm(row.dataset.id);
       else if (addF) this.showForm();
     };
   },
 
   showForm(id) {
+    if (id && !App.canEdit('lc-callout-log')) return;
     this.editId = id || null;
     const c = id ? this.callouts().find(x => x.id === id) : null;
     const staffOpts = '<option value="">Select staff...</option>'
