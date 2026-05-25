@@ -380,22 +380,26 @@ window.FixPanel = {
   },
 
   // Vertical fix-event markers for an annotated trend chart. xFn maps a week
-  // index to an x coordinate; top/bottom are the plot edges.
-  // Disabled for now — full-height dashed lines + gold dots were too visually
-  // loud against the trend lines on every chart they appeared in. Restore by
-  // removing the early return below if a softer style is added later.
+  // index to an x coordinate; top/bottom are the plot edges. The marker reads
+  // as "a fix landed here" without competing with the trend lines on every
+  // chart it appears in. Quiet by design: thin dashed gold line at low opacity
+  // gives the timeline reference, small gold dot near the bottom axis gives
+  // the anchor and the hover target. Title element shows label + date on hover.
   markerSvg(markers, xFn, top, bottom) {
-    return '';
-    /* eslint-disable */
     if (!markers || !markers.length) return '';
     return markers.map(m => {
-      const x = xFn(m.index).toFixed(1);
-      return '<line x1="' + x + '" y1="' + top.toFixed(1) + '" x2="' + x + '" y2="' + bottom.toFixed(1) + '" '
-        + 'stroke="rgba(219,171,70,0.5)" stroke-width="1" stroke-dasharray="2,3"/>'
-        + '<circle cx="' + x + '" cy="' + top.toFixed(1) + '" r="3" fill="#DBAB46">'
-        + '<title>' + esc(m.label) + ' implemented ' + esc(m.date) + '</title></circle>';
+      const x  = xFn(m.index).toFixed(1);
+      const t  = top.toFixed(1);
+      const b  = bottom.toFixed(1);
+      const cy = (bottom - 5).toFixed(1);
+      return ''
+        + '<line x1="' + x + '" y1="' + t + '" x2="' + x + '" y2="' + cy + '" '
+        +   'stroke="rgba(219,171,70,0.18)" stroke-width="1" stroke-dasharray="3,4"/>'
+        + '<circle cx="' + x + '" cy="' + cy + '" r="4" fill="#DBAB46" '
+        +   'stroke="rgba(0,0,0,0.35)" stroke-width="0.5">'
+        +   '<title>' + esc(m.label) + ' implemented ' + esc(m.date) + '</title>'
+        + '</circle>';
     }).join('');
-    /* eslint-enable */
   },
 
   renderInto(el, moduleKey, focusId) {
