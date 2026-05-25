@@ -18,7 +18,7 @@ S.LaborCalloutLog = {
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -37,7 +37,8 @@ S.LaborCalloutLog = {
   },
 
   renderList() {
-    this.actions.innerHTML = '';
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="co-export">Export PDF</button>';
+    document.getElementById('co-export')?.addEventListener('click', () => window.print());
     if (this.staff().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
         + '<div class="empty-title">Add staff first</div>'
@@ -79,11 +80,11 @@ S.LaborCalloutLog = {
         const repTag = reps > 1 ? ' <span class="badge badge-warn">' + reps + '&times; / 60d</span>' : '';
         return '<tr class="co-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
-          + '<td>' + esc(c.name || '—') + repTag + '</td>'
+          + '<td>' + esc(c.name || '-') + repTag + '</td>'
           + '<td>' + (c.type === 'No-Show'
               ? '<span class="badge badge-warn">No-Show</span>'
-              : '<span class="badge badge-dim">' + esc(c.type || '—') + '</span>') + '</td>'
-          + '<td>' + esc(c.shift_type || '—') + '</td>'
+              : '<span class="badge badge-dim">' + esc(c.type || '-') + '</span>') + '</td>'
+          + '<td>' + esc(c.shift_type || '-') + '</td>'
           + '<td>' + (c.covered
               ? '<span class="badge badge-ok">Covered</span>'
               : '<span class="badge badge-warn">Not Covered</span>') + '</td>'
@@ -127,7 +128,7 @@ S.LaborCalloutLog = {
     const typeOpts = this.TYPES.map(t =>
       '<option' + ((c ? c.type : 'No-Show') === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const shiftOpts = this.SHIFTS.map(s =>
-      '<option value="' + s + '"' + (c && c.shift_type === s ? ' selected' : '') + '>' + (s || '—') + '</option>').join('');
+      '<option value="' + s + '"' + (c && c.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'Log') + ' Call-Out</div>'
