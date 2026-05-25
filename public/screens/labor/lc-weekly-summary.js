@@ -46,7 +46,9 @@ S.LaborWeeklySummary = {
 
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '';
+    this.actions = actions;
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button>';
+    document.getElementById('ws-export')?.addEventListener('click', () => window.print());
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
   },
@@ -83,22 +85,22 @@ S.LaborWeeklySummary = {
       + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Labor Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val dim">'
-      + (schedHours != null ? schedHours.toFixed(1) : '—') + '</div></div>'
+      + (schedHours != null ? schedHours.toFixed(1) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val '
       + (hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good') + '">'
-      + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '—') + '</div></div>'
+      + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val '
       + (laborPct == null ? '' : laborPct > target ? 'warn' : 'good') + '">'
-      + (laborPct != null ? App.fmtPct(laborPct) : '—') + '</div></div>'
+      + (laborPct != null ? App.fmtPct(laborPct) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">'
-      + (rplh != null ? App.fmtCurrency(rplh) : '—') + '</div></div>'
+      + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
       + '</div>';
 
     // By staff
     const byStaff = {};
     weekActuals.forEach(a => {
       const k = a.staff_id || a.name || '?';
-      if (!byStaff[k]) byStaff[k] = { name: a.name || '—', days: {}, hours: 0, cost: 0 };
+      if (!byStaff[k]) byStaff[k] = { name: a.name || '-', days: {}, hours: 0, cost: 0 };
       byStaff[k].days[a.date] = true;
       byStaff[k].hours += (a.hours || 0);
       byStaff[k].cost += (a.cost || 0);
