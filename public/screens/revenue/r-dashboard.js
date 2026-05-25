@@ -204,8 +204,12 @@ S.RevenueDashboard = {
     const tCA  = t.check_avg||35;
     const uid  = 'rg'+Math.random().toString(36).slice(2,6);
 
-    const fixMarkers = (window.Recovery && window.FixPanel)
-      ? FixPanel.markerSvg(Recovery.chartMarkers(weeks, 'revenue'), xs, PAD.t, PAD.t + ch) : '';
+    const fixMarks = (window.Recovery) ? Recovery.chartMarkers(weeks, 'revenue') : [];
+    const fixMarkers = (window.FixPanel && fixMarks.length)
+      ? FixPanel.markerSvg(fixMarks, xs, PAD.t, PAD.t + ch) : '';
+    const fixLegend = fixMarks.length
+      ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:#DBAB46;display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
+      : '';
 
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">'
@@ -213,10 +217,11 @@ S.RevenueDashboard = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
       + '<button class="btn btn-ghost btn-sm" id="r-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
       + '</div>'
-      + '<div style="display:flex;gap:20px;">'
+      + '<div style="display:flex;gap:20px;flex-wrap:wrap;">'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Check Avg</span>'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.4);display:inline-block;border-radius:1px;"></span>Labor %</span>'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.2);display:inline-block;border-radius:1px;"></span>RPLH</span>'
+      + fixLegend
       + '</div></div>'
       + '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
       + '<defs><linearGradient id="caGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
