@@ -664,6 +664,7 @@ S.Hub = {
       + navItem('contact-support',  'Contact Us',      'mail',     [])
       + '<div class="nav-section">System</div>'
       + navItem('settings',         'App Settings',    'settings', [])
+      + navItem('user-accounts',    'User Accounts',   'settings', [])
       + navItem('report-bug',       'Report a Bug',    'bug',      []);
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
@@ -774,6 +775,7 @@ S.Hub = {
       else if (action === 'getting-started') S.HubGettingStarted.open();
       else if (action === 'help')            S.HubHelp.open();
       else if (action === 'settings')        S.HubSettings.open();
+      else if (action === 'user-accounts')   S.HubUserAccounts.open();
       else if (action === 'contact-support') S.HubSupport.open();
       else if (action === 'report-bug')      S.HubReportBug.open();
     });
