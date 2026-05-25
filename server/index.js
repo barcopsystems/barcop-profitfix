@@ -1036,6 +1036,49 @@ app.post('/api/invite-user', async (req, res) => {
     );
 
     if (inviteError) {
+      // Common case: this person was previously invited/removed. Their auth
+      // row still exists, so Supabase refuses a new invite. Look up the
+      // existing user by email and add a membership row directly.
+      const errMsg = (inviteError.message || '').toLowerCase();
+      const isAlreadyRegistered = errMsg.includes('already') &&
+        (errMsg.includes('registered') || errMsg.includes('exists'));
+
+      if (isAlreadyRegistered) {
+        let existingUserId = null;
+        try {
+          const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+          const found = (usersData?.users || []).find(u => u.email && u.email.toLowerCase() === cleanEmail);
+          if (found) existingUserId = found.id;
+        } catch (e) {
+          console.error('listUsers fallback failed:', e);
+        }
+
+        if (!existingUserId) {
+          return res.status(500).json({ error: 'Email is already registered but the user record could not be located.' });
+        }
+
+        const { data: alreadyMember } = await supabaseAdmin
+          .from('memberships')
+          .select('id')
+          .eq('account_id', accountId)
+          .eq('user_id', existingUserId)
+          .maybeSingle();
+
+        if (alreadyMember) {
+          return res.status(400).json({ error: 'This person is already a member of this account.' });
+        }
+
+        const { error: insertError } = await supabaseAdmin
+          .from('memberships')
+          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole });
+
+        if (insertError) {
+          return res.status(500).json({ error: insertError.message });
+        }
+
+        return res.json({ ok: true, email: cleanEmail, role: inviteRole, addedDirectly: true });
+      }
+
       console.error('Invite error:', inviteError);
       return res.status(500).json({ error: inviteError.message || 'Invite failed' });
     }
