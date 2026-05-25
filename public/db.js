@@ -448,6 +448,30 @@ const DB = {
         // Static digital-presence profile state — set once on the scorecard
         // screens, not repeated on every weekly record.
         profile: {},
+        // Operation links — the operator's public URLs for each platform.
+        // The audit fetches public data from these; Recovery screens use them
+        // for "Open Live" click-throughs. Empty until the operator enters them.
+        urls: {
+          website:         '',
+          gbp:             '',
+          yelp:            '',
+          instagram:       '',
+          facebook:        '',
+          doordash:        '',
+          ubereats:        '',
+          grubhub:         '',
+          email_platform:  ''
+        },
+        // Traffic Recovery Scoreboard conversion rates. These map a Traffic
+        // metric improvement to a dollar figure using check_avg from Revenue
+        // Recovery as the per-visit value. Defaults are industry benchmarks
+        // for restaurant digital channels; operator can override per channel.
+        conversion_rates: {
+          web_session_to_visit:    3,
+          gbp_view_to_visit:       2,
+          social_profile_to_visit: 1,
+          email_open_to_visit:     1
+        },
         _targets_saved: false
       },
       traffic_weeks:   [],
