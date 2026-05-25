@@ -123,12 +123,13 @@ S.ShiftSafeLog = {
       const addF = ev.target.closest('#sl-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row && App.canEdit('sc-safe-log')) this.showForm(row.dataset.id);
       else if (addF) this.showForm();
     };
   },
 
   showForm(id) {
+    if (id && !App.canEdit('sc-safe-log')) return;
     this.editId = id || null;
     const e = id ? this.entries().find(x => x.id === id) : null;
     const typeOpts = this.TYPES.map(t =>
