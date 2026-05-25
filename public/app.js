@@ -636,7 +636,7 @@ const App = {
     // Settings and Getting Started are Hub-owned views, never module screens —
     // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
-    if (id === 'getting-started' || id === 'r-getting-started' || id === 't-getting-started') {
+    if (id === 'getting-started') {
       S.HubGettingStarted.open();
       return;
     }
