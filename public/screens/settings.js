@@ -1122,24 +1122,34 @@ S.HubSettings = {
     };
 
     // ── Traffic weeks — recovery arc, oldest to newest ──
+    // Five tracked-metric series (monthly_sessions, gbp_views, social_profile_visits,
+    // email_list_size+open_rate, delivery_orders+avg_order_value) hold flat through
+    // the first ~5-7 weeks then climb after the matching fix dates seeded below in
+    // fix_log. That gives the Traffic Recovery Scoreboard real before/after data so
+    // every tracked gap dollarizes on demo. Reviews and SEO stay untracked (Rule
+    // 14a — too indirect to defend) and ride along as context.
     const tw = {
-      google_rating:    [3.9,3.9,4.0,4.0,4.1,4.1,4.2,4.3,4.3,4.4,4.5,4.5],
-      google_total:     [240,246,253,261,268,275,284,293,302,310,318,326],
-      new_reviews:      [3,4,4,5,5,6,8,9,9,10,11,11],
-      response_rate:    [38,42,48,54,60,68,74,78,82,84,86,88],
-      yelp_rating:      [3.7,3.7,3.8,3.8,3.8,3.9,3.9,4.0,4.0,4.0,4.1,4.1],
-      yelp_total:       [80,81,83,84,86,88,90,92,95,98,101,104],
-      monthly_sessions: [1180,1240,1300,1380,1480,1620,1780,1940,2080,2200,2320,2420],
-      bounce_rate:      [74,73,72,70,68,66,64,62,60,58,57,56],
-      ig_followers:     [1880,1920,1965,2010,2060,2120,2200,2280,2360,2440,2520,2600],
-      ig_posts_month:   [5,6,6,7,8,9,10,11,12,13,14,14],
-      fb_followers:     [1050,1060,1075,1085,1100,1115,1135,1155,1175,1195,1215,1240],
-      dd_rating:        [4.2,4.2,4.3,4.3,4.3,4.4,4.4,4.5,4.5,4.5,4.6,4.6],
-      ue_rating:        [4.0,4.0,4.1,4.1,4.1,4.2,4.2,4.3,4.3,4.3,4.4,4.4],
-      email_list_size:  [380,410,445,480,520,560,605,650,690,720,745,760],
-      emails_sent:      [1,1,2,2,2,3,3,3,4,4,4,4],
-      email_open_rate:  [18,19,20,21,22,24,25,26,27,27,28,28],
-      loyalty_members:  [0,0,0,0,0,0,60,140,220,300,370,420],
+      google_rating:        [3.9,3.9,4.0,4.0,4.1,4.1,4.2,4.3,4.3,4.4,4.5,4.5],
+      google_total:         [240,246,253,261,268,275,284,293,302,310,318,326],
+      new_reviews:          [3,4,4,5,5,6,8,9,9,10,11,11],
+      response_rate:        [38,42,48,54,60,68,74,78,82,84,86,88],
+      yelp_rating:          [3.7,3.7,3.8,3.8,3.8,3.9,3.9,4.0,4.0,4.0,4.1,4.1],
+      yelp_total:           [80,81,83,84,86,88,90,92,95,98,101,104],
+      monthly_sessions:     [1180,1240,1300,1380,1480,1620,1780,1940,2080,2200,2320,2420],
+      bounce_rate:          [74,73,72,70,68,66,64,62,60,58,57,56],
+      gbp_views:            [1500,1520,1540,1560,1580,1680,1820,1980,2120,2240,2340,2400],
+      ig_followers:         [1880,1920,1965,2010,2060,2120,2200,2280,2360,2440,2520,2600],
+      ig_posts_month:       [5,6,6,7,8,9,10,11,12,13,14,14],
+      fb_followers:         [1050,1060,1075,1085,1100,1115,1135,1155,1175,1195,1215,1240],
+      social_profile_visits:[260,265,270,280,290,300,340,400,460,510,560,600],
+      dd_rating:            [4.2,4.2,4.3,4.3,4.3,4.4,4.4,4.5,4.5,4.5,4.6,4.6],
+      ue_rating:            [4.0,4.0,4.1,4.1,4.1,4.2,4.2,4.3,4.3,4.3,4.4,4.4],
+      delivery_orders:      [120,122,125,128,130,132,135,148,162,178,190,200],
+      delivery_avg_order_value:[28,28,29,29,29,30,30,31,32,33,34,36],
+      email_list_size:      [380,410,445,480,520,560,605,650,690,720,745,760],
+      emails_sent:          [1,1,2,2,2,3,3,3,4,4,4,4],
+      email_open_rate:      [18,19,20,21,22,24,25,26,27,27,28,28],
+      loyalty_members:      [0,0,0,0,0,0,60,140,220,300,370,420],
     };
     App.data.traffic_weeks = window.ANCHOR.weeks.map((a, i) => ({
       id: Date.now() + i, week_num: a.wk, period_end: dateStr((12 - a.wk) * 7),
@@ -1148,11 +1158,15 @@ S.HubSettings = {
       new_reviews: tw.new_reviews[i], response_rate: tw.response_rate[i],
       yelp_rating: tw.yelp_rating[i], yelp_total: tw.yelp_total[i],
       monthly_sessions: tw.monthly_sessions[i], bounce_rate: tw.bounce_rate[i],
+      gbp_views: tw.gbp_views[i],
       ig_followers: tw.ig_followers[i], ig_posts_month: tw.ig_posts_month[i],
       fb_followers: tw.fb_followers[i],
+      social_profile_visits: tw.social_profile_visits[i],
       dd_active: 'yes', dd_rating: tw.dd_rating[i],
       ue_active: 'yes', ue_rating: tw.ue_rating[i],
       gh_active: 'no',  gh_rating: null,
+      delivery_orders: tw.delivery_orders[i],
+      delivery_avg_order_value: tw.delivery_avg_order_value[i],
       email_list_size: tw.email_list_size[i], emails_sent: tw.emails_sent[i],
       email_open_rate: tw.email_open_rate[i],
       loyalty_active: i >= 6 ? 'yes' : 'no', loyalty_members: tw.loyalty_members[i],
@@ -1671,10 +1685,13 @@ S.HubSettings = {
     ];
 
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
-    // Pour Cost, Food Cost, and Prime Cost fixes landed around weeks 6 and 5,
-    // which is where the trends break downward. RPLH fix follows. Each fix
-    // that maps to a Recovery.METRICS gap will produce a dollar figure on
-    // its module's Recovery Scoreboard card.
+    // Profit and Revenue fixes landed around weeks 5-7, which is where those
+    // trends break in the right direction. Traffic fixes follow the same arc
+    // so all five tracked Traffic metrics (website, gbp, social, email-loyalty,
+    // delivery) produce dollar figures on the Scoreboard. The Reviews fix is
+    // intentionally kept untracked (Reviews is absent from Recovery.METRICS by
+    // design — Rule 14a, too indirect to dollarize cleanly) so the demo also
+    // shows operators how an untracked fix renders.
     App.data.fix_log = (App.data.fix_log || [])
       .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
       .concat([
@@ -1694,6 +1711,14 @@ S.HubSettings = {
         date:dateStr(31), logged_at:daysAgoISO(31) },
       { id:uid(), module:'traffic', gap_id:'gbp', gap_name:'Google Business Profile',
         date:dateStr(45), logged_at:daysAgoISO(45) },
+      { id:uid(), module:'traffic', gap_id:'website', gap_name:'Website',
+        date:dateStr(45), logged_at:daysAgoISO(45) },
+      { id:uid(), module:'traffic', gap_id:'social', gap_name:'Social Media',
+        date:dateStr(38), logged_at:daysAgoISO(38) },
+      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email and Loyalty',
+        date:dateStr(38), logged_at:daysAgoISO(38) },
+      { id:uid(), module:'traffic', gap_id:'delivery', gap_name:'Delivery Platforms',
+        date:dateStr(31), logged_at:daysAgoISO(31) },
       { id:uid(), module:'traffic', gap_id:'reviews', gap_name:'Reviews',
         date:dateStr(30), logged_at:daysAgoISO(30) },
     ]);
