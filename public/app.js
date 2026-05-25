@@ -242,6 +242,7 @@ const App = {
         this._navigationLock = false;
       }
     });
+    this._wireSyncLifecycle();
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
       await this.startDemo();
       return;
@@ -428,6 +429,64 @@ const App = {
           + 'Try again once you have a connection.';
       }
     };
+  },
+
+  // ── Offline sync lifecycle ──────────────────────────────────────────────────
+  // Three pieces wired once at init time:
+  //   Fix A — offline indicator pill while navigator.onLine is false
+  //   Fix B — auto-fire syncPending() on the online event
+  //   Fix C — surface the sync banner the moment a write lands in the pending
+  //           queue (rather than waiting for next page reload)
+  _wireSyncLifecycle() {
+    window.addEventListener('offline', () => this._showOfflinePill());
+    window.addEventListener('online', () => {
+      this._hideOfflinePill();
+      this._autoSync();
+    });
+    window.addEventListener('bcop:pending-write', () => {
+      if (this.data) this._promptSync();
+    });
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this._showOfflinePill();
+    }
+  },
+
+  _showOfflinePill() {
+    if (document.getElementById('offline-pill')) return;
+    const pill = document.createElement('div');
+    pill.id = 'offline-pill';
+    pill.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
+      + 'background:rgba(20,20,20,0.92);color:var(--gold);border:1px solid var(--gold);'
+      + 'border-radius:14px;padding:5px 14px;font-size:11px;font-weight:700;letter-spacing:1px;'
+      + 'text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
+    pill.textContent = 'Offline. Saves staying on this device.';
+    document.body.appendChild(pill);
+  },
+
+  _hideOfflinePill() {
+    const pill = document.getElementById('offline-pill');
+    if (pill) pill.remove();
+  },
+
+  async _autoSync() {
+    if (!DB.hasPendingSync()) return;
+    const r = await DB.syncPending();
+    if (r.ok && r.synced > 0) {
+      const existing = document.getElementById('sync-banner');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
+        + 'background:var(--gold);color:#000;border-radius:3px;padding:7px 16px;'
+        + 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
+        + 'box-shadow:0 2px 10px rgba(0,0,0,0.5);';
+      toast.textContent = 'Synced ' + r.synced + ' offline ' + (r.synced === 1 ? 'change.' : 'changes.');
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2800);
+    } else if (!r.ok) {
+      // Auto-sync failed even though we are online. Surface the manual banner
+      // so the operator can retry on their own time.
+      this._promptSync();
+    }
   },
 
   showHub() {
