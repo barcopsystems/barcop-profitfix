@@ -17,7 +17,7 @@ S.LaborTipLog = {
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -29,7 +29,8 @@ S.LaborTipLog = {
   },
 
   renderList() {
-    this.actions.innerHTML = '';
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>';
+    document.getElementById('tl-export')?.addEventListener('click', () => window.print());
     if (this.staff().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
         + '<div class="empty-title">Add staff first</div>'
@@ -66,8 +67,8 @@ S.LaborTipLog = {
         + '</div>';
       const rows = list.slice(0, 100).map(x => '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(x.date) + '</div></td>'
-        + '<td>' + esc(x.name || '—') + '</td>'
-        + '<td>' + esc(x.shift_type || '—') + '</td>'
+        + '<td>' + esc(x.name || '-') + '</td>'
+        + '<td>' + esc(x.shift_type || '-') + '</td>'
         + '<td>' + App.fmtCurrency(x.cash_tips || 0) + '</td>'
         + '<td>' + App.fmtCurrency(x.card_tips || 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(x.total_tips || 0) + '</td>'
@@ -108,7 +109,7 @@ S.LaborTipLog = {
       + this.staff().filter(s => s.status !== 'Inactive' || (x && x.staff_id === s.id)).map(s =>
           '<option value="' + s.id + '"' + (x && x.staff_id === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
     const shiftOpts = this.SHIFTS.map(s =>
-      '<option value="' + s + '"' + (x && x.shift_type === s ? ' selected' : '') + '>' + (s || '—') + '</option>').join('');
+      '<option value="' + s + '"' + (x && x.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
     const v = val => (val != null && val !== '') ? val : '';
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
@@ -134,7 +135,7 @@ S.LaborTipLog = {
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="tl-notes" rows="2" placeholder="Optional">' + esc(x?.notes || '') + '</textarea></div></div>'
       + '<div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good" id="tl-c-total">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good" id="tl-c-total">-</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="tl-save">' + (id ? 'Update' : 'Save Tips') + '</button>'
