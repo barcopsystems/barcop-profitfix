@@ -83,8 +83,8 @@ S.LaborLogHours = {
         + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm lo-edit" data-id="' + a.id + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm lo-del" data-id="' + a.id + '">Delete</button>'
+        + (App.canEdit('lc-log-hours') ? '<button class="btn btn-ghost btn-sm lo-edit" data-id="' + a.id + '">Edit</button>' : '')
+        + (App.canEdit('lc-log-hours') ? '<button class="btn btn-danger btn-sm lo-del" data-id="' + a.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
