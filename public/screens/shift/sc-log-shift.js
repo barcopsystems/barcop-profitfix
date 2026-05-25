@@ -77,12 +77,13 @@ S.ShiftLogShift = {
       const addF = ev.target.closest('#ls-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row && App.canEdit('sc-log-shift')) this.showForm(row.dataset.id);
       else if (addF) this.showForm();
     };
   },
 
   showForm(id) {
+    if (id && !App.canEdit('sc-log-shift')) return;
     this.editId = id || null;
     const s = id ? this.shifts().find(x => x.id === id) : null;
     const typeOpts = this.SHIFT_TYPES.map(t => '<option' + (s && s.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
