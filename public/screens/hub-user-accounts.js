@@ -105,6 +105,8 @@ S.HubUserAccounts = {
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
       +   '<div style="flex:1;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Team</div>'
       + '</div>'
+      + sh('Members').replace('margin:18px', 'margin:2px')
+      + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:8px;">Loading...</div>'
       + sh('Invite a Member')
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Send an invite email. Admin sees everything. Viewer is read-only on all data, useful for a bookkeeper. Staff gets only the sections you check below, with optional edit and delete on each.</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
@@ -114,8 +116,6 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div id="ua-team-perms-wrap" style="margin-top:16px;">' + this.renderPermsGrid({}, 'invite') + '</div>'
       + '<div id="ua-team-invite-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:10px;display:none;"></div>'
-      + sh('Members')
-      + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);">Loading...</div>'
       + '</div>' : '';
 
     container.innerHTML =
