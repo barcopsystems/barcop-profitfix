@@ -81,7 +81,7 @@ FIX.revenue = [
       'Setting prices once at opening and never reviewing them on a schedule. Costs change quarterly and a menu drifts below floor within 18 months.',
       'Pricing by competition without calculating your own cost floor first. Competitor prices say what the market accepts. Your floor says what you need.',
       'Raising all prices at once in a visible refresh. A blanket increase reads as a price event. Surgical item-by-item increases rarely draw feedback.',
-      'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is really 38% once trim loss is included.',
+      'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is 38% once trim loss is in it.',
       'Treating the competitive price as a ceiling. If your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
       'Skipping the price sensitivity check on a high-volume item. Knowing the break-even volume before you change the price is what makes the decision confident.'
     ]
@@ -229,7 +229,7 @@ FIX.revenue = [
 
     commonMistakes: [
       'Having no named owner for events. Everyone responsible means nobody responsible.',
-      'Pricing events per inquiry rather than from a rate card. Bespoke pricing is slower, produces worse margins, and looks less professional.',
+      'Pricing events per inquiry rather than from a rate card. Bespoke pricing is slower, produces worse margins, and signals to the client you do not have your operation buttoned up.',
       'Waiting more than two hours to respond. Booking probability drops sharply after two hours and below 20% after 24.',
       'Sending a website link instead of a complete package. A client who has to hunt for pricing calls the next venue.',
       'Not requiring a deposit to hold a date. A hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.',
@@ -263,7 +263,7 @@ FIX.revenue = [
     commonMistakes: [
       'Managing server performance by impression and total sales instead of individual check average. Total sales hides the productivity difference.',
       'Not having a written standard. An unwritten standard means something different to every manager and cannot be trained or enforced.',
-      'Coaching the whole team when only two or three servers are below average. A general push has no impact on the people who need it.',
+      'Coaching the whole team when only two or three servers are below average. A "sell more" speech has no impact on the people who need it and creates resistance from the ones already producing.',
       'Starting the coaching conversation with judgment rather than data. The numbers are a coaching conversation. "Your tables are not selling" is an accusation.',
       'Training new servers by shadowing without a written standard. They learn another server\'s personal style, not a consistent standard.',
       'Not connecting the briefing Stars list to the upsell sequence. Servers who know what to suggest before the shift perform better than those deciding in the moment.'
