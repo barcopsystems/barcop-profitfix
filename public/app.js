@@ -386,6 +386,16 @@ const App = {
     if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
+    // Staff role: skip Hub and onboarding entirely, land on their operational
+    // dashboard. Admin and viewer get the normal flow.
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role === 'staff') {
+      const land = this.staffLanding();
+      this.showApp(land.module);
+      this.navigate(land.screen);
+      this._promptSync();
+      return;
+    }
     if (!this.data.settings.onboarding_complete) {
       Onboarding.start();
     } else if (!this.setupMeetsThreshold() && window.S && S.HubGettingStarted) {
@@ -399,6 +409,20 @@ const App = {
       this.showHub();
       this._promptSync();
     }
+    this._renderViewerBanner();
+  },
+
+  // Persistent banner shown to viewer role so they know writes are blocked.
+  _renderViewerBanner() {
+    const existing = document.getElementById('viewer-banner');
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role !== 'viewer') { if (existing) existing.remove(); return; }
+    if (existing) return;
+    const bar = document.createElement('div');
+    bar.id = 'viewer-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9400;background:rgba(20,20,20,0.92);color:var(--gold);border-bottom:1px solid var(--gold);text-align:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 10px;';
+    bar.textContent = 'Viewer access — read-only';
+    document.body.appendChild(bar);
   },
 
   // Offline sync prompt (Section 14). If a write failed while offline, the
@@ -496,6 +520,15 @@ const App = {
   },
 
   showHub() {
+    // Staff role: Hub shows financial data they shouldn't see. Redirect to
+    // their operational landing screen instead.
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role === 'staff') {
+      const land = this.staffLanding();
+      this.showApp(land.module);
+      this.navigate(land.screen);
+      return;
+    }
     // Full screen hub - hide the app shell, show a standalone container
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('ob-overlay').classList.add('hidden');
@@ -513,7 +546,58 @@ const App = {
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
   },
 
+  // ── Role-based access (Phase 2 Item 25) ───────────────────────────────────
+  // Staff role: operational screens only. Anything not in the whitelist is
+  // hidden from the sidebar, blocked by navigate, and skipped by showApp.
+  // Admin and Viewer roles see all screens; Viewer writes are blocked at the
+  // DB layer (db.js writeData / _writeControl).
+  STAFF_SCREENS: new Set([
+    // Inventory Control — operational
+    'ic-dashboard', 'ic-take-inventory', 'ic-receive-delivery', 'ic-order-sheet',
+    'ic-spot-check', 'ic-count-history', 'ic-delivery-history', 'ic-order-history',
+    'ic-help',
+    // Labor Control — operational
+    'lc-dashboard', 'lc-log-hours', 'lc-tip-log', 'lc-daily-view',
+    'lc-schedule-history', 'lc-tip-history', 'lc-callout-log',
+    'lc-help',
+    // Shift Control — operational
+    'sc-dashboard', 'sc-active-shift', 'sc-log-shift', 'sc-cash-drop', 'sc-safe-log',
+    'sc-opening-checklist', 'sc-closing-checklist', 'sc-86-list', 'sc-void-comp',
+    'sc-variance-log', 'sc-maintenance', 'sc-shift-history',
+    'sc-help',
+    // Hub support (always allowed)
+    'hub-help', 'hub-support', 'hub-report-bug'
+  ]),
+  STAFF_MODULES: new Set(['inventory', 'labor', 'shift']),
+
+  canAccess(screenId) {
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (!role || role === 'admin' || role === 'viewer') return true;
+    if (role === 'staff') return this.STAFF_SCREENS.has(screenId);
+    return true;
+  },
+
+  canSeeModule(module) {
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (!role || role === 'admin' || role === 'viewer') return true;
+    if (role === 'staff') return this.STAFF_MODULES.has(module);
+    return true;
+  },
+
+  canWrite() {
+    return !(window.DB && DB.role && DB.role() === 'viewer');
+  },
+
+  // For staff, a sensible landing screen when they sign in or click "Hub"
+  staffLanding() { return { module: 'shift', screen: 'sc-active-shift' }; },
+
   showApp(module) {
+    if (!this.canSeeModule(module)) {
+      // Staff trying to enter a non-operational module — bounce to their landing
+      const land = this.staffLanding();
+      module = land.module;
+      this._pendingStaffRedirect = land.screen;
+    }
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('ob-overlay').classList.add('hidden');
     document.getElementById('auth-screen').style.display = 'none';
@@ -522,6 +606,11 @@ const App = {
     // Swap sidebar nav based on module
     this._activeModule = module || this._activeModule || 'profit';
     this._renderNav(this._activeModule);
+    if (this._pendingStaffRedirect) {
+      const target = this._pendingStaffRedirect;
+      this._pendingStaffRedirect = null;
+      setTimeout(() => this.navigate(target), 0);
+    }
   },
 
   _activeModule: 'profit',
@@ -542,12 +631,28 @@ const App = {
     } else {
       nav.innerHTML = ProfitNav.html();
     }
-    // Rewire nav click handlers
+    // Rewire nav click handlers, filtering out items the current role can't access
     nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
-      el.addEventListener('click', () => App.navigate(el.dataset.screen));
+      if (!App.canAccess(el.dataset.screen)) {
+        el.style.display = 'none';
+      } else {
+        el.addEventListener('click', () => App.navigate(el.dataset.screen));
+      }
     });
     nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
       el.addEventListener('click', () => App.showHub());
+    });
+    // Hide section headers with no visible items below them
+    nav.querySelectorAll('.nav-section').forEach(sec => {
+      let hasVisible = false;
+      let sib = sec.nextElementSibling;
+      while (sib && !sib.classList.contains('nav-section')) {
+        if (sib.classList.contains('nav-item') && sib.style.display !== 'none') {
+          hasVisible = true; break;
+        }
+        sib = sib.nextElementSibling;
+      }
+      if (!hasVisible) sec.style.display = 'none';
     });
   },
 
@@ -704,6 +809,16 @@ const App = {
   },
 
   navigate(id) {
+    // Role-based block: staff can't navigate to disallowed screens.
+    // Bounce them to their landing instead of silently failing.
+    if (!this.canAccess(id)) {
+      const land = this.staffLanding();
+      if (this._activeModule !== land.module) {
+        this.showApp(land.module);  // showApp will route to the landing screen
+        return;
+      }
+      id = land.screen;
+    }
     // Settings and Getting Started are Hub-owned views, never module screens —
     // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
