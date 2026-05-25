@@ -114,12 +114,13 @@ S.ShiftVarianceLog = {
       const addF = ev.target.closest('#vl-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row && App.canEdit('sc-variance-log')) this.showForm(row.dataset.id);
       else if (addF) this.showForm();
     };
   },
 
   showForm(id) {
+    if (id && !App.canEdit('sc-variance-log')) return;
     this.editId = id || null;
     const v = id ? this.variances().find(x => x.id === id) : null;
     const typeOpts = this.shiftTypes().map(t =>
