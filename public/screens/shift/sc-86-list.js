@@ -184,6 +184,7 @@ S.Shift86List = {
   },
 
   showForm(id) {
+    if (id && !App.canEdit('sc-86-list')) return;
     this.editId = id;
     const i = this.items().find(x => x.id === id);
     if (!i) { this.renderMain(); return; }
