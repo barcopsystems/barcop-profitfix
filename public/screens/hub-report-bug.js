@@ -11,20 +11,8 @@ S.HubReportBug = {
   _submitting: false,
 
   open() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('ob-overlay').classList.add('hidden');
-    document.getElementById('app').classList.add('hidden');
-    let wrap = document.getElementById('hub-wrapper');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'hub-wrapper';
-      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
-      document.body.appendChild(wrap);
-    }
-    wrap.style.display = 'block';
-    wrap.style.overflowY = 'auto';
     this._state = 'form';
-    this.render(wrap);
+    App.openHubOverlay((panel) => this.render(panel));
   },
 
   render(container) {
