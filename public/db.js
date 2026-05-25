@@ -4,6 +4,7 @@ const DB = {
   _sb: null,
   _user: null,
   _accountId: null,  // resolved lazily on first read/write after signin (Phase 2)
+  _role: null,       // 'admin' | 'staff' | 'viewer' — resolved alongside _accountId
   _demo: false,   // demo mode — all writes are no-ops so the demo never persists
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -24,7 +25,8 @@ const DB = {
     if (!this._sb) return null;
     const { data } = await this._sb.auth.getSession();
     this._user = data?.session?.user || null;
-    this._accountId = null;  // force re-resolve on next read/write
+    this._accountId = null;
+    this._role = null;  // force re-resolve on next read/write
     return data?.session || null;
   },
 
@@ -33,6 +35,7 @@ const DB = {
     this._sb.auth.onAuthStateChange((event, session) => {
       this._user = session?.user || null;
       this._accountId = null;
+    this._role = null;
       cb(event, session);
     });
   },
@@ -42,6 +45,7 @@ const DB = {
     const { data, error } = await this._sb.auth.signInWithPassword({ email, password });
     if (data?.user) this._user = data.user;
     this._accountId = null;
+    this._role = null;
     return { data, error };
   },
 
@@ -55,6 +59,7 @@ const DB = {
     await this._sb.auth.signOut();
     this._user = null;
     this._accountId = null;
+    this._role = null;
   },
 
   async resetPassword(email) {
@@ -105,17 +110,26 @@ const DB = {
     try {
       const { data, error } = await this._sb
         .from('memberships')
-        .select('account_id')
+        .select('account_id, role')
         .eq('user_id', this._user.id)
         .limit(1)
         .single();
       if (error || !data) return null;
       this._accountId = data.account_id;
+      this._role = data.role || 'admin';
       return this._accountId;
     } catch (e) {
       return null;
     }
   },
+
+  // Current user's role in their active account. 'admin' | 'staff' | 'viewer' |
+  // null if not yet resolved. Resolved lazily as a side effect of any read/write.
+  role() { return this._role; },
+  isAdmin()  { return this._role === 'admin'; },
+  isStaff()  { return this._role === 'staff'; },
+  isViewer() { return this._role === 'viewer'; },
+  canWrite() { return this._role !== 'viewer'; },
 
   // ── Data ──────────────────────────────────────────────────────────────────
   async readData() {
@@ -180,6 +194,12 @@ const DB = {
         this._localWrite(appData);
         this._markPending('pf_data');
         return { ok: false, error: 'no account membership found' };
+      }
+      // Viewer role: read-only. Silently swallow writes so the UI doesn't
+      // pretend a save succeeded. Server-side RLS is the real enforcement;
+      // this is the friendly client-side rejection.
+      if (this._role === 'viewer') {
+        return { ok: false, error: 'Viewer access is read-only.' };
       }
       try {
         const { error } = await this._sb
@@ -349,6 +369,9 @@ const DB = {
         this._localWriteControl(lsKey, data);
         this._markPending(lsKey);
         return { ok: false, error: 'no account membership found' };
+      }
+      if (this._role === 'viewer') {
+        return { ok: false, error: 'Viewer access is read-only.' };
       }
       try {
         const { error } = await this._sb
