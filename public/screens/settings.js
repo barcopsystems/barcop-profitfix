@@ -27,12 +27,14 @@ S.HubSettings = {
 
   render(container) {
     const secs = [
-      { id:'profile', title:'Profile',           body:this.secProfile(), save:true },
-      { id:'profit',  title:'Profit Targets',    body:this.secProfit(),  save:true },
-      { id:'revenue', title:'Revenue Targets',   body:this.secRevenue(), save:true },
-      { id:'traffic', title:'Traffic Targets',   body:this.secTraffic(), save:true },
-      { id:'shift',   title:'Shift Preferences', body:this.secShift(),   save:true },
-      { id:'account', title:'Account',           body:this.secAccount(), save:false }
+      { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
+      { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
+      { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true },
+      { id:'traffic', title:'Traffic Targets',           body:this.secTraffic(),       save:true },
+      { id:'links',   title:'Operation Links',           body:this.secLinks(),         save:true },
+      { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true },
+      { id:'shift',   title:'Shift Preferences',         body:this.secShift(),         save:true },
+      { id:'account', title:'Account',                   body:this.secAccount(),       save:false }
     ];
     container.scrollTop = 0;
 
@@ -120,6 +122,48 @@ S.HubSettings = {
 
   secInventory() {
     return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Inventory Control has no platform-level preferences. Counting locations, vendors, and par levels are set inside the Inventory Control module, on each product and location.</div>';
+  },
+
+  // Operation Links — operator's public URLs for each digital platform. The
+  // Traffic Audit fetches public data from these (where possible) and Recovery
+  // screens use them for "Open Live" click-throughs to the operator's actual
+  // listings. One-time setup.
+  secLinks() {
+    const u = ((App.data.traffic_settings || {}).urls) || {};
+    const field = (id, label, val, ph) =>
+      '<div class="f" style="width:300px;"><label>' + label + '</label>'
+      + '<input type="url" id="' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(ph) + '"/></div>';
+    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
+      + 'Paste the public URL for each platform. Bar Cop uses these for one-click access to your live listings and pulls public data from them into the Traffic Audit.'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px 20px;flex-wrap:wrap;">'
+      + field('hs-url-website',   'Website',                 u.website,        'https://yourbar.com')
+      + field('hs-url-gbp',       'Google Business Profile', u.gbp,            'https://maps.google.com/?cid=...')
+      + field('hs-url-yelp',      'Yelp Listing',            u.yelp,           'https://yelp.com/biz/your-bar')
+      + field('hs-url-instagram', 'Instagram',               u.instagram,      'https://instagram.com/yourbar')
+      + field('hs-url-facebook',  'Facebook Page',           u.facebook,       'https://facebook.com/yourbar')
+      + field('hs-url-doordash',  'DoorDash',                u.doordash,       'https://doordash.com/store/...')
+      + field('hs-url-ubereats',  'Uber Eats',               u.ubereats,       'https://ubereats.com/store/...')
+      + field('hs-url-grubhub',   'Grubhub',                 u.grubhub,        'https://grubhub.com/restaurant/...')
+      + field('hs-url-email',     'Email Platform Login',    u.email_platform, 'https://mailchimp.com or your tool')
+      + '</div>';
+  },
+
+  // Traffic Recovery Scoreboard conversion rates. Each rate maps a Traffic
+  // metric improvement to a dollar figure via check_avg × this rate. Defaults
+  // are industry benchmarks; operator can override per channel based on their
+  // own data once they have it.
+  secTrafficConv() {
+    const c = ((App.data.traffic_settings || {}).conversion_rates) || {};
+    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
+      + 'How often each digital signal turns into an actual guest visit. These rates power dollar figures on the Recovery Scoreboard for Traffic fixes. Defaults are industry benchmarks for bar and restaurant operations. Override if your own data shows a different conversion.'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:200px;"><label>Website Session to Visit ' + tt('hs-conv-web') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-web" value="' + (c.web_session_to_visit ?? 3) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:200px;"><label>GBP View to Visit ' + tt('hs-conv-gbp') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-gbp" value="' + (c.gbp_view_to_visit ?? 2) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:200px;"><label>Social Profile to Visit ' + tt('hs-conv-social') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-social" value="' + (c.social_profile_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:200px;"><label>Email Open to Visit ' + tt('hs-conv-email') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-email" value="' + (c.email_open_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
+      + '</div>';
   },
 
   secShift() {
@@ -245,6 +289,30 @@ S.HubSettings = {
         social_posts_month: numOr('hs-t-sp', 12)
       });
       ts._targets_saved = true;
+      keys.push('traffic_settings');
+    } else if (which === 'links') {
+      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
+      const strOr = (id) => (document.getElementById(id)?.value || '').trim();
+      ts.urls = Object.assign({}, ts.urls, {
+        website:        strOr('hs-url-website'),
+        gbp:            strOr('hs-url-gbp'),
+        yelp:           strOr('hs-url-yelp'),
+        instagram:      strOr('hs-url-instagram'),
+        facebook:       strOr('hs-url-facebook'),
+        doordash:       strOr('hs-url-doordash'),
+        ubereats:       strOr('hs-url-ubereats'),
+        grubhub:        strOr('hs-url-grubhub'),
+        email_platform: strOr('hs-url-email')
+      });
+      keys.push('traffic_settings');
+    } else if (which === 'tconv') {
+      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
+      ts.conversion_rates = Object.assign({}, ts.conversion_rates, {
+        web_session_to_visit:    numOr('hs-conv-web',    3),
+        gbp_view_to_visit:       numOr('hs-conv-gbp',    2),
+        social_profile_to_visit: numOr('hs-conv-social', 1),
+        email_open_to_visit:     numOr('hs-conv-email',  1)
+      });
       keys.push('traffic_settings');
     } else if (which === 'shift') {
       App.data.settings.cash_tolerance = numOr('hs-ct', 10);
