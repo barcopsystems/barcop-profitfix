@@ -20,7 +20,7 @@ S.Shift86List = {
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
@@ -35,7 +35,8 @@ S.Shift86List = {
 
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '';
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button>';
+    document.getElementById('el-export')?.addEventListener('click', () => window.print());
     this.editId = null;
     this.renderMain();
   },
@@ -96,7 +97,7 @@ S.Shift86List = {
     let backCard = '';
     if (back.length > 0) {
       const rows = back.map(i => '<tr><td><div class="val">' + esc(i.item) + '</div></td>'
-        + '<td>' + esc(i.category || '—') + '</td>'
+        + '<td>' + esc(i.category || '-') + '</td>'
         + '<td>' + this.fmtDate(i.date_86) + '</td>'
         + '<td>' + this.fmtDate(i.date_back) + '</td>'
         + '<td><div class="row-actions">'
