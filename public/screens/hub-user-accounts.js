@@ -15,6 +15,7 @@ S.HubUserAccounts = {
   // staff invite. Protects ownership from accidental over-permissioning.
   PERMISSION_GROUPS: [
     // Inventory Control
+    { module: 'Inventory Control', key: 'inventory-dashboard', label: 'Inventory Overview (Dashboard)' },
     { module: 'Inventory Control', key: 'take-inventory',   label: 'Take Inventory' },
     { module: 'Inventory Control', key: 'receive-delivery', label: 'Receive Deliveries' },
     { module: 'Inventory Control', key: 'place-orders',     label: 'Place Orders' },
@@ -22,6 +23,7 @@ S.HubUserAccounts = {
     { module: 'Inventory Control', key: 'manage-products',  label: 'Manage Products & Vendors' },
     { module: 'Inventory Control', key: 'inventory-reports',label: 'Inventory Reports' },
     // Labor Control
+    { module: 'Labor Control',     key: 'labor-dashboard',  label: 'Labor Overview (Dashboard)' },
     { module: 'Labor Control',     key: 'log-hours',        label: 'Log Hours' },
     { module: 'Labor Control',     key: 'log-tips',         label: 'Log Tips' },
     { module: 'Labor Control',     key: 'view-schedule',    label: 'View Schedule' },
@@ -30,6 +32,7 @@ S.HubUserAccounts = {
     { module: 'Labor Control',     key: 'call-out-log',     label: 'Call-Out Log' },
     { module: 'Labor Control',     key: 'labor-reports',    label: 'Labor Reports' },
     // Shift Control
+    { module: 'Shift Control',     key: 'shift-dashboard',  label: 'Shift Overview (Dashboard)' },
     { module: 'Shift Control',     key: 'log-shift',        label: 'Log Shifts' },
     { module: 'Shift Control',     key: 'active-shift',     label: 'Run Active Shift' },
     { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management' },
