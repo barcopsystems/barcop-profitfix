@@ -985,6 +985,278 @@ app.post('/api/support-message-notify', async (req, res) => {
   }
 });
 
+// ── Invite user to an account (Phase 2 multi-user) ────────────────────────────
+// Admin sends an invite from App Settings → Team. Recipient gets a Supabase
+// magic-link email. When they sign up, the 24a trigger reads the metadata
+// (invited_to_account_id + invited_role) and links them to this account
+// instead of creating a new one for them.
+app.post('/api/invite-user', async (req, res) => {
+  try {
+    const { email, accountId, role } = req.body || {};
+    if (!email || !accountId) {
+      return res.status(400).json({ error: 'email and accountId required' });
+    }
+
+    // Verify the requester via their JWT (don't trust client-supplied user IDs)
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const inviterUserId = userData.user.id;
+
+    // Inviter must be an admin of the target account
+    const { data: membership, error: memberError } = await supabaseAdmin
+      .from('memberships')
+      .select('role')
+      .eq('account_id', accountId)
+      .eq('user_id', inviterUserId)
+      .single();
+
+    if (memberError || !membership || membership.role !== 'admin') {
+      return res.status(403).json({ error: 'Only account admins can send invites' });
+    }
+
+    const validRoles = ['admin', 'staff', 'viewer'];
+    const inviteRole = validRoles.includes(role) ? role : 'staff';
+    const cleanEmail = String(email).toLowerCase().trim();
+
+    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+      cleanEmail,
+      {
+        data: {
+          invited_to_account_id: accountId,
+          invited_role: inviteRole
+        },
+        redirectTo: 'https://app.barcop.com/'
+      }
+    );
+
+    if (inviteError) {
+      console.error('Invite error:', inviteError);
+      return res.status(500).json({ error: inviteError.message || 'Invite failed' });
+    }
+
+    res.json({ ok: true, email: cleanEmail, role: inviteRole });
+  } catch (e) {
+    console.error('Invite exception:', e);
+    res.status(500).json({ error: e.message || 'Invite failed' });
+  }
+});
+
+// ── List members of an account (Phase 2 multi-user) ───────────────────────────
+// Returns every member of the account along with their email and role. Caller
+// must be a member of the account (any role) to see the list.
+app.post('/api/list-members', async (req, res) => {
+  try {
+    const { accountId } = req.body || {};
+    if (!accountId) return res.status(400).json({ error: 'accountId required' });
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const requesterUserId = userData.user.id;
+
+    const { data: requesterMembership } = await supabaseAdmin
+      .from('memberships')
+      .select('role')
+      .eq('account_id', accountId)
+      .eq('user_id', requesterUserId)
+      .single();
+
+    if (!requesterMembership) {
+      return res.status(403).json({ error: 'Not a member of this account' });
+    }
+
+    const { data: memberships, error: listError } = await supabaseAdmin
+      .from('memberships')
+      .select('id, user_id, role, created_at')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: true });
+
+    if (listError) {
+      return res.status(500).json({ error: listError.message });
+    }
+
+    // Resolve emails via admin API
+    const members = [];
+    for (const m of memberships || []) {
+      try {
+        const { data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
+        members.push({
+          id: m.id,
+          user_id: m.user_id,
+          email: u?.user?.email || '(unknown)',
+          role: m.role,
+          confirmed: !!u?.user?.confirmed_at,
+          created_at: m.created_at,
+          is_self: m.user_id === requesterUserId
+        });
+      } catch (e) {
+        members.push({
+          id: m.id,
+          user_id: m.user_id,
+          email: '(unknown)',
+          role: m.role,
+          confirmed: false,
+          created_at: m.created_at,
+          is_self: m.user_id === requesterUserId
+        });
+      }
+    }
+
+    res.json({ ok: true, members, requesterRole: requesterMembership.role });
+  } catch (e) {
+    console.error('list-members exception:', e);
+    res.status(500).json({ error: e.message || 'List members failed' });
+  }
+});
+
+// ── Update a member's role (Phase 2 multi-user) ───────────────────────────────
+// Only admins can call. Cannot demote the last admin. Cannot change your own role.
+app.post('/api/update-member-role', async (req, res) => {
+  try {
+    const { accountId, membershipId, newRole } = req.body || {};
+    if (!accountId || !membershipId || !newRole) {
+      return res.status(400).json({ error: 'accountId, membershipId, newRole required' });
+    }
+    const validRoles = ['admin', 'staff', 'viewer'];
+    if (!validRoles.includes(newRole)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const requesterUserId = userData.user.id;
+
+    const { data: requesterMembership } = await supabaseAdmin
+      .from('memberships')
+      .select('role')
+      .eq('account_id', accountId)
+      .eq('user_id', requesterUserId)
+      .single();
+
+    if (!requesterMembership || requesterMembership.role !== 'admin') {
+      return res.status(403).json({ error: 'Only account admins can change roles' });
+    }
+
+    const { data: target } = await supabaseAdmin
+      .from('memberships')
+      .select('id, user_id, role')
+      .eq('id', membershipId)
+      .eq('account_id', accountId)
+      .single();
+
+    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
+    if (target.user_id === requesterUserId) {
+      return res.status(400).json({ error: 'You cannot change your own role' });
+    }
+
+    // Last-admin protection: if demoting an admin, ensure another admin exists
+    if (target.role === 'admin' && newRole !== 'admin') {
+      const { count } = await supabaseAdmin
+        .from('memberships')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .eq('role', 'admin');
+      if ((count || 0) <= 1) {
+        return res.status(400).json({ error: 'Cannot remove the last admin from this account' });
+      }
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('memberships')
+      .update({ role: newRole })
+      .eq('id', membershipId);
+
+    if (updateError) return res.status(500).json({ error: updateError.message });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('update-member-role exception:', e);
+    res.status(500).json({ error: e.message || 'Update role failed' });
+  }
+});
+
+// ── Remove a member from an account (Phase 2 multi-user) ──────────────────────
+// Only admins can call. Cannot remove the last admin. Cannot remove yourself.
+app.post('/api/remove-member', async (req, res) => {
+  try {
+    const { accountId, membershipId } = req.body || {};
+    if (!accountId || !membershipId) {
+      return res.status(400).json({ error: 'accountId and membershipId required' });
+    }
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const requesterUserId = userData.user.id;
+
+    const { data: requesterMembership } = await supabaseAdmin
+      .from('memberships')
+      .select('role')
+      .eq('account_id', accountId)
+      .eq('user_id', requesterUserId)
+      .single();
+
+    if (!requesterMembership || requesterMembership.role !== 'admin') {
+      return res.status(403).json({ error: 'Only account admins can remove members' });
+    }
+
+    const { data: target } = await supabaseAdmin
+      .from('memberships')
+      .select('id, user_id, role')
+      .eq('id', membershipId)
+      .eq('account_id', accountId)
+      .single();
+
+    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
+    if (target.user_id === requesterUserId) {
+      return res.status(400).json({ error: 'You cannot remove yourself' });
+    }
+
+    if (target.role === 'admin') {
+      const { count } = await supabaseAdmin
+        .from('memberships')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .eq('role', 'admin');
+      if ((count || 0) <= 1) {
+        return res.status(400).json({ error: 'Cannot remove the last admin from this account' });
+      }
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('memberships')
+      .delete()
+      .eq('id', membershipId);
+
+    if (deleteError) return res.status(500).json({ error: deleteError.message });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('remove-member exception:', e);
+    res.status(500).json({ error: e.message || 'Remove member failed' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
