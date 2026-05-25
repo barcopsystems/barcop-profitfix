@@ -964,6 +964,52 @@ S.Hub = {
       }
     }
 
+    // 3b-2. New reviews below absolute target — a Traffic target, separate from
+    // the relative "velocity sliding" check above. Catches the operator who
+    // has been consistently low rather than recently dropping.
+    const velTarget = tTar.review_velocity ?? 8;
+    if (tw.length) {
+      const latestT = tw[tw.length - 1];
+      if (latestT && latestT.new_reviews != null && latestT.new_reviews < velTarget) {
+        const gap = velTarget - latestT.new_reviews;
+        out.push({
+          sev: latestT.new_reviews < velTarget / 2 ? 'bad' : 'warn',
+          text: 'New reviews running at ' + latestT.new_reviews + ' a month, ' + gap + ' below your ' + velTarget + '/month target. Ask satisfied guests this week to close the gap.',
+          screen: 't-reviews', mod: 'traffic'
+        });
+      }
+    }
+
+    // 3b-3. Traffic data going stale — the latest logged period is more than
+    // 10 days old. The dashboard stops being useful once data ages out.
+    if (tw.length) {
+      const latestT = tw[tw.length - 1];
+      if (latestT && latestT.period_end) {
+        const dt = new Date(String(latestT.period_end).length <= 10 ? latestT.period_end + 'T00:00:00' : latestT.period_end);
+        const age = isNaN(dt.getTime()) ? null : Math.floor((Date.now() - dt.getTime()) / 86400000);
+        if (age != null && age > 10) {
+          out.push({
+            sev: 'warn',
+            text: 'Traffic data is ' + age + ' days old. Log this week in This Week so the trend stays current.',
+            screen: 't-this-week', mod: 'traffic'
+          });
+        }
+      }
+    }
+
+    // 3d. No marketing emails logged this period — a list you never email
+    // goes cold within 30 days.
+    if (tw.length) {
+      const latestT = tw[tw.length - 1];
+      if (latestT && latestT.email_list_size && (!latestT.emails_sent || latestT.emails_sent === 0)) {
+        out.push({
+          sev: 'warn',
+          text: 'No marketing emails sent this period against a list of ' + latestT.email_list_size + '. A list you never email goes cold inside 30 days.',
+          screen: 't-email', mod: 'traffic'
+        });
+      }
+    }
+
     // 3c. Social posting frequency below benchmark — quiet feeds lose
     // discovery on Instagram and Facebook fast.
     const postTarget = tTar.social_posts_month ?? 12;
