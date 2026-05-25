@@ -22,7 +22,7 @@ S.ShiftVoidComp = {
     return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -35,6 +35,11 @@ S.ShiftVoidComp = {
     addBtn.textContent = 'Log Void / Comp';
     addBtn.addEventListener('click', () => this.showForm());
     actions.appendChild(addBtn);
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-ghost btn-sm';
+    exportBtn.textContent = 'Export PDF';
+    exportBtn.addEventListener('click', () => window.print());
+    actions.appendChild(exportBtn);
     this.renderList();
   },
 
@@ -66,11 +71,11 @@ S.ShiftVoidComp = {
         return '<tr class="vc-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
           + '<td>' + badge + '</td>'
-          + '<td>' + esc(r.item || '—') + '</td>'
+          + '<td>' + esc(r.item || '-') + '</td>'
           + '<td class="val">' + App.fmtCurrency(r.amount || 0) + '</td>'
-          + '<td>' + esc(r.server || '—') + '</td>'
-          + '<td>' + esc(r.authorized_by || '—') + '</td>'
-          + '<td>' + esc(r.reason || '—') + '</td>'
+          + '<td>' + esc(r.server || '-') + '</td>'
+          + '<td>' + esc(r.authorized_by || '-') + '</td>'
+          + '<td>' + esc(r.reason || '-') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm vc-edit" data-id="' + r.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm vc-del" data-id="' + r.id + '">Delete</button>'
