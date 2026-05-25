@@ -44,7 +44,7 @@ S.HubUserAccounts = {
     { module: 'Recovery',          key: 'traffic-recovery', label: 'Traffic Recovery (all)' }
   ],
 
-  open() {
+  async open() {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('ob-overlay').classList.add('hidden');
     document.getElementById('app').classList.add('hidden');
@@ -58,6 +58,10 @@ S.HubUserAccounts = {
     wrap.style.display = 'block';
     wrap.style.overflowY = 'auto';
     this.container = wrap;
+    // Ensure role/permissions are resolved before render checks isAdmin.
+    // Otherwise the Team card silently disappears on the first open after a
+    // token refresh (when _role got cleared and hasn't been re-fetched yet).
+    if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
     this.render(wrap);
   },
 
