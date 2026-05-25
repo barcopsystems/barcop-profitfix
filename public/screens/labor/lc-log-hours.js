@@ -107,7 +107,7 @@ S.LaborLogHours = {
       const addF = ev.target.closest('#lo-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row && App.canEdit('lc-log-hours')) this.showForm(row.dataset.id);
       else if (addF) this.showForm();
     };
   },
@@ -119,6 +119,7 @@ S.LaborLogHours = {
   },
 
   showForm(id) {
+    if (id && !App.canEdit('lc-log-hours')) return;
     this.editId = id || null;
     const a = id ? this.actuals().find(x => x.id === id) : null;
     const shiftOpts = this.SHIFTS.map(s =>
