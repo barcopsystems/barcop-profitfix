@@ -77,8 +77,8 @@ S.ShiftVoidComp = {
           + '<td>' + esc(r.authorized_by || '-') + '</td>'
           + '<td>' + esc(r.reason || '-') + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm vc-edit" data-id="' + r.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm vc-del" data-id="' + r.id + '">Delete</button>'
+          + (App.canEdit('sc-void-comp') ? '<button class="btn btn-ghost btn-sm vc-edit" data-id="' + r.id + '">Edit</button>' : '')
+          + (App.canEdit('sc-void-comp') ? '<button class="btn btn-danger btn-sm vc-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
