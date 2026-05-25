@@ -89,8 +89,8 @@ S.LaborCalloutLog = {
               ? '<span class="badge badge-ok">Covered</span>'
               : '<span class="badge badge-warn">Not Covered</span>') + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm co-edit" data-id="' + c.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm co-del" data-id="' + c.id + '">Delete</button>'
+          + (App.canEdit('lc-callout-log') ? '<button class="btn btn-ghost btn-sm co-edit" data-id="' + c.id + '">Edit</button>' : '')
+          + (App.canEdit('lc-callout-log') ? '<button class="btn btn-danger btn-sm co-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
