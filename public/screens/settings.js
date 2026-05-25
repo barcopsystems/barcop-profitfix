@@ -410,7 +410,10 @@ S.HubSettings = {
       if (!r.ok || !data.ok) {
         this._teamMsg(data.error || 'Invite failed.', 'var(--red)');
       } else if (data.addedDirectly) {
-        this._teamMsg('Added ' + email + ' to your team. They already have a Bar Cop account.', 'var(--gold)');
+        const tail = data.emailSent
+          ? ' They will receive an email to set their password.'
+          : ' They already have a Bar Cop account.';
+        this._teamMsg('Added ' + email + ' to your team.' + tail, 'var(--gold)');
         if (emailInput) emailInput.value = '';
         this._teamRefresh();
       } else {
