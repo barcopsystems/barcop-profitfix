@@ -155,7 +155,7 @@ S.HubUserAccounts = {
 
     let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:0 0 10px;">Permissions (Staff role only)</div>';
     html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">Check Access to grant the user that section. Check Allow Edit/Delete to additionally let them modify existing entries. Unchecked Allow Edit means they can only add new entries, not change past ones.</div>';
-    html += '<div id="ua-perms-grid" style="border:1px solid var(--b2);border-radius:4px;background:var(--input);padding:14px 16px;">';
+    html += '<div class="ua-perms-grid" style="border:1px solid var(--b2);border-radius:4px;background:var(--input);padding:14px 16px;">';
 
     Object.keys(byModule).forEach(mod => {
       html += '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);margin:8px 0 6px;border-bottom:1px solid var(--b2);padding-bottom:4px;">' + esc(mod) + '</div>';
@@ -175,13 +175,17 @@ S.HubUserAccounts = {
     return html;
   },
 
-  // Read the current state of the permissions grid into a permissions object
-  collectPerms() {
+  // Read the current state of the permissions grid into a permissions object.
+  // root scopes the query to a specific container (modal box or invite wrap),
+  // so when both the invite form AND the edit modal are in the DOM we don't
+  // mix their checkbox states.
+  collectPerms(root) {
+    const scope = root || document;
     const out = {};
-    document.querySelectorAll('.ua-perm-access').forEach(box => {
+    scope.querySelectorAll('.ua-perm-access').forEach(box => {
       const key = box.dataset.key;
       if (box.checked) {
-        const editBox = document.querySelector('.ua-perm-edit[data-key="' + key + '"]');
+        const editBox = scope.querySelector('.ua-perm-edit[data-key="' + key + '"]');
         out[key] = (editBox && editBox.checked) ? 'edit' : 'add';
       }
     });
@@ -206,14 +210,17 @@ S.HubUserAccounts = {
     document.getElementById('ua-team-invite')?.addEventListener('click', () => this._teamInvite());
     document.getElementById('ua-team-role')?.addEventListener('change', () => this._teamRoleChange());
 
-    // Wire perms grid: Access checkbox enables/disables the matching Edit checkbox
-    this._wirePermsGrid();
+    // Wire the INVITE form's perms grid (scoped to its wrap so it doesn't
+    // collide with the Edit Permissions modal when that opens).
+    const inviteWrap = document.getElementById('ua-team-perms-wrap');
+    this._wirePermsGrid(inviteWrap);
   },
 
-  _wirePermsGrid() {
-    document.querySelectorAll('.ua-perm-access').forEach(box => {
+  _wirePermsGrid(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.ua-perm-access').forEach(box => {
       box.addEventListener('change', () => {
-        const editBox = document.querySelector('.ua-perm-edit[data-key="' + box.dataset.key + '"]');
+        const editBox = scope.querySelector('.ua-perm-edit[data-key="' + box.dataset.key + '"]');
         if (editBox) {
           if (box.checked) {
             editBox.disabled = false;
@@ -435,7 +442,8 @@ S.HubUserAccounts = {
       return;
     }
 
-    const permissions = (role === 'staff') ? this.collectPerms() : {};
+    const inviteWrap = document.getElementById('ua-team-perms-wrap');
+    const permissions = (role === 'staff') ? this.collectPerms(inviteWrap) : {};
 
     if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
 
@@ -528,9 +536,11 @@ S.HubUserAccounts = {
         { label: 'Cancel', act: 'cancel', kind: 'ghost' },
         { label: 'Save Permissions', act: 'ok', kind: 'primary' }
       ],
-      onAction: async (act) => {
+      onAction: async (act, modalBox) => {
         if (act !== 'ok') return;
-        const newPerms = this.collectPerms();
+        // Scope to the modal so we read only the modal's checkboxes, not the
+        // invite form's grid that lives elsewhere on the same page.
+        const newPerms = this.collectPerms(modalBox);
         const accountId = await DB._ensureAccountId();
         if (!accountId) return;
         try {
@@ -550,6 +560,8 @@ S.HubUserAccounts = {
         }
       }
     });
-    this._wirePermsGrid();
+    // Wire the modal's checkboxes (scoped) so toggling Access enables/disables
+    // the matching Allow Edit/Delete checkbox in the modal only.
+    this._wirePermsGrid(box);
   }
 };
