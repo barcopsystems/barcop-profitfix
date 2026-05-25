@@ -589,21 +589,37 @@ const App = {
   // Staff Hub tiles: one per permission group, in display order.
   // Used by showStaffHub() to render the staff landing page.
   STAFF_TILES: [
-    { group:'take-inventory',  label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
-    { group:'receive-delivery',label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
-    { group:'place-orders',    label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
-    { group:'spot-check',      label:'Spot Check',               module:'inventory', screen:'ic-spot-check',        moduleName:'Inventory Control' },
-    { group:'log-hours',       label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
-    { group:'log-tips',        label:'Log Tips',                 module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
-    { group:'view-schedule',   label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
-    { group:'call-out-log',    label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
-    { group:'log-shift',       label:'Log Shift',                module:'shift',     screen:'sc-log-shift',         moduleName:'Shift Control' },
-    { group:'active-shift',    label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
-    { group:'cash-mgmt',       label:'Cash Management',          module:'shift',     screen:'sc-cash-drop',         moduleName:'Shift Control' },
-    { group:'checklists',      label:'Opening / Closing Checklists', module:'shift', screen:'sc-opening-checklist', moduleName:'Shift Control' },
-    { group:'86-list',         label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
-    { group:'void-comp',       label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
-    { group:'maintenance',     label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' }
+    // Inventory Control
+    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-dashboard',         moduleName:'Inventory Control' },
+    { group:'take-inventory',      label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
+    { group:'receive-delivery',    label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
+    { group:'place-orders',        label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
+    { group:'spot-check',          label:'Spot Check',               module:'inventory', screen:'ic-spot-check',        moduleName:'Inventory Control' },
+    { group:'manage-products',     label:'Manage Products & Vendors',module:'inventory', screen:'ic-product-setup',     moduleName:'Inventory Control' },
+    { group:'inventory-reports',   label:'Inventory Reports',        module:'inventory', screen:'ic-report-stock',      moduleName:'Inventory Control' },
+    // Labor Control
+    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-dashboard',         moduleName:'Labor Control' },
+    { group:'log-hours',           label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
+    { group:'log-tips',            label:'Log Tips',                 module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
+    { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
+    { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
+    { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster',      moduleName:'Labor Control' },
+    { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
+    { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
+    // Shift Control
+    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
+    { group:'log-shift',           label:'Log Shift',                module:'shift',     screen:'sc-log-shift',         moduleName:'Shift Control' },
+    { group:'active-shift',        label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
+    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-drop',         moduleName:'Shift Control' },
+    { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-opening-checklist', moduleName:'Shift Control' },
+    { group:'86-list',             label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
+    { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
+    { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
+    { group:'shift-reports',       label:'Shift Reports',            module:'shift',     screen:'sc-reports-shift',     moduleName:'Shift Control' },
+    // Recovery
+    { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
+    { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
+    { group:'traffic-recovery',    label:'Traffic Recovery',         module:'traffic',   screen:'t-dashboard',          moduleName:'Traffic Recovery' }
   ],
 
   // Pick the first accessible screen as a non-admin user's landing.
