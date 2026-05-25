@@ -16,7 +16,6 @@ FIX.revenue = [
     summary: 'Every menu item is a Star, Plowhorse, Puzzle, or Dog. Each quadrant gets a different action.',
 
     process: {
-      intro: 'Menu engineering plots every item on two axes: contribution margin in dollars, not food cost percent, and sales volume. That puts every item in one of four quadrants. Stars are high margin and high volume. Plowhorses are low margin and high volume. Puzzles are high margin and low volume. Dogs are low margin and low volume. Each quadrant gets a different action. Bar Cop plots the quadrant for you. Each step below opens where the work happens.',
       steps: [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Set up the menu data',
@@ -46,57 +45,6 @@ FIX.revenue = [
       'Leaving Stars in mid-menu positions because they sell anyway. A Star in a prime position with server promotion typically lifts orders 15 to 25%.',
       'Announcing price increases across the board instead of surgically. A targeted increase on a few Plowhorses is far less visible than a blanket raise.',
       'Running menu engineering without connecting it to the server briefing. Positioning and pricing only work when servers know what to suggest.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Confirm every item in the menu data has name, category, price, and yield-adjusted food cost %',
-        'Re-read the engineering matrix with the latest weekly sales counts in',
-        'Review the quadrant output and note which Stars are not in prime menu positions',
-        'Sort by contribution margin dollars and flag every Plowhorse for a pricing review',
-        'List every Dog with a 90-day test or remove decision before the review closes',
-        'Refresh ingredient costs for any item whose supplier price moved more than 5%',
-        'Update the pre-shift briefing list from the current Stars'
-      ],
-      escalation: [
-        'Calculate the price floor: ingredient cost divided by target food cost %.',
-        'Run the price sensitivity calculation at the proposed new price.',
-        'Confirm the break-even volume is at least 20% below current weekly volume.',
-        'Log the change with its date and reason in a pricing tracker.',
-        'Update the item description to support the new price if needed.',
-        'Brief servers on the change before the new menu goes live.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'me-ai-1',
-        title: 'Run a Full Menu Engineering Analysis',
-        whatItDoes: 'Classifies every menu item into the four quadrants by contribution margin and volume, with a reprice target for each Plowhorse and the annual cost of each Dog.',
-        prompt: 'Here is my menu item data. For each item: name, category, current price, ingredient cost (yield-adjusted), weekly sales count. [PASTE DATA]. My target food cost by category: food [X]%, bar [X]%, cocktails [X]%. Calculate contribution margin in dollars for every item, classify each as Star, Plowhorse, Puzzle, or Dog based on margin relative to category average and volume relative to category average, and list Stars first, then Plowhorses, Puzzles, Dogs. For each Plowhorse show the price increase needed to move it to Star margin territory. For each Dog show the annual margin cost of keeping it at current volume.',
-        whatToPaste: 'Paste your menu item table into [PASTE DATA] and fill in the category food cost targets.'
-      },
-      {
-        id: 'me-ai-2',
-        title: 'Write Menu Descriptions for Your Stars',
-        whatItDoes: 'Drafts tight, specific menu descriptions for your top Stars, each with a beverage pairing.',
-        prompt: 'I need updated menu descriptions for my top Stars. For each item I will provide: name, key ingredients, preparation method, and one beverage pairing. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words, including the preparation method, one specific ingredient detail, and the beverage pairing. No filler. No "fresh", "delicious", or "house-made" unless followed by a specific detail. Format: item name on one line, description on the next.',
-        whatToPaste: 'Paste each Star with its ingredients, prep method, and pairing into [PASTE ITEM DETAILS].'
-      },
-      {
-        id: 'me-ai-3',
-        title: 'Pick This Week\'s Pre-Shift Features',
-        whatItDoes: 'Selects the two best Stars to feature this week and writes one line of server briefing language for each.',
-        prompt: 'Here is my current menu engineering quadrant output. [PASTE STARS LIST WITH MARGIN AND WEEKLY SALES]. My current team check average target is $[X]. Select the two best items to feature in this week\'s pre-shift briefing. Criteria: highest contribution margin, reasonable server suggestion comfort, and a beverage pairing that supports the check average target. For each selected item, write one sentence of server briefing language.',
-        whatToPaste: 'Paste your Stars list and fill in the check average target.'
-      },
-      {
-        id: 'me-ai-4',
-        title: 'Model Moving Items to Their Price Floor',
-        whatItDoes: 'Models the annual revenue impact of repricing below-floor items at three volume scenarios, with break-even volume and a proceed recommendation.',
-        prompt: 'I have three items currently priced below their contribution margin floor. For each: item name, current price, floor price, current weekly sales volume. [PASTE DATA]. Model the annual revenue impact of moving each item to its floor price at three volume scenarios: flat, down 10%, down 15%. Show the break-even volume for each item at the new price, and recommend whether to proceed based on current volume versus break-even.',
-        whatToPaste: 'Paste the three items with current price, floor price, and weekly volume.'
-      }
     ]
   },
 
@@ -107,7 +55,6 @@ FIX.revenue = [
     summary: 'Menus priced by feel drift below cost as ingredients rise.',
 
     process: {
-      intro: 'Price from the math, not the gut. The cost floor tells you what a price needs to be. The competition tells you what the market accepts. Those are two different numbers for two different decisions. A menu priced once at opening drifts below floor inside 18 months, so this is a quarterly job. Bar Cop holds your costs and prices and shows you cost percent per item. Each step below opens where the work happens.',
       steps: [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Keep ingredient costs current',
@@ -137,55 +84,6 @@ FIX.revenue = [
       'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is really 38% once trim loss is included.',
       'Treating the competitive price as a ceiling. If your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
       'Skipping the price sensitivity check on a high-volume item. Knowing the break-even volume before you change the price is what makes the decision confident.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Refresh costs in Menu Items for every item whose ingredient cost moved since last review',
-        'Flag every item running over its target cost percent',
-        'Run each flagged Plowhorse through the sensitivity calculator at a $1.50-$3 increase',
-        'List items to reprice, items to remove, and items needing new cost cards',
-        'Close the review with a written action list and a target menu print date',
-        'Update ingredient costs in the menu data whenever supplier prices change'
-      ],
-      escalation: [
-        'Supplier price increase above 8% on any item: recalculate the floor before the next service.',
-        'New item added to the menu: cost card and floor calculation required before it prints.',
-        'Food cost moves 3+ points above target in a single weekly review: run a pricing review now.',
-        'A category review shows more than 20% of items below their margin floor: review the category.',
-        'Staff report consistent guest pushback on a specific item\'s price: re-run that item\'s numbers.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'pr-ai-1',
-        title: 'Calculate Price Floors Across the Full Menu',
-        whatItDoes: 'Runs the floor calculation on every item, flags everything below floor, and sorts the flagged list by annual margin impact.',
-        prompt: 'Here is my current menu with ingredient costs and current prices. For each item: item name, ingredient cost (yield-adjusted), current price, category. [PASTE DATA]. My target food cost by category: spirits 22%, cocktails 26%, draft beer 24%, wine by glass 30%, food 30%. Calculate the price floor for each item at its category target, flag every item where the current price is below the floor, show the gap in dollars and as a percentage, and sort flagged items by annual margin impact at current weekly volume.',
-        whatToPaste: 'Paste your menu with yield-adjusted costs, prices, and categories into [PASTE DATA]; adjust the category targets to yours.'
-      },
-      {
-        id: 'pr-ai-2',
-        title: 'Write Descriptions for High-Margin Items',
-        whatItDoes: 'Drafts tight, specific menu descriptions that support a higher price point, each with a beverage pairing.',
-        prompt: 'I need menu descriptions for [NUMBER] items. For each item: name, key ingredients, preparation method, and one beverage pairing suggestion. [PASTE ITEM DETAILS]. Write a menu description for each under 22 words including the preparation method, one specific ingredient detail, and the beverage pairing. No filler. No "fresh", "delicious", "to perfection", or "house-made" unless followed by a specific detail. Format: item name, then description on the next line.',
-        whatToPaste: 'Fill in the item count and paste each item\'s ingredients, prep method, and pairing.'
-      },
-      {
-        id: 'pr-ai-3',
-        title: 'Model the Cost of Never Raising Prices',
-        whatItDoes: 'Projects five years of margin loss from flat pricing against rising costs, then the same with a managed quarterly review.',
-        prompt: 'My current annual revenue is $[AMOUNT], my current average food cost percentage is [X]%, and my sales split is [BAR]% bar and [FOOD]% food. Assume ingredient costs increase [Y]% per year for five years with no price changes. Calculate my food cost percentage each year, the annual margin lost versus the current baseline, and the cumulative five-year margin loss. Then show the same calculation with a quarterly pricing review that makes targeted adjustments to hold my current food cost percentage.',
-        whatToPaste: 'Fill in revenue, current food cost %, the bar/food split, and an annual cost-inflation assumption.'
-      },
-      {
-        id: 'pr-ai-4',
-        title: 'Draft a Seasonal Item with Pricing Rationale',
-        whatItDoes: 'Creates a seasonal menu item: name, description, and a floor-based recommended price with a server briefing line.',
-        prompt: 'I want to add a seasonal cocktail for [SEASON/OCCASION]. Key ingredients: [LIST]. My cost for the ingredients is approximately $[COST] per drink and my target beverage cost is 24%. Write a menu name, a description under 18 words, a recommended price based on my cost floor, and one sentence of server training language for the pre-shift briefing.',
-        whatToPaste: 'Fill in the season/occasion, ingredient list, and per-drink cost.'
-      }
     ]
   },
 
@@ -196,7 +94,6 @@ FIX.revenue = [
     summary: 'Build the schedule from a revenue forecast, not from last week.',
 
     process: {
-      intro: 'A schedule built before the revenue number is checked is built on habit. A schedule built from a revenue forecast is a plan. The difference shows up in your labor percentage every week. Build Schedule in Labor Control turns a forecast into a labor budget in hours, so the math is done before you write a single name. Each step below opens where the work happens.',
       steps: [
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
           title: 'Start the schedule from a revenue forecast',
@@ -223,56 +120,6 @@ FIX.revenue = [
       'Treating overtime as a staffing cost instead of a scheduling error. Almost all overtime is hours concentrated on too few people.',
       'Overstaffing slow shifts because it feels safer. An idle server on a slow Tuesday is a labor percentage problem that compounds across the year.',
       'Building a schedule with no revenue reference at all. A schedule without a forecast is a guess.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Pull the revenue forecast by day for the coming week from POS history',
-        'Enter the forecast by day and department and generate the labor budget in hours',
-        'Build the schedule to the budget, must-have coverage first, then fill',
-        'Flag any shift where the proposed schedule exceeds the labor budget by more than 5%',
-        'Review the schedule with the manager before posting. A budget conversation is easy before, hard after',
-        'Confirm department labor targets are current for the season'
-      ],
-      escalation: [
-        'Pull actual labor hours and revenue by department for the prior week.',
-        'Compare actual labor percentage to target for each department.',
-        'Flag any department that ran more than 2 points above target.',
-        'Determine whether the variance was a scheduling error or a revenue miss.',
-        'If a scheduling error, identify the specific over-budget shifts to correct next week.',
-        'Assign one action item before the review closes.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'ls-ai-1',
-        title: 'Build a Revenue-Based Schedule',
-        whatItDoes: 'Turns a revenue forecast into a staffing table: labor budget, hours available, and recommended headcount by day and department.',
-        prompt: 'Here is my revenue forecast for next week by day and daypart. [PASTE FORECAST]. My labor targets by department: bar [X]%, kitchen [X]%, floor [X]%. My average hourly wage including taxes and benefits: bar $[X]/hr, kitchen $[X]/hr, floor $[X]/hr. Average shift length: bar [X] hrs, kitchen [X] hrs, floor [X] hrs. Calculate the maximum labor hours available for each department each day and show the result as a staffing table: day, department, revenue, labor budget, hours available, recommended headcount.',
-        whatToPaste: 'Paste the forecast and fill in your department targets, loaded wages, and shift lengths.'
-      },
-      {
-        id: 'ls-ai-2',
-        title: 'Find Over-Scheduled Shifts',
-        whatItDoes: 'Analyzes four weeks of labor data, flags every shift over budget, and ranks the worst by annual dollar impact.',
-        prompt: 'Here is four weeks of actual labor data by department and day. Columns: date, day of week, department, actual labor hours, actual revenue, labor percentage. [PASTE DATA]. My target labor percentages: bar [X]%, kitchen [X]%, floor [X]%. Identify every shift where actual labor exceeded target by more than 2 points, calculate the annualized dollar cost of those over-budget shifts, sort by total annual impact, and show the top five shifts to address first.',
-        whatToPaste: 'Paste four weeks of labor data and fill in the department targets.'
-      },
-      {
-        id: 'ls-ai-3',
-        title: 'Calculate the Annual Cost of Overtime',
-        whatItDoes: 'Totals and annualizes overtime premium, names the top earners, and shows the redistribution opportunity.',
-        prompt: 'Here is four weeks of payroll data showing regular and overtime hours by employee. [PASTE DATA]. My regular wage rates by employee: [PASTE RATES]. Overtime premium is 1.5x the regular rate for hours above 40 per week. Calculate total overtime premium paid in these four weeks, annualize it, identify the top three overtime earners, and for each show how many overtime hours could have been redistributed to under-scheduled employees based on the same four weeks.',
-        whatToPaste: 'Paste four weeks of regular/overtime hours and the wage rates.'
-      },
-      {
-        id: 'ls-ai-4',
-        title: 'Build a Slow-Season Labor Strategy',
-        whatItDoes: 'Recalculates department labor targets and headcount for the slow season so margin holds when revenue drops.',
-        prompt: 'My high season runs [MONTHS] and my slow season runs [MONTHS]. My high season average weekly revenue is $[AMOUNT] and my slow season average weekly revenue is $[AMOUNT]. My current labor targets were set for high season. Calculate what my labor targets by department should be in slow season to maintain the same margin, given that fixed labor costs do not flex, then show the schedule headcount implications for a typical slow-season week.',
-        whatToPaste: 'Fill in the season months and the high- and slow-season weekly revenue.'
-      }
     ]
   },
 
@@ -283,7 +130,6 @@ FIX.revenue = [
     summary: 'Revenue per labor hour measures what the schedule produces, not just what it costs.',
 
     process: {
-      intro: 'Labor cost percentage tells you the ratio of labor to revenue. RPLH tells you the return on each scheduled hour. You need both. A schedule decision made with only one is missing half the picture. The RPLH Tracker pulls your labor hours straight from Labor Control and does the math. Each step below opens where the work happens.',
       steps: [
         { kind: 'result', target: 'r-rplh', targetLabel: 'RPLH Tracker',
           title: 'Read RPLH by shift every Monday',
@@ -307,63 +153,6 @@ FIX.revenue = [
       'Tracking RPLH as a blended number across departments. Bar, kitchen, and floor generate revenue differently and a blend hides the differences.',
       'Not connecting RPLH data to the pre-shift briefing. Servers who know their check average goal change behavior, which moves RPLH.',
       'Treating a single week of low RPLH as a trend. One weak week is noise. Four consecutive weeks on the same shift is a structural problem.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Confirm last week\'s revenue and labor hours imported from Labor Control',
-        'Review RPLH vs target by shift and flag any shift more than 10% below target',
-        'Check the four-week trend and see whether RPLH is moving toward target or away from it',
-        'Identify whether each below-target shift is a scheduling or a check average problem',
-        'If scheduling: adjust next week\'s schedule before it is posted',
-        'If check average: add the shift to next week\'s pre-shift briefing focus'
-      ],
-      benchmarks: [
-        { label: 'Bar, peak shift',           target: '$65-85', warning: '$45-65', critical: 'below $45' },
-        { label: 'Bar, shoulder shift',       target: '$45-60', warning: '$30-45', critical: 'below $30' },
-        { label: 'Full service, peak dinner', target: '$55-75', warning: '$38-55', critical: 'below $38' },
-        { label: 'Full service, slow night',  target: '$35-50', warning: '$22-35', critical: 'below $22' },
-        { label: 'Kitchen department',        target: '$40-55', warning: '$28-40', critical: 'below $28' }
-      ],
-      escalation: [
-        'Confirm the shift has been below target for multiple consecutive weeks, not one.',
-        'Calculate average check per cover for the shift across those weeks.',
-        'Determine whether labor hours ran above budget or revenue ran below what the staffing should produce.',
-        'If labor hours drove it: treat it as a scheduling problem and adjust next week\'s schedule.',
-        'If revenue / check average drove it: treat it as an upsell problem and brief that shift.',
-        'Re-check the shift after two weeks to confirm the fix moved the number.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'rp-ai-1',
-        title: 'Analyze 13 Weeks of RPLH and Set Targets',
-        whatItDoes: 'Averages a quarter of RPLH by shift, ranks the best and worst, and sets initial targets at 12% above baseline.',
-        prompt: 'Here is 13 weeks of revenue and labor hour data by shift and department. Columns: week number, shift name, department, net revenue, labor hours, RPLH calculated. [PASTE DATA]. Calculate my average RPLH by shift type and by department across all 13 weeks, identify the three highest- and three lowest-performing shifts, set initial RPLH targets at 12% above the 13-week average for each shift type, and flag any shift where RPLH varied more than 25% across the 13 weeks as needing further investigation before a target is set.',
-        whatToPaste: 'Paste 13 weeks of by-shift revenue and labor-hour data into [PASTE DATA].'
-      },
-      {
-        id: 'rp-ai-2',
-        title: 'Diagnose a Below-Target Shift',
-        whatItDoes: 'Determines whether a chronically low-RPLH shift is a scheduling problem or a check average problem and recommends one action.',
-        prompt: 'I have a shift running below my RPLH target for four consecutive weeks. Shift: [SHIFT NAME]. Target RPLH: $[X]. Actual RPLH last four weeks: [W1], [W2], [W3], [W4]. Scheduled labor hours each week: [W1], [W2], [W3], [W4]. Actual revenue each week: [W1], [W2], [W3], [W4]. Covers each week: [W1], [W2], [W3], [W4]. Calculate average check per cover each week, determine whether the RPLH miss is primarily labor hours above budget or revenue below what the staffing should produce, state the primary cause, and recommend one specific action.',
-        whatToPaste: 'Fill in the shift, target, and four weeks of RPLH, hours, revenue, and covers.'
-      },
-      {
-        id: 'rp-ai-3',
-        title: 'Calculate Optimal Staffing From RPLH Targets',
-        whatItDoes: 'Turns next week\'s forecast and RPLH targets into a staffing table with projected labor percentage.',
-        prompt: 'My revenue forecast for next week by shift: [PASTE FORECAST]. My RPLH targets by shift type: peak dinner $[X], shoulder dinner $[X], lunch $[X], brunch $[X]. My average labor cost per hour including taxes and benefits: $[X]. Average shift length by department: floor [X] hrs, bar [X] hrs, kitchen [X] hrs. For each shift, calculate the labor hours available at the RPLH target, the recommended headcount by department, and the labor cost percentage that schedule produces at the forecast revenue.',
-        whatToPaste: 'Paste the forecast and fill in your RPLH targets, loaded wage, and shift lengths.'
-      },
-      {
-        id: 'rp-ai-4',
-        title: 'Prioritize Shifts for RPLH Improvement',
-        whatItDoes: 'Ranks below-target shifts by annual dollar opportunity and names the likely cause for the top three.',
-        prompt: 'Here is my RPLH by shift for the last quarter (13 weeks). [PASTE DATA]. My RPLH targets by shift type: [PASTE TARGETS]. Calculate the annualized dollar gap between actual and target RPLH for each shift, sort by total annual opportunity, and for the top three shifts state whether the likely cause is scheduling or check average based on how consistent the RPLH miss is across weeks.',
-        whatToPaste: 'Paste 13 weeks of by-shift RPLH and your shift-type targets.'
-      }
     ]
   },
 
@@ -374,7 +163,6 @@ FIX.revenue = [
     summary: 'Check average per cover is the floor\'s biggest revenue lever.',
 
     process: {
-      intro: 'The pre-shift briefing and the weekly review are two halves of one system. The briefing sets the behavior. The review tells you whether it worked. The system compounds. It feels like process for no result until about week four, then the data starts moving. Bar Cop tracks check average by server and shows you the spread. Each step below opens where the work happens.',
       steps: [
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Track check average by server',
@@ -404,56 +192,6 @@ FIX.revenue = [
       'Setting check average targets without a four-week baseline. A target with no baseline is a guess.',
       'Treating upselling as a personality trait rather than a learned sequence. Every server can follow a written, trained sequence.',
       'Forgetting the beverage pairing. A specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Daily: pull today\'s 2-3 Stars and set one specific check average target for the shift',
-        'Daily: brief the upsell sequence and one named beverage pairing, on the written form',
-        'Weekly: pull server sales and covers and review check average by server',
-        'Weekly: flag any server more than 15% below team average or trending down two weeks',
-        'Weekly: review the table visit audits and confirm the briefing produced floor behavior',
-        'Weekly: set next week\'s briefing Stars list from the menu engineering output'
-      ],
-      escalation: [
-        'Confirm the server is more than 15% below team average, not just one slow week.',
-        'Check the four-week trend and see whether the server is trending down two weeks in a row.',
-        'Calculate the annual revenue gap versus team average at the server\'s cover count.',
-        'Open the conversation with that dollar number and ask which part of the upsell sequence they are least comfortable with.',
-        'Set a specific check average target and focus items for the next two weeks.',
-        'Re-review after two weeks; if there is no movement, move to a structured performance plan.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'ca-ai-1',
-        title: 'Identify Server Coaching Priorities',
-        whatItDoes: 'Reads four weeks of server check average data, flags who is below average, and quantifies the annual gap for each.',
-        prompt: 'Here is my server check average data for the past four weeks. For each server: name, total sales, total covers, check average by week for four weeks. [PASTE DATA]. My weekly cover count is approximately [X] and my current team average check is $[X]. Calculate each server\'s four-week average check, identify any server more than 15% below team average, calculate each below-average server\'s annual revenue gap versus team average at their cover count, sort by annual gap, and flag the top two for immediate coaching focus.',
-        whatToPaste: 'Paste your four weeks of by-server sales and covers into [PASTE DATA].'
-      },
-      {
-        id: 'ca-ai-2',
-        title: 'Write Server Upsell Scripts',
-        whatItDoes: 'Drafts three suggestion versions per item: for an undecided guest, a decided guest, and as a pairing.',
-        prompt: 'I need upsell language for my servers for the following category: [CATEGORY]. My current Stars in this category: [LIST ITEMS WITH BRIEF DESCRIPTION]. My target check average for a table that orders from this category: $[X]. Write three versions of the suggestion for each item: one for a guest who seems undecided, one for a guest who already knows what they want, and one that works as a pairing suggestion with a specific menu item. Keep each version under 20 words. No filler language.',
-        whatToPaste: 'Fill in the category, your Stars in it, and the target check average.'
-      },
-      {
-        id: 'ca-ai-3',
-        title: 'Model the Check Average Gap',
-        whatItDoes: 'Calculates the annual revenue at each check average level and the revenue from lifting just the bottom servers.',
-        prompt: 'My current team check average is $[X], my target check average is $[Y], my daily cover count is approximately [Z], and I operate [N] service days per year. Calculate the annual revenue at the current average, at target, and at three intermediate steps, showing the revenue added at each step. Also calculate the revenue added if only my three lowest-average servers move to the current team average, keeping everyone else flat.',
-        whatToPaste: 'Fill in current and target check average, daily covers, and service days per year.'
-      },
-      {
-        id: 'ca-ai-4',
-        title: 'Draft Tonight\'s Pre-Shift Briefing',
-        whatItDoes: 'Writes a five-minute pre-shift briefing script covering Stars, the check average goal, the upsell sequence, and the pairing.',
-        prompt: 'Tonight\'s shift details: [SHIFT NAME], expected covers [X], current team check average $[X]. Stars to feature: [LIST 2-3 ITEMS WITH BRIEF DESCRIPTION]. Beverage pairing: [ITEM] with [PAIRING]. Target check average for this shift: $[X]. Write a pre-shift briefing script under 150 words that a manager can read in five minutes, including tonight\'s Stars with one sentence each, the check average goal, the upsell sequence order, and the beverage pairing. Direct language, no motivational filler.',
-        whatToPaste: 'Fill in the shift, covers, Stars, pairing, and the check average target.'
-      }
     ]
   },
 
@@ -464,7 +202,6 @@ FIX.revenue = [
     summary: 'Private dining and catering is revenue most independents leave on the table.',
 
     process: {
-      intro: 'An events business runs on speed and process. A published rate card so pricing is instant, a two-hour response standard so the client stays engaged, and a pipeline so nothing goes cold. Name one person to own all of it. Everyone responsible means nobody responsible. Margin varies widely by event, so run the P&L before you confirm, not after. Each step below opens where the work happens.',
       steps: [
         { kind: 'action', target: 'r-events', targetLabel: 'Events and Catering',
           title: 'Build the rate card before any inquiry',
@@ -497,56 +234,6 @@ FIX.revenue = [
       'Sending a website link instead of a complete package. A client who has to hunt for pricing calls the next venue.',
       'Not requiring a deposit to hold a date. A hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.',
       'Not running an Event P&L on every booking. Event margin varies widely, so calculate it before the event, not after.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Within 2 hours of any inquiry: log it, send the complete package with a personal note',
-        'Set a follow-up date 48 hours out on every inquiry when the package goes out',
-        'Confirm or propose the requested date in the same first response',
-        'Weekly: review every open inquiry and its status in the pipeline',
-        'Weekly: assign a follow-up to any inquiry without a next action in 7 days',
-        'Weekly: calculate pipeline value and review last week\'s closed and lost inquiries'
-      ],
-      escalation: [
-        'Review every open inquiry\'s current status and last action.',
-        'Close or reactivate any inquiry stuck in the same status for 14 days.',
-        'Calculate the overall close rate and find the stage where inquiries go cold.',
-        'Compare average response time on booked inquiries versus lost inquiries.',
-        'Look for patterns in lost bookings by event type, day of week, guest count, or price.',
-        'Fix the most common loss cause first and re-check the close rate next quarter.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'ec-ai-1',
-        title: 'Draft an Event Inquiry Response',
-        whatItDoes: 'Writes a warm, professional response email that confirms the date, references the attached package, and gives a direct contact.',
-        prompt: 'I received an event inquiry with the following details: client name [NAME], event type [TYPE], estimated guest count [X], requested date [DATE], any specific requests noted [DETAILS]. My venue details: room name [ROOM], capacity [X], F&B minimum [X], available packages [DESCRIBE]. Write a professional response email under 150 words that confirms receipt and interest, notes that the package is attached, confirms or proposes the requested date, and provides a direct contact name and number. Warm and direct, no sales language.',
-        whatToPaste: 'Fill in the inquiry details and your venue\'s room, capacity, minimum, and packages.'
-      },
-      {
-        id: 'ec-ai-2',
-        title: 'Analyze the Events Pipeline',
-        whatItDoes: 'Reads 90 days of pipeline data to find the close rate, the stage where inquiries go cold, and the patterns in lost bookings.',
-        prompt: 'Here is my event pipeline data for the last 90 days. Columns: inquiry date, event type, guest count, status (booked/lost/open), days to first response, notes on reason for loss if known. [PASTE DATA]. Calculate my overall close rate, identify the most common stage where inquiries go cold, calculate average response time for bookings versus lost inquiries, and identify any patterns in lost bookings by event type, day of week, or guest count.',
-        whatToPaste: 'Paste 90 days of pipeline rows into [PASTE DATA].'
-      },
-      {
-        id: 'ec-ai-3',
-        title: 'Build a Catering Package Description',
-        whatItDoes: 'Writes a client-facing catering package description with the per-head price at your target margin.',
-        prompt: 'I want to add a catering package for [EVENT TYPE]. The package includes: [LIST ITEMS]. My per-head cost at current ingredient prices is approximately $[X] and my target margin for catering is [X]%. Write a client-facing package description under 120 words that describes what is included, the service style, the per-head price at target margin, and the minimum guest count. Professional and specific, no filler.',
-        whatToPaste: 'Fill in the event type, item list, per-head cost, and target margin.'
-      },
-      {
-        id: 'ec-ai-4',
-        title: 'Write a Post-Event Follow-Up',
-        whatItDoes: 'Drafts a personal post-event follow-up email that drives repeat bookings without offering a discount.',
-        prompt: 'Event details: client name [NAME], event type [TYPE], date [DATE], guest count [X], any notable details [NOTES]. Write a post-event follow-up email under 100 words that thanks the client personally, references one specific detail from the event, asks one question about their experience, and mentions you would love to host their next occasion. Do not offer a discount and do not use a template-sounding opener. Write it as the manager who ran the event.',
-        whatToPaste: 'Fill in the client, event type, date, guest count, and a notable detail.'
-      }
     ]
   },
 
@@ -557,7 +244,6 @@ FIX.revenue = [
     summary: 'A written standard turns serving from personal style into a trained, measurable job.',
 
     process: {
-      intro: 'A briefing tells servers what to suggest today. A written standard tells them how to suggest it at every touch point. The standard is what makes performance trainable, measurable, and enforceable. Coaching has to run on data, not impression, and Bar Cop tracks check average by server so the data is there. Each step below opens where the work happens.',
       steps: [
         { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Write and roll out the server standard',
@@ -581,56 +267,6 @@ FIX.revenue = [
       'Starting the coaching conversation with judgment rather than data. The numbers are a coaching conversation. "Your tables are not selling" is an accusation.',
       'Training new servers by shadowing without a written standard. They learn another server\'s personal style, not a consistent standard.',
       'Not connecting the briefing Stars list to the upsell sequence. Servers who know what to suggest before the shift perform better than those deciding in the moment.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Review check average by server and identify anyone below the threshold',
-        'Check the four-week trend and flag any server trending down two weeks in a row',
-        'Name the prior week\'s top performer in the next pre-shift briefing',
-        'Schedule coaching conversations for below-average servers this week, not next',
-        'Review the table visit audits and confirm the sequence is being executed on the floor',
-        'Update first-section assignments based on last week\'s performance data'
-      ],
-      escalation: [
-        'Open the conversation with the specific numbers: the server\'s check average, the team average, and the annual gap.',
-        'Ask one diagnostic question to identify the weakest touch point.',
-        'Use the table audit data to confirm whether it is a skill gap or an effort gap.',
-        'Agree on one specific behavior change to try this week, drawn from the briefing.',
-        'Set a follow-up checkpoint date and review the check average data together.',
-        'If there is no movement after two coaching cycles, move to a structured performance plan.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'sp-ai-1',
-        title: 'Build a Coaching Conversation Routine',
-        whatItDoes: 'Drafts a data-first coaching routine for a below-average server: number opening, one diagnostic question, one behavior change, a follow-up date.',
-        prompt: 'I need to coach a server whose check average is below team average. Server details: [NAME], average check last 4 weeks: $[X]. Team average: $[X]. Weekly covers: approximately [X]. Annual revenue gap versus team average: $[X]. Table audit results for this server: [DESCRIBE WHAT YOU OBSERVED]. Draft a coaching conversation routine that opens with the specific numbers (not a general statement), asks one question to identify their weakest touch point, suggests one specific behavior change to try this week, and closes with a follow-up checkpoint date.',
-        whatToPaste: 'Fill in the server\'s name, check average, the team average, weekly covers, annual gap, and audit notes.'
-      },
-      {
-        id: 'sp-ai-2',
-        title: 'Write the Server Upsell Standard',
-        whatItDoes: 'Drafts a concise server standard for your concept covering all six touch points with shift-specific check average targets.',
-        prompt: 'I need to write a server upsell standard for my concept. Concept type: [TYPE]. Current team check average: $[X]. Target check average: $[X]. Top 3 Stars from my menu engineering matrix: [LIST WITH BRIEF DESCRIPTION]. Current beverage program highlights: [LIST 2-3 ITEMS]. Write a server standard under 4 pages covering table greeting and timing, the beverage suggestion sequence, the appetizer suggestion, the entree pairing suggestion, the dessert close by name, and check average targets for peak versus shoulder shifts. Direct, specific language, no hospitality filler.',
-        whatToPaste: 'Fill in your concept type, current and target check average, top Stars, and beverage highlights.'
-      },
-      {
-        id: 'sp-ai-3',
-        title: 'Identify Top Performers for Recognition',
-        whatItDoes: 'Finds the top two servers, quantifies the revenue their performance adds, and writes one recognition line each for the briefing.',
-        prompt: 'Here is my server check average data for the last four weeks. [PASTE DATA]. My team average is $[X]. Identify the top two performers by four-week average, calculate how much additional annual revenue their performance generates compared to team average, and draft one sentence of recognition language for each that I can use in the next pre-shift briefing. Specific and fact-based, not generic praise.',
-        whatToPaste: 'Paste four weeks of by-server check average data and the team average.'
-      },
-      {
-        id: 'sp-ai-4',
-        title: 'Build a New-Server Training Schedule',
-        whatItDoes: 'Creates a day-by-day 14-day onboarding schedule built around the written standard, with a check average review at day 14.',
-        prompt: 'I need a two-week onboarding schedule for a new server. My concept: [TYPE]. Current server standard document: [DESCRIBE KEY ELEMENTS]. Top servers they can shadow: [NAMES]. Expected starting shift schedule: [DESCRIBE]. Build a day-by-day training schedule for the first 14 days that starts with the written standard on day one, includes shadow shifts with a specific observation focus, includes managed table time with check average tracking from day four, and ends with a check average review and first coaching conversation at day 14.',
-        whatToPaste: 'Fill in the concept, the standard\'s key elements, shadow servers, and the starting schedule.'
-      }
     ]
   }
 
