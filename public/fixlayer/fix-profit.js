@@ -16,7 +16,6 @@ FIX.profit = [
     summary: 'The gap between what you spent on bar product and what you sold.',
 
     process: {
-      intro: 'A working pour cost system has four parts that all have to run: a count on the same day every week, the pour cost calculated right after it, a variance report reviewed within 48 hours, and a written pour standard. Bar Cop does the counting and the math. Each step below opens the screen where that happens.',
       steps: [
         { kind: 'action', target: 'ic-product-setup', targetLabel: 'Products',
           title: 'Set accurate bottle yields',
@@ -44,64 +43,6 @@ FIX.profit = [
       'Letting the count slip when a manager is out. The system dies from a missed cycle, not a bad number. Write the process down so it lives in paper, not people.',
       'Starting a variance investigation with a conversation instead of the data. Verify the count first. Many spikes turn out to be a counting error, not a person.',
       'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Complete a full physical bar inventory count',
-        'Read actual pour cost by category on the Profit dashboard',
-        'Run the variance report and flag any product above 3%',
-        'Review flagged products within 48 hours of the count',
-        'Verify opening and closing counts were completed every shift',
-        'Confirm the jigger policy was enforced with the floor manager'
-      ],
-      benchmarks: [
-        { label: 'Spirits',          target: '18-24%', warning: '24-28%', critical: 'above 28%' },
-        { label: 'Draft Beer',       target: '20-26%', warning: '26-30%', critical: 'above 30%' },
-        { label: 'Bottled Beer',     target: '22-28%', warning: '28-32%', critical: 'above 32%' },
-        { label: 'Wine',             target: '28-34%', warning: '34-38%', critical: 'above 38%' },
-        { label: 'NA Beverages',     target: '15-22%', warning: '22-26%', critical: 'above 26%' },
-        { label: 'Blended bar cost', target: '20-26%', warning: '26-28%', critical: 'above 28%' }
-      ],
-      escalation: [
-        'Verify the count: pull the product count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error.',
-        'Calculate theoretical usage: POS sales by drink type times recipe ounces, compared to actual ounce movement.',
-        'Identify which shifts drove the variance from the opening and closing counts.',
-        'Talk to the bar manager about what they noticed on those shifts, such as breakage, waste, or unusual activity.',
-        'Run an unannounced mid-shift count on the flagged product during a service period.',
-        'Document the finding and resolution in writing before closing the investigation, even when it is inconclusive.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'pc-ai-1',
-        title: 'Analyze the Weekly Variance Report',
-        whatItDoes: 'Turns a week of variance data into the top three loss areas, their annualized dollar impact, and a probable operational cause for each.',
-        prompt: 'Here is my variance report for the week ending [DATE]. Columns are: SKU name, theoretical usage (oz), actual usage (oz), variance (oz), variance (%). [PASTE DATA]. Identify the top three loss SKUs, calculate the annualized dollar impact of each at my weekly bar revenue of $[AMOUNT], and suggest one operational cause for each.',
-        whatToPaste: 'Fill in [DATE], paste your variance report rows for [PASTE DATA], and put your weekly bar revenue in [AMOUNT].'
-      },
-      {
-        id: 'pc-ai-2',
-        title: 'Write the Measured Pour Staff Memo',
-        whatItDoes: 'Drafts a short, positively framed staff memo introducing the jigger policy as an operational standard, not a punishment.',
-        prompt: 'I am introducing a measured pour policy at my bar. All bartenders will now use jiggers for every spirit pour. Write a short staff memo (under 200 words) that introduces the policy, explains the reason in operational terms, frames it as a standard rather than a sign of distrust, and sets the start date as [DATE].',
-        whatToPaste: 'Replace [DATE] with your effective date.'
-      },
-      {
-        id: 'pc-ai-3',
-        title: 'Build a Monthly Pour Cost Trend Summary',
-        whatItDoes: 'Reads four weeks of category pour cost and flags which categories are trending up, holding, or improving.',
-        prompt: 'Here are my weekly pour cost percentages for the past four weeks by category. Week 1: Spirits [X]%, Draft Beer [X]%, Bottled Beer [X]%, Wine [X]%. Week 2: [repeat]. Week 3: [repeat]. Week 4: [repeat]. Identify which categories are trending up, which are stable, and which improved. Flag any category that moved more than 2 points in either direction over the four weeks.',
-        whatToPaste: 'Replace each [X] with your actual weekly category pour cost percentages.'
-      },
-      {
-        id: 'pc-ai-4',
-        title: 'Diagnose a Variance Spike on One SKU',
-        whatItDoes: 'Walks a single flagged SKU through probable causes in order and tells you which records to pull to confirm each.',
-        prompt: 'My variance report shows [SKU NAME] running [X]% above theoretical this week. Last week it was [X]%. The week before it was within normal range. My POS shows [X] units sold this week, my physical count shows [X] units used, and my delivery record shows [X] units received. Walk me through the most likely causes in order of probability and tell me what records to pull to confirm each one.',
-        whatToPaste: 'Fill in the SKU name and the four bracketed numbers from your reports.'
-      }
     ]
   },
 
@@ -112,7 +53,6 @@ FIX.profit = [
     summary: 'Cash, product, and comp loss that never shows as a line item.',
 
     process: {
-      intro: 'Theft is caught by accountability, not suspicion. Daily logging creates the data, the weekly review reads it, and a written policy plus a paper trail make action possible when you need it. Each step opens the screen where it happens.',
       steps: [
         { kind: 'reference', target: 'Theft_Loss_Prevention_Policy.docx', targetLabel: 'Theft and Loss Prevention Policy',
           title: 'Set a written theft and loss policy',
@@ -145,65 +85,6 @@ FIX.profit = [
       'Having no written comp authorization policy. A comp that needs no manager sign-off is an unauthorized expense you approved by silence.',
       'Treating all comps the same. A manager comp for service recovery and a bartender comp for a regular are different things and must be tracked separately.',
       'Using behavioral indicators to accuse someone. They direct attention. They are not evidence.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Daily: reconcile every cash drawer before it leaves the floor',
-        'Daily: log all voids, comps, and no-sales by employee',
-        'Daily: inspect any delivery against its invoice before the driver leaves',
-        'Weekly: review void and comp rate by employee, flag anyone above benchmark',
-        'Weekly: review drawer reconciliation history for recurring variance',
-        'Weekly: run at least two shift audits on different shifts at varied times',
-        'Weekly: document any incidents observed in writing before the week closes'
-      ],
-      benchmarks: [
-        { label: 'Void rate (all staff)',     target: '0.5-1.5%', warning: 'above 2.5%', critical: 'above 4%' },
-        { label: 'Void rate (per bartender)', target: 'under 1%',  warning: 'above 2%',   critical: 'above 4%' },
-        { label: 'Comp rate (all staff)',     target: '1-2%',     warning: 'above 3%',   critical: 'above 5%' },
-        { label: 'Comp rate (per bartender)', target: 'under 1.5%', warning: 'above 3%', critical: 'above 5%' },
-        { label: 'No-sale transactions',      target: '0-2 / shift', warning: '5+ / shift', critical: '10+ / shift' },
-        { label: 'Cash drawer variance',      target: 'under $5',  warning: '$10-$20 consistent', critical: '$25+ recurring' }
-      ],
-      escalation: [
-        'Single incident: document it, increase oversight, do not act yet.',
-        'Two incidents on the same employee within 30 days: issue written corrective action.',
-        'Unexplained variance above 4% after a full investigation: escalate to a Profit Audit.',
-        'Confirmed cash theft with documentation: consult legal before the termination conversation.',
-        'Confirmed vendor short count: file a discrepancy report and dispute the invoice.',
-        'Pattern of comps without manager approval: address it in writing and revoke comp authority if needed.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'tl-ai-1',
-        title: 'Analyze Voids and Comps by Employee',
-        whatItDoes: 'Finds the statistical outliers in a month of void and comp data and quantifies the dollar gap versus the group median, without drawing conclusions about intent.',
-        prompt: 'Here is my void and comp data for the past 30 days by employee. Columns are: employee name, total sales, total voids, total comps, void rate %, comp rate %. [PASTE DATA]. Identify any employees running statistically above the group average, calculate the dollar value of their excess void and comp rate versus the group median, and flag any patterns by shift or day of week if visible. Do not draw conclusions about intent. Report only what the numbers show.',
-        whatToPaste: 'Paste your by-employee void and comp table into [PASTE DATA].'
-      },
-      {
-        id: 'tl-ai-2',
-        title: 'Write the Void/Comp Tracking Staff Memo',
-        whatItDoes: 'Drafts a matter-of-fact memo introducing void and comp tracking as standard practice, not a response to an incident.',
-        prompt: 'I am introducing void and comp tracking by employee at my bar. Write a staff memo under 200 words that introduces the system, explains it is standard industry practice, frames it as a normal operational process rather than a sign of distrust, and confirms the start date of [DATE]. Tone should be matter-of-fact and professional with no accusatory language.',
-        whatToPaste: 'Replace [DATE] with your start date.'
-      },
-      {
-        id: 'tl-ai-3',
-        title: 'Generate a Monthly Theft Risk Summary',
-        whatItDoes: 'Turns scorecard indicators into a team risk summary and the top two employees for increased oversight, in pattern-based language.',
-        prompt: 'Here is my employee theft risk scorecard data for [MONTH]. For each employee I scored these indicators 0-3: void rate trend, cash drawer consistency, shift audit observations, delivery involvement, peer reports. [PASTE SCORES]. Summarize the risk profile of the team, identify the top two employees for increased oversight, and suggest one specific management action for each. Frame everything as observable patterns, not conclusions about intent.',
-        whatToPaste: 'Fill in [MONTH] and paste your scorecard values into [PASTE SCORES].'
-      },
-      {
-        id: 'tl-ai-4',
-        title: 'Write a Corrective Action Summary',
-        whatItDoes: 'Produces a factual, file-ready corrective action paragraph from the incident facts.',
-        prompt: 'I need to document a corrective action for an employee file. The facts: employee name [NAME], date of incident [DATE], shift [SHIFT], what was specifically observed [DESCRIPTION], which policy was violated [POLICY SECTION], prior written warnings [YES or NO and details]. Write a corrective action summary paragraph suitable for the employee file. Keep it factual and specific, with no editorializing or conclusions beyond what was directly observed.',
-        whatToPaste: 'Fill in each bracketed field with the incident facts.'
-      }
     ]
   },
 
@@ -214,7 +95,6 @@ FIX.profit = [
     summary: 'What the kitchen spends on product against what it sells.',
 
     process: {
-      intro: 'Food cost is set before service on the cost card and held during service at the station. Bar Cop costs the recipes and computes the number. The count, the waste sheet, and the portion audit tell you why it moved. Each step opens where the work happens.',
       steps: [
         { kind: 'action', target: 'recipe-library', targetLabel: 'Recipe Library',
           title: 'Build yield-adjusted recipe cost cards',
@@ -247,64 +127,6 @@ FIX.profit = [
       'Building recipe cards once and never updating them. A card built at January prices is wrong by March, and the error compounds with every price move since.',
       'Having no written portion standards posted at stations. A verbal instruction given on day one is a memory that fades and drifts.',
       'Costing proteins at purchase price without a yield adjustment. Every protein on the menu is understated until you cost on true cost per usable pound.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Review the food waste log and identify the top three waste categories by dollar value',
-        'Run a portion control audit on at least two stations',
-        'Update recipe cost cards for any ingredients with invoice price changes',
-        'Confirm daily waste sheets are using reason codes correctly',
-        'Share the top waste categories with the kitchen manager, one action each',
-        'Confirm specials are costed before service, not after'
-      ],
-      benchmarks: [
-        { label: 'Proteins',          target: '28-34%', warning: '34-38%', critical: 'above 38%' },
-        { label: 'Produce',           target: '22-28%', warning: '28-32%', critical: 'above 32%' },
-        { label: 'Dairy and Eggs',    target: '18-24%', warning: '24-28%', critical: 'above 28%' },
-        { label: 'Dry Goods',         target: '15-22%', warning: '22-26%', critical: 'above 26%' },
-        { label: 'Bar Food',          target: '24-30%', warning: '30-34%', critical: 'above 34%' },
-        { label: 'Blended food cost', target: '28-34%', warning: '34-36%', critical: 'above 36%' }
-      ],
-      escalation: [
-        'Run the category breakdown to find which category is driving the blended number.',
-        'Pull recent invoices for that category and check for ingredient price changes not yet in the cost cards.',
-        'Re-cost the affected cards at current prices, with yield adjustment on proteins and produce.',
-        'Run a portion audit on the stations producing that category.',
-        'Review the waste log for that category and read the reason codes.',
-        'If cost is still above target, decide between a surgical price increase and a recipe modification.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'fc-ai-1',
-        title: 'Build a Recipe Cost Card',
-        whatItDoes: 'Costs a menu item from an ingredient list, yield-adjusted, with food cost % at your price and the minimum price to hit target.',
-        prompt: 'I need to cost a menu item called [ITEM NAME]. Here are the ingredients with purchase units and current purchase prices: [LIST]. The recipe uses these quantities per portion: [LIST RECIPE QUANTITIES]. Assume a waste factor of [X]% on proteins and [X]% on produce. Calculate total cost per portion, food cost percentage at my current menu price of $[PRICE], and the minimum menu price to hit a [TARGET]% food cost. Show your work on yield-adjusted costs for protein and produce items.',
-        whatToPaste: 'Fill in the item name, ingredient list, recipe quantities, waste factors, current price, and target.'
-      },
-      {
-        id: 'fc-ai-2',
-        title: 'Analyze the 30-Day Waste Log',
-        whatItDoes: 'Finds the top waste categories by dollar value, annualizes them, and suggests one specific operational change per category from the reason codes.',
-        prompt: 'Here is my food waste log for the past 30 days. Columns: date, item, quantity wasted, unit, reason code, dollar value, station. [PASTE DATA]. Identify the top three waste categories by total dollar value, calculate what each costs annually at this run rate, and for each category identify the most common reason code and suggest one specific operational change based on it. Do not suggest general improvements. Give one specific change per category.',
-        whatToPaste: 'Paste your 30-day waste log into [PASTE DATA].'
-      },
-      {
-        id: 'fc-ai-3',
-        title: 'Find Menu Items Below Food Cost Target',
-        whatItDoes: 'Flags every menu item above its category target and calculates the minimum price increase to fix it.',
-        prompt: 'Here are my recipe cost cards with current food cost percentages. [LIST MENU ITEMS WITH CURRENT FOOD COST % AND MENU PRICE]. My target food cost by category is: proteins [X]%, produce [X]%, dry goods [X]%. Identify all items above their category target. For each, calculate the minimum price increase to hit target without rounding up more than $1. Flag any item where hitting target needs an increase above $2. Those need a separate decision about recipe modification versus price change.',
-        whatToPaste: 'Paste your menu items with food cost % and price, and fill in the category targets.'
-      },
-      {
-        id: 'fc-ai-4',
-        title: 'Write the Weekly Food Cost Summary',
-        whatItDoes: 'Drafts a short, direct weekly summary for the kitchen manager with one named priority action.',
-        prompt: 'Here is this week\'s food cost data. Total food sales: $[AMOUNT]. Total food cost: $[AMOUNT]. Food cost by category: [LIST CATEGORIES WITH DOLLAR AMOUNTS]. Top three waste items this week with reason codes: [LIST]. Portion audit findings this week: [NOTES]. Write a brief weekly summary under 150 words for my kitchen manager covering what improved from last week, what is still above target, and one priority action for next week with a specific owner named. Direct and operational tone, not congratulatory.',
-        whatToPaste: 'Fill in the sales and cost figures, category amounts, waste items, and audit notes.'
-      }
     ]
   },
 
@@ -315,7 +137,6 @@ FIX.profit = [
     summary: 'Price drift, short counts, and quiet substitutions on every invoice.',
 
     process: {
-      intro: 'Vendor overcharge recovery is an ongoing weekly job, not a one-time audit. Every discrepancy you document at delivery is a credit you can request. Every one you miss is a cost you absorbed. Bar Cop flags price changes the moment you receive a delivery and tracks the drift over time. Each step below opens the screen where that happens.',
       steps: [
         { kind: 'action', target: 'ic-order-history', targetLabel: 'Order History',
           title: 'Know what you ordered before the truck arrives',
@@ -348,63 +169,6 @@ FIX.profit = [
       'Signing the delivery receipt before counting the cases. A short count not caught at the door is a loss you already accepted.',
       'Running vendor relationships on verbal terms with nothing in writing. When a dispute happens, a phone conversation is not documentation.',
       'Treating overcharge recovery as a one-time audit rather than an ongoing job at every delivery.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Every delivery: pull the order, count every case, check the invoiced prices',
-        'Every delivery: log the delivery and inspection in Receive Delivery before the driver leaves',
-        'On any variance: file a discrepancy report and contact the rep within 24 hours',
-        'Monthly: review the price drift Bar Cop surfaced in Vendor Watch',
-        'Monthly: flag any item up more than 5% since last quarter or cheaper elsewhere',
-        'Quarterly: run the vendor review with the documented drift data in hand',
-        'Quarterly: confirm pricing and substitution terms in writing within 48 hours'
-      ],
-      benchmarks: [
-        { label: 'Invoice price vs order',         target: 'matches order', warning: 'up to 2% over',  critical: 'above 2% over' },
-        { label: 'Price drift per quarter',        target: 'flat',          warning: 'up to 5%',       critical: 'above 5%' },
-        { label: 'Alternative-vendor gap',         target: 'in line',       warning: '5-8% cheaper',   critical: '8%+ cheaper elsewhere' },
-        { label: 'Cumulative overcharge per vendor', target: '$0',          warning: 'under $500 / qtr', critical: '$500+ / qtr' }
-      ],
-      escalation: [
-        'Pull the order and the invoice and compare them line by line for the flagged delivery.',
-        'File a vendor discrepancy report: SKU, agreed price, invoiced price, and total overcharge.',
-        'Contact your rep within 24 hours of the delivery. Discrepancies age out fast.',
-        'Request a credit memo for the full overcharge with a specific response deadline.',
-        'Log the variance so the pattern is visible in Vendor Watch at the quarterly review.',
-        'If overcharges recur after the dispute, renegotiate terms or move the category to another vendor.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'vc-ai-1',
-        title: 'Calculate Cumulative Overcharge by Vendor',
-        whatItDoes: 'Reads a quarter of invoice audit data and totals the overcharge by vendor, flags the worst SKUs, and projects the annual cost.',
-        prompt: 'Here is my invoice audit data for the past quarter. Columns: vendor name, SKU, PO price, invoiced price, variance per unit, quantity, total variance. [PASTE DATA]. Calculate cumulative overcharge by vendor, identify which SKUs have the most consistent variance across deliveries, project the annual overcharge at this run rate, and flag any vendor where cumulative overcharge exceeds $500 for the quarter.',
-        whatToPaste: 'Paste your quarter of invoice audit rows into [PASTE DATA].'
-      },
-      {
-        id: 'vc-ai-2',
-        title: 'Draft a Vendor Dispute Letter',
-        whatItDoes: 'Writes a direct, factual dispute letter requesting a credit memo for a documented overcharge.',
-        prompt: 'I need to dispute a price variance with my vendor [VENDOR NAME]. Details: SKU [NAME], agreed price $[AMOUNT], invoiced price $[AMOUNT], quantity [NUMBER], total overcharge $[AMOUNT], delivery date [DATE], invoice number [NUMBER]. Write a professional dispute letter requesting a credit memo for the full overcharge amount. Direct and factual tone, not adversarial. Include a specific deadline for the credit memo response.',
-        whatToPaste: 'Fill in the vendor, SKU, prices, quantity, overcharge, date, and invoice number.'
-      },
-      {
-        id: 'vc-ai-3',
-        title: 'Build a Quarterly Vendor Review Agenda',
-        whatItDoes: 'Turns a quarter of purchase history into a printable review agenda with talking points, questions, and target outcomes.',
-        prompt: 'I am preparing for my quarterly review with [VENDOR NAME]. Here is my purchase history for the quarter: total spend $[AMOUNT], top 5 SKUs by spend [LIST WITH AMOUNTS], invoice variances found [LIST], substitutions received [LIST], quality issues [NOTES]. Build a structured meeting agenda with talking points for each item, specific questions to ask, and a target outcome for each agenda item. Format it so I can print it and bring it to the meeting.',
-        whatToPaste: 'Fill in the vendor and the quarter\'s spend, SKUs, variances, substitutions, and quality notes.'
-      },
-      {
-        id: 'vc-ai-4',
-        title: 'Identify Price Drift on a SKU',
-        whatItDoes: 'Reads six months of invoiced prices for one SKU and reports the drift trend, total increase, and cumulative overcharge.',
-        prompt: 'Here are my invoiced prices for [SKU NAME] over the past six months, one entry per delivery: [LIST DATES AND PRICES]. Identify the trend direction, calculate the total price increase over the period as a percentage, determine whether it is gradual drift or step changes at specific dates, tell me at what point the price first moved above my original quoted rate of $[AMOUNT], and express the cumulative overcharge in dollars based on my average weekly order volume of [QUANTITY].',
-        whatToPaste: 'Fill in the SKU, the dated price list, your original quoted rate, and weekly order volume.'
-      }
     ]
   },
 
@@ -415,7 +179,6 @@ FIX.profit = [
     summary: 'COGS plus labor as a share of sales. The one number that confirms your cost systems are working.',
 
     process: {
-      intro: 'Prime cost is an operations metric, not a finance metric. It is the one number that tells you whether pour cost, food cost, and labor control are actually working. Bar Cop pulls the inputs from your Control modules and computes it for you. Read it weekly, on Monday, in fifteen minutes. Each step below opens where that happens.',
       steps: [
         { kind: 'action', target: 'this-week', targetLabel: 'This Week',
           title: 'Confirm the week\'s inputs',
@@ -443,64 +206,6 @@ FIX.profit = [
       'Treating prime cost as a finance metric. It belongs in the weekly management meeting, not the monthly P&L review.',
       'Acting on a single week\'s spike before checking the data. A miscoded payroll run or a one-time bulk purchase produces a false spike.',
       'Excluding payroll taxes and benefits from labor. Real labor cost runs 10 to 15% above wages alone, and a wages-only number understates the problem every week.'
-    ],
-
-    quickRef: {
-      rhythm: [
-        'Pull prior-week net sales (after comps and discounts), COGS by category, and total labor',
-        'Read prime cost on the dashboard and compare it to target and to last week',
-        'If above target, identify whether COGS or labor is the driver',
-        'If COGS, isolate the category; if labor, isolate the shifts or departments',
-        'Assign an investigation or corrective action before the week starts',
-        'File the weekly P&L snapshot',
-        'Once a month, review the four weeks together and set named priorities'
-      ],
-      benchmarks: [
-        { label: 'Bar-heavy concept',           target: '48-55%', warning: '55-60%', critical: 'above 60%' },
-        { label: 'Full-service bar & restaurant', target: '55-60%', warning: '60-65%', critical: 'above 65%' },
-        { label: 'Fast casual',                  target: '55-62%', warning: '62-67%', critical: 'above 67%' },
-        { label: 'High-volume nightlife',        target: '42-50%', warning: '50-56%', critical: 'above 56%' },
-        { label: 'Craft cocktail bar',           target: '50-58%', warning: '58-63%', critical: 'above 63%' }
-      ],
-      escalation: [
-        'Verify the data first. Net sales truly net of comps, labor including taxes. A miscode produces a false spike.',
-        'Split the move: did COGS or labor drive the change versus last week?',
-        'If COGS, isolate food versus beverage, then drill to the category.',
-        'If labor, isolate which shifts or departments ran over their hours.',
-        'Check for one-time events: a bulk purchase or a payroll correction landing in the week.',
-        'Decide whether this is a structural problem or a one-week anomaly before acting.'
-      ]
-    },
-
-    aiWorkflows: [
-      {
-        id: 'pr-ai-1',
-        title: 'Calculate Prime Cost vs. Concept Benchmark',
-        whatItDoes: 'Calculates prime cost from your weekly inputs, compares it to your concept target, and says whether COGS or labor is the larger driver.',
-        prompt: 'Here is my data for the week ending [DATE]. Net sales: $[AMOUNT]. Food cost: $[AMOUNT]. Beverage cost: $[AMOUNT]. Paper and supplies: $[AMOUNT]. Total wages: $[AMOUNT]. Payroll taxes and benefits: $[AMOUNT]. My concept is a [CONCEPT TYPE] and my target prime cost is [TARGET]%. Calculate my prime cost percentage, compare it to target and calculate the dollar value of the gap, tell me whether COGS or labor is the larger driver of any variance, and show your math.',
-        whatToPaste: 'Fill in the week\'s sales and cost figures, your concept type, and target.'
-      },
-      {
-        id: 'pr-ai-2',
-        title: 'Diagnose a Prime Cost Spike',
-        whatItDoes: 'Walks a week-over-week prime cost jump through probable causes in order and names the exact data to pull for each.',
-        prompt: 'My prime cost moved from [X]% to [Y]% this week. Component changes: food cost [X]% to [Y]%, beverage cost [X]% to [Y]%, labor [X]% to [Y]%. Net sales this week: $[AMOUNT] versus $[AMOUNT] last week. Walk me through the most likely cause of the spike in order of probability and tell me exactly what data to pull to confirm each one. Do not suggest general improvements. Suggest specific things to check, in order.',
-        whatToPaste: 'Fill in this week and last week\'s prime cost, component percentages, and net sales.'
-      },
-      {
-        id: 'pr-ai-3',
-        title: 'Build a Four-Week Prime Cost Trend',
-        whatItDoes: 'Calculates four weeks of prime cost, finds the trend and the biggest mover, and judges structural problem versus one-week anomaly.',
-        prompt: 'Here are my weekly prime cost inputs for the past four weeks. For each week: net sales, food cost, beverage cost, labor. [PASTE DATA]. Calculate prime cost for each week, identify the trend direction, flag which component has moved the most over the four weeks, and tell me whether this looks like a structural problem or a one-week anomaly and what data to pull to confirm. My concept target is [TARGET]%.',
-        whatToPaste: 'Paste four weeks of inputs into [PASTE DATA] and fill in your target.'
-      },
-      {
-        id: 'pr-ai-4',
-        title: 'Write the Monthly Cost Control Summary',
-        whatItDoes: 'Drafts a direct monthly review summary for management with three named priorities for next month.',
-        prompt: 'Here is my prime cost data for the past month by week: [PASTE WEEKLY DATA]. Top three cost control actions we took this month: [LIST]. Results from last month\'s priority actions: [NOTES]. Write a brief monthly review summary under 200 words for my management team covering what the numbers showed, what we did about it, and three priorities for next month with a named owner for each. Direct and operational tone, not encouraging, not congratulatory.',
-        whatToPaste: 'Paste the weekly data, this month\'s actions, and last month\'s results.'
-      }
     ]
   }
 
