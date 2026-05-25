@@ -17,7 +17,7 @@ S.ShiftMaintenance = {
     return App.shiftData.sc_maintenance;
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -34,6 +34,11 @@ S.ShiftMaintenance = {
     addBtn.textContent = 'Log Issue';
     addBtn.addEventListener('click', () => this.showForm());
     actions.appendChild(addBtn);
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-ghost btn-sm';
+    exportBtn.textContent = 'Export PDF';
+    exportBtn.addEventListener('click', () => window.print());
+    actions.appendChild(exportBtn);
     this.renderList();
   },
 
@@ -78,13 +83,13 @@ S.ShiftMaintenance = {
         + '</div>';
       const rows = recs.map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(r.date_reported) + '</div></td>'
-        + '<td><div class="val">' + esc(r.equipment || '—') + '</div>'
+        + '<td><div class="val">' + esc(r.equipment || '-') + '</div>'
         + (r.issue ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.issue) + '</div>' : '') + '</td>'
-        + '<td>' + esc(r.location || '—') + '</td>'
+        + '<td>' + esc(r.location || '-') + '</td>'
         + '<td>' + this.priorityBadge(r.priority) + '</td>'
         + '<td>' + this.statusBadge(r.status) + '</td>'
-        + '<td>' + esc(r.assigned_to || '—') + '</td>'
-        + '<td>' + (r.cost ? App.fmtCurrency(r.cost) : '<span style="color:var(--t4);">—</span>') + '</td>'
+        + '<td>' + esc(r.assigned_to || '-') + '</td>'
+        + '<td>' + (r.cost ? App.fmtCurrency(r.cost) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm mt-edit" data-id="' + r.id + '">Edit</button>'
         + '<button class="btn btn-danger btn-sm mt-del" data-id="' + r.id + '">Delete</button>'
