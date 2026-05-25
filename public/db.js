@@ -397,7 +397,6 @@ const DB = {
     return {
       settings: {
         bar_name: '', city_state: '',
-        bar_type: 'bar_kitchen',
         annual_bar_revenue: 0, annual_food_revenue: 0,
         targets: {
           bar_pour_cost_pct: 22, food_cost_pct: 32,
