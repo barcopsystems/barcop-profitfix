@@ -5,6 +5,7 @@ const DB = {
   _user: null,
   _accountId: null,  // resolved lazily on first read/write after signin (Phase 2)
   _role: null,       // 'admin' | 'staff' | 'viewer' — resolved alongside _accountId
+  _permissions: null, // { groupKey: 'view' | 'add' | 'edit' } — staff granular permissions
   _demo: false,   // demo mode — all writes are no-ops so the demo never persists
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -26,7 +27,8 @@ const DB = {
     const { data } = await this._sb.auth.getSession();
     this._user = data?.session?.user || null;
     this._accountId = null;
-    this._role = null;  // force re-resolve on next read/write
+    this._role = null;
+    this._permissions = null;  // force re-resolve on next read/write
     return data?.session || null;
   },
 
@@ -36,6 +38,7 @@ const DB = {
       this._user = session?.user || null;
       this._accountId = null;
     this._role = null;
+    this._permissions = null;
       cb(event, session);
     });
   },
@@ -46,6 +49,7 @@ const DB = {
     if (data?.user) this._user = data.user;
     this._accountId = null;
     this._role = null;
+    this._permissions = null;
     return { data, error };
   },
 
@@ -60,6 +64,7 @@ const DB = {
     this._user = null;
     this._accountId = null;
     this._role = null;
+    this._permissions = null;
   },
 
   async resetPassword(email) {
@@ -110,13 +115,14 @@ const DB = {
     try {
       const { data, error } = await this._sb
         .from('memberships')
-        .select('account_id, role')
+        .select('account_id, role, permissions')
         .eq('user_id', this._user.id)
         .limit(1)
         .single();
       if (error || !data) return null;
       this._accountId = data.account_id;
       this._role = data.role || 'admin';
+      this._permissions = data.permissions || {};
       return this._accountId;
     } catch (e) {
       return null;
@@ -126,10 +132,88 @@ const DB = {
   // Current user's role in their active account. 'admin' | 'staff' | 'viewer' |
   // null if not yet resolved. Resolved lazily as a side effect of any read/write.
   role() { return this._role; },
+  permissions() { return this._permissions || {}; },
   isAdmin()  { return this._role === 'admin'; },
   isStaff()  { return this._role === 'staff'; },
   isViewer() { return this._role === 'viewer'; },
   canWrite() { return this._role !== 'viewer'; },
+
+  // ── Granular permission system (Phase 2 Item 25b) ───────────────────────────
+  // Each screen maps to a permission group. The user's permissions object
+  // stores per-group access levels: 'add' (view + create new) or 'edit'
+  // (view + create + edit + delete). Missing key = no access.
+  //
+  // Admin: implicit 'edit' on all groups (bypasses the map).
+  // Viewer: implicit 'view' on all groups (read-only, blocked at write).
+  // Staff: looks up the screen's group in their permissions object.
+  // Help screens (mapped to '_always'): accessible to anyone signed in.
+  SCREEN_GROUPS: {
+    // Inventory Control
+    'ic-take-inventory':'take-inventory','ic-count-history':'take-inventory',
+    'ic-receive-delivery':'receive-delivery','ic-delivery-history':'receive-delivery',
+    'ic-order-sheet':'place-orders','ic-order-history':'place-orders',
+    'ic-spot-check':'spot-check',
+    'ic-product-setup':'manage-products','ic-locations':'manage-products','ic-vendors':'manage-products',
+    'ic-report-stock':'inventory-reports','ic-report-movers':'inventory-reports',
+    'ic-report-usage':'inventory-reports','ic-report-variance':'inventory-reports',
+    'ic-dashboard':'inventory-reports','ic-help':'_always',
+    // Labor Control
+    'lc-log-hours':'log-hours','lc-daily-view':'log-hours',
+    'lc-tip-log':'log-tips','lc-tip-history':'log-tips','lc-tip-pool':'log-tips',
+    'lc-schedule-history':'view-schedule',
+    'lc-build-schedule':'manage-schedule','lc-schedule-templates':'manage-schedule',
+    'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
+    'lc-callout-log':'call-out-log',
+    'lc-reports':'labor-reports','lc-weekly-summary':'labor-reports','lc-overtime-watch':'labor-reports',
+    'lc-dashboard':'labor-reports','lc-help':'_always',
+    // Shift Control
+    'sc-log-shift':'log-shift','sc-shift-history':'log-shift',
+    'sc-active-shift':'active-shift',
+    'sc-cash-drop':'cash-mgmt','sc-safe-log':'cash-mgmt','sc-variance-log':'cash-mgmt',
+    'sc-opening-checklist':'checklists','sc-closing-checklist':'checklists','sc-checklist-templates':'checklists',
+    'sc-86-list':'86-list',
+    'sc-void-comp':'void-comp',
+    'sc-maintenance':'maintenance',
+    'sc-reports-shift':'shift-reports','sc-reports-cash':'shift-reports','sc-reports-ops':'shift-reports',
+    'sc-dashboard':'shift-reports','sc-help':'_always',
+    // Profit Recovery (root + profit module screens)
+    'dashboard':'profit-recovery','this-week':'profit-recovery',
+    'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
+    'cash-recon':'profit-recovery','theft-risk':'profit-recovery',
+    'recipe-library':'profit-recovery','vendor-watch':'profit-recovery','vendor-discrepancy':'profit-recovery',
+    'bar-products':'profit-recovery','kitchen-products':'profit-recovery',
+    'reports':'profit-recovery','help':'_always',
+    // Revenue Recovery
+    'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery',
+    'r-audit':'revenue-recovery','r-fix':'revenue-recovery',
+    'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
+    'r-menu-engineering':'revenue-recovery','r-pricing':'revenue-recovery',
+    'r-rplh':'revenue-recovery','r-dog-test':'revenue-recovery',
+    'r-events':'revenue-recovery','r-check-average':'revenue-recovery',
+    'r-reports':'revenue-recovery','r-help':'_always',
+    // Traffic Recovery
+    't-dashboard':'traffic-recovery','t-this-week':'traffic-recovery',
+    't-audit':'traffic-recovery','t-fix':'traffic-recovery',
+    't-website':'traffic-recovery','t-gbp':'traffic-recovery',
+    't-reviews':'traffic-recovery','t-search':'traffic-recovery',
+    't-social':'traffic-recovery','t-delivery':'traffic-recovery',
+    't-email':'traffic-recovery','t-reports':'traffic-recovery','t-help':'_always'
+  },
+
+  canAccessLevel(screen) {
+    if (!this._role) return 'edit';  // not yet resolved (e.g., demo mode) — open
+    if (this._role === 'admin') return 'edit';
+    const group = this.SCREEN_GROUPS[screen];
+    if (group === '_always') return 'view';  // help screens always accessible
+    if (this._role === 'viewer') return 'view';
+    if (!group) return null;
+    const perms = this._permissions || {};
+    return perms[group] || null;
+  },
+
+  screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
+  screenCanAdd(screen)  { const l = this.canAccessLevel(screen); return l === 'add' || l === 'edit'; },
+  screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },
 
   // ── Data ──────────────────────────────────────────────────────────────────
   async readData() {
