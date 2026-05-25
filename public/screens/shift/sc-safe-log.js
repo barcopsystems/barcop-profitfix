@@ -97,8 +97,8 @@ S.ShiftSafeLog = {
           + '<td>' + amtCell + '</td>'
           + '<td class="val">' + App.fmtCurrency(r.bal) + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm sl-edit" data-id="' + e.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm sl-del" data-id="' + e.id + '">Delete</button>'
+          + (App.canEdit('sc-safe-log') ? '<button class="btn btn-ghost btn-sm sl-edit" data-id="' + e.id + '">Edit</button>' : '')
+          + (App.canEdit('sc-safe-log') ? '<button class="btn btn-danger btn-sm sl-del" data-id="' + e.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
