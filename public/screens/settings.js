@@ -33,7 +33,6 @@ S.HubSettings = {
       { id:'profit',  title:'Profit Targets',    body:this.secProfit() },
       { id:'revenue', title:'Revenue Targets',   body:this.secRevenue() },
       { id:'traffic', title:'Traffic Targets',   body:this.secTraffic() },
-      { id:'team',    title:'Team and Wages',    body:this.secTeam() },
       { id:'shift',   title:'Shift Preferences', body:this.secShift() },
       { id:'account', title:'Account',           body:this.secAccount() }
     ];
@@ -130,15 +129,6 @@ S.HubSettings = {
       + '<div class="f" style="width:140px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
       + '<div class="f" style="width:140px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
       + '</div>' + this.saveRow('traffic');
-  },
-
-  secTeam() {
-    const wg = ((App.data.revenue_settings||{}).avg_hourly_wage) || { bar:15, kitchen:14, floor:13 };
-    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;"><label>Bar Staff Wage ' + tt('r-wage-bar') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-w-bar" value="' + (wg.bar ?? 15) + '" step="0.25"/></div></div>'
-      + '<div class="f" style="width:160px;"><label>Kitchen Staff Wage ' + tt('r-wage-kitchen') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-w-kit" value="' + (wg.kitchen ?? 14) + '" step="0.25"/></div></div>'
-      + '<div class="f" style="width:150px;"><label>Floor Staff Wage ' + tt('r-wage-floor') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-w-floor" value="' + (wg.floor ?? 13) + '" step="0.25"/></div></div>'
-      + '</div>' + this.saveRow('team');
   },
 
   secInventory() {
@@ -288,14 +278,6 @@ S.HubSettings = {
       });
       ts._targets_saved = true;
       keys.push('traffic_settings');
-    } else if (which === 'team') {
-      const rs = App.data.revenue_settings = App.data.revenue_settings || {};
-      rs.avg_hourly_wage = {
-        bar:     numOr('hs-w-bar', 15),
-        kitchen: numOr('hs-w-kit', 14),
-        floor:   numOr('hs-w-floor', 13)
-      };
-      keys.push('revenue_settings');
     } else if (which === 'shift') {
       App.data.settings.cash_tolerance = numOr('hs-ct', 10);
       keys.push('settings');
@@ -954,7 +936,6 @@ S.HubSettings = {
     App.data.revenue_settings = App.data.revenue_settings || {};
     App.data.revenue_settings.targets = { check_avg:35, bar_labor_pct:28, kitchen_labor_pct:30,
       floor_labor_pct:32, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
-    App.data.revenue_settings.avg_hourly_wage = { bar:16, kitchen:15, floor:14 };
     App.data.revenue_settings._targets_saved = true;
 
     // Four servers carry the floor. Each week's covers split by these weights,
