@@ -42,6 +42,11 @@ S.LaborStaffRoster = {
       addBtn.addEventListener('click', () => this.showForm());
       this.actions.appendChild(addBtn);
     }
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-ghost btn-sm';
+    exportBtn.textContent = 'Export PDF';
+    exportBtn.addEventListener('click', () => window.print());
+    this.actions.appendChild(exportBtn);
 
     if (this.positions().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
