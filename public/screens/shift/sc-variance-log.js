@@ -88,8 +88,8 @@ S.ShiftVarianceLog = {
           + '<td class="' + cls + '">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</td>'
           + '<td>' + this.statusBadge(v.status) + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm vl-edit" data-id="' + v.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm vl-del" data-id="' + v.id + '">Delete</button>'
+          + (App.canEdit('sc-variance-log') ? '<button class="btn btn-ghost btn-sm vl-edit" data-id="' + v.id + '">Edit</button>' : '')
+          + (App.canEdit('sc-variance-log') ? '<button class="btn btn-danger btn-sm vl-del" data-id="' + v.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
