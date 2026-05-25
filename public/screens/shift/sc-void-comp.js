@@ -103,7 +103,7 @@ S.ShiftVoidComp = {
       const addF = ev.target.closest('#vc-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row && App.canEdit('sc-void-comp')) this.showForm(row.dataset.id);
       else if (addF) this.showForm();
     };
   },
@@ -115,6 +115,7 @@ S.ShiftVoidComp = {
   },
 
   showForm(id) {
+    if (id && !App.canEdit('sc-void-comp')) return;
     this.editId = id || null;
     const r = id ? this.records().find(x => x.id === id) : null;
     const type = (r && r.type) || 'Void';
