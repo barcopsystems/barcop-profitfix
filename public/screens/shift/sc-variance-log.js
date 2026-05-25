@@ -29,7 +29,7 @@ S.ShiftVarianceLog = {
     return variance > 0 ? 'Over' : 'Short';
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -42,6 +42,11 @@ S.ShiftVarianceLog = {
     addBtn.textContent = 'Log Variance';
     addBtn.addEventListener('click', () => this.showForm());
     actions.appendChild(addBtn);
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-ghost btn-sm';
+    exportBtn.textContent = 'Export PDF';
+    exportBtn.addEventListener('click', () => window.print());
+    actions.appendChild(exportBtn);
     this.renderList();
   },
 
@@ -75,9 +80,9 @@ S.ShiftVarianceLog = {
         const cls = v.status === 'Short' ? 'neg' : v.status === 'Over' ? '' : 'pos';
         return '<tr class="vl-row" data-id="' + v.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
-          + '<td>' + esc(v.shift_type || '—') + '</td>'
-          + '<td>' + esc(v.drawer || '—') + '</td>'
-          + '<td>' + esc(v.cashier || '—') + '</td>'
+          + '<td>' + esc(v.shift_type || '-') + '</td>'
+          + '<td>' + esc(v.drawer || '-') + '</td>'
+          + '<td>' + esc(v.cashier || '-') + '</td>'
           + '<td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
           + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td>'
           + '<td class="' + cls + '">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</td>'
@@ -149,8 +154,8 @@ S.ShiftVarianceLog = {
       + '</div>'
 
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="vl-c-variance">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="vl-c-status">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="vl-c-variance">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="vl-c-status">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim">&plusmn;' + App.fmtCurrency(this.tolerance()) + '</div></div>'
       + '</div>'
 
@@ -176,8 +181,8 @@ S.ShiftVarianceLog = {
     const statEl = document.getElementById('vl-c-status');
     if (varEl == null || statEl == null) return;
     if (isNaN(exp) || isNaN(cnt)) {
-      varEl.textContent = '—'; varEl.className = 'calc-val';
-      statEl.textContent = '—'; statEl.className = 'calc-val';
+      varEl.textContent = '-'; varEl.className = 'calc-val';
+      statEl.textContent = '-'; statEl.className = 'calc-val';
       return;
     }
     const variance = cnt - exp;
