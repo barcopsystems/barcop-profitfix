@@ -116,10 +116,44 @@ const DB = {
   // Looks up the current user's account_id from the memberships table and
   // caches it. Lazy: resolves on first read/write after signin. Cleared in
   // every auth handler so a fresh signin always re-resolves.
+  // Active account ID is stored in localStorage so it persists across reloads.
+  // Multi-account users (owners of 2+ bars) pick which bar to view via the
+  // topbar account switcher; that selection becomes the active account.
+  _ACTIVE_ACCOUNT_KEY: 'pf_active_account_id',
+  _getStoredActiveAccountId() {
+    try { return localStorage.getItem(this._ACTIVE_ACCOUNT_KEY) || null; }
+    catch (e) { return null; }
+  },
+  _setStoredActiveAccountId(id) {
+    try {
+      if (id) localStorage.setItem(this._ACTIVE_ACCOUNT_KEY, id);
+      else localStorage.removeItem(this._ACTIVE_ACCOUNT_KEY);
+    } catch (e) {}
+  },
+
   async _ensureAccountId() {
     if (this._accountId) return this._accountId;
     if (!this._sb || !this._user) return null;
     try {
+      // Multi-account: if the user previously selected an active account,
+      // resolve that one first. Falls back to first membership otherwise.
+      const stored = this._getStoredActiveAccountId();
+      if (stored) {
+        const { data: m, error: e1 } = await this._sb
+          .from('memberships')
+          .select('account_id, role, permissions')
+          .eq('user_id', this._user.id)
+          .eq('account_id', stored)
+          .maybeSingle();
+        if (!e1 && m) {
+          this._accountId = m.account_id;
+          this._role = m.role || 'admin';
+          this._permissions = m.permissions || {};
+          return this._accountId;
+        }
+        // Stale stored ID (user lost access to that account). Clear it.
+        this._setStoredActiveAccountId(null);
+      }
       const { data, error } = await this._sb
         .from('memberships')
         .select('account_id, role, permissions')
@@ -134,6 +168,31 @@ const DB = {
     } catch (e) {
       return null;
     }
+  },
+
+  // Returns every account the current user is a member of, with name + role.
+  // Used by the topbar account switcher.
+  async listMyAccounts() {
+    if (!this._sb || !this._user) return [];
+    try {
+      const { data, error } = await this._sb
+        .from('memberships')
+        .select('account_id, role, accounts(id, name)')
+        .eq('user_id', this._user.id);
+      if (error || !data) return [];
+      return data
+        .filter(m => m.accounts)
+        .map(m => ({ id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role }));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // Switch which account is active. Stores in localStorage and reloads so
+  // every cached data structure starts fresh under the new account context.
+  setActiveAccount(accountId) {
+    this._setStoredActiveAccountId(accountId);
+    window.location.reload();
   },
 
   // Current user's role in their active account. 'admin' | 'staff' | 'viewer' |
