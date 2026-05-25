@@ -21,10 +21,13 @@ S.TrafficThisWeek = {
       week_num: lastWk + 1,
       period_end: App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0,10),
       google_rating: '', google_total: '', new_reviews: '', response_rate: '',
+      gbp_views: '',
       yelp_rating: '', yelp_total: '',
       monthly_sessions: '', bounce_rate: '',
       ig_followers: '', ig_posts_month: '', fb_followers: '',
+      social_profile_visits: '',
       dd_active: '', dd_rating: '', ue_active: '', ue_rating: '', gh_active: '', gh_rating: '',
+      delivery_orders: '', delivery_avg_order_value: '',
       email_list_size: '', emails_sent: '', email_open_rate: '',
       loyalty_active: '', loyalty_members: '',
       notes: ''
@@ -114,6 +117,7 @@ S.TrafficThisWeek = {
       + '<div class="f" style="width:130px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="ttw-rr" value="' + esc(this.draft.response_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Yelp Rating ' + tt('t-yelp-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-yr" value="' + esc(this.draft.yelp_rating) + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Yelp Reviews ' + tt('t-yelp-total') + '</label><div class="fw"><input class="suf" type="number" id="ttw-yt" value="' + esc(this.draft.yelp_total) + '"/><span class="suf">total</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>GBP Views/Mo ' + tt('t-gbp-views') + '</label><div class="fw"><input class="suf" type="number" id="ttw-gbpv" value="' + esc(this.draft.gbp_views) + '"/><span class="suf">/mo</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Rating vs Target</div><div id="ttw-gr-status">' + st(gr, gr>=tGR, gr!=null?(gr.toFixed(1)+'★ vs '+tGR+'★'):'') + '</div></div>'
@@ -178,6 +182,7 @@ S.TrafficThisWeek = {
       + '<div class="f" style="width:180px;"><label>Instagram Followers ' + tt('t-ig-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igf" value="' + esc(this.draft.ig_followers) + '"/><span class="suf">followers</span></div></div>'
       + '<div class="f" style="width:180px;"><label>IG Posts/Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igp" value="' + esc(this.draft.ig_posts_month) + '" oninput="S.TrafficThisWeek.calcSocial()"/><span class="suf">posts</span></div></div>'
       + '<div class="f" style="width:180px;"><label>Facebook Followers ' + tt('t-fb-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-fbf" value="' + esc(this.draft.fb_followers) + '"/><span class="suf">followers</span></div></div>'
+      + '<div class="f" style="width:200px;"><label>Profile Visits/Mo ' + tt('t-social-profile-visits') + '</label><div class="fw"><input class="suf" type="number" id="ttw-spv" value="' + esc(this.draft.social_profile_visits) + '"/><span class="suf">/mo</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Posts vs Target</div><div id="ttw-sp-status">' + spStatus + '</div></div>'
@@ -202,6 +207,8 @@ S.TrafficThisWeek = {
       + '<div class="f" style="width:130px;"><label>Uber Eats Rating ' + tt('t-delivery-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-ue" value="' + esc(this.draft.ue_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Grubhub Active ' + tt('t-delivery-active') + '</label>' + this.yesNo('ttw-gha', this.draft.gh_active) + '</div>'
       + '<div class="f" style="width:130px;"><label>Grubhub Rating ' + tt('t-delivery-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-gh" value="' + esc(this.draft.gh_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>Total Orders/Mo ' + tt('t-delivery-orders') + '</label><div class="fw"><input class="suf" type="number" id="ttw-dlo" value="' + esc(this.draft.delivery_orders) + '"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>Avg Order Value ' + tt('t-delivery-avg-order') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ttw-dlav" value="' + esc(this.draft.delivery_avg_order_value) + '" step="0.50"/></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Delivery Rating Avg</div><div id="ttw-dl-status"><span class="calc-val">Enter ratings</span></div></div>'
@@ -271,6 +278,7 @@ S.TrafficThisWeek = {
       + row('Total Google Reviews', d.google_total || '',                       '',           null)
       + row('New Reviews/Mo',   rv != null ? rv + ' reviews' : '',              tRV + '/mo',  rv != null ? rv >= tRV : null)
       + row('Response Rate',    rr != null ? rr.toFixed(0) + '%' : '',          tRR + '%',    rr != null ? rr >= tRR : null)
+      + row('GBP Views/Mo',     d.gbp_views || '',                              '',           null)
       + row('Yelp Rating',      yr != null ? yr.toFixed(1) + '★' : '',          '4.0★',       yr != null ? yr >= 4.0 : null)
       + row('Total Yelp Reviews', d.yelp_total || '',                           '',           null)
       + row('Sessions/Mo',      ss != null ? ss.toLocaleString() : '',          tSS.toLocaleString() + '/mo', ss != null ? ss >= tSS : null)
@@ -278,9 +286,12 @@ S.TrafficThisWeek = {
       + row('IG Followers',     d.ig_followers || '',                           '',           null)
       + row('IG Posts/Mo',      igp != null ? igp + ' posts' : '',              tSP + '/mo',  igp != null ? igp >= tSP : null)
       + row('FB Followers',     d.fb_followers || '',                           '',           null)
+      + row('Profile Visits/Mo', d.social_profile_visits || '',                 '',           null)
       + row('DoorDash',         yn(d.dd_active) + (d.dd_rating ? '  ' + d.dd_rating + '★' : ''),  '',  null)
       + row('Uber Eats',        yn(d.ue_active) + (d.ue_rating ? '  ' + d.ue_rating + '★' : ''),  '',  null)
       + row('Grubhub',          yn(d.gh_active) + (d.gh_rating ? '  ' + d.gh_rating + '★' : ''),  '',  null)
+      + row('Delivery Orders/Mo', d.delivery_orders || '',                      '',           null)
+      + row('Delivery Avg Order', d.delivery_avg_order_value ? '$' + d.delivery_avg_order_value : '', '', null)
       + row('Email List Size',  d.email_list_size || '',                        '',           null)
       + row('Emails Sent/Mo',   d.emails_sent || '',                            '',           null)
       + row('Email Open Rate',  eor != null ? eor.toFixed(0) + '%' : '',         '20% or more', eor != null ? eor >= 20 : null)
@@ -318,13 +329,18 @@ S.TrafficThisWeek = {
       d.google_rating = val('ttw-gr'); d.google_total = val('ttw-gt');
       d.new_reviews = val('ttw-nr'); d.response_rate = val('ttw-rr');
       d.yelp_rating = val('ttw-yr'); d.yelp_total = val('ttw-yt');
+      d.gbp_views = val('ttw-gbpv');
     }
     if (step === 3) { d.monthly_sessions = val('ttw-ss'); d.bounce_rate = val('ttw-br'); }
-    if (step === 4) { d.ig_followers = val('ttw-igf'); d.ig_posts_month = val('ttw-igp'); d.fb_followers = val('ttw-fbf'); }
+    if (step === 4) {
+      d.ig_followers = val('ttw-igf'); d.ig_posts_month = val('ttw-igp');
+      d.fb_followers = val('ttw-fbf'); d.social_profile_visits = val('ttw-spv');
+    }
     if (step === 5) {
       d.dd_active = val('ttw-dda'); d.dd_rating = val('ttw-dd');
       d.ue_active = val('ttw-uea'); d.ue_rating = val('ttw-ue');
       d.gh_active = val('ttw-gha'); d.gh_rating = val('ttw-gh');
+      d.delivery_orders = val('ttw-dlo'); d.delivery_avg_order_value = val('ttw-dlav');
     }
     if (step === 6) {
       d.email_list_size = val('ttw-els'); d.emails_sent = val('ttw-esnt');
@@ -360,6 +376,7 @@ S.TrafficThisWeek = {
       google_total:     numI(d.google_total),
       new_reviews:      rv,
       response_rate:    numF(d.response_rate),
+      gbp_views:        numI(d.gbp_views),
       yelp_rating:      numF(d.yelp_rating),
       yelp_total:       numI(d.yelp_total),
       monthly_sessions: ss,
@@ -367,12 +384,15 @@ S.TrafficThisWeek = {
       ig_followers:     numI(d.ig_followers),
       ig_posts_month:   numI(d.ig_posts_month),
       fb_followers:     numI(d.fb_followers),
+      social_profile_visits: numI(d.social_profile_visits),
       dd_active:        d.dd_active || null,
       dd_rating:        numF(d.dd_rating),
       ue_active:        d.ue_active || null,
       ue_rating:        numF(d.ue_rating),
       gh_active:        d.gh_active || null,
       gh_rating:        numF(d.gh_rating),
+      delivery_orders:  numI(d.delivery_orders),
+      delivery_avg_order_value: numF(d.delivery_avg_order_value),
       email_list_size:  numI(d.email_list_size),
       emails_sent:      numI(d.emails_sent),
       email_open_rate:  numF(d.email_open_rate),
