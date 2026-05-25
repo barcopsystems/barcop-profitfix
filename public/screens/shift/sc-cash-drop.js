@@ -65,8 +65,8 @@ S.ShiftCashDrop = {
         + '<td>' + esc(d.performed_by || '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm cd-edit" data-id="' + d.id + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm cd-del" data-id="' + d.id + '">Delete</button>'
+        + (App.canEdit('sc-cash-drop') ? '<button class="btn btn-ghost btn-sm cd-edit" data-id="' + d.id + '">Edit</button>' : '')
+        + (App.canEdit('sc-cash-drop') ? '<button class="btn btn-danger btn-sm cd-del" data-id="' + d.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th><th></th>'
