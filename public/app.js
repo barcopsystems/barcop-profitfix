@@ -386,13 +386,12 @@ const App = {
     if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
-    // Staff role: skip Hub and onboarding entirely, land on their operational
-    // dashboard. Admin and viewer get the normal flow.
+    // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
+    // (a simplified tile view of their accessible tasks across all modules).
+    // Admin and viewer get the normal flow.
     const role = (window.DB && DB.role && DB.role()) || null;
     if (role === 'staff') {
-      const land = this.staffLanding();
-      this.showApp(land.module);
-      this.navigate(land.screen);
+      this.showStaffHub();
       this._promptSync();
       return;
     }
@@ -520,13 +519,11 @@ const App = {
   },
 
   showHub() {
-    // Staff role: Hub shows financial data they shouldn't see. Redirect to
-    // their operational landing screen instead.
+    // Staff role: real Hub shows financial data they shouldn't see. Redirect
+    // to the Staff Hub (tile view of their accessible tasks).
     const role = (window.DB && DB.role && DB.role()) || null;
     if (role === 'staff') {
-      const land = this.staffLanding();
-      this.showApp(land.module);
-      this.navigate(land.screen);
+      this.showStaffHub();
       return;
     }
     // Full screen hub - hide the app shell, show a standalone container
@@ -589,22 +586,93 @@ const App = {
     return (window.DB && DB.screenCanAdd) ? DB.screenCanAdd(screen) : true;
   },
 
+  // Staff Hub tiles: one per permission group, in display order.
+  // Used by showStaffHub() to render the staff landing page.
+  STAFF_TILES: [
+    { group:'take-inventory',  label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
+    { group:'receive-delivery',label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
+    { group:'place-orders',    label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
+    { group:'spot-check',      label:'Spot Check',               module:'inventory', screen:'ic-spot-check',        moduleName:'Inventory Control' },
+    { group:'log-hours',       label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
+    { group:'log-tips',        label:'Log Tips',                 module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
+    { group:'view-schedule',   label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
+    { group:'call-out-log',    label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
+    { group:'log-shift',       label:'Log Shift',                module:'shift',     screen:'sc-log-shift',         moduleName:'Shift Control' },
+    { group:'active-shift',    label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
+    { group:'cash-mgmt',       label:'Cash Management',          module:'shift',     screen:'sc-cash-drop',         moduleName:'Shift Control' },
+    { group:'checklists',      label:'Opening / Closing Checklists', module:'shift', screen:'sc-opening-checklist', moduleName:'Shift Control' },
+    { group:'86-list',         label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
+    { group:'void-comp',       label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
+    { group:'maintenance',     label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' }
+  ],
+
   // Pick the first accessible screen as a non-admin user's landing.
-  // Order matters: try the common bartender/staff defaults first.
+  // Falls back to ic-take-inventory if nothing matches (shouldn't happen for
+  // a properly-permissioned staff user).
   staffLanding() {
-    const order = [
-      { screen: 'ic-take-inventory', module: 'inventory' },
-      { screen: 'sc-86-list',        module: 'shift' },
-      { screen: 'lc-log-hours',      module: 'labor' },
-      { screen: 'lc-tip-log',        module: 'labor' },
-      { screen: 'sc-log-shift',      module: 'shift' },
-      { screen: 'sc-active-shift',   module: 'shift' },
-      { screen: 'ic-receive-delivery', module: 'inventory' }
-    ];
-    for (const candidate of order) {
-      if (this.canAccess(candidate.screen)) return candidate;
+    for (const t of this.STAFF_TILES) {
+      if (this.canAccess(t.screen)) return { module: t.module, screen: t.screen };
     }
-    return { screen: 'ic-take-inventory', module: 'inventory' };
+    return { module: 'inventory', screen: 'ic-take-inventory' };
+  },
+
+  // Staff Hub: simplified landing page with one tile per accessible screen.
+  // Replaces the real Hub (financial overview) for staff role since they
+  // shouldn't see financial data, AND gives them a way to move between the
+  // operational modules (without it they'd be stuck in one module's sidebar).
+  showStaffHub() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('ob-overlay').classList.add('hidden');
+    document.getElementById('app').classList.add('hidden');
+    let wrap = document.getElementById('hub-wrapper');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'hub-wrapper';
+      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
+      document.body.appendChild(wrap);
+    }
+    wrap.style.display = 'block';
+    wrap.style.overflowY = 'auto';
+
+    const userEmail = DB._user?.email || '';
+    const accessibleTiles = this.STAFF_TILES.filter(t => this.canAccess(t.screen));
+
+    const tiles = accessibleTiles.map(t => {
+      return '<div class="staff-tile" data-screen="' + t.screen + '" data-module="' + t.module + '" '
+        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;cursor:pointer;transition:border-color 0.15s, background 0.15s;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;">' + t.label + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:6px;letter-spacing:0.5px;">' + t.moduleName + '</div>'
+        + '</div>';
+    }).join('');
+
+    const empty = accessibleTiles.length === 0
+      ? '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;font-size:13px;color:var(--t2);line-height:1.6;">You do not have access to any sections yet. Ask the account admin to grant you access from the User Accounts page.</div>'
+      : '';
+
+    wrap.innerHTML = '<div style="max-width:880px;margin:0 auto;padding:40px 24px;">'
+      + '<div style="font-size:18px;font-weight:800;color:var(--w);letter-spacing:0.5px;margin-bottom:6px;">Welcome back</div>'
+      + (userEmail ? '<div style="font-size:12px;color:var(--t3);margin-bottom:30px;">Signed in as ' + userEmail + '</div>' : '<div style="margin-bottom:30px;"></div>')
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Your Tasks</div>'
+      + (tiles ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">' + tiles + '</div>' : empty)
+      + '<div style="margin-top:40px;padding-top:20px;border-top:1px solid var(--b2);display:flex;justify-content:flex-end;">'
+      +   '<button class="btn btn-ghost" id="staff-signout">Sign Out</button>'
+      + '</div>'
+      + '</div>';
+
+    wrap.querySelectorAll('.staff-tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const mod = tile.dataset.module;
+        const screen = tile.dataset.screen;
+        this.showApp(mod);
+        this.navigate(screen);
+      });
+      tile.addEventListener('mouseenter', () => { tile.style.borderColor = 'var(--gold)'; });
+      tile.addEventListener('mouseleave', () => { tile.style.borderColor = 'var(--b1)'; });
+    });
+    document.getElementById('staff-signout')?.addEventListener('click', async () => {
+      await DB.signOut();
+      this.showAuth();
+    });
   },
 
   showApp(module) {
@@ -826,11 +894,13 @@ const App = {
 
   navigate(id) {
     // Role-based block: staff can't navigate to disallowed screens.
-    // Bounce them to their landing instead of silently failing.
+    // Bounce them to the Staff Hub so they can pick something they CAN do.
     if (!this.canAccess(id)) {
+      const role = (window.DB && DB.role && DB.role()) || null;
+      if (role === 'staff') { this.showStaffHub(); return; }
       const land = this.staffLanding();
       if (this._activeModule !== land.module) {
-        this.showApp(land.module);  // showApp will route to the landing screen
+        this.showApp(land.module);
         return;
       }
       id = land.screen;
