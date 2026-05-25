@@ -83,14 +83,13 @@ S.HubHelp = {
     container.scrollTop = 0;
     container.innerHTML =
       '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + '<div style="display:flex;align-items:baseline;gap:10px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
       +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Help and FAQ</div>'
-      +   '<span style="color:var(--t4);font-size:11px;font-weight:400;">|</span>'
-      +   '<a id="hh-back" class="topbar-back-link">Back to Hub</a>'
+      +   '<button id="hh-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
       + '</div>'
       + sectionsHtml
       + '</div>';
 
-    document.getElementById('hh-back').addEventListener('click', () => App.showHub());
+    document.getElementById('hh-close')?.addEventListener('click', () => App.closeHubOverlay());
   }
 };
