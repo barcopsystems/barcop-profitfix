@@ -16,7 +16,7 @@ S.LaborDailyView = {
     return isNaN(d.getTime()) ? '' : this.DAYS[d.getDay()];
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -40,7 +40,9 @@ S.LaborDailyView = {
 
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '';
+    this.actions = actions;
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button>';
+    document.getElementById('dv-export')?.addEventListener('click', () => window.print());
     if (!this.date) this.date = new Date().toISOString().slice(0, 10);
     this.draw();
   },
@@ -71,10 +73,10 @@ S.LaborDailyView = {
       + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val dim">'
-      + (schedHours != null ? schedHours.toFixed(1) : '—') + '</div></div>'
+      + (schedHours != null ? schedHours.toFixed(1) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val '
       + (hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good') + '">'
-      + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '—') + '</div></div>'
+      + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
       + '</div>';
 
     let actualsCard;
@@ -83,10 +85,10 @@ S.LaborDailyView = {
         + '<div style="font-size:13px;color:var(--t3);">No hours logged for this day. Log them in Log Hours.</div></div>';
     } else {
       const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a =>
-        '<tr><td><div class="val">' + esc(a.name || '—') + '</div></td>'
-        + '<td>' + esc(a.shift_type || '—') + '</td>'
-        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '—') + '</td>'
-        + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '—') + '</td>'
+        '<tr><td><div class="val">' + esc(a.name || '-') + '</div></td>'
+        + '<td>' + esc(a.shift_type || '-') + '</td>'
+        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
+        + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td></tr>').join('');
       actualsCard = '<div class="card"><div class="card-title">Logged Hours</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -97,10 +99,10 @@ S.LaborDailyView = {
     let schedCard = '';
     if (sched && sched.length) {
       const rows = [...sched].sort((a, b) => (a.start || '').localeCompare(b.start || '')).map(s =>
-        '<tr><td><div class="val">' + esc(s.name || '—') + '</div></td>'
-        + '<td>' + esc(s.start || '—') + '</td>'
-        + '<td>' + esc(s.end || '—') + '</td>'
-        + '<td>' + (s.hours != null ? s.hours.toFixed(1) : '—') + '</td>'
+        '<tr><td><div class="val">' + esc(s.name || '-') + '</div></td>'
+        + '<td>' + esc(s.start || '-') + '</td>'
+        + '<td>' + esc(s.end || '-') + '</td>'
+        + '<td>' + (s.hours != null ? s.hours.toFixed(1) : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(s.cost || 0) + '</td></tr>').join('');
       schedCard = '<div class="card"><div class="card-title">Scheduled This Day</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
