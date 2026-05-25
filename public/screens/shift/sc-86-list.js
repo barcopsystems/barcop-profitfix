@@ -88,8 +88,8 @@ S.Shift86List = {
             + (i.reported_by ? ' &middot; by ' + esc(i.reported_by) : '') + '</div>'
             + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
             + '<button class="btn btn-primary ei-back" data-id="' + i.id + '" style="height:44px;">Back In Stock</button>'
-            + '<button class="btn btn-ghost ei-edit" data-id="' + i.id + '" style="height:44px;">Edit</button>'
-            + '<button class="btn btn-danger ei-del" data-id="' + i.id + '" style="height:44px;">Delete</button>'
+            + (App.canEdit('sc-86-list') ? '<button class="btn btn-ghost ei-edit" data-id="' + i.id + '" style="height:44px;">Edit</button>' : '')
+            + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger ei-del" data-id="' + i.id + '" style="height:44px;">Delete</button>' : '')
             + '</div></div>';
         }).join('') + '</div>';
     }
@@ -102,7 +102,7 @@ S.Shift86List = {
         + '<td>' + this.fmtDate(i.date_back) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm ei-re86" data-id="' + i.id + '">Re-86</button>'
-        + '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>'
+        + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
       backCard = '<div class="card"><div class="card-title">Recently Back In Stock</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
