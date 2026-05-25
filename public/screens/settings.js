@@ -163,7 +163,7 @@ S.HubSettings = {
       // wire() listener) before launching the paid app.
       + (App.demoMode ? '' :
           sh('Testing Tools')
-          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every module to test calculations and layouts. Clear all data wipes every store, App data and Inventory, Labor, and Shift Control, and starts fresh.</div>'
+          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every system to test calculations and layouts. Clear All Data wipes every record across Bar Cop and the Inventory, Labor, and Shift Control stores, and starts fresh.</div>'
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
           + '<button class="btn btn-ghost" id="s-load-sample">Load Sample Data</button>'
           + '<button class="btn btn-danger" id="s-clear-all">Clear All Data</button>'
@@ -1642,7 +1642,7 @@ S.HubSettings = {
           { done:true, finding:'Mid-shift count run the following Friday came back clean.' },
           { done:true, finding:'Closed as a counting error plus one unlogged spill. No theft indicated.' },
         ],
-        resolution:'Counting error plus an unlogged spill. Added a spill line to the closing checklist so breakage is recorded going forward.' },
+        resolution:'Counting error plus an unlogged spill. Added a spill line to the closing checklist so breakage gets recorded from here on.' },
       { id:uid(), sku:'Espolòn Tequila Blanco', opened_date:dateStr(9),
         status:'open',
         steps:[
@@ -1818,7 +1818,7 @@ S.HubSettings = {
     await App.saveShift();
     App.updatePeriod();
 
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six modules populated. Go test!'; }
+    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six systems populated. Go test!'; }
   },
 
   async clearAll() {
