@@ -35,10 +35,17 @@ const DB = {
   onAuthChange(cb) {
     if (!this._sb) return;
     this._sb.auth.onAuthStateChange((event, session) => {
+      const prevUserId = this._user?.id;
       this._user = session?.user || null;
-      this._accountId = null;
-    this._role = null;
-    this._permissions = null;
+      const newUserId = this._user?.id;
+      // Only clear cached account/role/permissions if the user actually
+      // changed. TOKEN_REFRESHED events keep the same user — wiping the cache
+      // there was hiding the Team card after periodic token refresh.
+      if (prevUserId !== newUserId) {
+        this._accountId = null;
+        this._role = null;
+        this._permissions = null;
+      }
       cb(event, session);
     });
   },
