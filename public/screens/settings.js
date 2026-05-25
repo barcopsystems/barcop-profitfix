@@ -6,23 +6,9 @@
    own. Reads and writes the existing settings keys; purely a UI consolidation. */
 S.HubSettings = {
 
-  // Open the Hub Settings view inside the Hub container. Mirrors App.showHub().
+  // Open App Settings as a modal overlay on top of the Hub Dashboard.
   open() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('ob-overlay').classList.add('hidden');
-    document.getElementById('app').classList.add('hidden');
-    let wrap = document.getElementById('hub-wrapper');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'hub-wrapper';
-      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
-      document.body.appendChild(wrap);
-    }
-    wrap.style.display = 'block';
-    // The Hub leaves hub-wrapper at overflowY:hidden (fixed-viewport dashboard).
-    // This view scrolls, so restore it whenever the wrapper is reused.
-    wrap.style.overflowY = 'auto';
-    this.render(wrap);
+    App.openHubOverlay((panel) => this.render(panel));
   },
 
   render(container) {
