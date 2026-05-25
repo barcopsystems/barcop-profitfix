@@ -48,24 +48,12 @@ S.HubUserAccounts = {
   ],
 
   async open() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('ob-overlay').classList.add('hidden');
-    document.getElementById('app').classList.add('hidden');
-    let wrap = document.getElementById('hub-wrapper');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'hub-wrapper';
-      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
-      document.body.appendChild(wrap);
-    }
-    wrap.style.display = 'block';
-    wrap.style.overflowY = 'auto';
-    this.container = wrap;
-    // Ensure role/permissions are resolved before render checks isAdmin.
-    // Otherwise the Team card silently disappears on the first open after a
-    // token refresh (when _role got cleared and hasn't been re-fetched yet).
+    // Ensure role/permissions are resolved before render checks isAdmin
     if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
-    this.render(wrap);
+    App.openHubOverlay((panel) => {
+      this.container = panel;
+      this.render(panel);
+    });
   },
 
   render(container) {
