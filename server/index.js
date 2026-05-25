@@ -992,10 +992,17 @@ app.post('/api/support-message-notify', async (req, res) => {
 // instead of creating a new one for them.
 app.post('/api/invite-user', async (req, res) => {
   try {
-    const { email, accountId, role } = req.body || {};
+    const { email, accountId, role, permissions } = req.body || {};
     if (!email || !accountId) {
       return res.status(400).json({ error: 'email and accountId required' });
     }
+    // Permissions: optional JSON object { groupKey: 'add' | 'edit' } for staff role.
+    // Sanitized so only known levels are stored.
+    const cleanPerms = (permissions && typeof permissions === 'object')
+      ? Object.fromEntries(
+          Object.entries(permissions).filter(([k, v]) => v === 'add' || v === 'edit')
+        )
+      : {};
 
     // Verify the requester via their JWT (don't trust client-supplied user IDs)
     const authHeader = req.headers.authorization || '';
@@ -1029,7 +1036,8 @@ app.post('/api/invite-user', async (req, res) => {
       {
         data: {
           invited_to_account_id: accountId,
-          invited_role: inviteRole
+          invited_role: inviteRole,
+          invited_permissions: cleanPerms
         },
         redirectTo: 'https://app.barcop.com/'
       }
@@ -1070,7 +1078,7 @@ app.post('/api/invite-user', async (req, res) => {
 
         const { error: insertError } = await supabaseAdmin
           .from('memberships')
-          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole });
+          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: cleanPerms });
 
         if (insertError) {
           return res.status(500).json({ error: insertError.message });
@@ -1135,7 +1143,7 @@ app.post('/api/list-members', async (req, res) => {
 
     const { data: memberships, error: listError } = await supabaseAdmin
       .from('memberships')
-      .select('id, user_id, role, created_at')
+      .select('id, user_id, role, permissions, created_at')
       .eq('account_id', accountId)
       .order('created_at', { ascending: true });
 
@@ -1153,6 +1161,7 @@ app.post('/api/list-members', async (req, res) => {
           user_id: m.user_id,
           email: u?.user?.email || '(unknown)',
           role: m.role,
+          permissions: m.permissions || {},
           confirmed: !!u?.user?.confirmed_at,
           created_at: m.created_at,
           is_self: m.user_id === requesterUserId
@@ -1163,6 +1172,7 @@ app.post('/api/list-members', async (req, res) => {
           user_id: m.user_id,
           email: '(unknown)',
           role: m.role,
+          permissions: m.permissions || {},
           confirmed: false,
           created_at: m.created_at,
           is_self: m.user_id === requesterUserId
@@ -1245,6 +1255,56 @@ app.post('/api/update-member-role', async (req, res) => {
   } catch (e) {
     console.error('update-member-role exception:', e);
     res.status(500).json({ error: e.message || 'Update role failed' });
+  }
+});
+
+// ── Update a member's permissions (Phase 2 Item 25b) ──────────────────────────
+// Only admins can call. Permissions is a JSON object { groupKey: 'add' | 'edit' }.
+// Missing keys mean no access to that group.
+app.post('/api/update-member-permissions', async (req, res) => {
+  try {
+    const { accountId, membershipId, permissions } = req.body || {};
+    if (!accountId || !membershipId) {
+      return res.status(400).json({ error: 'accountId and membershipId required' });
+    }
+    const cleanPerms = (permissions && typeof permissions === 'object')
+      ? Object.fromEntries(
+          Object.entries(permissions).filter(([k, v]) => v === 'add' || v === 'edit')
+        )
+      : {};
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const requesterUserId = userData.user.id;
+
+    const { data: requesterMembership } = await supabaseAdmin
+      .from('memberships')
+      .select('role')
+      .eq('account_id', accountId)
+      .eq('user_id', requesterUserId)
+      .single();
+
+    if (!requesterMembership || requesterMembership.role !== 'admin') {
+      return res.status(403).json({ error: 'Only account admins can change permissions' });
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('memberships')
+      .update({ permissions: cleanPerms })
+      .eq('id', membershipId)
+      .eq('account_id', accountId);
+
+    if (updateError) return res.status(500).json({ error: updateError.message });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('update-member-permissions exception:', e);
+    res.status(500).json({ error: e.message || 'Update permissions failed' });
   }
 });
 
