@@ -31,6 +31,8 @@ window.Recovery = {
   // 'unit' means dollars = improvement x base x 52.
   _ptargets() { return (App.data.settings || {}).targets || {}; },
   _rtargets() { return ((App.data.revenue_settings || {}).targets) || {}; },
+  _tconv()    { return ((App.data.traffic_settings || {}).conversion_rates) || {}; },
+  _checkAvg() { return Recovery._rtargets().check_avg ?? 35; },
 
   METRICS: {
     'pour-cost': {
@@ -83,6 +85,69 @@ window.Recovery = {
       target: () => { const t = Recovery._rtargets();
         return ((t.rplh_lunch ?? 50) + (t.rplh_dinner ?? 75) + (t.rplh_bar ?? 65)) / 3; },
       fmt: v => '$' + v.toFixed(0)
+    },
+
+    // ── Traffic Recovery metrics ─────────────────────────────────────────────
+    // Five Traffic gap-areas dollarize using operator-set conversion rates from
+    // traffic_settings.conversion_rates × check_avg from revenue_settings as the
+    // per-visit value. Monthly-tracked metrics are divided by 4.33 to convert
+    // to weekly so improvement × base × 52 yields an annual figure. Reviews
+    // and SEO stay absent (their dollar path is too indirect to defend).
+
+    // Website — monthly_sessions ÷ 4.33 weekly × (web_session_to_visit% × check_avg) × 52 = annual $
+    'website': {
+      series: 'traffic_weeks', label: 'Website Sessions', lowerBetter: false,
+      value: w => w.monthly_sessions != null ? w.monthly_sessions / 4.33 : null,
+      base:  () => ((Recovery._tconv().web_session_to_visit ?? 3) / 100) * Recovery._checkAvg(),
+      baseKind: 'unit',
+      target: () => ((App.data.traffic_settings || {}).targets || {}).monthly_sessions ?? 2000,
+      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
+    },
+
+    // Google Business Profile — gbp_views ÷ 4.33 × (gbp_view_to_visit% × check_avg) × 52
+    'gbp': {
+      series: 'traffic_weeks', label: 'GBP Views', lowerBetter: false,
+      value: w => w.gbp_views != null ? w.gbp_views / 4.33 : null,
+      base:  () => ((Recovery._tconv().gbp_view_to_visit ?? 2) / 100) * Recovery._checkAvg(),
+      baseKind: 'unit',
+      target: () => null,
+      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
+    },
+
+    // Social Media — social_profile_visits ÷ 4.33 × (social_profile_to_visit% × check_avg) × 52
+    'social': {
+      series: 'traffic_weeks', label: 'Social Profile Visits', lowerBetter: false,
+      value: w => w.social_profile_visits != null ? w.social_profile_visits / 4.33 : null,
+      base:  () => ((Recovery._tconv().social_profile_to_visit ?? 1) / 100) * Recovery._checkAvg(),
+      baseKind: 'unit',
+      target: () => null,
+      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
+    },
+
+    // Email and Loyalty — (list × open_rate% × email_open_to_visit%) ÷ 4.33 weekly visits × check_avg × 52
+    'email-loyalty': {
+      series: 'traffic_weeks', label: 'Email-Driven Visits', lowerBetter: false,
+      value: w => {
+        const list = w.email_list_size, open = w.email_open_rate;
+        if (list == null || open == null) return null;
+        const conv = (Recovery._tconv().email_open_to_visit ?? 1) / 100;
+        return (list * (open / 100) * conv) / 4.33;
+      },
+      base:  () => Recovery._checkAvg(),
+      baseKind: 'unit',
+      target: () => null,
+      fmt: v => Math.round(v * 4.33).toLocaleString() + ' visits/mo'
+    },
+
+    // Delivery Platforms — delivery_orders ÷ 4.33 weekly orders × delivery_avg_order_value × 52
+    // No conversion rate: orders × avg order value is direct revenue.
+    'delivery': {
+      series: 'traffic_weeks', label: 'Delivery Orders', lowerBetter: false,
+      value: w => w.delivery_orders != null ? w.delivery_orders / 4.33 : null,
+      base:  w => w.delivery_avg_order_value,
+      baseKind: 'unit',
+      target: () => null,
+      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
     }
   },
 
@@ -90,6 +155,7 @@ window.Recovery = {
     if (key === 'weeks') return (App.data.weeks || []);
     if (key === 'revenue_weeks') return (App.data.revenue_weeks || [])
       .filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0);
+    if (key === 'traffic_weeks') return (App.data.traffic_weeks || []);
     return [];
   },
 
