@@ -579,20 +579,24 @@ S.TrafficAudit = {
       + '<button class="btn btn-ghost" id="ta-iz-cancel">Cancel</button>'
       + '</div>';
 
+    const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || {};
+
     let stepHtml = '';
     if (step === 1) {
       stepHtml = '<div class="card">' + header + barInfo
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Google Business Profile</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Upload screenshots of your Google Business Profile. The full profile view is required. GBP Insights unlocks Tier 3 scoring. Your Bar Cop data is included automatically.</div>'
-        + this.renderFileSection('required', 'GBP Screenshot: Full Profile View', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Adds: Section 1 full. Completeness audit, photo count, post frequency, response rate')
-        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',  'ta-f-gbp-insights', 'ta-gbp-insights', 'Adds: Section 1 Tier 3. Full funnel from impression to action')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Your saved GBP link in Operation Links is used to pull live profile data. The optional GBP Insights screenshot unlocks Tier 3 scoring (impressions, calls, directions). Your Bar Cop data is included automatically.</div>'
+        + this.renderUrlSection('GBP URL (from Operation Links)', urls.gbp, 'GBP', 'Settings > Operation Links > Google Business Profile')
+        + this.renderFileSection('optional', 'GBP Screenshot: Full Profile View (Fallback)', 'ta-f-gbp-profile',  'ta-gbp-profile',  'Adds: Backup data source if the live URL fetch is blocked or returns nothing useful')
+        + this.renderFileSection('optional', 'GBP Insights Export or Screenshot',            'ta-f-gbp-insights', 'ta-gbp-insights', 'Adds: Section 1 Tier 3. Full funnel from impression to action. Cannot be pulled by URL.')
         + nav(false, true, false) + '</div>';
     } else if (step === 2) {
       stepHtml = '<div class="card">' + header
         + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Website Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Website analytics is the highest-value file in this section. Mobile screenshot adds conversion assessment.</div>'
-        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Adds: Section 2 full. Sessions, bounce rate, top pages, menu page performance')
-        + this.renderFileSection('optional',  'Website Screenshot: Homepage on Mobile','ta-f-mobile-site', 'ta-mobile-site', 'Adds: Mobile conversion assessment, above-the-fold call-to-action analysis')
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Your saved website link is run through Google PageSpeed Insights for mobile performance, accessibility, SEO, and best-practices scoring. Analytics export is still the highest-value upload because it covers session and bounce data behind the login.</div>'
+        + this.renderUrlSection('Website URL (from Operation Links)', urls.website, 'Website', 'Settings > Operation Links > Website')
+        + this.renderFileSection('highlight', 'Website Analytics Export or Screenshot', 'ta-f-analytics',   'ta-analytics',   'Adds: Section 2 full. Sessions, bounce rate, top pages, menu page performance. Cannot be pulled by URL.')
+        + this.renderFileSection('optional',  'Website Screenshot: Homepage on Mobile (Fallback)','ta-f-mobile-site', 'ta-mobile-site', 'Adds: Backup data source if the live URL fetch is blocked.')
         + nav(true, true, false) + '</div>';
     } else if (step === 3) {
       stepHtml = '<div class="card">' + header
@@ -640,10 +644,14 @@ S.TrafficAudit = {
     });
     document.getElementById('ta-iz-next')?.addEventListener('click', () => {
       if (step === 1) {
+        // Step 1 now uses the GBP URL from Operation Links instead of requiring
+        // a screenshot. Block forward if both the URL and a fallback screenshot
+        // are missing — the audit needs at least one source for the GBP section.
+        const gbpUrl = (App.data.traffic_settings && App.data.traffic_settings.urls && App.data.traffic_settings.urls.gbp) || '';
         const gbpFiles = document.getElementById('ta-f-gbp-profile')?.files;
-        if (!gbpFiles || gbpFiles.length === 0) {
+        if (!gbpUrl && (!gbpFiles || gbpFiles.length === 0)) {
           const st = document.getElementById('ta-iz-status');
-          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='GBP Profile Screenshot is required to continue.'; }
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Add your Google Business Profile URL in Settings, or upload a GBP screenshot as the fallback, to continue.'; }
           return;
         }
       }
@@ -669,6 +677,35 @@ S.TrafficAudit = {
     if (document.getElementById('ta-iz-notes')) this._intakeDraft.notes = document.getElementById('ta-iz-notes').value;
   },
 
+
+  // Renders an indicator for a URL pulled from Settings. If the URL is set,
+  // shows green-tinted "Using your saved [Platform] link" with a truncated
+  // preview. If not, shows a "Add it in Settings" prompt with a button that
+  // jumps to App Settings. The audit endpoint reads urls from traffic_settings
+  // either way; this is purely the operator-facing indicator.
+  renderUrlSection(label, url, platform, settingsPath) {
+    const has = !!(url && url.trim());
+    const truncate = (s, n) => (s && s.length > n) ? s.slice(0, n - 1) + '…' : s;
+    if (has) {
+      return '<div style="border:1px solid var(--green);background:rgba(81,138,121,0.08);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+        +   '<span style="background:var(--green);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Live URL</span>'
+        +   '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(label) + '</div>'
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);word-break:break-all;">' + esc(truncate(url, 110)) + '</div>'
+        + '</div>';
+    }
+    return '<div style="border:1px solid rgba(192,56,40,0.4);background:rgba(192,56,40,0.06);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+      +   '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Missing</span>'
+      +   '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(label) + '</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:8px;">'
+      +   'No ' + esc(platform) + ' URL is saved. Add it in ' + esc(settingsPath) + ' so the audit can pull live data. You can also upload a fallback screenshot below.'
+      + '</div>'
+      + '<button class="btn btn-ghost btn-sm" onclick="S.HubSettings.open()" style="font-size:10px;padding:4px 10px;">Open Settings</button>'
+      + '</div>';
+  },
 
   renderFileSection(type, title, inputId, ttId, unlocks) {
     const badge = type === 'required'
@@ -699,6 +736,11 @@ S.TrafficAudit = {
     const form = new FormData();
     form.append('appData', JSON.stringify(App.data));
     form.append('notes', this._intakeDraft?.notes || '');
+    // Saved URLs from Operation Links. Server fetches public data from these
+    // (PageSpeed Insights for website, HTML for GBP) instead of relying on
+    // operator screenshots for sections we can read live.
+    const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || null;
+    if (urls) form.append('urls', JSON.stringify(urls));
 
     const fileInputIds = [
       'ta-f-gbp-profile','ta-f-gbp-insights','ta-f-analytics','ta-f-mobile-site',
