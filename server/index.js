@@ -1076,7 +1076,21 @@ app.post('/api/invite-user', async (req, res) => {
           return res.status(500).json({ error: insertError.message });
         }
 
-        return res.json({ ok: true, email: cleanEmail, role: inviteRole, addedDirectly: true });
+        // Also send a password recovery email so they can set (or reset) their
+        // password and sign in. Triggers the recovery flow in app.js which
+        // shows the set-password panel. Non-fatal if email send fails.
+        let emailSent = false;
+        try {
+          const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail, {
+            redirectTo: 'https://app.barcop.com/'
+          });
+          emailSent = !resetErr;
+          if (resetErr) console.error('Password reset email failed:', resetErr);
+        } catch (e) {
+          console.error('Password reset email exception:', e);
+        }
+
+        return res.json({ ok: true, email: cleanEmail, role: inviteRole, addedDirectly: true, emailSent });
       }
 
       console.error('Invite error:', inviteError);
