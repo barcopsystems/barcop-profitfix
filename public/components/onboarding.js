@@ -87,14 +87,10 @@ const Onboarding = {
   // ── Step 2 — Operation profile ──────────────────────────────────────────────
   renderProfile() {
     const s = App.data.settings;
-    const bt = s.bar_type || 'bar_kitchen';
-    const opt = (v, label) => '<option value="' + v + '"' + (bt === v ? ' selected' : '') + '>' + label + '</option>';
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Your Operation</div>'
       + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">These numbers set the dollar baselines for every calculation and audit. You can change them any time in Settings.</div>'
       + this._stepDots(2)
-      + '<div class="f" style="margin-bottom:14px;"><label>Operation Type</label>'
-      + '<select id="ob-type" style="width:100%;">' + opt('bar_kitchen', 'Bar and Kitchen') + opt('bar_only', 'Bar Only') + '</select></div>'
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
       + '<div class="f" style="flex:1;"><label>Annual Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + (s.annual_bar_revenue || '') + '"/></div></div>'
       + '<div class="f" style="flex:1;"><label>Annual Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + (s.annual_food_revenue || '') + '"/></div></div>'
@@ -106,7 +102,6 @@ const Onboarding = {
 
     document.getElementById('ob-back')?.addEventListener('click', () => { this._step = 1; this.render(); });
     document.getElementById('ob-next')?.addEventListener('click', () => {
-      App.data.settings.bar_type            = document.getElementById('ob-type')?.value || 'bar_kitchen';
       App.data.settings.annual_bar_revenue  = parseFloat(document.getElementById('ob-bar-rev')?.value)  || 0;
       App.data.settings.annual_food_revenue = parseFloat(document.getElementById('ob-food-rev')?.value) || 0;
       this._step = 3;
