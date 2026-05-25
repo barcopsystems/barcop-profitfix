@@ -11,35 +11,37 @@ S.HubUserAccounts = {
   // Permission groups: 24 sections, organized by module, each with two
   // checkboxes per member (Access + Allow Edit/Delete). Default staff
   // baseline (pre-checked for new invites): Take Inventory + 86 List.
+  // No pre-selected defaults. Admin explicitly checks every box for every
+  // staff invite. Protects ownership from accidental over-permissioning.
   PERMISSION_GROUPS: [
     // Inventory Control
-    { module: 'Inventory Control', key: 'take-inventory',   label: 'Take Inventory',           defaultStaff: 'add' },
-    { module: 'Inventory Control', key: 'receive-delivery', label: 'Receive Deliveries',       defaultStaff: null  },
-    { module: 'Inventory Control', key: 'place-orders',     label: 'Place Orders',             defaultStaff: null  },
-    { module: 'Inventory Control', key: 'spot-check',       label: 'Spot Checks',              defaultStaff: null  },
-    { module: 'Inventory Control', key: 'manage-products',  label: 'Manage Products & Vendors',defaultStaff: null  },
-    { module: 'Inventory Control', key: 'inventory-reports',label: 'Inventory Reports',        defaultStaff: null  },
+    { module: 'Inventory Control', key: 'take-inventory',   label: 'Take Inventory' },
+    { module: 'Inventory Control', key: 'receive-delivery', label: 'Receive Deliveries' },
+    { module: 'Inventory Control', key: 'place-orders',     label: 'Place Orders' },
+    { module: 'Inventory Control', key: 'spot-check',       label: 'Spot Checks' },
+    { module: 'Inventory Control', key: 'manage-products',  label: 'Manage Products & Vendors' },
+    { module: 'Inventory Control', key: 'inventory-reports',label: 'Inventory Reports' },
     // Labor Control
-    { module: 'Labor Control',     key: 'log-hours',        label: 'Log Hours',                defaultStaff: null  },
-    { module: 'Labor Control',     key: 'log-tips',         label: 'Log Tips',                 defaultStaff: null  },
-    { module: 'Labor Control',     key: 'view-schedule',    label: 'View Schedule',            defaultStaff: null  },
-    { module: 'Labor Control',     key: 'manage-schedule',  label: 'Manage Schedule',          defaultStaff: null  },
-    { module: 'Labor Control',     key: 'manage-staff',     label: 'Manage Staff & Positions', defaultStaff: null  },
-    { module: 'Labor Control',     key: 'call-out-log',     label: 'Call-Out Log',             defaultStaff: null  },
-    { module: 'Labor Control',     key: 'labor-reports',    label: 'Labor Reports',            defaultStaff: null  },
+    { module: 'Labor Control',     key: 'log-hours',        label: 'Log Hours' },
+    { module: 'Labor Control',     key: 'log-tips',         label: 'Log Tips' },
+    { module: 'Labor Control',     key: 'view-schedule',    label: 'View Schedule' },
+    { module: 'Labor Control',     key: 'manage-schedule',  label: 'Manage Schedule' },
+    { module: 'Labor Control',     key: 'manage-staff',     label: 'Manage Staff & Positions' },
+    { module: 'Labor Control',     key: 'call-out-log',     label: 'Call-Out Log' },
+    { module: 'Labor Control',     key: 'labor-reports',    label: 'Labor Reports' },
     // Shift Control
-    { module: 'Shift Control',     key: 'log-shift',        label: 'Log Shifts',               defaultStaff: null  },
-    { module: 'Shift Control',     key: 'active-shift',     label: 'Run Active Shift',         defaultStaff: null  },
-    { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management',          defaultStaff: null  },
-    { module: 'Shift Control',     key: 'checklists',       label: 'Opening / Closing Checklists', defaultStaff: null },
-    { module: 'Shift Control',     key: '86-list',          label: '86 Items List',            defaultStaff: 'add' },
-    { module: 'Shift Control',     key: 'void-comp',        label: 'Void / Comp Log',          defaultStaff: null  },
-    { module: 'Shift Control',     key: 'maintenance',      label: 'Maintenance Log',          defaultStaff: null  },
-    { module: 'Shift Control',     key: 'shift-reports',    label: 'Shift Reports',            defaultStaff: null  },
+    { module: 'Shift Control',     key: 'log-shift',        label: 'Log Shifts' },
+    { module: 'Shift Control',     key: 'active-shift',     label: 'Run Active Shift' },
+    { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management' },
+    { module: 'Shift Control',     key: 'checklists',       label: 'Opening / Closing Checklists' },
+    { module: 'Shift Control',     key: '86-list',          label: '86 Items List' },
+    { module: 'Shift Control',     key: 'void-comp',        label: 'Void / Comp Log' },
+    { module: 'Shift Control',     key: 'maintenance',      label: 'Maintenance Log' },
+    { module: 'Shift Control',     key: 'shift-reports',    label: 'Shift Reports' },
     // Recovery
-    { module: 'Recovery',          key: 'profit-recovery',  label: 'Profit Recovery (all)',    defaultStaff: null  },
-    { module: 'Recovery',          key: 'revenue-recovery', label: 'Revenue Recovery (all)',   defaultStaff: null  },
-    { module: 'Recovery',          key: 'traffic-recovery', label: 'Traffic Recovery (all)',   defaultStaff: null  }
+    { module: 'Recovery',          key: 'profit-recovery',  label: 'Profit Recovery (all)' },
+    { module: 'Recovery',          key: 'revenue-recovery', label: 'Revenue Recovery (all)' },
+    { module: 'Recovery',          key: 'traffic-recovery', label: 'Traffic Recovery (all)' }
   ],
 
   open() {
@@ -135,11 +137,9 @@ S.HubUserAccounts = {
   },
 
   renderPermsGrid(currentPerms, mode) {
-    // mode: 'invite' (default staff baseline) or 'edit' (current member perms)
-    const useDefaults = mode === 'invite' && Object.keys(currentPerms || {}).length === 0;
+    // Always starts from currentPerms (empty {} for new invites = all unchecked).
+    // Admin explicitly chooses every section for every invite.
     const groups = this.PERMISSION_GROUPS;
-
-    // Group by module
     const byModule = {};
     groups.forEach(g => {
       if (!byModule[g.module]) byModule[g.module] = [];
@@ -153,7 +153,7 @@ S.HubUserAccounts = {
     Object.keys(byModule).forEach(mod => {
       html += '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);margin:8px 0 6px;border-bottom:1px solid var(--b2);padding-bottom:4px;">' + esc(mod) + '</div>';
       byModule[mod].forEach(g => {
-        const current = (currentPerms || {})[g.key] || (useDefaults ? g.defaultStaff : null);
+        const current = (currentPerms || {})[g.key] || null;
         const access = current === 'add' || current === 'edit';
         const edit = current === 'edit';
         html += '<div style="display:flex;align-items:center;gap:12px;padding:5px 0;">'
