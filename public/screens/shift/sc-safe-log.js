@@ -36,7 +36,7 @@ S.ShiftSafeLog = {
     });
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -49,6 +49,11 @@ S.ShiftSafeLog = {
     addBtn.textContent = 'Add Entry';
     addBtn.addEventListener('click', () => this.showForm());
     actions.appendChild(addBtn);
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-ghost btn-sm';
+    exportBtn.textContent = 'Export PDF';
+    exportBtn.addEventListener('click', () => window.print());
+    actions.appendChild(exportBtn);
     this.renderList();
   },
 
@@ -58,7 +63,7 @@ S.ShiftSafeLog = {
     let html;
     if (chrono.length === 0) {
       html = '<div class="empty"><div class="empty-title">No safe activity logged yet</div>'
-        + '<div class="empty-sub">Record cash moving in and out of the safe — drops, banks, deposits, '
+        + '<div class="empty-sub">Record cash moving in and out of the safe: drops, banks, deposits, '
         + 'paid-outs. Each entry keeps a running balance so you always know what should be in the safe.</div>'
         + '<button class="btn btn-primary" id="sl-add-first">Add Entry</button></div>';
     } else {
@@ -86,9 +91,9 @@ S.ShiftSafeLog = {
         return '<tr class="sl-row" data-id="' + e.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(e.date) + '</div>'
           + (e.time ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.time) + '</div>' : '') + '</td>'
-          + '<td>' + esc(e.txn_type || '—') + '</td>'
-          + '<td>' + esc(e.performed_by || '—') + '</td>'
-          + '<td>' + esc(e.reference || '—') + '</td>'
+          + '<td>' + esc(e.txn_type || '-') + '</td>'
+          + '<td>' + esc(e.performed_by || '-') + '</td>'
+          + '<td>' + esc(e.reference || '-') + '</td>'
           + '<td>' + amtCell + '</td>'
           + '<td class="val">' + App.fmtCurrency(r.bal) + '</td>'
           + '<td><div class="row-actions">'
@@ -146,7 +151,7 @@ S.ShiftSafeLog = {
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sl-amount" min="0" step="0.01" value="' + v(e?.amount) + '"/></div></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Direction</label>'
-      + '<div class="f-display" id="sl-dir" style="height:36px;display:flex;align-items:center;">—</div></div>'
+      + '<div class="f-display" id="sl-dir" style="height:36px;display:flex;align-items:center;">-</div></div>'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Reference</label>'
       + '<input type="text" id="sl-ref" value="' + esc(e?.reference || '') + '" placeholder="e.g. Bar 1, Deposit #"/></div>'
       + '</div>'
