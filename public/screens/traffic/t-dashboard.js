@@ -12,13 +12,7 @@ S.TrafficDashboard = {
     const googleRating  = latest?.google_rating ?? null;
     const responseRate  = latest?.response_rate ?? null;
 
-    // Trend Insights button
-    const insBtn = document.createElement('button');
-    insBtn.className = 'btn btn-ghost btn-sm';
-    insBtn.id = 't-insights-btn';
-    insBtn.textContent = 'Trend Insights';
-    insBtn.addEventListener('click', () => this.showInsights());
-    actions.appendChild(insBtn);
+    // Trend Insights button lives in the 8-Week Trend chart header, not here.
 
     // Alert
     let alertHtml = '';
@@ -35,24 +29,6 @@ S.TrafficDashboard = {
 
     // Chart — annotated 8-week trend
     const chartHtml = this.buildChart(weeks, t);
-
-    // Activity reminder nudges
-    const nudges = this.activityNudges();
-    const shown = nudges.slice(0, 4);
-    const nudgeBody = shown.length
-      ? shown.map((n, i) =>
-          '<div onclick="App.navigate(\'' + n.screen + '\')" style="display:flex;align-items:center;gap:10px;'
-          + 'padding:9px 0;cursor:pointer;' + (i < shown.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-          + '<span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:'
-          + (n.sev === 'warn' ? 'var(--gold)' : 'var(--t3)') + ';"></span>'
-          + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">' + esc(n.text) + '</div>'
-          + '<span style="flex-shrink:0;font-size:12px;color:var(--t3);">&#9656;</span>'
-          + '</div>').join('')
-      : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Posting, reviews, and email are keeping pace. Nothing is slipping right now.</div>';
-    const activityHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + FixPanel.sectionHeader('Activity Reminders')
-      + '<div style="padding:18px 20px;">' + nudgeBody + '</div>'
-      + '</div>';
 
     // Priority Action Items — ranked by dollar impact from the latest Traffic audit
     const tAudits = App.data.traffic_audits || [];
@@ -90,7 +66,6 @@ S.TrafficDashboard = {
       + FixPanel.recoveryCard('traffic')
       + alertHtml
       + chartHtml
-      + activityHtml
       + actionHtml
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
       + FixPanel.sectionHeader('Quick Actions')
@@ -118,112 +93,6 @@ S.TrafficDashboard = {
     });
     document.getElementById('t-insights-btn')?.addEventListener('click', () => this.showInsights());
     FixPanel.wireFixAreas(container);
-  },
-
-  showInsights() {
-    if (App.demoBlock('AI Trend Insights')) return;
-    const weeks = (App.data.traffic_weeks || []).slice(-8);
-    const showModal = (html) => {
-      const m = document.createElement('div');
-      m.className = 'ins-modal';
-      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-      const box = document.createElement('div');
-      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
-      box.innerHTML = html;
-      m.appendChild(box);
-      document.body.appendChild(m);
-      m.onclick = ev => { if (ev.target === m) m.remove(); };
-      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
-    };
-    if (weeks.length < 2) {
-      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of traffic data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-      return;
-    }
-    const btn = document.getElementById('t-insights-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
-    const t = (App.data.traffic_settings || {}).targets || {};
-    const grT  = t.google_rating ?? 4.3;
-    const rrT  = t.response_rate ?? 80;
-    const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
-    const grS = weeks.map(w => w.google_rating).filter(v => v != null);
-    const rvS = weeks.map(w => w.new_reviews).filter(v => v != null);
-    const rrS = weeks.map(w => w.response_rate).filter(v => v != null);
-    const aGR = avg(grS).toFixed(2);
-    const aRV = avg(rvS).toFixed(1);
-    const aRR = avg(rrS).toFixed(0);
-    const trend = grS.length >= 3
-      ? (grS[grS.length-1] - grS[0] > 0.1 ? 'rating climbing'
-        : grS[0] - grS[grS.length-1] > 0.1 ? 'rating slipping'
-        : 'rating flat')
-      : 'early data';
-    const lines = [
-      'Google Rating: ' + weeks.map(w => (w.google_rating||0).toFixed(2) + '★').join(', ') + ' (target: ' + grT + '★, avg: ' + aGR + '★)',
-      'New Reviews per week: ' + weeks.map(w => Math.round(w.new_reviews||0)).join(', ') + ' (avg: ' + aRV + ')',
-      'Response Rate: ' + weeks.map(w => (w.response_rate||0).toFixed(0) + '%').join(', ') + ' (target: ' + rrT + '%, avg: ' + aRR + '%)',
-      'Rating trend: ' + trend
-    ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with what the rating and review velocity are saying about how the bar shows up in local search, then response rate as a coachable habit, then the single action that will matter most this week.';
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Trend Insights'; }
-        if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: ' + data.error.message + '</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
-        const text = data.content?.[0]?.text;
-        if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
-        const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last ' + weeks.length + ' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
-        const body = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">') + '</div>';
-        showModal(header + body);
-      }).catch(err => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Trend Insights'; }
-        showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: ' + err.message + '. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-      });
-  },
-
-  /* Activity reminder nudges (Section 10) — advisory signals on whether
-     the digital presence routines are keeping pace. Each is computed from
-     real weekly data; no nudge fires on a number the app does not hold. */
-  activityNudges() {
-    const weeks = App.data.traffic_weeks || [];
-    const ts = (App.data.traffic_settings || {}).targets || {};
-    const nudges = [];
-    if (!weeks.length) {
-      nudges.push({ text: 'No traffic data logged yet. Enter your first week in This Week.', sev: 'warn', screen: 't-this-week' });
-      return nudges;
-    }
-    const latest = weeks[weeks.length - 1];
-    const daysSince = (str) => {
-      if (!str) return null;
-      const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-      return isNaN(d.getTime()) ? null : Math.floor((Date.now() - d.getTime()) / 86400000);
-    };
-    const age = daysSince(latest.period_end);
-    if (age != null && age > 10) {
-      nudges.push({ text: 'Traffic data is ' + age + ' days old. Log this week so the trend stays current.', sev: 'warn', screen: 't-this-week' });
-    }
-    const velT = ts.review_velocity ?? 8;
-    if (latest.new_reviews != null && latest.new_reviews < velT) {
-      nudges.push({ text: 'New reviews running at ' + latest.new_reviews + ' a month, below your target of ' + velT + '. Ask satisfied guests this week.', sev: 'warn', screen: 't-reviews' });
-    }
-    const priorRev = weeks.slice(-5, -1).map(w => w.new_reviews).filter(v => v != null);
-    if (priorRev.length >= 2 && latest.new_reviews != null) {
-      const avg = priorRev.reduce((a, b) => a + b, 0) / priorRev.length;
-      if (avg > 0 && latest.new_reviews < avg * 0.8) {
-        nudges.push({ text: 'Review velocity is down. ' + latest.new_reviews + ' this period against a ' + avg.toFixed(0) + ' average.', sev: 'info', screen: 't-reviews' });
-      }
-    }
-    const rrT = ts.response_rate ?? 75;
-    if (latest.response_rate != null && latest.response_rate < rrT) {
-      nudges.push({ text: 'Review response rate at ' + latest.response_rate.toFixed(0) + '%, below the ' + rrT + '% target. Respond to every open review.', sev: 'warn', screen: 't-reviews' });
-    }
-    const postT = ts.social_posts_month ?? 12;
-    if (latest.ig_posts_month != null && latest.ig_posts_month < postT) {
-      nudges.push({ text: 'Social posting at ' + latest.ig_posts_month + ' for the month, below the ' + postT + ' benchmark. Get on a posting calendar.', sev: 'info', screen: 't-social' });
-    }
-    if (!latest.emails_sent) {
-      nudges.push({ text: 'No marketing emails logged this period. A list you never email goes cold. Send at least one a month.', sev: 'info', screen: 't-email' });
-    }
-    return nudges.sort((a, b) => (a.sev === 'warn' ? 0 : 1) - (b.sev === 'warn' ? 0 : 1));
   },
 
   showInsights() {
@@ -338,10 +207,10 @@ S.TrafficDashboard = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>'
       + '<button class="btn btn-ghost btn-sm" id="t-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
       + '</div>'
-      + '<div style="display:flex;gap:16px;">'
-      + '<span style="font-size:10px;color:var(--gold);font-weight:600;">  Google Rating</span>'
-      + '<span style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:600;">  Reviews/mo (÷10)</span>'
-      + '<span style="font-size:10px;color:#4888A8;font-weight:600;">  Response % (÷10)</span>'
+      + '<div style="display:flex;gap:20px;">'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Google Rating</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.55);display:inline-block;border-radius:1px;"></span>Reviews/mo (÷10)</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:var(--blue);display:inline-block;border-radius:1px;"></span>Response % (÷10)</span>'
       + '</div></div>'
       + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;" preserveAspectRatio="none">'
       + '<defs><linearGradient id="grGrad'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0"/></linearGradient></defs>'
@@ -351,7 +220,7 @@ S.TrafficDashboard = {
       + (areaPath(grS)?'<path d="'+areaPath(grS)+'" fill="url(#grGrad'+uid+')"/>':'')
       + '<path d="'+smoothPath(grS)+'" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<path d="'+smoothPath(rvS)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+smoothPath(rrS)+'" fill="none" stroke="#4888A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+smoothPath(rrS)+'" fill="none" stroke="#4C8EAB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
       + grLabels + xLabels
       + '</svg></div>';
   }
