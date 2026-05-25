@@ -108,11 +108,10 @@ S.HubGettingStarted = {
     const done  = this.TASKS.filter(t => prog[t.id]).length;
     const pct   = total ? Math.round(done / total * 100) : 0;
 
-    const groups = this.GROUPS.map(g => {
+    const groups = this.GROUPS.map((g, i) => {
       const tasks = this.TASKS.filter(t => t.group === g.id);
       if (!tasks.length) return '';
       const gDone = tasks.filter(t => prog[t.id]).length;
-      const open  = !!this._open[g.id];
       const rows = tasks.map(t => {
         const d = !!prog[t.id];
         return '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--b2);">'
@@ -124,31 +123,33 @@ S.HubGettingStarted = {
           + '</div>';
       }).join('');
       const allDone = gDone === tasks.length;
+      const badge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--gold);color:var(--gold);font-size:11px;font-weight:800;font-family:\'Barlow Condensed\',sans-serif;flex-shrink:0;">' + (i + 1) + '</span>';
       return '<div class="hg-card" data-group="' + g.id + '" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;margin-bottom:10px;overflow:hidden;">'
-        + '<div class="hg-head" style="display:flex;align-items:center;gap:12px;padding:15px 20px;cursor:pointer;">'
+        + '<div class="hg-head" style="display:flex;align-items:center;gap:12px;padding:15px 20px;">'
+        +   badge
         +   '<div style="flex:1;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);">' + esc(g.title) + '</div>'
         +   '<div style="font-size:11px;font-weight:700;color:' + (allDone ? 'var(--gold)' : 'var(--t3)') + ';">' + gDone + ' / ' + tasks.length + '</div>'
-        +   '<span class="hg-chev" style="font-size:13px;color:var(--t3);transition:transform .15s;transform:rotate(' + (open ? '90' : '0') + 'deg);">&#9656;</span>'
         + '</div>'
-        + '<div class="hg-body" style="display:' + (open ? 'block' : 'none') + ';padding:2px 20px 14px;border-top:1px solid var(--b2);">' + rows + '</div>'
+        + '<div class="hg-body" style="padding:2px 20px 14px;border-top:1px solid var(--b2);">' + rows + '</div>'
         + '</div>';
     }).join('');
 
     container.scrollTop = container.scrollTop || 0;
     container.innerHTML =
       '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + '<div style="display:flex;align-items:center;gap:14px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<button id="hg-back" class="btn btn-ghost btn-sm">&#8592; Back to Hub</button>'
+      + '<div style="display:flex;align-items:baseline;gap:10px;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
       +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Getting Started</div>'
+      +   '<span style="color:var(--t4);font-size:11px;font-weight:400;">|</span>'
+      +   '<a id="hg-back" class="topbar-back-link">Back to Hub</a>'
       + '</div>'
       + '<div class="card" style="margin-bottom:18px;">'
       +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-      +     '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Setup Progress, All Six Modules</div>'
+      +     '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Setup Progress, All Six Systems</div>'
       +     '<div style="font-size:18px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:' + (pct===100?'var(--gold)':'var(--w)') + ';">' + pct + '%</div>'
       +   '</div>'
       +   '<div class="prog"><div class="prog-fill" style="width:' + pct + '%;"></div></div>'
       +   (pct===100
-            ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:12px;">Setup complete. Every module is configured and feeding Bar Cop.</div>'
+            ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:12px;">Setup complete. Every system is configured and feeding Bar Cop.</div>'
             : '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">Work top to bottom. Each phase builds on the one above it.</div>')
       + '</div>'
       + groups
@@ -156,18 +157,6 @@ S.HubGettingStarted = {
 
     document.getElementById('hg-back').addEventListener('click', () => App.showHub());
 
-    container.querySelectorAll('.hg-head').forEach(head => {
-      head.addEventListener('click', () => {
-        const card  = head.closest('.hg-card');
-        const id    = card.dataset.group;
-        const body  = head.nextElementSibling;
-        const chev  = head.querySelector('.hg-chev');
-        const isOpen = body.style.display !== 'none';
-        this._open[id] = !isOpen;
-        body.style.display = isOpen ? 'none' : 'block';
-        if (chev) chev.style.transform = 'rotate(' + (isOpen ? '0' : '90') + 'deg)';
-      });
-    });
     container.querySelectorAll('.gs-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const p = this.progress();
