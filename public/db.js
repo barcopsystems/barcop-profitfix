@@ -3,6 +3,7 @@
 const DB = {
   _sb: null,
   _user: null,
+  _accountId: null,  // resolved lazily on first read/write after signin (Phase 2)
   _demo: false,   // demo mode — all writes are no-ops so the demo never persists
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ const DB = {
     if (!this._sb) return null;
     const { data } = await this._sb.auth.getSession();
     this._user = data?.session?.user || null;
+    this._accountId = null;  // force re-resolve on next read/write
     return data?.session || null;
   },
 
@@ -30,6 +32,7 @@ const DB = {
     if (!this._sb) return;
     this._sb.auth.onAuthStateChange((event, session) => {
       this._user = session?.user || null;
+      this._accountId = null;
       cb(event, session);
     });
   },
@@ -38,6 +41,7 @@ const DB = {
     if (!this._sb) return { error: { message: 'Not connected' } };
     const { data, error } = await this._sb.auth.signInWithPassword({ email, password });
     if (data?.user) this._user = data.user;
+    this._accountId = null;
     return { data, error };
   },
 
@@ -50,6 +54,7 @@ const DB = {
     if (!this._sb) return;
     await this._sb.auth.signOut();
     this._user = null;
+    this._accountId = null;
   },
 
   async resetPassword(email) {
@@ -90,6 +95,28 @@ const DB = {
     return App.subscription?.active_modules?.includes(moduleName) || false;
   },
 
+  // ── Account resolution (Phase 2) ──────────────────────────────────────────
+  // Looks up the current user's account_id from the memberships table and
+  // caches it. Lazy: resolves on first read/write after signin. Cleared in
+  // every auth handler so a fresh signin always re-resolves.
+  async _ensureAccountId() {
+    if (this._accountId) return this._accountId;
+    if (!this._sb || !this._user) return null;
+    try {
+      const { data, error } = await this._sb
+        .from('memberships')
+        .select('account_id')
+        .eq('user_id', this._user.id)
+        .limit(1)
+        .single();
+      if (error || !data) return null;
+      this._accountId = data.account_id;
+      return this._accountId;
+    } catch (e) {
+      return null;
+    }
+  },
+
   // ── Data ──────────────────────────────────────────────────────────────────
   async readData() {
     // Supabase mode
@@ -99,11 +126,18 @@ const DB = {
       if (this._pendingList().includes('pf_data')) {
         return this._mergeDefaults(this._localRead());
       }
+      const accountId = await this._ensureAccountId();
+      if (!accountId) {
+        // No membership found — should not happen after Phase 19 backfill +
+        // 22a signup trigger, but fall back to local so the operator is never
+        // locked out of their own data.
+        return this._mergeDefaults(this._localRead());
+      }
       try {
         const { data, error } = await this._sb
           .from('user_data')
           .select('data')
-          .eq('user_id', this._user.id)
+          .eq('account_id', accountId)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -114,6 +148,7 @@ const DB = {
           // First login — create row with defaults
           const defaults = this._defaultData();
           await this._sb.from('user_data').insert({
+            account_id: accountId,
             user_id: this._user.id,
             data: defaults,
             updated_at: new Date().toISOString()
@@ -140,14 +175,21 @@ const DB = {
         this._markPending('pf_data');
         return { ok: false, offline: true };
       }
+      const accountId = await this._ensureAccountId();
+      if (!accountId) {
+        this._localWrite(appData);
+        this._markPending('pf_data');
+        return { ok: false, error: 'no account membership found' };
+      }
       try {
         const { error } = await this._sb
           .from('user_data')
           .upsert({
+            account_id: accountId,
             user_id: this._user.id,
             data: appData,
             updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' });
+          }, { onConflict: 'account_id' });
 
         if (error) {
           console.error('writeData error:', error);
@@ -259,11 +301,15 @@ const DB = {
       if (this._pendingList().includes(lsKey)) {
         return this._localReadControl(lsKey);
       }
+      const accountId = await this._ensureAccountId();
+      if (!accountId) {
+        return this._localReadControl(lsKey);
+      }
       try {
         const { data, error } = await this._sb
           .from(table)
           .select('data')
-          .eq('user_id', this._user.id)
+          .eq('account_id', accountId)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -273,6 +319,7 @@ const DB = {
         if (!data) {
           // First access — create the row with an empty object
           await this._sb.from(table).insert({
+            account_id: accountId,
             user_id: this._user.id,
             data: {},
             updated_at: new Date().toISOString()
@@ -297,14 +344,21 @@ const DB = {
         this._markPending(lsKey);
         return { ok: false, offline: true };
       }
+      const accountId = await this._ensureAccountId();
+      if (!accountId) {
+        this._localWriteControl(lsKey, data);
+        this._markPending(lsKey);
+        return { ok: false, error: 'no account membership found' };
+      }
       try {
         const { error } = await this._sb
           .from(table)
           .upsert({
+            account_id: accountId,
             user_id: this._user.id,
             data: data,
             updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' });
+          }, { onConflict: 'account_id' });
 
         if (error) {
           console.error('write ' + table + ' error:', error);
