@@ -44,7 +44,9 @@ S.LaborOvertimeWatch = {
 
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '';
+    this.actions = actions;
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button>';
+    document.getElementById('ow-export')?.addEventListener('click', () => window.print());
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
   },
@@ -57,7 +59,7 @@ S.LaborOvertimeWatch = {
     // aggregate per staff
     const map = {};
     const ensure = (id, name) => {
-      if (!map[id]) map[id] = { id, name: name || '—', actual: 0, scheduled: 0 };
+      if (!map[id]) map[id] = { id, name: name || '-', actual: 0, scheduled: 0 };
       return map[id];
     };
     weekActuals.forEach(a => {
@@ -123,8 +125,8 @@ S.LaborOvertimeWatch = {
           + '<td>' + r.actual.toFixed(1) + '</td>'
           + '<td>' + r.scheduled.toFixed(1) + '</td>'
           + '<td class="' + (r.status === 'Over' ? 'neg' : '') + '">' + r.projected.toFixed(1) + '</td>'
-          + '<td class="' + (r.otHours > 0 ? 'neg' : '') + '">' + (r.otHours > 0 ? r.otHours.toFixed(1) : '—') + '</td>'
-          + '<td class="' + (r.otCost > 0 ? 'neg' : '') + '">' + (r.otCost > 0 ? App.fmtCurrency(r.otCost) : '—') + '</td>'
+          + '<td class="' + (r.otHours > 0 ? 'neg' : '') + '">' + (r.otHours > 0 ? r.otHours.toFixed(1) : '-') + '</td>'
+          + '<td class="' + (r.otCost > 0 ? 'neg' : '') + '">' + (r.otCost > 0 ? App.fmtCurrency(r.otCost) : '-') + '</td>'
           + '<td>' + badge + '</td></tr>';
       }).join('');
       table = '<div class="card"><div class="card-title">Hours Projection</div>'
