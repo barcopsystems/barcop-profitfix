@@ -133,6 +133,13 @@ const DB = {
   async writeData(appData) {
     if (this._demo) return { ok: true };
     if (this._sb && this._user) {
+      // Fix D: short-circuit the network call when the browser knows it is offline.
+      // No round-trip, no console error, faster save. The local copy is canonical.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        this._localWrite(appData);
+        this._markPending('pf_data');
+        return { ok: false, offline: true };
+      }
       try {
         const { error } = await this._sb
           .from('user_data')
@@ -186,7 +193,14 @@ const DB = {
   },
   _markPending(lsKey) {
     const list = this._pendingList();
-    if (!list.includes(lsKey)) { list.push(lsKey); this._setPendingList(list); }
+    if (!list.includes(lsKey)) {
+      list.push(lsKey);
+      this._setPendingList(list);
+      // Fix C: tell the app that something just landed in the pending queue, so it
+      // can surface the sync banner immediately instead of waiting for next reload.
+      try { window.dispatchEvent(new CustomEvent('bcop:pending-write', { detail: { key: lsKey } })); }
+      catch (e) { /* CustomEvent unavailable */ }
+    }
   },
   _clearPending(lsKey) {
     this._setPendingList(this._pendingList().filter(k => k !== lsKey));
@@ -277,6 +291,12 @@ const DB = {
   async _writeControl(table, lsKey, data) {
     if (this._demo) return { ok: true };
     if (this._sb && this._user) {
+      // Fix D: short-circuit the network call when the browser knows it is offline.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        this._localWriteControl(lsKey, data);
+        this._markPending(lsKey);
+        return { ok: false, offline: true };
+      }
       try {
         const { error } = await this._sb
           .from(table)
