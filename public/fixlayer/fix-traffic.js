@@ -20,10 +20,10 @@ FIX.traffic = [
         { kind: 'result', target: 't-gbp', targetLabel: 'Google Business Profile',
           title: 'Audit where your profile stands',
           detail: 'Open the Google Business Profile screen. It scores your profile completeness and tracks photo count, posts per month, and the weekly insight numbers. Start here, so you know which fields are costing you ranking before you change anything.' },
-        { kind: 'reference', target: 'GBP_Optimization_Checklist.pdf', targetLabel: 'GBP Optimization Checklist',
+        { kind: 'reference', target: 'GBP_Checklist.pdf', targetLabel: 'GBP Optimization Checklist',
           title: 'Complete every field',
           detail: 'Work the GBP Optimization Checklist on Google itself. Every field filled, the right primary and secondary categories, the full 750-character description, and ten seeded Q&A entries. Use your exact business name and do not stuff keywords into it, that risks a suspension.' },
-        { kind: 'reference', target: 'GBP_Photo_Brief.pdf', targetLabel: 'GBP Photo Brief',
+        { kind: 'reference', target: 'Photo_Brief_25_Shots.pdf', targetLabel: 'GBP Photo Brief',
           title: 'Load a real, current photo set',
           detail: 'Use the GBP Photo Brief as your shot list. At least 25 real photos across the categories Google surfaces, reshot every six months. Stock photos do not convert, and photos over 12 months old pull down click-through.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
@@ -53,13 +53,13 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'Restaurant_Website_Audit_Form.pdf', targetLabel: 'Restaurant Website Audit Form',
+        { kind: 'reference', target: 'Website_Conversion_Audit.pdf', targetLabel: 'Restaurant Website Audit Form',
           title: 'Audit the site before you change anything',
           detail: 'Work the Restaurant Website Audit Form page by page: page speed on the homepage and menu page, mobile elements, menu structure, and calls to action. Do the eight-second test on your own phone, you should find the phone number, the hours, and the reservation link without scrolling. An audit done after fixes cannot measure what changed.' },
         { kind: 'result', target: 't-website', targetLabel: 'Website Scorecard',
           title: 'Score it and hold the baseline',
           detail: 'Enter the audit results into the Website Scorecard. It turns them into a conversion score and a baseline. Every fix from here is measured against that baseline, so set it before you change a thing.' },
-        { kind: 'reference', target: 'Website_Conversion_Fix_Checklist.pdf', targetLabel: 'Website Conversion Fix Checklist',
+        { kind: 'reference', target: 'Website_Copy_CTA_Standards.docx', targetLabel: 'Website Conversion Fix Checklist',
           title: 'Fix conversion in priority order',
           detail: 'Work the Website Conversion Fix Checklist, which lists each fix by impact and effort. Compress every homepage and menu image under 200KB, get four elements above the fold on mobile, replace any PDF menu with a web page, and install Google Analytics 4. Speed first, it is 20 minutes and costs nothing.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
@@ -92,10 +92,10 @@ FIX.traffic = [
         { kind: 'result', target: 't-reviews', targetLabel: 'Review Tracker',
           title: 'Track velocity, not just the rating',
           detail: 'The Review Tracker counts new Google and Yelp reviews, the rolling 30-day rating, and your response rate. Velocity is what ranks you in the map results. A high rating with no recent reviews looks stale next to a competitor getting a steady flow.' },
-        { kind: 'reference', target: 'Review_Response_Templates.docx', targetLabel: 'Review Response Templates',
+        { kind: 'reference', target: 'Review_Response_Templates.pdf', targetLabel: 'Review Response Templates',
           title: 'Respond to every review within 48 hours',
           detail: 'Download the Review Response Templates. Negative reviews get the four-sentence pattern: acknowledge, address the specific complaint, state your standard, invite them back, with your direct contact at the end so the next step happens off the public page. Positive reviews get a named, specific reply too. A generic thank-you signals you did not read it.' },
-        { kind: 'reference', target: 'Review_Request_Script.pdf', targetLabel: 'Review Request Script',
+        { kind: 'reference', target: 'Review_Request_Script_Card.pdf', targetLabel: 'Review Request Script',
           title: 'Build the review ask into service',
           detail: 'Use the Review Request Script: a short compliment-moment ask for every server, a QR code on the bill presenter, framed as how the bar operates rather than a campaign. Never offer an incentive and never ask only happy guests. Both violate Google policy and risk a suspension.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
@@ -125,13 +125,13 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'NAP_Consistency_Audit.pdf', targetLabel: 'NAP Consistency Audit',
+        { kind: 'reference', target: 'Local_SEO_Audit.pdf', targetLabel: 'NAP Consistency Audit',
           title: 'Fix NAP consistency first',
           detail: 'Work the NAP Consistency Audit across Google, Yelp, TripAdvisor, and the top local directories. Your name, address, and phone have to match exactly everywhere. One wrong character splits your citation authority, so fix every variant before you build anything new.' },
         { kind: 'reference', target: 'Keyword_Research_Worksheet.docx', targetLabel: 'Keyword Research Worksheet',
           title: 'Build your target keyword list',
           detail: 'Use the Keyword Research Worksheet to land 10 target terms across neighborhood, occasion, concept, and proximity. Aim at terms like "bar Wicker Park" that drive walk-ins. Broad city terms like "best bar Chicago" drive almost no real traffic for an independent bar.' },
-        { kind: 'reference', target: 'Local_SEO_Quick_Start_Guide.docx', targetLabel: 'Local SEO Quick-Start Guide',
+        { kind: 'reference', target: 'Platform_Claiming_Checklist.docx', targetLabel: 'Local SEO Quick-Start Guide',
           title: 'Merge duplicates, then build citations',
           detail: 'Follow the Local SEO Quick-Start Guide. Merge duplicate Google and Yelp listings first, because two listings split your reviews and authority in half. Then build citations in priority order: Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor. Do not skip Foursquare, its data feeds dozens of downstream directories.' },
         { kind: 'result', target: 't-search', targetLabel: 'Search and SEO',
@@ -161,16 +161,16 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'Social_Media_Profile_Audit_Form.pdf', targetLabel: 'Social Media Profile Audit Form',
+        { kind: 'reference', target: 'Social_Media_Profile_Audit.pdf', targetLabel: 'Social Media Profile Audit Form',
           title: 'Audit the profile',
           detail: 'Work the Social Media Profile Audit Form across bio, profile photo, link-in-bio, content mix, and posting frequency. Fix the bio, photo, and link-in-bio before you post anything new.' },
         { kind: 'result', target: 't-social', targetLabel: 'Social Media',
           title: 'Set the baseline',
           detail: 'Record your current follower count, profile visits, link clicks, and posts per month in the Social Media screen. Set the baseline before you change anything, so you can tell later whether the work moved the numbers.' },
-        { kind: 'reference', target: 'Social_Content_Calendar.pdf', targetLabel: 'Social Content Calendar',
+        { kind: 'reference', target: 'Social_Content_Brief.pdf', targetLabel: 'Social Content Calendar',
           title: 'Run on a content calendar',
           detail: 'Plan the month on the Social Content Calendar. Post five times a week on the 3-1-1 mix: three experience posts, one promotional, one community. Make experience content the dominant type. A 60-second walkthrough of a busy night outperforms a polished promo, because the feel of the room is what drives a new guest\'s decision.' },
-        { kind: 'reference', target: 'Social_Media_Standards_Policy.docx', targetLabel: 'Social Media Standards Policy',
+        { kind: 'reference', target: 'Social_Media_Content_Standards.docx', targetLabel: 'Social Media Standards Policy',
           title: 'Set the posting standard and the Sunday review',
           detail: 'The Social Media Standards Policy covers posting frequency, image quality, caption tone, and the approval workflow for staff posts. Protect the Sunday review: go through the week\'s captured content, pick five posts, schedule them, and flag one to cross-post to the Google profile.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
@@ -200,13 +200,13 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'Delivery_Platform_Audit_Checklist.pdf', targetLabel: 'Delivery Platform Audit Checklist',
+        { kind: 'reference', target: 'Delivery_Platform_Audit.pdf', targetLabel: 'Delivery Platform Audit Checklist',
           title: 'Audit every active listing first',
           detail: 'Work the Delivery Platform Audit Checklist across DoorDash, Uber Eats, and Grubhub: photos, hours, menu items, descriptions, and reviews. Replace any photo showing a discontinued item, and match platform hours to kitchen hours exactly. It is a one-time project of three to four hours.' },
         { kind: 'result', target: 't-delivery', targetLabel: 'Delivery Platforms',
           title: 'Score and baseline the listings',
           detail: 'Record each platform\'s active status, rating, and photo count in the Delivery Platforms screen. Set the baseline so you can tell later whether the audit and the menu work moved the numbers.' },
-        { kind: 'reference', target: 'Delivery_Menu_Builder_Worksheet.pdf', targetLabel: 'Delivery Menu Builder Worksheet',
+        { kind: 'reference', target: 'Online_Menu_Audit.pdf', targetLabel: 'Delivery Menu Builder Worksheet',
           title: 'Curate the delivery menu',
           detail: 'Use the Delivery Menu Builder Worksheet. The delivery menu is a tight subset of your in-house menu, not the whole thing. Recalculate every item\'s margin at the platform commission rate, rate how well each item travels, and pull any item whose margin drops below 15%.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
@@ -236,7 +236,7 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'Email_List_Building_Playbook.pdf', targetLabel: 'Email List Building Playbook',
+        { kind: 'reference', target: 'Guest_Email_Capture.pdf', targetLabel: 'Email List Building Playbook',
           title: 'Build the list at every contact point',
           detail: 'Work the Email List Building Playbook. Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the contact points two at a time so each one gets set up properly. A loyalty program sign-up is one of the strongest capture points, so run the two together.' },
         { kind: 'reference', target: 'Email_Campaign_Templates.docx', targetLabel: 'Email Campaign Templates',
