@@ -36,8 +36,8 @@ S.ThisWeek = {
       const p = prods.find(x => x.id === pid);
       if (!p || !cats.includes(p.category)) return;
       const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
-      const uc = p.unit_cost != null ? p.unit_cost : (eMap[pid].unit_cost != null ? eMap[pid].unit_cost : null);
-      if (uc != null) { cogs += used * uc; any = true; }
+      const bc = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
+      if (bc != null) { cogs += used * bc; any = true; }
     });
     return any ? cogs : null;
   },
