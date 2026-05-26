@@ -83,9 +83,9 @@ S.InventoryReceiveDelivery = {
       + '<div class="f" style="flex:1;min-width:180px;"><label>Product</label>'
       + '<select class="rd-prod">' + this.productOptions() + '</select></div></div>'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="width:100px;flex-shrink:0;"><label>Qty Received</label>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Qty Received <span class="rd-qty-hint" style="color:var(--t4);font-weight:400;"></span></label>'
       + '<input type="number" class="rd-qty" min="0" step="0.01" placeholder="0"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Unit Price</label>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Unit Price <span class="rd-price-hint" style="color:var(--t4);font-weight:400;"></span></label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre rd-price" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Extended</label>'
       + '<div class="f-display rd-ext">$0</div></div>'
@@ -208,13 +208,23 @@ S.InventoryReceiveDelivery = {
     line.querySelector('.rd-ext').textContent = App.fmtCurrency(ext);
 
     const p = this.productById(line.querySelector('.rd-prod').value);
+    // For bottle beer with case_size, qty is in cases and unit_cost is
+    // cost-per-case. Annotate the qty + price inputs so the operator sees
+    // they are working in case units.
+    const isCaseBeer = p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
+    const qtyHint   = line.querySelector('.rd-qty-hint');
+    const priceHint = line.querySelector('.rd-price-hint');
+    if (qtyHint)   qtyHint.textContent   = isCaseBeer ? 'cases (' + p.case_size + ' btl/case)' : '';
+    if (priceHint) priceHint.textContent = isCaseBeer ? 'per case' : '';
+
     const flag = line.querySelector('.rd-flag');
     const flagBtn = line.querySelector('.rd-flag-btn');
     const messages = [];
     let hasPriceChange = false;
     if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) {
       const up = price > p.unit_cost;
-      messages.push('Price ' + (up ? 'up' : 'down') + ' from ' + App.fmtCurrency(p.unit_cost) + ' to ' + App.fmtCurrency(price) + '.');
+      const priceLabel = isCaseBeer ? ' per case' : '';
+      messages.push('Price ' + (up ? 'up' : 'down') + ' from ' + App.fmtCurrency(p.unit_cost) + priceLabel + ' to ' + App.fmtCurrency(price) + priceLabel + '.');
       hasPriceChange = true;
     }
     const orderedQty = parseFloat(line.dataset.orderedQty);
@@ -507,6 +517,7 @@ S.InventoryReceiveDelivery = {
       const orderedQty = (orderedQtyRaw === '' || orderedQtyRaw == null) ? null : parseFloat(orderedQtyRaw);
       const shortCount = (orderedQty != null && !isNaN(orderedQty) && orderedQty > 0 && qty < orderedQty);
       if (shortCount) shortCounts++;
+      const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       lineItems.push({
         product_id:        pid,
         name:              p.name,
@@ -517,7 +528,14 @@ S.InventoryReceiveDelivery = {
         price_changed:     changed,
         ordered_qty:       (orderedQty != null && !isNaN(orderedQty)) ? orderedQty : null,
         short_count:       shortCount,
-        extended:          unitPrice != null ? qty * unitPrice : 0
+        extended:          unitPrice != null ? qty * unitPrice : 0,
+        // For case-tracked bottle beer, qty is in cases and unit price is
+        // cost-per-case. case_size_at_receive snapshots the value so
+        // downstream variance math can multiply through to bottles even
+        // if the product's case_size changes later.
+        display_unit:        isCaseBeer ? 'case' : 'unit',
+        case_size_at_receive: isCaseBeer ? p.case_size : null,
+        total_units:         isCaseBeer ? (qty * p.case_size) : qty
       });
     });
 
