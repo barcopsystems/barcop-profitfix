@@ -35,7 +35,7 @@ S.VendorWatch = {
     let purch = 0;
     ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
       .filter(d => d.date > s.date && d.date <= e.date)
-      .forEach(d => (d.line_items || []).forEach(li => { if (li.product_id === pid) purch += (li.qty || 0); }));
+      .forEach(d => (d.line_items || []).forEach(li => { if (li.product_id === pid) purch += App.bottlesFromDeliveryLine(li); }));
     const used = (si.total || 0) + purch - (ei.total || 0);
     const days = (new Date(e.date + 'T00:00:00').getTime() - new Date(s.date + 'T00:00:00').getTime()) / 86400000;
     if (days <= 0) return null;
@@ -43,7 +43,7 @@ S.VendorWatch = {
   },
 
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -78,13 +78,13 @@ S.VendorWatch = {
 
       const rows = changes.map(c => '<tr>'
         + '<td>' + this.fmtDate(c.date) + '</td>'
-        + '<td>' + esc(c.vendor || '—') + '</td>'
-        + '<td class="val">' + esc(c.name || '—') + '</td>'
+        + '<td>' + esc(c.vendor || '-') + '</td>'
+        + '<td class="val">' + esc(c.name || '-') + '</td>'
         + '<td>' + App.fmtCurrency(c.old, 2) + '</td>'
         + '<td>' + App.fmtCurrency(c.new, 2) + '</td>'
         + '<td class="' + (c.delta > 0 ? 'neg' : 'pos') + '">' + (c.delta > 0 ? '+' : '') + App.fmtPct(c.pct) + '</td>'
         + '<td class="' + (c.annual == null ? '' : c.annual > 0 ? 'neg' : 'pos') + '">'
-        + (c.annual == null ? '<span style="color:var(--t4);">—</span>'
+        + (c.annual == null ? '<span style="color:var(--t4);">-</span>'
             : (c.annual > 0 ? '+' : '') + App.fmtCurrency(c.annual) + '/yr') + '</td>'
         + '</tr>').join('');
 
