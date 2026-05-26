@@ -164,7 +164,7 @@ S.InventoryOrderSheet = {
       + '<div style="font-size:10px;color:var(--t3);">' + esc(l.product.category || '') + '</div></td>'
       + '<td>' + l.on_hand.toFixed(1) + '</td>'
       + '<td>' + l.par + '</td>'
-      + '<td><input type="number" class="os-qty" data-cost="' + l.unit_cost + '" min="0" step="1" '
+      + '<td><input type="number" class="os-qty" data-cost="' + l.unit_cost + '" data-product-id="' + esc(l.product.id || '') + '" min="0" step="1" '
       + 'value="' + l.suggested + '" style="width:80px;"/></td>'
       + '<td>' + App.fmtCurrency(l.unit_cost) + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(l.suggested * l.unit_cost) + '</td>'
@@ -219,7 +219,8 @@ S.InventoryOrderSheet = {
       if (qty <= 0) return;
       const name = line.querySelector('.val').textContent;
       const cost = parseFloat(inp.dataset.cost) || 0;
-      lineItems.push({ name, qty, unit_cost: cost, extended: qty * cost });
+      const productId = inp.dataset.productId || '';
+      lineItems.push({ product_id: productId, name, qty, unit_cost: cost, extended: qty * cost });
     });
     if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
 
