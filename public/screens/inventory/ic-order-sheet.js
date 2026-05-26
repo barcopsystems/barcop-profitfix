@@ -248,9 +248,20 @@ S.InventoryOrderSheet = {
     const picker = card.querySelector('.os-picker');
     const sel = picker?.querySelector('.os-picker-prod');
     const pid = sel?.value;
-    if (!pid) return;
+    if (!pid) {
+      // Visual nudge — pulse the dropdown border so operator knows what's
+      // missing instead of silently doing nothing.
+      if (sel) {
+        sel.style.borderColor = 'var(--red)';
+        setTimeout(() => { sel.style.borderColor = ''; }, 1200);
+      }
+      return;
+    }
     const product = this.productById(pid);
     if (!product) return;
+
+    const qtyInp = picker?.querySelector('.os-picker-qty');
+    const qty = Math.max(1, parseFloat(qtyInp?.value) || 1);
 
     // Pull on-hand from latest count if present (informational only).
     let onHand = null;
@@ -263,7 +274,7 @@ S.InventoryOrderSheet = {
     const par = (product.par_level != null && product.par_level !== '') ? product.par_level : null;
     const tbody = card.querySelector('.os-lines-tbody');
     if (tbody) {
-      tbody.insertAdjacentHTML('beforeend', this.lineRowHTML(product, 1, onHand, par));
+      tbody.insertAdjacentHTML('beforeend', this.lineRowHTML(product, qty, onHand, par));
     }
     this.recalcVendor(card);
     this.closePicker(card);
@@ -308,10 +319,13 @@ S.InventoryOrderSheet = {
       return;
     }
     body.style.display = '';
-    // Refresh the picker mount with this vendor's products and clear lines.
+    // Clear any existing lines and reset the picker. closePicker resets the
+    // "+ Add Item" button visibility so changing vendor mid-picker does not
+    // leave the button hidden.
     const tbody = panel.querySelector('.os-lines-tbody');
     if (tbody) tbody.innerHTML = '';
     this.refreshPicker(panel);
+    this.closePicker(panel);
     this.recalcVendor(panel);
   },
 
@@ -414,10 +428,13 @@ S.InventoryOrderSheet = {
       ));
     return '<div class="os-picker" style="display:none;margin-top:12px;padding:12px 14px;background:var(--bg);border:1px solid var(--b1);border-radius:4px;">'
       + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="flex:1;min-width:240px;"><label>Add Product</label>'
+        + '<div class="f" style="flex:1;min-width:220px;"><label>Add Product</label>'
           + '<select class="os-picker-prod">' + opts.join('') + '</select>'
         + '</div>'
-        + '<button class="btn btn-primary os-picker-add">Add to Order</button>'
+        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Qty</label>'
+          + '<input type="number" class="os-picker-qty" min="1" step="1" value="1"/>'
+        + '</div>'
+        + '<button class="btn btn-primary os-picker-add">Add</button>'
         + '<button class="btn btn-ghost os-picker-cancel">Cancel</button>'
       + '</div>'
       + (filtered.length === 0
