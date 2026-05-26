@@ -380,7 +380,7 @@ S.InventoryProducts = {
       if (parLabel)    parLabel.firstChild.nodeValue    = isBeerCase ? 'Par (cases) ' : 'Par Level ';
       if (reorderLabel) reorderLabel.firstChild.nodeValue = isBeerCase ? 'Reorder Point (cases) ' : 'Reorder Point ';
     });
-    ['ip-coz','ip-pour','ip-cost','ip-price'].forEach(fid =>
+    ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this.calcProduct())
     );
     if (p) this.calcProduct();
@@ -396,10 +396,23 @@ S.InventoryProducts = {
     return parseFloat(v) || 0;
   },
 
+  // For Bottle Beer with case_size set, the cost field is cost-per-case
+  // (not per-bottle). The pour-cost math wants per-bottle cost, so divide
+  // through. Other categories: cost is per single container, no change.
+  effectiveBottleCost() {
+    const cost = parseFloat(document.getElementById('ip-cost')?.value) || 0;
+    const cat = document.getElementById('ip-cat')?.value;
+    if (cat === 'Bottle Beer') {
+      const cs = parseInt(document.getElementById('ip-case-size')?.value) || 0;
+      if (cs > 0) return cost / cs;
+    }
+    return cost;
+  },
+
   calcProduct() {
     const oz    = this.getOz();
     const pour  = parseFloat(document.getElementById('ip-pour')?.value) || 0;
-    const cost  = parseFloat(document.getElementById('ip-cost')?.value) || 0;
+    const cost  = this.effectiveBottleCost();
     const price = parseFloat(document.getElementById('ip-price')?.value) || 0;
     const target = App.data?.settings?.targets?.bar_pour_cost_pct || 22;
     const pours = pour > 0 ? oz / pour : null;
@@ -427,7 +440,11 @@ S.InventoryProducts = {
     const cost  = num('ip-cost');
     const price = num('ip-price');
     const pours = oz && pour ? oz / pour : null;
-    const cpp   = pours && cost != null ? cost / pours : null;
+    // For Bottle Beer with case_size, cost is per case. Divide through to
+    // per-bottle for cost_per_pour and pour_cost_pct so downstream metrics
+    // are accurate.
+    const effCost = this.effectiveBottleCost();
+    const cpp   = pours && effCost != null ? effCost / pours : null;
     const pct   = cpp != null && price ? cpp / price * 100 : null;
 
     const prod = {
