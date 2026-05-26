@@ -1,1080 +1,1422 @@
 'use strict';
 
-S.Hub = {
+/* ── Hub Books — Monthly Close Package (Phase 3 Item 31) ─────────────────────
+   Generates a multi-tab XLSX workbook plus a PDF executive summary as the
+   monthly deliverable to the operator's accountant or bookkeeper.
 
-  AUDIT_STALE: 35,
-  WEEKLY_CUTOFF: 8,
-  _sidebarCollapsed: false,
+   This is THE accountant-grade output that distinguishes Bar Cop from a basic
+   POS-export workflow. Built entirely from data already captured across the
+   six Bar Cop systems — no new operator capture burden, just aggregation +
+   formatting. Restaurant365 ($569/mo+) and Margin Edge ($429/mo+) charge for
+   this; Bar Cop bakes it in.
 
-  render(container) {
-    this._stage = container;
-    // Outer wrapper scrolls when the dashboard content exceeds the viewport
-    // (tablets, small laptops). On a desktop monitor the min-heights on the
-    // grid rows fit naturally and the scrollbar never appears.
-    container.style.overflowY = 'auto';
-    const data = App.data || {};
+   Sheets (built incrementally — Phase A ships sheet 1, later phases add the rest):
+     1. Income Statement (month + YTD)
+     2. Inventory Valuation Report
+     3. Cash Reconciliation Audit Trail
+     4. Void & Comp Compliance Log
+     5. Tip Allocation Schedule (IRS Form 8027)
+     6. Variance & Shrinkage Report
+     7. Labor Cost Analysis
+     8. Operational Opportunities
+     9. Year-End Tax Helper (annual roll only)
+*/
 
-    // ── Data sources ──
-    const s   = data.settings || {};
-    const pt  = s.targets || {};
-    const rt  = (data.revenue_settings || {}).targets || {};
-    const tTar= (data.traffic_settings || {}).targets || {};
+S.HubBooks = {
 
-    const pWeeks  = data.weeks || [];
-    const rWeeks  = (data.revenue_weeks || []).filter(w => (w.bar_revenue||0)+(w.floor_revenue||0) > 0);
-    const tWeeks  = data.traffic_weeks || [];
-    const pAudits = data.audits || [];
-    const rAudits = data.revenue_audits || [];
-    const tAudits = data.traffic_audits || [];
-    // Cash data is owned by Shift Control (sc_variances), not the legacy
-    // user_data reconciliations key — that key is empty for a real operator.
-    const recs    = (App.shiftData && App.shiftData.sc_variances) || [];
+  // ── Entry point — called from the Hub sidebar ──────────────────────────────
+  open() {
+    App.openHubOverlay((panel) => this._render(panel));
+  },
 
-    const barName = s.bar_name || 'Your Operation';
+  // ── Render the picker screen ───────────────────────────────────────────────
+  _render(panel) {
+    const months = this._availableMonths();
+    const defaultMonth = months[0] || this._currentMonthKey();
+    const monthOpts = months.map(m =>
+      '<option value="' + m + '"' + (m === defaultMonth ? ' selected' : '') + '>' + this._monthLabel(m) + '</option>'
+    ).join('');
 
-    const last  = a => a.length ? a[a.length-1] : null;
-    const prior = a => a.length >= 2 ? a[a.length-2] : null;
-    const pW = last(pWeeks), rW = last(rWeeks), tW = last(tWeeks);
-    const pA = last(pAudits), rA = last(rAudits), tA = last(tAudits);
+    panel.innerHTML =
+      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+      + this._header()
+      + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Month-End Books</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a month. Bar Cop pulls every number together into one file your accountant or bookkeeper can work from. Income statement, inventory value, cash variance, voids and comps, tip allocation worksheet for IRS Form 8027, shrinkage, and labor cost. All built from what you log in Bar Cop. Nothing to re-enter.</div>'
+        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
+          + '<div class="f" style="width:240px;"><label>Close Month</label><select id="hb-month">' + monthOpts + '</select></div>'
+          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
+            + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
+            + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
+          + '</div>'
+        + '</div>'
+        + '<div id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
+        + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before filing anything or closing the books.</div>'
+      + '</div>'
+      + this._whatsInsideCard()
+      + '</div>';
 
-    // ── Helpers ──
-    const daysSince = (str) => {
-      if (!str) return null;
-      const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-      if (isNaN(d.getTime())) return null;
-      return Math.floor((Date.now() - d.getTime()) / 86400000);
+    document.getElementById('hb-close')?.addEventListener('click', () => App.closeHubOverlay());
+    document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
+    document.getElementById('hb-pdf')?.addEventListener('click', () => this._openPdfSummary());
+  },
+
+  // ── PDF executive summary — owner-readable, 1-page snapshot ──────────────
+  // Opens a styled summary in a new tab and triggers the browser print dialog
+  // so the owner can save it as a PDF or print it. Built from the same data
+  // as the XLSX so the numbers always agree.
+  _openPdfSummary() {
+    const monthKey = document.getElementById('hb-month')?.value;
+    if (!monthKey) return;
+    const monthLabel = this._monthLabel(monthKey);
+    const barName    = (App.data?.settings?.bar_name) || 'Bar Cop';
+    const M   = this._aggregateMonth(monthKey);
+    const YTD = this._aggregateYTD(monthKey);
+
+    // Prior month for the "vs last month" line
+    const prevKey = this._priorMonthKey(monthKey);
+    const PREV    = prevKey ? this._aggregateMonth(prevKey) : null;
+    const delta   = (cur, prev) => (prev != null && prev !== 0) ? ((cur - prev) / prev) : null;
+
+    const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtPct = (v) => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
+    const fmtPctDelta = (v) => {
+      if (v == null || isNaN(v)) return '';
+      const sign = v >= 0 ? '+' : '';
+      return ' (' + sign + (v * 100).toFixed(1) + '% vs ' + this._monthLabel(prevKey) + ')';
     };
-    const auditOpp  = (a) => a ? (a.action_items || []).reduce((sum,x) => sum + (x.monthly_impact || 0), 0) : 0;
-    const sysTrend  = (au) => { const l = last(au), p = prior(au); return (l && p) ? (l.overall_score||0) - (p.overall_score||0) : null; };
-    const shortDate = (str) => str ? new Date(String(str).length<=10 ? str+'T00:00:00' : str).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
 
-    // ── Cross-system rollup ──
-    const sysScores = [pA, rA, tA].map(a => a ? a.overall_score : null).filter(v => v != null);
-    const overall   = sysScores.length ? Math.round(sysScores.reduce((a,b)=>a+b,0)/sysScores.length) : null;
-    const anyAudit  = !!(pAudits.length || rAudits.length || tAudits.length);
-    const totalOpp  = auditOpp(pA) + auditOpp(rA) + auditOpp(tA);
-    const trendVals = [sysTrend(pAudits), sysTrend(rAudits), sysTrend(tAudits)].filter(v => v != null);
-    const netTrend  = trendVals.length ? trendVals.reduce((a,b)=>a+b,0) : null;
-
-    // ── Weekly status ──
-    const wkMods = [
-      { name:'Profit',  d: daysSince(pW?.period_end) },
-      { name:'Revenue', d: daysSince(rW?.period_end) },
-      { name:'Traffic', d: daysSince(tW?.period_end) },
-    ].map(m => ({ ...m, current: m.d != null && m.d <= this.WEEKLY_CUTOFF }));
-    const wkCount   = wkMods.filter(m => m.current).length;
-    const wkOverdue = wkMods.filter(m => !m.current).map(m => m.name);
-
-    // ── Key metrics ──
-    const invVar  = pW ? (pW.bar_variance || []).reduce((sum,v) => sum + (v.variance_dollar||0), 0) : null;
-    const recOpen = recs.length
-      ? recs.filter(r => { const d = daysSince(r.date); return d != null && d <= 30 && r.status && r.status !== 'OK'; }).length
-      : null;
-
-    const band = (val, target, dir) => {
-      if (val == null) return 'none';
-      if (dir === 'low')  return val <= target ? 'good' : val <= target*1.1 ? 'warn' : 'bad';
-      return val >= target ? 'good' : val >= target*0.9 ? 'warn' : 'bad';
+    // Latest audits for the recommendations section
+    const monthEnd = this._monthEndDate(monthKey);
+    const latestBefore = (list) => {
+      if (!Array.isArray(list)) return null;
+      return list.filter(a => a && a.date && String(a.date).slice(0, 10) <= monthEnd)
+        .slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .slice(-1)[0] || null;
     };
-    // Hub uses tier-2 (soft) red for status indicators so the few real
-    // attention reds (Leaking This Week headline, Alerts count) carry more
-    // visual weight than the supporting status data.
-    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red-soft)' : 'var(--t4)';
-    const softScore = s => { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red-soft)'; };
-
-    const pourT = pt.bar_pour_cost_pct ?? 22;
-    const foodT = pt.food_cost_pct ?? 32;
-    const primeT= pt.prime_cost_pct ?? 60;
-    const caT   = rt.check_avg ?? 35;
-    const laborT= rt.labor_pct ?? 30;
-    const grT   = tTar.google_rating ?? 4.3;
-
-    const metrics = [
-      { label:'Bar Pour Cost', val: pW?.bar?.cost_pct ?? null, disp: pW?.bar?.cost_pct!=null?App.fmtPct(pW.bar.cost_pct):null, tgt: pourT+'%', status: band(pW?.bar?.cost_pct ?? null, pourT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Food Cost', val: pW?.food?.cost_pct ?? null, disp: pW?.food?.cost_pct!=null?App.fmtPct(pW.food.cost_pct):null, tgt: foodT+'%', status: band(pW?.food?.cost_pct ?? null, foodT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Prime Cost', val: pW?.prime_cost_pct ?? null, disp: pW?.prime_cost_pct!=null?App.fmtPct(pW.prime_cost_pct):null, tgt: primeT+'%', status: band(pW?.prime_cost_pct ?? null, primeT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high'), screen:'r-dashboard', mod:'revenue' },
-      { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low'), screen:'r-dashboard', mod:'revenue' },
-      { label:'Google Rating', val: tW?.google_rating ?? null, disp: tW?.google_rating!=null?tW.google_rating.toFixed(1)+' / 5.0':null, tgt: grT.toFixed(1)+' stars', status: band(tW?.google_rating ?? null, grT, 'high'), screen:'t-dashboard', mod:'traffic' },
+    const audits = [
+      { label: 'Profit',  audit: latestBefore(App.data?.audits) },
+      { label: 'Revenue', audit: latestBefore(App.data?.revenue_audits) },
+      { label: 'Traffic', audit: latestBefore(App.data?.traffic_audits) }
     ];
+    const totalMonthlyOpp = audits.reduce((s, a) => {
+      const items = a.audit?.action_items || [];
+      return s + items.reduce((ss, i) => ss + (parseFloat(i.monthly_impact) || 0), 0);
+    }, 0);
 
-    // ── Alerts — metric breaches plus forward-looking signals ──
-    const sevRank = { bad:0, warn:1 };
-    const metricAlerts = metrics
-      .filter(m => m.status === 'warn' || m.status === 'bad')
-      .map(m => ({
-        sev: m.status,
-        text: m.label + ' at ' + m.disp + ' · target ' + m.tgt,
-        screen: m.screen, mod: m.mod
-      }));
-    const alerts = metricAlerts.concat(this.forwardAlerts())
-      .sort((a,b) => sevRank[a.sev] - sevRank[b.sev])
-      .slice(0, 50);
-
-    // ── Priority action items ──
-    // Show every action item from every audited module, ranked by dollar
-    // impact. Cap at 50 as a safety ceiling; the card scrolls internally
-    // when the list runs past its allotted height.
-    const itemRows = [];
-    const collect = (audit, sysName, mod) => {
-      if (!audit) return;
-      (audit.action_items || []).forEach(it => {
-        if (it && it.action) {
-          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, mod) : null);
-          itemRows.push({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, mod: mod, gap: gid });
-        }
+    // Top 5 action items across all systems by monthly impact
+    const allItems = [];
+    audits.forEach(({ label, audit }) => {
+      (audit?.action_items || []).forEach(it => {
+        allItems.push({
+          system: label,
+          title: it.title || it.name || it.action || '(unnamed)',
+          monthly: parseFloat(it.monthly_impact) || 0
+        });
       });
-    };
-    collect(pA, 'Profit',  'profit');
-    collect(rA, 'Revenue', 'revenue');
-    collect(tA, 'Traffic', 'traffic');
-    itemRows.sort((a,b) => b.impact - a.impact);
-    // Cap visible PAIs at 8 — top by impact — so the most important items are
-    // never hidden behind a scrollbar. Overflow flagged in a small footer.
-    const topItems = itemRows.slice(0, 8);
-    const overflowItems = Math.max(0, itemRows.length - topItems.length);
-
-    // ── Last updated ──
-    const stamps = [];
-    [pWeeks,rWeeks,tWeeks].forEach(arr => arr.forEach(w => { if (w && w.saved_at) stamps.push(w.saved_at); }));
-    const prof = (data.traffic_settings || {}).profile || {};
-    ['gbp_reviewed_at','search_reviewed_at','web_reviewed_at','rev_reviewed_at','social_reviewed_at','delivery_reviewed_at','email_reviewed_at']
-      .forEach(k => { if (prof[k]) stamps.push(prof[k]); });
-    [pAudits,rAudits,tAudits].forEach(arr => arr.forEach(a => { if (a && a.date) stamps.push(a.date); }));
-    recs.forEach(r => { const ts = r && (r.saved_at || r.created_at); if (ts) stamps.push(ts); });
-
-    let lastStamp = null, lastT = -1;
-    stamps.forEach(str => {
-      const t = new Date(String(str).length<=10 ? str+'T00:00:00' : str).getTime();
-      if (!isNaN(t) && t > lastT) { lastT = t; lastStamp = str; }
     });
-    let lastUpdatedTxt = 'No data entered yet';
-    if (lastStamp) {
-      const dateOnly = String(lastStamp).length <= 10;
-      const d = new Date(dateOnly ? lastStamp+'T00:00:00' : lastStamp);
-      const sameDay = d.toDateString() === new Date().toDateString();
-      const datePart = sameDay ? 'today' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      lastUpdatedTxt = 'Data last updated: ' + (dateOnly ? datePart : datePart + ' at ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}));
+    allItems.sort((a, b) => b.monthly - a.monthly);
+    const topFive = allItems.slice(0, 5);
+
+    // Counts of compliance/operational events
+    const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
+    const voidComps = (App.shiftData?.sc_void_comps || []).filter(r => inMonth(r.date));
+    const variances = (App.shiftData?.sc_variances  || []).filter(r => inMonth(r.date));
+    const callouts  = (App.laborData?.lc_callouts   || []).filter(r => inMonth(r.date));
+    const tips      = (App.laborData?.lc_tips       || []).filter(r => inMonth(r.date));
+    const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
+
+    // Cost ratios for the month
+    const pourCost = M.barRev  ? (M.barCogs  / M.barRev)  : null;
+    const foodCost = M.foodRev ? (M.foodCogs / M.foodRev) : null;
+    const laborPct = M.totalRev ? (M.totalLabor / M.totalRev) : null;
+    const primeCost = M.totalRev ? ((M.totalCogs + M.totalLabor) / M.totalRev) : null;
+    const prevPour  = PREV && PREV.barRev  ? (PREV.barCogs  / PREV.barRev)  : null;
+    const prevFood  = PREV && PREV.foodRev ? (PREV.foodCogs / PREV.foodRev) : null;
+    const prevLabor = PREV && PREV.totalRev ? (PREV.totalLabor / PREV.totalRev) : null;
+    const prevPrime = PREV && PREV.totalRev ? ((PREV.totalCogs + PREV.totalLabor) / PREV.totalRev) : null;
+
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
+      + '<title>' + esc(barName) + ' Books Summary, ' + esc(monthLabel) + '</title>'
+      + '<style>'
+      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
+      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
+      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
+      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
+      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
+      + 'td { padding: 4px 6px; border-bottom: 1px solid #eee; }'
+      + 'td.right { text-align: right; font-variant-numeric: tabular-nums; }'
+      + 'td.bold { font-weight: bold; }'
+      + 'td.muted { color: #666; font-size: 12px; }'
+      + '.delta-pos { color: #1a7a1a; }'
+      + '.delta-neg { color: #a01818; }'
+      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
+      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
+      + '</style></head><body>'
+      + '<h1>' + esc(barName) + ' Books Summary<span class="sub">' + esc(monthLabel) + '</span></h1>'
+
+      + '<h2>The Month in Dollars</h2>'
+      + '<table>'
+      + '<tr><td>Total Revenue (net of comps)</td><td class="right bold">' + fmt$(M.totalRev - (M.comps || 0)) + '</td></tr>'
+      + '<tr><td class="muted">  Bar Revenue</td><td class="right muted">' + fmt$(M.barRev) + '</td></tr>'
+      + '<tr><td class="muted">  Food Revenue</td><td class="right muted">' + fmt$(M.foodRev) + '</td></tr>'
+      + '<tr><td>Cost of Goods Sold</td><td class="right">' + fmt$(M.totalCogs) + '</td></tr>'
+      + '<tr><td>Labor</td><td class="right">' + fmt$(M.totalLabor) + '</td></tr>'
+      + '<tr><td>Prime Cost (COGS + Labor)</td><td class="right bold">' + fmt$(M.totalCogs + M.totalLabor) + '</td></tr>'
+      + '</table>'
+
+      + '<h2>The Month in Percentages</h2>'
+      + '<table>'
+      + '<tr><td>Pour Cost</td><td class="right bold">' + fmtPct(pourCost) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(pourCost, prevPour, prevKey, true)) + '</td></tr>'
+      + '<tr><td>Food Cost</td><td class="right bold">' + fmtPct(foodCost) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(foodCost, prevFood, prevKey, true)) + '</td></tr>'
+      + '<tr><td>Labor %</td><td class="right bold">' + fmtPct(laborPct) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(laborPct, prevLabor, prevKey, true)) + '</td></tr>'
+      + '<tr><td>Prime Cost %</td><td class="right bold">' + fmtPct(primeCost) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(primeCost, prevPrime, prevKey, true)) + '</td></tr>'
+      + '</table>'
+
+      + '<h2>Year to Date</h2>'
+      + '<table>'
+      + '<tr><td>Revenue (net of comps)</td><td class="right">' + fmt$(YTD.totalRev - (YTD.comps || 0)) + '</td></tr>'
+      + '<tr><td>COGS</td><td class="right">' + fmt$(YTD.totalCogs) + '</td></tr>'
+      + '<tr><td>Labor</td><td class="right">' + fmt$(YTD.totalLabor) + '</td></tr>'
+      + '<tr><td>Prime Cost</td><td class="right bold">' + fmt$(YTD.totalCogs + YTD.totalLabor) + '</td></tr>'
+      + '</table>'
+
+      + '<h2>Operational Events This Month</h2>'
+      + '<table>'
+      + '<tr><td>Voids and Comps Logged</td><td class="right">' + voidComps.length + '</td></tr>'
+      + '<tr><td>Cash Variances Logged</td><td class="right">' + variances.length + '</td></tr>'
+      + '<tr><td>Tips Logged (total)</td><td class="right">' + fmt$(totalTips) + '</td></tr>'
+      + '<tr><td>Call-Outs Logged</td><td class="right">' + callouts.length + '</td></tr>'
+      + '</table>'
+
+      + '<h2>Top Opportunities From Your Audits</h2>'
+      + (topFive.length === 0
+          ? '<p style="color:#666;font-size:13px;">No open audit action items on file. Run a Profit, Revenue, or Traffic audit to surface opportunities.</p>'
+          : '<p style="color:#444;font-size:13px;margin-bottom:6px;">Total monthly opportunity across all systems: <strong>' + fmt$(totalMonthlyOpp) + '</strong>'
+            + '. Annualized: <strong>' + fmt$(totalMonthlyOpp * 12) + '</strong>.</p>'
+            + '<table>'
+            + topFive.map(it => '<tr><td>' + esc(it.system) + ' — ' + esc(it.title) + '</td><td class="right">' + fmt$(it.monthly) + '/mo</td></tr>').join('')
+            + '</table>')
+
+      + '<div class="footer">'
+      + 'Generated by Bar Cop on ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '. '
+      + 'Bar Cop is a software tool, not a tax preparer, accountant, or CPA. '
+      + 'Numbers come from the data you logged in Bar Cop. Your accountant should review and verify before filing or closing your books.'
+      + '</div>'
+
+      + '<script>window.addEventListener("load", function() { setTimeout(function() { window.print(); }, 250); });<\/script>'
+      + '</body></html>';
+
+    const w = window.open('', '_blank');
+    if (!w) {
+      this._setStatus('Your browser blocked the new tab. Allow pop-ups for app.barcop.com and try again.', 'var(--red)');
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  },
+
+  // Helper for the PDF summary: format a "(% vs prior month)" label.
+  // lowerBetter inverts the sign coloring assumption but here we just produce
+  // text. Color is handled inline in the HTML.
+  _pctDeltaLabel(current, previous, prevKey, lowerBetter) {
+    if (current == null || previous == null || !prevKey) return '';
+    const diff = current - previous;
+    if (diff === 0) return 'flat vs ' + this._monthLabel(prevKey);
+    const sign = diff >= 0 ? '+' : '';
+    return sign + (diff * 100).toFixed(1) + ' pts vs ' + this._monthLabel(prevKey);
+  },
+
+  // Prior month key (returns YYYY-MM or null if would go before year 0).
+  _priorMonthKey(monthKey) {
+    const y = parseInt(monthKey.slice(0, 4), 10);
+    const m = parseInt(monthKey.slice(5, 7), 10);
+    let py = y, pm = m - 1;
+    if (pm < 1) { pm = 12; py = y - 1; }
+    if (py < 1900) return null;
+    return py + '-' + String(pm).padStart(2, '0');
+  },
+
+  _header() {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Books</div>'
+      +   '<button id="hb-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>';
+  },
+
+  _whatsInsideCard() {
+    const rows = [
+      ['Income Statement', 'Revenue, COGS, labor, prime cost. Month and year to date side by side.'],
+      ['Inventory Valuation', 'Dollar value of what is on the shelf at month end. Bottle by bottle. Ready for Schedule C.'],
+      ['Cash Reconciliation', 'Every shift. POS revenue, expected cash, counted cash, variance, reason.'],
+      ['Void and Comp Log', 'Every void and comp with the manager who signed off, the server, the amount, the reason.'],
+      ['Tip Allocation Worksheet', 'Numbers for IRS Form 8027. Your accountant transcribes them onto the actual form.'],
+      ['Variance and Shrinkage', 'What the recipes say you sold versus what the count says you have. Flags the gaps.'],
+      ['Labor Cost Analysis', 'Wages by position, overtime hours, tip credit applied.'],
+      ['Operational Opportunities', 'Your audits turned into dollars you can pull back next month.']
+    ];
+    const listHtml = rows.map(r =>
+      '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
+      + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
+    ).join('');
+    return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
+      + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
+      + '</div>';
+  },
+
+  // ── Month list — months with at least one saved week of data ───────────────
+  // Default selection is the most recent fully-completed month (today's
+  // month is excluded unless the operator has data in it and the month has
+  // ended). Listed newest first.
+  _availableMonths() {
+    const weeks = (App.data?.weeks || []).filter(w => w && w.period_end);
+    if (!weeks.length) {
+      // No data yet. Offer the previous calendar month as a placeholder so
+      // the picker still renders; the generate will surface an empty-state.
+      const d = new Date();
+      d.setDate(0);
+      return [this._dateToMonthKey(d)];
+    }
+    const set = new Set();
+    weeks.forEach(w => {
+      const d = new Date(String(w.period_end).length <= 10 ? w.period_end + 'T00:00:00' : w.period_end);
+      if (!isNaN(d.getTime())) set.add(this._dateToMonthKey(d));
+    });
+    return Array.from(set).sort().reverse();
+  },
+
+  _currentMonthKey() {
+    return this._dateToMonthKey(new Date());
+  },
+
+  _dateToMonthKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  },
+
+  _monthLabel(key) {
+    if (!key || key.length < 7) return key;
+    const y = parseInt(key.slice(0, 4), 10);
+    const m = parseInt(key.slice(5, 7), 10) - 1;
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return (monthNames[m] || '') + ' ' + y;
+  },
+
+  // ── Generate the workbook ──────────────────────────────────────────────────
+  async _generate() {
+    const monthKey = document.getElementById('hb-month')?.value;
+    if (!monthKey) return;
+    const btn = document.getElementById('hb-generate');
+    const status = document.getElementById('hb-status');
+
+    if (typeof XLSX === 'undefined') {
+      this._setStatus('The file builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
+      return;
     }
 
-    const todayStr = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    btn.disabled = true;
+    btn.textContent = 'Building...';
+    this._setStatus('Building your file...', 'var(--t3)');
 
-    // ── UI builders ──
-    const ring = (score, size) => {
-      if (score == null) return `<div style="width:${size}px;height:${size}px;border-radius:50%;border:3px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;"><span style="font-size:8px;color:var(--t4);text-align:center;line-height:1.2;">No<br>Data</span></div>`;
-      const r = (size/2)-5, circ = 2*Math.PI*r, dash = (Math.min(score,100)/100)*circ, col = softScore(score);
-      return `<div style="position:relative;width:${size}px;height:${size}px;"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3.5"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="3.5" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><span style="font-size:15px;font-weight:800;color:${col};">${score}</span></div></div>`;
-    };
+    try {
+      // Defer one frame so the UI updates before the work starts.
+      await new Promise(r => setTimeout(r, 50));
 
-    const panelTitle = (t) => `<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;flex-shrink:0;">${t}</div>`;
-    const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
+      const wb = XLSX.utils.book_new();
 
-    // Stat tiles — center-aligned to match the 4-stat tile pattern used
-    // throughout the rest of the app (module dashboards, etc.). Big number in
-    // Barlow Condensed, colored by status (green for good, red for bad).
-    const tile = (label, big, bigColor, sub, subColor) => `
-      <div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
-        <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">${label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;line-height:1;color:${bigColor};">${big}</div>
-        <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
-      </div>`;
-
-    const tiles =
-        tile('Overall Recovery Score', overall != null ? overall : 'None',
-             overall != null ? softScore(overall) : 'var(--t4)',
-             overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
-      + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
-             anyAudit && totalOpp > 0 ? 'var(--gold)' : 'var(--t4)',
-             anyAudit ? 'Recoverable across audited systems' : 'Run an audit to surface this')
-      + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
-             netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
-             netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
-      + tile('Weekly Status', `${wkCount} / 3 <span style="font-family:'Barlow',sans-serif;font-size:11px;color:var(--t3);font-weight:600;">this week</span>`,
-             'var(--gold)',
-             wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All systems updated this week',
-             wkOverdue.length ? 'var(--red)' : 'var(--t3)');
-
-    // Audit Scores panel — three stacked rows, one per module.
-    // Each row uses the PDF-cover layout: bold module name + action top-right,
-    // big score / 100 with the score bar full-width below it, then the red
-    // dollar statement (or green "On target") computed honestly from the
-    // audit's action_items, then audit date + trend in small subtext. The
-    // action mirrors the 30-day rolling rule the audit screens enforce.
-    const auditDaysLeft = (a) => {
-      if (!a || !a.date) return 0;
-      const d = Math.floor((Date.now() - new Date(a.date + 'T00:00:00').getTime()) / 86400000);
-      return Math.max(0, 30 - d);
-    };
-    const auditRow = (name, audit, trend, screen, mod, isFirst, indAvg) => {
-      const score      = audit?.overall_score ?? null;
-      const scoreColor = score != null ? softScore(score) : 'var(--t4)';
-      const daysLeft   = auditDaysLeft(audit);
-      const canRun     = daysLeft <= 0;
-      const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
-
-      // Action area: button when ready, countdown otherwise
-      const actionHtml = canRun
-        ? '<button class="hd-btn" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
-        : '<div style="text-align:right;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;line-height:1.3;">'
-          + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow\',sans-serif;font-weight:700;font-size:12px;letter-spacing:0;text-transform:none;">in '
-          + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
-
-      // Score block: big number / 100 + industry/target line + bar with marker
-      let scoreBlock;
-      if (score != null) {
-        const barPct = Math.max(0, Math.min(100, Math.round(score)));
-        scoreBlock = ''
-          + '<div style="display:flex;align-items:baseline;gap:12px;">'
-          +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
-          +     score + '<span style="font-family:\'Barlow\',sans-serif;font-size:11px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
-          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Industry avg ' + indAvg + ' &middot; Your target 65+</div>'
-          + '</div>'
-          // Status bar shortened on the right so it clears the "Next Audit"
-          // countdown / "Run Audit" button area (~85px wide on the right
-          // edge of the row above). Bar still spans the score+industry text.
-          + '<div style="margin-top:7px;margin-right:85px;">'
-          +   '<div style="display:flex;height:6px;border-radius:4px;overflow:hidden;">'
-          +     '<div style="width:50%;background:var(--red);"></div>'
-          +     '<div style="width:20%;background:var(--amber);"></div>'
-          +     '<div style="width:30%;background:var(--green);"></div>'
-          +   '</div>'
-          +   '<div style="position:relative;height:0;">'
-          +     '<div style="position:absolute;top:-9px;left:' + barPct + '%;width:3px;height:11px;background:var(--w);border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 0 1.5px var(--surface);"></div>'
-          +   '</div>'
-          + '</div>';
-      } else {
-        scoreBlock = '<div style="display:flex;align-items:baseline;gap:12px;">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--t4);line-height:1;">&#8212;</div>'
-          + '<div style="flex:1;font-size:11px;color:var(--t3);">Run the first audit to score this module.</div>'
-          + '</div>';
+      XLSX.utils.book_append_sheet(wb, this._buildIncomeStatement(monthKey),    'Income Statement');
+      XLSX.utils.book_append_sheet(wb, this._buildInventoryValuation(monthKey), 'Inventory Valuation');
+      XLSX.utils.book_append_sheet(wb, this._buildCashReconciliation(monthKey), 'Cash Reconciliation');
+      XLSX.utils.book_append_sheet(wb, this._buildVoidCompLog(monthKey),        'Void and Comp Log');
+      XLSX.utils.book_append_sheet(wb, this._buildTipAllocation(monthKey),      'Form 8027 Worksheet');
+      XLSX.utils.book_append_sheet(wb, this._buildVarianceShrinkage(monthKey),  'Variance and Shrinkage');
+      XLSX.utils.book_append_sheet(wb, this._buildLaborCostAnalysis(monthKey),  'Labor Cost Analysis');
+      XLSX.utils.book_append_sheet(wb, this._buildOperationalOpportunities(monthKey), 'Operational Opportunities');
+      // Year-End Tax Helper appears only for December close (annual roll).
+      if (monthKey.slice(5, 7) === '12') {
+        XLSX.utils.book_append_sheet(wb, this._buildYearEndTaxHelper(monthKey), 'Year-End Tax Helper');
       }
 
-      // Combined summary line: leak status, trend vs last audit, audit date.
-      // Was three stacked rows; now one inline row to free vertical space and
-      // let the card breathe.
-      let summaryLine = '';
-      if (audit) {
-        const monthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
-        const weekly  = monthly / 4.345;
-        const parts = [];
-        if (weekly > 0) {
-          parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--red-soft);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
-        } else {
-          parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
-        }
-        if (trend != null) {
-          parts.push('<span style="color:' + (trend>=0?'var(--green)':'var(--red)') + ';font-weight:700;">'
-            + (trend>=0?'+':'') + trend + ' pts</span>');
-        }
-        if (audit.date) {
-          parts.push('<span style="color:var(--t3);">since ' + shortDate(audit.date) + ' audit</span>');
-        }
-        summaryLine = '<div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.4;">'
-          + parts.join(' <span style="color:var(--t4);">&middot;</span> ')
-          + '</div>';
-      }
-
-      return '<div style="padding:11px 0;' + (isFirst ? '' : 'border-top:1px solid var(--b2);') + '">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-        +   '<div style="font-size:10px;font-weight:800;letter-spacing:0.18em;color:var(--t1);text-transform:uppercase;">' + name + '</div>'
-        +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
-        + '</div>'
-        + scoreBlock
-        + summaryLine
-        + '</div>';
-    };
-    const auditPanel = `<div style="${PANEL}">${panelTitle('Audit Scores')}
-      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;">
-        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true,  63)}
-        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false, 61)}
-        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
-      </div></div>`;
-
-    // Recovery Scoreboard panel — cross-module headline number, sized to be
-    // the visual hero of the dashboard. The receipt for the platform: total $
-    // recovered across Profit, Revenue, and Traffic from every measured fix.
-    const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
-
-    // Setup catch-up banner — shows above the dashboard whenever the Hub
-    // Getting Started checklist is incomplete. One click opens the checklist
-    // so the operator can pick up where they left off. Hides at 100% done.
-    const setupTasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
-    const setupProg  = data.hub_setup_progress || {};
-    const setupDone  = setupTasks.filter(t => setupProg[t.id]).length;
-    const setupTotal = setupTasks.length;
-    const catchupBanner = (setupTotal > 0 && setupDone < setupTotal)
-      ? '<div class="hub-catchup" style="background:rgba(219,171,70,0.10);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
-        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">'
-        +   setupDone + ' of ' + setupTotal + ' setup tasks done. '
-        +   '<span style="color:var(--gold);font-weight:700;">Continue setup</span>'
-        + '</div>'
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-        + '</div>'
-      : '';
-    const fixLog = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    const oldestFix = fixLog.map(e => e.date).filter(Boolean).sort()[0];
-    const sinceTxt = oldestFix
-      ? ' since ' + new Date(oldestFix + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      : '';
-    const recoveryPanel = `<div style="${PANEL}">${panelTitle('Recovery Scoreboard')}
-      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;gap:6px;">
-        ${recoveryTotal.dollars > 0
-          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-0.01em;">${App.fmtCurrency(recoveryTotal.dollars, 0)}<span style="font-size:14px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>
-             <div style="font-size:11px;color:var(--t3);">across ${recoveryTotal.fixes} measured fix${recoveryTotal.fixes === 1 ? '' : 'es'} in Profit, Revenue, and Traffic${sinceTxt}</div>`
-          : `<div style="font-size:12px;color:var(--t3);line-height:1.55;">Mark fixes implemented in any Recovery module and the running total recovered shows here.</div>`
-        }
-      </div></div>`;
-
-    // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
-    // and a 22px number so each tile fits in the shorter container that now
-    // shares the middle column with the Recovery Scoreboard above it.
-    const metricCells = metrics.map(m => `
-      <div class="hd-metric" onclick="S.Hub._enter('${m.screen}','${m.mod}')">
-        <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">${m.label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
-        <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
-      </div>`).join('');
-    const metricsPanel = `<div style="${PANEL}">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div></div>`;
-
-    // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
-    // 50/50 split so the metric tiles get a usable but compact footprint.
-    const middleColumn = `<div style="display:grid;grid-template-rows:1fr 1fr;gap:18px;min-height:0;">${recoveryPanel}${metricsPanel}</div>`;
-
-    // Alerts panel — focal headline up top (big red count if alerts exist,
-    // big green check + "All Clear" headline if not), then the alert rows
-    // below as a clean list. Row styling matches the Priority Action Items
-    // panel so the two list cards feel like a pair.
-    let alertsPanel;
-    if (alerts.length) {
-      const alertRows = alerts.map((a,i) => {
-        const isLast = i === alerts.length - 1;
-        const dotCol = a.sev === 'bad' ? 'var(--red)' : 'var(--gold)';
-        return '<div class="hd-row" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
-          + 'style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
-          + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-          + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
-          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
-          + '</div>';
-      }).join('');
-      const alertHead = '<div style="display:flex;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.35;">'
-        +   'metric' + (alerts.length===1?'':'s') + ' over target'
-        +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Address the worst-scoring first.</div>'
-        + '</div></div>';
-      // Holding-the-line counter: metrics tracked minus metrics flagged as
-      // alerts. Quiet positive counterpoint, fills the panel's empty space
-      // with productive context instead of dead air.
-      const holdingCount = metrics.length - metricAlerts.length;
-      const holdingHtml = holdingCount > 0
-        ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-          + '<span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;"></span>'
-          + '<div style="font-size:10px;color:var(--t3);line-height:1.4;">' + holdingCount + ' metric' + (holdingCount === 1 ? '' : 's') + ' holding the line.</div>'
-          + '</div>'
-        : '';
-      alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${alertHead}
-        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div>${holdingHtml}</div>`;
-    } else {
-      const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
-        + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;">All Clear</div>'
-        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">No metrics are off target right now.</div>'
-        + '</div>';
-      alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${allClear}</div>`;
-    }
-
-    // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
-    // Check Average $, Prime Cost %. Each chart sits in its own bordered
-    // card. Line stroke is tuned for the small chart size (1.7px) — the
-    // module dashboards use 2.5 because those charts are 3x taller.
-    // Fix-event markers (Section 10.5) ride on the bottom chart only so
-    // they show up once instead of three times. Each data point carries
-    // hover data attributes consumed by the shared tooltip below.
-    const miniChart = (label, weeks, valueOf, target, valFmt, dir, withMarkers) => {
-      const series   = weeks.map(w => valueOf(w));
-      const lastVal  = [...series].reverse().find(v => v != null) ?? null;
-      const status   = lastVal != null ? band(lastVal, target, dir) : 'none';
-      const curColor = bandColor(status);
-      const curDisp  = lastVal != null ? valFmt(lastVal) : '—';
-      const tgtDisp  = valFmt(target);
-
-      const card = (inner) => '<div style="border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
-
-      const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:700;color:' + curColor + ';line-height:1;">' + curDisp + '</div>'
-        + '<div style="margin-left:auto;font-size:9px;color:var(--t4);">Target ' + tgtDisp + '</div>'
-        + '</div>';
-
-      const nonNull = series.filter(v => v != null);
-      if (nonNull.length < 2) {
-        return card(head
-          + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Need 2+ weeks</div>');
-      }
-
-      const W = 540, H = 54, P = { t:6, r:6, b:4, l:6 };
-      const cw = W-P.l-P.r, ch = H-P.t-P.b;
-      let mn = Math.min(...nonNull, target);
-      let mx = Math.max(...nonNull, target);
-      const sp = (mx-mn)*0.2 || 1; mn -= sp; mx += sp;
-      const x = i => P.l + (series.length > 1 ? (i/(series.length-1))*cw : cw/2);
-      const y = v => P.t + ch - ((v-mn)/(mx-mn||1))*ch;
-
-      // Smooth path through non-null values; nulls keep their x slot so the
-      // time axis stays honest, the path just skips them. Build the line
-      // path and the area path (line + closure down to chart floor) in the
-      // same pass; the area gets a vertical gradient fill that fades to
-      // transparent, matching the audit score chart style.
-      const baseY = (H-P.b).toFixed(1);
-      let d = '', area = '';
-      let prev = -1, lastX = null;
-      for (let i = 0; i < series.length; i++) {
-        const v = series[i];
-        if (v == null) continue;
-        const xi = x(i), yi = y(v);
-        if (prev < 0) {
-          d    = 'M' + xi.toFixed(1) + ',' + yi.toFixed(1);
-          area = 'M' + xi.toFixed(1) + ',' + baseY + ' L' + xi.toFixed(1) + ',' + yi.toFixed(1);
-        } else {
-          const cp = (xi-x(prev))*0.35;
-          const seg = ' C' + (x(prev)+cp).toFixed(1) + ',' + y(series[prev]).toFixed(1) + ' '
-            + (xi-cp).toFixed(1) + ',' + yi.toFixed(1) + ' '
-            + xi.toFixed(1) + ',' + yi.toFixed(1);
-          d    += seg;
-          area += seg;
-        }
-        lastX = xi;
-        prev = i;
-      }
-      if (area) area += ' L' + lastX.toFixed(1) + ',' + baseY + ' Z';
-
-      const gradId = 'hub-trend-' + label.replace(/[^a-z]/gi,'').toLowerCase();
-
-      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#DBAB46" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
-
-      // Dots render as HTML <div>s positioned absolutely over the SVG
-      // (instead of <circle>s inside the SVG). The SVG uses
-      // preserveAspectRatio="none" so the line stretches to fill the card,
-      // but that same stretching squishes SVG circles into vertical ovals.
-      // CSS-sized divs stay round regardless of how the SVG is scaled.
-      const dots = series.map((v,i) => {
-        if (v == null) return '';
-        const xPct = (x(i) / W * 100).toFixed(2);
-        const yPct = (y(v) / H * 100).toFixed(2);
-        const wkRaw = weeks[i] && weeks[i].period_end;
-        const wkDate = wkRaw ? (shortDate(wkRaw) || '').toUpperCase() : '';
-        const dotBand = band(v, target, dir);
-        return '<div class="hd-chart-dot"'
-          + ' data-label="' + esc(label) + '"'
-          + ' data-disp="' + esc(valFmt(v)) + '"'
-          + ' data-tgt="' + esc(tgtDisp) + '"'
-          + ' data-date="' + esc(wkDate) + '"'
-          + ' data-band="' + dotBand + '"'
-          + ' style="position:absolute;left:' + xPct + '%;top:' + yPct + '%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;">'
-          + '<div class="hd-chart-marker"></div>'
-          + '</div>';
-      }).join('');
-
-      let markerSvg = '';
-      if (withMarkers && window.Recovery && window.FixPanel) {
-        const refWeeks = pWeeks.slice(-series.length);
-        if (refWeeks.length >= 2) {
-          const marks = ['profit','revenue','traffic']
-            .reduce((acc,m) => acc.concat(Recovery.chartMarkers(refWeeks, m)), []);
-          const mxFn = i => P.l + (refWeeks.length > 1 ? (i/(refWeeks.length-1))*cw : cw/2);
-          markerSvg = FixPanel.markerSvg(marks, mxFn, P.t, H-P.b);
-        }
-      }
-
-      // Trend chart is the dashboard's visual rest zone — muted gold line and
-      // a barely-there area fill so the shape carries the story without
-      // adding to the color noise. Status still comes through via the head
-      // (current value in band color) and per-dot hover tooltips.
-      return card(head
-        + '<div style="position:relative;flex:1;min-height:0;">'
-        +   '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" height="100%" style="display:block;position:absolute;inset:0;">'
-        +     '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +       '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.08"/>'
-        +       '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.005"/>'
-        +     '</linearGradient></defs>'
-        +     markerSvg
-        +     tgtLine
-        +     (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +     '<path d="'+d+'" fill="none" stroke="rgba(219,171,70,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-        +   '</svg>'
-        +   dots
-        + '</div>');
-    };
-
-    const w8p = pWeeks.slice(-8);
-    const w8r = rWeeks.slice(-8);
-    const pourSeries  = w8p.map(w => w?.bar?.cost_pct ?? null);
-    const caSeries    = w8r.map(w => w?.check_avg ?? null);
-    const primeSeries = w8p.map(w => w?.prime_cost_pct ?? null);
-    const anyTrend = pourSeries.filter(v=>v!=null).length >= 2
-                  || caSeries.filter(v=>v!=null).length >= 2
-                  || primeSeries.filter(v=>v!=null).length >= 2;
-
-    let trendBody;
-    if (!anyTrend) {
-      trendBody = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Enter 2+ weeks to see trends</div>';
-    } else {
-      trendBody = ''
-        + miniChart('Bar Pour Cost %', w8p, w => w?.bar?.cost_pct ?? null,    pourT,  v => v.toFixed(1) + '%', 'low',  false)
-        + miniChart('Check Average',   w8r, w => w?.check_avg ?? null,        caT,    v => App.fmtCurrency(v), 'high', false)
-        + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  false);
-    }
-    const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:6px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
-    const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
-      <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div></div>`;
-
-    // Priority Action Items panel — dollar amount is the magnet (big gold
-    // Barlow Condensed on the left), then a small module badge above the
-    // action text on the right. Row styling matches the Alerts panel so the
-    // two list cards feel like a pair.
-    const actionBody = topItems.length
-      ? topItems.map((it,i) => {
-          const isLast = i === topItems.length - 1;
-          const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '—';
-          const modBadgeColors = {
-            Profit:  { c: 'var(--gold)',  bg: 'var(--gold-bg)'  },
-            Revenue: { c: 'var(--green)', bg: 'var(--green-bg)' },
-            Traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
-          };
-          const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
-          return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
-            + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
-            + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-            + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
-            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--gold);line-height:1;">' + dollar + '</span>'
-            +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
-            + '</div>'
-            + '<div style="flex:1;min-width:0;font-size:11px;line-height:1.45;">'
-            +   '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;color:' + mc.c + ';">' + it.sys.toUpperCase() + '</span>'
-            +   '<span style="color:var(--t3);"> &middot; </span>'
-            +   '<span style="color:var(--t1);">' + esc(it.action) + '</span>'
-            + '</div>'
-            + '</div>';
-        }).join('')
-      : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
-    const overflowFooter = overflowItems > 0
-      ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
-      : '';
-    const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}</div>`;
-
-    // Weekly money readout panel — big red weekly leak total up top, then a
-    // ranked list of the gap areas producing it. Same emotional language as
-    // the Audit Scores card: lead with the dollar number, support with detail.
-    const readout = this.weeklyReadout();
-    const hasWeekData = pWeeks.length > 0 || rWeeks.length > 0;
-
-    // Per-module color-tinted badge (PROFIT gold, REVENUE green, TRAFFIC blue)
-    // — adds visual variation per module on each row.
-    const modBadge = (mod) => {
-      const map = {
-        profit:  { c: 'var(--gold)',  bg: 'var(--gold-bg)'  },
-        revenue: { c: 'var(--green)', bg: 'var(--green-bg)' },
-        traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
+      // Workbook properties so the disclaimer is visible in Excel's File >
+      // Properties pane too, not only in the sheet footers.
+      wb.Props = {
+        Title:        'Bar Cop Books, ' + this._monthLabel(monthKey),
+        Subject:      'Month-end books generated by Bar Cop from operator input data. Bar Cop is a software tool, not a tax preparer or CPA. The accountant or bookkeeper should review and verify before filing.',
+        Author:       (App.data?.settings?.bar_name) || 'Bar Cop',
+        Company:      'Bar Cop',
+        CreatedDate:  new Date()
       };
-      const m = map[mod] || map.profit;
-      return '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:'
-        + m.c + ';background:' + m.bg + ';padding:3px 6px;border-radius:3px;flex-shrink:0;min-width:62px;text-align:center;">'
-        + (mod || '').toUpperCase() + '</span>';
-    };
 
-    let readoutBody;
-    if (!hasWeekData) {
-      readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 16px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">&#8212; / wk</div>'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:240px;">Enter this week\'s numbers in Profit and Revenue to see what is leaking and where.</div>'
-        + '</div>';
-    } else if (readout.items.length === 0) {
-      readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;">'
-        + '<svg width="34" height="34" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        + '<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--green);line-height:1;">$0</div><div style="font-size:11px;color:var(--green);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ wk</div></div>'
-        + '<div style="font-size:11px;color:var(--green);font-weight:700;">Holding the line.</div>'
-        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Every gap area with a weekly dollar metric is on target.</div>'
-        + '</div>';
+      const filename = 'Bar Cop Books - ' + this._monthLabel(monthKey) + '.xlsx';
+      XLSX.writeFile(wb, filename);
+
+      this._setStatus('Downloaded ' + filename, 'var(--gold)');
+    } catch (e) {
+      console.error('Books generation error:', e);
+      this._setStatus('Could not build the file: ' + (e?.message || 'unknown error'), 'var(--red)');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate File';
+    }
+  },
+
+  _setStatus(text, color) {
+    const el = document.getElementById('hb-status');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color || 'var(--t3)';
+    el.style.display = 'block';
+  },
+
+  // ── Sheet 1 — Income Statement ────────────────────────────────────────────
+  // Month column + Year-to-date column. Standard P&L layout an accountant
+  // expects: Revenue, COGS, Gross Profit, Labor, Prime Cost, Operating
+  // Expenses (placeholder rows for occupancy/utilities/insurance the
+  // operator's accountant fills in), Operating Income.
+  _buildIncomeStatement(monthKey) {
+    const M = this._aggregateMonth(monthKey);
+    const YTD = this._aggregateYTD(monthKey);
+    const COL_COUNT = 3;
+
+    const r = (label, monthVal, ytdVal) => [label, monthVal, ytdVal];
+    const blank = () => this._blankRow(COL_COUNT);
+
+    const rows = [];
+    const merges = [];
+
+    // Row 1: Title (merged A:C)
+    rows.push(this._lineRow(this._baseTitle('Income Statement', monthKey), COL_COUNT));
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
+    rows.push(blank());
+
+    // Column header row
+    rows.push(['', this._monthLabel(monthKey), 'Year to Date']);
+    rows.push(blank());
+
+    // Revenue
+    rows.push(['Revenue', '', '']);
+    rows.push(r('  Bar Revenue',  M.barRev,  YTD.barRev));
+    rows.push(r('  Food Revenue', M.foodRev, YTD.foodRev));
+    rows.push(r('  Less: Comps',  M.comps != null ? -Math.abs(M.comps) : null, YTD.comps != null ? -Math.abs(YTD.comps) : null));
+    rows.push(r('Total Revenue (net of comps)', M.totalRev - (M.comps || 0), YTD.totalRev - (YTD.comps || 0)));
+    rows.push(blank());
+
+    // COGS
+    rows.push(['Cost of Goods Sold', '', '']);
+    rows.push(r('  Bar COGS',  M.barCogs,  YTD.barCogs));
+    rows.push(r('  Food COGS', M.foodCogs, YTD.foodCogs));
+    rows.push(r('Total COGS', M.totalCogs, YTD.totalCogs));
+    rows.push(blank());
+
+    rows.push(r('Gross Profit', M.totalRev - M.totalCogs - (M.comps || 0), YTD.totalRev - YTD.totalCogs - (YTD.comps || 0)));
+    rows.push(blank());
+
+    // Labor
+    rows.push(['Labor', '', '']);
+    rows.push(r('  Bar Labor',  M.barLabor,  YTD.barLabor));
+    rows.push(r('  Food Labor', M.foodLabor, YTD.foodLabor));
+    rows.push(r('Total Labor', M.totalLabor, YTD.totalLabor));
+    rows.push(blank());
+
+    rows.push(r('Prime Cost (COGS + Labor)', M.totalCogs + M.totalLabor, YTD.totalCogs + YTD.totalLabor));
+    rows.push(blank());
+
+    // Operating Expenses
+    rows.push(['Operating Expenses (your accountant fills in)', '', '']);
+    rows.push(r('  Occupancy (rent, property tax)', null, null));
+    rows.push(r('  Utilities', null, null));
+    rows.push(r('  Insurance', null, null));
+    rows.push(r('  Marketing and advertising', null, null));
+    rows.push(r('  Repairs and maintenance', M.maintenance, YTD.maintenance));
+    rows.push(r('  Professional fees', null, null));
+    rows.push(r('  Bank and credit card fees', null, null));
+    rows.push(r('  Other operating expenses', null, null));
+    rows.push(r('Total Operating Expenses', null, null));
+    rows.push(blank());
+
+    rows.push(r('Operating Income (before taxes)', null, null));
+    rows.push(blank());
+
+    // Key Ratios
+    rows.push(['Key Cost Ratios', '', '']);
+    rows.push(r('  Pour Cost %',  M.barRev  ? (M.barCogs  / M.barRev)  : null, YTD.barRev  ? (YTD.barCogs  / YTD.barRev)  : null));
+    rows.push(r('  Food Cost %',  M.foodRev ? (M.foodCogs / M.foodRev) : null, YTD.foodRev ? (YTD.foodCogs / YTD.foodRev) : null));
+    rows.push(r('  Labor % of Revenue', M.totalRev ? (M.totalLabor / M.totalRev) : null, YTD.totalRev ? (YTD.totalLabor / YTD.totalRev) : null));
+    rows.push(r('  Prime Cost %', M.totalRev ? ((M.totalCogs + M.totalLabor) / M.totalRev) : null, YTD.totalRev ? ((YTD.totalCogs + YTD.totalLabor) / YTD.totalRev) : null));
+
+    // Source notes (each line as its own merged row)
+    rows.push(blank());
+    rows.push(this._lineRow('Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals.', COL_COUNT));
+    merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
+    rows.push(this._lineRow('Comps from Shift Control void and comp log. Maintenance from Shift Control maintenance log.', COL_COUNT));
+    merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
+
+    // Footer + disclaimer
+    this._pushFooter(rows, merges, null, COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    rows.forEach((row, i) => {
+      const label = String(row[0] || '');
+      const isPctRow = /%$/.test(label);
+      [1, 2].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = isPctRow ? pctFmt : moneyFmt;
+      });
+    });
+
+    return this._finishSheet(ws, rows.length, merges, [{ wch: 56 }, { wch: 20 }, { wch: 20 }]);
+  },
+
+  // ── Shared formatting helpers for cohesion across every sheet ────────────
+  // The 5 sheets share a layout pattern so the deliverable feels consistent:
+  // Row 1: title (merged across all columns, taller row height)
+  // Row 2: blank
+  // Row 3+: column header row, then data
+  // Footer: blank, source note (merged), then 3 disclaimer lines (each merged)
+  //
+  // SheetJS community does not write cell styles (bold/colors), but it does
+  // write column widths, row heights, and cell merges. Merges across the
+  // full row are the trick that keeps long text from being clipped by an
+  // adjacent narrow column.
+
+  // Title shown in row 1 of every sheet.
+  _baseTitle(sheetName, monthKey) {
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    return barName + ': ' + sheetName + ', ' + this._monthLabel(monthKey);
+  },
+
+  // The disclaimer is split into 3 short lines so each fits in a merged-row
+  // cell without depending on wrap-text style (community SheetJS does not
+  // write style). Each line is pushed as its own row and merged across.
+  _disclaimerLines() {
+    return [
+      'Generated from your input data on ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '.',
+      'Bar Cop is a software tool, not a tax preparer, accountant, or CPA.',
+      'Your accountant should review and verify before filing or closing your books.'
+    ];
+  },
+
+  // Push a standard footer: blank row, source note (one line, merged across
+  // the full column range), then the 3 disclaimer lines (each merged).
+  // colCount is the total number of columns in the sheet.
+  _pushFooter(rows, merges, sourceText, colCount) {
+    rows.push(this._blankRow(colCount));
+    if (sourceText) {
+      rows.push(this._lineRow(sourceText, colCount));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: colCount - 1 } });
+    }
+    this._disclaimerLines().forEach(line => {
+      rows.push(this._lineRow(line, colCount));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: colCount - 1 } });
+    });
+  },
+
+  // Make a blank row with the right column count.
+  _blankRow(colCount) {
+    const r = [];
+    for (let i = 0; i < colCount; i++) r.push('');
+    return r;
+  },
+
+  // Make a row whose first cell holds text and the rest are blank (so a
+  // full-row merge displays the text cleanly).
+  _lineRow(text, colCount) {
+    const r = [text];
+    for (let i = 1; i < colCount; i++) r.push('');
+    return r;
+  },
+
+  // Apply all the standard finishing to a worksheet: title row merge + row
+  // height, column widths, the rest of the merges, and number formats.
+  _finishSheet(ws, rowsLength, mergesIn, colWidths) {
+    ws['!cols']   = colWidths;
+    ws['!merges'] = mergesIn;
+    const rowHeights = [];
+    rowHeights[0] = { hpt: 22 }; // taller title row for visual weight
+    ws['!rows'] = rowHeights;
+    return ws;
+  },
+
+  // ── Sheet 2 — Inventory Valuation Report ─────────────────────────────────
+  // Snapshot of inventory value at period end (or as close to it as the
+  // operator's most recent count gets us), broken down bottle-by-bottle,
+  // subtotaled by category and storage location. Includes the Schedule C
+  // COGS math (beginning + purchases - ending = COGS for the period) when
+  // both a prior-period count and the current count are present, plus
+  // purchases summed from receive-delivery records.
+  _buildInventoryValuation(monthKey) {
+    const COL_COUNT = 5;
+    const COL_WIDTHS = [{ wch: 50 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
+
+    const periodEnd = this._monthEndDate(monthKey);
+    const periodStart = this._monthStartDate(monthKey);
+    const counts = (App.inventoryData?.ic_counts || [])
+      .slice()
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+
+    const endingCount    = counts.filter(c => c.date && c.date <= periodEnd).slice(-1)[0] || null;
+    const beginningCount = counts.filter(c => c.date && c.date <  periodStart).slice(-1)[0] || null;
+
+    const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
+    const purchases = (App.inventoryData?.ic_deliveries || [])
+      .filter(d => inMonth(d.date))
+      .reduce((s, d) => s + (parseFloat(d.total) || 0), 0);
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+
+    // Row 1: Title (merged across)
+    rows.push(this._lineRow(this._baseTitle('Inventory Valuation', monthKey), COL_COUNT));
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
+    rows.push(blank());
+
+    if (!endingCount) {
+      rows.push(this._lineRow('No inventory count on file for this period.', COL_COUNT));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
+      rows.push(this._lineRow('Take a count in Inventory Control before closing the month so this sheet can value your inventory.', COL_COUNT));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
+      this._pushFooter(rows, merges, null, COL_COUNT);
+      const wsEmpty = XLSX.utils.aoa_to_sheet(rows);
+      return this._finishSheet(wsEmpty, rows.length, merges, COL_WIDTHS);
+    }
+
+    // Schedule C COGS math
+    const beginValue  = beginningCount ? (parseFloat(beginningCount.total_value) || 0) : null;
+    const endingValue = parseFloat(endingCount.total_value) || 0;
+    const calcCogs    = (beginValue != null) ? (beginValue + purchases - endingValue) : null;
+
+    rows.push(['Schedule C COGS Math (for the accountant)', '', '', '', '']);
+    rows.push(['  Beginning Inventory (count dated ' + (beginningCount?.date || 'none on file') + ')', beginValue, '', '', '']);
+    rows.push(['  Plus Purchases (from receive-delivery log this month)', purchases, '', '', '']);
+    rows.push(['  Less Ending Inventory (count dated ' + endingCount.date + ')', endingValue != null ? -endingValue : null, '', '', '']);
+    rows.push(['  Cost of Goods Sold (calculated)', calcCogs, '', '', '']);
+    rows.push(blank());
+
+    // Subtotal by category
+    const items = endingCount.items || [];
+    const byCat = {};
+    items.forEach(it => {
+      const cat = it.category || 'Uncategorized';
+      if (!byCat[cat]) byCat[cat] = { qty: 0, value: 0 };
+      byCat[cat].qty   += parseFloat(it.total) || 0;
+      byCat[cat].value += parseFloat(it.value) || 0;
+    });
+    rows.push(['Ending Inventory by Category', 'Units', 'Value', '', '']);
+    Object.keys(byCat).sort().forEach(c => {
+      rows.push(['  ' + c, byCat[c].qty, byCat[c].value, '', '']);
+    });
+    rows.push(['Total Ending Inventory', items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0), endingValue, '', '']);
+    rows.push(blank());
+
+    // Bottle-level detail
+    rows.push(['Bottle Detail', '', '', '', '']);
+    rows.push(['Product', 'Category', 'Units', 'Unit Cost', 'Extended Value']);
+    items.slice().sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
+      .forEach(it => {
+        rows.push([it.name || '', it.category || '', parseFloat(it.total) || 0, parseFloat(it.unit_cost) || 0, parseFloat(it.value) || 0]);
+      });
+
+    // Source + disclaimer footer
+    this._pushFooter(rows, merges,
+      'Source: Inventory Control count dated ' + endingCount.date + ' (type: ' + (endingCount.type || 'Full') + ', counted by ' + (endingCount.counted_by || 'unrecorded') + ').',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const qtyFmt   = '#,##0.00';
+    rows.forEach((row, i) => {
+      const apply = (addr, fmt) => { const cell = ws[addr]; if (cell && typeof cell.v === 'number') cell.z = fmt; };
+      apply(XLSX.utils.encode_cell({ r: i, c: 1 }), /Units$/.test(String(row[1])) ? qtyFmt : moneyFmt);
+      apply(XLSX.utils.encode_cell({ r: i, c: 2 }), /Units$/.test(String(row[1])) ? qtyFmt : moneyFmt);
+      apply(XLSX.utils.encode_cell({ r: i, c: 3 }), moneyFmt);
+      apply(XLSX.utils.encode_cell({ r: i, c: 4 }), moneyFmt);
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 3 — Cash Reconciliation Audit Trail ─────────────────────────────
+  // Per-shift table joining sc_shifts (total revenue) with sc_variances
+  // (expected vs counted cash + reason). This is the documentation the IRS
+  // looks for in a cash-heavy business audit. Monthly totals at the bottom.
+  _buildCashReconciliation(monthKey) {
+    const COL_COUNT = 9;
+    const COL_WIDTHS = [{ wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 40 }];
+
+    const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
+    const shifts    = (App.shiftData?.sc_shifts    || []).filter(s => inMonth(s.date));
+    const variances = (App.shiftData?.sc_variances || []).filter(v => inMonth(v.date));
+
+    const vKey = (date, type) => (date || '') + '|' + (type || '');
+    const vIndex = {};
+    variances.forEach(v => {
+      const k = vKey(v.date, v.shift_type);
+      if (!vIndex[k]) vIndex[k] = [];
+      vIndex[k].push(v);
+    });
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+
+    // Row 1: Title merged across all 9 columns so the bar name never gets clipped
+    rows.push(this._lineRow(this._baseTitle('Cash Reconciliation', monthKey), COL_COUNT));
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
+    rows.push(blank());
+
+    rows.push(['Date', 'Shift', 'Manager', 'Total Revenue', 'Expected Cash', 'Counted Cash', 'Variance', 'Status', 'Reason']);
+
+    let totalRev = 0, totalExp = 0, totalCnt = 0, totalVar = 0;
+    const sortedShifts = shifts.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    if (sortedShifts.length === 0 && variances.length === 0) {
+      rows.push(this._lineRow('(no shifts or cash variances logged this month)', COL_COUNT));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
     } else {
-      const shown = readout.items.slice(0, 50);
-      const roRows = shown.map((it, i) => {
-        const isLast = i === shown.length - 1;
-        return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.module + '\',\'' + esc(it.gapId) + '\')"'
-          + ' style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
-          + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-          + modBadge(it.module)
-          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.label) + '</div>'
-          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
-          + '</div>';
-      }).join('');
-      readoutBody = ''
-        + '<div style="display:flex;align-items:baseline;gap:10px;">'
-        +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + App.fmtCurrency(readout.total, 0) + '</div>'
-        +   '<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ week</div>'
-        + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">'
-        +   App.fmtCurrency(readout.total * 52, 0) + ' annualized at this pace '
-        +   '<span style="color:var(--t4);">&middot;</span> '
-        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's')
-        + '</div>'
-        + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
-    }
-    const readoutPanel = `<div style="${PANEL}">${panelTitle('Leaking This Week')}${readoutBody}</div>`;
+      sortedShifts.forEach(s => {
+        const k = vKey(s.date, s.shift_type);
+        const v = (vIndex[k] || [])[0] || null;
+        const rev = parseFloat(s.total_revenue) || 0;
+        const exp = v ? (parseFloat(v.expected_cash) || 0) : null;
+        const cnt = v ? (parseFloat(v.counted_cash)  || 0) : null;
+        const varc = v ? (parseFloat(v.variance) || (cnt - exp)) : null;
+        rows.push([s.date || '', s.shift_type || '', s.manager || '', rev, exp, cnt, varc, v ? (v.status || '') : '', v ? (v.reason || '') : '']);
+        totalRev += rev;
+        if (exp  != null) totalExp += exp;
+        if (cnt  != null) totalCnt += cnt;
+        if (varc != null) totalVar += varc;
+      });
 
-    // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
-    const navIcons = {
-      profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      revenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      traffic: '<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
-      inv:     '<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
-      labor:   '<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      shift:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      getStart:'<path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      allBars: '<rect x="2" y="6" width="3" height="8" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="3" width="3" height="11" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="12" y="8" width="3" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3"/>',
-      books:   '<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
-      settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      mail:    '<rect x="2.2" y="4" width="12.6" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 4.5l6.3 4.5 6.3-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      signout: '<path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
+      // Orphan variances (no matching shift)
+      const accountedFor = new Set();
+      sortedShifts.forEach(s => accountedFor.add(vKey(s.date, s.shift_type)));
+      variances.forEach(v => {
+        if (accountedFor.has(vKey(v.date, v.shift_type))) return;
+        const exp = parseFloat(v.expected_cash) || 0;
+        const cnt = parseFloat(v.counted_cash)  || 0;
+        const varc = parseFloat(v.variance) || (cnt - exp);
+        rows.push([v.date || '', v.shift_type || '', v.cashier || '', null, exp, cnt, varc, v.status || '', v.reason || '']);
+        totalExp += exp;
+        totalCnt += cnt;
+        totalVar += varc;
+      });
+    }
+
+    rows.push(blank());
+    rows.push(['Monthly Totals', '', '', totalRev, totalExp, totalCnt, totalVar, '', '']);
+
+    this._pushFooter(rows, merges,
+      'Source: Shift Control. Variance equals counted cash minus expected cash. Status comes from your tolerance setting in App Settings.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((row, i) => {
+      [3, 4, 5, 6].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 4 — Void & Comp Compliance Log ──────────────────────────────────
+  // Every void and comp in the month with full audit context: who, when,
+  // what, how much, why, who authorized. Subtotals by type, by manager, by
+  // reason. Required for sales-tax reconciliation in most states and for
+  // internal-controls documentation during an audit.
+  _buildVoidCompLog(monthKey) {
+    const COL_COUNT = 9;
+    const COL_WIDTHS = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 32 }];
+
+    const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
+    const records = (App.shiftData?.sc_void_comps || [])
+      .filter(r => inMonth(r.date))
+      .slice()
+      .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.created_at || '').localeCompare(b.created_at || ''));
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+
+    rows.push(this._lineRow(this._baseTitle('Void and Comp Log', monthKey), COL_COUNT));
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
+    rows.push(blank());
+
+    rows.push(['Date', 'Type', 'Shift', 'Item', 'Amount', 'Server', 'Authorized By', 'Check #', 'Reason']);
+
+    let totalVoids = 0, totalComps = 0;
+    const byMgr = {}, byReason = {};
+
+    if (records.length === 0) {
+      rows.push(this._lineRow('(no voids or comps recorded this month)', COL_COUNT));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
+    } else {
+      records.forEach(r => {
+        const amt = parseFloat(r.amount) || 0;
+        rows.push([r.date || '', r.type || '', r.shift_type || '', r.item || '', amt, r.server || '', r.authorized_by || '', r.check_number || '', r.reason || '']);
+        const type = (r.type || '').toLowerCase();
+        if (type === 'void') totalVoids += amt;
+        else if (type === 'comp') totalComps += amt;
+        const mgr = r.authorized_by || '(none recorded)';
+        byMgr[mgr] = (byMgr[mgr] || 0) + amt;
+        const rea = r.reason || '(none recorded)';
+        byReason[rea] = (byReason[rea] || 0) + amt;
+      });
+    }
+
+    rows.push(blank());
+    rows.push(['Monthly Totals by Type', '', '', '', '', '', '', '', '']);
+    rows.push(['  Total Voids',  '', '', '', totalVoids, '', '', '', '']);
+    rows.push(['  Total Comps',  '', '', '', totalComps, '', '', '', '']);
+    rows.push(['  Combined',     '', '', '', totalVoids + totalComps, '', '', '', '']);
+
+    if (Object.keys(byMgr).length) {
+      rows.push(blank());
+      rows.push(['Subtotal by Authorizer', 'Amount', '', '', '', '', '', '', '']);
+      Object.keys(byMgr).sort().forEach(mgr => {
+        rows.push(['  ' + mgr, byMgr[mgr], '', '', '', '', '', '', '']);
+      });
+    }
+
+    if (Object.keys(byReason).length) {
+      rows.push(blank());
+      rows.push(['Subtotal by Reason', 'Amount', '', '', '', '', '', '', '']);
+      Object.keys(byReason).sort().forEach(rea => {
+        rows.push(['  ' + rea, byReason[rea], '', '', '', '', '', '', '']);
+      });
+    }
+
+    this._pushFooter(rows, merges,
+      'Source: Shift Control void and comp log. Used for sales tax reconciliation and internal controls documentation.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((row, i) => {
+      [1, 4].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 5 — Tip Allocation Worksheet (IRS Form 8027) ────────────────────
+  // Worksheet, not the form itself. The operator (or their CPA) transcribes
+  // these line values onto the actual IRS Form 8027 and signs it. Bar Cop
+  // is a software tool, not a tax preparer.
+  //
+  // Form 8027 is required for "large food and beverage establishments" —
+  // operators with more than 10 employees on a typical business day where
+  // tipping is customary. Some operators do not need to file. We compute
+  // the figures unconditionally so the accountant has the data either way.
+  _buildTipAllocation(monthKey) {
+    const COL_COUNT = 5;
+    const COL_WIDTHS = [{ wch: 60 }, { wch: 18 }, { wch: 42 }, { wch: 16 }, { wch: 22 }];
+
+    const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
+    const tips   = (App.laborData?.lc_tips   || []).filter(t => inMonth(t.date));
+    const shifts = (App.shiftData?.sc_shifts || []).filter(s => inMonth(s.date));
+
+    const grossReceipts = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+    const totalChargedTips = tips.reduce((s, t) => s + (parseFloat(t.card_tips) || 0), 0);
+    const totalCashTips    = tips.reduce((s, t) => s + (parseFloat(t.cash_tips) || 0), 0);
+    const totalReported    = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
+    const line7  = grossReceipts * 0.08;
+    const line7a = Math.max(0, line7 - totalReported);
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+    const mergeFull = (rowIdx) => merges.push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: COL_COUNT - 1 } });
+
+    // Title (merged)
+    rows.push(this._lineRow(this._baseTitle('Tip Allocation Worksheet (IRS Form 8027)', monthKey), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    // Banner rows (merged across full width so the long sentences are not clipped)
+    rows.push(this._lineRow('This is a worksheet. It is not the IRS form. Your accountant moves these numbers onto the actual Form 8027 and signs it.', COL_COUNT));
+    mergeFull(rows.length - 1);
+    rows.push(this._lineRow('Form 8027 is required for restaurants with more than 10 employees on a typical business day where tipping happens. Some operators do not have to file. Confirm with your accountant.', COL_COUNT));
+    mergeFull(rows.length - 1);
+    rows.push(blank());
+
+    rows.push(['Form 8027 Lines (figured for the month)', '', '', '', '']);
+    rows.push(['  Line 1: Total charged tips for the month',                     totalChargedTips, '', '', '']);
+    rows.push(['  Line 2: Total charge receipts on which charged tips were shown', null,           '(your accountant fills. Bar Cop does not track this separately.)', '', '']);
+    rows.push(['  Line 3: Total service charges less than 10% paid as wages',     null,           '(your accountant fills if it applies.)', '', '']);
+    rows.push(['  Line 4a: Tips reported by indirectly tipped employees',         null,           '(your accountant sorts this. Bar Cop logs total tips per server.)', '', '']);
+    rows.push(['  Line 4b: Tips reported by directly tipped employees',           null,           '(your accountant sorts this. Bar Cop logs total tips per server.)', '', '']);
+    rows.push(['  Line 5: Total tips reported (4a plus 4b)',                      totalReported, '', '', '']);
+    rows.push(['  Line 6: Gross receipts from food and beverage',                 grossReceipts, '', '', '']);
+    rows.push(['  Line 7: 8% of gross receipts (or your approved lower rate)',    line7,         '', '', '']);
+    rows.push(['  Line 7a: Allocated tips (Line 7 minus Line 5, never below zero)', line7a,      '', '', '']);
+    rows.push(blank());
+
+    rows.push(['Reference Totals', '', '', '', '']);
+    rows.push(['  Total Cash Tips logged',  totalCashTips,    '', '', '']);
+    rows.push(['  Total Card Tips logged',  totalChargedTips, '', '', '']);
+    rows.push(['  Combined Tips logged',    totalReported,    '', '', '']);
+    rows.push(blank());
+
+    // Per-employee, per-shift detail
+    rows.push(['Per-Employee Tip Detail', '', '', '', '']);
+    rows.push(['Date', 'Employee', 'Shift', 'Hours', 'Total Tips']);
+    const sortedTips = tips.slice().sort((a, b) =>
+      (a.date || '').localeCompare(b.date || '') || (a.name || '').localeCompare(b.name || '')
+    );
+    if (sortedTips.length === 0) {
+      rows.push(this._lineRow('(no tips logged this month)', COL_COUNT));
+      mergeFull(rows.length - 1);
+    } else {
+      sortedTips.forEach(t => {
+        const total = parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
+        rows.push([t.date || '', t.name || '', t.shift_type || '', parseFloat(t.hours) || null, total]);
+      });
+    }
+
+    // Per-employee monthly totals + suggested allocation
+    const byEmp = {};
+    sortedTips.forEach(t => {
+      const name = t.name || '(unnamed)';
+      if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0 };
+      byEmp[name].tips  += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
+      byEmp[name].hours += parseFloat(t.hours) || 0;
+    });
+    const allocStartIdx = rows.length;
+    if (Object.keys(byEmp).length) {
+      rows.push(blank());
+      rows.push(['Per-Employee Monthly Totals', '', '', '', '']);
+      rows.push(['Employee', 'Hours', 'Tips Reported', 'Share of Hours', 'Suggested Allocation (Line 7a x share)']);
+      const totalHours = Object.values(byEmp).reduce((s, e) => s + e.hours, 0);
+      Object.keys(byEmp).sort().forEach(name => {
+        const e = byEmp[name];
+        const share = totalHours > 0 ? (e.hours / totalHours) : 0;
+        const suggested = line7a * share;
+        rows.push([name, e.hours, e.tips, share, suggested]);
+      });
+    }
+
+    this._pushFooter(rows, merges,
+      'Source: Labor Control tip log (per-shift tip entries) and Shift Control shifts (gross receipts).',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    rows.forEach((row, i) => {
+      // Line value column (col 1) is money on Form 8027 line rows
+      const c1 = XLSX.utils.encode_cell({ r: i, c: 1 });
+      if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = moneyFmt;
+      // For per-employee allocation rows (col 3 = share <= 1, col 4 = money)
+      if (i > allocStartIdx && typeof row[3] === 'number' && row[3] >= 0 && row[3] <= 1 && typeof row[4] === 'number') {
+        const c3 = XLSX.utils.encode_cell({ r: i, c: 3 });
+        const c4 = XLSX.utils.encode_cell({ r: i, c: 4 });
+        if (ws[c3]) ws[c3].z = pctFmt;
+        if (ws[c4]) ws[c4].z = moneyFmt;
+      } else {
+        // Per-employee detail rows (col 4 = total tips)
+        const c4 = XLSX.utils.encode_cell({ r: i, c: 4 });
+        if (ws[c4] && typeof ws[c4].v === 'number') ws[c4].z = moneyFmt;
+      }
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 6 — Variance and Shrinkage Report ──────────────────────────────
+  // Per-product usage over the month, computed from inventory counts and
+  // receive-delivery records: usage = startCount + monthDeliveries - endCount.
+  // Bottle-level table sorted by extended usage dollars (the biggest movers
+  // surface first, which is where shrinkage and overpouring show up).
+  // True theft variance also needs POS sales detail, which Bar Cop does not
+  // persist between sessions; see Inventory Control's Variance Report screen
+  // for the POS-matched version. This sheet is the persistent-data view.
+  _buildVarianceShrinkage(monthKey) {
+    const COL_COUNT = 6;
+    const COL_WIDTHS = [{ wch: 36 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
+    const periodStart = this._monthStartDate(monthKey);
+    const periodEnd   = this._monthEndDate(monthKey);
+
+    const counts = (App.inventoryData?.ic_counts || []).slice()
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    const startCount = counts.filter(c => c.date && c.date <  periodStart).slice(-1)[0] || null;
+    const endCount   = counts.filter(c => c.date && c.date <= periodEnd).slice(-1)[0] || null;
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Variance and Shrinkage Report', monthKey), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    if (!startCount || !endCount || startCount.id === endCount.id) {
+      rows.push(this._lineRow('Two counts on file are needed for a variance period. Bar Cop did not find a count before this month and a count on or before month end.', COL_COUNT));
+      mergeFull(rows.length - 1);
+      rows.push(this._lineRow('Take an end-of-month count in Inventory Control before closing the books so this report can compute usage.', COL_COUNT));
+      mergeFull(rows.length - 1);
+      this._pushFooter(rows, merges, null, COL_COUNT);
+      const wsEmpty = XLSX.utils.aoa_to_sheet(rows);
+      return this._finishSheet(wsEmpty, rows.length, merges, COL_WIDTHS);
+    }
+
+    // Build the usage map per product.
+    const sMap = {}; (startCount.items || []).forEach(it => sMap[it.product_id] = it);
+    const eMap = {}; (endCount.items   || []).forEach(it => eMap[it.product_id] = it);
+
+    const purch = {};
+    (App.inventoryData?.ic_deliveries || [])
+      .filter(d => d.date && d.date > startCount.date && d.date <= endCount.date)
+      .forEach(d => (d.line_items || []).forEach(li => {
+        purch[li.product_id] = (purch[li.product_id] || 0) + (parseFloat(li.qty) || 0);
+      }));
+
+    const products = (App.inventoryData?.ic_products || []);
+    const productById = {};
+    products.forEach(p => { productById[p.id] = p; });
+
+    const detail = [];
+    Object.keys(eMap).forEach(pid => {
+      if (!sMap[pid]) return;
+      const p = productById[pid] || {};
+      const startQty = parseFloat(sMap[pid].total) || 0;
+      const endQty   = parseFloat(eMap[pid].total) || 0;
+      const purchQty = purch[pid] || 0;
+      const usedQty  = startQty + purchQty - endQty;
+      const unitCost = parseFloat(p.unit_cost) || parseFloat(eMap[pid].unit_cost) || 0;
+      const usedValue = usedQty * unitCost;
+      detail.push({
+        name: eMap[pid].name || p.name || '(unnamed)',
+        category: eMap[pid].category || p.category || '',
+        startQty, purchQty, endQty, usedQty, usedValue
+      });
+    });
+
+    // Sort by used value, biggest first.
+    detail.sort((a, b) => b.usedValue - a.usedValue);
+
+    rows.push(['Period: ' + startCount.date + ' through ' + endCount.date, '', '', '', '', '']);
+    mergeFull(rows.length - 1);
+    rows.push(blank());
+
+    rows.push(['Product', 'Category', 'Start Units', 'Delivered', 'End Units', 'Usage Value']);
+    let totalUsage = 0;
+    if (detail.length === 0) {
+      rows.push(this._lineRow('(no products matched between the two counts)', COL_COUNT));
+      mergeFull(rows.length - 1);
+    } else {
+      detail.forEach(d => {
+        rows.push([d.name, d.category, d.startQty, d.purchQty, d.endQty, d.usedValue]);
+        totalUsage += d.usedValue;
+      });
+      rows.push(['Total Period Usage', '', '', '', '', totalUsage]);
+    }
+
+    this._pushFooter(rows, merges,
+      'Source: Inventory Control counts and receive-delivery records between ' + startCount.date + ' and ' + endCount.date + '. Recipe-based shrinkage detection requires POS sales detail, which is loaded on demand in the Variance Report screen inside Inventory Control.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const qtyFmt   = '#,##0.00';
+    rows.forEach((row, i) => {
+      [2, 3, 4].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        if (ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = qtyFmt;
+      });
+      const addrVal = XLSX.utils.encode_cell({ r: i, c: 5 });
+      if (ws[addrVal] && typeof ws[addrVal].v === 'number') ws[addrVal].z = moneyFmt;
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 7 — Labor Cost Analysis ─────────────────────────────────────────
+  // Two breakdowns from lc_actuals filtered to the month:
+  //  (1) By position: total hours, total wages, share of labor
+  //  (2) By staff member: total hours, total wages, average wage realized
+  // Plus monthly totals, labor percentage of revenue (from sc_shifts), and a
+  // call-out count from lc_callouts.
+  _buildLaborCostAnalysis(monthKey) {
+    const COL_COUNT = 5;
+    const COL_WIDTHS = [{ wch: 36 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+    const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
+    const actuals  = (App.laborData?.lc_actuals  || []).filter(a => inMonth(a.date));
+    const positions = (App.laborData?.lc_positions || []);
+    const staff     = (App.laborData?.lc_staff     || []);
+    const callouts  = (App.laborData?.lc_callouts  || []).filter(c => inMonth(c.date));
+    const shifts    = (App.shiftData?.sc_shifts    || []).filter(s => inMonth(s.date));
+
+    const posName = (id) => (positions.find(p => p.id === id) || {}).name || '(no position)';
+    const staffPosId = (sid) => (staff.find(s => s.id === sid) || {}).position_id || '';
+
+    let totalHours = 0, totalWages = 0;
+    const byPos = {}, byStaff = {};
+    actuals.forEach(a => {
+      const hours = parseFloat(a.hours) || 0;
+      const cost  = parseFloat(a.cost)  || (hours * (parseFloat(a.wage) || 0));
+      totalHours += hours;
+      totalWages += cost;
+      const pid = a.position_id || staffPosId(a.staff_id);
+      const pname = posName(pid);
+      if (!byPos[pname]) byPos[pname] = { hours: 0, wages: 0 };
+      byPos[pname].hours += hours;
+      byPos[pname].wages += cost;
+      const sid = a.staff_id || a.name || '(unknown)';
+      if (!byStaff[sid]) byStaff[sid] = { name: a.name || '(unknown)', position: pname, hours: 0, wages: 0 };
+      byStaff[sid].hours += hours;
+      byStaff[sid].wages += cost;
+    });
+
+    const totalRev = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+    const laborPct = totalRev > 0 ? (totalWages / totalRev) : null;
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Labor Cost Analysis', monthKey), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(['Monthly Summary', '', '', '', '']);
+    rows.push(['  Total Hours Worked', totalHours, '', '', '']);
+    rows.push(['  Total Wages Paid',   totalWages, '', '', '']);
+    rows.push(['  Total Revenue',      totalRev,   '', '', '']);
+    rows.push(['  Labor as % of Revenue', laborPct, '', '', '']);
+    rows.push(['  Call-Outs Logged',   callouts.length, '', '', '']);
+    rows.push(blank());
+
+    // By position
+    rows.push(['By Position', 'Hours', 'Wages', 'Share of Wages', 'Avg Wage Per Hour']);
+    if (Object.keys(byPos).length === 0) {
+      rows.push(this._lineRow('(no hours logged this month)', COL_COUNT));
+      mergeFull(rows.length - 1);
+    } else {
+      Object.keys(byPos).sort().forEach(name => {
+        const p = byPos[name];
+        const share = totalWages > 0 ? (p.wages / totalWages) : 0;
+        const avg = p.hours > 0 ? (p.wages / p.hours) : null;
+        rows.push(['  ' + name, p.hours, p.wages, share, avg]);
+      });
+      rows.push(['Total', totalHours, totalWages, 1, totalHours > 0 ? totalWages / totalHours : null]);
+    }
+    rows.push(blank());
+
+    // By staff
+    rows.push(['By Staff Member', 'Position', 'Hours', 'Wages', 'Avg Wage Per Hour']);
+    const staffList = Object.values(byStaff).sort((a, b) => b.wages - a.wages);
+    if (staffList.length === 0) {
+      rows.push(this._lineRow('(no hours logged this month)', COL_COUNT));
+      mergeFull(rows.length - 1);
+    } else {
+      staffList.forEach(s => {
+        const avg = s.hours > 0 ? (s.wages / s.hours) : null;
+        rows.push(['  ' + s.name, s.position, s.hours, s.wages, avg]);
+      });
+    }
+
+    if (callouts.length > 0) {
+      rows.push(blank());
+      rows.push(['Call-Out Log', 'Staff', 'Reason', '', '']);
+      callouts.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach(c => {
+        rows.push([c.date || '', c.name || c.staff_name || '(unrecorded)', c.reason || '', '', '']);
+      });
+    }
+
+    this._pushFooter(rows, merges,
+      'Source: Labor Control log hours and call-out log. Revenue from Shift Control. Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const qtyFmt   = '#,##0.00';
+    const pctFmt   = '0.0%';
+    rows.forEach((row, i) => {
+      const label = String(row[0] || '');
+      // Wages column position varies: Summary at col 1, By Position at col 2, By Staff at col 3.
+      // Apply formats based on row context.
+      if (/(Wages|Revenue|Wage Per Hour)/.test(label)) {
+        const c1 = XLSX.utils.encode_cell({ r: i, c: 1 });
+        if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = moneyFmt;
+      }
+      if (/Hours/.test(label)) {
+        const c1 = XLSX.utils.encode_cell({ r: i, c: 1 });
+        if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = qtyFmt;
+      }
+      if (/Labor as %/.test(label)) {
+        const c1 = XLSX.utils.encode_cell({ r: i, c: 1 });
+        if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = pctFmt;
+      }
+      // By Position rows: col 1 = hours, col 2 = wages, col 3 = share %, col 4 = avg wage
+      // By Staff rows:    col 2 = hours, col 3 = wages, col 4 = avg wage
+      if (typeof row[1] === 'number' && typeof row[2] === 'number') {
+        // Likely By Position detail row
+        const c1 = XLSX.utils.encode_cell({ r: i, c: 1 });
+        const c2 = XLSX.utils.encode_cell({ r: i, c: 2 });
+        if (ws[c1] && ws[c1].v != null) ws[c1].z = qtyFmt;
+        if (ws[c2] && ws[c2].v != null) ws[c2].z = moneyFmt;
+      }
+      const c3 = XLSX.utils.encode_cell({ r: i, c: 3 });
+      const c4 = XLSX.utils.encode_cell({ r: i, c: 4 });
+      if (ws[c3] && typeof ws[c3].v === 'number' && ws[c3].v >= 0 && ws[c3].v <= 1.0001) ws[c3].z = pctFmt;
+      else if (ws[c3] && typeof ws[c3].v === 'number') ws[c3].z = moneyFmt;
+      if (ws[c4] && typeof ws[c4].v === 'number') ws[c4].z = moneyFmt;
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 8 — Operational Opportunities ───────────────────────────────────
+  // The latest audit from each system, with score, gap dollar value, and the
+  // open action items. The owner uses this with the accountant as a forward-
+  // looking agenda: here is what we can still pull back next month.
+  _buildOperationalOpportunities(monthKey) {
+    const COL_COUNT = 4;
+    const COL_WIDTHS = [{ wch: 56 }, { wch: 14 }, { wch: 18 }, { wch: 18 }];
+    const monthEnd = this._monthEndDate(monthKey);
+
+    const latestBefore = (list) => {
+      if (!Array.isArray(list)) return null;
+      return list.filter(a => a && a.date && String(a.date).slice(0, 10) <= monthEnd)
+        .slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .slice(-1)[0] || null;
     };
 
-    // Build one sidebar nav row. extra is an array of [attr, value] tuples
-    // for data-mod / data-screen on the module-enter rows.
-    const navItem = (action, name, iconKey, extra) => {
-      const attrs = (extra || []).map(([k,v]) => ' ' + k + '="' + v + '"').join('');
-      return '<div class="nav-item" data-hub-action="' + action + '"' + attrs + '>'
-        + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + navIcons[iconKey] + '</svg>'
-        + '<span class="nav-label">' + name + '</span></div>';
+    const profitAudit  = latestBefore(App.data?.audits);
+    const revenueAudit = latestBefore(App.data?.revenue_audits);
+    const trafficAudit = latestBefore(App.data?.traffic_audits);
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Operational Opportunities', monthKey), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(this._lineRow('Your latest audit from each system, translated into dollar opportunities to discuss with your accountant.', COL_COUNT));
+    mergeFull(rows.length - 1);
+    rows.push(blank());
+
+    const renderAudit = (label, audit) => {
+      rows.push([label, '', '', '']);
+      if (!audit) {
+        rows.push(['  (no audit on file at or before ' + monthEnd + ')', '', '', '']);
+        rows.push(blank());
+        return;
+      }
+      rows.push(['  Audit dated', (audit.date || '').slice(0, 10), '', '']);
+      rows.push(['  Overall score', audit.overall_score != null ? audit.overall_score : '', '', '']);
+      const items = audit.action_items || [];
+      if (items.length === 0) {
+        rows.push(['  (no open action items)', '', '', '']);
+        rows.push(blank());
+        return;
+      }
+      const monthlyTotal = items.reduce((s, a) => s + (parseFloat(a.monthly_impact) || 0), 0);
+      rows.push(['  Total monthly opportunity', monthlyTotal, '', '']);
+      rows.push(['  Total annual opportunity', monthlyTotal * 12, '', '']);
+      rows.push(blank());
+      rows.push(['  Action Items', 'Priority', 'Monthly $', 'Annual $']);
+      items.slice().sort((a, b) => (parseFloat(b.monthly_impact) || 0) - (parseFloat(a.monthly_impact) || 0)).forEach(it => {
+        const mon = parseFloat(it.monthly_impact) || 0;
+        rows.push(['    ' + (it.title || it.name || it.action || '(unnamed item)'), it.priority || '', mon, mon * 12]);
+      });
+      rows.push(blank());
     };
 
-    const sidebarNav = ''
-      // Locations section — only visible when the operator belongs to more
-      // than one account (the multi-bar group case). Single-location operators
-      // never see the section header or its lone Dashboard link.
-      + ((DB.cachedAccounts && DB.cachedAccounts().length > 1)
-          ? ('<div class="nav-section">Locations</div>'
-             + navItem('group-dashboard', 'Dashboard', 'allBars', []))
-          : '')
-      + '<div class="nav-section">Recovery</div>'
-      + navItem('enter', 'Profit Recovery',  'profit',  [['data-mod','profit'],   ['data-screen','dashboard']])
-      + navItem('enter', 'Revenue Recovery', 'revenue', [['data-mod','revenue'],  ['data-screen','r-dashboard']])
-      + navItem('enter', 'Traffic Recovery', 'traffic', [['data-mod','traffic'],  ['data-screen','t-dashboard']])
-      + '<div class="nav-section">Control</div>'
-      + navItem('enter', 'Inventory Control','inv',     [['data-mod','inventory'],['data-screen','ic-dashboard']])
-      + navItem('enter', 'Labor Control',    'labor',   [['data-mod','labor'],    ['data-screen','lc-dashboard']])
-      + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
-      + '<div class="nav-section">Accounting</div>'
-      + navItem('books',            'Month-End Books', 'books',    [])
-      + '<div class="nav-section">Setup</div>'
-      // Getting Started hides once every setup step is checked off so the
-      // sidebar does not carry permanent clutter for operators past setup.
-      // Auto-resurfaces if a new step ever gets added to the list.
-      + ((App.isSetupComplete && App.isSetupComplete())
-          ? ''
-          : navItem('getting-started',  'Getting Started', 'getStart', []))
-      + navItem('settings',         'App Settings',    'settings', [])
-      + navItem('user-accounts',    'User Accounts',   'settings', [])
-      + '<div class="nav-section">Support</div>'
-      + navItem('help',             'Help and FAQ',    'help',     [])
-      + navItem('report-bug',       'Report a Bug',    'bug',      [])
-      + navItem('contact-support',  'Contact Us',      'mail',     []);
+    renderAudit('Profit Recovery',  profitAudit);
+    renderAudit('Revenue Recovery', revenueAudit);
+    renderAudit('Traffic Recovery', trafficAudit);
 
-    const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
+    this._pushFooter(rows, merges,
+      'Source: latest Profit, Revenue, and Traffic audits at or before ' + monthEnd + '. Action items and their dollar impacts come from the audit you ran in Bar Cop.',
+      COL_COUNT);
 
-    // ── Compose ──
-    // Reuses the same .app / .sidebar / .topbar / .content classes as the
-    // module shells so the Hub sidebar matches them exactly in width, logo
-    // area, collapse behavior, and visual styling. The .hub-app class adds
-    // hub-specific overrides for the fixed-viewport dashboard layout.
-    container.innerHTML = `
-      <style>
-        .hub-app{min-height:100% !important;}
-        .hub-app .content{padding:24px;min-width:0;}
-        .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
-        .hub-app .nav-item.nav-disabled:hover{background:transparent;}
-        .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app.sidebar-collapsed .sidebar-last-updated{display:none;}
-        .hub-app .hd-metric{background:var(--panel);padding:8px 10px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
-        .hub-app .hd-metric:hover{border-color:var(--b-edge);}
-        .hub-app .hd-row{cursor:pointer;}
-        .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
-        .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
-        .hub-app .hd-btn:hover{border-color:var(--gold);color:var(--gold);}
-        /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
-           when row count exceeds card height. Thin scrollbar so it does not
-           visually overwhelm the small lists. */
-        .hub-app .hd-scroll{overflow-y:auto;}
-        .hub-app .hd-scroll::-webkit-scrollbar{width:6px;}
-        .hub-app .hd-scroll::-webkit-scrollbar-track{background:transparent;}
-        .hub-app .hd-scroll::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
-        .hub-app .hd-scroll::-webkit-scrollbar-thumb:hover{background:var(--b1);}
-        /* Trend chart data point hover — the marker grows on hover so the
-           interaction reads as "this dot does something." */
-        .hub-app .hd-chart-marker{width:5px;height:5px;border-radius:50%;background:rgba(219,171,70,0.55);transition:width 0.12s ease,height 0.12s ease,background 0.12s ease;}
-        .hub-app .hd-chart-dot:hover .hd-chart-marker{width:8px;height:8px;background:rgba(219,171,70,0.9);}
-        /* Shared tooltip element used by all three mini charts. Lives as a
-           sibling of .hub-app inside the wrapper, so the selector has no
-           ancestor — otherwise display:block would force the empty div into
-           flow and ratchet the dashboard. */
-        #hd-chart-tip{
-          position:fixed;z-index:200;pointer-events:none;display:none;
-          background:var(--surface);border:1px solid var(--b-edge);border-radius:5px;
-          padding:8px 12px;min-width:140px;
-          font-family:Barlow,sans-serif;font-size:11px;color:var(--t1);
-          box-shadow:0 4px 14px rgba(0,0,0,0.45);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((row, i) => {
+      [1, 2, 3].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') {
+          // Score values are 0-100 integers; leave as plain numbers. Anything else as money.
+          const label = String(row[0] || '');
+          if (/score/i.test(label)) {
+            // leave as default
+          } else {
+            cell.z = moneyFmt;
+          }
         }
-      </style>
-      <div id="hd-chart-tip"></div>
-      <div class="app hub-app${collapsedClass}">
-        <aside class="sidebar">
-          <div class="sidebar-logo">
-            <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
-            <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
-            <button class="sidebar-logo-toggle" id="hub-sidebar-toggle" title="Toggle sidebar">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
-            </button>
-          </div>
-          <nav class="sidebar-nav">${sidebarNav}</nav>
-          <div class="sidebar-footer">
-            <div class="sidebar-last-updated" style="font-size:10px;color:var(--t4);padding:10px 14px;line-height:1.4;border-top:1px solid var(--b2);">${esc(lastUpdatedTxt)}</div>
-            <button class="sidebar-btn" id="hub-signout">
-              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">${navIcons.signout}</svg>
-              <span class="sidebar-btn-label">${App.demoMode ? 'Exit Demo' : 'Sign Out'}</span>
-            </button>
-          </div>
-        </aside>
-        <div class="main">
-          <header class="topbar">
-            <div class="topbar-left">
-              <h1 class="topbar-title">${esc(barName)}</h1>
-              <span class="topbar-sub">${todayStr}</span>
-            </div>
-            <div id="hub-topbar-account-switcher" style="display:none;"></div>
-            <div class="topbar-right"></div>
-          </header>
-          <main class="content">
-            ${catchupBanner}
-            <div style="display:grid;grid-template-rows:auto 470px 510px;gap:18px;padding-bottom:18px;">
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${actionPanel}</div>
-            </div>
-          </main>
-        </div>
-      </div>
-    `;
-
-    // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
-    document.getElementById('hub-signout')?.addEventListener('click', async () => {
-      if (App.demoMode) { window.location.href = '/'; return; }
-      await DB.signOut();
-    });
-
-    container.querySelector('.hub-catchup')?.addEventListener('click', () => {
-      if (window.S && S.HubGettingStarted) S.HubGettingStarted.open();
-    });
-
-    document.getElementById('hub-sidebar-toggle')?.addEventListener('click', () => {
-      this._sidebarCollapsed = !this._sidebarCollapsed;
-      container.querySelector('.hub-app')?.classList.toggle('sidebar-collapsed');
-    });
-
-    const navEl = container.querySelector('.sidebar-nav');
-    if (navEl) navEl.addEventListener('click', (ev) => {
-      const item = ev.target.closest('.nav-item');
-      if (!item || item.classList.contains('nav-disabled')) return;
-      const action = item.dataset.hubAction;
-      if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
-      else if (action === 'getting-started') S.HubGettingStarted.open();
-      else if (action === 'help')            S.HubHelp.open();
-      else if (action === 'settings')        S.HubSettings.open();
-      else if (action === 'user-accounts')   S.HubUserAccounts.open();
-      else if (action === 'group-dashboard') S.HubGroupDashboard.open();
-      else if (action === 'books')           S.HubBooks.open();
-      else if (action === 'contact-support') S.HubSupport.open();
-      else if (action === 'report-bug')      S.HubReportBug.open();
-    });
-
-    // Trend chart data point hover — populate and position the shared
-    // tooltip with the dot's week, value, status, and target.
-    const tip = container.querySelector('#hd-chart-tip');
-    if (tip) {
-      const bandText = { good: 'on target', warn: 'watch', bad: 'off target' };
-      const bandCol  = { good: 'var(--green)', warn: 'var(--amber)', bad: 'var(--red)' };
-      container.querySelectorAll('.hd-chart-dot').forEach(g => {
-        g.addEventListener('mouseenter', () => {
-          const r  = g.getBoundingClientRect();
-          const cx = r.left + r.width / 2;
-          const cy = r.top + r.height / 2;
-          const b  = g.dataset.band || 'none';
-          const col = bandCol[b] || 'var(--t1)';
-          tip.innerHTML =
-              '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">Week Ending ' + g.dataset.date + '</div>'
-            + '<div style="display:flex;align-items:baseline;gap:10px;margin-top:5px;">'
-            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:' + col + ';line-height:1;">' + g.dataset.disp + '</div>'
-            +   (bandText[b] ? '<div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:' + col + ';">' + bandText[b] + '</div>' : '')
-            + '</div>'
-            + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">Target ' + g.dataset.tgt + '</div>';
-          tip.style.left = cx + 'px';
-          tip.style.top  = (cy - 12) + 'px';
-          tip.style.transform = 'translate(-50%, -100%)';
-          tip.style.display = 'block';
-        });
-        g.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
       });
-    }
-
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
   },
 
-  _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); },
+  // ── Sheet 9 — Year-End Tax Helper (annual roll, December only) ────────────
+  // Lifts the year's beginning inventory, total purchases, ending inventory,
+  // total revenue, total COGS, total labor, and operating expenses into the
+  // Schedule C / Form 1120 line numbers an accountant maps to. Only generated
+  // for December close (or any month ending in -12).
+  _buildYearEndTaxHelper(monthKey) {
+    const COL_COUNT = 4;
+    const COL_WIDTHS = [{ wch: 56 }, { wch: 16 }, { wch: 18 }, { wch: 36 }];
+    const year = monthKey.slice(0, 4);
+    const yearStart = year + '-01-01';
+    const yearEnd   = year + '-12-31';
 
-  // Deep-link from the weekly readout into a module's Fix screen at a gap-area.
-  _enterFix(module, gapId) {
-    App.showApp(module || 'profit');
-    if (gapId) App._fixFocus = gapId;
-    const scr = module === 'revenue' ? 'r-fix'
-              : module === 'traffic' ? 't-fix'
-              : 'profit-fix';
-    App.navigate(scr);
+    // Full-year aggregates from weeks
+    const YTD = this._aggregateYTD(year + '-12');
+
+    // Beginning and ending inventory from counts
+    const counts = (App.inventoryData?.ic_counts || []).slice()
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    const beginCount = counts.filter(c => c.date && c.date < yearStart).slice(-1)[0] || null;
+    const endCount   = counts.filter(c => c.date && c.date <= yearEnd).slice(-1)[0] || null;
+    const beginValue = beginCount ? (parseFloat(beginCount.total_value) || 0) : null;
+    const endValue   = endCount   ? (parseFloat(endCount.total_value)   || 0) : null;
+
+    // Total purchases from receive-delivery log over the year
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const purchases = (App.inventoryData?.ic_deliveries || [])
+      .filter(d => inYear(d.date))
+      .reduce((s, d) => s + (parseFloat(d.total) || 0), 0);
+
+    // Calculated COGS = begin + purchases - end
+    const calcCogs = (beginValue != null && endValue != null) ? (beginValue + purchases - endValue) : null;
+
+    const blank = () => this._blankRow(COL_COUNT);
+    const rows = [];
+    const merges = [];
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Year-End Tax Helper', monthKey) + ' (' + year + ')', COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(this._lineRow('Annual totals lifted to the Schedule C line numbers an accountant transcribes. Your accountant should review and verify every figure.', COL_COUNT));
+    mergeFull(rows.length - 1);
+    rows.push(blank());
+
+    rows.push(['Schedule C Line', 'Amount', 'Source', '']);
+    rows.push(['Line 1: Gross receipts', YTD.totalRev, 'Sum of Profit weekly revenue for ' + year, '']);
+    rows.push(['Line 2: Returns and allowances', YTD.comps, 'Sum of comps from Shift Control', '']);
+    rows.push(['Line 3: Subtract Line 2 from Line 1', YTD.totalRev - (YTD.comps || 0), 'Calculated', '']);
+    rows.push(['Line 4: Cost of goods sold', calcCogs != null ? calcCogs : YTD.totalCogs, calcCogs != null ? 'Begin + purchases - end' : 'Sum of Profit weekly COGS (no end-of-year count on file)', '']);
+    rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', (YTD.totalRev - (YTD.comps || 0)) - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
+    rows.push(blank());
+    rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
+    rows.push(['Line 21: Repairs and maintenance', YTD.maintenance, 'Sum of Shift Control maintenance log for ' + year, '']);
+    rows.push(blank());
+
+    rows.push(['Part III: Cost of Goods Sold Detail', '', '', '']);
+    rows.push(['Line 35: Beginning inventory', beginValue, beginCount ? ('Count dated ' + beginCount.date) : 'No count on file before ' + yearStart, '']);
+    rows.push(['Line 36: Purchases', purchases, 'Sum of receive-delivery records for ' + year, '']);
+    rows.push(['Line 41: Ending inventory', endValue, endCount ? ('Count dated ' + endCount.date) : 'No count on file at or before ' + yearEnd, '']);
+    rows.push(['Line 42: Cost of goods sold (35 + 36 - 41)', calcCogs, 'Calculated', '']);
+
+    this._pushFooter(rows, merges,
+      'Line numbers match IRS Schedule C (Form 1040). For corporations, the equivalent Form 1120 line numbers should be mapped by your accountant. Bar Cop is a software tool, not a tax preparer.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((row, i) => {
+      const addr = XLSX.utils.encode_cell({ r: i, c: 1 });
+      if (ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = moneyFmt;
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
   },
 
-  /* Weekly money readout (Section 10.3) — what is leaking this week, where, and
-     biggest first. Profit and Revenue read live from Recovery.gapImpact (same
-     engine the dashboards use). Traffic doesn't have weekly dollar-quantifiable
-     live metrics, so its leak figures come from the latest traffic_audit's
-     action_items.monthly_impact divided by 4.345. A gap-area only counts when
-     its weekly dollar loss computes from real data. */
-  weeklyReadout() {
-    if (!window.Recovery || !window.FIX) return { items: [], total: 0 };
-    const seen = {};
-    const items = [];
-
-    // Profit + Revenue — live metric-based
-    [['profit'], ['revenue']].forEach(([mod]) => {
-      (FIX[mod] || []).forEach(g => {
-        const imp = Recovery.gapImpact(g.id);
-        if (!imp || imp.onTarget || !(imp.dollars > 0)) return;
-        if (seen[imp.label]) return;
-        seen[imp.label] = true;
-        items.push({ label: imp.label, gapId: g.id, module: mod,
-                     weekly: imp.dollars / 52, band: imp.band });
-      });
-    });
-
-    // Traffic — audit-based. Map each action item to its traffic gap-area
-    // and use the gap's short name as the label, so the readout stays
-    // consistent with the noun-phrase labels Profit and Revenue produce
-    // (e.g. "Reviews" not "Close the review velocity and response gap").
-    const tA = ((App.data || {}).traffic_audits || []).slice(-1)[0];
-    if (tA && Array.isArray(tA.action_items)) {
-      const hints = [
-        { rx: /google business|gbp/i,           id: 'gbp' },
-        { rx: /website|bounce|conversion/i,     id: 'website' },
-        { rx: /review/i,                        id: 'reviews' },
-        { rx: /search|seo|maps pack|nap/i,      id: 'search-seo' },
-        { rx: /social|instagram|facebook|post/i, id: 'social' },
-        { rx: /delivery|doordash|uber/i,        id: 'delivery' },
-        { rx: /email|loyalty/i,                 id: 'email-loyalty' }
-      ];
-      const trafficGaps = (window.FIX && FIX.traffic) || [];
-      tA.action_items.forEach(it => {
-        if (!it || !(it.monthly_impact > 0)) return;
-        const raw = it.action || '';
-        const hint = hints.find(h => h.rx.test(raw));
-        const gapId = hint ? hint.id : 'gbp';
-        const gap   = trafficGaps.find(g => g.id === gapId);
-        const label = gap ? gap.name : 'Traffic';
-        if (seen[label]) return;
-        seen[label] = true;
-        items.push({ label, gapId, module: 'traffic',
-                     weekly: it.monthly_impact / 4.345, band: 'over' });
-      });
-    }
-
-    items.sort((a, b) => b.weekly - a.weekly);
-    return { items: items, total: items.reduce((s, x) => s + x.weekly, 0) };
+  // ── Period-bound helpers ──────────────────────────────────────────────────
+  _monthStartDate(monthKey) {
+    return monthKey + '-01';
+  },
+  _monthEndDate(monthKey) {
+    const y = parseInt(monthKey.slice(0, 4), 10);
+    const m = parseInt(monthKey.slice(5, 7), 10);
+    // last day of month
+    const d = new Date(y, m, 0);
+    return d.toISOString().slice(0, 10);
   },
 
-  /* Forward-looking alerts (Section 10.4) — predictive signals, not just
-     historical breaches. Each fires only when the data to compute it exists,
-     never on a fabricated projection. They feed the same Hub alert strip. */
-  forwardAlerts() {
-    const data = App.data || {};
-    const out = [];
-    const iso = d => d.toISOString().slice(0, 10);
-    const mondayOf = d => { const x = new Date(d); const day = x.getDay();
-      x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return iso(x); };
+  // ── Data aggregation — sum the data for a given month ─────────────────────
+  // monthKey is "YYYY-MM". Weeks are matched by period_end falling in the
+  // calendar month. Profit weeks carry bar/food revenue, COGS, and labor as
+  // already-aggregated weekly figures from Profit > This Week (which itself
+  // auto-fills from Shift Control + Inventory Control + Labor Control).
+  _aggregateMonth(monthKey) {
+    const inMonth = (dateStr) => {
+      if (!dateStr) return false;
+      return String(dateStr).slice(0, 7) === monthKey;
+    };
+    const weeks = (App.data?.weeks || []).filter(w => inMonth(w.period_end));
+    const agg = this._sumWeeks(weeks);
+    agg.comps = this._sumComps(monthKey);
+    agg.maintenance = this._sumMaintenance(monthKey);
+    return agg;
+  },
 
-    // 1. Projected overtime — current week, lc_actuals projected against lc_schedules
-    const ld = App.laborData || {};
-    const ws = mondayOf(new Date());
-    const weEnd = (() => { const d = new Date(ws + 'T00:00:00'); d.setDate(d.getDate() + 6); return iso(d); })();
-    const wkActuals = (ld.lc_actuals || []).filter(a => a.date >= ws && a.date <= weEnd);
-    const sched = (ld.lc_schedules || []).find(s => {
-      if (!s.week_start) return false;
-      const st = new Date(s.week_start + 'T00:00:00').getTime();
-      const tg = new Date(ws + 'T00:00:00').getTime();
-      return !isNaN(st) && tg >= st && tg <= st + 6 * 86400000;
+  _aggregateYTD(monthKey) {
+    const year = monthKey.slice(0, 4);
+    const monthNum = parseInt(monthKey.slice(5, 7), 10);
+    const inYearThroughMonth = (dateStr) => {
+      if (!dateStr) return false;
+      const s = String(dateStr);
+      if (s.slice(0, 4) !== year) return false;
+      const m = parseInt(s.slice(5, 7), 10);
+      return m <= monthNum;
+    };
+    const weeks = (App.data?.weeks || []).filter(w => inYearThroughMonth(w.period_end));
+    const agg = this._sumWeeks(weeks);
+
+    // Comps and maintenance for the whole YTD window.
+    const vcs = (App.shiftData?.sc_void_comps || []).filter(v => inYearThroughMonth(v.date));
+    agg.comps = vcs.filter(v => (v.type === 'comp' || v.type === 'Comp')).reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
+    const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inYearThroughMonth(m.date));
+    agg.maintenance = mnts.reduce((s, m) => s + (parseFloat(m.cost || m.amount) || 0), 0);
+    return agg;
+  },
+
+  _sumWeeks(weeks) {
+    let barRev = 0, foodRev = 0, barCogs = 0, foodCogs = 0, barLabor = 0, foodLabor = 0;
+    weeks.forEach(w => {
+      barRev    += parseFloat(w.bar?.revenue)  || 0;
+      foodRev   += parseFloat(w.food?.revenue) || 0;
+      barCogs   += parseFloat(w.bar?.cogs)     || 0;
+      foodCogs  += parseFloat(w.food?.cogs)    || 0;
+      barLabor  += parseFloat(w.bar?.labor)    || 0;
+      foodLabor += parseFloat(w.food?.labor)   || 0;
     });
-    const otMap = {};
-    wkActuals.forEach(a => { const id = a.staff_id || a.name;
-      (otMap[id] = otMap[id] || { actual: 0, scheduled: 0, wage: a.wage, name: a.name }).actual += (a.hours || 0); });
-    if (sched) (sched.shifts || []).forEach(sh => { const id = sh.staff_id || sh.name;
-      (otMap[id] = otMap[id] || { actual: 0, scheduled: 0, name: sh.name }).scheduled += (sh.hours || 0); });
-    let otCount = 0, otCost = 0;
-    Object.keys(otMap).forEach(id => {
-      const e = otMap[id];
-      const st = (ld.lc_staff || []).find(s => s.id === id);
-      const wage = st && st.wage != null ? st.wage : (e.wage || 0);
-      const otHrs = Math.max(0, Math.max(e.actual, e.scheduled) - 40);
-      if (otHrs > 0) { otCount++; otCost += otHrs * wage * 0.5; }
-    });
-    if (otCount > 0) out.push({
-      sev: otCount >= 3 ? 'bad' : 'warn',
-      text: 'Overtime projected: ' + otCount + ' staff over 40 hours this week, about ' + App.fmtCurrency(otCost, 0) + ' in extra OT premium.',
-      screen: 'lc-overtime-watch', mod: 'labor'
-    });
+    return {
+      barRev, foodRev, totalRev: barRev + foodRev,
+      barCogs, foodCogs, totalCogs: barCogs + foodCogs,
+      barLabor, foodLabor, totalLabor: barLabor + foodLabor
+    };
+  },
 
-    // 2. Projected month-end prime cost — latest week's pace held to month end
-    const weeks = data.weeks || [];
-    const lw = weeks.length ? weeks[weeks.length - 1] : null;
-    const primeT = ((data.settings || {}).targets || {}).prime_cost_pct ?? 60;
-    if (lw && lw.prime_cost_pct != null && lw.prime_cost_pct > primeT) {
-      const gap = lw.prime_cost_pct - primeT;
-      const monthlyRev = (((lw.bar || {}).revenue || 0) + ((lw.food || {}).revenue || 0)) * 4.345;
-      const monthlyOver = (gap / 100) * monthlyRev;
-      out.push({
-        sev: gap > 3 ? 'bad' : 'warn',
-        text: 'Prime cost is tracking at ' + lw.prime_cost_pct.toFixed(1) + '%, ' + gap.toFixed(1) + ' points over your ' + primeT + '% target. Hold this pace and the month closes about ' + App.fmtCurrency(monthlyOver, 0) + ' over.',
-        screen: 'dashboard', mod: 'profit'
-      });
-    }
+  // Sum void+comp records (comps only — voids are not a cost line, they are
+  // sales reversals, but the accountant wants comps as a contra-revenue or
+  // operating expense depending on their treatment).
+  _sumComps(monthKey) {
+    const inMonth = (dateStr) => dateStr && String(dateStr).slice(0, 7) === monthKey;
+    const vcs = (App.shiftData?.sc_void_comps || []).filter(v => inMonth(v.date));
+    return vcs.filter(v => (v.type === 'comp' || v.type === 'Comp')).reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
+  },
 
-    // 3. Declining review velocity — latest period below its recent average
-    const tw = data.traffic_weeks || [];
-    if (tw.length >= 3) {
-      const latestT = tw[tw.length - 1];
-      const prior = tw.slice(-5, -1).map(w => w.new_reviews).filter(v => v != null);
-      if (latestT && latestT.new_reviews != null && prior.length >= 2) {
-        const avg = prior.reduce((a, b) => a + b, 0) / prior.length;
-        if (avg > 0 && latestT.new_reviews < avg * 0.8) out.push({
-          sev: 'warn',
-          text: 'Review velocity is sliding: ' + latestT.new_reviews + ' new reviews this period against a ' + avg.toFixed(0) + ' average. Reviews drive local ranking.',
-          screen: 't-reviews', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3b. Review response rate below target — guests see unanswered reviews
-    // long after they're posted. Response rate is a Traffic target.
-    const tTar = (data.traffic_settings || {}).targets || {};
-    const respTarget = tTar.response_rate ?? 75;
-    if (tw.length) {
-      const latestT = tw[tw.length - 1];
-      if (latestT && latestT.response_rate != null && latestT.response_rate < respTarget) {
-        const gap = respTarget - latestT.response_rate;
-        out.push({
-          sev: gap > 20 ? 'bad' : 'warn',
-          text: 'Review response rate at ' + latestT.response_rate + '%, ' + gap.toFixed(0) + ' points under your ' + respTarget + '% target. Unanswered reviews are visible to every guest searching you.',
-          screen: 't-reviews', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3b-2. New reviews below absolute target — a Traffic target, separate from
-    // the relative "velocity sliding" check above. Catches the operator who
-    // has been consistently low rather than recently dropping.
-    const velTarget = tTar.review_velocity ?? 8;
-    if (tw.length) {
-      const latestT = tw[tw.length - 1];
-      if (latestT && latestT.new_reviews != null && latestT.new_reviews < velTarget) {
-        const gap = velTarget - latestT.new_reviews;
-        out.push({
-          sev: latestT.new_reviews < velTarget / 2 ? 'bad' : 'warn',
-          text: 'New reviews running at ' + latestT.new_reviews + ' a month, ' + gap + ' below your ' + velTarget + '/month target. Ask satisfied guests this week to close the gap.',
-          screen: 't-reviews', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3b-3. Traffic data going stale — the latest logged period is more than
-    // 10 days old. The dashboard stops being useful once data ages out.
-    if (tw.length) {
-      const latestT = tw[tw.length - 1];
-      if (latestT && latestT.period_end) {
-        const dt = new Date(String(latestT.period_end).length <= 10 ? latestT.period_end + 'T00:00:00' : latestT.period_end);
-        const age = isNaN(dt.getTime()) ? null : Math.floor((Date.now() - dt.getTime()) / 86400000);
-        if (age != null && age > 10) {
-          out.push({
-            sev: 'warn',
-            text: 'Traffic data is ' + age + ' days old. Log this week in This Week so the trend stays current.',
-            screen: 't-this-week', mod: 'traffic'
-          });
-        }
-      }
-    }
-
-    // 3d. No marketing emails logged this period — a list you never email
-    // goes cold within 30 days.
-    if (tw.length) {
-      const latestT = tw[tw.length - 1];
-      if (latestT && latestT.email_list_size && (!latestT.emails_sent || latestT.emails_sent === 0)) {
-        out.push({
-          sev: 'warn',
-          text: 'No marketing emails sent this period against a list of ' + latestT.email_list_size + '. A list you never email goes cold inside 30 days.',
-          screen: 't-email', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3c. Social posting frequency below benchmark — quiet feeds lose
-    // discovery on Instagram and Facebook fast.
-    const postTarget = tTar.social_posts_month ?? 12;
-    if (tw.length) {
-      const latestT = tw[tw.length - 1];
-      if (latestT && latestT.ig_posts_month != null && latestT.ig_posts_month < postTarget * 0.7) {
-        out.push({
-          sev: latestT.ig_posts_month < postTarget * 0.4 ? 'bad' : 'warn',
-          text: 'Instagram posting ran ' + latestT.ig_posts_month + ' posts this period vs your ' + postTarget + '/month target. Quiet feeds lose the discovery algorithm fast.',
-          screen: 't-social', mod: 'traffic'
-        });
-      }
-    }
-
-    // 4. Recurring cash shortages — repeated shorts in recent drawer counts
-    // (Shift Control sc_variances, the owner of cash data).
-    const variances = (App.shiftData || {}).sc_variances || [];
-    if (variances.length >= 2) {
-      const recent = variances.slice(-6);
-      const shorts = recent.filter(r => r.status === 'Short').length;
-      if (shorts >= 2) out.push({
-        sev: shorts >= 3 ? 'bad' : 'warn',
-        text: 'Cash came up short in ' + shorts + ' of the last ' + recent.length + ' drawer counts. Recurring shortages point to a process gap, not a one-off.',
-        screen: 'cash-recon', mod: 'profit'
-      });
-    }
-
-    // 5. Vendor price re-drift — fresh price increases in recent deliveries
-    const dels = (App.inventoryData || {}).ic_deliveries || [];
-    const cutoff = (() => { const d = new Date(); d.setDate(d.getDate() - 45); return iso(d); })();
-    let incCount = 0;
-    dels.filter(d => d.date && d.date >= cutoff).forEach(d => {
-      (d.line_items || []).forEach(li => {
-        if (li.price_changed && li.prev_price != null && li.price_per_unit != null
-            && li.price_per_unit > li.prev_price) incCount++;
-      });
-    });
-    if (incCount >= 2) out.push({
-      sev: 'warn',
-      text: 'Vendor prices rose on ' + incCount + ' items in deliveries over the last 45 days. Verify these against quoted sheets before they stick.',
-      screen: 'vendor-watch', mod: 'profit'
-    });
-
-    return out;
+  _sumMaintenance(monthKey) {
+    const inMonth = (dateStr) => dateStr && String(dateStr).slice(0, 7) === monthKey;
+    const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inMonth(m.date));
+    return mnts.reduce((s, m) => s + (parseFloat(m.cost || m.amount) || 0), 0);
   }
-
 };
