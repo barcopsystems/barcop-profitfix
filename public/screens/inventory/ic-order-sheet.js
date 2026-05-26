@@ -149,7 +149,7 @@ S.InventoryOrderSheet = {
       }
       if (create) this.createOrder(create.dataset.vendor);
     };
-    vendors.forEach(v => {
+    visibleVendors.forEach(v => {
       const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(v) + '"]');
       if (card) this.recalcVendor(card);
     });
