@@ -6,6 +6,7 @@ const DB = {
   _accountId: null,  // resolved lazily on first read/write after signin (Phase 2)
   _role: null,       // 'admin' | 'staff' | 'viewer' — resolved alongside _accountId
   _permissions: null, // { groupKey: 'view' | 'add' | 'edit' } — staff granular permissions
+  _accountsCache: null,  // last-known accounts list for the current user (Phase 2)
   _demo: false,   // demo mode — all writes are no-ops so the demo never persists
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -28,7 +29,8 @@ const DB = {
     this._user = data?.session?.user || null;
     this._accountId = null;
     this._role = null;
-    this._permissions = null;  // force re-resolve on next read/write
+    this._permissions = null;
+    this._accountsCache = null;  // force re-resolve on next read/write
     return data?.session || null;
   },
 
@@ -45,6 +47,7 @@ const DB = {
         this._accountId = null;
         this._role = null;
         this._permissions = null;
+        this._accountsCache = null;
       }
       cb(event, session);
     });
@@ -57,6 +60,7 @@ const DB = {
     this._accountId = null;
     this._role = null;
     this._permissions = null;
+    this._accountsCache = null;
     return { data, error };
   },
 
@@ -72,6 +76,7 @@ const DB = {
     this._accountId = null;
     this._role = null;
     this._permissions = null;
+    this._accountsCache = null;
   },
 
   async resetPassword(email) {
@@ -171,21 +176,35 @@ const DB = {
   },
 
   // Returns every account the current user is a member of, with name + role.
-  // Used by the topbar account switcher.
+  // Used by the topbar account switcher and the Hub sidebar Locations gate.
+  // Caches the result in _accountsCache so synchronous callers (sidebar render)
+  // can read the list without awaiting a network round-trip. Cache clears on
+  // signIn / signOut / user change.
   async listMyAccounts() {
-    if (!this._sb || !this._user) return [];
+    if (!this._sb || !this._user) { this._accountsCache = []; return []; }
     try {
       const { data, error } = await this._sb
         .from('memberships')
         .select('account_id, role, accounts(id, name)')
         .eq('user_id', this._user.id);
-      if (error || !data) return [];
-      return data
+      if (error || !data) { this._accountsCache = []; return []; }
+      const list = data
         .filter(m => m.accounts)
         .map(m => ({ id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role }));
+      this._accountsCache = list;
+      return list;
     } catch (e) {
+      this._accountsCache = [];
       return [];
     }
+  },
+
+  // Sync accessor for callers that need the accounts list during render and
+  // cannot await. Returns whatever the last listMyAccounts() populated, or
+  // an empty array if nothing has been resolved yet. Pre-fetched by
+  // App.loadAllData() so by the time the Hub renders, the cache is populated.
+  cachedAccounts() {
+    return this._accountsCache || [];
   },
 
   // Switch which account is active. Stores in localStorage and reloads so
