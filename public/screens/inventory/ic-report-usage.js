@@ -22,9 +22,9 @@ S.InventoryUsageReport = {
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
   // ── Usage computation ─────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ S.InventoryUsageReport = {
     const dels = this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date);
     const purch = {};
     dels.forEach(d => (d.line_items || []).forEach(li => {
-      purch[li.product_id] = (purch[li.product_id] || 0) + (li.qty || 0);
+      purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
     }));
     const rows = [];
     Object.keys(endMap).forEach(pid => {
@@ -151,8 +151,8 @@ S.InventoryUsageReport = {
     }
   },
 
-  num(v, d) { return v == null ? '<span style="color:var(--t4);">—</span>' : Number(v).toFixed(d == null ? 1 : d); },
-  cur(v) { return v == null ? '<span style="color:var(--t4);">—</span>' : App.fmtCurrency(v); },
+  num(v, d) { return v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d); },
+  cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
 
   tabUsage(rows) {
     if (!rows.length) return this.emptyRows();
@@ -206,7 +206,7 @@ S.InventoryUsageReport = {
       const val = it.value != null ? it.value : (it.unit_cost != null ? (it.total || 0) * it.unit_cost : null);
       total += val || 0;
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td>' + esc(it.category || '—') + '</td>'
+        + '<td>' + esc(it.category || '-') + '</td>'
         + '<td>' + this.num(it.total) + '</td>'
         + '<td>' + this.cur(it.unit_cost) + '</td>'
         + '<td class="val">' + this.cur(val) + '</td></tr>';
@@ -234,7 +234,7 @@ S.InventoryUsageReport = {
         + '<td>' + this.cur(r.usageCost) + '</td></tr>';
     }).join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + (most ? 'Top 10 products by units used this period.' : 'Bottom 10 products by units used — your slowest movers.')
+      + (most ? 'Top 10 products by units used this period.' : 'Bottom 10 products by units used, your slowest movers.')
       + '</div><div class="tbl-wrap"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Units Used</th><th>Usage Cost</th></tr></thead><tbody>' + body + '</tbody></table></div>';
   },
@@ -275,8 +275,8 @@ S.InventoryUsageReport = {
       else { status = 'OK'; cls = 'badge-ok'; }
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + it.onHand.toFixed(1) + '</td>'
-        + '<td>' + (it.par != null ? it.par : '—') + '</td>'
-        + '<td>' + (it.reorder != null ? it.reorder : '—') + '</td>'
+        + '<td>' + (it.par != null ? it.par : '-') + '</td>'
+        + '<td>' + (it.reorder != null ? it.reorder : '-') + '</td>'
         + '<td><span class="badge ' + cls + '">' + status + '</span></td></tr>';
     }).join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
