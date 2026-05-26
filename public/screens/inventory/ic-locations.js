@@ -56,6 +56,7 @@ S.InventoryLocations = {
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm il-up" data-id="' + l.id + '"' + (i === 0 ? ' disabled' : '') + '>&#8593;</button>'
           + '<button class="btn btn-ghost btn-sm il-down" data-id="' + l.id + '"' + (i === active.length - 1 ? ' disabled' : '') + '>&#8595;</button>'
+          + '<button class="btn btn-ghost btn-sm il-arrange" data-id="' + l.id + '">Arrange Products</button>'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
           + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
@@ -84,6 +85,7 @@ S.InventoryLocations = {
       const open = ev.target.closest('.il-open');
       const up   = ev.target.closest('.il-up');
       const down = ev.target.closest('.il-down');
+      const arr  = ev.target.closest('.il-arrange');
       const edit = ev.target.closest('.il-edit');
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
@@ -92,6 +94,7 @@ S.InventoryLocations = {
       if (open)      this.showDetail(open.dataset.id);
       else if (up)   this.move(up.dataset.id, -1);
       else if (down) this.move(down.dataset.id, 1);
+      else if (arr)  this.showDetail(arr.dataset.id);
       else if (edit) this.showForm(edit.dataset.id);
       else if (arch) this.confirmDelete(arch.dataset.id);
       else if (un)   this.setArchived(un.dataset.id, false);
