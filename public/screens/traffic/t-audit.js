@@ -107,12 +107,9 @@ S.TrafficAudit = {
           + '</tr>';
       }).join('');
       historyCard = '<div class="card">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="display:flex;align-items:center;gap:12px;">'
-        +   '<button class="btn btn-ghost btn-sm ta-compare-btn" style="font-size:10px;padding:4px 10px;">Compare Audits</button>'
-        +   '<div style="font-size:11px;color:var(--t3);">Last 12 months stored.</div>'
-        + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
@@ -221,7 +218,10 @@ S.TrafficAudit = {
     }).join('');
     const overallDiff = (curr.overall_score||0) - (prev.overall_score||0);
     return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit Comparison</div>'
+      +   '<button class="btn btn-ghost btn-sm ta-compare-btn" style="font-size:10px;padding:4px 10px;">Compare Other Audits</button>'
+      + '</div>'
       + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
       + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(prev.overall_score||0) + ';">' + (prev.overall_score||0) + '</div></div>'
