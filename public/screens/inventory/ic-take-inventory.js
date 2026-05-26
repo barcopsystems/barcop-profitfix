@@ -76,9 +76,12 @@ S.InventoryTakeInventory = {
 
     const saved = this.loadDraft();
     const resumeBar = saved
-      ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div class="alert-text">A ' + esc(saved.type) + ' count started ' + this.ago(saved.started_at) + ' is in progress.</div>'
-        + '<button class="btn btn-primary btn-sm" id="ti-resume">Resume Count</button></div>'
+        + '<div style="display:flex;gap:8px;">'
+          + '<button class="btn btn-primary btn-sm" id="ti-resume">Resume Count</button>'
+          + '<button class="btn btn-ghost btn-sm" id="ti-discard">Discard</button>'
+        + '</div></div>'
       : '';
 
     const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
@@ -124,7 +127,34 @@ S.InventoryTakeInventory = {
         this.route();
       }
     });
+    document.getElementById('ti-discard')?.addEventListener('click', () => this.confirmDiscardDraft());
     document.getElementById('ti-start')?.addEventListener('click', () => this.startCount());
+  },
+
+  // Discard the in-progress draft. Confirmation modal because losing count
+  // data part-way through is destructive — easy to recover from a manual
+  // back-out, hard to recover from an accidental discard.
+  confirmDiscardDraft() {
+    const m = document.createElement('div');
+    m.id = 'ti-discard-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
+    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:460px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
+      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:12px;">Discard This Count?</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
+        + '<button type="button" id="ti-disc-cancel" class="btn btn-ghost">Keep Counting</button>'
+        + '<button type="button" id="ti-disc-confirm" class="btn btn-danger">Discard</button>'
+      + '</div>'
+    + '</div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+    document.getElementById('ti-disc-cancel').addEventListener('click', close);
+    document.getElementById('ti-disc-confirm').addEventListener('click', () => {
+      this.clearDraft();
+      close();
+      this.renderSetup();
+    });
   },
 
   startCount() {
@@ -221,7 +251,10 @@ S.InventoryTakeInventory = {
       + cards
       + '<div class="card-actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">'
       + '<button class="btn btn-ghost" id="ti-prev"' + (this.locStep === 0 ? ' disabled' : '') + '>&#8592; Previous</button>'
-      + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
+        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Discard Count</button>'
+      + '</div>'
       + (isLast
           ? '<button class="btn btn-primary" id="ti-review">Review Count &#8594;</button>'
           : '<button class="btn btn-primary" id="ti-next">Next Location &#8594;</button>')
@@ -252,6 +285,7 @@ S.InventoryTakeInventory = {
     document.getElementById('ti-next')?.addEventListener('click', () => { this.locStep++; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
     document.getElementById('ti-review')?.addEventListener('click', () => { this.draft._view = 'review'; this.saveDraft(); this.renderReview(); });
     document.getElementById('ti-exit')?.addEventListener('click', () => { this.saveDraft(); App.navigate('ic-product-setup'); });
+    document.getElementById('ti-discard-count')?.addEventListener('click', () => this.confirmDiscardDraft());
   },
 
   updateProgress() {
