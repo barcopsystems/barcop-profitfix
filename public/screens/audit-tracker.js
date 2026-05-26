@@ -1,915 +1,237 @@
 'use strict';
-S.AuditTracker = {
 
-  render(container, actions) {
-    this.container = container;
-    this.actions   = actions;
-    actions.innerHTML = '';
-    this.renderMain();
-  },
+/* ── Audit Diff Visual ──────────────────────────────────────────────────────
+   Compare any two audits within the same module. Shows section-by-section
+   score deltas, action items resolved vs surfaced, and dollar-impact change.
+   Pure visual — no Claude call, runs on existing audit data. Phase 3 Item 28.
+   Launched by a "Compare Audits" button on each module's audit screen. */
 
-  renderMain() {
-    this.actions.innerHTML = '';
-    const audits       = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    const latest       = audits[0] || null;
-    // 30-day rolling: next audit is available 30 days after the last one
-    // ran, independent of the calendar month. First audit is always available.
-    const daysSince    = latest && latest.date
-      ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000)
-      : Infinity;
-    const canRunAudit  = daysSince >= 30;
-    const daysLeft     = canRunAudit ? 0 : 30 - daysSince;
+S.AuditDiff = {
 
-    const requestCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      + '<div style="flex:1;min-width:200px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Monthly Profit Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive profit audit per month. Upload your POS reports and data files. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
-      + '</div>'
-      + (canRunAudit
-          ? '<button class="btn btn-primary" id="at-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>'
-          : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' day' + (daysLeft===1?'':'s') + '</div>'
-            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit</div></div>')
-      + '</div></div>';
-
-    let latestCard = '';
-    if (latest) {
-      const prev = audits[1] || null;
-      const scoreColor = App.scoreColor(latest.overall_score);
-      const scoreLabel = App.scoreLabel(latest.overall_score);
-
-      let progressBanner = '';
-      if (prev) {
-        const diff = (latest.overall_score||0) - (prev.overall_score||0);
-        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</div>'
-          + '<div style="font-size:12px;color:var(--t2);">' + prev.overall_score + ' to ' + latest.overall_score + '</div>'
-          + '</div>';
-      }
-
-      const sections = latest.sections || {};
-      const sectionRows = Object.entries(sections).map(([name, score]) => {
-        const ps   = prev?.sections?.[name];
-        const diff = ps != null ? score - ps : null;
-        const bar  = Math.min(100, Math.max(0, score));
-        return '<tr>'
-          + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
-          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+bar+'%;background:'+App.scoreColor(score)+';border-radius:3px;"></div></div></td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:'+App.scoreColor(score)+';padding:8px 12px;">' + score + '</td>'
-          + (diff != null ? '<td style="font-size:12px;color:'+(diff>=0?'var(--gold)':'var(--red)')+';padding:8px 12px;">'+(diff>=0?'+':'')+diff+'</td>' : '<td></td>')
-          + '</tr>';
-      }).join('');
-
-      // Top Action Items by Impact lives on the full audit view (where the
-      // Fix This buttons route into the Fix Process). Keeping it off the
-      // preview card makes the preview a faster score-only scan and gives the
-      // operator a reason to click through.
-      latestCard = '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
-        + '<div>'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Profit Audit</div>'
-        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
-        + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
-        + '</div>'
-        + '</div>'
-        + progressBanner
-        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
-          + '<thead><tr>'
-          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
-          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
-          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
-          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
-          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
-        + '</div>';
-    }
-
-    let historyCard = '';
-    if (audits.length > 1) {
-      const rows = audits.map((a,i) => {
-        const p    = audits[i+1];
-        const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
-        const tier = a.grade || '';
-        const tierBadge = tier
-          ? '<span style="background:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'var(--gold)':tier.includes('2')||tier.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;">' + esc(tier) + '</span>'
-          : '';
-        return '<tr>'
-          + '<td>' + (a.date||'').slice(0,10) + '</td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score||0) + ';">' + (a.overall_score||0) + '</td>'
-          + (diff != null ? '<td style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</td>' : '<td></td>')
-          + '<td>' + tierBadge + '</td>'
-          + '<td><button class="btn btn-ghost btn-sm at-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
-          + '</tr>';
-      }).join('');
-      historyCard = '<div class="card">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="display:flex;align-items:center;gap:12px;">'
-        +   '<button class="btn btn-ghost btn-sm at-compare-btn" style="font-size:10px;padding:4px 10px;">Compare Audits</button>'
-        +   '<div style="font-size:11px;color:var(--t3);">Last 12 months stored.</div>'
-        + '</div>'
-        + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>'
-        + '</div>';
-    }
-
-    const emptyState = !latest
-      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
-        + '<div class="empty-sub">Generate your first monthly Profit Audit above. Upload your POS reports and the scored audit appears once the analysis finishes.</div></div>'
-      : '';
-
-
-
-    // Score History Chart (2+ audits)
-    let scoreChart = '';
-    if (audits.length >= 2) {
-      scoreChart = this.renderScoreChart(audits, 'at');
-    }
-
-    // Score Comparison (2 audits)
-    let comparison = '';
-    if (audits.length >= 2) {
-      comparison = this.renderComparison(audits[0], audits[1]);
-    }
-
-    // Section Trend sparklines (3+ audits)
-    let sparklines = '';
-    if (audits.length >= 3) {
-      sparklines = this.renderSparklines(audits);
-    }
-
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + sparklines + historyCard + '</div>';
-
-    document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
-    this.container.querySelectorAll('.at-view-btn').forEach(btn => {
-      btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
-    });
-    this.container.querySelector('.at-compare-btn')?.addEventListener('click', () => S.AuditDiff.open('profit'));
-  },
-
-  renderScoreChart(audits, prefix) {
-    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
-    const W=700, H=180, PAD={t:24,r:20,b:36,l:40};
-    const cw = W-PAD.l-PAD.r, ch = H-PAD.t-PAD.b;
-    const scores = sorted.map(a => a.overall_score||0);
-    const minY = Math.max(0, Math.min(...scores) - 10);
-    const maxY = Math.min(100, Math.max(...scores) + 10);
-    const xs = i => PAD.l + (sorted.length > 1 ? (i/(sorted.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
-
-    const smoothPath = pts => {
-      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
-      if (valid.length < 2) return valid.length===1 ? `M${valid[0].x},${valid[0].y}` : '';
-      let d = `M${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
-      for (let i=1; i<valid.length; i++) {
-        const cp = (valid[i].x - valid[i-1].x) * 0.35;
-        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
-      }
-      return d;
-    };
-    const areaPath = pts => {
-      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
-      if (valid.length < 2) return '';
-      let d = `M${valid[0].x.toFixed(1)},${ys(minY).toFixed(1)} L${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
-      for (let i=1; i<valid.length; i++) {
-        const cp = (valid[i].x - valid[i-1].x) * 0.35;
-        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
-      }
-      d += ` L${valid[valid.length-1].x.toFixed(1)},${ys(minY).toFixed(1)} Z`;
-      return d;
-    };
-
-    const ticks = [minY, Math.round((minY+maxY)/2), maxY].filter((v,i,a) => a.indexOf(v)===i);
-    const uid = prefix + 'sc' + Math.random().toString(36).slice(2,6);
-    const linePath  = smoothPath(scores);
-    const fillPath  = areaPath(scores);
-    const xLabels   = sorted.map((a,i) =>
-      `<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${(a.date||'').slice(0,7)}</text>`
-    ).join('');
-    const dots = sorted.map((a,i) => {
-      const v = a.overall_score||0;
-      const col = App.scoreHex(v);
-      return `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="5" fill="#0A1520" stroke="${col}" stroke-width="2.5"/>
-        <text x="${xs(i).toFixed(1)}" y="${(ys(v)-10).toFixed(1)}" text-anchor="middle" fill="${col}" font-family="'Barlow Condensed',sans-serif" font-size="13" font-weight="700">${v}</text>`;
-    }).join('');
-
-    return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Profit Score History</div>'
-      + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">`
-      + `<defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>`
-      + ticks.map(v => `<line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${PAD.l-6}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${Math.round(v)}</text>`).join('')
-      + (fillPath ? `<path d="${fillPath}" fill="url(#${uid})"/>` : '')
-      + (linePath ? `<path d="${linePath}" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')
-      + dots + xLabels
-      + '</svg></div>';
-  },
-
-  renderComparison(curr, prev) {
-    const cs = curr.sections || {};
-    const ps = prev.sections || {};
-    const allNames = [...new Set([...Object.keys(cs), ...Object.keys(ps)])];
-    const rows = allNames.map(name => {
-      const cv = cs[name] ?? null;
-      const pv = ps[name] ?? null;
-      const diff = (cv != null && pv != null) ? cv - pv : null;
-      const arrow = diff == null ? '' : diff > 0
-        ? '<span style="color:var(--gold);font-weight:700;">&#9650; +' + diff + '</span>'
-        : diff < 0
-        ? '<span style="color:var(--red);font-weight:700;">&#9660; ' + diff + '</span>'
-        : '<span style="color:var(--t3);">&#8212;</span>';
-      const col = (v) => v==null?'':App.scoreColor(v);
-      return '<tr>'
-        + '<td style="padding:9px 12px;font-size:12px;color:var(--t2);">' + esc(name) + '</td>'
-        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(pv) + ';">' + (pv??'--') + '</td>'
-        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(cv) + ';">' + (cv??'--') + '</td>'
-        + '<td style="padding:9px 12px;text-align:center;font-size:13px;">' + arrow + '</td>'
-        + '</tr>';
-    }).join('');
-    const overallDiff = (curr.overall_score||0) - (prev.overall_score||0);
-    return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
-      + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
-      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(prev.overall_score||0) + ';">' + (prev.overall_score||0) + '</div></div>'
-      + '<div style="display:flex;align-items:center;padding:0 8px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + (overallDiff>=0?'var(--gold)':'var(--red)') + ';">' + (overallDiff>=0?'+':'') + overallDiff + ' pts</div></div>'
-      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((curr.date||'').slice(0,7)) + (curr.grade?' &nbsp;&middot;&nbsp;' + esc(curr.grade):'') + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(curr.overall_score||0) + ';">' + (curr.overall_score||0) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th style="text-align:left;">Section</th><th style="text-align:center;">' + esc((prev.date||'').slice(0,7)) + '</th><th style="text-align:center;">' + esc((curr.date||'').slice(0,7)) + '</th><th style="text-align:center;">Change</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
-  },
-
-  renderSparklines(audits) {
-    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-6);
-    const latest = sorted[sorted.length-1];
-    const allNames = Object.keys(latest.sections||{});
-    if (!allNames.length) return '';
-    const W=120, H=40, PAD=4;
-
-    const spark = (values) => {
-      const valid = values.filter(v => v != null);
-      if (valid.length < 2) return '';
-      const minV = Math.min(...valid), maxV = Math.max(...valid);
-      const range = maxV - minV || 1;
-      const pts = values.map((v,i) => {
-        if (v == null) return null;
-        const x = PAD + (i/(values.length-1))*(W-PAD*2);
-        const y = H - PAD - ((v-minV)/range)*(H-PAD*2);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      }).filter(Boolean);
-      return pts.length >= 2 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
-    };
-
-    const tiles = allNames.map(name => {
-      const values = sorted.map(a => (a.sections||{})[name] ?? null);
-      const curr   = values[values.length-1] ?? 0;
-      const prev   = values.slice(0,-1).reverse().find(v => v != null) ?? null;
-      const diff   = prev != null ? curr - prev : null;
-      const col    = App.scoreColor(curr);
-      return '<div style="flex:1;min-width:140px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:10px 12px;">'
-        + '<div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:4px;letter-spacing:0.5px;">' + esc(name) + '</div>'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + col + ';line-height:1;">' + curr + '</div>'
-        + (diff != null ? '<div style="font-size:11px;font-weight:700;color:' + (diff>0?'var(--gold)':diff<0?'var(--red)':'var(--t3)') + ';">' + (diff>0?'+':'') + diff + '</div>' : '')
-        + '</div>'
-        + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">`
-        + `<line x1="4" y1="${(H/2).toFixed(1)}" x2="${W-4}" y2="${(H/2).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`
-        + spark(values)
-        + (values[values.length-1] != null ? (() => {
-            const valid = values.filter(v=>v!=null);
-            const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
-            const lx = PAD + ((values.length-1)/(values.length-1))*(W-PAD*2);
-            const ly = H - PAD - ((values[values.length-1]-minV)/range)*(H-PAD*2);
-            return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>`;
-          })() : '')
-        + '</svg>'
-        + '</div>';
-    }).join('');
-
-    return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Section Trends  <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;color:var(--t3);">Last ' + sorted.length + ' audits</span></div>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:10px;">' + tiles + '</div>'
-      + '</div>';
-  },
-
-  viewAudit(idx) {
-    const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    const audit  = audits[idx];
-    if (!audit) return;
-
-    this.actions.innerHTML = '';
-    const backBtn = document.createElement('button');
-    backBtn.className = 'btn btn-ghost btn-sm';
-    backBtn.textContent = '← Back';
-    backBtn.style.marginRight = '8px';
-    backBtn.onclick = () => this.renderMain();
-    this.actions.appendChild(backBtn);
-
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print / Save PDF';
-    printBtn.onclick = () => window.print();
-    this.actions.appendChild(printBtn);
-
-
-    const d = audit.raw || audit;
-    const scoreColor = App.scoreColor(audit.overall_score||0);
-
-    const sectionBlock = (num, name, score, items, signals) => {
-      const bar   = Math.min(100, Math.max(0, score||0));
-      const color = App.scoreColor(score);
-      const rows  = items.filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
-        '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
-        + '<td style="padding:7px 0;font-size:11px;color:var(--t3);width:55%;">' + label + '</td>'
-        + '<td style="padding:7px 0;font-size:11px;color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';font-weight:600;">' + val + '</td>'
-        + '</tr>'
-      ).join('');
-      const sigRows = (signals||[]).map(sig => {
-        const sc = (sig.score||'').toUpperCase();
-        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'rgba(255,200,0,0.7)':'var(--gold)';
-        return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px;margin-top:10px;">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-          + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></div>'
-          + '<div style="font-size:11px;font-weight:700;color:var(--t1);">' + esc(sig.label||'') + '</div>'
-          + '<div style="margin-left:auto;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + dot + ';">' + esc(sig.score||'') + '</div>'
-          + '</div>'
-          + (sig.evidence ? '<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">' + esc(sig.evidence) + '</div>' : '')
-          + (sig.gap      ? '<div style="font-size:11px;color:var(--t2);margin-bottom:4px;">' + esc(sig.gap) + '</div>' : '')
-          + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
-          + '</div>';
-      }).join('');
-      // score === null means the section is intentionally unscored (Risk
-      // Signals). Skip the big number + scale bar so we don't paint a
-      // red "0" that reads like a failing score.
-      const scoreBlock = score == null
-        ? ''
-        : '<div style="text-align:right;">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
-          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
-          + '</div>';
-      return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
-        + scoreBlock + '</div>'
-        + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
-        + sigRows
-        + '</div>';
-    };
-
-    const pct = (v,t) => v ? v+'%' + (t?' (Target: '+t+'%)':'') : '';
-    const cur = v => v ? App.fmtCurrency(v) : '';
-    const num = v => v != null && v !== 0 ? String(v) : '';
-    const yN  = v => v===true?'Yes':v===false?'No':'';
-
-    const gap = (v) => v > 0 ? [cur(v), 'warn'] : v < 0 ? [cur(Math.abs(v)) + ' under target', 'good'] : [''];
-    const [s1gap]  = gap(d.S1_MONTHLY_GAP);
-    const [s2gap]  = gap(d.S2_MONTHLY_GAP);
-    const [s3gap]  = gap(d.S3_MONTHLY_GAP);
-    const [s5gap]  = gap(d.S5_PRIME_COST_PCT - (d.S5_TARGET_PCT||60) > 0 ? d.S5_COMBINED_COGS_GAP : 0);
-
-    const signals6 = [
-      {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
-      {score:d.S6_SIG2_SCORE, label:d.S6_SIG2_LABEL, evidence:d.S6_SIG2_EVIDENCE, gap:d.S6_SIG2_GAP, tool:d.S6_SIG2_TOOL},
-      {score:d.S6_SIG3_SCORE, label:d.S6_SIG3_LABEL, evidence:d.S6_SIG3_EVIDENCE, gap:d.S6_SIG3_GAP, tool:d.S6_SIG3_TOOL},
-      {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL},
-    ].filter(s => s.label);
-
-    const sections = [
-      sectionBlock(1, 'Bar Cost and Pour Control', d.S1_SCORE, [
-        ['Bar Pour Cost %',         pct(d.S1_BAR_COST_PCT, d.S1_TARGET_PCT), d.S1_BAR_COST_PCT > d.S1_TARGET_PCT ? 'warn' : 'good'],
-        ['Monthly Bar Revenue',     cur(d.S1_BAR_REV_MONTHLY)],
-        ['Bev COGS Period',         cur(d.S1_BEV_COGS_PERIOD)],
-        ['Inventory Variance %',    pct(d.S1_INV_VARIANCE_PCT), d.S1_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
-        ['Inventory Variance $',    cur(d.S1_INV_VARIANCE_AMT), d.S1_INV_VARIANCE_AMT > 500 ? 'warn' : ''],
-        ['Pour Method',             d.S1_POUR_METHOD],
-        ['Recipe Coverage',         d.S1_RECIPE_COVERAGE],
-        ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
-        ['Annual Gap',              cur(d.S1_ANNUAL_GAP), d.S1_ANNUAL_GAP > 0 ? 'warn' : ''],
-      ]),
-      sectionBlock(2, 'Theft and Loss Prevention', d.S2_SCORE, [
-        ['Void/Comp %',             pct(d.S2_VOID_COMP_PCT), d.S2_VOID_COMP_PCT > 2 ? 'warn' : ''],
-        ['Void/Comp Amount',        cur(d.S2_VOID_COMP_AMT), d.S2_VOID_COMP_AMT > 0 ? 'warn' : ''],
-        ['Unauthorized Voids %',    pct(d.S2_VOIDS_NO_APPROVAL_PCT), d.S2_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
-        ['Drawer Reconciliation',   d.S2_DRAWER_RECON],
-        ['Cash Policy Documented',  d.S2_CASH_POLICY],
-        ['Void Approval Required',  d.S2_VOID_APPROVAL],
-        ['Spillage Log',            d.S2_SPILLAGE_LOG],
-        ['Monthly Gap',             cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
-      ]),
-      sectionBlock(3, 'Food Cost Control', d.S3_SCORE, [
-        ['Food Cost %',             pct(d.S3_FOOD_COST_PCT, d.S3_TARGET_PCT), d.S3_FOOD_COST_PCT > d.S3_TARGET_PCT ? 'warn' : 'good'],
-        ['Monthly Food Revenue',    cur(d.S3_FOOD_REV_MONTHLY)],
-        ['Food Variance %',         pct(d.S3_FOOD_VAR_PCT), d.S3_FOOD_VAR_PCT > 3 ? 'warn' : ''],
-        ['Food Variance $',         cur(d.S3_FOOD_VAR_AMT)],
-        ['Recipe Coverage',         d.S3_RECIPE_COVERAGE],
-        ['Inventory Frequency',     d.S3_INV_FREQ],
-        ['Waste Log',               d.S3_WASTE_LOG],
-        ['Monthly Gap vs Target',   cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
-        ['Annual Gap',              cur(d.S3_ANNUAL_GAP), d.S3_ANNUAL_GAP > 0 ? 'warn' : ''],
-      ]),
-      sectionBlock(4, 'Vendor Control', d.S4_SCORE, [
-        ['Bev Invoice Count',       num(d.S4_BEV_INVOICE_COUNT)],
-        ['Food Invoice Count',      num(d.S4_FOOD_INVOICE_COUNT)],
-        ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
-        ['Invoice vs PO Matching',  d.S4_INVOICE_VS_PO],
-        ['Price Verification',      d.S4_PRICE_VERIFY],
-        ['Annual Bid Process',      d.S4_ANNUAL_BIDS],
-        ['Backup Vendors',          d.S4_BACKUP_VENDORS],
-        ['Monthly Exposure',        cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
-        ['Annual Exposure',         cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
-      ]),
-      sectionBlock(5, 'Prime Cost', d.S5_SCORE, [
-        ['Total Revenue Period',    cur(d.S5_TOTAL_REV_PERIOD)],
-        ['Total COGS Period',       cur(d.S5_TOTAL_COGS_PERIOD)],
-        ['Labor Period',            cur(d.S5_LABOR_PERIOD)],
-        ['Labor %',                 pct(d.S5_LABOR_PCT), d.S5_LABOR_PCT > 35 ? 'warn' : ''],
-        ['Bar Pour Cost %',         pct(d.S5_BAR_COST_PCT)],
-        ['Food Cost %',             pct(d.S5_FOOD_COST_PCT)],
-        ['Prime Cost %',            pct(d.S5_PRIME_COST_PCT, d.S5_TARGET_PCT), d.S5_PRIME_COST_PCT > (d.S5_TARGET_PCT||60) ? 'warn' : 'good'],
-        ['Prime Cost Amount',       cur(d.S5_PRIME_COST_AMT)],
-        ['RPLH Tracked',            d.S5_RPLH_TRACKED],
-        ['Labor by Department',     d.S5_LABOR_BY_DEPT],
-        ['Monthly COGS Gap',        cur(d.S5_COMBINED_COGS_GAP), d.S5_COMBINED_COGS_GAP > 0 ? 'warn' : ''],
-      ]),
-      ...(signals6.length ? [sectionBlock(6, 'Operational Risk Signals', null, [], signals6)] : []),
-    ].join('');
-
-    const actionItems = (audit.action_items || []).map((a,i) => {
-      const txt = a.action || a || '';
-      const gid = a.gap_id || (window.FixPanel ? FixPanel.inferGapId(txt, 'profit') : null);
-      const btn = gid
-        ? '<button class="at-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This &#9656;</button>'
-        : '';
-      return '<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
-        + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(txt) + '</div>'
-        + (a.monthly_impact ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:4px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
-        + '</div>'
-        + btn
-        + '</div>';
-    }).join('');
-
-    // Total recoverable
-    const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      + '<div>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Recovery Audit</div>'
-      + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">'
-        + (audit.date||'').slice(0,10)
-        + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '')
-        + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '')
-        + '</div>'
-      + (audit.grade ? '<div style="margin-top:8px;"><span style="background:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'var(--gold)':audit.grade.includes('2')||audit.grade.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:2px;">' + esc(audit.grade) + '</span></div>' : '')
-      + '</div>'
-      + '<div style="text-align:right;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Score</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);">Industry Avg: ' + (d.INDUSTRY_AVG||63) + '  |  Target: ' + (d.TARGET_SCORE||65) + '</div>'
-      + '</div>'
-      + '</div>'
-      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);">'
-      +   '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
-      +   App.scoreBar(audit.overall_score||0)
-      + '</div>'
-      + (totalMonthly > 0 ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:20px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Total Recoverable Per Month</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + App.fmtCurrency(totalMonthly) + '</div></div>'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Annualized</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + App.fmtCurrency(totalMonthly*12) + '</div></div>'
-        + (d.WEEKLY_GAP_AMT ? '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Weekly Gap</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + esc(String(d.WEEKLY_GAP_AMT)) + '</div></div>' : '')
-        + '</div>' : '')
-      + '</div>'
-
-      // Tabs
-      + '<div style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:16px;">'
-      + '<button id="at-tab-scores" style="background:none;border:none;border-bottom:2px solid var(--gold);color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Scores</button>'
-      + '<button id="at-tab-narrative" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--t3);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Findings</button>'
-      + '</div>'
-
-      + '<div id="at-tab-scores-content">'
-      + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items, Ranked by Impact</div>'
-        + actionItems + '</div>' : '')
-      + sections
-      + '</div>'
-
-      + '<div id="at-tab-narrative-content" style="display:none;">'
-      + this.renderNarrative(d)
-      + '</div>'
-
-      + '</div>';
-
-    document.getElementById('at-tab-scores')?.addEventListener('click', () => {
-      document.getElementById('at-tab-scores-content').style.display = '';
-      document.getElementById('at-tab-narrative-content').style.display = 'none';
-      document.getElementById('at-tab-scores').style.borderBottomColor = 'var(--gold)';
-      document.getElementById('at-tab-scores').style.color = 'var(--t1)';
-      document.getElementById('at-tab-narrative').style.borderBottomColor = 'transparent';
-      document.getElementById('at-tab-narrative').style.color = 'var(--t3)';
-    });
-    this.container.querySelectorAll('.at-fix-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        App._fixFocus = btn.dataset.gap;
-        App.navigate('profit-fix');
-      });
-    });
-    document.getElementById('at-tab-narrative')?.addEventListener('click', () => {
-      document.getElementById('at-tab-scores-content').style.display = 'none';
-      document.getElementById('at-tab-narrative-content').style.display = '';
-      document.getElementById('at-tab-narrative').style.borderBottomColor = 'var(--gold)';
-      document.getElementById('at-tab-narrative').style.color = 'var(--t1)';
-      document.getElementById('at-tab-scores').style.borderBottomColor = 'transparent';
-      document.getElementById('at-tab-scores').style.color = 'var(--t3)';
-    });
-  },
-
-  renderNarrative(d) {
-    // Collect evidence/gap/tool fields across all sections
-    const sections = [
-      { num:1, name:'Bar Cost and Pour Control',  fields: ['S1_EVIDENCE','S1_GAP','S1_TOOL','S1_NARRATIVE','S1_FINDING'] },
-      { num:2, name:'Theft and Loss Prevention',  fields: ['S2_EVIDENCE','S2_GAP','S2_TOOL','S2_NARRATIVE','S2_FINDING'] },
-      { num:3, name:'Food Cost Control',          fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
-      { num:4, name:'Vendor Control',             fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
-      { num:5, name:'Prime Cost',                 fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
-      { num:6, name:'Operational Risk Signals',   fields: ['S6_SIG1_EVIDENCE','S6_SIG1_GAP','S6_SIG1_TOOL','S6_SIG2_EVIDENCE','S6_SIG2_GAP','S6_SIG2_TOOL','S6_SIG3_EVIDENCE','S6_SIG3_GAP','S6_SIG3_TOOL'] },
-    ];
-    const cards = sections.map(s => {
-      const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
-      if (!texts.length) return '';
-      const score = d['S'+s.num+'_SCORE'];
-      const col = score!=null ? App.scoreColor(score) : 'var(--t3)';
-      return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--b2);">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Section ' + s.num + '</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + s.name + '</div></div>'
-        + (score!=null ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + col + ';">' + score + '</div>' : '')
-        + '</div>'
-        + texts.map(t => '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
-        + '</div>';
-    }).filter(Boolean).join('');
-    if (!cards) {
-      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. With your POS exception report and inventory sheets attached, the audit produces section narratives.</div>';
-    }
-    return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
-  },
-
-  // ── Stepped intake wizard ─────────────────────────────────────────────────
-  _intakeStep: 1,
-  _intakeDraft: null,
-
-  showIntakeForm() {
-    this._intakeStep = 1;
-    this._intakeDraft = { barRev: '', foodRev: '' };
-    this.actions.innerHTML = '';
-    this.renderIntakeStep();
-  },
-
-  intakeStepsHtml(total) {
-    let h = '<div class="steps">';
-    for (let i = 1; i <= total; i++) {
-      const cls = i < this._intakeStep ? 'done' : i === this._intakeStep ? 'active' : '';
-      h += (i > 1 ? '<div class="step-line' + (i-1 < this._intakeStep ? ' done' : '') + '"></div>' : '')
-        + '<div class="step-dot ' + cls + '">' + (i < this._intakeStep ? '&#10003;' : i) + '</div>';
-    }
-    return h + '</div>';
-  },
-
-  renderIntakeStep() {
-    const s    = App.data.settings;
-    const step = this._intakeStep;
-    const total = 5;
-    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
-
-    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Monthly Profit Audit</div>';
-
-    const cd = this.buildControlData();
-    const controlBanner = (cd && cd.sources && cd.sources.length)
-      ? '<div style="background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
-        + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:5px;">Control Data Is Feeding This Audit</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Verified figures from ' + esc(cd.sources.join(', '))
-        + ' go in automatically as ground truth. The uploads below only need to cover what your Control modules do not.</div>'
-        + '</div>'
-      : '';
-    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
-      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
-      + '</div>';
-
-    const nav = (showPrev, showNext, isSubmit) =>
-      '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
-      + (showPrev ? '<button class="btn btn-ghost" id="at-iz-prev">&#8592; Back</button>' : '')
-      + (showNext ? '<button class="btn btn-primary" id="at-iz-next">Next &#8594;</button>' : '')
-      + (isSubmit ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>' : '')
-      + '<div id="at-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
-      + '<div style="flex:1;"></div>'
-      + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button>'
-      + '</div>';
-
-    let stepHtml = '';
-    if (step === 1) {
-      stepHtml = '<div class="card">' + header + barInfo
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Enter your annual bar and food revenue. This sets the dollar baselines for every gap calculation in the audit. Your Bar Cop data from the last 30 days is included automatically.</div>'
-        + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
-        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>Annual Bar Revenue</label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-iz-bar-rev" placeholder="480000" value="' + esc(this._intakeDraft.barRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
-        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>Annual Food Revenue</label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-iz-food-rev" placeholder="320000" value="' + esc(this._intakeDraft.foodRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
-        + '</div>'
-        + nav(false, true, false) + '</div>';
-    } else if (step === 2) {
-      stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Bar Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Beverages report is required. Every additional file unlocks more scored sections.</div>'
-        + this.renderFileSection('required', 'POS Sales Report: Beverages',           'at-f-pos-bev',   'at-pos-bev',   'Adds: Revenue baseline, category split, estimated gap calculations')
-        + this.renderFileSection('optional', 'Bar Inventory Count Sheets',             'at-f-bar-inv',   'at-bar-inv',   'Adds: Actual pour cost %, theoretical vs. actual variance by product')
-        + this.renderFileSection('optional', 'POS Exception Report: Voids and Comps', 'at-f-exception', 'at-exception', 'Adds: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
-        + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',     'at-f-cash',      'at-cash',      'Adds: Cash handling gap analysis by shift')
-        + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv',   'at-bev-inv',   'Adds: Delivery accuracy rate, vendor short analysis')
-        + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices',   'at-f-vendor',    'at-vendor',    'Adds: Price drift analysis, distributor negotiation data')
-        + nav(true, true, false) + '</div>';
-    } else if (step === 3) {
-      stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Kitchen Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Upload whatever you have. Each file unlocks additional food cost scoring.</div>'
-        + this.renderFileSection('optional',   'POS Sales Report: Food',               'at-f-pos-food',  'at-pos-food',  'Adds: Food cost benchmarking, category-level analysis')
-        + this.renderFileSection('optional',   'Kitchen Inventory Count Sheets',       'at-f-kit-inv',   'at-kit-inv',   'Adds: Actual food cost %, kitchen variance, spoilage rate')
-        + this.renderFileSection('optional',   'Food Invoices and Delivery Receipts',  'at-f-food-inv',  'at-food-inv',  'Adds: Food delivery accuracy, produce par analysis')
-        + this.renderFileSection('highlight',  'Recipe Costing Sheet',                 'at-f-recipe',    'at-recipe',    'Adds: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
-        + this.renderFileSection('optional',   'Daily Prep Sheets or Production Logs', 'at-f-prep',      'at-prep',      'Adds: Production loss analysis, prep yield by station')
-        + this.renderFileSection('optional',   'Daily Waste Logs',                     'at-f-waste',     'at-waste',     'Adds: Weekly spoilage cost, waste pattern diagnosis')
-        + nav(true, true, false) + '</div>';
-    } else if (step === 4) {
-      stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Payroll or time clock data is required to calculate verified prime cost and RPLH.</div>'
-        + this.renderFileSection('optional', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Adds: Required for prime cost calculation, labor by department, RPLH calculation')
-        + nav(true, true, false) + '</div>';
-    } else if (step === 5) {
-      stepHtml = '<div class="card">' + header
-        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
-        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
-        + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
-        + '<textarea id="at-iz-notes" rows="4" placeholder="Recent changes, seasonal factors, staffing changes, anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
-        + nav(true, false, true) + '</div>';
-    }
-
-    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + controlBanner + stepHtml + '</div>';
-
-    document.getElementById('at-iz-cancel')?.addEventListener('click', () => {
-      document.getElementById('topbar-sub').textContent = '';
-      this.renderMain();
-    });
-    document.getElementById('at-iz-prev')?.addEventListener('click', () => {
-      this._saveIntakeStep();
-      this._intakeStep--;
-      this.renderIntakeStep();
-    });
-    document.getElementById('at-iz-next')?.addEventListener('click', () => {
-      if (step === 1) {
-        const barRev  = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
-        const foodRev = parseFloat(document.getElementById('at-iz-food-rev')?.value) || 0;
-        if (barRev === 0 && foodRev === 0) {
-          const st = document.getElementById('at-iz-status');
-          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Enter at least one revenue figure to continue.'; }
-          return;
-        }
-        this._intakeDraft.barRev  = document.getElementById('at-iz-bar-rev')?.value || '';
-        this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
-      }
-      if (step === 2) {
-        const posFiles = document.getElementById('at-f-pos-bev')?.files;
-        if (!posFiles || posFiles.length === 0) {
-          const st = document.getElementById('at-iz-status');
-          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='POS Beverages report is required.'; }
-          return;
-        }
-      }
-      this._saveIntakeStep();
-      this._intakeStep++;
-      this.renderIntakeStep();
-    });
-    document.getElementById('at-iz-submit')?.addEventListener('click', () => {
-      this._intakeDraft.notes = document.getElementById('at-iz-notes')?.value || '';
-      this.generateAudit();
-    });
-  },
-
-  _saveIntakeStep() {
-    // File inputs can't be persisted but text values can
-    if (document.getElementById('at-iz-bar-rev'))  this._intakeDraft.barRev  = document.getElementById('at-iz-bar-rev').value;
-    if (document.getElementById('at-iz-food-rev')) this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev').value;
-    if (document.getElementById('at-iz-notes'))    this._intakeDraft.notes   = document.getElementById('at-iz-notes').value;
-  },
-
-
-  renderFileSection(type, title, inputId, ttId, unlocks) {
-    const badge = type === 'required'
-      ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
-      : type === 'highlight'
-      ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
-      : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
-    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
-      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
-      + (ttId ? tt(ttId) : '')
-      + '</div>'
-      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:8px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:8px;"></div>')
-      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
-      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
-      + '</div>';
-  },
-
-  async generateAudit() {
-    if (App.demoBlock('Running an audit')) return;
-    // Show generating state in the current container
-    const submitBtn = document.getElementById('at-iz-submit');
-    const statusEl  = document.getElementById('at-iz-status');
-    const setStatus = (msg, color='var(--t2)') => {
-      if (statusEl) { statusEl.style.display='block'; statusEl.style.color=color; statusEl.textContent=msg; }
-    };
-    if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
-
-    const fileInputIds = ['at-f-pos-bev','at-f-bar-inv','at-f-exception','at-f-cash','at-f-bev-inv',
-      'at-f-vendor','at-f-pos-food','at-f-kit-inv','at-f-food-inv','at-f-recipe','at-f-prep','at-f-waste','at-f-payroll'];
-    const allFiles = [];
-    for (const id of fileInputIds) {
-      const inp = document.getElementById(id);
-      if (inp?.files) for (const f of inp.files) allFiles.push({file:f, field:id});
-    }
-
-    const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
-    const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
-
-    // Validation — do not run an audit with nothing to analyze
-    const hasRealData = allFiles.length > 0 || (App.data.weeks && App.data.weeks.length > 0) || barRev > 0 || foodRev > 0;
-    if (!hasRealData) {
-      setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your POS reports.', 'var(--red)');
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
+  // Public entry: open the diff modal for a specific module.
+  open(moduleKey) {
+    const audits = this._auditsFor(moduleKey);
+    if (!audits || audits.length < 2) {
+      this._alertModal('You need at least 2 ' + this._moduleName(moduleKey) + ' audits to compare. Run another audit and try again.');
       return;
     }
-
-    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
-
-    try {
-      const auditAppData = JSON.parse(JSON.stringify(App.data));
-      auditAppData.settings.annual_bar_revenue  = barRev;
-      auditAppData.settings.annual_food_revenue = foodRev;
-
-      const form = new FormData();
-      form.append('appData', JSON.stringify(auditAppData));
-      form.append('notes', this._intakeDraft?.notes || '');
-      const controlData = this.buildControlData();
-      if (controlData) form.append('controlData', JSON.stringify(controlData));
-      for (const {file, field} of allFiles) form.append(field, file, file.name);
-
-      setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
-
-      const res  = await fetch('/api/generate-profit-audit', { method:'POST', body: form });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Generation failed');
-
-      setStatus('Saving audit...', 'var(--gold)');
-      const d = data.auditData || {};
-
-      const auditRecord = {
-        id:            App.uid(),
-        date:          new Date().toISOString().slice(0,10),
-        bar_name:      d.BAR_NAME || App.data.settings.bar_name,
-        overall_score: d.OVERALL_SCORE || 0,
-        grade:         d.DATA_TIER_LABEL || '',
-        audit_period:  d.AUDIT_PERIOD || '',
-        audit_id:      d.AUDIT_ID || '',
-        sections:      this.extractSections(d),
-        action_items:  this.extractActionItems(d),
-        raw:           d,
-        generated_at:  new Date().toISOString()
-      };
-
-      if (!App.data.audits) App.data.audits = [];
-      App.data.audits.push(auditRecord);
-      if (App.data.audits.length > 12) App.data.audits = App.data.audits.slice(-12);
-      await App.saveKey('audits');
-      App.markSetupDone('gs_p_audit');
-
-      document.getElementById('topbar-sub').textContent = '';
-      this.renderMain();
-      setTimeout(() => this.viewAudit(0), 100);
-
-    } catch(e) {
-      setStatus('Error: ' + (e.message||'Generation failed. Please try again.'), 'var(--red)');
-      if (submitBtn) { submitBtn.disabled=false; submitBtn.textContent='Generate Audit'; }
-    }
+    const sorted = audits.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    const after  = sorted[0];
+    const before = sorted[1];
+    this._showModal(moduleKey, sorted, before.audit_id || before.date, after.audit_id || after.date);
   },
 
-  extractSections(d) {
-    const s = {};
-    if (d.S1_SCORE != null) s['Bar Cost and Pour Control'] = d.S1_SCORE;
-    if (d.S2_SCORE != null) s['Theft and Loss Prevention']  = d.S2_SCORE;
-    if (d.S3_SCORE != null) s['Food Cost Control']          = d.S3_SCORE;
-    if (d.S4_SCORE != null) s['Vendor Control']             = d.S4_SCORE;
-    if (d.S5_SCORE != null) s['Prime Cost']                 = d.S5_SCORE;
-    return s;
+  _auditsFor(moduleKey) {
+    if (moduleKey === 'profit')  return App.data?.audits || [];
+    if (moduleKey === 'revenue') return App.data?.revenue_audits || [];
+    if (moduleKey === 'traffic') return App.data?.traffic_audits || [];
+    return [];
   },
 
-  extractActionItems(d) {
-    const items = [];
-    if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Reduce bar pour cost. $' + Math.round(d.S1_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S1_MONTHLY_GAP, gap_id: 'pour-cost' });
-    if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S3_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'food-cost' });
-    if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S2_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'theft-loss' });
-    if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY, gap_id: 'vendor-control' });
-    if (d.S5_COMBINED_COGS_GAP > 0) items.push({ action: 'Close prime cost gap. $' + Math.round(d.S5_COMBINED_COGS_GAP) + '/month combined COGS overage.', monthly_impact: d.S5_COMBINED_COGS_GAP, gap_id: 'prime-cost' });
-    return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
+  _moduleName(moduleKey) {
+    return moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
   },
 
-  /* Verified Control-module data sent with the audit as ground truth (map
-     Section 8). Each slice is real logged operational data; a section only
-     appears when its Control data exists, so the server never gets a
-     fabricated figure. Returns null when no Control module has data. */
-  buildControlData() {
-    const inv = App.inventoryData || {};
-    const sh  = App.shiftData || {};
-    const lab = App.laborData || {};
-    const r1  = n => (n == null || isNaN(n)) ? null : Math.round(n * 10) / 10;
-    const cd  = { sources: [] };
+  _auditLabel(a) {
+    const dateStr = (a.date || '').slice(0, 10) || 'unknown date';
+    const period = a.audit_period ? ' · ' + a.audit_period : '';
+    const score = a.overall_score != null ? ' (' + a.overall_score + ')' : '';
+    return dateStr + period + score;
+  },
 
-    // Bar / food / prime cost — the weeks already derive from Control feeds
-    const weeks = (App.data.weeks || []).filter(w => w.period_end).slice(-4);
-    if (weeks.length) {
-      const avg = fn => { const v = weeks.map(fn).filter(x => x != null && !isNaN(x));
-        return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
-      cd.bar_cost_pct   = r1(avg(w => w.bar && w.bar.cost_pct));
-      cd.food_cost_pct  = r1(avg(w => w.food && w.food.cost_pct));
-      cd.prime_cost_pct = r1(avg(w => w.prime_cost_pct));
-    }
+  _auditKey(a) {
+    return a.audit_id || a.date || JSON.stringify(a).slice(0, 16);
+  },
 
-    // Inventory Control — counts
-    const counts = inv.ic_counts || [];
-    if (counts.length) { cd.inventory_counts = counts.length; cd.sources.push('Inventory Control counts'); }
+  _close() {
+    const m = document.getElementById('audit-diff-modal');
+    if (m) m.remove();
+  },
 
-    // Inventory Control — deliveries and vendor price drift
-    const dels = inv.ic_deliveries || [];
-    if (dels.length) {
-      let changes = 0;
-      dels.forEach(d => (d.line_items || []).forEach(li => {
-        if (li.price_changed && li.prev_price != null && li.price_per_unit != null) changes++;
-      }));
-      cd.deliveries_logged = dels.length;
-      cd.vendor_price_changes = changes;
-      cd.sources.push('Inventory Control deliveries');
-    }
+  _alertModal(message) {
+    const m = document.createElement('div');
+    m.id = 'audit-diff-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:440px;width:100%;">'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;margin-bottom:20px;">' + esc(message) + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;"><button id="ad-alert-ok" class="btn btn-ghost">OK</button></div>'
+      + '</div>';
+    document.body.appendChild(m);
+    document.getElementById('ad-alert-ok').addEventListener('click', () => this._close());
+    m.addEventListener('click', ev => { if (ev.target === m) this._close(); });
+  },
 
-    // Inventory Control — spot checks (theft pour-variance signal)
-    const spots = inv.ic_spot_checks || [];
-    if (spots.length) {
-      cd.spot_checks = spots.length;
-      cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
-      cd.spot_check_variance_dollar = r1(spots.reduce((s,c) => s + (c.total_variance_dollar || 0), 0));
-      cd.sources.push('Inventory Control spot checks');
-    }
+  _showModal(moduleKey, sorted, beforeKey, afterKey) {
+    const m = document.createElement('div');
+    m.id = 'audit-diff-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.65);';
+    m.innerHTML = '<div class="ad-panel" style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:960px;width:100%;max-height:calc(100vh - 80px);overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.55);"></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', ev => { if (ev.target === m) this._close(); });
+    const panel = m.querySelector('.ad-panel');
+    this._render(panel, moduleKey, sorted, beforeKey, afterKey);
+  },
 
-    // Shift Control — voids and comps
-    const vc = sh.sc_void_comps || [];
-    if (vc.length) {
-      cd.void_comp_count = vc.length;
-      cd.void_comp_total = r1(vc.reduce((s,v) => s + (v.amount || 0), 0));
-      cd.void_comp_unauthorized = vc.filter(v => !v.authorized_by).length;
-      cd.sources.push('Shift Control void and comp log');
-    }
+  _fixScreenFor(moduleKey) {
+    if (moduleKey === 'profit')  return 'profit-fix';
+    if (moduleKey === 'revenue') return 'r-fix';
+    if (moduleKey === 'traffic') return 't-fix';
+    return 'profit-fix';
+  },
 
-    // Shift Control — drawer reconciliations and cash drops
-    const variances = sh.sc_variances || [];
-    if (variances.length) {
-      cd.cash_reconciliations = variances.length;
-      cd.cash_variance_total = r1(variances.reduce((s,v) => s + (v.variance || 0), 0));
-      cd.cash_short_count = variances.filter(v => v.status === 'Short').length;
-      cd.sources.push('Shift Control drawer reconciliation');
-    }
-    const drops = sh.sc_cash_drops || [];
-    if (drops.length) cd.cash_drops = drops.length;
+  _render(panel, moduleKey, sorted, beforeKey, afterKey) {
+    const before = sorted.find(a => this._auditKey(a) === beforeKey) || sorted[1];
+    const after  = sorted.find(a => this._auditKey(a) === afterKey)  || sorted[0];
+    this._currentModule = moduleKey;
 
-    // Labor Control — actual hours and cost (prime cost labor)
-    const actuals = lab.lc_actuals || [];
-    if (actuals.length) {
-      cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
-      cd.labor_cost  = Math.round(actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0));
-      cd.sources.push('Labor Control actuals');
-    }
+    const opts = (selectedKey) => sorted.map(a => {
+      const k = this._auditKey(a);
+      const sel = k === selectedKey ? ' selected' : '';
+      return '<option value="' + esc(k) + '"' + sel + '>' + esc(this._auditLabel(a)) + '</option>';
+    }).join('');
 
-    return cd.sources.length ? cd : null;
+    const header = '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Compare ' + this._moduleName(moduleKey) + ' Audits</div>'
+      +   '<button id="ad-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>';
+
+    const pickers = '<div style="padding:18px 24px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--b2);">'
+      +   '<div class="f" style="flex:1;min-width:260px;"><label style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Compare</label>'
+      +     '<select id="ad-before-sel" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--w);font-size:13px;padding:8px 10px;">' + opts(this._auditKey(before)) + '</select>'
+      +   '</div>'
+      +   '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding-bottom:9px;">vs</div>'
+      +   '<div class="f" style="flex:1;min-width:260px;"><label style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Against</label>'
+      +     '<select id="ad-after-sel" style="width:100%;background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--w);font-size:13px;padding:8px 10px;">' + opts(this._auditKey(after)) + '</select>'
+      +   '</div>'
+      + '</div>';
+
+    const body = (before === after)
+      ? '<div style="padding:32px 24px;font-size:13px;color:var(--t3);text-align:center;">Pick two different audits to see the comparison.</div>'
+      : this._renderDiff(before, after);
+
+    panel.innerHTML = header + pickers + body;
+
+    document.getElementById('ad-close').addEventListener('click', () => this._close());
+    document.getElementById('ad-before-sel').addEventListener('change', (e) => {
+      this._render(panel, moduleKey, sorted, e.target.value, this._auditKey(after));
+    });
+    document.getElementById('ad-after-sel').addEventListener('change', (e) => {
+      this._render(panel, moduleKey, sorted, this._auditKey(before), e.target.value);
+    });
+    // Fix This deep-links — close modal, focus the gap, navigate to the right fix screen
+    panel.querySelectorAll('.ad-fix-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gapId = btn.dataset.gap;
+        const fixScreen = this._fixScreenFor(moduleKey);
+        this._close();
+        App._fixFocus = gapId;
+        App.openScreen(fixScreen);
+      });
+    });
+  },
+
+  _renderDiff(before, after) {
+    const beforeScore = before.overall_score || 0;
+    const afterScore  = after.overall_score || 0;
+    const scoreDelta  = afterScore - beforeScore;
+    const scoreColor  = scoreDelta > 0 ? 'var(--green)' : scoreDelta < 0 ? 'var(--red)' : 'var(--t2)';
+    const scoreSign   = scoreDelta > 0 ? '+' : '';
+
+    // Section deltas — show every section in either audit
+    const beforeS = before.sections || {};
+    const afterS  = after.sections || {};
+    const allSections = Array.from(new Set([...Object.keys(beforeS), ...Object.keys(afterS)]));
+    const sectionRows = allSections.map(name => {
+      const b = beforeS[name];
+      const a = afterS[name];
+      const delta = (b != null && a != null) ? (a - b) : null;
+      const deltaCell = delta == null
+        ? '<span style="color:var(--t4);">—</span>'
+        : '<span style="color:' + (delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--t3)') + ';font-weight:700;">' + (delta > 0 ? '+' : '') + delta + '</span>';
+      const beforeCell = b == null ? '—' : b;
+      const afterCell  = a == null ? '—' : a;
+      return '<tr style="border-bottom:1px solid var(--b2);">'
+        + '<td style="padding:10px 14px;font-size:13px;color:var(--t1);">' + esc(name) + '</td>'
+        + '<td style="padding:10px 14px;font-size:14px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--t2);text-align:right;">' + beforeCell + '</td>'
+        + '<td style="padding:10px 14px;font-size:14px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--t1);text-align:right;">' + afterCell + '</td>'
+        + '<td style="padding:10px 14px;font-size:14px;font-family:\'Barlow Condensed\',sans-serif;text-align:right;">' + deltaCell + '</td>'
+        + '</tr>';
+    }).join('');
+
+    // Action item changes (by gap_id)
+    const beforeItems = before.action_items || [];
+    const afterItems  = after.action_items  || [];
+    const beforeIds = new Set(beforeItems.map(i => i.gap_id).filter(Boolean));
+    const afterIds  = new Set(afterItems.map(i => i.gap_id).filter(Boolean));
+    const resolved = beforeItems.filter(i => i.gap_id && !afterIds.has(i.gap_id));
+    const surfaced = afterItems.filter(i => i.gap_id && !beforeIds.has(i.gap_id));
+    const ongoing  = afterItems.filter(i => i.gap_id && beforeIds.has(i.gap_id));
+
+    const beforeMonthly = beforeItems.reduce((s,i) => s + (i.monthly_impact || 0), 0);
+    const afterMonthly  = afterItems.reduce((s,i) => s + (i.monthly_impact || 0), 0);
+    const monthlyDelta  = afterMonthly - beforeMonthly;
+
+    const itemList = (items, kind) => {
+      if (!items.length) return '<div style="font-size:12px;color:var(--t4);padding:8px 0;">None.</div>';
+      return '<div>' + items.map(i => {
+        const dollar = i.monthly_impact ? ' · ' + App.fmtCurrency(i.monthly_impact, 0) + '/mo' : '';
+        const fixBtn = (kind === 'ongoing' && i.gap_id)
+          ? '<button class="ad-fix-btn" data-gap="' + esc(i.gap_id) + '" style="margin-left:8px;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:3px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Fix This &#9656;</button>'
+          : '';
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.5;display:flex;align-items:flex-start;gap:6px;">'
+          + '<span style="display:inline-block;width:18px;color:' + (kind === 'resolved' ? 'var(--green)' : kind === 'surfaced' ? 'var(--red)' : 'var(--t4)') + ';font-weight:700;flex-shrink:0;">' + (kind === 'resolved' ? '✓' : kind === 'surfaced' ? '+' : '·') + '</span>'
+          + '<span style="flex:1;">' + esc(i.action || i.gap_id || 'Action') + dollar + '</span>'
+          + fixBtn
+          + '</div>';
+      }).join('') + '</div>';
+    };
+
+    const summary = '<div style="padding:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;border-bottom:1px solid var(--b2);">'
+      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Overall Score</div>'
+      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:var(--w);line-height:1;">' + beforeScore + ' → ' + afterScore + '</div>'
+      +     '<div style="font-size:13px;font-weight:700;color:' + scoreColor + ';margin-top:4px;">' + scoreSign + scoreDelta + ' pts</div>'
+      +   '</div>'
+      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Gaps Resolved</div>'
+      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:var(--green);line-height:1;">' + resolved.length + '</div>'
+      +   '</div>'
+      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">New Gaps Surfaced</div>'
+      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:var(--red);line-height:1;">' + surfaced.length + '</div>'
+      +   '</div>'
+      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Monthly Opportunity</div>'
+      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--w);line-height:1.2;">' + App.fmtCurrency(beforeMonthly, 0) + ' → ' + App.fmtCurrency(afterMonthly, 0) + '</div>'
+      +     '<div style="font-size:12px;font-weight:700;color:' + (monthlyDelta < 0 ? 'var(--green)' : monthlyDelta > 0 ? 'var(--red)' : 'var(--t3)') + ';margin-top:4px;">' + (monthlyDelta > 0 ? '+' : '') + App.fmtCurrency(monthlyDelta, 0) + '/mo</div>'
+      +   '</div>'
+      + '</div>';
+
+    const sectionsCard = '<div style="padding:24px;border-bottom:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;">Section Scores</div>'
+      + '<div style="border:1px solid var(--b2);border-radius:6px;overflow:hidden;background:var(--surface);">'
+      +   '<table style="width:100%;border-collapse:collapse;">'
+      +     '<thead><tr style="background:var(--input);">'
+      +       '<th style="padding:9px 14px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;">Section</th>'
+      +       '<th style="padding:9px 14px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:right;">Before</th>'
+      +       '<th style="padding:9px 14px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:right;">After</th>'
+      +       '<th style="padding:9px 14px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:right;">Change</th>'
+      +     '</tr></thead>'
+      +     '<tbody>' + sectionRows + '</tbody>'
+      +   '</table>'
+      + '</div></div>';
+
+    const actionsCard = '<div style="padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
+      + '<div>'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:10px;">Resolved (' + resolved.length + ')</div>'
+      +   itemList(resolved, 'resolved')
+      + '</div>'
+      + '<div>'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:10px;">New Gaps Surfaced (' + surfaced.length + ')</div>'
+      +   itemList(surfaced, 'surfaced')
+      + '</div>'
+      + '<div style="grid-column:1 / -1;">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Still Open (' + ongoing.length + ')</div>'
+      +   itemList(ongoing, 'ongoing')
+      + '</div>'
+      + '</div>';
+
+    return summary + sectionsCard + actionsCard;
   }
 };
