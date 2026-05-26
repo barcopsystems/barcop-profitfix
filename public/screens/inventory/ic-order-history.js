@@ -18,14 +18,80 @@ S.InventoryOrderHistory = {
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   statusBadge(s) {
-    return s === 'Received'
-      ? '<span class="badge badge-ok">Received</span>'
-      : '<span class="badge badge-dim">Open</span>';
+    if (s === 'Received')  return '<span class="badge badge-ok">Received</span>';
+    if (s === 'Submitted') return '<span class="badge badge-dim">Submitted</span>';
+    return '<span class="badge badge-warn">Open</span>';
+  },
+
+  // Find the vendor record matching this order's vendor name. Returns null
+  // if no match (operator never set up the vendor in Vendors).
+  vendorByName(name) {
+    if (!name) return null;
+    const vendors = (App.inventoryData && App.inventoryData.ic_vendors) || [];
+    return vendors.find(v => v.name === name) || null;
+  },
+
+  // Build the email body for a vendor order. Plain text, structured like a
+  // real operator's email to their distributor rep. Includes account number
+  // and payment terms when on file; falls back gracefully when missing.
+  buildEmailBody(order) {
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop User';
+    const v = this.vendorByName(order.vendor);
+    const lines = [];
+    lines.push('Hi' + (v?.rep ? ' ' + v.rep : '') + ',');
+    lines.push('');
+    lines.push('Please process the following order for ' + barName + '.');
+    lines.push('');
+    if (v?.account_number) lines.push('Account: ' + v.account_number);
+    if (v?.payment_terms)  lines.push('Terms: ' + v.payment_terms);
+    if (v?.account_number || v?.payment_terms) lines.push('');
+    lines.push('Order date: ' + (order.date || ''));
+    lines.push('');
+    lines.push('Items');
+    lines.push('-----');
+    (order.line_items || []).forEach(li => {
+      const qty  = li.qty || 0;
+      const unit = parseFloat(li.unit_cost || 0).toFixed(2);
+      const ext  = parseFloat(li.extended  || 0).toFixed(2);
+      lines.push('  ' + (li.name || '(unnamed)') + '  -  qty ' + qty + '  @  $' + unit + '  =  $' + ext);
+    });
+    lines.push('');
+    lines.push('Order total: $' + parseFloat(order.total || 0).toFixed(2));
+    lines.push('');
+    lines.push('Please confirm receipt and let me know your soonest delivery.');
+    lines.push('');
+    lines.push('Thanks,');
+    lines.push(barName);
+    return lines.join('\n');
+  },
+
+  buildMailto(order) {
+    const v = this.vendorByName(order.vendor);
+    const to = v?.email || '';
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop User';
+    const subj = 'Order from ' + barName + ' - ' + (order.date || '');
+    const body = this.buildEmailBody(order);
+    return 'mailto:' + encodeURIComponent(to)
+      + '?subject=' + encodeURIComponent(subj)
+      + '&body='    + encodeURIComponent(body);
+  },
+
+  async submitToVendor(id) {
+    const o = this.orders().find(x => x.id === id);
+    if (!o) return;
+    window.location.href = this.buildMailto(o);
+    // Mark Submitted right after opening the mailto. If the operator never
+    // hits Send in their email client they can toggle the status back via
+    // the Reopen / Mark Received buttons later.
+    o.status = 'Submitted';
+    o.submitted_at = new Date().toISOString();
+    await App.saveInventory();
+    this.renderDetail(id);
   },
 
   render(container, actions) {
@@ -54,7 +120,7 @@ S.InventoryOrderHistory = {
         + '</div>';
       const rows = orders.map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(o.date) + '</div></td>'
-        + '<td>' + esc(o.vendor || '—') + '</td>'
+        + '<td>' + esc(o.vendor || '-') + '</td>'
         + '<td>' + (o.item_count || (o.line_items ? o.line_items.length : 0)) + '</td>'
         + '<td class="val">' + App.fmtCurrency(o.total || 0) + '</td>'
         + '<td>' + this.statusBadge(o.status) + '</td>'
@@ -99,27 +165,48 @@ S.InventoryOrderHistory = {
       + '<td class="val">' + App.fmtCurrency(li.extended || 0) + '</td>'
       + '</tr>').join('');
 
-    const received = o.status === 'Received';
+    const received  = o.status === 'Received';
+    const submitted = o.status === 'Submitted';
+    const v = this.vendorByName(o.vendor);
+    const statusLabel = received ? 'Received' : submitted ? 'Submitted' : 'Open';
+
+    // Build the submit-to-vendor row. Shown when the order is not yet
+    // received. Notes when no email is on file so the operator knows the
+    // mailto will open without a recipient address.
+    const submitRow = !received
+      ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">'
+        + (v?.email
+            ? 'Sends to ' + esc(v.email) + ' from your default email client.'
+            : 'No email on file for ' + esc(o.vendor || 'this vendor') + '. The email will still open in your client so you can type the address. Add the vendor email under Vendors to skip this step next time.')
+        + (submitted && o.submitted_at
+            ? '  &middot;  Last submitted ' + this.fmtDate(o.submitted_at.slice(0, 10))
+            : '')
+        + '</div>'
+      : '';
+
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="oh-back">&#8592; Back to Order History</button></div>'
       + '<div class="card"><div class="card-title">Order &middot; ' + esc(o.vendor || 'Vendor') + ' &middot; ' + this.fmtDate(o.date) + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Vendor</div><div class="calc-val">' + esc(o.vendor || '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Vendor</div><div class="calc-val">' + esc(o.vendor || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val">' + (o.item_count || (o.line_items || []).length) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val">' + App.fmtCurrency(o.total || 0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val">' + (received ? 'Received' : 'Open') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val">' + statusLabel + '</div></div>'
       + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Qty</th><th>Unit Cost</th><th>Extended</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + submitRow
       + '<div class="card-actions">'
-      + '<button class="btn ' + (received ? 'btn-ghost' : 'btn-primary') + '" id="oh-status">'
+      + (received ? '' : '<button class="btn btn-primary" id="oh-submit">' + (submitted ? 'Resend to Vendor' : 'Email to Vendor') + '</button>')
+      + '<button class="btn ' + (received ? 'btn-ghost' : 'btn-ghost') + '" id="oh-status">'
       + (received ? 'Reopen Order' : 'Mark Received') + '</button>'
       + (received ? '' : '<button class="btn btn-ghost" id="oh-receive">Log the Delivery</button>')
       + '</div></div></div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#oh-back')) this.renderList();
+      else if (ev.target.closest('#oh-submit')) this.submitToVendor(id);
       else if (ev.target.closest('#oh-status')) this.toggleStatus(id);
       else if (ev.target.closest('#oh-receive')) App.navigate('ic-receive-delivery');
     };
