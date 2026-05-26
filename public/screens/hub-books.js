@@ -992,8 +992,8 @@ S.HubBooks = {
       const endQty   = parseFloat(eMap[pid].total) || 0;
       const purchQty = purch[pid] || 0;
       const usedQty  = startQty + purchQty - endQty;
-      const unitCost = parseFloat(p.unit_cost) || parseFloat(eMap[pid].unit_cost) || 0;
-      const usedValue = usedQty * unitCost;
+      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
+      const usedValue = bottleCost != null ? usedQty * bottleCost : 0;
       detail.push({
         name: eMap[pid].name || p.name || '(unnamed)',
         category: eMap[pid].category || p.category || '',
