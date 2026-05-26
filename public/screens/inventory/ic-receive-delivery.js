@@ -212,13 +212,24 @@ S.InventoryReceiveDelivery = {
   // invoice formats vary too much for a single parser to nail every one;
   // this is a workable starting point that can be tuned with per-vendor
   // template overrides later if any specific format proves popular.
-  setPdfStatus(text, color) {
+  setPdfStatus(text, color, opts) {
     const el = document.getElementById('rd-pdf-status');
     if (!el) return;
-    if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
+    if (!text) { el.style.display = 'none'; el.innerHTML = ''; return; }
     el.style.display = '';
     el.style.color = color || 'var(--t3)';
-    el.textContent = text;
+    el.style.lineHeight = '1.6';
+    el.style.maxWidth = '640px';
+    let html = esc(text);
+    if (opts && opts.contactButton) {
+      html += ' <button class="btn btn-ghost btn-sm" id="rd-pdf-contact" style="margin-left:6px;">Send to Bar Cop</button>';
+    }
+    el.innerHTML = html;
+    if (opts && opts.contactButton) {
+      document.getElementById('rd-pdf-contact')?.addEventListener('click', () => {
+        if (window.S && S.HubSupport && S.HubSupport.open) S.HubSupport.open();
+      });
+    }
   },
 
   async handlePdfUpload(ev) {
@@ -261,13 +272,17 @@ S.InventoryReceiveDelivery = {
       }
 
       if (allLines.length === 0) {
-        this.setPdfStatus('No text found in this PDF. It may be a scan/image PDF rather than a text PDF. Type the items manually.', 'var(--red)');
+        this.setPdfStatus('This looks like a scanned image PDF, not a text PDF. Bar Cop can only read text-based PDFs (the kind a vendor emails out of their billing system). Type the items manually below.', 'var(--red)');
         return;
       }
 
       const detected = this.parseInvoiceLines(allLines);
       if (detected.length === 0) {
-        this.setPdfStatus('Bar Cop could not detect any line items in this PDF format. Type them manually below, or try a different vendor PDF.', 'var(--red)');
+        this.setPdfStatus(
+          'Bar Cop could not detect line items in this vendor\'s PDF format. Type the items manually below. If you want this vendor supported, send the PDF to Bar Cop and we will add the format.',
+          'var(--red)',
+          { contactButton: true }
+        );
         return;
       }
 
@@ -276,9 +291,17 @@ S.InventoryReceiveDelivery = {
 
       const matchCount = matched.filter(m => m.product).length;
       const skipCount  = matched.length - matchCount;
+      if (matchCount === 0) {
+        this.setPdfStatus(
+          'Bar Cop detected ' + matched.length + ' line' + (matched.length === 1 ? '' : 's') + ' in the PDF but none matched a product in your master list. Type the items manually below, or send the PDF to Bar Cop so we can improve the matching for this vendor.',
+          'var(--red)',
+          { contactButton: true }
+        );
+        return;
+      }
       let msg = matchCount + ' item' + (matchCount === 1 ? '' : 's') + ' added.';
       if (skipCount > 0) {
-        msg += ' ' + skipCount + ' detected line' + (skipCount === 1 ? '' : 's') + ' could not be matched to a product in your master list and were skipped.';
+        msg += ' ' + skipCount + ' detected line' + (skipCount === 1 ? '' : 's') + ' could not be matched to a product in your master list and were skipped. Add them manually below if needed.';
       }
       msg += ' Review every line before saving.';
       this.setPdfStatus(msg, 'var(--gold)');
