@@ -71,13 +71,11 @@ S.VendorDiscrepancy = {
       + '<button class="btn btn-primary" id="vd-file">File Discrepancy</button>'
       + '</div>';
 
-    const summary = '<div class="card" style="position:relative;margin-bottom:18px;padding-right:220px;">'
+    const summary = '<div class="calc" style="position:relative;margin-bottom:18px;padding-right:220px;">'
+      + '<div class="calc-item"><div class="calc-label">Open Discrepancies</div><div class="calc-val ' + (open.length ? 'warn' : 'good') + '">' + open.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Open Overcharge</div><div class="calc-val ' + (openTotal > 0 ? 'warn' : '') + '">' + App.fmtCurrency(openTotal) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Recovered</div><div class="calc-val good">' + App.fmtCurrency(recovered) + '</div></div>'
       + '<button class="btn btn-ghost btn-sm" id="vd-show-form" style="position:absolute;top:50%;right:20px;transform:translateY(-50%);">+ File Manual Discrepancy</button>'
-      + '<div class="calc" style="margin:0;">'
-        + '<div class="calc-item"><div class="calc-label">Open Discrepancies</div><div class="calc-val ' + (open.length ? 'warn' : 'good') + '">' + open.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Open Overcharge</div><div class="calc-val ' + (openTotal > 0 ? 'warn' : '') + '">' + App.fmtCurrency(openTotal) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Recovered</div><div class="calc-val good">' + App.fmtCurrency(recovered) + '</div></div>'
-      + '</div>'
     + '</div>';
 
     let body;
