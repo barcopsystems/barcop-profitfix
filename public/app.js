@@ -409,7 +409,6 @@ const App = {
       this._promptSync();
     }
     this._renderViewerBanner();
-    this.renderAccountSwitcher();
   },
 
   // Persistent banner shown to viewer role so they know writes are blocked.
@@ -555,7 +554,6 @@ const App = {
     hubWrap.style.filter = '';
     hubWrap.style.pointerEvents = '';
     S.Hub.render(hubWrap);
-    this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
   },
 
@@ -616,41 +614,6 @@ const App = {
       wrap.style.filter = '';
       wrap.style.pointerEvents = '';
     }
-  },
-
-  // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
-  // Renders a dropdown in the topbar showing all bars the user belongs to.
-  // Hidden when the user has only one account. Switching reloads the page so
-  // every cached data structure starts fresh under the new account context.
-  // Called from boot(), showApp(), and the Hub render.
-  async renderAccountSwitcher() {
-    if (!window.DB || !DB.listMyAccounts) return;
-    const accounts = await DB.listMyAccounts();
-    const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
-    // Both topbars (module + hub) have their own switcher slot — populate both
-    ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
-      const slot = document.getElementById(slotId);
-      if (!slot) return;
-      if (!accounts || accounts.length <= 1) {
-        slot.style.display = 'none';
-        slot.innerHTML = '';
-        return;
-      }
-      const active = accounts.find(a => a.id === activeId) || accounts[0];
-      const options = accounts.map(a => {
-        const sel = a.id === active.id ? ' selected' : '';
-        return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
-      }).join('');
-      slot.style.display = 'flex';
-      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:14px;';
-      slot.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Viewing</span>'
-        + '<select class="acct-switcher" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--w);font-family:inherit;font-size:12px;font-weight:600;padding:6px 10px;cursor:pointer;outline:none;">' + options + '</select>';
-      const sel = slot.querySelector('.acct-switcher');
-      sel.addEventListener('change', (ev) => {
-        const newId = ev.target.value;
-        if (newId && newId !== active.id) DB.setActiveAccount(newId);
-      });
-    });
   },
 
   // ── Role-based access (Phase 2 Items 25 + 25b) ─────────────────────────────
@@ -818,7 +781,6 @@ const App = {
     // Swap sidebar nav based on module
     this._activeModule = module || this._activeModule || 'profit';
     this._renderNav(this._activeModule);
-    this.renderAccountSwitcher();
     if (this._pendingStaffRedirect) {
       const target = this._pendingStaffRedirect;
       this._pendingStaffRedirect = null;
