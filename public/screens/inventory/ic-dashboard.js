@@ -12,9 +12,9 @@ S.InventoryDashboard = {
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   daysSince(str) {
     if (!str) return null;
@@ -46,12 +46,24 @@ S.InventoryDashboard = {
     const latest = asc.length ? asc[asc.length - 1] : null;
     const items = latest ? (latest.items || []) : [];
 
-    // Below par — products in the latest count under their par level
+    // Below par — products in the latest count under their par level.
+    // For bottle beer with case_size, par_level is in cases. Convert the
+    // total bottles in the count to cases before comparing so the
+    // below-par check uses the same unit on both sides.
     const belowPar = items.map(it => {
       const p = this.productById(it.product_id);
       if (!p || p.par_level == null || p.par_level === '') return null;
-      if ((it.total || 0) >= p.par_level) return null;
-      return { name: it.name, onHand: it.total || 0, par: p.par_level };
+      const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
+      const onHand = isCaseBeer ? ((it.total || 0) / p.case_size) : (it.total || 0);
+      if (onHand >= p.par_level) return null;
+      return {
+        name: it.name,
+        onHand,
+        par: p.par_level,
+        isCaseBeer,
+        rawBottles: it.total || 0,
+        caseSize: isCaseBeer ? p.case_size : null
+      };
     }).filter(Boolean);
 
     // Deliveries since the last count
@@ -87,12 +99,16 @@ S.InventoryDashboard = {
     // ── Alert strip — below par ──
     let alertCard = '';
     if (belowPar.length) {
-      alertCard = '<div class="card"><div class="card-title">Below Par — Reorder Soon</div>'
+      alertCard = '<div class="card"><div class="card-title">Below Par: Reorder Soon</div>'
         + belowPar.map((b, i) => '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
             + (i < belowPar.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
             + '<span style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>'
             + '<div style="flex:1;font-size:13px;color:var(--t1);">' + esc(b.name)
-            + ' <span style="color:var(--t3);font-size:11px;">on hand ' + b.onHand.toFixed(1) + ' / par ' + b.par + '</span></div>'
+            + ' <span style="color:var(--t3);font-size:11px;">on hand '
+            + (b.isCaseBeer
+                ? (b.onHand.toFixed(1) + ' cases / par ' + b.par + ' cases')
+                : (b.onHand.toFixed(1) + ' / par ' + b.par))
+            + '</span></div>'
             + '<button class="btn btn-ghost btn-sm ic-d-order" style="margin:0;">Add to Order</button></div>').join('')
         + '</div>';
     }
@@ -101,7 +117,7 @@ S.InventoryDashboard = {
     let repeat86Card = '';
     const reps = this.repeat86();
     if (reps.length) {
-      repeat86Card = '<div class="card"><div class="card-title">Repeat 86s — Review Par Levels</div>'
+      repeat86Card = '<div class="card"><div class="card-title">Repeat 86s: Review Par Levels</div>'
         + reps.map((r, i) => '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
             + (i < reps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
             + '<span style="width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;"></span>'
