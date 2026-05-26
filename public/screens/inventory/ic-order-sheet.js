@@ -20,7 +20,7 @@ S.InventoryOrderSheet = {
     return App.inventoryData.ic_orders;
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -59,6 +59,20 @@ S.InventoryOrderSheet = {
     return { latest, groups };
   },
 
+  // Returns the most recent order for a vendor that is still in flight
+  // (status is anything other than Received). Null if no open order exists.
+  // Used to suppress the vendor's card on the Order Sheet so the operator
+  // cannot accidentally place a duplicate order.
+  openOrderForVendor(vendorName) {
+    if (!vendorName) return null;
+    const orders = this.orders();
+    const open = orders.filter(o => o && o.vendor === vendorName && o.status !== 'Received');
+    if (open.length === 0) return null;
+    return open.slice().sort((a, b) =>
+      new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime()
+    )[0];
+  },
+
   renderMain() {
     this.actions.innerHTML = '';
     const data = this.belowParByVendor();
@@ -73,20 +87,49 @@ S.InventoryOrderSheet = {
       return;
     }
 
-    const vendors = Object.keys(data.groups).sort();
+    const allVendors = Object.keys(data.groups).sort();
+    // Split vendors into "needs ordering" vs "already has an open order"
+    // so we never render a Create Order button next to a vendor the operator
+    // already placed an order for. The hidden vendors get summarized in a
+    // compact notice that links to Order History.
+    const visibleVendors = [];
+    const hiddenVendors  = [];
+    allVendors.forEach(v => {
+      if (this.openOrderForVendor(v)) hiddenVendors.push(v);
+      else visibleVendors.push(v);
+    });
+
+    const hiddenNotice = hiddenVendors.length === 0 ? '' :
+      '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Already Ordered</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
+      +   hiddenVendors.map(v => esc(v)).join(', ')
+      +   ' ' + (hiddenVendors.length === 1 ? 'has an open order.' : 'have open orders.')
+      +   ' <button class="btn btn-ghost btn-sm" id="os-go-history" style="margin-left:8px;">View in Order History</button>'
+      + '</div></div>';
+
     let body;
-    if (vendors.length === 0) {
+    if (visibleVendors.length === 0 && hiddenVendors.length === 0) {
       body = '<div class="empty"><div class="empty-title">Everything is at par</div>'
         + '<div class="empty-sub">No products in the ' + this.fmtDate(data.latest.date)
         + ' count are below their par level. Nothing to order.</div></div>';
+    } else if (visibleVendors.length === 0) {
+      body = hiddenNotice
+        + '<div class="empty"><div class="empty-title">Everything below par is already on order</div>'
+        + '<div class="empty-sub">Every vendor with products below par from the '
+        + esc(this.fmtDate(data.latest.date))
+        + ' count has an open order in flight. Mark those received in Order History as deliveries arrive.</div></div>';
     } else {
-      body = '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">'
+      body = hiddenNotice
+        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">'
         + 'Suggested from the ' + esc(this.fmtDate(data.latest.date)) + ' count. '
         + 'Adjust quantities, then create an order per vendor.</div>'
-        + vendors.map(v => this.vendorCard(v, data.groups[v])).join('');
+        + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
     }
 
     this.container.innerHTML = '<div class="screen">' + body + '</div>';
+
+    document.getElementById('os-go-history')?.addEventListener('click', () => App.navigate('ic-order-history'));
 
     this.container.querySelectorAll('.os-vcard').forEach(card => {
       card.addEventListener('input', ev => {
@@ -140,7 +183,7 @@ S.InventoryOrderSheet = {
       + '<div class="card-actions">'
       + '<button class="btn btn-primary os-create" data-vendor="' + this.cssEsc(vendor) + '">Create Order</button>'
       + (created
-          ? '<span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:8px;">Order created — see Order History</span>'
+          ? '<span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:8px;">Order created. See Order History</span>'
           : '')
       + '<span class="os-verr" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
