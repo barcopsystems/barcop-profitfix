@@ -102,43 +102,61 @@ S.Reports={
   // with QuickBooks, Xero, or any spreadsheet.
   // ─────────────────────────────────────────────────────────────────────
 
+  // Header pattern shared with every other Hub overlay screen (Books,
+  // User Accounts, App Settings, Help, etc.) so the operator sees the
+  // same container shape no matter which sidebar item they tapped.
+  _qboHeader(){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Weekly P&amp;L Export</div>'
+      +   '<button id="qbo-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>';
+  },
+
   _openQboModal(){
     const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
-    if(weeks.length===0){
-      this._qboMessageModal('No weeks saved yet. Save at least one week from Profit > This Week before exporting.');
-      return;
-    }
-    const m=document.createElement('div');
-    m.id='qbo-export-modal';
-    m.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.65);';
-    m.innerHTML='<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:540px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
-        +'<div style="font-size:13px;font-weight:600;color:var(--t1);letter-spacing:0.6px;text-transform:uppercase;">Quick P&amp;L Export</div>'
-        +'<button id="qbo-close" class="btn btn-ghost btn-sm" style="margin:-4px -4px 0 0;">Close</button>'
-      +'</div>'
-      +'<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:18px;">Weekly revenue, COGS, and labor as a CSV. Hand it to your bookkeeper or import into QuickBooks, Xero, or any spreadsheet.</div>'
-      +'<div class="f" style="margin-bottom:14px;"><label>Range</label>'
-        +'<select id="qbo-range">'
-          +'<option value="last1">Last completed week</option>'
-          +'<option value="last4">Last 4 weeks</option>'
-          +'<option value="last13" selected>Last 13 weeks (quarter)</option>'
-          +'<option value="ytd">Year to date</option>'
-          +'<option value="all">All saved weeks</option>'
-          +'<option value="custom">Custom range</option>'
-        +'</select>'
-      +'</div>'
-      +'<div id="qbo-custom" style="display:none;gap:12px;margin-bottom:14px;">'
-        +'<div class="f" style="flex:1;"><label>From</label><input type="date" id="qbo-from"/></div>'
-        +'<div class="f" style="flex:1;"><label>To</label><input type="date" id="qbo-to"/></div>'
-      +'</div>'
-      +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-bottom:18px;padding:10px 12px;background:var(--surface);border-radius:4px;line-height:1.5;"></div>'
-      +'<div style="display:flex;justify-content:flex-end;gap:10px;">'
-        +'<button id="qbo-download" class="btn">Download CSV</button>'
+    App.openHubOverlay((panel) => {
+      if(weeks.length===0){
+        panel.innerHTML='<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+          + this._qboHeader()
+          + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks saved yet. Save at least one week from Profit > This Week before exporting.</div>'
+          + '</div>'
+        + '</div>';
+        document.getElementById('qbo-close')?.addEventListener('click',()=>App.closeHubOverlay());
+        return;
+      }
+      this._renderQboPicker(panel, weeks);
+    });
+  },
+
+  _renderQboPicker(panel, weeks){
+    panel.innerHTML='<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+      + this._qboHeader()
+      + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
+        +'<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Weekly P&amp;L Range</div>'
+        +'<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Weekly revenue, COGS, and labor as a CSV. Hand it to your bookkeeper or import into QuickBooks, Xero, or any spreadsheet software.</div>'
+        +'<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
+          +'<div class="f" style="width:240px;"><label>Range</label>'
+            +'<select id="qbo-range">'
+              +'<option value="last1">Last completed week</option>'
+              +'<option value="last4">Last 4 weeks</option>'
+              +'<option value="last13" selected>Last 13 weeks (quarter)</option>'
+              +'<option value="ytd">Year to date</option>'
+              +'<option value="all">All saved weeks</option>'
+              +'<option value="custom">Custom range</option>'
+            +'</select>'
+          +'</div>'
+          +'<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" id="qbo-download">Download CSV</button></div>'
+        +'</div>'
+        +'<div id="qbo-custom" style="display:none;gap:12px;margin-top:14px;">'
+          +'<div class="f" style="flex:1;max-width:200px;"><label>From</label><input type="date" id="qbo-from"/></div>'
+          +'<div class="f" style="flex:1;max-width:200px;"><label>To</label><input type="date" id="qbo-to"/></div>'
+        +'</div>'
+        +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;line-height:1.5;"></div>'
       +'</div>'
     +'</div>';
-    document.body.appendChild(m);
-    m.addEventListener('click',ev=>{if(ev.target===m)this._closeQboModal();});
-    document.getElementById('qbo-close').addEventListener('click',()=>this._closeQboModal());
+
+    document.getElementById('qbo-close')?.addEventListener('click',()=>App.closeHubOverlay());
 
     const rangeSel=document.getElementById('qbo-range');
     const customRow=document.getElementById('qbo-custom');
@@ -182,26 +200,8 @@ S.Reports={
       const csv=this._buildQboCsv(filtered);
       const today=new Date().toISOString().slice(0,10);
       this._downloadCsv(csv,'barcop-weekly-pnl-'+today+'.csv');
-      this._closeQboModal();
+      App.closeHubOverlay();
     });
-  },
-
-  _closeQboModal(){
-    const m=document.getElementById('qbo-export-modal');
-    if(m) m.remove();
-  },
-
-  _qboMessageModal(msg){
-    const m=document.createElement('div');
-    m.id='qbo-export-modal';
-    m.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
-    m.innerHTML='<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;max-width:440px;width:100%;">'
-      +'<div style="font-size:13px;color:var(--t1);line-height:1.6;margin-bottom:18px;">'+esc(msg)+'</div>'
-      +'<div style="display:flex;justify-content:flex-end;"><button id="qbo-msg-ok" class="btn btn-ghost">OK</button></div>'
-    +'</div>';
-    document.body.appendChild(m);
-    m.addEventListener('click',ev=>{if(ev.target===m)this._closeQboModal();});
-    document.getElementById('qbo-msg-ok').addEventListener('click',()=>this._closeQboModal());
   },
 
   _filterWeeksByRange(weeks,range,customFrom,customTo){
