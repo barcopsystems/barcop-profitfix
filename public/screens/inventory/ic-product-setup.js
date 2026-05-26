@@ -240,20 +240,21 @@ S.InventoryProducts = {
       const n = all.filter(p => (p.category || '') === c).length;
       const incomplete = all.filter(p => (p.category || '') === c && !this.isComplete(p)).length;
       const badge = incomplete > 0
-        ? '<span style="display:inline-block;margin-left:8px;font-size:9px;font-weight:700;letter-spacing:1px;color:var(--red);">' + incomplete + ' INCOMPLETE</span>'
+        ? '<div style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--red);margin-top:6px;">' + incomplete + ' INCOMPLETE</div>'
         : '';
       return '<div class="ip-card" data-cat="' + esc(c) + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:20px 22px;cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:border-color 0.15s, transform 0.05s;">'
-        + '<div style="font-size:16px;font-weight:800;color:var(--gold);letter-spacing:0.5px;">' + esc(c) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + badge + '</div>'
-        + '<div style="display:flex;gap:14px;margin-top:10px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">'
-          + '<span class="ip-card-add" data-cat="' + esc(c) + '" style="color:var(--gold);">+ Add</span>'
-          + '<span class="ip-card-imp" data-cat="' + esc(c) + '" style="color:var(--t2);">Import CSV</span>'
+        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:32px 22px 24px;cursor:pointer;text-align:center;transition:border-color 0.15s;">'
+        + '<div style="font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:8px;">' + esc(c) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + '</div>'
+        + badge
+        + '<div style="display:flex;gap:14px;margin-top:22px;justify-content:center;align-items:center;">'
+          + '<span class="ip-card-add" data-cat="' + esc(c) + '" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add</span>'
+          + '<button type="button" class="ip-card-imp" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 14px;cursor:pointer;">Import CSV</button>'
         + '</div>'
         + '</div>';
     }).join('');
 
-    const cardsBlock = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:22px;">'
+    const cardsBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">'
       + cards + '</div>';
 
     // Existing-products table, filtered by activeCat. Tabs flip the filter.
@@ -413,119 +414,146 @@ S.InventoryProducts = {
     const spec = this.FORM_SPEC[cat] || this.FORM_SPEC['Misc'];
     const p = this.editId ? this.products().find(x => x.id === this.editId) : null;
     const v = (val) => val != null && val !== '' ? val : '';
-    const headerLabel = (this.editId ? 'Edit ' : 'New ') + spec.title;
+    const isActive = p ? p.active !== false : true;
 
-    let middle = '';
+    // ── Header: back + title (or category dropdown on edit) + status ───────
+    let titleHTML;
+    if (this.editId) {
+      const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (c === cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+      titleHTML = '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span style="font-size:13px;font-weight:700;color:var(--t1);letter-spacing:0.5px;text-transform:uppercase;">Editing</span>'
+        + '<select id="ip-edit-cat" style="min-width:160px;">' + catOpts + '</select>'
+        + '<span style="font-size:13px;font-weight:700;color:var(--t1);letter-spacing:0.5px;text-transform:uppercase;">Product</span>'
+        + '</div>';
+    } else {
+      titleHTML = '<div style="font-size:14px;font-weight:800;color:var(--t1);letter-spacing:0.5px;text-transform:uppercase;">New ' + esc(spec.title) + ' Product</div>';
+    }
 
-    // ── Bar categories (Liquor / Wine / Draft Beer): size + pour + cost ────
+    const statusHTML = this.editId
+      ? '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span class="ip-active-state" data-active="' + (isActive ? 'true' : 'false') + '" style="'
+          + 'display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px;'
+          + 'background:' + (isActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)') + ';'
+          + 'color:' + (isActive ? '#7dc77d' : '#c77d7d') + ';">'
+          + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>'
+          + (isActive ? 'ACTIVE' : 'HIDDEN')
+        + '</span>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-toggle-active">'
+          + (isActive ? 'Hide from operations' : 'Make active')
+        + '</button>'
+      + '</div>'
+      : '';
+
+    const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:14px;">'
+      + '<div style="display:flex;align-items:center;gap:16px;">'
+        + '<button class="btn btn-ghost btn-sm" id="ip-back">&#8592; Back to Products</button>'
+        + titleHTML
+      + '</div>'
+      + statusHTML
+    + '</div>';
+
+    // ── Row 1: identity fields (Name, Brand, Sub-Cat, Vendor, Location) ────
+    const row1 = '<div class="form-row" style="gap:14px;">'
+      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Product Name</label>'
+      + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Brand</label>'
+      + '<input type="text" id="ip-brand" value="' + esc(p?.brand || '') + '" placeholder="' + esc(this._brandPlaceholder(cat)) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Sub-Category</label>'
+      + '<input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Primary Vendor</label>'
+      + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Primary Location</label>'
+      + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
+    + '</div>';
+
+    // ── Row 2: category-specific size/cost/par fields ─────────────────────
+    let row2 = '';
     if (spec.sizeGroup && spec.showPour) {
+      // Liquor / Wine / Draft Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
-      middle += '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
-        + '<select id="ip-size">' + this.sizeOpts(isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize), spec.sizeGroup) + '</select></div>'
-        + '<div class="f" id="ip-cw" style="width:120px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
+      const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
+      row2 = '<div class="form-row" style="gap:14px;margin-top:14px;">'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
+        + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
+        + '<div class="f" id="ip-cw" style="width:100px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Pour Size</label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz != null ? p.pour_size_oz : spec.defaultPour) + '" step="0.25" placeholder="' + spec.defaultPour + '"/><span class="suf">oz</span></div></div>'
+        + '<div class="f" style="width:100px;flex-shrink:0;"><label>Pour Size</label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz != null ? p.pour_size_oz : spec.defaultPour) + '" step="0.25"/><span class="suf">oz</span></div></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Menu Price</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Menu Price</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
-        + '</div>';
-    }
-
-    // ── Bottle Beer: bottle size + case size + cost per case ───────────────
-    if (spec.showCaseSize) {
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
+        + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
+        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
+      + '</div>';
+    } else if (spec.showCaseSize) {
+      // Bottle Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
-      middle += '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
-        + '<select id="ip-size">' + this.sizeOpts(isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize), spec.sizeGroup) + '</select></div>'
-        + '<div class="f" id="ip-cw" style="width:120px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
+      const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
+      row2 = '<div class="form-row" style="gap:14px;margin-top:14px;">'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
+        + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
+        + '<div class="f" id="ip-cw" style="width:100px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Case Size</label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1" placeholder="' + spec.defaultCaseSize + '"/><span class="suf">btl/case</span></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Case Size</label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Menu Price <span style="color:var(--t4);font-weight:400;">(per bottle)</span></label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Menu Price <span style="color:var(--t4);font-weight:400;">(per bottle)</span></label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
-        + '</div>';
-    }
-
-    // ── Food / Misc: unit type + cost per unit (no menu price, no pour) ────
-    if (spec.showUnitType) {
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
+        + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
+        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
+      + '</div>';
+    } else if (spec.showUnitType) {
+      // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
-      middle += '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Unit Type</label>'
+      row2 = '<div class="form-row" style="gap:14px;margin-top:14px;">'
+        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
         + '<div class="f" id="ip-uw" style="width:160px;flex-shrink:0;' + (isCustomUnit ? '' : 'display:none;') + '"><label>Custom Unit</label>'
         + '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '</div>';
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
+        + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
+        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
+      + '</div>';
     }
 
-    // ── Par / Reorder row ──────────────────────────────────────────────────
-    const parLabel     = 'Par Level <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span>';
-    const reorderLabel = 'Reorder Point <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span>';
-    middle += '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>' + parLabel + '</label>'
-      + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>' + reorderLabel + '</label>'
-      + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
-      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Primary Location</label>'
-      + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
-      + '</div>';
-
-    // ── Calc strip (pourable categories and bottle beer only) ──────────────
+    // ── Calc strip (pourable + bottle beer) ───────────────────────────────
     let calcStrip = '';
     if (spec.showCalcStrip) {
-      calcStrip = '<div class="calc" style="margin-bottom:0;">'
+      calcStrip = '<div class="calc" style="margin-top:18px;">'
         + '<div class="calc-item"><div class="calc-label">' + (spec.showCaseSize ? 'Cost / Bottle' : 'Pours / Container') + '</div><div class="calc-val" id="ip-pours">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">' + (spec.showCaseSize ? 'Cost / Pour' : 'Cost / Pour') + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Cost / Pour</div><div class="calc-val" id="ip-cpp">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pour Cost %</div><div class="calc-val" id="ip-pct">-</div></div>'
-        + '</div>';
+      + '</div>';
     }
 
-    const changeCatLink = this.editId
-      ? '<span style="font-size:11px;color:var(--t3);margin-left:14px;">Wrong category? <a href="#" id="ip-change-cat" style="color:var(--gold);">Change category</a></span>'
-      : '';
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="ip-back">&#8592; Back to Products</button></div>'
-      + '<div class="card-title">' + esc(headerLabel) + changeCatLink + '</div>'
-
-      // Common header row: name, brand, sub-category
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-lg"><label>Product Name</label><input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
-      + '<div class="f w-md"><label>Brand</label><input type="text" id="ip-brand" value="' + esc(p?.brand || '') + '" placeholder="' + esc(this._brandPlaceholder(cat)) + '"/></div>'
-      + '<div class="f w-md"><label>Sub-Category</label><input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>'
-      + '</div>'
-
-      // Vendor + Status row
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-lg"><label>Primary Vendor</label>'
-      + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Status <span style="color:var(--t4);font-weight:400;">(hides from operations)</span></label>'
-      + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;height:36px;">'
-      + '<input type="checkbox" id="ip-active"' + (p ? (p.active === false ? '' : ' checked') : ' checked') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>Active</label></div>'
-      + '</div>'
-
-      + middle
-
-      // Notes
-      + '<div class="form-row" style="gap:16px;">'
+    // ── Notes ─────────────────────────────────────────────────────────────
+    const notes = '<div class="form-row" style="gap:14px;margin-top:14px;">'
       + '<div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="ip-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div>'
-      + '</div>'
+    + '</div>';
 
+    this.container.innerHTML = '<div class="screen"><div class="card">'
+      + header
+      + row1
+      + row2
       + calcStrip
-
+      + notes
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="ip-save">' + (this.editId ? 'Update' : 'Save') + '</button>'
-      + '<button class="btn btn-ghost" id="ip-cancel">Cancel</button>'
-      + '<span id="ip-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+        + '<button class="btn btn-primary" id="ip-save">' + (this.editId ? 'Update' : 'Save') + '</button>'
+        + '<button class="btn btn-ghost" id="ip-cancel">Cancel</button>'
+        + '<span id="ip-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>'
+    + '</div></div>';
 
     this._wireForm();
   },
@@ -561,38 +589,31 @@ S.InventoryProducts = {
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this.calcProduct())
     );
-    document.getElementById('ip-change-cat')?.addEventListener('click', ev => {
-      ev.preventDefault();
-      this._changeCategoryPrompt();
-    });
-    if (this.editId) this.calcProduct();
-  },
 
-  // Change category on an existing product. Pops a small chooser, then
-  // re-renders the form for the chosen category. Field values that map
-  // directly (name, brand, vendor, location, par, etc.) carry over. Fields
-  // that don't apply to the new category drop on save.
-  _changeCategoryPrompt() {
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
-    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:420px;width:100%;padding:24px;">'
-      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;">Change Category</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">Pick a new category. Fields that do not apply to the new category will reset on save.</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:18px;">'
-      + this.CATEGORIES.map(c => '<button class="btn btn-ghost cc-pick" data-cat="' + esc(c) + '"' + (c === this._formCategory ? ' disabled style="opacity:0.4;"' : '') + '>' + esc(c) + '</button>').join('')
-      + '</div>'
-      + '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-ghost" id="cc-cancel">Cancel</button></div>'
-      + '</div>';
-    document.body.appendChild(m);
-    const close = () => m.remove();
-    m.querySelector('#cc-cancel').addEventListener('click', close);
-    m.addEventListener('click', ev => { if (ev.target === m) close(); });
-    m.querySelectorAll('.cc-pick').forEach(btn => btn.addEventListener('click', () => {
-      const newCat = btn.dataset.cat;
-      close();
-      this._formCategory = newCat;
+    // Edit mode: changing the category dropdown re-renders the form for the
+    // new category. Field values that map directly persist via the existing
+    // product record. Operator should verify cost/size fields after a change
+    // since their unit interpretation can shift (per-case vs per-bottle).
+    document.getElementById('ip-edit-cat')?.addEventListener('change', ev => {
+      this._formCategory = ev.target.value;
       this.renderForm();
-    }));
+    });
+
+    // Edit mode: status toggle. Flips the visual state and updates the
+    // button label. Save reads the toggled state via the badge's data-active
+    // attribute, so the operator commits the change by clicking Update.
+    document.getElementById('ip-toggle-active')?.addEventListener('click', () => {
+      const el = document.querySelector('.ip-active-state');
+      if (!el) return;
+      const nowActive = !(el.dataset.active === 'true');
+      el.dataset.active = nowActive ? 'true' : 'false';
+      el.style.background = nowActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)';
+      el.style.color = nowActive ? '#7dc77d' : '#c77d7d';
+      el.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>' + (nowActive ? 'ACTIVE' : 'HIDDEN');
+      document.getElementById('ip-toggle-active').textContent = nowActive ? 'Hide from operations' : 'Make active';
+    });
+
+    if (this.editId) this.calcProduct();
   },
 
   getOz() {
@@ -673,6 +694,9 @@ S.InventoryProducts = {
       ? (parseInt(document.getElementById('ip-case-size')?.value) || null)
       : null;
     const unitType = spec.showUnitType ? this.getUnitType() : null;
+    // Status: edit mode reads the badge state, new mode defaults to active.
+    const stateEl = document.querySelector('.ip-active-state');
+    const active = stateEl ? stateEl.dataset.active === 'true' : true;
 
     const prod = {
       id:                  this.editId || App.uid(),
@@ -690,7 +714,7 @@ S.InventoryProducts = {
       par_level:           num('ip-par'),
       reorder_point:       num('ip-reorder'),
       primary_location:    document.getElementById('ip-loc1')?.value.trim() || '',
-      active:              !!document.getElementById('ip-active')?.checked,
+      active,
       notes:               document.getElementById('ip-notes')?.value.trim() || '',
       pours_per_container: pours,
       cost_per_pour:       cpp,
