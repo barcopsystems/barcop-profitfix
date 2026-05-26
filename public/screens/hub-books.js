@@ -41,14 +41,14 @@ S.HubBooks = {
       '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
       + this._header()
       + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Monthly Close Package</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Hand this to your accountant or bookkeeper each month. The workbook has every number they need to close your books — income statement, inventory valuation, cash reconciliation, void and comp log, tip allocation worksheet for IRS Form 8027, shrinkage report, and labor cost analysis. Built from what you have already logged in Bar Cop.</div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Month-End Books</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a month. Bar Cop pulls every number together into one file your accountant or bookkeeper can work from. Income statement, inventory value, cash variance, voids and comps, tip allocation worksheet for IRS Form 8027, shrinkage, and labor cost. All built from what you log in Bar Cop. Nothing to re-enter.</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
           + '<div class="f" style="width:240px;"><label>Close Month</label><select id="hb-month">' + monthOpts + '</select></div>'
-          + '<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" id="hb-generate">Generate Package</button></div>'
+          + '<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" id="hb-generate">Generate File</button></div>'
         + '</div>'
         + '<div id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
-        + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">Generated from the data you have logged in Bar Cop. Bar Cop is a software tool, not a tax preparer, accountant, or CPA. Your accountant should review and verify before filing any tax form or closing your books.</div>'
+        + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before filing anything or closing the books.</div>'
       + '</div>'
       + this._whatsInsideCard()
       + '</div>';
@@ -67,20 +67,20 @@ S.HubBooks = {
   _whatsInsideCard() {
     const rows = [
       ['Income Statement', 'Revenue, COGS, labor, prime cost. Month and year to date side by side.'],
-      ['Inventory Valuation Report', 'Dollar value of inventory on hand at period end. Bottle-level. Ready for Schedule C.'],
-      ['Cash Reconciliation Audit Trail', 'Every shift. POS revenue, expected vs counted cash, variance, reason.'],
-      ['Void and Comp Compliance Log', 'Every void and comp with manager, server, amount, reason.'],
-      ['Tip Allocation Worksheet', 'Pre-built worksheet for IRS Form 8027. Your accountant transcribes the figures onto the actual form.'],
-      ['Variance and Shrinkage Report', 'Recipe-implied usage versus counted usage. Flagged products.'],
+      ['Inventory Valuation', 'Dollar value of what is on the shelf at month end. Bottle by bottle. Ready for Schedule C.'],
+      ['Cash Reconciliation', 'Every shift. POS revenue, expected cash, counted cash, variance, reason.'],
+      ['Void and Comp Log', 'Every void and comp with the manager who signed off, the server, the amount, the reason.'],
+      ['Tip Allocation Worksheet', 'Numbers for IRS Form 8027. Your accountant transcribes them onto the actual form.'],
+      ['Variance and Shrinkage', 'What the recipes say you sold versus what the count says you have. Flags the gaps.'],
       ['Labor Cost Analysis', 'Wages by position, overtime hours, tip credit applied.'],
-      ['Operational Opportunities', 'Audit findings translated to dollar opportunities for the next period.']
+      ['Operational Opportunities', 'Your audits turned into dollars you can pull back next month.']
     ];
     const listHtml = rows.map(r =>
       '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
       + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
     ).join('');
     return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is inside</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
       + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
       + '</div>';
   },
@@ -130,13 +130,13 @@ S.HubBooks = {
     const status = document.getElementById('hb-status');
 
     if (typeof XLSX === 'undefined') {
-      this._setStatus('Workbook library did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
+      this._setStatus('The file builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = 'Generating...';
-    this._setStatus('Building your workbook...', 'var(--t3)');
+    btn.textContent = 'Building...';
+    this._setStatus('Building your file...', 'var(--t3)');
 
     try {
       // Defer one frame so the UI updates before the work starts.
@@ -153,8 +153,8 @@ S.HubBooks = {
       // Workbook properties so the disclaimer is visible in Excel's File >
       // Properties pane too, not only in the sheet footers.
       wb.Props = {
-        Title:        'Bar Cop Books — ' + this._monthLabel(monthKey),
-        Subject:      'Monthly close package generated by Bar Cop from operator input data. Bar Cop is a software tool, not a tax preparer or CPA. The accountant or bookkeeper should review and verify before filing.',
+        Title:        'Bar Cop Books, ' + this._monthLabel(monthKey),
+        Subject:      'Month-end books generated by Bar Cop from operator input data. Bar Cop is a software tool, not a tax preparer or CPA. The accountant or bookkeeper should review and verify before filing.',
         Author:       (App.data?.settings?.bar_name) || 'Bar Cop',
         Company:      'Bar Cop',
         CreatedDate:  new Date()
@@ -166,10 +166,10 @@ S.HubBooks = {
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
     } catch (e) {
       console.error('Books generation error:', e);
-      this._setStatus('Could not generate the workbook: ' + (e?.message || 'unknown error'), 'var(--red)');
+      this._setStatus('Could not build the file: ' + (e?.message || 'unknown error'), 'var(--red)');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Generate Package';
+      btn.textContent = 'Generate File';
     }
   },
 
@@ -196,7 +196,7 @@ S.HubBooks = {
     const blank = () => ['', '', ''];
 
     const rows = [
-      [barName + ' — Income Statement', this._monthLabel(monthKey), 'Year to Date'],
+      [barName + ': Income Statement', this._monthLabel(monthKey), 'Year to Date'],
       blank(),
       ['Revenue', '', ''],
       r('  Bar Revenue',  M.barRev,  YTD.barRev),
@@ -266,7 +266,7 @@ S.HubBooks = {
     });
 
     // Column widths so the labels do not get truncated.
-    ws['!cols'] = [{ wch: 44 }, { wch: 18 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 56 }, { wch: 20 }, { wch: 20 }];
 
     return ws;
   },
@@ -312,7 +312,7 @@ S.HubBooks = {
     const blank = () => ['', '', '', '', ''];
     const rows = [];
 
-    rows.push([barName + ' — Inventory Valuation', this._monthLabel(monthKey), '', '', '']);
+    rows.push([barName + ': Inventory Valuation', this._monthLabel(monthKey), '', '', '']);
     rows.push(blank());
 
     if (!endingCount) {
@@ -382,7 +382,7 @@ S.HubBooks = {
       apply(c3, moneyFmt);
       apply(c4, moneyFmt);
     });
-    ws['!cols'] = [{ wch: 42 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 60 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
     return ws;
   },
 
@@ -406,7 +406,7 @@ S.HubBooks = {
     });
 
     const rows = [];
-    rows.push([barName + ' — Cash Reconciliation Audit Trail', this._monthLabel(monthKey), '', '', '', '', '', '', '']);
+    rows.push([barName + ': Cash Reconciliation Audit Trail', this._monthLabel(monthKey), '', '', '', '', '', '', '']);
     const blank = () => ['', '', '', '', '', '', '', '', ''];
     rows.push(blank());
     rows.push(['Date', 'Shift', 'Manager', 'Total Revenue', 'Expected Cash', 'Counted Cash', 'Variance', 'Status', 'Reason']);
@@ -474,7 +474,7 @@ S.HubBooks = {
         if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
       });
     });
-    ws['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 36 }];
+    ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 40 }];
     return ws;
   },
 
@@ -493,7 +493,7 @@ S.HubBooks = {
 
     const rows = [];
     const blank = () => ['', '', '', '', '', '', '', '', ''];
-    rows.push([barName + ' — Void and Comp Compliance Log', this._monthLabel(monthKey), '', '', '', '', '', '', '']);
+    rows.push([barName + ': Void and Comp Log', this._monthLabel(monthKey), '', '', '', '', '', '', '']);
     rows.push(blank());
     rows.push(['Date', 'Type', 'Shift', 'Item', 'Amount', 'Server', 'Authorized By', 'Check #', 'Reason']);
 
@@ -551,7 +551,7 @@ S.HubBooks = {
         if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
       });
     });
-    ws['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 24 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 30 }];
+    ws['!cols'] = [{ wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 36 }];
     return ws;
   },
 
@@ -591,22 +591,22 @@ S.HubBooks = {
 
     const rows = [];
     const blank = () => ['', '', '', '', ''];
-    rows.push([barName + ' — Tip Allocation Worksheet (IRS Form 8027)', this._monthLabel(monthKey), '', '', '']);
+    rows.push([barName + ': Tip Allocation Worksheet (IRS Form 8027)', this._monthLabel(monthKey), '', '', '']);
     rows.push(blank());
-    rows.push(['This is a WORKSHEET, not the IRS form itself. Your accountant transcribes these line values onto the actual Form 8027 and signs it.', '', '', '', '']);
-    rows.push(['Form 8027 is required for "large food and beverage establishments" — more than 10 employees on a typical business day. Some operators do not need to file. Confirm with your accountant.', '', '', '', '']);
+    rows.push(['This is a worksheet. It is not the IRS form. Your accountant moves these numbers onto the actual Form 8027 and signs it.', '', '', '', '']);
+    rows.push(['Form 8027 is required for restaurants with more than 10 employees on a typical business day where tipping happens. Some operators do not have to file. Confirm with your accountant.', '', '', '', '']);
     rows.push(blank());
 
-    rows.push(['Form 8027 Lines (calculated for the month)', '', '', '', '']);
-    rows.push(['  Line 1  — Total charged tips for the month',                     totalChargedTips, '', '', '']);
-    rows.push(['  Line 2  — Total charge receipts on which charged tips were shown', null,           '(your accountant fills — Bar Cop does not track separately)', '', '']);
-    rows.push(['  Line 3  — Total service charges less than 10% paid as wages',     null,           '(your accountant fills if applicable)', '', '']);
-    rows.push(['  Line 4a — Tips reported by indirectly tipped employees',          null,           '(your accountant categorizes; Bar Cop logs total)', '', '']);
-    rows.push(['  Line 4b — Tips reported by directly tipped employees',            null,           '(your accountant categorizes; Bar Cop logs total)', '', '']);
-    rows.push(['  Line 5  — Total tips reported (4a + 4b)',                         totalReported, '', '', '']);
-    rows.push(['  Line 6  — Gross receipts from food and beverage',                 grossReceipts, '', '', '']);
-    rows.push(['  Line 7  — 8% of gross receipts (or your approved lower rate)',    line7,         '', '', '']);
-    rows.push(['  Line 7a — Allocated tips (Line 7 minus Line 5, but not below 0)', line7a,        '', '', '']);
+    rows.push(['Form 8027 Lines (figured for the month)', '', '', '', '']);
+    rows.push(['  Line 1: Total charged tips for the month',                     totalChargedTips, '', '', '']);
+    rows.push(['  Line 2: Total charge receipts on which charged tips were shown', null,           '(your accountant fills. Bar Cop does not track this separately.)', '', '']);
+    rows.push(['  Line 3: Total service charges less than 10% paid as wages',     null,           '(your accountant fills if it applies.)', '', '']);
+    rows.push(['  Line 4a: Tips reported by indirectly tipped employees',         null,           '(your accountant sorts this. Bar Cop logs total tips per server.)', '', '']);
+    rows.push(['  Line 4b: Tips reported by directly tipped employees',           null,           '(your accountant sorts this. Bar Cop logs total tips per server.)', '', '']);
+    rows.push(['  Line 5: Total tips reported (4a plus 4b)',                      totalReported, '', '', '']);
+    rows.push(['  Line 6: Gross receipts from food and beverage',                 grossReceipts, '', '', '']);
+    rows.push(['  Line 7: 8% of gross receipts (or your approved lower rate)',    line7,         '', '', '']);
+    rows.push(['  Line 7a: Allocated tips (Line 7 minus Line 5, never below zero)', line7a,      '', '', '']);
     rows.push(blank());
 
     rows.push(['Reference Totals (informational)', '', '', '', '']);
@@ -675,7 +675,7 @@ S.HubBooks = {
       const c4d = XLSX.utils.encode_cell({ r: i, c: 4 });
       if (ws[c4d] && typeof ws[c4d].v === 'number' && !isShareRow) ws[c4d].z = moneyFmt;
     });
-    ws['!cols'] = [{ wch: 56 }, { wch: 18 }, { wch: 48 }, { wch: 18 }, { wch: 32 }];
+    ws['!cols'] = [{ wch: 78 }, { wch: 20 }, { wch: 52 }, { wch: 18 }, { wch: 36 }];
     return ws;
   },
 
