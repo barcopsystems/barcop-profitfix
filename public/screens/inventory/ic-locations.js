@@ -57,7 +57,7 @@ S.InventoryLocations = {
           + '<button class="btn btn-ghost btn-sm il-up" data-id="' + l.id + '"' + (i === 0 ? ' disabled' : '') + '>&#8593;</button>'
           + '<button class="btn btn-ghost btn-sm il-down" data-id="' + l.id + '"' + (i === active.length - 1 ? ' disabled' : '') + '>&#8595;</button>'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
-          + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '">Archive</button>'
+          + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
       }).join('');
 
@@ -66,13 +66,14 @@ S.InventoryLocations = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
       if (archived.length) {
-        html += '<div class="sh" style="margin:24px 0 8px;">Archived</div>'
+        html += '<div class="sh" style="margin:24px 0 8px;">Deleted</div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Restore any of these to bring them back. Product assignments are preserved.</div>'
           + '<div class="tbl-wrap"><table class="tbl"><tbody>'
           + archived.map(l => '<tr style="opacity:0.55;">'
               + '<td style="font-weight:700;color:var(--t2);">' + esc(l.name) + '</td>'
               + '<td>' + this.productCount(l.name) + ' products</td>'
               + '<td><div class="row-actions">'
-              + '<button class="btn btn-ghost btn-sm il-unarchive" data-id="' + l.id + '">Unarchive</button>'
+              + '<button class="btn btn-ghost btn-sm il-unarchive" data-id="' + l.id + '">Restore</button>'
               + '</div></td></tr>').join('')
           + '</tbody></table></div>';
       }
@@ -92,11 +93,44 @@ S.InventoryLocations = {
       else if (up)   this.move(up.dataset.id, -1);
       else if (down) this.move(down.dataset.id, 1);
       else if (edit) this.showForm(edit.dataset.id);
-      else if (arch) this.setArchived(arch.dataset.id, true);
+      else if (arch) this.confirmDelete(arch.dataset.id);
       else if (un)   this.setArchived(un.dataset.id, false);
       else if (addF) this.showForm();
       else if (addD) this.addDefaults();
     };
+  },
+
+  // Soft-delete a location. If products are assigned, prompt with a count so
+  // the operator knows what they are about to disconnect. Soft-delete keeps
+  // the record in the Deleted section for one-click restore.
+  confirmDelete(id) {
+    const l = this.locations().find(x => x.id === id);
+    if (!l) return;
+    const n = this.productCount(l.name);
+    const m = document.createElement('div');
+    m.id = 'il-del-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
+    const productNote = n > 0
+      ? '<div style="font-size:12px;color:var(--gold);line-height:1.7;margin-bottom:18px;background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:10px 12px;">'
+        + n + ' product' + (n === 1 ? ' is' : 's are') + ' assigned to this location. Their assignment stays in place but the location will be hidden from new flows (Take Inventory, Product Setup). Restore anytime to bring it back.'
+        + '</div>'
+      : '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">No products are assigned here. Restore anytime from the Deleted section if you change your mind.</div>';
+    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:480px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
+      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;">Delete ' + esc(l.name) + '?</div>'
+      + productNote
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
+        + '<button type="button" id="il-del-cancel" class="btn btn-ghost">Cancel</button>'
+        + '<button type="button" id="il-del-confirm" class="btn btn-danger">Delete</button>'
+      + '</div>'
+    + '</div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+    document.getElementById('il-del-cancel').addEventListener('click', close);
+    document.getElementById('il-del-confirm').addEventListener('click', () => {
+      close();
+      this.setArchived(id, true);
+    });
   },
 
   // ── Reorder / archive / defaults ──────────────────────────────────────────
@@ -194,37 +228,86 @@ S.InventoryLocations = {
     }
   },
 
-  // ── Location detail (products assigned here) ──────────────────────────────
+  // ── Location detail (products assigned here, in inventory-count order) ───
+  // Products are shown in the order they will appear during Take Inventory
+  // at this location. Up/down arrows let the operator arrange products to
+  // match the physical shelf/rail order so counting flows left-to-right
+  // (or however the operator walks the bar) instead of randomly.
   showDetail(id) {
     const l = this.locations().find(x => x.id === id);
     if (!l) { this.renderList(); return; }
-    const prods = this.products().filter(p => p.primary_location === l.name || p.secondary_location === l.name);
+    const prods = this.sortedProductsForLocation(l.name);
 
     let body;
     if (prods.length === 0) {
       body = '<div class="empty"><div class="empty-title">No products assigned here</div>'
         + '<div class="empty-sub">Assign products to ' + esc(l.name) + ' from the Products screen using the '
-        + 'Primary Location or Secondary Location field.</div></div>';
+        + 'Primary Location field.</div></div>';
     } else {
-      const rows = prods.map(p => '<tr>'
+      const rows = prods.map((p, i) => '<tr>'
+        + '<td style="width:36px;color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
         + '<td>' + esc(p.category || '-') + '</td>'
-        + '<td>' + (p.primary_location === l.name ? 'Primary' : 'Secondary') + '</td>'
         + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm il-pup" data-pid="' + esc(p.id) + '"' + (i === 0 ? ' disabled' : '') + '>&#8593;</button>'
+        + '<button class="btn btn-ghost btn-sm il-pdown" data-pid="' + esc(p.id) + '"' + (i === prods.length - 1 ? ' disabled' : '') + '>&#8595;</button>'
+        + '</div></td>'
         + '</tr>').join('');
-      body = '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Category</th><th>Assigned As</th><th>Par</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:12px;">'
-        + 'Live on-hand counts appear here once you record an inventory count in Take Inventory.</div>';
+      body = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+        + 'Use the arrows to put products in the order they sit on the shelf or rail at this location. Take Inventory at ' + esc(l.name) + ' will count them in this order.'
+        + '</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+        + '<th style="width:36px;">#</th><th>Product</th><th>Category</th><th>Par</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="il-back">&#8592; Back to Locations</button></div>'
       + '<div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:14px;">' + esc(l.name) + '</div>'
       + body + '</div>';
-    this.container.onclick = null;
-    document.getElementById('il-back')?.addEventListener('click', () => this.renderList());
+
+    this.container.onclick = ev => {
+      const back = ev.target.closest('#il-back');
+      const up   = ev.target.closest('.il-pup');
+      const down = ev.target.closest('.il-pdown');
+      if (back) this.renderList();
+      else if (up)   this.moveProduct(l.name, up.dataset.pid, -1);
+      else if (down) this.moveProduct(l.name, down.dataset.pid, 1);
+    };
+  },
+
+  // Sort products at a given location by their per-location sequence, then
+  // by name. Products with no recorded sequence sort to the end so new
+  // products do not jump above the operator's curated order.
+  sortedProductsForLocation(locationName) {
+    const list = this.products().filter(p => p.primary_location === locationName);
+    return list.slice().sort((a, b) => {
+      const sa = (a.location_sequences && a.location_sequences[locationName] != null) ? a.location_sequences[locationName] : Number.MAX_SAFE_INTEGER;
+      const sb = (b.location_sequences && b.location_sequences[locationName] != null) ? b.location_sequences[locationName] : Number.MAX_SAFE_INTEGER;
+      if (sa !== sb) return sa - sb;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  },
+
+  // Move a product up or down in this location's order. Updates the
+  // location_sequences map on each affected product so the order persists
+  // across sessions and surfaces in Take Inventory.
+  async moveProduct(locationName, productId, dir) {
+    const ordered = this.sortedProductsForLocation(locationName);
+    const idx = ordered.findIndex(p => p.id === productId);
+    if (idx < 0) return;
+    const j = idx + dir;
+    if (j < 0 || j >= ordered.length) return;
+    [ordered[idx], ordered[j]] = [ordered[j], ordered[idx]];
+    // Re-stamp sequences 1..N on the new order. Persisting the full sequence
+    // every move keeps the data consistent and avoids gaps that drift over time.
+    ordered.forEach((p, i) => {
+      if (!p.location_sequences) p.location_sequences = {};
+      p.location_sequences[locationName] = i + 1;
+    });
+    await App.saveInventory();
+    this.showDetail((this.locations().find(l => l.name === locationName) || {}).id);
   }
 };
