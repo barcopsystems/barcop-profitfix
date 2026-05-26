@@ -121,16 +121,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-<script>
-  // Configure PDF.js worker so text extraction does not block the main
-  // thread. The legacy v3 build supports the plain-script-tag pattern;
-  // newer v4+ uses ES modules which would require import changes here.
-  if (window.pdfjsLib) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-  }
-</script>
 <script>var S = {};</script>
 <script src="sample-profile.js?v=1"></script>
 <script src="nav.js?v=15"></script>
@@ -199,7 +189,7 @@
 <script src="screens/inventory/ic-spot-check.js?v=3"></script>
 <script src="screens/inventory/ic-order-sheet.js?v=7"></script>
 <script src="screens/inventory/ic-order-history.js?v=3"></script>
-<script src="screens/inventory/ic-receive-delivery.js?v=6"></script>
+<script src="screens/inventory/ic-receive-delivery.js?v=8"></script>
 <script src="screens/inventory/ic-delivery-history.js?v=2"></script>
 <script src="screens/inventory/ic-report-usage.js?v=2"></script>
 <script src="screens/inventory/ic-report-variance.js?v=2"></script>
