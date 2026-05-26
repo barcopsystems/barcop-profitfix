@@ -17,13 +17,14 @@ S.InventoryStockReport = {
   },
   productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   itemValue(it) {
     if (it.value != null) return it.value;
-    return it.unit_cost != null ? (it.total || 0) * it.unit_cost : 0;
+    const bc = App.bottleCostFromCountItem(it);
+    return bc != null ? (it.total || 0) * bc : 0;
   },
   itemLoc(it) {
     const p = this.productById(it.product_id);
@@ -150,7 +151,7 @@ S.InventoryStockReport = {
         + '<td style="width:40%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
         + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div></td>'
-        + '<td>' + (r.total != null ? r.total.toFixed(1) : '—') + '</td>'
+        + '<td>' + (r.total != null ? r.total.toFixed(1) : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(r.value) + '</td></tr>';
     }).join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
