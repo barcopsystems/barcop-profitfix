@@ -138,8 +138,17 @@ S.InventoryReceiveDelivery = {
       + '<textarea id="rd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '</div>'
       + '<div class="card"><div class="card-title">Line Items</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6;">'
+        + 'Type line items manually, or upload the vendor\'s PDF invoice and Bar Cop will pre-fill what it can read. '
+        + 'Image-based PDFs (scans) will not parse. Most vendor-emailed PDFs work.'
+      + '</div>'
       + '<div id="rd-lines">' + this.lineHTML(++this._seq) + '</div>'
-      + '<button class="btn btn-ghost btn-sm" id="rd-add">+ Add Line Item</button>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;">'
+        + '<button class="btn btn-ghost btn-sm" id="rd-add">+ Add Line Item</button>'
+        + '<button class="btn btn-ghost btn-sm" id="rd-pdf-btn">Upload Invoice PDF</button>'
+        + '<input type="file" id="rd-pdf-file" accept="application/pdf" style="display:none;"/>'
+        + '<span id="rd-pdf-status" style="font-size:11px;color:var(--t3);display:none;"></span>'
+      + '</div>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val" id="rd-count">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Price Changes</div><div class="calc-val" id="rd-changes">0</div></div>'
@@ -183,7 +192,202 @@ S.InventoryReceiveDelivery = {
       this.recalcTotal();
     });
     document.getElementById('rd-save')?.addEventListener('click', () => this.save());
+
+    // PDF invoice upload (text PDFs only; image PDFs won't parse). Operator
+    // confirms every line after pre-fill so any parser miss is correctable.
+    document.getElementById('rd-pdf-btn')?.addEventListener('click', () => {
+      document.getElementById('rd-pdf-file')?.click();
+    });
+    document.getElementById('rd-pdf-file')?.addEventListener('change', (ev) => this.handlePdfUpload(ev));
+
     this.container.onclick = null;
+  },
+
+  // ── PDF Invoice Upload (text PDFs only) ──────────────────────────────────
+  // PDF.js extracts the page text, a generic heuristic finds lines that
+  // look like invoice line items (description + qty + currency price), and
+  // each detected item is matched against ic_products by name substring.
+  // Matches get appended as form lines for operator review. Anything we
+  // cannot parse stays missing and the operator types it manually. Vendor
+  // invoice formats vary too much for a single parser to nail every one;
+  // this is a workable starting point that can be tuned with per-vendor
+  // template overrides later if any specific format proves popular.
+  setPdfStatus(text, color) {
+    const el = document.getElementById('rd-pdf-status');
+    if (!el) return;
+    if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = '';
+    el.style.color = color || 'var(--t3)';
+    el.textContent = text;
+  },
+
+  async handlePdfUpload(ev) {
+    const file = ev.target?.files?.[0];
+    ev.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (!window.pdfjsLib) {
+      this.setPdfStatus('PDF reader did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
+      return;
+    }
+
+    this.setPdfStatus('Reading ' + file.name + '...', 'var(--t3)');
+    try {
+      const buf = await file.arrayBuffer();
+      const loadingTask = window.pdfjsLib.getDocument({ data: buf });
+      const pdf = await loadingTask.promise;
+      let allText = '';
+      const allLines = [];
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        // PDF.js returns text items with their position. Group items into
+        // logical lines by y-coordinate so column-oriented invoices read
+        // as one row per item rather than a stream of fragments.
+        const byY = new Map();
+        content.items.forEach(it => {
+          if (!it.str) return;
+          const y = Math.round((it.transform?.[5] ?? 0) * 10) / 10;
+          if (!byY.has(y)) byY.set(y, []);
+          byY.get(y).push({ x: it.transform?.[4] ?? 0, str: it.str });
+        });
+        const yKeys = [...byY.keys()].sort((a, b) => b - a); // top to bottom
+        yKeys.forEach(y => {
+          const fragments = byY.get(y).sort((a, b) => a.x - b.x).map(f => f.str.trim()).filter(Boolean);
+          if (fragments.length === 0) return;
+          const line = fragments.join(' ').replace(/\s+/g, ' ').trim();
+          if (line.length > 0) allLines.push(line);
+        });
+        allText += allLines.join('\n') + '\n';
+      }
+
+      if (allLines.length === 0) {
+        this.setPdfStatus('No text found in this PDF. It may be a scan/image PDF rather than a text PDF. Type the items manually.', 'var(--red)');
+        return;
+      }
+
+      const detected = this.parseInvoiceLines(allLines);
+      if (detected.length === 0) {
+        this.setPdfStatus('Bar Cop could not detect any line items in this PDF format. Type them manually below, or try a different vendor PDF.', 'var(--red)');
+        return;
+      }
+
+      const matched = this.matchDetectedToProducts(detected);
+      this.appendDetectedLines(matched);
+
+      const matchCount = matched.filter(m => m.product).length;
+      const skipCount  = matched.length - matchCount;
+      let msg = matchCount + ' item' + (matchCount === 1 ? '' : 's') + ' added.';
+      if (skipCount > 0) {
+        msg += ' ' + skipCount + ' detected line' + (skipCount === 1 ? '' : 's') + ' could not be matched to a product in your master list and were skipped.';
+      }
+      msg += ' Review every line before saving.';
+      this.setPdfStatus(msg, 'var(--gold)');
+    } catch (e) {
+      console.error('PDF upload error:', e);
+      this.setPdfStatus('Could not read this PDF: ' + (e?.message || 'unknown error'), 'var(--red)');
+    }
+  },
+
+  // Generic line parser. Looks for rows with a description + integer qty +
+  // 1-2 currency amounts. Returns [{ name, qty, unitPrice }].
+  parseInvoiceLines(lines) {
+    const out = [];
+    // Patterns to try, in priority order. Each captures (description, qty, unit, extended OR description, qty, unit).
+    // PDF text often arrives as "DESCRIPTION ... QTY UNIT_PRICE EXTENDED" or "QTY DESCRIPTION UNIT EXTENDED".
+    const patterns = [
+      // "Description QTY UnitPrice ExtendedPrice" at end of line
+      /^(.+?)\s+(\d+(?:\.\d+)?)\s+\$?(\d+(?:,\d{3})*\.\d{2})\s+\$?(\d+(?:,\d{3})*\.\d{2})\s*$/,
+      // "QTY Description UnitPrice ExtendedPrice"
+      /^(\d+(?:\.\d+)?)\s+(.+?)\s+\$?(\d+(?:,\d{3})*\.\d{2})\s+\$?(\d+(?:,\d{3})*\.\d{2})\s*$/,
+      // "Description QTY UnitPrice" (no extended column)
+      /^(.+?)\s+(\d+(?:\.\d+)?)\s+\$?(\d+(?:,\d{3})*\.\d{2})\s*$/
+    ];
+    const normNum = s => parseFloat(String(s).replace(/,/g, ''));
+
+    lines.forEach(line => {
+      // Skip obvious header/footer rows
+      if (/^(subtotal|total|tax|invoice|date|po\s*#|account|terms|thank|page|due)/i.test(line)) return;
+      // Skip lines too short to be a real item
+      if (line.length < 8) return;
+
+      let m = line.match(patterns[0]);
+      if (m) {
+        const name = m[1].trim();
+        const qty  = normNum(m[2]);
+        const unit = normNum(m[3]);
+        if (qty > 0 && unit > 0 && name.length >= 2 && /[A-Za-z]/.test(name)) {
+          out.push({ name, qty, unitPrice: unit });
+          return;
+        }
+      }
+      m = line.match(patterns[1]);
+      if (m) {
+        const qty  = normNum(m[1]);
+        const name = m[2].trim();
+        const unit = normNum(m[3]);
+        if (qty > 0 && unit > 0 && name.length >= 2 && /[A-Za-z]/.test(name)) {
+          out.push({ name, qty, unitPrice: unit });
+          return;
+        }
+      }
+      m = line.match(patterns[2]);
+      if (m) {
+        const name = m[1].trim();
+        const qty  = normNum(m[2]);
+        const unit = normNum(m[3]);
+        if (qty > 0 && unit > 0 && name.length >= 2 && /[A-Za-z]/.test(name)) {
+          out.push({ name, qty, unitPrice: unit });
+        }
+      }
+    });
+    return out;
+  },
+
+  matchDetectedToProducts(detected) {
+    const all = (App.inventoryData?.ic_products || []).filter(p => p.active !== false);
+    return detected.map(d => {
+      const lower = d.name.toLowerCase();
+      // 1) Try exact name match first (case-insensitive)
+      let product = all.find(p => (p.name || '').toLowerCase() === lower);
+      // 2) Try substring match either direction
+      if (!product) {
+        product = all.find(p => {
+          const pn = (p.name || '').toLowerCase();
+          return pn.length >= 3 && (lower.includes(pn) || pn.includes(lower));
+        });
+      }
+      // 3) Try token overlap on the first meaningful word
+      if (!product) {
+        const tokens = lower.split(/\s+/).filter(t => t.length >= 4);
+        if (tokens.length > 0) {
+          product = all.find(p => {
+            const pn = (p.name || '').toLowerCase();
+            return tokens.some(t => pn.includes(t));
+          });
+        }
+      }
+      return { ...d, product: product || null };
+    });
+  },
+
+  appendDetectedLines(matchedItems) {
+    const linesEl = document.getElementById('rd-lines');
+    if (!linesEl) return;
+    matchedItems.forEach(m => {
+      if (!m.product) return; // skip unmatched
+      const lid = ++this._seq;
+      linesEl.insertAdjacentHTML('beforeend', this.lineHTML(lid));
+      const line = linesEl.querySelector('.rd-line[data-lid="' + lid + '"]');
+      if (!line) return;
+      const prodSel  = line.querySelector('.rd-prod');
+      const qtyInp   = line.querySelector('.rd-qty');
+      const priceInp = line.querySelector('.rd-price');
+      prodSel.value  = m.product.id;
+      qtyInp.value   = m.qty;
+      priceInp.value = m.unitPrice;
+      this.recalcLine(line);
+    });
+    this.recalcTotal();
   },
 
   recalcLine(line) {
