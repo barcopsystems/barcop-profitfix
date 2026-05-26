@@ -5,7 +5,7 @@ S.Reports={
   },
   renderMain(){
     if(this.actions){
-      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-qbo">Export to QuickBooks</button> <button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
+      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-qbo">Quick P&amp;L Export</button> <button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
       document.getElementById('pr-export')?.addEventListener('click',()=>window.print());
       document.getElementById('pr-qbo')?.addEventListener('click',()=>this._openQboModal());
     }
@@ -114,7 +114,7 @@ S.Reports={
     m.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.65);';
     m.innerHTML='<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:540px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
-        +'<div style="font-size:13px;font-weight:600;color:var(--t1);letter-spacing:0.6px;text-transform:uppercase;">Export to QuickBooks</div>'
+        +'<div style="font-size:13px;font-weight:600;color:var(--t1);letter-spacing:0.6px;text-transform:uppercase;">Quick P&amp;L Export</div>'
         +'<button id="qbo-close" class="btn btn-ghost btn-sm" style="margin:-4px -4px 0 0;">Close</button>'
       +'</div>'
       +'<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:18px;">Weekly revenue, COGS, and labor as a CSV. Hand it to your bookkeeper or import into QuickBooks, Xero, or any spreadsheet.</div>'
