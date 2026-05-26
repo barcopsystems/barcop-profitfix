@@ -24,6 +24,32 @@ S.InventoryReceiveDelivery = {
     if (!Array.isArray(App.inventoryData.ic_deliveries)) App.inventoryData.ic_deliveries = [];
     return App.inventoryData.ic_deliveries;
   },
+  orders() {
+    return ((App.inventoryData && App.inventoryData.ic_orders) || []);
+  },
+  // All in-flight orders (Open or Submitted) for a given vendor name, newest first.
+  openOrdersForVendor(vendorName) {
+    if (!vendorName) return [];
+    return this.orders()
+      .filter(o => o && o.vendor === vendorName && o.status !== 'Received')
+      .slice()
+      .sort((a, b) => new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime());
+  },
+  // Find a product by id OR fall back to a case-insensitive name match. Used
+  // when pre-filling from an order whose line items may pre-date the
+  // product_id capture (older orders).
+  resolveProduct(productId, name) {
+    if (productId) {
+      const p = this.productById(productId);
+      if (p) return p;
+    }
+    if (name) {
+      const lower = String(name).toLowerCase().trim();
+      return ((App.inventoryData && App.inventoryData.ic_products) || [])
+        .find(p => (p.name || '').toLowerCase().trim() === lower) || null;
+    }
+    return null;
+  },
 
   // ── Entry ─────────────────────────────────────────────────────────────────
   render(container, actions) {
@@ -100,6 +126,14 @@ S.InventoryReceiveDelivery = {
       + '<div class="f w-md"><label>Invoice #</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
       + '<div class="f w-md"><label>Driver</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
       + '</div>'
+      // Open Order picker. Hidden until a vendor with at least one open
+      // order is selected. Picking an order pre-fills the line items so the
+      // operator does not re-enter what they already ordered.
+      + '<div class="form-row" style="gap:16px;" id="rd-order-row">'
+        + '<div class="f" style="flex:1;min-width:280px;"><label>Open Order</label>'
+          + '<select id="rd-order"><option value="">No open orders for this vendor</option></select>'
+        + '</div>'
+      + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="rd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '</div>'
@@ -109,12 +143,20 @@ S.InventoryReceiveDelivery = {
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val" id="rd-count">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Price Changes</div><div class="calc-val" id="rd-changes">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Short Counts</div><div class="calc-val" id="rd-shorts">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Delivery Total</div><div class="calc-val good" id="rd-total">$0</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
       + '<span id="rd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
+
+    // Hide the Open Order row until a vendor is picked.
+    const orderRow = document.getElementById('rd-order-row');
+    if (orderRow) orderRow.style.display = 'none';
+
+    document.getElementById('rd-vendor')?.addEventListener('change', (ev) => this.onVendorChange(ev.target.value));
+    document.getElementById('rd-order')?.addEventListener('change', (ev) => this.onOrderPick(ev.target.value));
 
     const lines = document.getElementById('rd-lines');
     const onInput = ev => {
@@ -153,32 +195,107 @@ S.InventoryReceiveDelivery = {
 
     const p = this.productById(line.querySelector('.rd-prod').value);
     const flag = line.querySelector('.rd-flag');
+    const messages = [];
     if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) {
       const up = price > p.unit_cost;
+      messages.push('Price ' + (up ? 'up' : 'down') + ' from ' + App.fmtCurrency(p.unit_cost) + ' to ' + App.fmtCurrency(price) + ' (master will update).');
+    }
+    const orderedQty = parseFloat(line.dataset.orderedQty);
+    if (!isNaN(orderedQty) && orderedQty > 0 && qty > 0 && qty < orderedQty) {
+      const shortBy = orderedQty - qty;
+      messages.push('Short count: ordered ' + orderedQty + ', received ' + qty + ' (short ' + shortBy + ').');
+      line.dataset.shortCount = '1';
+    } else {
+      line.dataset.shortCount = '';
+    }
+    if (messages.length > 0) {
       flag.style.display = '';
       flag.style.color = 'var(--gold)';
-      flag.textContent = 'Price change: ' + (up ? 'up' : 'down') + ' from '
-        + App.fmtCurrency(p.unit_cost) + '. The product master will update to ' + App.fmtCurrency(price);
+      flag.textContent = messages.join(' ');
     } else {
       flag.style.display = 'none';
+      flag.textContent = '';
     }
   },
 
   recalcTotal() {
     const lines = [...document.querySelectorAll('.rd-line')];
-    let total = 0, count = 0, changes = 0;
+    let total = 0, count = 0, changes = 0, shorts = 0;
     lines.forEach(line => {
       const ext = parseFloat(line.dataset.ext) || 0;
       total += ext;
       const prod = line.querySelector('.rd-prod').value;
       const qty = parseFloat(line.querySelector('.rd-qty').value) || 0;
       if (prod && qty > 0) count++;
-      if (line.querySelector('.rd-flag').style.display !== 'none') changes++;
+      // Price-change vs short-count: distinguish by checking the data flag.
+      if (line.querySelector('.rd-flag').style.display !== 'none') {
+        const p = this.productById(prod);
+        const price = parseFloat(line.querySelector('.rd-price').value);
+        if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) changes++;
+      }
+      if (line.dataset.shortCount === '1') shorts++;
     });
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('rd-count', count);
     set('rd-changes', changes);
+    set('rd-shorts', shorts);
     set('rd-total', App.fmtCurrency(total));
+  },
+
+  // ── Vendor + Open Order pickers ──────────────────────────────────────────
+  // When operator selects a vendor, populate the Open Order picker with that
+  // vendor's open/submitted orders. Picking an order pre-fills the line items
+  // with the ordered products + quantities so the operator just confirms or
+  // adjusts. Skip the picker entirely (walk-in delivery) by leaving it on the
+  // default "No matched order" option.
+  onVendorChange(vendorName) {
+    const orderRow = document.getElementById('rd-order-row');
+    const orderSel = document.getElementById('rd-order');
+    if (!orderRow || !orderSel) return;
+    const open = this.openOrdersForVendor(vendorName);
+    if (open.length === 0) {
+      orderRow.style.display = 'none';
+      orderSel.innerHTML = '<option value="">No open orders for this vendor</option>';
+      return;
+    }
+    orderRow.style.display = '';
+    const opts = ['<option value="">No matched order (walk-in delivery)</option>']
+      .concat(open.map(o => {
+        const label = (o.date || '') + '  ·  ' + (o.item_count || (o.line_items || []).length) + ' items  ·  ' + App.fmtCurrency(o.total || 0) + (o.status === 'Submitted' ? '  ·  Submitted' : '  ·  Open');
+        return '<option value="' + esc(o.id) + '">' + esc(label) + '</option>';
+      }));
+    orderSel.innerHTML = opts.join('');
+    orderSel.value = '';
+  },
+
+  onOrderPick(orderId) {
+    if (!orderId) return;
+    const order = this.orders().find(o => o.id === orderId);
+    if (!order) return;
+    const linesEl = document.getElementById('rd-lines');
+    if (!linesEl) return;
+
+    // Replace the existing line(s) with one per order item, pre-filled.
+    linesEl.innerHTML = '';
+    (order.line_items || []).forEach(li => {
+      const prod = this.resolveProduct(li.product_id, li.name);
+      const lid  = ++this._seq;
+      linesEl.insertAdjacentHTML('beforeend', this.lineHTML(lid));
+      const line = linesEl.querySelector('.rd-line[data-lid="' + lid + '"]');
+      if (!line) return;
+      const prodSel = line.querySelector('.rd-prod');
+      const qtyInp  = line.querySelector('.rd-qty');
+      const priceInp = line.querySelector('.rd-price');
+      if (prod) {
+        prodSel.value = prod.id;
+      }
+      qtyInp.value   = li.qty != null ? li.qty : '';
+      priceInp.value = (prod && prod.unit_cost != null) ? prod.unit_cost : (li.unit_cost != null ? li.unit_cost : '');
+      // Stash ordered qty for short-count detection on every recalc.
+      line.dataset.orderedQty = li.qty != null ? li.qty : '';
+      this.recalcLine(line);
+    });
+    this.recalcTotal();
   },
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -194,6 +311,7 @@ S.InventoryReceiveDelivery = {
     let priceChanges = 0;
     const productUpdates = [];
 
+    let shortCounts = 0;
     lineEls.forEach(line => {
       const pid   = line.querySelector('.rd-prod').value;
       const qty   = parseFloat(line.querySelector('.rd-qty').value);
@@ -205,6 +323,13 @@ S.InventoryReceiveDelivery = {
       const unitPrice = isNaN(price) ? prevPrice : price;
       const changed = prevPrice != null && unitPrice != null && Math.abs(unitPrice - prevPrice) > 0.001;
       if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice }); }
+      // Short count: ordered_qty came from the matched order (data attribute);
+      // a delivered qty under the ordered qty flags this line for the
+      // Vendor Discrepancy auto-fill in Phase 4.
+      const orderedQtyRaw = line.dataset.orderedQty;
+      const orderedQty = (orderedQtyRaw === '' || orderedQtyRaw == null) ? null : parseFloat(orderedQtyRaw);
+      const shortCount = (orderedQty != null && !isNaN(orderedQty) && orderedQty > 0 && qty < orderedQty);
+      if (shortCount) shortCounts++;
       lineItems.push({
         product_id:        pid,
         name:              p.name,
@@ -213,6 +338,8 @@ S.InventoryReceiveDelivery = {
         price_per_unit:    unitPrice,
         prev_price:        prevPrice,
         price_changed:     changed,
+        ordered_qty:       (orderedQty != null && !isNaN(orderedQty)) ? orderedQty : null,
+        short_count:       shortCount,
         extended:          unitPrice != null ? qty * unitPrice : 0
       });
     });
@@ -230,6 +357,8 @@ S.InventoryReceiveDelivery = {
         ? product.cost_per_pour / product.menu_price * 100 : null;
     });
 
+    const matchedOrderId = document.getElementById('rd-order')?.value || '';
+
     const record = {
       id:             App.uid(),
       vendor,
@@ -241,7 +370,9 @@ S.InventoryReceiveDelivery = {
       item_count:     lineItems.length,
       total:          lineItems.reduce((s, i) => s + (i.extended || 0), 0),
       price_change_count: priceChanges,
-      has_discrepancy: priceChanges > 0,
+      short_count_count:  shortCounts,
+      matched_order_id:   matchedOrderId || null,
+      has_discrepancy: priceChanges > 0 || shortCounts > 0,
       created_at:     new Date().toISOString()
     };
 
@@ -249,6 +380,19 @@ S.InventoryReceiveDelivery = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
     this.deliveries().push(record);
+
+    // Auto-mark the matched order as Received so the Order Sheet stops
+    // hiding the vendor and the operator gets a clean inventory picture
+    // for the next order cycle.
+    if (matchedOrderId) {
+      const order = this.orders().find(o => o.id === matchedOrderId);
+      if (order && order.status !== 'Received') {
+        order.status = 'Received';
+        order.received_at = new Date().toISOString();
+        order.received_delivery_id = record.id;
+      }
+    }
+
     const ok = await App.saveInventory();
     if (ok) {
       App.markSetupDone('gs_ic_delivery');
