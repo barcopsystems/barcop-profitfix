@@ -138,12 +138,7 @@ S.AuditDiff = {
 
   _renderNarrativeShell() {
     return '<div id="ad-narrative-wrap" style="padding:18px 24px;border-bottom:1px solid var(--b2);background:rgba(219,171,70,0.04);">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">AI Narrative</div>'
-      +     '<div style="font-size:11px;color:var(--t3);margin-top:4px;">Operator-voice summary of what changed between these two audits.</div>'
-      +   '</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="ad-narr-btn" style="font-size:10px;padding:4px 12px;">Get AI Narrative</button>'
-      + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="ad-narr-btn" style="font-size:10px;padding:4px 12px;">Bar Cop Outlook</button>'
       + '<div id="ad-narr-body" style="display:none;font-size:13px;color:var(--t2);line-height:1.7;margin-top:14px;"></div>'
       + '</div>';
   },
@@ -153,11 +148,14 @@ S.AuditDiff = {
     const body = document.getElementById('ad-narr-body');
     if (!btn || !body) return;
     btn.disabled = true;
+    btn.style.opacity = '0.65';
+    btn.style.cursor = 'not-allowed';
     btn.textContent = 'Generating...';
     body.style.display = 'block';
-    body.innerHTML = '<div style="color:var(--t3);">Reading both audits and writing the analysis...</div>';
+    body.innerHTML = '<div style="color:var(--t3);">Reading both audits and writing the outlook...</div>';
 
     const prompt = this._buildNarrativePrompt(moduleKey, before, after);
+    let succeeded = false;
     try {
       const r = await fetch('/api/claude', {
         method: 'POST',
@@ -182,13 +180,27 @@ S.AuditDiff = {
             '<div style="margin-bottom:12px;">' + esc(p).replace(/\n/g, '<br>') + '</div>'
           ).join('');
           body.innerHTML = paragraphs;
+          succeeded = true;
         }
       }
     } catch (e) {
-      body.innerHTML = '<div style="color:var(--red);">Could not generate narrative: ' + esc(e.message || 'unknown error') + '</div>';
+      body.innerHTML = '<div style="color:var(--red);">Could not generate outlook: ' + esc(e.message || 'unknown error') + '</div>';
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Regenerate';
+      if (succeeded) {
+        // One per comparison. Button stays disabled with a "done" label so the
+        // user can't tap-tap-tap and rack up API calls for no reason. To get a
+        // new outlook, change the dropdown selection — the modal re-renders
+        // with a fresh button enabled.
+        btn.disabled = true;
+        btn.style.opacity = '0.65';
+        btn.style.cursor = 'not-allowed';
+        btn.textContent = 'Outlook Generated';
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        btn.textContent = 'Try Again';
+      }
     }
   },
 
