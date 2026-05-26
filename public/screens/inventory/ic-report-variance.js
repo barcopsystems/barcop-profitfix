@@ -51,12 +51,12 @@ S.InventoryVarianceReport = {
       const p = this.productById(pid) || {};
       const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
       const ppc = p.pours_per_container || null;
-      const unitCost = p.unit_cost != null ? p.unit_cost : (eMap[pid].unit_cost != null ? eMap[pid].unit_cost : null);
+      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
       map[pid] = {
         product: p, name: eMap[pid].name, used,
         poursMade: ppc != null ? used * ppc : null,
         ouncesUsed: p.container_size_oz != null ? used * p.container_size_oz : null,
-        usageCost: unitCost != null ? used * unitCost : null
+        usageCost: bottleCost != null ? used * bottleCost : null
       };
     });
     return map;
