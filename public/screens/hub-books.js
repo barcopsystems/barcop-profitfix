@@ -977,7 +977,7 @@ S.HubBooks = {
     (App.inventoryData?.ic_deliveries || [])
       .filter(d => d.date && d.date > startCount.date && d.date <= endCount.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + (parseFloat(li.qty) || 0);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
       }));
 
     const products = (App.inventoryData?.ic_products || []);
