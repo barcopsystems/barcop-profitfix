@@ -288,8 +288,28 @@ S.HubUserAccounts = {
 
   // ── Team management (Phase 2 Item 25b) ────────────────────────────────────
   async _teamAuthHeaders() {
-    const s = await DB._sb?.auth.getSession();
-    const token = s?.data?.session?.access_token;
+    // Force-refresh the JWT if it's expiring within 2 minutes (or has
+    // already expired). supabase-js auto-refreshes in the background, but
+    // the auto-refresher can lapse if the tab has been idle or backgrounded
+    // for hours, leaving getSession() to return a stale token that the
+    // server rejects with "Invalid auth token." Refreshing here costs one
+    // extra round-trip on Team operations, which are infrequent.
+    let session = null;
+    try {
+      const cur = await DB._sb?.auth.getSession();
+      session = cur?.data?.session || null;
+      const expiresAt = session?.expires_at || 0;
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (!session || expiresAt - nowSec < 120) {
+        const refreshed = await DB._sb?.auth.refreshSession();
+        session = refreshed?.data?.session || session;
+      }
+    } catch (e) {
+      // Refresh failed (refresh token itself expired or network issue).
+      // Fall through with whatever token we have; the server will return
+      // the real error message and the user can re-sign-in.
+    }
+    const token = session?.access_token;
     const h = { 'Content-Type': 'application/json' };
     if (token) h['Authorization'] = 'Bearer ' + token;
     return h;
