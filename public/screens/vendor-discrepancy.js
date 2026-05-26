@@ -25,7 +25,13 @@ S.VendorDiscrepancy = {
     const rows = this.list().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const open = rows.filter(r => r.status !== 'Resolved');
     const openTotal = open.reduce((s, r) => s + (r.overcharge || 0), 0);
-    const recovered = rows.filter(r => r.status === 'Resolved').reduce((s, r) => s + (r.overcharge || 0), 0);
+    // Recovered tile sums what the operator actually got back, not the
+    // original overcharge. Falls back to overcharge for legacy resolved
+    // records that pre-date the recovered_amount field.
+    const recovered = rows.filter(r => r.status === 'Resolved').reduce((s, r) => {
+      const v = (r.recovered_amount != null) ? r.recovered_amount : r.overcharge;
+      return s + (v || 0);
+    }, 0);
 
     const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
       .map(v => v && v.name).filter(Boolean);
@@ -37,7 +43,7 @@ S.VendorDiscrepancy = {
     // form is the escape hatch for the cases that do not come from a
     // delivery (damaged bottle discovered days later, vendor substitution
     // mid-week, etc.). Expands when "+ File Manual Discrepancy" is clicked.
-    const form = '<div class="card" id="vd-form-wrap" style="display:none;">'
+    const form = '<div class="card" id="vd-form-wrap" style="display:none;margin-top:18px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
         + '<div class="card-title" style="margin-bottom:0;">File a Manual Discrepancy</div>'
         + '<button type="button" class="btn btn-ghost btn-sm" id="vd-form-cancel">Cancel</button>'
@@ -65,14 +71,14 @@ S.VendorDiscrepancy = {
       + '<button class="btn btn-primary" id="vd-file">File Discrepancy</button>'
       + '</div>';
 
-    const summary = '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">'
-      + '<div class="calc" style="margin:0;flex:1;min-width:300px;">'
+    const summary = '<div class="card" style="position:relative;margin-bottom:18px;">'
+      + '<button class="btn btn-ghost btn-sm" id="vd-show-form" style="position:absolute;top:14px;right:14px;">+ File Manual Discrepancy</button>'
+      + '<div class="calc" style="margin:0;">'
         + '<div class="calc-item"><div class="calc-label">Open Discrepancies</div><div class="calc-val ' + (open.length ? 'warn' : 'good') + '">' + open.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Open Overcharge</div><div class="calc-val ' + (openTotal > 0 ? 'warn' : '') + '">' + App.fmtCurrency(openTotal) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Recovered</div><div class="calc-val good">' + App.fmtCurrency(recovered) + '</div></div>'
       + '</div>'
-      + '<button class="btn btn-ghost" id="vd-show-form">+ File Manual Discrepancy</button>'
-      + '</div>';
+    + '</div>';
 
     let body;
     if (!rows.length) {
@@ -132,11 +138,86 @@ S.VendorDiscrepancy = {
     document.getElementById('vd-show-form')?.addEventListener('click', () => this.toggleForm(true));
     document.getElementById('vd-form-cancel')?.addEventListener('click', () => this.toggleForm(false));
     this.container.querySelectorAll('.vd-credit').forEach(b =>
-      b.addEventListener('click', () => this.setStatus(b.dataset.id, 'Credit Requested')));
+      b.addEventListener('click', () => this.requestCredit(b.dataset.id)));
     this.container.querySelectorAll('.vd-resolve').forEach(b =>
-      b.addEventListener('click', () => this.setStatus(b.dataset.id, 'Resolved')));
+      b.addEventListener('click', () => this.markResolved(b.dataset.id)));
     this.container.querySelectorAll('.vd-remove').forEach(b =>
       b.addEventListener('click', () => this.remove(b.dataset.id)));
+  },
+
+  // ── Request Credit ───────────────────────────────────────────────────────
+  // Opens the operator's email client with a structured credit request to
+  // the vendor's rep, then flips status to "Credit Requested." Same mailto
+  // pattern used for order submission so the operator's own email address
+  // is the sender (vendor's reply threads back naturally).
+  requestCredit(id) {
+    const r = this.list().find(x => x.id === id);
+    if (!r) return;
+    const vendors = (App.inventoryData?.ic_vendors) || [];
+    const v = vendors.find(x => x.name === r.vendor) || null;
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop User';
+
+    const lines = [];
+    lines.push('Hi' + (v?.rep ? ' ' + v.rep : '') + ',');
+    lines.push('');
+    lines.push('I am writing to request a credit on a delivery discrepancy.');
+    lines.push('');
+    if (v?.account_number) lines.push('Account: ' + v.account_number);
+    lines.push('Delivery date: ' + (r.date || ''));
+    if (r.reference) lines.push('Invoice / Reference: ' + r.reference);
+    lines.push('');
+    lines.push('Type: ' + (r.type || 'Other'));
+    if (r.sku) lines.push('Product: ' + r.sku);
+    if (r.units != null && r.units !== '') lines.push('Units affected: ' + r.units);
+    if (r.agreed_price != null)   lines.push('Agreed price: $' + parseFloat(r.agreed_price).toFixed(2));
+    if (r.invoiced_price != null) lines.push('Invoiced price: $' + parseFloat(r.invoiced_price).toFixed(2));
+    lines.push('Credit amount requested: $' + parseFloat(r.overcharge || 0).toFixed(2));
+    if (r.notes) {
+      lines.push('');
+      lines.push('Notes: ' + r.notes);
+    }
+    lines.push('');
+    lines.push('Please confirm the credit and let me know when it will be applied.');
+    lines.push('');
+    lines.push('Thanks,');
+    lines.push(barName);
+
+    const subj = 'Credit request: ' + (r.vendor || 'vendor') + ' discrepancy from ' + (r.date || '');
+    const mailto = 'mailto:' + encodeURIComponent(v?.email || '')
+      + '?subject=' + encodeURIComponent(subj)
+      + '&body='    + encodeURIComponent(lines.join('\n'));
+    window.location.href = mailto;
+
+    // Flip status. If the operator never actually hits Send in their email
+    // client, they can revert via Remove + refile, or just leave it.
+    r.status = 'Credit Requested';
+    r.credit_requested_at = new Date().toISOString();
+    App.saveKey('vendor_discrepancies').then(() => this.draw());
+  },
+
+  // ── Mark Resolved ────────────────────────────────────────────────────────
+  // Prompts for the actual recovered amount because vendors often credit
+  // only part of what was claimed. Defaults to the original overcharge.
+  // Operator can override for partial credits.
+  markResolved(id) {
+    const r = this.list().find(x => x.id === id);
+    if (!r) return;
+    const claimed = parseFloat(r.overcharge) || 0;
+    const input = prompt(
+      'How much credit did the vendor actually give you? (Claimed was $' + claimed.toFixed(2) + ')\n\n'
+      + 'Enter the dollar amount you recovered. The Recovered tile sums what you actually got back, not what you originally claimed.',
+      claimed.toFixed(2)
+    );
+    if (input == null) return; // operator cancelled
+    const recovered = parseFloat(input);
+    if (isNaN(recovered) || recovered < 0) {
+      alert('Enter a valid dollar amount, or click Cancel.');
+      return;
+    }
+    r.status = 'Resolved';
+    r.resolved_at = new Date().toISOString();
+    r.recovered_amount = recovered;
+    App.saveKey('vendor_discrepancies').then(() => this.draw());
   },
 
   toggleForm(show) {
@@ -185,14 +266,6 @@ S.VendorDiscrepancy = {
     });
     // Close the form on successful save so the operator lands back on the
     // log view with the new discrepancy visible at the top.
-    App.saveKey('vendor_discrepancies').then(() => this.draw());
-  },
-
-  setStatus(id, status) {
-    const r = this.list().find(x => x.id === id);
-    if (!r) return;
-    r.status = status;
-    r.resolved_at = status === 'Resolved' ? new Date().toISOString() : null;
     App.saveKey('vendor_discrepancies').then(() => this.draw());
   },
 
