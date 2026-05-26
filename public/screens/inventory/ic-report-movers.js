@@ -16,9 +16,9 @@ S.InventoryMoversReport = {
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
   computeForPair(startC, endC) {
@@ -27,7 +27,7 @@ S.InventoryMoversReport = {
     const purch = {};
     this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + (li.qty || 0);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
       }));
     const rows = [];
     Object.keys(eMap).forEach(pid => {
@@ -106,7 +106,7 @@ S.InventoryMoversReport = {
     const rows = this.computeForPair(cur.startC, cur.endC);
     if (this.tab === 'trend') return this.tabTrend(rows, prior);
     if (this.tab === 'cost')  return this.tabRank(rows, 'usageCost', true, 'Top 10 products by usage cost this period.');
-    if (this.tab === 'slow')  return this.tabRank(rows, 'used', false, 'Bottom 10 products by units used — your slowest movers.');
+    if (this.tab === 'slow')  return this.tabRank(rows, 'used', false, 'Bottom 10 products by units used, your slowest movers.');
     return this.tabRank(rows, 'used', true, 'Top 10 products by units used this period.');
   },
 
@@ -154,12 +154,12 @@ S.InventoryMoversReport = {
       return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + (r.prev != null ? r.prev.toFixed(1) : '<span style="color:var(--t4);">new</span>') + '</td>'
         + '<td>' + r.cur.toFixed(1) + '</td>'
-        + '<td class="' + cls + '">' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '—') + '</td>'
-        + '<td class="' + cls + '">' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '—') + '</td>'
+        + '<td class="' + cls + '">' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
+        + '<td class="' + cls + '">' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
         + '</tr>';
     }).join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'Units used this period vs the prior period — biggest movement first.</div>'
+      + 'Units used this period vs the prior period, biggest movement first.</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
