@@ -20,9 +20,9 @@ S.InventoryVarianceReport = {
   allProducts() { return ((App.inventoryData && App.inventoryData.ic_products) || []); },
   productById(id) { return this.allProducts().find(p => p.id === id); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
   // ── Usage for the selected period ─────────────────────────────────────────
@@ -43,7 +43,7 @@ S.InventoryVarianceReport = {
     const purch = {};
     this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + (li.qty || 0);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
       }));
     const map = {};
     Object.keys(eMap).forEach(pid => {
@@ -165,7 +165,7 @@ S.InventoryVarianceReport = {
   unmatchedCard() {
     const un = this.unmatchedPos();
     if (!un.length) return '';
-    const prodOpts = '<option value="">Skip — not a tracked product</option>'
+    const prodOpts = '<option value="">Skip: not a tracked product</option>'
       + this.allProducts().slice().sort((a, b) => a.name.localeCompare(b.name))
           .map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
     const rows = un.map(pr => '<div class="form-row" style="gap:12px;align-items:center;margin-bottom:8px;">'
@@ -212,8 +212,8 @@ S.InventoryVarianceReport = {
     return '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:'
       + s.color + ';border:1px solid ' + s.color + ';border-radius:3px;padding:2px 6px;">' + s.label + '</span>';
   },
-  cur(v) { return v == null ? '<span style="color:var(--t4);">—</span>' : App.fmtCurrency(v); },
-  pct(v) { return v == null ? '<span style="color:var(--t4);">—</span>' : v.toFixed(1) + '%'; },
+  cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
+  pct(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : v.toFixed(1) + '%'; },
 
   // ── Sales Variance ────────────────────────────────────────────────────────
   tabSales() {
@@ -238,7 +238,7 @@ S.InventoryVarianceReport = {
       + '<td>' + this.pct(r.varPct) + '</td>'
       + '<td>' + this.pct(r.actualCostPct) + '</td>'
       + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
-      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '—') + '</td>'
+      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
       + 'Theoretical sales is what the product poured should have rung up. A large positive variance means '
@@ -261,7 +261,7 @@ S.InventoryVarianceReport = {
       return { name: u.name, ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade, used: u.used, ounceVar, varPct };
     });
     if (!rows.length) return this.emptyMatch();
-    const n = (v, d) => v == null ? '<span style="color:var(--t4);">—</span>' : Number(v).toFixed(d == null ? 1 : d);
+    const n = (v, d) => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d);
     const body = rows.map(r => '<tr>'
       + '<td><div class="val">' + esc(r.name) + '</div></td>'
       + '<td>' + n(r.ouncesSold) + '</td>'
@@ -270,7 +270,7 @@ S.InventoryVarianceReport = {
       + '<td>' + n(r.used) + '</td>'
       + '<td>' + n(r.ounceVar) + '</td>'
       + '<td>' + this.pct(r.varPct) + '</td>'
-      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '—') + '</td>'
+      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
       + 'Ounces used comes from your counts; ounces sold comes from POS quantity at each product\'s pour size. '
