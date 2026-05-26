@@ -46,25 +46,27 @@ S.InventoryLocations = {
         + '<button class="btn btn-ghost" id="il-add-defaults">Add Suggested Defaults</button>'
         + '</div></div>';
     } else {
-      const rows = active.map((l, i) => {
+      const rows = active.map(l => {
         const n = this.productCount(l.name);
-        return '<tr>'
+        return '<tr data-id="' + esc(l.id) + '">'
+          + DragReorder.handleCellHTML()
           + '<td><button class="il-open" data-id="' + l.id + '" '
           + 'style="padding:0;border:none;background:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer;">'
           + esc(l.name) + '</button></td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm il-up" data-id="' + l.id + '"' + (i === 0 ? ' disabled' : '') + '>&#8593;</button>'
-          + '<button class="btn btn-ghost btn-sm il-down" data-id="' + l.id + '"' + (i === active.length - 1 ? ' disabled' : '') + '>&#8595;</button>'
           + '<button class="btn btn-ghost btn-sm il-arrange" data-id="' + l.id + '">Arrange Products</button>'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
           + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
       }).join('');
 
-      html = '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th>Location</th><th>Assigned Products</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+      html = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+        + 'Drag the &#x2630; handle on the left to reorder locations. This is the order operators see when picking locations to count.'
+        + '</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+        + '<th style="width:32px;"></th><th>Location</th><th>Assigned Products</th><th></th>'
+        + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div>';
 
       if (archived.length) {
         html += '<div class="sh" style="margin:24px 0 8px;">Deleted</div>'
@@ -83,8 +85,6 @@ S.InventoryLocations = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       const open = ev.target.closest('.il-open');
-      const up   = ev.target.closest('.il-up');
-      const down = ev.target.closest('.il-down');
       const arr  = ev.target.closest('.il-arrange');
       const edit = ev.target.closest('.il-edit');
       const arch = ev.target.closest('.il-archive');
@@ -92,8 +92,6 @@ S.InventoryLocations = {
       const addF = ev.target.closest('#il-add-first');
       const addD = ev.target.closest('#il-add-defaults');
       if (open)      this.showDetail(open.dataset.id);
-      else if (up)   this.move(up.dataset.id, -1);
-      else if (down) this.move(down.dataset.id, 1);
       else if (arr)  this.showDetail(arr.dataset.id);
       else if (edit) this.showForm(edit.dataset.id);
       else if (arch) this.confirmDelete(arch.dataset.id);
@@ -101,6 +99,16 @@ S.InventoryLocations = {
       else if (addF) this.showForm();
       else if (addD) this.addDefaults();
     };
+
+    const body = document.getElementById('il-loc-body');
+    if (body) {
+      DragReorder.wire({
+        container:      body,
+        rowSelector:    'tr[data-id]',
+        handleSelector: '.dr-handle',
+        onCommit:       (newOrderIds) => this._persistLocationOrder(newOrderIds)
+      });
+    }
   },
 
   // Soft-delete a location. If products are assigned, prompt with a count so
@@ -136,15 +144,12 @@ S.InventoryLocations = {
     });
   },
 
-  // ── Reorder / archive / defaults ──────────────────────────────────────────
-  async move(id, dir) {
+  // ── Archive / defaults ────────────────────────────────────────────────────
+  async _persistLocationOrder(newActiveOrderIds) {
     const all = this.locations();
-    const active = all.filter(l => !l.archived);
     const archived = all.filter(l => l.archived);
-    const i = active.findIndex(l => l.id === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= active.length) return;
-    [active[i], active[j]] = [active[j], active[i]];
+    const byId = new Map(all.map(l => [l.id, l]));
+    const active = newActiveOrderIds.map(id => byId.get(id)).filter(Boolean);
     App.inventoryData.ic_locations = [...active, ...archived];
     await App.saveInventory();
     this.renderList();
@@ -247,8 +252,8 @@ S.InventoryLocations = {
         + '<div class="empty-sub">Assign products to ' + esc(l.name) + ' from the Products screen using the '
         + 'Primary Location field.</div></div>';
     } else {
-      const rows = prods.map((p, i) => '<tr data-pid="' + esc(p.id) + '">'
-        + '<td class="il-drag" style="width:32px;text-align:center;cursor:grab;color:var(--t3);font-size:16px;touch-action:none;user-select:none;" title="Drag to reorder">&#x2630;</td>'
+      const rows = prods.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
+        + DragReorder.handleCellHTML()
         + '<td style="width:36px;color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
@@ -273,7 +278,17 @@ S.InventoryLocations = {
       if (back) this.renderList();
     };
 
-    if (prods.length) this._wireDrag(l.name);
+    if (prods.length) {
+      const arrangeBody = document.getElementById('il-arrange-body');
+      if (arrangeBody) {
+        DragReorder.wire({
+          container:      arrangeBody,
+          rowSelector:    'tr[data-id]',
+          handleSelector: '.dr-handle',
+          onCommit:       (newOrderIds) => this._persistProductOrder(l.name, newOrderIds)
+        });
+      }
+    }
   },
 
   // Sort products at a given location by their per-location sequence, then
@@ -289,88 +304,7 @@ S.InventoryLocations = {
     });
   },
 
-  // Pointer-based drag-to-reorder. Works for mouse and touch via the unified
-  // Pointer Events API. The handle's touch-action:none stops the browser from
-  // hijacking the touch as a page scroll. We move the dragged <tr> directly
-  // in the DOM as the pointer crosses other rows so the operator sees the
-  // list rearrange in real time. On release we read the final DOM order and
-  // re-stamp location_sequences 1..N so the order persists.
-  _wireDrag(locationName) {
-    const body = document.getElementById('il-arrange-body');
-    if (!body) return;
-    const self = this;
-    let dragRow = null;
-    let activeHandle = null;
-    let autoScrollTimer = null;
-    let lastClientY = 0;
-
-    const stopAutoScroll = () => {
-      if (autoScrollTimer) { cancelAnimationFrame(autoScrollTimer); autoScrollTimer = null; }
-    };
-    const tickAutoScroll = () => {
-      if (!dragRow) { stopAutoScroll(); return; }
-      const margin = 70;
-      const vh = window.innerHeight;
-      let delta = 0;
-      if (lastClientY < margin)            delta = -Math.ceil((margin - lastClientY) / 6);
-      else if (lastClientY > vh - margin)  delta =  Math.ceil((lastClientY - (vh - margin)) / 6);
-      if (delta) window.scrollBy(0, delta);
-      autoScrollTimer = requestAnimationFrame(tickAutoScroll);
-    };
-
-    body.querySelectorAll('.il-drag').forEach(handle => {
-      handle.addEventListener('pointerdown', ev => {
-        if (ev.button != null && ev.button !== 0) return;
-        ev.preventDefault();
-        const tr = handle.closest('tr');
-        if (!tr) return;
-        dragRow = tr;
-        activeHandle = handle;
-        lastClientY = ev.clientY;
-        try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
-        tr.style.opacity = '0.45';
-        tr.style.background = 'var(--surface)';
-        handle.style.cursor = 'grabbing';
-        document.body.style.cursor = 'grabbing';
-        autoScrollTimer = requestAnimationFrame(tickAutoScroll);
-      });
-
-      handle.addEventListener('pointermove', ev => {
-        if (!dragRow) return;
-        lastClientY = ev.clientY;
-        // Temporarily disable pointer events on the dragged row so
-        // elementFromPoint returns the row underneath, not itself.
-        dragRow.style.pointerEvents = 'none';
-        const el = document.elementFromPoint(ev.clientX, ev.clientY);
-        dragRow.style.pointerEvents = '';
-        if (!el) return;
-        const targetRow = el.closest('tr[data-pid]');
-        if (!targetRow || targetRow === dragRow || targetRow.parentNode !== body) return;
-        const rect = targetRow.getBoundingClientRect();
-        const after = (ev.clientY - rect.top) > rect.height / 2;
-        if (after) targetRow.parentNode.insertBefore(dragRow, targetRow.nextSibling);
-        else       targetRow.parentNode.insertBefore(dragRow, targetRow);
-      });
-
-      const finish = (commit) => {
-        if (!dragRow) return;
-        dragRow.style.opacity = '';
-        dragRow.style.background = '';
-        if (activeHandle) activeHandle.style.cursor = 'grab';
-        document.body.style.cursor = '';
-        stopAutoScroll();
-        const order = Array.from(body.querySelectorAll('tr[data-pid]')).map(r => r.dataset.pid);
-        dragRow = null;
-        activeHandle = null;
-        if (commit) self._persistOrder(locationName, order);
-      };
-
-      handle.addEventListener('pointerup',     ev => { try { handle.releasePointerCapture(ev.pointerId); } catch (_) {} finish(true);  });
-      handle.addEventListener('pointercancel', ev => { try { handle.releasePointerCapture(ev.pointerId); } catch (_) {} finish(false); });
-    });
-  },
-
-  async _persistOrder(locationName, idsInOrder) {
+  async _persistProductOrder(locationName, idsInOrder) {
     const prods = this.products();
     idsInOrder.forEach((pid, i) => {
       const p = prods.find(x => x.id === pid);
