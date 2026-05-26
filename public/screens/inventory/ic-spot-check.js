@@ -68,22 +68,36 @@ S.InventorySpotCheck = {
   lineHTML(lid, p) {
     const pp = this.poursPer(p);
     return '<div class="sp-line" data-lid="' + lid + '" data-pid="' + p.id + '" data-vd="0" '
-      + 'style="border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:10px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
-      + '<span style="flex:1;font-size:15px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
-      + '<span class="badge badge-dim">' + esc(p.category || '-') + '</span>'
-      + '<button type="button" class="btn btn-ghost btn-sm sp-remove">Remove</button>'
+      + 'style="border:1px solid var(--b1);border-radius:6px;padding:16px;margin-bottom:12px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+        + '<span style="flex:1;font-size:15px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
+        + '<span class="badge badge-dim">' + esc(p.category || '-') + '</span>'
+        + '<button type="button" class="btn btn-ghost btn-sm sp-remove">Remove</button>'
       + '</div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:10px;">'
-      + '<div class="f" style="width:104px;flex-shrink:0;"><label>Pre Count</label>'
-      + '<input type="number" class="sp-pre" min="0" step="0.1" inputmode="decimal" placeholder="btl" style="height:44px;font-size:16px;"/></div>'
-      + '<div class="f" style="width:104px;flex-shrink:0;"><label>Post Count</label>'
-      + '<input type="number" class="sp-post" min="0" step="0.1" inputmode="decimal" placeholder="btl" style="height:44px;font-size:16px;"/></div>'
-      + '<div class="f" style="width:104px;flex-shrink:0;"><label>POS Sold</label>'
-      + '<input type="number" class="sp-sold" min="0" step="0.1" inputmode="decimal" placeholder="pours" style="height:44px;font-size:16px;"/></div>'
+      // Pre-shift count: open bottle (slider partial 0-1) + full bottles (integer)
+      + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">'
+        + '<div style="flex:1;min-width:220px;">'
+          + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Pre-Shift Count</div>'
+          + BottleSlider.html('sp-pre-' + lid, { value: 0, fulls: 0, category: p.category })
+        + '</div>'
+        + '<div style="flex:1;min-width:220px;">'
+          + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Post-Shift Count</div>'
+          + BottleSlider.html('sp-post-' + lid, { value: 0, fulls: 0, category: p.category })
+        + '</div>'
       + '</div>'
-      + '<div class="sp-result" style="font-size:12px;color:var(--t3);">'
-      + 'Enter counts. ' + (pp ? pp.toFixed(1) : '1') + ' pours per container.</div>'
+      // Mid-shift restock + POS pours sold inputs.
+      + '<div class="form-row" style="gap:14px;margin-bottom:10px;">'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Restocked Mid-Shift</label>'
+          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">btl</span></div>'
+          + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">Full bottles added from storage during the shift.</div>'
+        + '</div>'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>POS Pours Sold</label>'
+          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">pours</span></div>'
+          + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">From your POS report for this shift.</div>'
+        + '</div>'
+      + '</div>'
+      + '<div class="sp-result" style="font-size:12px;color:var(--t3);line-height:1.6;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;">'
+      + 'Drag pre and post sliders, then enter POS pours to see the variance. ' + (pp ? pp.toFixed(1) : '1') + ' pours per container.</div>'
       + '</div>';
   },
 
@@ -145,7 +159,15 @@ S.InventorySpotCheck = {
     document.getElementById('sp-add')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
       if (p) {
-        lines.insertAdjacentHTML('beforeend', this.lineHTML(++this._seq, p));
+        const lid = ++this._seq;
+        lines.insertAdjacentHTML('beforeend', this.lineHTML(lid, p));
+        const newLine = lines.querySelector('.sp-line[data-lid="' + lid + '"]');
+        // Mount the two BottleSliders for this line. Slider changes do not
+        // bubble as input events, so we recompute the line from the slider
+        // onChange callback directly.
+        BottleSlider.mount('sp-pre-'  + lid, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
+        BottleSlider.mount('sp-post-' + lid, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
+        this.recalcLine(newLine);
         this.recalcTotal();
       }
       e.target.value = '';
@@ -159,18 +181,40 @@ S.InventorySpotCheck = {
     };
   },
 
-  // compute one line; returns its variance dollars
+  // compute one line; returns its variance dollars and supporting numbers
+  // Pre + Post counts come from BottleSliders (open + full split). Added is
+  // full bottles brought up from storage during the shift. Sold is from
+  // the operator's POS report for that shift.
+  //   actual_pours_used = (pre_total + added - post_total) × pours_per_container
+  //   expected_pours    = pos_pours_sold
+  //   variance_pours    = actual - expected   (positive = overpoured/theft)
+  //   variance_dollars  = variance_pours × cost_per_pour
   lineCalc(line) {
     const p = this.productById(line.dataset.pid);
+    if (!p) return null;
+    const lid = line.dataset.lid;
+    const pre  = BottleSlider.get ? BottleSlider.get('sp-pre-'  + lid) : null;
+    const post = BottleSlider.get ? BottleSlider.get('sp-post-' + lid) : null;
+    if (!pre || !post) return null;
+    const preTotal  = (pre.fulls || 0) + (pre.value || 0);
+    const postTotal = (post.fulls || 0) + (post.value || 0);
     const num = sel => { const v = parseFloat(line.querySelector(sel)?.value); return isNaN(v) ? null : v; };
-    const pre = num('.sp-pre'), post = num('.sp-post'), sold = num('.sp-sold');
-    if (pre == null || post == null) return null;
-    const pp = this.poursPer(p);
-    const used = pre - post;
-    const poured = used * pp;
-    const variance = sold != null ? poured - sold : null;
+    const added = num('.sp-added') || 0;
+    const sold  = num('.sp-sold');
+    const pp    = this.poursPer(p);
+    const usedContainers = preTotal + added - postTotal;
+    const actualPours = usedContainers * pp;
+    const variance = sold != null ? actualPours - sold : null;
     const vd = variance != null ? variance * this.costPer(p) : null;
-    return { p, pre, post, sold, used, poured, variance, vd, pp };
+    return {
+      p,
+      preTotal, postTotal, added, sold,
+      pre_value: pre.value, pre_fulls: pre.fulls,
+      post_value: post.value, post_fulls: post.fulls,
+      used: usedContainers,
+      poured: actualPours,
+      variance, vd, pp
+    };
   },
 
   recalcLine(line) {
@@ -179,24 +223,34 @@ S.InventorySpotCheck = {
     if (!r) {
       line.dataset.vd = '0';
       line.dataset.flag = '0';
-      if (res) res.innerHTML = 'Enter pre and post counts to compute variance.';
+      if (res) res.innerHTML = 'Set the pre and post bottle levels to start the variance calculation.';
       return;
     }
     line.dataset.vd = r.vd != null ? r.vd : '0';
-    if (r.variance == null) {
+    if (r.preTotal === 0 && r.postTotal === 0) {
       line.dataset.flag = '0';
-      if (res) res.innerHTML = '<span style="color:var(--t2);">Used ' + r.used.toFixed(1) + ' btl &middot; '
-        + r.poured.toFixed(1) + ' pours.</span> Enter POS sold to compute variance.';
+      if (res) res.innerHTML = 'Set the pre and post bottle levels to start the variance calculation.';
       return;
     }
-    // flag when variance is meaningfully off (more than ~half a pour or $1)
+    const usedTxt = 'Used ' + r.used.toFixed(2) + ' container'
+      + (Math.abs(r.used - 1) < 0.001 ? '' : 's')
+      + (r.added > 0 ? ' (restocked ' + r.added + ' mid-shift)' : '')
+      + ' &middot; ' + r.poured.toFixed(1) + ' pours actual';
+    if (r.variance == null) {
+      line.dataset.flag = '0';
+      if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + '.</span> Enter POS pours sold to see the variance.';
+      return;
+    }
+    // Flag when variance is meaningfully off (more than ~half a pour or $1
+    // either direction). Positive variance = overpoured/possible theft.
+    // Negative variance = unusual, could be spill or miscount.
     const flagged = Math.abs(r.variance) > 0.5 && Math.abs(r.vd) >= 1;
     line.dataset.flag = flagged ? '1' : '0';
     const cls = flagged ? 'var(--red)' : 'var(--gold)';
-    if (res) res.innerHTML = '<span style="color:var(--t2);">Used ' + r.used.toFixed(1) + ' btl &middot; '
-      + r.poured.toFixed(1) + ' poured &middot; ' + r.sold.toFixed(1) + ' sold.</span> '
-      + '<span style="color:' + cls + ';font-weight:700;">Variance ' + (r.variance > 0 ? '+' : '')
-      + r.variance.toFixed(1) + ' pours &middot; ' + (r.vd > 0 ? '+' : '') + App.fmtCurrency(r.vd) + '</span>';
+    const direction = r.variance > 0 ? 'Overpoured' : (r.variance < 0 ? 'Underpoured' : 'On target');
+    if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + ' &middot; ' + r.sold.toFixed(0) + ' pours rung in.</span><br>'
+      + '<span style="color:' + cls + ';font-weight:700;">' + direction + ' by ' + Math.abs(r.variance).toFixed(1) + ' pours &middot; '
+      + (r.vd > 0 ? '+' : '') + App.fmtCurrency(r.vd) + '</span>';
   },
 
   recalcTotal() {
@@ -231,15 +285,27 @@ S.InventorySpotCheck = {
       const r = this.lineCalc(line);
       const p = this.productById(line.dataset.pid);
       if (!p) return;
-      if (r && r.pre != null && r.post != null) valid = true;
+      // A line is valid for save when at least one count was set (either
+      // partial level or full bottles entered on pre or post).
+      if (r && (r.preTotal > 0 || r.postTotal > 0)) valid = true;
       items.push({
         product_id:      p.id,
         name:            p.name,
         category:        p.category || '',
         pours_per_container: this.poursPer(p),
         cost_per_pour:   this.costPer(p),
-        pre:             r ? r.pre : null,
-        post:            r ? r.post : null,
+        // Open-bottle partial level and full-bottle integer for pre + post.
+        pre_value:       r ? r.pre_value : null,
+        pre_fulls:       r ? r.pre_fulls : null,
+        pre_total:       r ? r.preTotal : null,
+        post_value:      r ? r.post_value : null,
+        post_fulls:      r ? r.post_fulls : null,
+        post_total:      r ? r.postTotal : null,
+        // Backward-compat fields for any downstream consumer that still
+        // expects flat pre/post numbers.
+        pre:             r ? r.preTotal : null,
+        post:            r ? r.postTotal : null,
+        added:           r ? r.added : null,
         pos_sold:        r ? r.sold : null,
         used_containers: r ? r.used : null,
         poured:          r ? r.poured : null,
@@ -248,7 +314,7 @@ S.InventorySpotCheck = {
         flagged:         line.dataset.flag === '1'
       });
     });
-    if (!valid) { fail('Enter pre and post counts for at least one product.'); return; }
+    if (!valid) { fail('Set pre and post counts for at least one product.'); return; }
 
     const rec = {
       id:           App.uid(),
