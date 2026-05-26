@@ -541,13 +541,16 @@ S.InventoryReceiveDelivery = {
 
     if (lineItems.length === 0) { fail('Add at least one line item with a product and quantity.'); return; }
 
-    // Apply price changes to the product master
+    // Apply price changes to the product master. For case-tracked Bottle
+    // Beer, newPrice is per-case (operator enters per-case in the form), so
+    // divide by case_size before computing cost_per_pour and pour_cost_pct.
     productUpdates.forEach(({ product, newPrice }) => {
       product.unit_cost = newPrice;
       const pours = product.container_size_oz && product.pour_size_oz
         ? product.container_size_oz / product.pour_size_oz : null;
       product.pours_per_container = pours;
-      product.cost_per_pour = pours && newPrice != null ? newPrice / pours : null;
+      const perBottle = App.bottleCost(product);
+      product.cost_per_pour = pours && perBottle != null ? perBottle / pours : null;
       product.pour_cost_pct = product.cost_per_pour != null && product.menu_price
         ? product.cost_per_pour / product.menu_price * 100 : null;
     });
