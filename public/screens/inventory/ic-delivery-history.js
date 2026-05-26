@@ -15,9 +15,9 @@ S.InventoryDeliveryHistory = {
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
   // ── Entry ─────────────────────────────────────────────────────────────────
@@ -52,8 +52,8 @@ S.InventoryDeliveryHistory = {
           : '<span class="badge badge-dim">Clean</span>';
         return '<tr class="dh-row" data-id="' + d.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
-          + '<td>' + esc(d.vendor || '—') + '</td>'
-          + '<td>' + esc(d.invoice_number || '—') + '</td>'
+          + '<td>' + esc(d.vendor || '-') + '</td>'
+          + '<td>' + esc(d.invoice_number || '-') + '</td>'
           + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
           + '<td class="val">' + App.fmtCurrency(d.total || 0) + '</td>'
           + '<td>' + disc + '</td></tr>';
@@ -91,14 +91,20 @@ S.InventoryDeliveryHistory = {
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
 
     const itemRows = items.map(it => {
+      const isCase = it.display_unit === 'case';
+      const unitSuffix = isCase ? ' cases' : '';
+      const priceSuffix = isCase ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '';
       const change = it.price_changed
         ? '<span style="color:var(--gold);font-weight:700;">was ' + App.fmtCurrency(it.prev_price) + '</span>'
-        : '<span style="color:var(--t4);">—</span>';
+        : '<span style="color:var(--t4);">-</span>';
+      const containerCol = isCase && it.case_size_at_receive
+        ? (it.container_size_oz != null ? it.container_size_oz + ' oz btl &middot; ' + it.case_size_at_receive + '/case' : it.case_size_at_receive + ' btl/case')
+        : (it.container_size_oz != null ? it.container_size_oz + ' oz' : '-');
       return '<tr>'
         + '<td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td>' + (it.container_size_oz != null ? it.container_size_oz + ' oz' : '—') + '</td>'
-        + '<td>' + (it.qty != null ? it.qty : '—') + '</td>'
-        + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) : '—') + '</td>'
+        + '<td>' + containerCol + '</td>'
+        + '<td>' + (it.qty != null ? it.qty + unitSuffix : '-') + '</td>'
+        + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) + priceSuffix : '-') + '</td>'
         + '<td>' + change + '</td>'
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'
         + '</tr>';
@@ -108,8 +114,8 @@ S.InventoryDeliveryHistory = {
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="dh-back">&#8592; Back to Delivery History</button></div>'
       + '<div class="card"><div class="card-title">' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</div>'
       + '<div class="calc" style="margin-bottom:' + (d.notes ? '14px' : '0') + ';">'
-      + meta('Invoice #', esc(d.invoice_number || '—'))
-      + meta('Driver', esc(d.driver || '—'))
+      + meta('Invoice #', esc(d.invoice_number || '-'))
+      + meta('Driver', esc(d.driver || '-'))
       + meta('Line Items', d.item_count || items.length)
       + meta('Delivery Total', App.fmtCurrency(d.total || 0))
       + '</div>'
