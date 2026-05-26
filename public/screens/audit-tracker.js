@@ -107,9 +107,12 @@ S.AuditTracker = {
           + '</tr>';
       }).join('');
       historyCard = '<div class="card">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
+        + '<div style="display:flex;align-items:center;gap:12px;">'
+        +   '<button class="btn btn-ghost btn-sm at-compare-btn" style="font-size:10px;padding:4px 10px;">Compare Audits</button>'
+        +   '<div style="font-size:11px;color:var(--t3);">Last 12 months stored.</div>'
+        + '</div>'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
@@ -147,6 +150,7 @@ S.AuditTracker = {
     this.container.querySelectorAll('.at-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
+    this.container.querySelector('.at-compare-btn')?.addEventListener('click', () => S.AuditDiff.open('profit'));
   },
 
   renderScoreChart(audits, prefix) {
