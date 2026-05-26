@@ -309,22 +309,28 @@ S.InventoryProducts = {
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Container Size ' + tt('container-size') + '</label>'
+      + '<div class="f" style="width:240px;flex-shrink:0;"><label>' + (cat === 'Bottle Beer' ? 'Bottle Size' : 'Container Size') + ' ' + tt('container-size') + '</label>'
       + '<select id="ip-size">' + this.sizeOpts(isCustom ? null : p?.container_size_oz, cat) + '</select></div>'
       + '<div class="f" id="ip-cw" style="width:110px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
       + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Pour Size ' + tt('std-pour') + '</label>'
+      // Case Size field — visible only for Bottle Beer. Bottle beer is
+      // operationally tracked in cases, not single bottles. case_size is
+      // bottles-per-case (6/12/24/30 are common); unit_cost becomes the
+      // cost per case, par_level is in cases.
+      + '<div class="f" id="ip-case-size-wrap" style="width:130px;flex-shrink:0;' + (cat === 'Bottle Beer' ? '' : 'display:none;') + '"><label>Case Size</label>'
+      + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size) + '" step="1" min="1" placeholder="24"/><span class="suf">btl/case</span></div></div>'
+      + '<div class="f" id="ip-pour-wrap" style="width:110px;flex-shrink:0;' + (cat === 'Bottle Beer' ? 'display:none;' : '') + '"><label>Pour Size ' + tt('std-pour') + '</label>'
       + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz) + '" step="0.25" placeholder="1.5"/><span class="suf">oz</span></div></div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Unit Cost ' + tt('unit-cost') + '</label>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label id="ip-cost-label">' + (cat === 'Bottle Beer' ? 'Cost per Case' : 'Unit Cost') + ' ' + tt('unit-cost') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:110px;flex-shrink:0;"><label>Menu Price ' + tt('menu-price') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par Level ' + tt('ic-par-level') + '</label>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label id="ip-par-label">' + (cat === 'Bottle Beer' ? 'Par (cases)' : 'Par Level') + ' ' + tt('ic-par-level') + '</label>'
       + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Reorder Point ' + tt('ic-reorder-point') + '</label>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label id="ip-reorder-label">' + (cat === 'Bottle Beer' ? 'Reorder Point (cases)' : 'Reorder Point') + ' ' + tt('ic-reorder-point') + '</label>'
       + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Primary Location</label>'
       + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
@@ -351,18 +357,28 @@ S.InventoryProducts = {
       document.getElementById('ip-cw').style.display = document.getElementById('ip-size').value === 'custom' ? '' : 'none';
       this.calcProduct();
     });
-    // When the category changes, re-render the size dropdown so only the
-    // relevant group shows. Preserve the currently-selected oz value if it
-    // is still valid in the new group; otherwise the operator picks fresh.
+    // When the category changes, re-render the size dropdown AND swap the
+    // case-size / pour-size visibility plus cost/par labels for the new
+    // category. Bottle Beer needs case-aware fields (operationally tracked
+    // in cases, not bottles); everything else uses the standard fields.
     document.getElementById('ip-cat')?.addEventListener('change', () => {
       const newCat = document.getElementById('ip-cat').value;
       const cur = document.getElementById('ip-size').value;
       const curOz = (cur === 'custom') ? null : (parseFloat(cur) || null);
       const sizeSel = document.getElementById('ip-size');
       sizeSel.innerHTML = this.sizeOpts(curOz, newCat);
-      // If the previously-selected size is not in the new group, the
-      // dropdown will land on the blank option. That is fine — operator
-      // picks again from the right set.
+
+      const isBeerCase = (newCat === 'Bottle Beer');
+      const caseWrap = document.getElementById('ip-case-size-wrap');
+      const pourWrap = document.getElementById('ip-pour-wrap');
+      const costLabel    = document.getElementById('ip-cost-label');
+      const parLabel     = document.getElementById('ip-par-label');
+      const reorderLabel = document.getElementById('ip-reorder-label');
+      if (caseWrap)    caseWrap.style.display    = isBeerCase ? '' : 'none';
+      if (pourWrap)    pourWrap.style.display    = isBeerCase ? 'none' : '';
+      if (costLabel)   costLabel.firstChild.nodeValue   = isBeerCase ? 'Cost per Case ' : 'Unit Cost ';
+      if (parLabel)    parLabel.firstChild.nodeValue    = isBeerCase ? 'Par (cases) ' : 'Par Level ';
+      if (reorderLabel) reorderLabel.firstChild.nodeValue = isBeerCase ? 'Reorder Point (cases) ' : 'Reorder Point ';
     });
     ['ip-coz','ip-pour','ip-cost','ip-price'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this.calcProduct())
@@ -422,6 +438,11 @@ S.InventoryProducts = {
       sub_category:        document.getElementById('ip-subcat')?.value.trim() || '',
       vendor:              document.getElementById('ip-vendor')?.value.trim() || '',
       container_size_oz:   oz,
+      // Case size for Bottle Beer (bottles per case). null/0 for other
+      // categories means single-unit tracking as before.
+      case_size:           (document.getElementById('ip-cat')?.value === 'Bottle Beer')
+                             ? (parseInt(document.getElementById('ip-case-size')?.value) || null)
+                             : null,
       pour_size_oz:        pour,
       unit_cost:           cost,
       menu_price:          price,
