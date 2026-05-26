@@ -85,40 +85,51 @@ S.InventoryTakeInventory = {
       : '';
 
     const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
-    const locOpts = locs.length
-      ? locs.map(l => '<label style="display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px;color:var(--t1);cursor:pointer;">'
-          + '<input type="checkbox" class="ti-loc" value="' + esc(l.name) + '" style="width:16px;height:16px;accent-color:var(--gold);"/>'
-          + esc(l.name) + '</label>').join('')
-      : '<div style="font-size:12px;color:var(--t3);">No locations defined yet. Add them in the Locations screen.</div>';
 
-    const typeCard = (val, desc) =>
-      '<label style="display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid var(--b1);border-radius:6px;cursor:pointer;margin-bottom:8px;">'
-      + '<input type="radio" name="ti-type" value="' + val + '" style="margin-top:2px;accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;"/>'
-      + '<div><div style="font-size:13px;font-weight:700;color:var(--t1);">' + val + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + desc + '</div></div></label>';
+    let locPicker;
+    if (locs.length === 0) {
+      locPicker = '<div class="empty" style="margin:0;"><div class="empty-title">No locations set up yet</div>'
+        + '<div class="empty-sub">Add storage locations in the Locations screen first. Inventory counts are organized by location.</div>'
+        + '<button class="btn btn-primary" id="ti-go-locs">Go to Locations</button></div>';
+    } else {
+      const locCards = locs.map(l => {
+        const productCount = this.products().filter(p => p.primary_location === l.name).length;
+        return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--b1);border-radius:6px;cursor:pointer;margin-bottom:8px;">'
+          + '<input type="checkbox" class="ti-loc" value="' + esc(l.name) + '" style="width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;"/>'
+          + '<div style="flex:1;">'
+            + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(l.name) + '</div>'
+            + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + productCount + ' product' + (productCount === 1 ? '' : 's') + ' assigned</div>'
+          + '</div></label>';
+      }).join('');
+      locPicker = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+        + 'Pick the location you want to count right now. Most operators count one location at a time and come back for the others later. Pick more than one if you are doing a full inventory in one session.'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+          + '<button type="button" class="btn btn-ghost btn-sm" id="ti-loc-all">Select all</button>'
+          + '<button type="button" class="btn btn-ghost btn-sm" id="ti-loc-none">Clear</button>'
+        + '</div>'
+        + locCards;
+    }
 
     this.container.innerHTML = '<div class="screen">' + resumeBar
       + '<div class="card"><div class="card-title">Start an Inventory Count</div>'
-      + typeCard('Full', 'Count every active product across all categories.')
-      + typeCard('Bar Only', 'Liquor, wine, and beer only.')
-      + typeCard('Kitchen Only', 'Food and misc products only.')
-      + typeCard('Custom', 'Choose specific storage locations to count.')
-      + '<div id="ti-custom" style="display:none;margin:6px 0 4px;padding:12px 14px;background:var(--input);border-radius:6px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Locations to Count</div>'
-      + locOpts + '</div>'
+      + locPicker
       + '<div class="form-row" style="gap:16px;margin-top:14px;">'
       + '<div class="f w-md"><label>Counted By</label><input type="text" id="ti-by" placeholder="Optional"/></div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="ti-start">Start Count</button>'
+      + (locs.length > 0 ? '<button class="btn btn-primary" id="ti-start">Start Count</button>' : '')
       + '<span id="ti-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 
     this.container.onclick = null;
-    this.container.querySelectorAll('input[name="ti-type"]').forEach(r =>
-      r.addEventListener('change', () => {
-        document.getElementById('ti-custom').style.display = (r.value === 'Custom' && r.checked) ? '' : 'none';
-      }));
+    document.getElementById('ti-go-locs')?.addEventListener('click', () => App.navigate('ic-locations'));
+    document.getElementById('ti-loc-all')?.addEventListener('click', () => {
+      this.container.querySelectorAll('.ti-loc').forEach(c => { c.checked = true; });
+    });
+    document.getElementById('ti-loc-none')?.addEventListener('click', () => {
+      this.container.querySelectorAll('.ti-loc').forEach(c => { c.checked = false; });
+    });
     document.getElementById('ti-resume')?.addEventListener('click', () => {
       this.draft = this.loadDraft();
       if (this.draft) {
@@ -158,19 +169,22 @@ S.InventoryTakeInventory = {
   },
 
   startCount() {
-    const typeEl = this.container.querySelector('input[name="ti-type"]:checked');
     const err = document.getElementById('ti-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!typeEl) { fail('Choose a count type.'); return; }
-    const type = typeEl.value;
-    let customLocs = [];
-    if (type === 'Custom') {
-      customLocs = [...this.container.querySelectorAll('.ti-loc:checked')].map(c => c.value);
-      if (!customLocs.length) { fail('Select at least one location to count.'); return; }
-    }
+    const picked = [...this.container.querySelectorAll('.ti-loc:checked')].map(c => c.value);
+    if (picked.length === 0) { fail('Pick at least one location to count.'); return; }
+
+    // "type" is now derived: a single location uses the location name; more
+    // than one is labeled "Multi-Location". The full set of picked locations
+    // is preserved on the draft and the saved count record.
+    const allLocs = ((App.inventoryData && App.inventoryData.ic_locations) || [])
+      .filter(l => !l.archived).map(l => l.name);
+    const isFull = picked.length === allLocs.length && allLocs.length > 0;
+    const type = isFull ? 'Full' : (picked.length === 1 ? picked[0] : 'Multi-Location');
+
     this.draft = {
       type,
-      custom_locations: customLocs,
+      custom_locations: picked,
       counted_by: document.getElementById('ti-by')?.value.trim() || '',
       counts: {},
       started_at: new Date().toISOString(),
@@ -183,12 +197,20 @@ S.InventoryTakeInventory = {
   },
 
   // ── Counting ──────────────────────────────────────────────────────────────
+  // Products to count = active products whose primary_location is one of
+  // the picked locations on the draft. Backward compat: old draft types
+  // ('Full' / 'Bar Only' / 'Kitchen Only' without custom_locations) still
+  // resolve so a resumed pre-rebuild draft does not break.
   countProducts() {
     const all = this.products();
+    const locs = this.draft.custom_locations || [];
+    if (locs.length > 0) {
+      return all.filter(p => locs.includes(p.primary_location || ''));
+    }
+    // Legacy fallbacks for drafts created before the rebuild.
     const t = this.draft.type;
     if (t === 'Bar Only')     return all.filter(p => this.BAR_CATS.includes(p.category));
     if (t === 'Kitchen Only') return all.filter(p => this.KITCHEN_CATS.includes(p.category));
-    if (t === 'Custom')       return all.filter(p => this.draft.custom_locations.includes(p.primary_location || ''));
     return all;
   },
 
@@ -201,9 +223,21 @@ S.InventoryTakeInventory = {
       const loc = p.primary_location || 'Unassigned';
       (byLoc[loc] = byLoc[loc] || []).push(p);
     });
+    // Sort products within each location by the per-location sequence set
+    // on the Locations Manage Order screen. Products with no sequence sort
+    // to the end so new products do not jump above the operator's curated
+    // shelf/rail order.
+    const sortInLoc = (loc, list) => list.slice().sort((a, b) => {
+      const sa = (a.location_sequences && a.location_sequences[loc] != null) ? a.location_sequences[loc] : Number.MAX_SAFE_INTEGER;
+      const sb = (b.location_sequences && b.location_sequences[loc] != null) ? b.location_sequences[loc] : Number.MAX_SAFE_INTEGER;
+      if (sa !== sb) return sa - sb;
+      return (a.name || '').localeCompare(b.name || '');
+    });
     const result = [];
-    order.forEach(loc => { if (byLoc[loc]) { result.push({ location: loc, products: byLoc[loc] }); delete byLoc[loc]; } });
-    Object.keys(byLoc).forEach(loc => result.push({ location: loc, products: byLoc[loc] }));
+    order.forEach(loc => {
+      if (byLoc[loc]) { result.push({ location: loc, products: sortInLoc(loc, byLoc[loc]) }); delete byLoc[loc]; }
+    });
+    Object.keys(byLoc).forEach(loc => result.push({ location: loc, products: sortInLoc(loc, byLoc[loc]) }));
     return result;
   },
 
