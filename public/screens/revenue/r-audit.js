@@ -140,7 +140,7 @@ S.RevenueAudit = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + sparklines + historyCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + historyCard + '</div>';
 
     document.getElementById('ra-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.ra-view-btn').forEach(btn => {
