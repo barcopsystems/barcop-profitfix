@@ -40,14 +40,87 @@ S.InventoryProducts = {
     return App.inventoryData.ic_products;
   },
 
-  sizeOpts(sel) {
+  // Map a product category to the SIZES group that should be offered.
+  // Liquor → Spirits, Wine → Wine, Bottle Beer → Beer, Draft Beer → Draft
+  // Keg, anything else falls back to showing every group so the operator
+  // can still pick something sensible.
+  groupForCategory(cat) {
+    if (cat === 'Liquor')       return 'Spirits';
+    if (cat === 'Wine')         return 'Wine';
+    if (cat === 'Bottle Beer')  return 'Beer';
+    if (cat === 'Draft Beer')   return 'Draft Keg';
+    return null;
+  },
+
+  // Pull unique oz values from existing products that are NOT in the
+  // built-in SIZES list. These get added to a "Saved Custom Sizes" optgroup
+  // so an operator who entered "22.5 oz" once never has to re-type it.
+  customSizesUsed() {
+    const builtIn = new Set(this.SIZES.filter(s => s.oz != null).map(s => s.oz));
+    const seen = new Set();
+    (this.products() || []).forEach(p => {
+      const oz = parseFloat(p.container_size_oz);
+      if (!isNaN(oz) && oz > 0 && !builtIn.has(oz)) seen.add(oz);
+    });
+    return [...seen].sort((a, b) => a - b);
+  },
+
+  // Vendor dropdown driven by the operator's actual ic_vendors records.
+  // First option is blank, then the saved vendors alphabetically, then a
+  // permanent "+ Add Vendor in Vendors screen" hint so they know where to
+  // create one (rather than typing freeform here and producing orphan names).
+  vendorOpts(sel) {
+    const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    let h = '<option value="">Select vendor...</option>';
+    vendors.forEach(v => {
+      h += '<option value="' + esc(v.name) + '"' + (sel === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>';
+    });
+    // Preserve any legacy free-text vendor that no longer matches a saved
+    // record so the operator does not lose data on edit.
+    if (sel && !vendors.some(v => v.name === sel)) {
+      h += '<option value="' + esc(sel) + '" selected>' + esc(sel) + ' (unsaved)</option>';
+    }
+    return h;
+  },
+
+  // Location dropdown driven by ic_locations, archived ones excluded.
+  // Same legacy-preservation pattern as vendorOpts.
+  locationOpts(sel) {
+    const locs = ((App.inventoryData && App.inventoryData.ic_locations) || [])
+      .filter(l => !l.archived)
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    let h = '<option value="">Select location...</option>';
+    locs.forEach(l => {
+      h += '<option value="' + esc(l.name) + '"' + (sel === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>';
+    });
+    if (sel && !locs.some(l => l.name === sel)) {
+      h += '<option value="' + esc(sel) + '" selected>' + esc(sel) + ' (unsaved)</option>';
+    }
+    return h;
+  },
+
+  sizeOpts(sel, cat) {
+    const group = this.groupForCategory(cat);
     let g = '', h = '<option value="">Select container size...</option>';
+    // Always show the relevant category group first, then a small set of
+    // saved custom sizes the operator has used before, then Other (which
+    // includes the "Custom (enter oz)" entry).
     this.SIZES.forEach(s => {
+      if (group && s.g !== group && s.g !== 'Other') return;
       if (s.g !== g) { if (g) h += '</optgroup>'; h += '<optgroup label="' + s.g + '">'; g = s.g; }
       const v = s.oz !== null ? s.oz : 'custom';
       h += '<option value="' + v + '"' + (sel != null && s.oz === sel ? ' selected' : '') + '>' + s.l + '</option>';
     });
     if (g) h += '</optgroup>';
+    const custom = this.customSizesUsed();
+    if (custom.length) {
+      h += '<optgroup label="Saved Custom Sizes">';
+      custom.forEach(oz => {
+        h += '<option value="' + oz + '"' + (sel === oz ? ' selected' : '') + '>' + oz + ' oz</option>';
+      });
+      h += '</optgroup>';
+    }
     return h;
   },
 
@@ -228,15 +301,16 @@ S.InventoryProducts = {
 
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f w-md"><label>Sub-Category</label><input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="Vodka"/></div>'
-      + '<div class="f w-lg"><label>Primary Vendor</label><input type="text" id="ip-vendor" value="' + esc(p?.vendor || '') + '" placeholder="Republic National"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Status</label>'
+      + '<div class="f w-lg"><label>Primary Vendor</label>'
+      + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Status <span style="color:var(--t4);font-weight:400;">(hides from operations)</span></label>'
       + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;height:36px;">'
       + '<input type="checkbox" id="ip-active"' + (p ? (p.active === false ? '' : ' checked') : ' checked') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>Active</label></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Container Size ' + tt('container-size') + '</label>'
-      + '<select id="ip-size">' + this.sizeOpts(isCustom ? null : p?.container_size_oz) + '</select></div>'
+      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Container Size ' + tt('container-size') + '</label>'
+      + '<select id="ip-size">' + this.sizeOpts(isCustom ? null : p?.container_size_oz, cat) + '</select></div>'
       + '<div class="f" id="ip-cw" style="width:110px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
       + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
       + '<div class="f" style="width:110px;flex-shrink:0;"><label>Pour Size ' + tt('std-pour') + '</label>'
@@ -252,10 +326,8 @@ S.InventoryProducts = {
       + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Reorder Point ' + tt('ic-reorder-point') + '</label>'
       + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Primary Location</label>'
-      + '<input type="text" id="ip-loc1" value="' + esc(p?.primary_location || '') + '" placeholder="Front Bar"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Secondary Location</label>'
-      + '<input type="text" id="ip-loc2" value="' + esc(p?.secondary_location || '') + '" placeholder="Walk-In Cooler"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Primary Location</label>'
+      + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
@@ -278,6 +350,19 @@ S.InventoryProducts = {
     document.getElementById('ip-size')?.addEventListener('change', () => {
       document.getElementById('ip-cw').style.display = document.getElementById('ip-size').value === 'custom' ? '' : 'none';
       this.calcProduct();
+    });
+    // When the category changes, re-render the size dropdown so only the
+    // relevant group shows. Preserve the currently-selected oz value if it
+    // is still valid in the new group; otherwise the operator picks fresh.
+    document.getElementById('ip-cat')?.addEventListener('change', () => {
+      const newCat = document.getElementById('ip-cat').value;
+      const cur = document.getElementById('ip-size').value;
+      const curOz = (cur === 'custom') ? null : (parseFloat(cur) || null);
+      const sizeSel = document.getElementById('ip-size');
+      sizeSel.innerHTML = this.sizeOpts(curOz, newCat);
+      // If the previously-selected size is not in the new group, the
+      // dropdown will land on the blank option. That is fine — operator
+      // picks again from the right set.
     });
     ['ip-coz','ip-pour','ip-cost','ip-price'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this.calcProduct())
@@ -343,7 +428,6 @@ S.InventoryProducts = {
       par_level:           num('ip-par'),
       reorder_point:       num('ip-reorder'),
       primary_location:    document.getElementById('ip-loc1')?.value.trim() || '',
-      secondary_location:  document.getElementById('ip-loc2')?.value.trim() || '',
       active:              !!document.getElementById('ip-active')?.checked,
       notes:               document.getElementById('ip-notes')?.value.trim() || '',
       pours_per_container: pours,
