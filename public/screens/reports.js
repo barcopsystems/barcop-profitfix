@@ -5,9 +5,8 @@ S.Reports={
   },
   renderMain(){
     if(this.actions){
-      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-qbo">Quick P&amp;L Export</button> <button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
+      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
       document.getElementById('pr-export')?.addEventListener('click',()=>window.print());
-      document.getElementById('pr-qbo')?.addEventListener('click',()=>this._openQboModal());
     }
     const weeks=(App.data.weeks||[]).slice().reverse();
     const t=App.data.settings.targets||{};
