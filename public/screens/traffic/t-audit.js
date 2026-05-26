@@ -132,7 +132,7 @@ S.TrafficAudit = {
     let sparklines = '';
     if (audits.length >= 3) sparklines = this.renderSparklines(audits);
 
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + sparklines + historyCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + historyCard + '</div>';
 
     document.getElementById('ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.ta-view-btn').forEach(btn => {
