@@ -5,8 +5,9 @@ S.Reports={
   },
   renderMain(){
     if(this.actions){
-      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
+      this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-qbo">Export to QuickBooks</button> <button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
       document.getElementById('pr-export')?.addEventListener('click',()=>window.print());
+      document.getElementById('pr-qbo')?.addEventListener('click',()=>this._openQboModal());
     }
     const weeks=(App.data.weeks||[]).slice().reverse();
     const t=App.data.settings.targets||{};
@@ -94,6 +95,191 @@ S.Reports={
       });
     });
   },
+  // ─────────────────────────────────────────────────────────────────────
+  // Export to QuickBooks — Phase 3 Item 30.
+  // Drops a wide-format weekly P&L CSV (revenue, COGS, labor with bar+food
+  // splits, plus prime cost and percentages) for the operator's bookkeeper.
+  // Not a direct QBO API integration. CSV is the universal handoff and works
+  // with QuickBooks, Xero, or any spreadsheet.
+  // ─────────────────────────────────────────────────────────────────────
+
+  _openQboModal(){
+    const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
+    if(weeks.length===0){
+      this._qboMessageModal('No weeks saved yet. Save at least one week from Profit > This Week before exporting.');
+      return;
+    }
+    const m=document.createElement('div');
+    m.id='qbo-export-modal';
+    m.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.65);';
+    m.innerHTML='<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:540px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--t1);letter-spacing:0.6px;text-transform:uppercase;">Export to QuickBooks</div>'
+        +'<button id="qbo-close" class="btn btn-ghost btn-sm" style="margin:-4px -4px 0 0;">Close</button>'
+      +'</div>'
+      +'<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:18px;">Weekly revenue, COGS, and labor as a CSV. Hand it to your bookkeeper or import into QuickBooks, Xero, or any spreadsheet.</div>'
+      +'<div class="f" style="margin-bottom:14px;"><label>Range</label>'
+        +'<select id="qbo-range">'
+          +'<option value="last1">Last completed week</option>'
+          +'<option value="last4">Last 4 weeks</option>'
+          +'<option value="last13" selected>Last 13 weeks (quarter)</option>'
+          +'<option value="ytd">Year to date</option>'
+          +'<option value="all">All saved weeks</option>'
+          +'<option value="custom">Custom range</option>'
+        +'</select>'
+      +'</div>'
+      +'<div id="qbo-custom" style="display:none;gap:12px;margin-bottom:14px;">'
+        +'<div class="f" style="flex:1;"><label>From</label><input type="date" id="qbo-from"/></div>'
+        +'<div class="f" style="flex:1;"><label>To</label><input type="date" id="qbo-to"/></div>'
+      +'</div>'
+      +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-bottom:18px;padding:10px 12px;background:var(--surface);border-radius:4px;line-height:1.5;"></div>'
+      +'<div style="display:flex;justify-content:flex-end;gap:10px;">'
+        +'<button id="qbo-download" class="btn">Download CSV</button>'
+      +'</div>'
+    +'</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click',ev=>{if(ev.target===m)this._closeQboModal();});
+    document.getElementById('qbo-close').addEventListener('click',()=>this._closeQboModal());
+
+    const rangeSel=document.getElementById('qbo-range');
+    const customRow=document.getElementById('qbo-custom');
+    const fromInp=document.getElementById('qbo-from');
+    const toInp=document.getElementById('qbo-to');
+    const dlBtn=document.getElementById('qbo-download');
+
+    const lastDate=weeks[weeks.length-1]?.period_end||'';
+    const firstCustomDate=weeks[Math.max(0,weeks.length-13)]?.period_end||'';
+    if(fromInp) fromInp.value=firstCustomDate;
+    if(toInp) toInp.value=lastDate;
+
+    const updatePreview=()=>{
+      const range=rangeSel.value;
+      customRow.style.display=(range==='custom')?'flex':'none';
+      const filtered=this._filterWeeksByRange(weeks,range,fromInp.value,toInp.value);
+      const previewEl=document.getElementById('qbo-preview');
+      if(filtered.length===0){
+        previewEl.innerHTML='<span style="color:var(--warn);">No weeks fall in that range.</span>';
+        dlBtn.disabled=true;
+        dlBtn.style.opacity='0.5';
+        dlBtn.style.cursor='not-allowed';
+      } else {
+        const first=filtered[0].period_end||'(no date)';
+        const last=filtered[filtered.length-1].period_end||'(no date)';
+        previewEl.innerHTML=filtered.length+' week'+(filtered.length===1?'':'s')+' will export. '+esc(first)+' through '+esc(last)+'.';
+        dlBtn.disabled=false;
+        dlBtn.style.opacity='';
+        dlBtn.style.cursor='';
+      }
+    };
+    rangeSel.addEventListener('change',updatePreview);
+    fromInp.addEventListener('change',updatePreview);
+    toInp.addEventListener('change',updatePreview);
+    updatePreview();
+
+    dlBtn.addEventListener('click',()=>{
+      const range=rangeSel.value;
+      const filtered=this._filterWeeksByRange(weeks,range,fromInp.value,toInp.value);
+      if(filtered.length===0) return;
+      const csv=this._buildQboCsv(filtered);
+      const today=new Date().toISOString().slice(0,10);
+      this._downloadCsv(csv,'barcop-weekly-pnl-'+today+'.csv');
+      this._closeQboModal();
+    });
+  },
+
+  _closeQboModal(){
+    const m=document.getElementById('qbo-export-modal');
+    if(m) m.remove();
+  },
+
+  _qboMessageModal(msg){
+    const m=document.createElement('div');
+    m.id='qbo-export-modal';
+    m.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
+    m.innerHTML='<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;max-width:440px;width:100%;">'
+      +'<div style="font-size:13px;color:var(--t1);line-height:1.6;margin-bottom:18px;">'+esc(msg)+'</div>'
+      +'<div style="display:flex;justify-content:flex-end;"><button id="qbo-msg-ok" class="btn btn-ghost">OK</button></div>'
+    +'</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click',ev=>{if(ev.target===m)this._closeQboModal();});
+    document.getElementById('qbo-msg-ok').addEventListener('click',()=>this._closeQboModal());
+  },
+
+  _filterWeeksByRange(weeks,range,customFrom,customTo){
+    if(!weeks.length) return [];
+    const sorted=weeks.slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
+    if(range==='all') return sorted;
+    if(range==='last1') return sorted.slice(-1);
+    if(range==='last4') return sorted.slice(-4);
+    if(range==='last13') return sorted.slice(-13);
+    if(range==='ytd'){
+      const yearStart=new Date(new Date().getFullYear(),0,1);
+      return sorted.filter(w=>{
+        if(!w.period_end) return false;
+        return new Date(w.period_end)>=yearStart;
+      });
+    }
+    if(range==='custom'){
+      if(!customFrom||!customTo) return [];
+      const from=new Date(customFrom);
+      const to=new Date(customTo);
+      return sorted.filter(w=>{
+        if(!w.period_end) return false;
+        const d=new Date(w.period_end);
+        return d>=from&&d<=to;
+      });
+    }
+    return sorted;
+  },
+
+  _buildQboCsv(weeks){
+    const num=v=>{
+      const n=parseFloat(v);
+      if(v==null||v===''||isNaN(n)) return '';
+      return n.toFixed(2);
+    };
+    const csvEsc=s=>{
+      const str=String(s==null?'':s);
+      return /[",\n\r]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str;
+    };
+    const header=['Week Ending','Week Number','Bar Revenue','Food Revenue','Total Revenue','Bar COGS','Food COGS','Total COGS','Bar Labor','Food Labor','Total Labor','Total Prime Cost','Bar Pour Cost %','Food Cost %','Prime Cost %'];
+    const lines=[header.map(csvEsc).join(',')];
+    weeks.forEach(w=>{
+      const bRev=parseFloat(w.bar?.revenue)||0;
+      const fRev=parseFloat(w.food?.revenue)||0;
+      const bCog=parseFloat(w.bar?.cogs)||0;
+      const fCog=parseFloat(w.food?.cogs)||0;
+      const bLab=parseFloat(w.bar?.labor)||0;
+      const fLab=parseFloat(w.food?.labor)||0;
+      const tRev=bRev+fRev;
+      const tCog=bCog+fCog;
+      const tLab=bLab+fLab;
+      const prime=tCog+tLab;
+      lines.push([
+        csvEsc(w.period_end||''),
+        csvEsc(w.week_num||''),
+        num(bRev),num(fRev),num(tRev),
+        num(bCog),num(fCog),num(tCog),
+        num(bLab),num(fLab),num(tLab),
+        num(prime),
+        num(w.bar?.cost_pct),num(w.food?.cost_pct),num(w.prime_cost_pct)
+      ].join(','));
+    });
+    return lines.join('\r\n');
+  },
+
+  _downloadCsv(csv,filename){
+    const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },
+
   viewWeek(id){
     const w=(App.data.weeks||[]).find(w=>w.id===id);if(!w)return;
     const det=document.getElementById('week-detail');if(!det)return;
