@@ -541,13 +541,17 @@ S.InventoryProducts = {
     }
 
     // ── Calc strip (pourable + bottle beer) ───────────────────────────────
+    // For Bottle Beer slots are: Btls/Case, Cost/Btl, Pour Cost %.
+    // For everything else: Pours/Container, Cost/Pour, Pour Cost %.
     let calcStrip = '';
     if (spec.showCalcStrip) {
-      const firstSlotLabel = spec.showCaseSize ? 'Cost / Btl' : 'Pours / Container';
-      const firstSlotTT    = spec.showCaseSize ? 'ic-cost-per-bottle-calc' : 'ic-pours-container';
+      const slot1Label = spec.showCaseSize ? 'Btls / Case'   : 'Pours / Container';
+      const slot1TT    = spec.showCaseSize ? 'ic-bottles-per-case' : 'ic-pours-container';
+      const slot2Label = spec.showCaseSize ? 'Cost / Btl'    : 'Cost / Pour';
+      const slot2TT    = spec.showCaseSize ? 'ic-cost-per-bottle-calc' : 'cost-pour';
       calcStrip = '<div class="calc" style="margin-top:18px;">'
-        + '<div class="calc-item"><div class="calc-label">' + esc(firstSlotLabel) + ' ' + tt(firstSlotTT) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Cost / Pour ' + tt('cost-pour') + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">' + esc(slot1Label) + ' ' + tt(slot1TT) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">' + esc(slot2Label) + ' ' + tt(slot2TT) + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pour Cost % ' + tt('pour-cost-pct') + '</div><div class="calc-val" id="ip-pct">-</div></div>'
       + '</div>';
     }
@@ -671,12 +675,13 @@ S.InventoryProducts = {
     const set   = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
 
     if (this._formCategory === 'Bottle Beer') {
-      // Show cost/bottle in slot 1 instead of pours/container
+      // Bottle Beer slots: Btls/Case · Cost/Btl · Pour Cost %
       const cs = parseInt(document.getElementById('ip-case-size')?.value) || 0;
       const cb = cs > 0 ? (parseFloat(document.getElementById('ip-cost')?.value) / cs) : null;
-      set('ip-pours', cb ? App.fmtCurrency(cb) : '-');
+      const pct = cb && price ? cb / price * 100 : null;
+      set('ip-pours', cs > 0 ? cs.toString() : '-');
       set('ip-cpp',   cb ? App.fmtCurrency(cb) : '-');
-      set('ip-pct',   cb && price ? App.fmtPct(cb / price * 100) : '-', cb && price ? ((cb / price * 100) > target ? 'warn' : 'good') : '');
+      set('ip-pct',   pct ? App.fmtPct(pct) : '-', pct ? (pct > target ? 'warn' : 'good') : '');
       return;
     }
     set('ip-pours', pours ? pours.toFixed(1) : '-');
