@@ -291,9 +291,6 @@ const App = {
       this.showAuth();
     }
     DB.onAuthChange(async (event, session) => {
-      // DEBUG Bug B: log every auth event so we can see whether SIGNED_IN
-      // actually fires on mobile after a successful signIn call.
-      console.log('[BARCOP-AUTH] onAuthChange event:', event, 'hasSession:', !!session, 'userId:', session?.user?.id || null);
       if (event === 'PASSWORD_RECOVERY') {
         // Show password reset screen instead of booting into the app
         document.getElementById('auth-screen').style.display = 'flex';
@@ -1022,6 +1019,22 @@ const App = {
     this.inventoryData = await DB.readInventoryData();
     this.laborData     = await DB.readLaborData();
     this.shiftData     = await DB.readShiftData();
+    // Pre-fetch the accounts list so the Hub sidebar can render the
+    // Locations section synchronously (multi-account users only).
+    if (DB.listMyAccounts) { await DB.listMyAccounts(); }
+  },
+
+  // True when every Getting Started step is checked off. The Hub sidebar uses
+  // this to hide the Getting Started nav item once setup is fully complete,
+  // so it does not clutter the sidebar for operators who have already worked
+  // through the entire setup. Help and FAQ still deep-links to the screen for
+  // anyone who wants to revisit. Auto-resurfaces if a new step is ever added.
+  isSetupComplete() {
+    if (!this.data) return false;
+    const tasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
+    if (!tasks.length) return false;
+    const prog = this.data.hub_setup_progress || {};
+    return tasks.every(t => !!prog[t.id]);
   },
 
   async saveInventory() {
@@ -1545,23 +1558,7 @@ function wireAuth() {
     const btn   = document.getElementById('login-btn');
     if (!email || !pass) { err.textContent='Enter email and password.'; err.style.display='block'; return; }
     btn.textContent='Signing in...'; btn.disabled=true;
-    // DEBUG Bug B: log UA once so we know which mobile browser we're in
-    console.log('[BARCOP-AUTH] signIn start. UA:', navigator.userAgent);
-    const result = await DB.signIn(email, pass);
-    const {error} = result;
-    // DEBUG Bug B: log signIn return shape + localStorage state right after
-    console.log('[BARCOP-AUTH] signIn returned:', {
-      hasUser: !!result?.data?.user,
-      hasSession: !!result?.data?.session,
-      userId: result?.data?.user?.id || null,
-      error: error?.message || null
-    });
-    try {
-      const lsKeys = Object.keys(localStorage).filter(k => k.includes('supabase') || k.startsWith('sb-'));
-      console.log('[BARCOP-AUTH] localStorage auth keys after signIn:', lsKeys);
-    } catch (e) {
-      console.log('[BARCOP-AUTH] localStorage read failed:', e?.message || e);
-    }
+    const {error} = await DB.signIn(email, pass);
     btn.textContent='Sign In'; btn.disabled=false;
     if (error) { err.textContent=error.message; err.style.display='block'; }
     else err.style.display='none';
