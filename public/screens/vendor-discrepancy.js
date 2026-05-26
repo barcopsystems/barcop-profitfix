@@ -71,8 +71,8 @@ S.VendorDiscrepancy = {
       + '<button class="btn btn-primary" id="vd-file">File Discrepancy</button>'
       + '</div>';
 
-    const summary = '<div class="card" style="position:relative;margin-bottom:18px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vd-show-form" style="position:absolute;top:14px;right:14px;">+ File Manual Discrepancy</button>'
+    const summary = '<div class="card" style="position:relative;margin-bottom:18px;padding-right:220px;">'
+      + '<button class="btn btn-ghost btn-sm" id="vd-show-form" style="position:absolute;top:50%;right:20px;transform:translateY(-50%);">+ File Manual Discrepancy</button>'
       + '<div class="calc" style="margin:0;">'
         + '<div class="calc-item"><div class="calc-label">Open Discrepancies</div><div class="calc-val ' + (open.length ? 'warn' : 'good') + '">' + open.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Open Overcharge</div><div class="calc-val ' + (openTotal > 0 ? 'warn' : '') + '">' + App.fmtCurrency(openTotal) + '</div></div>'
@@ -196,28 +196,57 @@ S.VendorDiscrepancy = {
   },
 
   // ── Mark Resolved ────────────────────────────────────────────────────────
-  // Prompts for the actual recovered amount because vendors often credit
-  // only part of what was claimed. Defaults to the original overcharge.
-  // Operator can override for partial credits.
+  // Opens an in-app modal asking how much credit the vendor actually gave.
+  // Vendors often credit only part of what was claimed, so the operator
+  // can override the default (which is the full claimed overcharge).
   markResolved(id) {
     const r = this.list().find(x => x.id === id);
     if (!r) return;
     const claimed = parseFloat(r.overcharge) || 0;
-    const input = prompt(
-      'How much credit did the vendor actually give you? (Claimed was $' + claimed.toFixed(2) + ')\n\n'
-      + 'Enter the dollar amount you recovered. The Recovered tile sums what you actually got back, not what you originally claimed.',
-      claimed.toFixed(2)
-    );
-    if (input == null) return; // operator cancelled
-    const recovered = parseFloat(input);
-    if (isNaN(recovered) || recovered < 0) {
-      alert('Enter a valid dollar amount, or click Cancel.');
-      return;
-    }
-    r.status = 'Resolved';
-    r.resolved_at = new Date().toISOString();
-    r.recovered_amount = recovered;
-    App.saveKey('vendor_discrepancies').then(() => this.draw());
+    this.openResolveModal(r, claimed);
+  },
+
+  openResolveModal(record, claimed) {
+    const m = document.createElement('div');
+    m.id = 'vd-resolve-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
+    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:480px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:1px solid var(--b2);padding-bottom:12px;">'
+        + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Mark Resolved</div>'
+        + '<button type="button" id="vd-resolve-close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:16px;">'
+        + 'How much credit did the vendor actually give you? Claimed was '
+        + '<strong style="color:var(--t1);">' + App.fmtCurrency(claimed) + '</strong>. '
+        + 'Vendors sometimes credit only part of a claim. Enter what you actually got back, then Save. The Recovered tile sums actual recoveries, not original claims.'
+      + '</div>'
+      + '<div class="f" style="margin-bottom:18px;"><label>Recovered Amount</label>'
+        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vd-resolve-amt" step="0.01" value="' + claimed.toFixed(2) + '" autofocus/></div>'
+      + '</div>'
+      + '<div id="vd-resolve-err" style="color:var(--red);font-size:12px;margin-bottom:10px;display:none;"></div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
+        + '<button type="button" id="vd-resolve-cancel" class="btn btn-ghost">Cancel</button>'
+        + '<button type="button" id="vd-resolve-save" class="btn btn-primary">Save</button>'
+      + '</div>'
+    + '</div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+    document.getElementById('vd-resolve-close').addEventListener('click', close);
+    document.getElementById('vd-resolve-cancel').addEventListener('click', close);
+    document.getElementById('vd-resolve-save').addEventListener('click', () => {
+      const errEl = document.getElementById('vd-resolve-err');
+      const inp = document.getElementById('vd-resolve-amt');
+      const fail = msg => { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } };
+      if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+      const recovered = parseFloat(inp?.value);
+      if (isNaN(recovered) || recovered < 0) { fail('Enter a valid dollar amount.'); return; }
+      record.status = 'Resolved';
+      record.resolved_at = new Date().toISOString();
+      record.recovered_amount = recovered;
+      App.saveKey('vendor_discrepancies').then(() => { close(); this.draw(); });
+    });
+    setTimeout(() => document.getElementById('vd-resolve-amt')?.select(), 50);
   },
 
   toggleForm(show) {
