@@ -8,6 +8,17 @@
 
 S.AuditDiff = {
 
+  // Session-only cache: keyed by moduleKey:beforeKey:afterKey, value is the
+  // rendered narrative HTML. Means flipping the dropdowns away and back to the
+  // same comparison restores the previously-generated outlook (button stays
+  // locked) instead of letting the user trigger fresh API calls for nothing.
+  // Resets on page reload — fresh session can regenerate if desired.
+  _narrativeCache: {},
+
+  _narrativeCacheKey(moduleKey, beforeKey, afterKey) {
+    return moduleKey + ':' + beforeKey + ':' + afterKey;
+  },
+
   // Public entry: open the diff modal for a specific module.
   open(moduleKey) {
     const audits = this._auditsFor(moduleKey);
@@ -130,10 +141,25 @@ S.AuditDiff = {
         App.openScreen(fixScreen);
       });
     });
-    // Generate AI Narrative (click-to-generate, fresh each click)
+    // Bar Cop Outlook — click-to-generate, one per comparison.
+    // If this comparison has been generated already in this session, restore
+    // from cache and lock the button so we don't burn another API call.
     document.getElementById('ad-narr-btn')?.addEventListener('click', () => {
       this._generateNarrative(moduleKey, before, after);
     });
+    const cacheKey = this._narrativeCacheKey(moduleKey, this._auditKey(before), this._auditKey(after));
+    const cached = this._narrativeCache[cacheKey];
+    if (cached) {
+      const body = document.getElementById('ad-narr-body');
+      const btn  = document.getElementById('ad-narr-btn');
+      if (body) { body.style.display = 'block'; body.innerHTML = cached; }
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.65';
+        btn.style.cursor = 'not-allowed';
+        btn.textContent = 'Outlook Generated';
+      }
+    }
   },
 
   _renderNarrativeShell() {
@@ -187,10 +213,12 @@ S.AuditDiff = {
       body.innerHTML = '<div style="color:var(--red);">Could not generate outlook: ' + esc(e.message || 'unknown error') + '</div>';
     } finally {
       if (succeeded) {
+        // Cache the rendered narrative so flipping the dropdowns away and back
+        // restores it without another API call.
+        const cacheKey = this._narrativeCacheKey(moduleKey, this._auditKey(before), this._auditKey(after));
+        this._narrativeCache[cacheKey] = body.innerHTML;
         // One per comparison. Button stays disabled with a "done" label so the
-        // user can't tap-tap-tap and rack up API calls for no reason. To get a
-        // new outlook, change the dropdown selection — the modal re-renders
-        // with a fresh button enabled.
+        // user can't tap-tap-tap and rack up API calls for no reason.
         btn.disabled = true;
         btn.style.opacity = '0.65';
         btn.style.cursor = 'not-allowed';
