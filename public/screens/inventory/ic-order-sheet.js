@@ -127,66 +127,362 @@ S.InventoryOrderSheet = {
         + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
     }
 
-    this.container.innerHTML = '<div class="screen">' + body + '</div>';
+    // Always show the New Custom Order button at the top of the screen.
+    const newCustomBtn = '<div style="margin-bottom:16px;display:flex;justify-content:flex-end;">'
+      + '<button class="btn btn-ghost btn-sm" id="os-new-custom">+ New Custom Order</button>'
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + newCustomBtn + this.customOrderPanelHTML() + body + '</div>';
 
     document.getElementById('os-go-history')?.addEventListener('click', () => App.navigate('ic-order-history'));
+    document.getElementById('os-new-custom')?.addEventListener('click', () => this.openCustomOrder());
 
+    // Per-card input handler for the quantity field on existing lines.
     this.container.querySelectorAll('.os-vcard').forEach(card => {
       card.addEventListener('input', ev => {
         if (ev.target.classList.contains('os-qty')) this.recalcVendor(card);
       });
     });
+
+    // Vendor picker on the custom order panel.
+    this.container.querySelector('.os-co-vendor')?.addEventListener('change', (ev) => this.onCustomVendorChange(ev.target.value));
+
     this.container.onclick = ev => {
-      const take = ev.target.closest('#os-take');
-      const rm = ev.target.closest('.os-remove');
-      const create = ev.target.closest('.os-create');
+      const take    = ev.target.closest('#os-take');
+      const rm      = ev.target.closest('.os-remove');
+      const create  = ev.target.closest('.os-create');
+      const coCreate = ev.target.closest('.os-co-create');
+      const coCancel = ev.target.closest('.os-co-cancel');
+      const addItem = ev.target.closest('.os-add-item');
+      const pickAdd = ev.target.closest('.os-picker-add');
+      const pickCancel = ev.target.closest('.os-picker-cancel');
+
       if (take) { App.navigate('ic-take-inventory'); return; }
       if (rm) {
         const card = rm.closest('.os-vcard');
         rm.closest('.os-line').remove();
         this.recalcVendor(card);
+        this.refreshPicker(card);
+        return;
+      }
+      if (addItem) {
+        this.openPicker(addItem.closest('.os-vcard'));
+        return;
+      }
+      if (pickAdd) {
+        this.addPickedItem(pickAdd.closest('.os-vcard'));
+        return;
+      }
+      if (pickCancel) {
+        this.closePicker(pickCancel.closest('.os-vcard'));
+        return;
+      }
+      if (coCreate) {
+        this.createCustomOrder();
+        return;
+      }
+      if (coCancel) {
+        this.closeCustomOrder();
         return;
       }
       if (create) this.createOrder(create.dataset.vendor);
     };
+
     visibleVendors.forEach(v => {
       const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(v) + '"]');
       if (card) this.recalcVendor(card);
     });
   },
 
+  // ── Picker open/close/add helpers (shared by suggested + custom cards) ───
+  openPicker(card) {
+    if (!card) return;
+    this.refreshPicker(card);
+    const picker = card.querySelector('.os-picker');
+    const btn = card.querySelector('.os-add-item');
+    if (picker) picker.style.display = '';
+    if (btn) btn.style.display = 'none';
+  },
+
+  closePicker(card) {
+    if (!card) return;
+    const picker = card.querySelector('.os-picker');
+    const btn = card.querySelector('.os-add-item');
+    if (picker) {
+      picker.style.display = 'none';
+      const sel = picker.querySelector('.os-picker-prod');
+      if (sel) sel.value = '';
+    }
+    if (btn) btn.style.display = '';
+  },
+
+  // Rebuild the picker's product list each time it opens so a newly-added
+  // line is excluded from the choices. Also rebuilds after a Remove so a
+  // removed product can be re-added.
+  refreshPicker(card) {
+    if (!card) return;
+    const vendor = card.dataset.vendor || '';
+    const existingIds = [...card.querySelectorAll('.os-line[data-product-id]')]
+      .map(el => el.dataset.productId).filter(Boolean);
+
+    // Custom card has the picker inside .os-picker-mount; suggested cards
+    // have the picker inline already. Replace either with a fresh build.
+    const mount = card.querySelector('.os-picker-mount');
+    if (mount) {
+      mount.innerHTML = this.addItemPickerHTML(vendor, existingIds);
+    } else {
+      const oldPicker = card.querySelector('.os-picker');
+      if (oldPicker) {
+        const wasVisible = oldPicker.style.display !== 'none';
+        const fresh = document.createElement('div');
+        fresh.innerHTML = this.addItemPickerHTML(vendor, existingIds);
+        const newPicker = fresh.firstChild;
+        if (wasVisible) newPicker.style.display = '';
+        oldPicker.replaceWith(newPicker);
+      }
+    }
+  },
+
+  addPickedItem(card) {
+    if (!card) return;
+    const picker = card.querySelector('.os-picker');
+    const sel = picker?.querySelector('.os-picker-prod');
+    const pid = sel?.value;
+    if (!pid) return;
+    const product = this.productById(pid);
+    if (!product) return;
+
+    // Pull on-hand from latest count if present (informational only).
+    let onHand = null;
+    const counts = this.countsAsc();
+    if (counts.length) {
+      const latest = counts[counts.length - 1];
+      const it = (latest.items || []).find(i => i.product_id === pid);
+      if (it) onHand = it.total != null ? it.total : null;
+    }
+    const par = (product.par_level != null && product.par_level !== '') ? product.par_level : null;
+    const tbody = card.querySelector('.os-lines-tbody');
+    if (tbody) {
+      tbody.insertAdjacentHTML('beforeend', this.lineRowHTML(product, 1, onHand, par));
+    }
+    this.recalcVendor(card);
+    this.closePicker(card);
+    this.refreshPicker(card);
+  },
+
+  // ── Custom Order open/close + create ─────────────────────────────────────
+  openCustomOrder() {
+    const panel = this.container.querySelector('.os-custom');
+    if (panel) panel.style.display = '';
+    const btn = document.getElementById('os-new-custom');
+    if (btn) btn.style.display = 'none';
+  },
+
+  closeCustomOrder() {
+    const panel = this.container.querySelector('.os-custom');
+    if (!panel) return;
+    // Reset to blank state for the next time.
+    panel.style.display = 'none';
+    panel.dataset.vendor = '';
+    const sel = panel.querySelector('.os-co-vendor');
+    if (sel) sel.value = '';
+    const body = panel.querySelector('.os-co-body');
+    if (body) body.style.display = 'none';
+    const tbody = panel.querySelector('.os-lines-tbody');
+    if (tbody) tbody.innerHTML = '';
+    const err = panel.querySelector('.os-verr');
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+    this.recalcVendor(panel);
+    const btn = document.getElementById('os-new-custom');
+    if (btn) btn.style.display = '';
+  },
+
+  onCustomVendorChange(vendorName) {
+    const panel = this.container.querySelector('.os-custom');
+    if (!panel) return;
+    panel.dataset.vendor = vendorName || '';
+    const body = panel.querySelector('.os-co-body');
+    if (!body) return;
+    if (!vendorName) {
+      body.style.display = 'none';
+      return;
+    }
+    body.style.display = '';
+    // Refresh the picker mount with this vendor's products and clear lines.
+    const tbody = panel.querySelector('.os-lines-tbody');
+    if (tbody) tbody.innerHTML = '';
+    this.refreshPicker(panel);
+    this.recalcVendor(panel);
+  },
+
+  async createCustomOrder() {
+    const panel = this.container.querySelector('.os-custom');
+    if (!panel) return;
+    const vendor = panel.dataset.vendor;
+    if (!vendor) return;
+    const err = panel.querySelector('.os-verr');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+
+    const lineItems = [];
+    panel.querySelectorAll('.os-line').forEach(line => {
+      const inp = line.querySelector('.os-qty');
+      const qty = parseFloat(inp.value) || 0;
+      if (qty <= 0) return;
+      const name = line.querySelector('.val').textContent;
+      const cost = parseFloat(inp.dataset.cost) || 0;
+      const productId = inp.dataset.productId || '';
+      lineItems.push({ product_id: productId, name, qty, unit_cost: cost, extended: qty * cost });
+    });
+    if (lineItems.length === 0) { fail('Add at least one item with a quantity above zero.'); return; }
+
+    const rec = {
+      id:         App.uid(),
+      vendor,
+      date:       new Date().toISOString().slice(0, 10),
+      status:     'Open',
+      line_items: lineItems,
+      item_count: lineItems.length,
+      total:      lineItems.reduce((t, i) => t + i.extended, 0),
+      custom:     true,
+      created_at: new Date().toISOString()
+    };
+
+    const btn = panel.querySelector('.os-co-create');
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+    this.orders().push(rec);
+    const ok = await App.saveInventory();
+    if (ok) {
+      this.closeCustomOrder();
+      this.renderMain();
+    } else {
+      this.orders().pop();
+      if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
+      fail('Could not create the order. Try again.');
+    }
+  },
+
   cssEsc(s) { return String(s).replace(/"/g, '&quot;'); },
 
-  vendorCard(vendor, lines) {
-    const created = this._created[vendor];
-    const rows = lines.map(l => '<tr class="os-line">'
-      + '<td><div class="val">' + esc(l.product.name) + '</div>'
-      + '<div style="font-size:10px;color:var(--t3);">' + esc(l.product.category || '') + '</div></td>'
-      + '<td>' + l.on_hand.toFixed(1) + '</td>'
-      + '<td>' + l.par + '</td>'
-      + '<td><input type="number" class="os-qty" data-cost="' + l.unit_cost + '" data-product-id="' + esc(l.product.id || '') + '" min="0" step="1" '
-      + 'value="' + l.suggested + '" style="width:80px;"/></td>'
-      + '<td>' + App.fmtCurrency(l.unit_cost) + '</td>'
-      + '<td class="val os-ext">' + App.fmtCurrency(l.suggested * l.unit_cost) + '</td>'
+  // ── Line row builder ──────────────────────────────────────────────────────
+  // Shared by the suggested-from-count rows AND the "+ Add Item" picker so
+  // both flow types produce identical HTML and recalcVendor/createOrder work
+  // the same way for either.
+  lineRowHTML(product, qty, onHand, par) {
+    const unitCost = product.unit_cost != null ? product.unit_cost : 0;
+    const onHandTxt = (onHand != null && !isNaN(onHand)) ? Number(onHand).toFixed(1) : '-';
+    const parTxt   = (par != null && par !== '' && !isNaN(par)) ? par : '-';
+    return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
+      + '<td><div class="val">' + esc(product.name || '') + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '') + '</div></td>'
+      + '<td>' + onHandTxt + '</td>'
+      + '<td>' + parTxt + '</td>'
+      + '<td><input type="number" class="os-qty" data-cost="' + unitCost + '" data-product-id="' + esc(product.id || '') + '" min="0" step="1" '
+      + 'value="' + qty + '" style="width:80px;"/></td>'
+      + '<td>' + App.fmtCurrency(unitCost) + '</td>'
+      + '<td class="val os-ext">' + App.fmtCurrency(qty * unitCost) + '</td>'
       + '<td><button class="btn btn-ghost btn-sm os-remove">Remove</button></td>'
-      + '</tr>').join('');
+      + '</tr>';
+  },
+
+  // Build the inline product picker HTML. When the operator clicks "+ Add
+  // Item" the picker expands here. Excludes products already on the card.
+  // For vendor-bound cards (suggested + custom-with-vendor-picked), filters
+  // to that vendor's products. For a custom card with no vendor yet, the
+  // picker is hidden.
+  addItemPickerHTML(vendorName, existingProductIds) {
+    const allProducts = ((App.inventoryData && App.inventoryData.ic_products) || [])
+      .filter(p => p && p.active !== false);
+    const onlyVendor = allProducts.filter(p => (p.vendor || '') === vendorName);
+    const pool = onlyVendor.length > 0 ? onlyVendor : allProducts;
+    const filtered = pool.filter(p => !existingProductIds.includes(p.id));
+
+    // Group by category
+    const byCat = {};
+    filtered.forEach(p => {
+      const c = p.category || 'Other';
+      if (!byCat[c]) byCat[c] = [];
+      byCat[c].push(p);
+    });
+    const cats = Object.keys(byCat).sort();
+    const opts = ['<option value="">Select a product...</option>']
+      .concat(cats.map(c =>
+        '<optgroup label="' + esc(c) + '">'
+        + byCat[c].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            .map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('')
+        + '</optgroup>'
+      ));
+    return '<div class="os-picker" style="display:none;margin-top:12px;padding:12px 14px;background:var(--bg);border:1px solid var(--b1);border-radius:4px;">'
+      + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'
+        + '<div class="f" style="flex:1;min-width:240px;"><label>Add Product</label>'
+          + '<select class="os-picker-prod">' + opts.join('') + '</select>'
+        + '</div>'
+        + '<button class="btn btn-primary os-picker-add">Add to Order</button>'
+        + '<button class="btn btn-ghost os-picker-cancel">Cancel</button>'
+      + '</div>'
+      + (filtered.length === 0
+          ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Every product for this vendor is already on the order. Edit a quantity above to add more of one.</div>'
+          : '')
+      + '</div>';
+  },
+
+  vendorCard(vendor, lines) {
+    const rows = lines.map(l =>
+      this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)
+    ).join('');
+    const existingIds = lines.map(l => l.product.id || '').filter(Boolean);
 
     return '<div class="card os-vcard" data-vendor="' + this.cssEsc(vendor) + '">'
       + '<div class="card-title">' + esc(vendor) + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>On Hand</th><th>Par</th><th>Order Qty</th><th>Unit Cost</th><th>Extended</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
+      + this.addItemPickerHTML(vendor, existingIds)
+      + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val os-vcount">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val good os-vtotal">$0</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary os-create" data-vendor="' + this.cssEsc(vendor) + '">Create Order</button>'
-      + (created
-          ? '<span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:8px;">Order created. See Order History</span>'
-          : '')
       + '<span class="os-verr" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
+  },
+
+  // ── Custom Order panel (vendor-agnostic ad-hoc order) ─────────────────────
+  // Lets the operator build an order from scratch without depending on the
+  // latest count. Picks a vendor first, then uses the same "+ Add Item"
+  // picker to add products. Useful for party orders, special events, any
+  // ad-hoc need outside the routine count-driven cycle.
+  customOrderPanelHTML() {
+    const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const opts = '<option value="">Select vendor...</option>'
+      + vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
+    return '<div class="card os-vcard os-custom" data-vendor="" style="display:none;">'
+      + '<div class="card-title">New Custom Order</div>'
+      + '<div class="form-row" style="margin-bottom:12px;">'
+        + '<div class="f" style="width:280px;"><label>Vendor</label>'
+          + '<select class="os-co-vendor">' + opts + '</select>'
+        + '</div>'
+      + '</div>'
+      + '<div class="os-co-body" style="display:none;">'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+          + '<th>Product</th><th>On Hand</th><th>Par</th><th>Order Qty</th><th>Unit Cost</th><th>Extended</th><th></th>'
+        + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
+        + '<div class="os-picker-mount"></div>'
+        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
+        + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+          + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val os-vcount">0</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val good os-vtotal">$0</div></div>'
+        + '</div>'
+        + '<div class="card-actions">'
+          + '<button class="btn btn-primary os-co-create">Create Order</button>'
+          + '<button class="btn btn-ghost os-co-cancel">Cancel</button>'
+          + '<span class="os-verr" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '</div>'
+      + '</div>'
+      + '</div>';
   },
 
   recalcVendor(card) {
