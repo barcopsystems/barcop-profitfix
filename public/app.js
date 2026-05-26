@@ -1024,6 +1024,25 @@ const App = {
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
   },
 
+  // Convert a delivery line_items[i] entry to total bottles. Used wherever
+  // inventory math needs raw-bottle counts (usage, variance, COGS, vendor
+  // watch annual usage, top movers, books inventory valuation, etc.).
+  //
+  // New deliveries store total_units pre-computed and display_unit='case'
+  // when the product is bottle beer with case_size set. Old deliveries
+  // (pre case-tracking) just have qty which was always in bottles.
+  bottlesFromDeliveryLine(li) {
+    if (!li) return 0;
+    if (li.total_units != null) {
+      const t = parseFloat(li.total_units);
+      if (!isNaN(t)) return t;
+    }
+    if (li.display_unit === 'case' && li.case_size_at_receive) {
+      return (parseFloat(li.qty) || 0) * (parseFloat(li.case_size_at_receive) || 1);
+    }
+    return parseFloat(li.qty) || 0;
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
