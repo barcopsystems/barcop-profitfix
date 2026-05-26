@@ -41,7 +41,6 @@ S.HubSettings = {
       + '</div>';
     document.getElementById('hs-close')?.addEventListener('click', () => App.closeHubOverlay());
     this.wire(container);
-    this.renderSubscription();
   },
 
   // Card header: title left, Saved indicator + Save Data button right.
@@ -161,304 +160,16 @@ S.HubSettings = {
     return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Alerts surface automatically on the Hub: metric breaches, forward-looking warnings, and Traffic activity reminders. There are no notification toggles to configure yet. When email or push delivery is added, its controls will live here.</div>';
   },
 
-  // ── Team card (Phase 2 multi-user) ──────────────────────────────────────────
-  // Admin sees an invite form plus the full member list with role select and
-  // remove buttons. Staff and Viewer see only the read-only member list.
-  // The member list is fetched async after render via _teamRefresh().
-  secTeam() {
-    return '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:2px 0 12px;">Invite a Member</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Send an invite email. Staff get operational screens (Inventory, Labor, Shift Control). Viewer is read-only on financial screens, useful for a bookkeeper. Admin has full access.</div>'
-      + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
-      +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="hs-team-email" placeholder="bartender@email.com" autocomplete="off"/></div>'
-      +   '<div class="f" style="width:120px;"><label>Role</label><select id="hs-team-role"><option value="staff">Staff</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div>'
-      +   '<div><button class="btn btn-primary" id="hs-team-invite">Send Invite</button></div>'
-      + '</div>'
-      + '<div id="hs-team-invite-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:10px;display:none;"></div>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:22px 0 12px;">Members</div>'
-      + '<div id="hs-team-members" style="font-size:12px;color:var(--t3);">Loading...</div>';
-  },
-
-  secAccount() {
-    const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
-    const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 12px;">' + txt + '</div>';
-    const userEmail = DB._user?.email || (App.demoMode ? 'Demo Account' : '');
-    const accountInfo = userEmail
-      ? sh('Account').replace('margin:18px', 'margin:2px')
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:4px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>'
-      : '';
-    return accountInfo
-      + sh('Password')
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:220px;"><label>New Password</label><div class="fw"><input class="suf" type="password" id="s-pw1" placeholder="Enter new password" autocomplete="new-password"/>' + eye('s-pw1') + '</div></div>'
-      + '<div class="f" style="width:220px;"><label>Confirm Password</label><div class="fw"><input class="suf" type="password" id="s-pw2" placeholder="Confirm new password" autocomplete="new-password"/>' + eye('s-pw2') + '</div></div>'
-      + '<div style="display:flex;align-items:flex-end;padding-bottom:1px;"><button class="btn btn-ghost" id="s-pw-btn">Update Password</button></div>'
-      + '</div>'
-      + '<div id="s-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>'
-      + sh('Subscription')
-      + '<div id="s-sub-content"></div>'
-      + sh('Data and Backup')
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export a full backup of everything in your account: settings, weekly numbers, audits, and your Inventory, Labor, and Shift Control records, in one file you keep offsite. Restore from a backup to recover your data or move it.</div>'
-      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost" id="s-export-data">Export Backup</button>'
-      + '<button class="btn btn-ghost" id="s-import-btn">Restore from Backup</button>'
-      + '<input type="file" id="s-import-file" accept="application/json,.json" style="display:none;"/>'
-      + '</div>'
-      + '<div id="s-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
-      // Testing Tools — build-time only. Remove the Load Sample button (and its
-      // wire() listener) before launching the paid app.
-      + (App.demoMode ? '' :
-          sh('Testing Tools')
-          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every system to test calculations and layouts. Clear All Data wipes every record across Bar Cop and the Inventory, Labor, and Shift Control stores, and starts fresh.</div>'
-          + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-          + '<button class="btn btn-ghost" id="s-load-sample">Load Sample Data</button>'
-          + '<button class="btn btn-danger" id="s-clear-all">Clear All Data</button>'
-          + '<button class="btn btn-ghost" id="s-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
-          + '</div>'
-          + '<div id="s-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>');
-  },
-
   // ── Wiring ──────────────────────────────────────────────────────────────────
   wire(container) {
     container.querySelectorAll('.hs-save').forEach(btn => {
       btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
-    });
-    document.getElementById('s-pw-btn')?.addEventListener('click', () => this.changePassword());
-    document.getElementById('s-export-data')?.addEventListener('click', () => this.exportBackup());
-    document.getElementById('s-import-btn')?.addEventListener('click', () => document.getElementById('s-import-file')?.click());
-    document.getElementById('s-import-file')?.addEventListener('change', (e) => this.importBackup(e));
-    document.getElementById('hs-team-invite')?.addEventListener('click', () => this._teamInvite());
-    this._teamRefresh();
-    document.getElementById('s-load-sample')?.addEventListener('click', () => this.loadSample());
-    document.getElementById('s-clear-all')?.addEventListener('click', () => this.clearAll());
-    document.getElementById('s-reset-ob')?.addEventListener('click', async () => {
-      App.data.settings.onboarding_complete = false;
-      App.data.settings._targets_saved = false;
-      await App.saveKey('settings');
-      window.location.reload();
     });
   },
 
   _flashSaved(id) {
     const m = document.querySelector('.hs-msg[data-msg="' + id + '"]');
     if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 2500); }
-  },
-
-  // ── Team management (Phase 2 multi-user) ────────────────────────────────────
-  async _teamAuthHeaders() {
-    const s = await DB._sb?.auth.getSession();
-    const token = s?.data?.session?.access_token;
-    const h = { 'Content-Type': 'application/json' };
-    if (token) h['Authorization'] = 'Bearer ' + token;
-    return h;
-  },
-
-  async _teamRefresh() {
-    const box = document.getElementById('hs-team-members');
-    if (!box) return;
-    if (App.demoMode) {
-      box.innerHTML = '<div style="color:var(--t3);">Team management is disabled in demo mode.</div>';
-      const ib = document.getElementById('hs-team-invite');
-      if (ib) { ib.disabled = true; ib.style.opacity = '0.5'; ib.style.cursor = 'not-allowed'; }
-      return;
-    }
-    const accountId = await DB._ensureAccountId();
-    if (!accountId) {
-      box.innerHTML = '<div style="color:var(--t3);">No account found.</div>';
-      return;
-    }
-    try {
-      const headers = await this._teamAuthHeaders();
-      const r = await fetch('/api/list-members', {
-        method: 'POST', headers, body: JSON.stringify({ accountId })
-      });
-      const data = await r.json();
-      if (!data.ok) {
-        box.innerHTML = '<div style="color:var(--t3);">' + esc(data.error || 'Could not load members.') + '</div>';
-        return;
-      }
-      this._teamRequesterRole = data.requesterRole;
-      this._teamRenderMembers(data.members || []);
-    } catch (e) {
-      box.innerHTML = '<div style="color:var(--t3);">Connection error.</div>';
-    }
-  },
-
-  _teamRenderMembers(members) {
-    const box = document.getElementById('hs-team-members');
-    if (!box) return;
-    const isAdmin = this._teamRequesterRole === 'admin';
-
-    const rows = members.map(m => {
-      const roleCell = (isAdmin && !m.is_self)
-        ? '<select data-mid="' + esc(m.id) + '" class="hs-team-role-sel" style="font-size:12px;padding:4px 8px;">'
-            + '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>Admin</option>'
-            + '<option value="staff"' + (m.role === 'staff' ? ' selected' : '') + '>Staff</option>'
-            + '<option value="viewer"' + (m.role === 'viewer' ? ' selected' : '') + '>Viewer</option>'
-          + '</select>'
-        : '<span style="text-transform:capitalize;font-weight:600;color:var(--t1);">' + esc(m.role) + '</span>';
-
-      const statusBadge = m.confirmed ? ''
-        : '<span style="font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-left:10px;">Pending</span>';
-
-      const actionCell = m.is_self
-        ? '<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;">You</span>'
-        : (isAdmin
-            ? '<button class="btn btn-ghost btn-sm hs-team-remove" data-mid="' + esc(m.id) + '" style="font-size:10px;padding:3px 9px;">Remove</button>'
-            : '');
-
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);">'
-        +   '<div style="flex:1;font-size:13px;color:var(--t1);">' + esc(m.email) + statusBadge + '</div>'
-        +   '<div style="width:130px;">' + roleCell + '</div>'
-        +   '<div style="width:90px;text-align:right;">' + actionCell + '</div>'
-        + '</div>';
-    }).join('');
-
-    box.innerHTML = rows || '<div style="color:var(--t3);">No members yet.</div>';
-
-    if (isAdmin) {
-      box.querySelectorAll('.hs-team-role-sel').forEach(sel => {
-        sel.addEventListener('change', (ev) => this._teamUpdateRole(sel.dataset.mid, ev.target.value));
-      });
-      box.querySelectorAll('.hs-team-remove').forEach(btn => {
-        btn.addEventListener('click', () => this._teamRemove(btn.dataset.mid));
-      });
-    } else {
-      const ib = document.getElementById('hs-team-invite');
-      if (ib) { ib.disabled = true; ib.style.opacity = '0.5'; ib.style.cursor = 'not-allowed'; }
-      document.getElementById('hs-team-email')?.setAttribute('disabled', '');
-      document.getElementById('hs-team-role')?.setAttribute('disabled', '');
-    }
-  },
-
-  _teamMsg(text, color) {
-    const el = document.getElementById('hs-team-invite-msg');
-    if (!el) return;
-    el.style.color = color;
-    el.textContent = text;
-    el.style.display = '';
-    setTimeout(() => { el.style.display = 'none'; }, 4500);
-  },
-
-  // In-app modal — replaces browser confirm/alert for Team actions
-  _teamModal(opts) {
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:420px;width:100%;';
-    const msgColor = opts.tone === 'error' ? 'var(--red)' : 'var(--t1)';
-    const buttons = (opts.buttons || [{ label: 'OK', act: 'ok', kind: 'ghost' }])
-      .map(b => '<button class="btn btn-' + (b.kind || 'ghost') + '" data-act="' + esc(b.act) + '">' + esc(b.label) + '</button>')
-      .join('');
-    box.innerHTML = '<div style="font-size:13px;color:' + msgColor + ';line-height:1.6;margin-bottom:20px;">' + esc(opts.message) + '</div>'
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;">' + buttons + '</div>';
-    m.appendChild(box);
-    document.body.appendChild(m);
-    const close = () => m.remove();
-    box.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const act = btn.dataset.act;
-        close();
-        if (opts.onAction) opts.onAction(act);
-      });
-    });
-    m.addEventListener('click', ev => { if (ev.target === m) close(); });
-  },
-
-  async _teamInvite() {
-    const emailInput = document.getElementById('hs-team-email');
-    const roleSelect = document.getElementById('hs-team-role');
-    const btn = document.getElementById('hs-team-invite');
-    const email = (emailInput?.value || '').trim().toLowerCase();
-    const role = roleSelect?.value || 'staff';
-
-    if (!email || email.indexOf('@') < 1) {
-      this._teamMsg('Enter a valid email address.', 'var(--red)');
-      return;
-    }
-    const accountId = await DB._ensureAccountId();
-    if (!accountId) {
-      this._teamMsg('No account found.', 'var(--red)');
-      return;
-    }
-
-    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
-
-    try {
-      const headers = await this._teamAuthHeaders();
-      const r = await fetch('/api/invite-user', {
-        method: 'POST', headers,
-        body: JSON.stringify({ email, accountId, role })
-      });
-      const data = await r.json();
-      if (!r.ok || !data.ok) {
-        this._teamMsg(data.error || 'Invite failed.', 'var(--red)');
-      } else if (data.addedDirectly) {
-        const tail = data.emailSent
-          ? ' They will receive an email to set their password.'
-          : ' They already have a Bar Cop account.';
-        this._teamMsg('Added ' + email + ' to your team.' + tail, 'var(--gold)');
-        if (emailInput) emailInput.value = '';
-        this._teamRefresh();
-      } else {
-        this._teamMsg('Invite sent to ' + email + '.', 'var(--gold)');
-        if (emailInput) emailInput.value = '';
-        this._teamRefresh();
-      }
-    } catch (e) {
-      this._teamMsg('Connection error. Try again.', 'var(--red)');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Send Invite'; }
-    }
-  },
-
-  async _teamUpdateRole(membershipId, newRole) {
-    const accountId = await DB._ensureAccountId();
-    if (!accountId) return;
-    try {
-      const headers = await this._teamAuthHeaders();
-      const r = await fetch('/api/update-member-role', {
-        method: 'POST', headers,
-        body: JSON.stringify({ accountId, membershipId, newRole })
-      });
-      const data = await r.json();
-      if (!r.ok || !data.ok) {
-        this._teamModal({ message: data.error || 'Could not change role.', tone: 'error' });
-      }
-      this._teamRefresh();
-    } catch (e) {
-      this._teamModal({ message: 'Connection error.', tone: 'error' });
-      this._teamRefresh();
-    }
-  },
-
-  async _teamRemove(membershipId) {
-    this._teamModal({
-      message: 'Remove this member from your account? They will lose access immediately.',
-      buttons: [
-        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
-        { label: 'Remove', act: 'ok', kind: 'danger' }
-      ],
-      onAction: async (act) => {
-        if (act !== 'ok') return;
-        const accountId = await DB._ensureAccountId();
-        if (!accountId) return;
-        try {
-          const headers = await this._teamAuthHeaders();
-          const r = await fetch('/api/remove-member', {
-            method: 'POST', headers,
-            body: JSON.stringify({ accountId, membershipId })
-          });
-          const data = await r.json();
-          if (!r.ok || !data.ok) {
-            this._teamModal({ message: data.error || 'Could not remove member.', tone: 'error' });
-          }
-          this._teamRefresh();
-        } catch (e) {
-          this._teamModal({ message: 'Connection error.', tone: 'error' });
-          this._teamRefresh();
-        }
-      }
-    });
   },
 
   // ── Per-section save — writes only that section's existing keys ─────────────
@@ -554,110 +265,11 @@ S.HubSettings = {
     });
   },
 
-  renderSubscription() {
-    const el = document.getElementById('s-sub-content');
-    if (!el) return;
-    const sub = App.subscription || {};
-    const status = sub.status || 'inactive';
-    const periodEnd = sub.period_end ? new Date(sub.period_end) : null;
-
-    // Single-tier subscription (Section 13 of platform map: "One price.
-    // Everything included.") — no more module/tier breakdown.
-    const planName = 'Bar Cop Recovery Platform';
-    const statusMeta = {
-      active:   { color: 'var(--green)', label: 'Active' },
-      past_due: { color: 'var(--red)',   label: 'Past Due' },
-      canceled: { color: 'var(--red)',   label: 'Canceled' },
-      inactive: { color: 'var(--t2)',    label: 'No Active Subscription' }
-    };
-    const meta = statusMeta[status] || statusMeta.inactive;
-
-    let billingLine = '';
-    if (status === 'active' && periodEnd) {
-      billingLine = '<div style="font-size:12px;color:var(--t2);margin-top:4px;">Renews ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
-    } else if (status === 'canceled' && periodEnd) {
-      billingLine = '<div style="font-size:12px;color:var(--red);margin-top:4px;">Access ends ' + periodEnd.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '</div>';
-    }
-
-    // 30-day cancellation retention (Section 15) — after a subscription is
-    // canceled the operator's data is kept 30 days so they can export it.
-    let retentionBlock = '';
-    if (status === 'canceled') {
-      let removalLine = 'Your data is kept for 30 days after your access ends so you have time to export it. After that it is removed.';
-      if (periodEnd) {
-        const removal = new Date(periodEnd.getTime() + 30 * 86400000);
-        removalLine = 'Your data is kept until ' + removal.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
-          + ', 30 days after your access ends, so you have time to export it. After that it is removed.';
-      }
-      retentionBlock = '<div style="border:1px solid rgba(192,56,40,0.35);border-radius:4px;padding:14px 16px;margin-top:16px;">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--red);margin-bottom:8px;text-transform:uppercase;">Export Your Data Before It Is Removed</div>'
-        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">' + removalLine + ' Download a full backup now so you keep your records.</div>'
-        + '<button class="btn btn-primary" id="s-retain-export">Export a Backup</button>'
-        + '</div>';
-    }
-
-    el.innerHTML = '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      + '<div>'
-      + '<div style="font-size:16px;font-weight:700;color:var(--t1);">' + planName + '</div>'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + meta.color + ';margin-top:4px;text-transform:uppercase;">' + meta.label + '</div>'
-      + billingLine
-      + '</div>'
-      + (status === 'active' ? '<button class="btn btn-ghost" id="s-portal-btn" style="flex-shrink:0;">Manage Billing</button>' : '')
-      + '</div>'
-      + retentionBlock;
-
-    document.getElementById('s-portal-btn')?.addEventListener('click', () => this.openBillingPortal());
-    document.getElementById('s-retain-export')?.addEventListener('click', () => this.exportBackup());
-  },
-
-  async openBillingPortal() {
-    const btn = document.getElementById('s-portal-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
-    try {
-      const userId = DB._sb?.auth?.getUser ? (await DB._sb.auth.getUser()).data?.user?.id : null;
-      if (!userId) throw new Error('Not logged in.');
-      const res = await fetch('/api/billing-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not open billing portal.');
-      window.open(data.url, '_blank');
-    } catch (e) {
-      alert('Could not open billing portal: ' + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Manage Billing'; }
-    }
-  },
-
-  async changePassword() {
-    const pw1=document.getElementById('s-pw1')?.value;
-    const pw2=document.getElementById('s-pw2')?.value;
-    const msg=document.getElementById('s-pw-msg');
-    if(!pw1||pw1.length<8){if(msg){msg.style.color='var(--red)';msg.textContent='Password must be at least 8 characters.';msg.style.display='block';}return;}
-    if(pw1!==pw2){if(msg){msg.style.color='var(--red)';msg.textContent='Passwords do not match.';msg.style.display='block';}return;}
-    const btn=document.getElementById('s-pw-btn');
-    if(btn){btn.disabled=true;btn.textContent='Updating...';}
-    try{
-      if(!DB._sb){throw new Error('Not connected to database.');}
-      const{error}=await DB._sb.auth.updateUser({password:pw1});
-      if(error)throw error;
-      if(msg){msg.style.color='var(--gold)';msg.textContent='Password updated successfully.';msg.style.display='block';}
-      document.getElementById('s-pw1').value='';
-      document.getElementById('s-pw2').value='';
-    }catch(e){
-      if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+(e.message||'Could not update password.');msg.style.display='block';}
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent='Update Password';}
-    }
-  },
-
   // ── Data backup (Section 15) ───────────────────────────────────────────────
   // A full, self-contained backup: the Recovery data blob plus all three
   // Control stores. Plain JSON the operator keeps offsite.
   _backupMsg(text, color) {
-    const m = document.getElementById('s-backup-msg') || document.getElementById('ua-backup-msg');
+    const m = document.getElementById('ua-backup-msg');
     if (m) { m.style.color = color || 'var(--gold)'; m.textContent = text; m.style.display = 'block'; }
   },
 
@@ -728,7 +340,7 @@ S.HubSettings = {
   },
 
   async loadSample() {
-    const msg = document.getElementById('s-test-msg') || document.getElementById('ua-test-msg');
+    const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
 
     const uid = () => App.uid();
@@ -2137,7 +1749,7 @@ S.HubSettings = {
 
   async clearAll() {
     if (!confirm('This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.\n\nClear all data?')) return;
-    const msg = document.getElementById('s-test-msg') || document.getElementById('ua-test-msg');
+    const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--t3)'; msg.textContent = 'Clearing...'; msg.style.display = 'block'; }
 
     // Reset every data key to its default. App.data.settings (bar name,
