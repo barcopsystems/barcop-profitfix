@@ -72,9 +72,17 @@ S.AuditDiff = {
     this._render(panel, moduleKey, sorted, beforeKey, afterKey);
   },
 
+  _fixScreenFor(moduleKey) {
+    if (moduleKey === 'profit')  return 'profit-fix';
+    if (moduleKey === 'revenue') return 'r-fix';
+    if (moduleKey === 'traffic') return 't-fix';
+    return 'profit-fix';
+  },
+
   _render(panel, moduleKey, sorted, beforeKey, afterKey) {
     const before = sorted.find(a => this._auditKey(a) === beforeKey) || sorted[1];
     const after  = sorted.find(a => this._auditKey(a) === afterKey)  || sorted[0];
+    this._currentModule = moduleKey;
 
     const opts = (selectedKey) => sorted.map(a => {
       const k = this._auditKey(a);
@@ -109,6 +117,16 @@ S.AuditDiff = {
     });
     document.getElementById('ad-after-sel').addEventListener('change', (e) => {
       this._render(panel, moduleKey, sorted, this._auditKey(before), e.target.value);
+    });
+    // Fix This deep-links — close modal, focus the gap, navigate to the right fix screen
+    panel.querySelectorAll('.ad-fix-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gapId = btn.dataset.gap;
+        const fixScreen = this._fixScreenFor(moduleKey);
+        this._close();
+        App._fixFocus = gapId;
+        App.openScreen(fixScreen);
+      });
     });
   },
 
@@ -157,9 +175,13 @@ S.AuditDiff = {
       if (!items.length) return '<div style="font-size:12px;color:var(--t4);padding:8px 0;">None.</div>';
       return '<div>' + items.map(i => {
         const dollar = i.monthly_impact ? ' · ' + App.fmtCurrency(i.monthly_impact, 0) + '/mo' : '';
-        return '<div style="padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.5;">'
-          + '<span style="display:inline-block;width:18px;color:' + (kind === 'resolved' ? 'var(--green)' : kind === 'surfaced' ? 'var(--red)' : 'var(--t4)') + ';font-weight:700;">' + (kind === 'resolved' ? '✓' : kind === 'surfaced' ? '+' : '·') + '</span>'
-          + esc(i.action || i.gap_id || 'Action') + dollar
+        const fixBtn = (kind === 'ongoing' && i.gap_id)
+          ? '<button class="ad-fix-btn" data-gap="' + esc(i.gap_id) + '" style="margin-left:8px;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:3px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Fix This &#9656;</button>'
+          : '';
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.5;display:flex;align-items:flex-start;gap:6px;">'
+          + '<span style="display:inline-block;width:18px;color:' + (kind === 'resolved' ? 'var(--green)' : kind === 'surfaced' ? 'var(--red)' : 'var(--t4)') + ';font-weight:700;flex-shrink:0;">' + (kind === 'resolved' ? '✓' : kind === 'surfaced' ? '+' : '·') + '</span>'
+          + '<span style="flex:1;">' + esc(i.action || i.gap_id || 'Action') + dollar + '</span>'
+          + fixBtn
           + '</div>';
       }).join('') + '</div>';
     };
