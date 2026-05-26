@@ -262,13 +262,30 @@ S.InventoryTakeInventory = {
 
     const cards = grp.products.map(p => {
       const c = this.draft.counts[p.id] || { value: 0, fulls: 0, notes: '' };
-      return '<div class="card" style="margin-bottom:12px;">'
+      // Bottle beer with case_size set uses a case + loose-bottle input
+      // pair. Bottles either are full or empty (no partial level applies),
+      // so the slider does not fit. Everything else uses the partial slider.
+      const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
+      const countInput = isCaseBeer
+        ? '<div class="form-row" style="gap:14px;justify-content:center;margin-bottom:14px;">'
+            + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cases</label>'
+              + '<div class="fw"><input class="suf ti-cases" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.cases != null ? c.cases : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">cases</span></div>'
+            + '</div>'
+            + '<div class="f" style="width:140px;flex-shrink:0;"><label>Loose Bottles</label>'
+              + '<div class="fw"><input class="suf ti-loose" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.loose != null ? c.loose : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">btl</span></div>'
+            + '</div>'
+            + '<div style="align-self:center;font-size:11px;color:var(--t3);">'
+              + (p.case_size + ' btl/case')
+            + '</div>'
+          + '</div>'
+        : '<div style="display:flex;justify-content:center;margin-bottom:14px;">'
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category })
+          + '</div>';
+      return '<div class="card" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" style="margin-bottom:12px;">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + esc(p.category || 'Uncategorized')
         + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</div>'
-        + '<div style="display:flex;justify-content:center;margin-bottom:14px;">'
-        + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category })
-        + '</div>'
+        + countInput
         + '<div class="f"><label>Notes</label><input type="text" class="ti-note" data-pid="' + p.id + '" '
         + 'value="' + esc(c.notes || '') + '" placeholder="Optional"/></div>'
         + '</div>';
@@ -296,9 +313,26 @@ S.InventoryTakeInventory = {
 
     BottleSlider._inst = {};
     grp.products.forEach(p => {
+      const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
+      if (isCaseBeer) return; // case + loose inputs handled below, not the slider
       BottleSlider.mount(p.id, (v) => {
         const prev = this.draft.counts[p.id] || {};
         this.draft.counts[p.id] = { value: v.value, fulls: v.fulls, notes: prev.notes || '' };
+        this.draft._locStep = this.locStep;
+        this.saveDraft();
+        this.updateProgress();
+      });
+    });
+    // Case + loose inputs for bottle beer products with case_size set.
+    this.container.querySelectorAll('.ti-cases, .ti-loose').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const pid = inp.dataset.pid;
+        const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
+        if (!card) return;
+        const cases = parseInt(card.querySelector('.ti-cases')?.value) || 0;
+        const loose = parseInt(card.querySelector('.ti-loose')?.value) || 0;
+        const prev = this.draft.counts[pid] || {};
+        this.draft.counts[pid] = { cases, loose, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
@@ -332,12 +366,31 @@ S.InventoryTakeInventory = {
   },
 
   // ── Review ────────────────────────────────────────────────────────────────
+  // For bottle beer with case_size, the operator entered cases + loose
+  // bottles. Total bottles = (cases * case_size) + loose. Value uses
+  // cost-per-case for case-tracked beer (unit_cost stores cost per case
+  // when case_size is set), divided through to per-bottle.
   rows() {
     return this.countProducts().map(p => {
       const c = this.draft.counts[p.id] || { value: 0, fulls: 0, notes: '' };
-      const total = (c.fulls || 0) + (c.value || 0);
-      const value = p.unit_cost != null ? total * p.unit_cost : null;
-      return { p, c, total, value };
+      const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
+      let total, value;
+      if (isCaseBeer) {
+        const cases = c.cases || 0;
+        const loose = c.loose || 0;
+        total = cases * p.case_size + loose;
+        // unit_cost is cost-per-case for case-tracked beer.
+        if (p.unit_cost != null) {
+          const costPerBottle = p.case_size > 0 ? (p.unit_cost / p.case_size) : 0;
+          value = total * costPerBottle;
+        } else {
+          value = null;
+        }
+      } else {
+        total = (c.fulls || 0) + (c.value || 0);
+        value = p.unit_cost != null ? total * p.unit_cost : null;
+      }
+      return { p, c, total, value, isCaseBeer };
     });
   },
 
@@ -346,15 +399,22 @@ S.InventoryTakeInventory = {
     const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0);
     const counted = Object.keys(this.draft.counts).length;
 
-    const tbody = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.p.name) + '</div>'
-      + (r.p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.p.brand) + '</div>' : '') + '</td>'
-      + '<td>' + esc(r.p.category || '-') + '</td>'
-      + '<td>' + (r.c.fulls || 0) + '</td>'
-      + '<td>' + (r.c.value || 0).toFixed(1) + '</td>'
-      + '<td class="val">' + r.total.toFixed(1) + '</td>'
-      + '<td>' + (r.value != null ? App.fmtCurrency(r.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
-      + '</tr>').join('');
+    const tbody = rows.map(r => {
+      const fullCol = r.isCaseBeer ? (r.c.cases || 0) + ' cases' : (r.c.fulls || 0);
+      const openCol = r.isCaseBeer ? (r.c.loose || 0) + ' loose' : (r.c.value || 0).toFixed(1);
+      const totalCol = r.isCaseBeer
+        ? (r.total + ' btl (' + (r.c.cases || 0) + ' &times; ' + r.p.case_size + ' + ' + (r.c.loose || 0) + ')')
+        : r.total.toFixed(1);
+      return '<tr>'
+        + '<td><div class="val">' + esc(r.p.name) + '</div>'
+        + (r.p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.p.brand) + '</div>' : '') + '</td>'
+        + '<td>' + esc(r.p.category || '-') + '</td>'
+        + '<td>' + fullCol + '</td>'
+        + '<td>' + openCol + '</td>'
+        + '<td class="val">' + totalCol + '</td>'
+        + '<td>' + (r.value != null ? App.fmtCurrency(r.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '</tr>';
+    }).join('');
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title">Review ' + esc(this.draft.type) + ' Count</div>'
@@ -382,17 +442,39 @@ S.InventoryTakeInventory = {
   // ── Submit ────────────────────────────────────────────────────────────────
   async submit() {
     const rows = this.rows();
-    const items = rows.map(r => ({
-      product_id: r.p.id,
-      name:       r.p.name,
-      category:   r.p.category || '',
-      fulls:      r.c.fulls || 0,
-      partial:    r.c.value || 0,
-      total:      r.total,
-      unit_cost:  r.p.unit_cost != null ? r.p.unit_cost : null,
-      value:      r.value,
-      notes:      r.c.notes || ''
-    }));
+    // Build per-item records. For bottle beer with case_size, store the
+    // case-aware fields (cases, loose, case_size_at_count) alongside the
+    // standard fields (fulls, partial, total) so downstream readers that
+    // only know about fulls/partial/total keep working unchanged.
+    const items = rows.map(r => {
+      if (r.isCaseBeer) {
+        return {
+          product_id: r.p.id,
+          name:       r.p.name,
+          category:   r.p.category || '',
+          cases:               r.c.cases || 0,
+          loose:               r.c.loose || 0,
+          case_size_at_count:  r.p.case_size || null,
+          fulls:               r.total,    // total bottles (legacy compat)
+          partial:             0,
+          total:               r.total,
+          unit_cost:           r.p.unit_cost != null ? r.p.unit_cost : null,
+          value:               r.value,
+          notes:               r.c.notes || ''
+        };
+      }
+      return {
+        product_id: r.p.id,
+        name:       r.p.name,
+        category:   r.p.category || '',
+        fulls:      r.c.fulls || 0,
+        partial:    r.c.value || 0,
+        total:      r.total,
+        unit_cost:  r.p.unit_cost != null ? r.p.unit_cost : null,
+        value:      r.value,
+        notes:      r.c.notes || ''
+      };
+    });
     const record = {
       id:          App.uid(),
       date:        new Date().toISOString().slice(0, 10),
