@@ -233,9 +233,9 @@ S.InventoryLocations = {
 
   // ── Location detail (products assigned here, in inventory-count order) ───
   // Products are shown in the order they will appear during Take Inventory
-  // at this location. Up/down arrows let the operator arrange products to
-  // match the physical shelf/rail order so counting flows left-to-right
-  // (or however the operator walks the bar) instead of randomly.
+  // at this location. Operator drags rows by the grip handle on the left to
+  // match the physical shelf/rail order so counting flows the way they walk
+  // the bar instead of alphabetical.
   showDetail(id) {
     const l = this.locations().find(x => x.id === id);
     if (!l) { this.renderList(); return; }
@@ -247,23 +247,20 @@ S.InventoryLocations = {
         + '<div class="empty-sub">Assign products to ' + esc(l.name) + ' from the Products screen using the '
         + 'Primary Location field.</div></div>';
     } else {
-      const rows = prods.map((p, i) => '<tr>'
+      const rows = prods.map((p, i) => '<tr data-pid="' + esc(p.id) + '">'
+        + '<td class="il-drag" style="width:32px;text-align:center;cursor:grab;color:var(--t3);font-size:16px;touch-action:none;user-select:none;" title="Drag to reorder">&#x2630;</td>'
         + '<td style="width:36px;color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
         + '<td>' + esc(p.category || '-') + '</td>'
         + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">-</span>') + '</td>'
-        + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm il-pup" data-pid="' + esc(p.id) + '"' + (i === 0 ? ' disabled' : '') + '>&#8593;</button>'
-        + '<button class="btn btn-ghost btn-sm il-pdown" data-pid="' + esc(p.id) + '"' + (i === prods.length - 1 ? ' disabled' : '') + '>&#8595;</button>'
-        + '</div></td>'
         + '</tr>').join('');
       body = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-        + 'Use the arrows to put products in the order they sit on the shelf or rail at this location. Take Inventory at ' + esc(l.name) + ' will count them in this order.'
+        + 'Grab the &#x2630; handle on the left and drag a product up or down to put it where it sits on the shelf or rail at this location. Take Inventory at ' + esc(l.name) + ' will count them in this order.'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th style="width:36px;">#</th><th>Product</th><th>Category</th><th>Par</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '<th style="width:32px;"></th><th style="width:36px;">#</th><th>Product</th><th>Category</th><th>Par</th>'
+        + '</tr></thead><tbody id="il-arrange-body">' + rows + '</tbody></table></div>';
     }
 
     this.container.innerHTML = '<div class="screen">'
@@ -273,12 +270,10 @@ S.InventoryLocations = {
 
     this.container.onclick = ev => {
       const back = ev.target.closest('#il-back');
-      const up   = ev.target.closest('.il-pup');
-      const down = ev.target.closest('.il-pdown');
       if (back) this.renderList();
-      else if (up)   this.moveProduct(l.name, up.dataset.pid, -1);
-      else if (down) this.moveProduct(l.name, down.dataset.pid, 1);
     };
+
+    if (prods.length) this._wireDrag(l.name);
   },
 
   // Sort products at a given location by their per-location sequence, then
@@ -294,19 +289,92 @@ S.InventoryLocations = {
     });
   },
 
-  // Move a product up or down in this location's order. Updates the
-  // location_sequences map on each affected product so the order persists
-  // across sessions and surfaces in Take Inventory.
-  async moveProduct(locationName, productId, dir) {
-    const ordered = this.sortedProductsForLocation(locationName);
-    const idx = ordered.findIndex(p => p.id === productId);
-    if (idx < 0) return;
-    const j = idx + dir;
-    if (j < 0 || j >= ordered.length) return;
-    [ordered[idx], ordered[j]] = [ordered[j], ordered[idx]];
-    // Re-stamp sequences 1..N on the new order. Persisting the full sequence
-    // every move keeps the data consistent and avoids gaps that drift over time.
-    ordered.forEach((p, i) => {
+  // Pointer-based drag-to-reorder. Works for mouse and touch via the unified
+  // Pointer Events API. The handle's touch-action:none stops the browser from
+  // hijacking the touch as a page scroll. We move the dragged <tr> directly
+  // in the DOM as the pointer crosses other rows so the operator sees the
+  // list rearrange in real time. On release we read the final DOM order and
+  // re-stamp location_sequences 1..N so the order persists.
+  _wireDrag(locationName) {
+    const body = document.getElementById('il-arrange-body');
+    if (!body) return;
+    const self = this;
+    let dragRow = null;
+    let activeHandle = null;
+    let autoScrollTimer = null;
+    let lastClientY = 0;
+
+    const stopAutoScroll = () => {
+      if (autoScrollTimer) { cancelAnimationFrame(autoScrollTimer); autoScrollTimer = null; }
+    };
+    const tickAutoScroll = () => {
+      if (!dragRow) { stopAutoScroll(); return; }
+      const margin = 70;
+      const vh = window.innerHeight;
+      let delta = 0;
+      if (lastClientY < margin)            delta = -Math.ceil((margin - lastClientY) / 6);
+      else if (lastClientY > vh - margin)  delta =  Math.ceil((lastClientY - (vh - margin)) / 6);
+      if (delta) window.scrollBy(0, delta);
+      autoScrollTimer = requestAnimationFrame(tickAutoScroll);
+    };
+
+    body.querySelectorAll('.il-drag').forEach(handle => {
+      handle.addEventListener('pointerdown', ev => {
+        if (ev.button != null && ev.button !== 0) return;
+        ev.preventDefault();
+        const tr = handle.closest('tr');
+        if (!tr) return;
+        dragRow = tr;
+        activeHandle = handle;
+        lastClientY = ev.clientY;
+        try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
+        tr.style.opacity = '0.45';
+        tr.style.background = 'var(--surface)';
+        handle.style.cursor = 'grabbing';
+        document.body.style.cursor = 'grabbing';
+        autoScrollTimer = requestAnimationFrame(tickAutoScroll);
+      });
+
+      handle.addEventListener('pointermove', ev => {
+        if (!dragRow) return;
+        lastClientY = ev.clientY;
+        // Temporarily disable pointer events on the dragged row so
+        // elementFromPoint returns the row underneath, not itself.
+        dragRow.style.pointerEvents = 'none';
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        dragRow.style.pointerEvents = '';
+        if (!el) return;
+        const targetRow = el.closest('tr[data-pid]');
+        if (!targetRow || targetRow === dragRow || targetRow.parentNode !== body) return;
+        const rect = targetRow.getBoundingClientRect();
+        const after = (ev.clientY - rect.top) > rect.height / 2;
+        if (after) targetRow.parentNode.insertBefore(dragRow, targetRow.nextSibling);
+        else       targetRow.parentNode.insertBefore(dragRow, targetRow);
+      });
+
+      const finish = (commit) => {
+        if (!dragRow) return;
+        dragRow.style.opacity = '';
+        dragRow.style.background = '';
+        if (activeHandle) activeHandle.style.cursor = 'grab';
+        document.body.style.cursor = '';
+        stopAutoScroll();
+        const order = Array.from(body.querySelectorAll('tr[data-pid]')).map(r => r.dataset.pid);
+        dragRow = null;
+        activeHandle = null;
+        if (commit) self._persistOrder(locationName, order);
+      };
+
+      handle.addEventListener('pointerup',     ev => { try { handle.releasePointerCapture(ev.pointerId); } catch (_) {} finish(true);  });
+      handle.addEventListener('pointercancel', ev => { try { handle.releasePointerCapture(ev.pointerId); } catch (_) {} finish(false); });
+    });
+  },
+
+  async _persistOrder(locationName, idsInOrder) {
+    const prods = this.products();
+    idsInOrder.forEach((pid, i) => {
+      const p = prods.find(x => x.id === pid);
+      if (!p) return;
       if (!p.location_sequences) p.location_sequences = {};
       p.location_sequences[locationName] = i + 1;
     });
