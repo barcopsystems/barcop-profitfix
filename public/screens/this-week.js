@@ -28,7 +28,7 @@ S.ThisWeek = {
     ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
       .filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + (li.qty || 0);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
       }));
     let cogs = 0, any = false;
     Object.keys(eMap).forEach(pid => {
