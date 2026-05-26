@@ -32,28 +32,41 @@ S.InventoryOrderSheet = {
     this.renderMain();
   },
 
-  // products below par in the latest count, grouped by vendor
+  // products below par in the latest count, grouped by vendor.
+  // For bottle beer with case_size, on-hand is converted from bottles to
+  // cases (par_level is already in cases for case-tracked beer) so the
+  // par comparison and the suggested order quantity are both in case units.
   belowParByVendor() {
     const asc = this.countsAsc();
     if (asc.length === 0) return null;
     const latest = asc[asc.length - 1];
-    const onHand = {};
-    (latest.items || []).forEach(it => { onHand[it.product_id] = it.total || 0; });
+    const onHandBottles = {};
+    const onHandItem = {};
+    (latest.items || []).forEach(it => {
+      onHandBottles[it.product_id] = it.total || 0;
+      onHandItem[it.product_id] = it;
+    });
 
     const groups = {};
-    Object.keys(onHand).forEach(pid => {
+    Object.keys(onHandBottles).forEach(pid => {
       const p = this.productById(pid);
       if (!p || p.par_level == null || p.par_level === '' || !(p.par_level > 0)) return;
-      const oh = onHand[pid];
+      const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
+      // For case-tracked beer: convert raw-bottle on-hand into cases.
+      // par_level is already in cases for case-tracked beer.
+      const oh = isCaseBeer ? ((onHandBottles[pid] || 0) / p.case_size) : (onHandBottles[pid] || 0);
       if (oh >= p.par_level) return;
       const vendor = p.vendor || 'Unassigned';
       if (!groups[vendor]) groups[vendor] = [];
       groups[vendor].push({
         product: p,
         on_hand: oh,
+        on_hand_raw_bottles: isCaseBeer ? (onHandBottles[pid] || 0) : null,
+        on_hand_loose: isCaseBeer ? ((onHandBottles[pid] || 0) % p.case_size) : null,
         par: p.par_level,
         suggested: Math.max(1, Math.ceil(p.par_level - oh)),
-        unit_cost: p.unit_cost != null ? p.unit_cost : 0
+        unit_cost: p.unit_cost != null ? p.unit_cost : 0,
+        is_case_beer: isCaseBeer
       });
     });
     return { latest, groups };
@@ -346,7 +359,17 @@ S.InventoryOrderSheet = {
       const name = line.querySelector('.val').textContent;
       const cost = parseFloat(inp.dataset.cost) || 0;
       const productId = inp.dataset.productId || '';
-      lineItems.push({ product_id: productId, name, qty, unit_cost: cost, extended: qty * cost });
+      const product = this.productById(productId);
+      const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
+      lineItems.push({
+        product_id: productId,
+        name,
+        qty,
+        unit_cost: cost,
+        extended: qty * cost,
+        display_unit: isCaseBeer ? 'case' : 'unit',
+        case_size: isCaseBeer ? product.case_size : null
+      });
     });
     if (lineItems.length === 0) { fail('Add at least one item with a quantity above zero.'); return; }
 
@@ -381,19 +404,38 @@ S.InventoryOrderSheet = {
   // ── Line row builder ──────────────────────────────────────────────────────
   // Shared by the suggested-from-count rows AND the "+ Add Item" picker so
   // both flow types produce identical HTML and recalcVendor/createOrder work
-  // the same way for either.
+  // the same way for either. For bottle beer with case_size set, the qty
+  // and unit cost are in case units (par_level is already in cases). The
+  // on-hand display shows "X cases + Y loose" so the operator sees raw
+  // counts the way they look on the shelf.
   lineRowHTML(product, qty, onHand, par) {
+    const isCaseBeer = (product.category === 'Bottle Beer') && product.case_size && product.case_size > 0;
     const unitCost = product.unit_cost != null ? product.unit_cost : 0;
-    const onHandTxt = (onHand != null && !isNaN(onHand)) ? Number(onHand).toFixed(1) : '-';
-    const parTxt   = (par != null && par !== '' && !isNaN(par)) ? par : '-';
+    const unitLabel = isCaseBeer ? 'cases' : '';
+
+    let onHandTxt;
+    if (onHand == null || isNaN(onHand)) {
+      onHandTxt = '-';
+    } else if (isCaseBeer) {
+      const totalBottles = Math.round(Number(onHand) * product.case_size);
+      const cases = Math.floor(totalBottles / product.case_size);
+      const loose = totalBottles % product.case_size;
+      onHandTxt = cases + ' cases' + (loose > 0 ? ' + ' + loose + ' btl' : '');
+    } else {
+      onHandTxt = Number(onHand).toFixed(1);
+    }
+    const parTxt = (par != null && par !== '' && !isNaN(par))
+      ? (par + (isCaseBeer ? ' cases' : ''))
+      : '-';
+
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
       + '<td><div class="val">' + esc(product.name || '') + '</div>'
       + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '') + '</div></td>'
       + '<td>' + onHandTxt + '</td>'
       + '<td>' + parTxt + '</td>'
       + '<td><input type="number" class="os-qty" data-cost="' + unitCost + '" data-product-id="' + esc(product.id || '') + '" min="0" step="1" '
-      + 'value="' + qty + '" style="width:80px;"/></td>'
-      + '<td>' + App.fmtCurrency(unitCost) + '</td>'
+      + 'value="' + qty + '" style="width:80px;"/>' + (unitLabel ? ' <span style="font-size:10px;color:var(--t3);">' + unitLabel + '</span>' : '') + '</td>'
+      + '<td>' + App.fmtCurrency(unitCost) + (isCaseBeer ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '') + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(qty * unitCost) + '</td>'
       + '<td><button class="btn btn-ghost btn-sm os-remove">Remove</button></td>'
       + '</tr>';
@@ -533,7 +575,20 @@ S.InventoryOrderSheet = {
       const name = line.querySelector('.val').textContent;
       const cost = parseFloat(inp.dataset.cost) || 0;
       const productId = inp.dataset.productId || '';
-      lineItems.push({ product_id: productId, name, qty, unit_cost: cost, extended: qty * cost });
+      const product = this.productById(productId);
+      const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
+      lineItems.push({
+        product_id: productId,
+        name,
+        qty,
+        unit_cost: cost,
+        extended: qty * cost,
+        // Display unit and case size snapshot so Receive Delivery knows
+        // whether the ordered qty is in cases or single units, and so
+        // downstream variance math can convert to bottles when needed.
+        display_unit: isCaseBeer ? 'case' : 'unit',
+        case_size: isCaseBeer ? product.case_size : null
+      });
     });
     if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
 
