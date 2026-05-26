@@ -35,10 +35,10 @@ S.InventoryMoversReport = {
       const p = this.productById(pid) || {};
       const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
       const ppc = p.pours_per_container || null;
-      const unitCost = p.unit_cost != null ? p.unit_cost : (eMap[pid].unit_cost != null ? eMap[pid].unit_cost : null);
+      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
       rows.push({
         pid, name: eMap[pid].name, category: eMap[pid].category || p.category || '',
-        used, usageCost: unitCost != null ? used * unitCost : 0,
+        used, usageCost: bottleCost != null ? used * bottleCost : 0,
         poursMade: ppc != null ? used * ppc : null
       });
     });
