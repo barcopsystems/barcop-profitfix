@@ -105,11 +105,13 @@ S.AuditDiff = {
       +   '</div>'
       + '</div>';
 
+    const narrativeSection = (before === after) ? '' : this._renderNarrativeShell();
+
     const body = (before === after)
       ? '<div style="padding:32px 24px;font-size:13px;color:var(--t3);text-align:center;">Pick two different audits to see the comparison.</div>'
       : this._renderDiff(before, after);
 
-    panel.innerHTML = header + pickers + body;
+    panel.innerHTML = header + pickers + narrativeSection + body;
 
     document.getElementById('ad-close').addEventListener('click', () => this._close());
     document.getElementById('ad-before-sel').addEventListener('change', (e) => {
@@ -128,6 +130,117 @@ S.AuditDiff = {
         App.openScreen(fixScreen);
       });
     });
+    // Generate AI Narrative (click-to-generate, fresh each click)
+    document.getElementById('ad-narr-btn')?.addEventListener('click', () => {
+      this._generateNarrative(moduleKey, before, after);
+    });
+  },
+
+  _renderNarrativeShell() {
+    return '<div id="ad-narrative-wrap" style="padding:18px 24px;border-bottom:1px solid var(--b2);background:rgba(219,171,70,0.04);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">AI Narrative</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:4px;">Operator-voice summary of what changed between these two audits.</div>'
+      +   '</div>'
+      +   '<button class="btn btn-ghost btn-sm" id="ad-narr-btn" style="font-size:10px;padding:4px 12px;">Get AI Narrative</button>'
+      + '</div>'
+      + '<div id="ad-narr-body" style="display:none;font-size:13px;color:var(--t2);line-height:1.7;margin-top:14px;"></div>'
+      + '</div>';
+  },
+
+  async _generateNarrative(moduleKey, before, after) {
+    const btn = document.getElementById('ad-narr-btn');
+    const body = document.getElementById('ad-narr-body');
+    if (!btn || !body) return;
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    body.style.display = 'block';
+    body.innerHTML = '<div style="color:var(--t3);">Reading both audits and writing the analysis...</div>';
+
+    const prompt = this._buildNarrativePrompt(moduleKey, before, after);
+    try {
+      const r = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 600,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      if (data.error) {
+        body.innerHTML = '<div style="color:var(--red);">API error: ' + esc(data.error.message || 'unknown') + '</div>';
+      } else {
+        const text = data.content?.[0]?.text || '';
+        if (!text) {
+          body.innerHTML = '<div style="color:var(--red);">Empty response. Try again.</div>';
+        } else {
+          // Render paragraphs separated by blank lines
+          const paragraphs = text.split(/\n\n+/).map(p =>
+            '<div style="margin-bottom:12px;">' + esc(p).replace(/\n/g, '<br>') + '</div>'
+          ).join('');
+          body.innerHTML = paragraphs;
+        }
+      }
+    } catch (e) {
+      body.innerHTML = '<div style="color:var(--red);">Could not generate narrative: ' + esc(e.message || 'unknown error') + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Regenerate';
+    }
+  },
+
+  _buildNarrativePrompt(moduleKey, before, after) {
+    const moduleName = this._moduleName(moduleKey);
+    const beforeDate = (before.date || '').slice(0, 10) || 'unknown';
+    const afterDate  = (after.date  || '').slice(0, 10) || 'unknown';
+    const beforeScore = before.overall_score || 0;
+    const afterScore  = after.overall_score || 0;
+    const scoreDelta  = afterScore - beforeScore;
+
+    const beforeS = before.sections || {};
+    const afterS  = after.sections || {};
+    const allSections = Array.from(new Set([...Object.keys(beforeS), ...Object.keys(afterS)]));
+    const sectionLines = allSections.map(name => {
+      const b = beforeS[name];
+      const a = afterS[name];
+      const delta = (b != null && a != null) ? (a - b) : null;
+      const deltaStr = delta == null ? 'n/a' : (delta > 0 ? '+' : '') + delta;
+      return '- ' + name + ': ' + (b ?? 'n/a') + ' -> ' + (a ?? 'n/a') + ' (' + deltaStr + ')';
+    }).join('\n');
+
+    const beforeItems = before.action_items || [];
+    const afterItems  = after.action_items || [];
+    const beforeIds = new Set(beforeItems.map(i => i.gap_id).filter(Boolean));
+    const afterIds  = new Set(afterItems.map(i => i.gap_id).filter(Boolean));
+    const resolved = beforeItems.filter(i => i.gap_id && !afterIds.has(i.gap_id));
+    const surfaced = afterItems.filter(i => i.gap_id && !beforeIds.has(i.gap_id));
+    const ongoing  = afterItems.filter(i => i.gap_id && beforeIds.has(i.gap_id));
+
+    const fmtItems = items => items.length === 0 ? 'none'
+      : items.map(i => '- ' + (i.action || i.gap_id) + (i.monthly_impact ? ' ($' + Math.round(i.monthly_impact) + '/mo)' : '')).join('\n');
+
+    const beforeMonthly = beforeItems.reduce((s,i) => s + (i.monthly_impact || 0), 0);
+    const afterMonthly  = afterItems.reduce((s,i) => s + (i.monthly_impact || 0), 0);
+    const monthlyDelta  = afterMonthly - beforeMonthly;
+
+    return 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. '
+      + 'Compare two ' + moduleName + ' audits and write 2 to 3 short paragraphs about what changed. '
+      + 'Rules: direct operator-to-operator voice, plain sentences, specific numbers from the data below. '
+      + 'No emdashes, no "--" dashes, no bullet points in your output, no headers, no AI language like "cadence" or "leverage" or "going forward". '
+      + 'Lead with the overall story (what happened to the score and why). '
+      + 'Second paragraph: the biggest win or biggest concern with specific numbers. '
+      + 'Third paragraph (optional): the single most important action to take this month. '
+      + 'Total length: 150 to 200 words.\n\n'
+      + 'AUDIT BEFORE: ' + beforeDate + ', overall score ' + beforeScore + '\n'
+      + 'AUDIT AFTER: ' + afterDate + ', overall score ' + afterScore + ' (delta ' + (scoreDelta > 0 ? '+' : '') + scoreDelta + ' pts)\n\n'
+      + 'SECTION SCORE CHANGES:\n' + sectionLines + '\n\n'
+      + 'GAPS RESOLVED (closed since the before audit):\n' + fmtItems(resolved) + '\n\n'
+      + 'NEW GAPS SURFACED (new in the after audit):\n' + fmtItems(surfaced) + '\n\n'
+      + 'STILL OPEN (in both audits):\n' + fmtItems(ongoing) + '\n\n'
+      + 'MONTHLY OPPORTUNITY: $' + Math.round(beforeMonthly) + ' -> $' + Math.round(afterMonthly) + ' (delta $' + Math.round(monthlyDelta) + '/mo)\n';
   },
 
   _renderDiff(before, after) {
