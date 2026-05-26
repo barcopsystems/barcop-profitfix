@@ -635,6 +635,8 @@ S.Hub = {
       getStart:'<path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       allBars: '<rect x="2" y="6" width="3" height="8" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="3" width="3" height="11" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="12" y="8" width="3" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3"/>',
       books:   '<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      user:    '<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      report:  '<rect x="3.5" y="2" width="10" height="13" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 5.5h5M6 8h5M6 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M9 12.5l1.2 1.2 2.2-2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
@@ -652,9 +654,13 @@ S.Hub = {
     };
 
     const sidebarNav = ''
-      + '<div class="nav-section">Overview</div>'
-      + navItem('group-dashboard', 'Group Dashboard', 'allBars', [])
-      + navItem('books',           'Books',           'books', [])
+      // Locations section — only visible when the operator belongs to more
+      // than one account (the multi-bar group case). Single-location operators
+      // never see the section header or its lone Dashboard link.
+      + ((DB.cachedAccounts && DB.cachedAccounts().length > 1)
+          ? ('<div class="nav-section">Locations</div>'
+             + navItem('group-dashboard', 'Dashboard', 'allBars', []))
+          : '')
       + '<div class="nav-section">Recovery</div>'
       + navItem('enter', 'Profit Recovery',  'profit',  [['data-mod','profit'],   ['data-screen','dashboard']])
       + navItem('enter', 'Revenue Recovery', 'revenue', [['data-mod','revenue'],  ['data-screen','r-dashboard']])
@@ -663,14 +669,22 @@ S.Hub = {
       + navItem('enter', 'Inventory Control','inv',     [['data-mod','inventory'],['data-screen','ic-dashboard']])
       + navItem('enter', 'Labor Control',    'labor',   [['data-mod','labor'],    ['data-screen','lc-dashboard']])
       + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
-      + '<div class="nav-section">Support</div>'
-      + navItem('getting-started',  'Getting Started', 'getStart', [])
-      + navItem('help',             'Help and FAQ',    'help',     [])
-      + navItem('contact-support',  'Contact Us',      'mail',     [])
-      + '<div class="nav-section">System</div>'
+      + '<div class="nav-section">Accounting</div>'
+      + navItem('books',            'Month-End Books', 'books',    [])
+      + navItem('weekly-pnl',       'Weekly P&L',      'report',   [])
+      + '<div class="nav-section">Setup</div>'
+      // Getting Started hides once every setup step is checked off so the
+      // sidebar does not carry permanent clutter for operators past setup.
+      // Auto-resurfaces if a new step ever gets added to the list.
+      + ((App.isSetupComplete && App.isSetupComplete())
+          ? ''
+          : navItem('getting-started',  'Getting Started', 'getStart', []))
+      + navItem('user-accounts',    'User Accounts',   'user',     [])
       + navItem('settings',         'App Settings',    'settings', [])
-      + navItem('user-accounts',    'User Accounts',   'settings', [])
-      + navItem('report-bug',       'Report a Bug',    'bug',      []);
+      + '<div class="nav-section">Support</div>'
+      + navItem('help',             'Help and FAQ',    'help',     [])
+      + navItem('report-bug',       'Report a Bug',    'bug',      [])
+      + navItem('contact-support',  'Contact Us',      'mail',     []);
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
@@ -686,6 +700,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
+        .hub-app.sidebar-collapsed .sidebar-last-updated{display:none;}
         .hub-app .hd-metric{background:var(--panel);padding:8px 10px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
@@ -727,6 +742,7 @@ S.Hub = {
             </button>
           </div>
           <nav class="sidebar-nav">${sidebarNav}</nav>
+          <div class="sidebar-last-updated" style="font-size:10px;color:var(--t4);padding:8px 14px 10px;line-height:1.4;">${esc(lastUpdatedTxt)}</div>
           <div class="sidebar-footer">
             <button class="sidebar-btn" id="hub-signout">
               <svg class="nav-icon" viewBox="0 0 17 17" fill="none">${navIcons.signout}</svg>
@@ -741,9 +757,7 @@ S.Hub = {
               <span class="topbar-sub">${todayStr}</span>
             </div>
             <div id="hub-topbar-account-switcher" style="display:none;"></div>
-            <div class="topbar-right">
-              <span style="font-size:10px;color:var(--t4);">${lastUpdatedTxt}</span>
-            </div>
+            <div class="topbar-right"></div>
           </header>
           <main class="content">
             ${catchupBanner}
@@ -784,6 +798,7 @@ S.Hub = {
       else if (action === 'user-accounts')   S.HubUserAccounts.open();
       else if (action === 'group-dashboard') S.HubGroupDashboard.open();
       else if (action === 'books')           S.HubBooks.open();
+      else if (action === 'weekly-pnl')      S.Reports?._openQboModal?.();
       else if (action === 'contact-support') S.HubSupport.open();
       else if (action === 'report-bug')      S.HubReportBug.open();
     });
