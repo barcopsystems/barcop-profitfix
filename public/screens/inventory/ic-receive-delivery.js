@@ -89,6 +89,8 @@ S.InventoryReceiveDelivery = {
       + '<div class="fw"><span class="pre">$</span><input class="pre rd-price" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Extended</label>'
       + '<div class="f-display rd-ext">$0</div></div>'
+      + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;margin-bottom:2px;border-color:var(--gold);color:var(--gold);">Flag Discrepancy</button>'
+      + '<span class="rd-flag-logged" style="display:none;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);align-self:center;">Discrepancy Logged</span>'
       + '<button type="button" class="btn btn-ghost btn-sm rd-remove" style="margin-bottom:2px;">Remove</button>'
       + '</div>'
       + '<div class="rd-flag" style="display:none;font-size:11px;font-weight:700;margin-top:8px;"></div>'
@@ -139,14 +141,11 @@ S.InventoryReceiveDelivery = {
       + '</div>'
       + '<div class="card"><div class="card-title">Line Items</div>'
       + '<div id="rd-line-instructions" style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6;">'
-        + 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order.'
+        + 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order. Compare to your invoice as you go and flag any line that does not match.'
       + '</div>'
       + '<div id="rd-lines">' + this.lineHTML(++this._seq) + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;">'
         + '<button class="btn btn-ghost btn-sm" id="rd-add">+ Add Line Item</button>'
-        + '<button class="btn btn-ghost btn-sm" id="rd-pdf-btn">Upload Invoice PDF</button>'
-        + '<input type="file" id="rd-pdf-file" accept="application/pdf" style="display:none;"/>'
-        + '<span id="rd-pdf-status" style="font-size:11px;color:var(--t3);display:none;"></span>'
       + '</div>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val" id="rd-count">0</div></div>'
@@ -191,225 +190,14 @@ S.InventoryReceiveDelivery = {
       this.recalcTotal();
     });
     document.getElementById('rd-save')?.addEventListener('click', () => this.save());
-
-    // PDF invoice upload (text PDFs only; image PDFs won't parse). Operator
-    // confirms every line after pre-fill so any parser miss is correctable.
-    document.getElementById('rd-pdf-btn')?.addEventListener('click', () => {
-      document.getElementById('rd-pdf-file')?.click();
+    // Flag a line for discrepancy: opens an inline modal pre-filled with the
+    // line's ordered/delivered/agreed/invoiced data.
+    document.getElementById('rd-lines')?.addEventListener('click', (ev) => {
+      const flagBtn = ev.target.closest('.rd-flag-btn');
+      if (flagBtn) this.openDiscrepancyModal(flagBtn.closest('.rd-line'));
     });
-    document.getElementById('rd-pdf-file')?.addEventListener('change', (ev) => this.handlePdfUpload(ev));
 
     this.container.onclick = null;
-  },
-
-  // ── PDF Invoice Upload (text PDFs only) ──────────────────────────────────
-  // PDF.js extracts the page text, a generic heuristic finds lines that
-  // look like invoice line items (description + qty + currency price), and
-  // each detected item is matched against ic_products by name substring.
-  // Matches get appended as form lines for operator review. Anything we
-  // cannot parse stays missing and the operator types it manually. Vendor
-  // invoice formats vary too much for a single parser to nail every one;
-  // this is a workable starting point that can be tuned with per-vendor
-  // template overrides later if any specific format proves popular.
-  setPdfStatus(text, color, opts) {
-    const el = document.getElementById('rd-pdf-status');
-    if (!el) return;
-    if (!text) { el.style.display = 'none'; el.innerHTML = ''; return; }
-    el.style.display = '';
-    el.style.color = color || 'var(--t3)';
-    el.style.lineHeight = '1.6';
-    el.style.maxWidth = '640px';
-    let html = esc(text);
-    if (opts && opts.contactButton) {
-      html += ' <button class="btn btn-ghost btn-sm" id="rd-pdf-contact" style="margin-left:6px;">Send to Bar Cop</button>';
-    }
-    el.innerHTML = html;
-    if (opts && opts.contactButton) {
-      document.getElementById('rd-pdf-contact')?.addEventListener('click', () => {
-        if (window.S && S.HubSupport && S.HubSupport.open) S.HubSupport.open();
-      });
-    }
-  },
-
-  async handlePdfUpload(ev) {
-    const file = ev.target?.files?.[0];
-    ev.target.value = ''; // allow re-selecting the same file later
-    if (!file) return;
-    if (!window.pdfjsLib) {
-      this.setPdfStatus('PDF reader did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
-      return;
-    }
-
-    this.setPdfStatus('Reading ' + file.name + '...', 'var(--t3)');
-    try {
-      const buf = await file.arrayBuffer();
-      const loadingTask = window.pdfjsLib.getDocument({ data: buf });
-      const pdf = await loadingTask.promise;
-      let allText = '';
-      const allLines = [];
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        // PDF.js returns text items with their position. Group items into
-        // logical lines by y-coordinate so column-oriented invoices read
-        // as one row per item rather than a stream of fragments.
-        const byY = new Map();
-        content.items.forEach(it => {
-          if (!it.str) return;
-          const y = Math.round((it.transform?.[5] ?? 0) * 10) / 10;
-          if (!byY.has(y)) byY.set(y, []);
-          byY.get(y).push({ x: it.transform?.[4] ?? 0, str: it.str });
-        });
-        const yKeys = [...byY.keys()].sort((a, b) => b - a); // top to bottom
-        yKeys.forEach(y => {
-          const fragments = byY.get(y).sort((a, b) => a.x - b.x).map(f => f.str.trim()).filter(Boolean);
-          if (fragments.length === 0) return;
-          const line = fragments.join(' ').replace(/\s+/g, ' ').trim();
-          if (line.length > 0) allLines.push(line);
-        });
-        allText += allLines.join('\n') + '\n';
-      }
-
-      if (allLines.length === 0) {
-        this.setPdfStatus('This looks like a scanned image PDF, not a text PDF. Bar Cop can only read text-based PDFs (the kind a vendor emails out of their billing system). Type the items manually below.', 'var(--red)');
-        return;
-      }
-
-      const detected = this.parseInvoiceLines(allLines);
-      if (detected.length === 0) {
-        this.setPdfStatus(
-          'Bar Cop could not detect line items in this vendor\'s PDF format. Type the items manually below. If you want this vendor supported, send the PDF to Bar Cop and we will add the format.',
-          'var(--red)',
-          { contactButton: true }
-        );
-        return;
-      }
-
-      const matched = this.matchDetectedToProducts(detected);
-      this.appendDetectedLines(matched);
-
-      const matchCount = matched.filter(m => m.product).length;
-      const skipCount  = matched.length - matchCount;
-      if (matchCount === 0) {
-        this.setPdfStatus(
-          'Bar Cop detected ' + matched.length + ' line' + (matched.length === 1 ? '' : 's') + ' in the PDF but none matched a product in your master list. Type the items manually below, or send the PDF to Bar Cop so we can improve the matching for this vendor.',
-          'var(--red)',
-          { contactButton: true }
-        );
-        return;
-      }
-      let msg = matchCount + ' item' + (matchCount === 1 ? '' : 's') + ' added.';
-      if (skipCount > 0) {
-        msg += ' ' + skipCount + ' detected line' + (skipCount === 1 ? '' : 's') + ' could not be matched to a product in your master list and were skipped. Add them manually below if needed.';
-      }
-      msg += ' Review every line before saving.';
-      this.setPdfStatus(msg, 'var(--gold)');
-    } catch (e) {
-      console.error('PDF upload error:', e);
-      this.setPdfStatus('Could not read this PDF: ' + (e?.message || 'unknown error'), 'var(--red)');
-    }
-  },
-
-  // Generic line parser. Looks for rows with a description + integer qty +
-  // 1-2 currency amounts. Returns [{ name, qty, unitPrice }].
-  parseInvoiceLines(lines) {
-    const out = [];
-    // Patterns to try, in priority order. Each captures (description, qty, unit, extended OR description, qty, unit).
-    // PDF text often arrives as "DESCRIPTION ... QTY UNIT_PRICE EXTENDED" or "QTY DESCRIPTION UNIT EXTENDED".
-    const patterns = [
-      // "Description QTY UnitPrice ExtendedPrice" at end of line
-      /^(.+?)\s+(\d+(?:\.\d+)?)\s+\$?(\d+(?:,\d{3})*\.\d{2})\s+\$?(\d+(?:,\d{3})*\.\d{2})\s*$/,
-      // "QTY Description UnitPrice ExtendedPrice"
-      /^(\d+(?:\.\d+)?)\s+(.+?)\s+\$?(\d+(?:,\d{3})*\.\d{2})\s+\$?(\d+(?:,\d{3})*\.\d{2})\s*$/,
-      // "Description QTY UnitPrice" (no extended column)
-      /^(.+?)\s+(\d+(?:\.\d+)?)\s+\$?(\d+(?:,\d{3})*\.\d{2})\s*$/
-    ];
-    const normNum = s => parseFloat(String(s).replace(/,/g, ''));
-
-    lines.forEach(line => {
-      // Skip obvious header/footer rows
-      if (/^(subtotal|total|tax|invoice|date|po\s*#|account|terms|thank|page|due)/i.test(line)) return;
-      // Skip lines too short to be a real item
-      if (line.length < 8) return;
-
-      let m = line.match(patterns[0]);
-      if (m) {
-        const name = m[1].trim();
-        const qty  = normNum(m[2]);
-        const unit = normNum(m[3]);
-        if (qty > 0 && unit > 0 && name.length >= 2 && /[A-Za-z]/.test(name)) {
-          out.push({ name, qty, unitPrice: unit });
-          return;
-        }
-      }
-      m = line.match(patterns[1]);
-      if (m) {
-        const qty  = normNum(m[1]);
-        const name = m[2].trim();
-        const unit = normNum(m[3]);
-        if (qty > 0 && unit > 0 && name.length >= 2 && /[A-Za-z]/.test(name)) {
-          out.push({ name, qty, unitPrice: unit });
-          return;
-        }
-      }
-      m = line.match(patterns[2]);
-      if (m) {
-        const name = m[1].trim();
-        const qty  = normNum(m[2]);
-        const unit = normNum(m[3]);
-        if (qty > 0 && unit > 0 && name.length >= 2 && /[A-Za-z]/.test(name)) {
-          out.push({ name, qty, unitPrice: unit });
-        }
-      }
-    });
-    return out;
-  },
-
-  matchDetectedToProducts(detected) {
-    const all = (App.inventoryData?.ic_products || []).filter(p => p.active !== false);
-    return detected.map(d => {
-      const lower = d.name.toLowerCase();
-      // 1) Try exact name match first (case-insensitive)
-      let product = all.find(p => (p.name || '').toLowerCase() === lower);
-      // 2) Try substring match either direction
-      if (!product) {
-        product = all.find(p => {
-          const pn = (p.name || '').toLowerCase();
-          return pn.length >= 3 && (lower.includes(pn) || pn.includes(lower));
-        });
-      }
-      // 3) Try token overlap on the first meaningful word
-      if (!product) {
-        const tokens = lower.split(/\s+/).filter(t => t.length >= 4);
-        if (tokens.length > 0) {
-          product = all.find(p => {
-            const pn = (p.name || '').toLowerCase();
-            return tokens.some(t => pn.includes(t));
-          });
-        }
-      }
-      return { ...d, product: product || null };
-    });
-  },
-
-  appendDetectedLines(matchedItems) {
-    const linesEl = document.getElementById('rd-lines');
-    if (!linesEl) return;
-    matchedItems.forEach(m => {
-      if (!m.product) return; // skip unmatched
-      const lid = ++this._seq;
-      linesEl.insertAdjacentHTML('beforeend', this.lineHTML(lid));
-      const line = linesEl.querySelector('.rd-line[data-lid="' + lid + '"]');
-      if (!line) return;
-      const prodSel  = line.querySelector('.rd-prod');
-      const qtyInp   = line.querySelector('.rd-qty');
-      const priceInp = line.querySelector('.rd-price');
-      prodSel.value  = m.product.id;
-      qtyInp.value   = m.qty;
-      priceInp.value = m.unitPrice;
-      this.recalcLine(line);
-    });
-    this.recalcTotal();
   },
 
   recalcLine(line) {
@@ -421,16 +209,21 @@ S.InventoryReceiveDelivery = {
 
     const p = this.productById(line.querySelector('.rd-prod').value);
     const flag = line.querySelector('.rd-flag');
+    const flagBtn = line.querySelector('.rd-flag-btn');
     const messages = [];
+    let hasPriceChange = false;
     if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) {
       const up = price > p.unit_cost;
-      messages.push('Price ' + (up ? 'up' : 'down') + ' from ' + App.fmtCurrency(p.unit_cost) + ' to ' + App.fmtCurrency(price) + ' (master will update).');
+      messages.push('Price ' + (up ? 'up' : 'down') + ' from ' + App.fmtCurrency(p.unit_cost) + ' to ' + App.fmtCurrency(price) + '.');
+      hasPriceChange = true;
     }
     const orderedQty = parseFloat(line.dataset.orderedQty);
-    if (!isNaN(orderedQty) && orderedQty > 0 && qty > 0 && qty < orderedQty) {
+    let hasShortCount = false;
+    if (!isNaN(orderedQty) && orderedQty > 0 && qty >= 0 && qty < orderedQty) {
       const shortBy = orderedQty - qty;
       messages.push('Short count: ordered ' + orderedQty + ', received ' + qty + ' (short ' + shortBy + ').');
       line.dataset.shortCount = '1';
+      hasShortCount = true;
     } else {
       line.dataset.shortCount = '';
     }
@@ -441,6 +234,14 @@ S.InventoryReceiveDelivery = {
     } else {
       flag.style.display = 'none';
       flag.textContent = '';
+    }
+
+    // Show the Flag Discrepancy button when a real diff is detected, AND
+    // the line has not already been flagged. The "Discrepancy Logged" badge
+    // takes over once filed.
+    const alreadyLogged = line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged';
+    if (flagBtn) {
+      flagBtn.style.display = (!alreadyLogged && (hasPriceChange || hasShortCount)) ? '' : 'none';
     }
   },
 
@@ -532,30 +333,146 @@ S.InventoryReceiveDelivery = {
     this.updateLineItemMode(vendor, orderId);
   },
 
-  // Toggle the line-item entry mode based on whether an order was matched.
-  // Matched: line items came from the order, PDF upload is hidden (it would
-  // re-do work Bar Cop already has). "+ Add Line Item" stays visible for
-  // promos/extras the vendor threw in on top of the order.
-  // Unmatched: walk-in delivery, PDF upload + manual entry both available.
+  // Update the instructional text based on whether an order is matched.
   updateLineItemMode(vendorName, orderId) {
     const inst = document.getElementById('rd-line-instructions');
-    const pdfBtn = document.getElementById('rd-pdf-btn');
-    if (!inst || !pdfBtn) return;
-
+    if (!inst) return;
     if (!vendorName) {
-      inst.textContent = 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order.';
-      pdfBtn.style.display = '';
+      inst.textContent = 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order. Compare to your invoice as you go and flag any line that does not match.';
+      return;
+    }
+    if (orderId) {
+      inst.textContent = 'Line items pre-filled from the matched order. Compare each line to your invoice. Adjust the qty or price if it differs, then click Flag Discrepancy on that line to log it for credit recovery. Use "+ Add Line Item" for promos or substitutions the vendor threw in on top.';
+    } else {
+      inst.textContent = 'Walk-in delivery (no order matched). Type the line items manually. If a delivered price differs from your product master, Bar Cop will offer a Flag Discrepancy button so you can log the credit claim.';
+    }
+  },
+
+  // ── Discrepancy modal — opens from a flagged line ────────────────────────
+  // Pre-fills date, vendor, product, agreed price, invoiced price, and
+  // calculated overcharge. Operator adds notes and saves. Discrepancy record
+  // lands in App.data.vendor_discrepancies and surfaces on the Profit
+  // Recovery Vendor Discrepancies screen. Operator stays on Receive Delivery
+  // throughout — modal closes back to the same screen on save or cancel.
+  openDiscrepancyModal(line) {
+    if (!line) return;
+    const vendor = document.getElementById('rd-vendor')?.value || '';
+    const date   = document.getElementById('rd-date')?.value || new Date().toISOString().slice(0, 10);
+    const invoice = document.getElementById('rd-invoice')?.value.trim() || '';
+
+    const productId = line.querySelector('.rd-prod')?.value || '';
+    const product = this.productById(productId);
+    const productName = product?.name || '(unrecorded)';
+
+    const qty = parseFloat(line.querySelector('.rd-qty')?.value) || 0;
+    const invoicedPrice = parseFloat(line.querySelector('.rd-price')?.value);
+    const agreedPrice = product?.unit_cost != null ? product.unit_cost : null;
+    const orderedQtyRaw = line.dataset.orderedQty;
+    const orderedQty = (orderedQtyRaw === '' || orderedQtyRaw == null) ? null : parseFloat(orderedQtyRaw);
+
+    const hasPriceChange = (agreedPrice != null && !isNaN(invoicedPrice) && Math.abs(invoicedPrice - agreedPrice) > 0.001);
+    const hasShortCount  = (orderedQty != null && !isNaN(orderedQty) && orderedQty > 0 && qty < orderedQty);
+
+    // Pick the most likely type based on what's wrong.
+    let suggestedType = 'Other';
+    if (hasShortCount && hasPriceChange) suggestedType = 'Other';
+    else if (hasShortCount) suggestedType = 'Short Count';
+    else if (hasPriceChange) suggestedType = 'Price Overcharge';
+
+    // Calculate overcharge dollars based on the issue type.
+    let overcharge = 0;
+    if (hasShortCount && agreedPrice != null) overcharge += (orderedQty - qty) * agreedPrice;
+    if (hasPriceChange && qty > 0) overcharge += (invoicedPrice - agreedPrice) * qty;
+    if (overcharge < 0) overcharge = 0;
+
+    const TYPES = ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'];
+    const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === suggestedType ? ' selected' : '') + '>' + t + '</option>').join('');
+
+    const m = document.createElement('div');
+    m.id = 'rd-discrepancy-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.65);';
+    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:620px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:1px solid var(--b2);padding-bottom:12px;">'
+        + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">File Discrepancy</div>'
+        + '<button type="button" id="rd-disc-close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Fill this with what was wrong, then save. The discrepancy goes to Profit Recovery > Vendor Discrepancies for credit recovery follow-up. You can adjust the numbers if needed.</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="rd-disc-date" value="' + esc(date) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><input type="text" id="rd-disc-vendor" value="' + esc(vendor) + '"/></div>'
+        + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="rd-disc-ref" value="' + esc(invoice) + '"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="flex:1;min-width:220px;"><label>Product</label><input type="text" id="rd-disc-product" value="' + esc(productName) + '"/></div>'
+        + '<div class="f" style="width:180px;"><label>Type</label><select id="rd-disc-type">' + typeOpts + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:100px;"><label>Units</label><input type="number" id="rd-disc-units" step="1" value="' + (hasShortCount ? (orderedQty - qty) : qty) + '"/></div>'
+        + '<div class="f" style="width:130px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="width:130px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-invoiced" step="0.01" value="' + (!isNaN(invoicedPrice) ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="width:150px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="flex:1;min-width:260px;"><label>Notes</label><input type="text" id="rd-disc-notes" placeholder="What was wrong, and who you contacted"/></div>'
+      + '</div>'
+      + '<div id="rd-disc-err" style="color:var(--red);font-size:12px;margin-bottom:10px;display:none;"></div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">'
+        + '<button type="button" id="rd-disc-cancel" class="btn btn-ghost">Cancel</button>'
+        + '<button type="button" id="rd-disc-file" class="btn btn-primary">File Discrepancy</button>'
+      + '</div>'
+    + '</div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+    document.getElementById('rd-disc-close').addEventListener('click', close);
+    document.getElementById('rd-disc-cancel').addEventListener('click', close);
+    document.getElementById('rd-disc-file').addEventListener('click', () => this.saveDiscrepancy(line, close));
+  },
+
+  async saveDiscrepancy(line, closeFn) {
+    const errEl = document.getElementById('rd-disc-err');
+    const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+
+    const date = document.getElementById('rd-disc-date')?.value;
+    const vendor = document.getElementById('rd-disc-vendor')?.value.trim();
+    if (!date) { fail('Date is required.'); return; }
+    if (!vendor) { fail('Vendor is required.'); return; }
+
+    const rec = {
+      id:             App.uid(),
+      date,
+      vendor,
+      ref:            document.getElementById('rd-disc-ref')?.value.trim() || '',
+      type:           document.getElementById('rd-disc-type')?.value || 'Other',
+      sku:            document.getElementById('rd-disc-product')?.value.trim() || '',
+      units:          parseFloat(document.getElementById('rd-disc-units')?.value) || 0,
+      agreed_price:   parseFloat(document.getElementById('rd-disc-agreed')?.value) || 0,
+      invoiced_price: parseFloat(document.getElementById('rd-disc-invoiced')?.value) || 0,
+      overcharge:     parseFloat(document.getElementById('rd-disc-overcharge')?.value) || 0,
+      notes:          document.getElementById('rd-disc-notes')?.value.trim() || '',
+      status:         'Open',
+      source:         'receive-delivery',
+      created_at:     new Date().toISOString()
+    };
+
+    if (!Array.isArray(App.data.vendor_discrepancies)) App.data.vendor_discrepancies = [];
+    App.data.vendor_discrepancies.push(rec);
+    const ok = await App.saveKey('vendor_discrepancies');
+    if (!ok && ok !== undefined) {
+      App.data.vendor_discrepancies.pop();
+      fail('Could not save the discrepancy. Try again.');
       return;
     }
 
-    if (orderId) {
-      inst.textContent = 'Line items pre-filled from the matched order. Adjust any quantity that came up short, then save. Use "+ Add Line Item" for anything the vendor threw in on top of the order (promos, samples, substitutions).';
-      pdfBtn.style.display = 'none';
-      this.setPdfStatus('');
-    } else {
-      inst.textContent = 'Walk-in delivery (no order matched). Type the line items manually, or upload the vendor\'s PDF invoice and Bar Cop will pre-fill what it can read. Image-based PDFs (scans) will not parse.';
-      pdfBtn.style.display = '';
-    }
+    // Mark the line as logged so the Flag button hides and the badge shows.
+    line.dataset.discrepancyId = '1';
+    const flagBtn = line.querySelector('.rd-flag-btn');
+    const loggedBadge = line.querySelector('.rd-flag-logged');
+    if (flagBtn) flagBtn.style.display = 'none';
+    if (loggedBadge) loggedBadge.style.display = '';
+
+    if (closeFn) closeFn();
   },
 
   // ── Save ──────────────────────────────────────────────────────────────────
