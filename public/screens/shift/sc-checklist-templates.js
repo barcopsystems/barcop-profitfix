@@ -95,17 +95,16 @@ S.ShiftChecklistTemplates = {
       '<option' + (this._type === ty ? ' selected' : '') + '>' + ty + '</option>').join('');
 
     const itemRows = this._items.map((it, idx) =>
-      '<div class="ct-line" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
+      '<div class="ct-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
+      + DragReorder.handleDivHTML()
       + '<input type="text" class="ct-item-input" data-idx="' + idx + '" value="' + esc(it) + '" '
       + 'placeholder="Checklist item" style="flex:1;"/>'
-      + '<button type="button" class="btn btn-ghost btn-sm ct-up" data-idx="' + idx + '"' + (idx === 0 ? ' disabled' : '') + '>&#9650;</button>'
-      + '<button type="button" class="btn btn-ghost btn-sm ct-down" data-idx="' + idx + '"' + (idx === this._items.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
       + '<button type="button" class="btn btn-danger btn-sm ct-remove" data-idx="' + idx + '">Remove</button>'
       + '</div>').join('');
 
     const itemsBlock = this._items.length === 0
       ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No items yet. Add items below or load the default list.</div>'
-      : itemRows;
+      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the &#x2630; handle on the left to reorder. Take this template into a shift and the checklist runs in this order.</div>' + itemRows;
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (this.editId ? 'Edit' : 'New') + ' Checklist Template</div>'
@@ -157,16 +156,29 @@ S.ShiftChecklistTemplates = {
     });
     document.getElementById('ct-items')?.addEventListener('click', ev => {
       const rm = ev.target.closest('.ct-remove');
-      const up = ev.target.closest('.ct-up');
-      const dn = ev.target.closest('.ct-down');
-      if (!rm && !up && !dn) return;
+      if (!rm) return;
       this.syncItems();
-      const idx = parseInt((rm || up || dn).dataset.idx, 10);
-      if (rm) this._items.splice(idx, 1);
-      else if (up && idx > 0) { const x = this._items.splice(idx, 1)[0]; this._items.splice(idx - 1, 0, x); }
-      else if (dn && idx < this._items.length - 1) { const x = this._items.splice(idx, 1)[0]; this._items.splice(idx + 1, 0, x); }
+      const idx = parseInt(rm.dataset.idx, 10);
+      this._items.splice(idx, 1);
       this.renderForm();
     });
+    const itemsHost = document.getElementById('ct-items');
+    if (itemsHost) {
+      DragReorder.wire({
+        container:      itemsHost,
+        rowSelector:    '.ct-line',
+        handleSelector: '.dr-handle',
+        onCommit:       (newOrderIds) => {
+          this.syncItems();
+          const newItems = newOrderIds
+            .map(id => parseInt(id, 10))
+            .filter(i => !isNaN(i))
+            .map(i => this._items[i]);
+          this._items = newItems;
+          this.renderForm();
+        }
+      });
+    }
     document.getElementById('ct-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('ct-save')?.addEventListener('click', () => this.save());
   },
