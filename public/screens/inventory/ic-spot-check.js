@@ -32,7 +32,8 @@ S.InventorySpotCheck = {
     if (!p) return 0;
     if (p.cost_per_pour != null) return p.cost_per_pour;
     const pp = this.poursPer(p);
-    if (p.unit_cost != null && pp > 0) return p.unit_cost / pp;
+    const bc = App.bottleCost(p);
+    if (bc != null && pp > 0) return bc / pp;
     return 0;
   },
   fmtDate(str) {
