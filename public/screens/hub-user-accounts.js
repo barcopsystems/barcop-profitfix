@@ -294,7 +294,13 @@ S.HubUserAccounts = {
     // for hours, leaving getSession() to return a stale token that the
     // server rejects with "Invalid auth token." Refreshing here costs one
     // extra round-trip on Team operations, which are infrequent.
+    //
+    // If the refresh itself fails (refresh token gone bad alongside the
+    // access token), the only recovery is a fresh sign-in, so we
+    // auto-sign-out and return null. Callers bail when headers is null;
+    // the SIGNED_OUT event routes the operator to the auth screen.
     let session = null;
+    let refreshFailed = false;
     try {
       const cur = await DB._sb?.auth.getSession();
       session = cur?.data?.session || null;
@@ -302,13 +308,26 @@ S.HubUserAccounts = {
       const nowSec = Math.floor(Date.now() / 1000);
       if (!session || expiresAt - nowSec < 120) {
         const refreshed = await DB._sb?.auth.refreshSession();
-        session = refreshed?.data?.session || session;
+        const newSession = refreshed?.data?.session || null;
+        if (newSession && newSession.access_token) {
+          session = newSession;
+        } else {
+          refreshFailed = true;
+        }
       }
     } catch (e) {
-      // Refresh failed (refresh token itself expired or network issue).
-      // Fall through with whatever token we have; the server will return
-      // the real error message and the user can re-sign-in.
+      refreshFailed = true;
     }
+
+    if (refreshFailed) {
+      const expiresAt = session?.expires_at || 0;
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (!session || expiresAt - nowSec < 0) {
+        try { await DB.signOut(); } catch (e) {}
+        return null;
+      }
+    }
+
     const token = session?.access_token;
     const h = { 'Content-Type': 'application/json' };
     if (token) h['Authorization'] = 'Bearer ' + token;
@@ -329,6 +348,7 @@ S.HubUserAccounts = {
     }
     try {
       const headers = await this._teamAuthHeaders();
+      if (!headers) return;
       const r = await fetch('/api/list-members', {
         method: 'POST', headers, body: JSON.stringify({ accountId })
       });
@@ -456,6 +476,7 @@ S.HubUserAccounts = {
 
     try {
       const headers = await this._teamAuthHeaders();
+      if (!headers) return;
       const r = await fetch('/api/invite-user', {
         method: 'POST', headers,
         body: JSON.stringify({ email, accountId, role, permissions })
@@ -487,6 +508,7 @@ S.HubUserAccounts = {
     if (!accountId) return;
     try {
       const headers = await this._teamAuthHeaders();
+      if (!headers) return;
       const r = await fetch('/api/update-member-role', {
         method: 'POST', headers,
         body: JSON.stringify({ accountId, membershipId, newRole })
@@ -516,6 +538,7 @@ S.HubUserAccounts = {
         if (!accountId) return;
         try {
           const headers = await this._teamAuthHeaders();
+          if (!headers) return;
           const r = await fetch('/api/remove-member', {
             method: 'POST', headers,
             body: JSON.stringify({ accountId, membershipId })
@@ -552,6 +575,7 @@ S.HubUserAccounts = {
         if (!accountId) return;
         try {
           const headers = await this._teamAuthHeaders();
+          if (!headers) return;
           const r = await fetch('/api/update-member-permissions', {
             method: 'POST', headers,
             body: JSON.stringify({ accountId, membershipId, permissions: newPerms })
