@@ -17,9 +17,9 @@ S.InventoryCountHistory = {
       new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
   // ── Entry ─────────────────────────────────────────────────────────────────
@@ -49,15 +49,15 @@ S.InventoryCountHistory = {
       }).reverse().map(r => {
         const c = r.c;
         const varCell = r.variance == null
-          ? '<span style="color:var(--t4);">—</span>'
+          ? '<span style="color:var(--t4);">-</span>'
           : (r.variance >= 0 ? '+' : '') + App.fmtCurrency(r.variance);
         const status = r.isLatest
           ? '<span class="badge badge-ok">Latest</span>'
           : '<span class="badge badge-dim">Past</span>';
         return '<tr class="ch-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
-          + '<td>' + esc(c.type || '—') + '</td>'
-          + '<td>' + esc(c.counted_by || '—') + '</td>'
+          + '<td>' + esc(c.type || '-') + '</td>'
+          + '<td>' + esc(c.counted_by || '-') + '</td>'
           + '<td>' + (c.item_count || (c.items ? c.items.length : 0)) + '</td>'
           + '<td class="val">' + App.fmtCurrency(c.total_value || 0) + '</td>'
           + '<td>' + varCell + '</td>'
@@ -94,22 +94,35 @@ S.InventoryCountHistory = {
     const meta = (label, val) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
 
-    const itemRows = items.map(it => '<tr>'
-      + '<td><div class="val">' + esc(it.name) + '</div>'
-      + (it.notes ? '<div style="font-size:10px;color:var(--t3);">' + esc(it.notes) + '</div>' : '') + '</td>'
-      + '<td>' + esc(it.category || '—') + '</td>'
-      + '<td>' + (it.fulls || 0) + '</td>'
-      + '<td>' + (it.partial || 0).toFixed(1) + '</td>'
-      + '<td class="val">' + (it.total || 0).toFixed(1) + '</td>'
-      + '<td>' + (it.unit_cost != null ? App.fmtCurrency(it.unit_cost) : '<span style="color:var(--t4);">—</span>') + '</td>'
-      + '<td>' + (it.value != null ? App.fmtCurrency(it.value) : '<span style="color:var(--t4);">—</span>') + '</td>'
-      + '</tr>').join('');
+    // Case-aware columns: bottle beer items recorded with case_size show
+    // "X cases" / "Y loose" / "Z btl" instead of fulls / partial / total.
+    const itemRows = items.map(it => {
+      const isCaseBeer = it.case_size_at_count && (it.cases != null || it.loose != null);
+      const fullCol = isCaseBeer ? ((it.cases || 0) + ' cases') : (it.fulls || 0);
+      const openCol = isCaseBeer ? ((it.loose || 0) + ' loose') : (it.partial || 0).toFixed(1);
+      const totalCol = isCaseBeer
+        ? ((it.total || 0) + ' btl')
+        : (it.total || 0).toFixed(1);
+      const unitCostCol = it.unit_cost != null
+        ? (App.fmtCurrency(it.unit_cost) + (isCaseBeer ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : ''))
+        : '<span style="color:var(--t4);">-</span>';
+      return '<tr>'
+        + '<td><div class="val">' + esc(it.name) + '</div>'
+        + (it.notes ? '<div style="font-size:10px;color:var(--t3);">' + esc(it.notes) + '</div>' : '') + '</td>'
+        + '<td>' + esc(it.category || '-') + '</td>'
+        + '<td>' + fullCol + '</td>'
+        + '<td>' + openCol + '</td>'
+        + '<td class="val">' + totalCol + '</td>'
+        + '<td>' + unitCostCol + '</td>'
+        + '<td>' + (it.value != null ? App.fmtCurrency(it.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '</tr>';
+    }).join('');
 
     // Compare dropdown — every other count
     const others = asc.filter(c => c.id !== id);
     const cmpOpts = '<option value="">Compare to another count...</option>'
       + others.map(c => '<option value="' + c.id + '"' + (this.compareId === c.id ? ' selected' : '') + '>'
-          + esc(c.type) + ' — ' + this.fmtDate(c.date) + '</option>').join('');
+          + esc(c.type) + ', ' + this.fmtDate(c.date) + '</option>').join('');
 
     let compareCard = '';
     if (compare) {
@@ -133,7 +146,7 @@ S.InventoryCountHistory = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
         + (older
             ? 'A negative change is product used between the two counts. A positive change is product received.'
-            : 'Comparing against a more recent count — a positive change means this count held more on hand.')
+            : 'Comparing against a more recent count, a positive change means this count held more on hand.')
         + '</div></div>';
     }
 
@@ -141,10 +154,10 @@ S.InventoryCountHistory = {
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="ch-back">&#8592; Back to Count History</button></div>'
       + '<div class="card"><div class="card-title">' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</div>'
       + '<div class="calc" style="margin-bottom:0;">'
-      + meta('Counted By', esc(count.counted_by || '—'))
+      + meta('Counted By', esc(count.counted_by || '-'))
       + meta('Products', count.item_count || items.length)
       + meta('Total Value', App.fmtCurrency(count.total_value || 0))
-      + meta('Locations', esc((count.locations || []).join(', ') || '—'))
+      + meta('Locations', esc((count.locations || []).join(', ') || '-'))
       + '</div></div>'
       + '<div class="card"><div class="card-title">Counted Items</div>'
       + '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
