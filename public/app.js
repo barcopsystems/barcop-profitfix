@@ -1043,6 +1043,36 @@ const App = {
     return parseFloat(li.qty) || 0;
   },
 
+  // Per-bottle cost for any product. For case-tracked Bottle Beer (case_size
+  // > 0), unit_cost is stored as cost-per-case; divide by case_size to get
+  // per-bottle. For everything else unit_cost is already per single
+  // container, so pass through. Used everywhere inventory math multiplies
+  // bottle counts by a cost (usage cost, COGS, stock value, variance dollars,
+  // spot check, books inventory valuation).
+  bottleCost(p) {
+    if (!p || p.unit_cost == null) return null;
+    const cost = parseFloat(p.unit_cost);
+    if (isNaN(cost)) return null;
+    if (p.category === 'Bottle Beer' && p.case_size && p.case_size > 0) {
+      return cost / p.case_size;
+    }
+    return cost;
+  },
+
+  // Per-bottle cost resolved from a count item snapshot. Used when the
+  // source product was deleted/disabled and we fall back to the historical
+  // unit_cost saved on the count item. Mirrors bottleCost but reads the
+  // snapshot's category and case_size_at_count fields.
+  bottleCostFromCountItem(it) {
+    if (!it || it.unit_cost == null) return null;
+    const cost = parseFloat(it.unit_cost);
+    if (isNaN(cost)) return null;
+    if (it.category === 'Bottle Beer' && it.case_size_at_count && it.case_size_at_count > 0) {
+      return cost / it.case_size_at_count;
+    }
+    return cost;
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
