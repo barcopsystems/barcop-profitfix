@@ -44,9 +44,12 @@ S.InventoryUsageReport = {
       const starting = si.total || 0, ending = ei.total || 0, purchases = purch[pid] || 0;
       const used = starting + purchases - ending;
       const ppc = p.pours_per_container || null;
-      const unitCost = p.unit_cost != null ? p.unit_cost : (ei.unit_cost != null ? ei.unit_cost : null);
+      // Per-bottle cost. Use the live product if available, otherwise fall
+      // back to the count item snapshot (which carries case_size_at_count).
+      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(ei);
+      const unitCost = (p.unit_cost != null) ? p.unit_cost : (ei.unit_cost != null ? ei.unit_cost : null);
       const poursMade = ppc != null ? used * ppc : null;
-      const usageCost = unitCost != null ? used * unitCost : null;
+      const usageCost = bottleCost != null ? used * bottleCost : null;
       const theoSales = poursMade != null && p.menu_price ? poursMade * p.menu_price : null;
       const theoProfit = theoSales != null && usageCost != null ? theoSales - usageCost : null;
       rows.push({
@@ -203,7 +206,8 @@ S.InventoryUsageReport = {
     if (!items.length) return this.emptyRows();
     let total = 0;
     const body = items.map(it => {
-      const val = it.value != null ? it.value : (it.unit_cost != null ? (it.total || 0) * it.unit_cost : null);
+      const bc = App.bottleCostFromCountItem(it);
+      const val = it.value != null ? it.value : (bc != null ? (it.total || 0) * bc : null);
       total += val || 0;
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
