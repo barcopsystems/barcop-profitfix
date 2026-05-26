@@ -138,9 +138,8 @@ S.InventoryReceiveDelivery = {
       + '<textarea id="rd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '</div>'
       + '<div class="card"><div class="card-title">Line Items</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6;">'
-        + 'Type line items manually, or upload the vendor\'s PDF invoice and Bar Cop will pre-fill what it can read. '
-        + 'Image-based PDFs (scans) will not parse. Most vendor-emailed PDFs work.'
+      + '<div id="rd-line-instructions" style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6;">'
+        + 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order.'
       + '</div>'
       + '<div id="rd-lines">' + this.lineHTML(++this._seq) + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;">'
@@ -483,20 +482,27 @@ S.InventoryReceiveDelivery = {
     if (open.length === 0) {
       orderRow.style.display = 'none';
       orderSel.innerHTML = '<option value="">No open orders for this vendor</option>';
-      return;
+    } else {
+      orderRow.style.display = '';
+      const opts = ['<option value="">No matched order (walk-in delivery)</option>']
+        .concat(open.map(o => {
+          const label = (o.date || '') + '  ·  ' + (o.item_count || (o.line_items || []).length) + ' items  ·  ' + App.fmtCurrency(o.total || 0) + (o.status === 'Submitted' ? '  ·  Submitted' : '  ·  Open');
+          return '<option value="' + esc(o.id) + '">' + esc(label) + '</option>';
+        }));
+      orderSel.innerHTML = opts.join('');
+      orderSel.value = '';
     }
-    orderRow.style.display = '';
-    const opts = ['<option value="">No matched order (walk-in delivery)</option>']
-      .concat(open.map(o => {
-        const label = (o.date || '') + '  ·  ' + (o.item_count || (o.line_items || []).length) + ' items  ·  ' + App.fmtCurrency(o.total || 0) + (o.status === 'Submitted' ? '  ·  Submitted' : '  ·  Open');
-        return '<option value="' + esc(o.id) + '">' + esc(label) + '</option>';
-      }));
-    orderSel.innerHTML = opts.join('');
-    orderSel.value = '';
+    this.updateLineItemMode(vendorName, '');
   },
 
   onOrderPick(orderId) {
-    if (!orderId) return;
+    const vendor = document.getElementById('rd-vendor')?.value || '';
+    if (!orderId) {
+      // Operator cleared the order pick (walk-in). Update mode but keep
+      // existing form lines so they do not lose typed-in data.
+      this.updateLineItemMode(vendor, '');
+      return;
+    }
     const order = this.orders().find(o => o.id === orderId);
     if (!order) return;
     const linesEl = document.getElementById('rd-lines');
@@ -523,6 +529,33 @@ S.InventoryReceiveDelivery = {
       this.recalcLine(line);
     });
     this.recalcTotal();
+    this.updateLineItemMode(vendor, orderId);
+  },
+
+  // Toggle the line-item entry mode based on whether an order was matched.
+  // Matched: line items came from the order, PDF upload is hidden (it would
+  // re-do work Bar Cop already has). "+ Add Line Item" stays visible for
+  // promos/extras the vendor threw in on top of the order.
+  // Unmatched: walk-in delivery, PDF upload + manual entry both available.
+  updateLineItemMode(vendorName, orderId) {
+    const inst = document.getElementById('rd-line-instructions');
+    const pdfBtn = document.getElementById('rd-pdf-btn');
+    if (!inst || !pdfBtn) return;
+
+    if (!vendorName) {
+      inst.textContent = 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order.';
+      pdfBtn.style.display = '';
+      return;
+    }
+
+    if (orderId) {
+      inst.textContent = 'Line items pre-filled from the matched order. Adjust any quantity that came up short, then save. Use "+ Add Line Item" for anything the vendor threw in on top of the order (promos, samples, substitutions).';
+      pdfBtn.style.display = 'none';
+      this.setPdfStatus('');
+    } else {
+      inst.textContent = 'Walk-in delivery (no order matched). Type the line items manually, or upload the vendor\'s PDF invoice and Bar Cop will pre-fill what it can read. Image-based PDFs (scans) will not parse.';
+      pdfBtn.style.display = '';
+    }
   },
 
   // ── Save ──────────────────────────────────────────────────────────────────
