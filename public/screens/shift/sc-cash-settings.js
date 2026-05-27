@@ -13,7 +13,7 @@
 
 S.ShiftCashSettings = {
   shiftTypes() {
-    return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
+    return App.SHIFT_TYPES;
   },
   settings() {
     if (!App.shiftData) App.shiftData = {};
