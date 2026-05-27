@@ -148,8 +148,8 @@ S.LaborCalloutLog = {
       + '<option value="no"' + (!c || !c.covered ? ' selected' : '') + '>Not Covered</option>'
       + '<option value="yes"' + (c && c.covered ? ' selected' : '') + '>Covered</option>'
       + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Covered By</label>'
-      + '<input type="text" id="co-coveredby" value="' + esc(c?.covered_by || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Covered By</label>'
+      + '<select id="co-coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Reason</label>'
       + '<input type="text" id="co-reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>'
@@ -182,7 +182,8 @@ S.LaborCalloutLog = {
       type:        document.getElementById('co-type')?.value || 'No-Show',
       shift_type:  document.getElementById('co-shift')?.value || '',
       covered:     document.getElementById('co-covered')?.value === 'yes',
-      covered_by:  document.getElementById('co-coveredby')?.value.trim() || '',
+      covered_by_id: document.getElementById('co-coveredby')?.value || '',
+      covered_by:    (App.staffById(document.getElementById('co-coveredby')?.value) || {}).name || '',
       reason:      document.getElementById('co-reason')?.value.trim() || '',
       notes:       document.getElementById('co-notes')?.value.trim() || ''
     };
