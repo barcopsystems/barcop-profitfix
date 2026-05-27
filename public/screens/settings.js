@@ -1283,24 +1283,24 @@ S.HubSettings = {
     attachRecipe('House Margarita', {
       mode: 'single',
       ingredients: [
-        { product_id: icProducts[1].id, quantity: 1.5 },   // Espolòn Tequila
-        { product_id: icProducts[16].id, quantity: 0.75 }, // Triple Sec
-        { product_id: icProducts[17].id, quantity: 1 }     // Lime Juice
+        { source: 'product', id: icProducts[1].id,  quantity: 1.5 },  // Espolòn Tequila
+        { source: 'product', id: icProducts[16].id, quantity: 0.75 }, // Triple Sec
+        { source: 'product', id: icProducts[17].id, quantity: 1 }     // Lime Juice
       ],
       plate_yield: null
     });
     attachRecipe('Anchor Burger', {
       mode: 'food',
       ingredients: [
-        { product_id: icProducts[9].id,  quantity: 0.33 }, // Ground Beef
-        { product_id: icProducts[11].id, quantity: 0.12 }  // Cheddar Cheese
+        { source: 'product', id: icProducts[9].id,  quantity: 0.33 }, // Ground Beef
+        { source: 'product', id: icProducts[11].id, quantity: 0.12 }  // Cheddar Cheese
       ],
       plate_yield: 1
     });
     attachRecipe('Old Fashioned', {
       mode: 'single',
       ingredients: [
-        { product_id: icProducts[2].id, quantity: 2 } // Bulleit Bourbon
+        { source: 'product', id: icProducts[2].id, quantity: 2 } // Bulleit Bourbon
       ],
       plate_yield: null
     });
@@ -1309,18 +1309,23 @@ S.HubSettings = {
     rMenu.forEach(m => {
       if (m.recipe && m.recipe.ingredients && m.recipe.ingredients.length) {
         const tc = m.recipe.ingredients.reduce((s, ing) => {
-          const p = icProducts.find(x => x.id === ing.product_id);
+          if (ing.source === 'batch') return s; // batches not seeded in cost pre-compute
+          const id = ing.id || ing.product_id;
+          const p = icProducts.find(x => x.id === id);
           if (!p) return s;
           const isBar = ['Liquor','Wine','Bottle Beer','Draft Beer'].includes(p.category);
-          const unitCost = isBar ? (p.cost_per_pour || 0) : (p.unit_cost || 0);
+          const unitCost = isBar
+            ? (m.recipe.mode === 'single' ? (p.cost_per_pour || 0) : (p.unit_cost || 0))
+            : (p.unit_cost || 0);
           return s + unitCost * (ing.quantity || 0);
         }, 0);
         m.cost = m.recipe.mode === 'food' && m.recipe.plate_yield > 0 ? tc / m.recipe.plate_yield : tc;
       }
     });
 
-    // Batches: prep recipes that yield product consumed by drinks. Frozen
-    // margarita mix is a classic example. Separate store from menu items.
+    // Prep batches: made-in-house ingredients. Frozen Margarita Mix is the
+    // classic example. Lives in App.inventoryData.ic_prep_batches alongside
+    // Products, Locations, Vendors as IC Setup reference data (Rule 21).
     const fmIngredients = [
       { product_id: icProducts[1].id, quantity: 2 },   // Espolòn Tequila
       { product_id: icProducts[16].id, quantity: 1 },  // Triple Sec
@@ -1331,7 +1336,7 @@ S.HubSettings = {
       const p = icProducts.find(x => x.id === ing.product_id);
       return s + (p?.unit_cost || 0) * ing.quantity;
     }, 0);
-    App.data.batches = [
+    App.inventoryData.ic_prep_batches = [
       {
         id: uid(), name: 'Frozen Margarita Mix', category: 'Cocktail Mix',
         ingredients: fmIngredients,
