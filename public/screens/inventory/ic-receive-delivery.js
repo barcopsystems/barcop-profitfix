@@ -127,6 +127,8 @@ S.InventoryReceiveDelivery = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
       + '<div class="f w-md"><label>Invoice #</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
       + '<div class="f w-md"><label>Driver</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
+      + '<div class="f w-md"><label>Received By</label>'
+      + '<select id="rd-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       // Open Order picker. Hidden until a vendor with at least one open
       // order is selected. Picking an order pre-fills the line items so the
@@ -576,6 +578,8 @@ S.InventoryReceiveDelivery = {
       date:           document.getElementById('rd-date')?.value || new Date().toISOString().slice(0, 10),
       invoice_number: document.getElementById('rd-invoice')?.value.trim() || '',
       driver:         document.getElementById('rd-driver')?.value.trim() || '',
+      received_by_id: document.getElementById('rd-by')?.value || '',
+      received_by:    (App.staffById(document.getElementById('rd-by')?.value) || {}).name || '',
       notes:          document.getElementById('rd-notes')?.value.trim() || '',
       line_items:     lineItems,
       item_count:     lineItems.length,
