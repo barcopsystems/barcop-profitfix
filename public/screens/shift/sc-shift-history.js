@@ -19,9 +19,9 @@ S.ShiftHistory = {
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
   filtered() {
@@ -48,16 +48,24 @@ S.ShiftHistory = {
     if (all.length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
         + '<div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Shifts you record in Log a Shift appear here, with revenue, '
-        + 'covers, and check average. Shift revenue is what feeds your weekly Profit and Revenue numbers.</div>'
-        + '<button class="btn btn-primary" id="sh-log">Log a Shift</button></div></div>';
+        + '<div class="empty-sub">Start a shift in Active Shift when service begins. Closed shifts appear here with revenue, covers, and check average. Shift revenue is what feeds your weekly Profit and Revenue numbers.</div>'
+        + '<div style="display:flex;gap:10px;justify-content:center;">'
+        + '<button class="btn btn-primary" id="sh-active">Open Active Shift</button>'
+        + '<button class="btn btn-ghost" id="sh-log-missed-empty">Log a Missed Shift</button>'
+        + '</div></div></div>';
       this.container.onclick = ev => {
-        if (ev.target.closest('#sh-log')) App.navigate('sc-log-shift');
+        if (ev.target.closest('#sh-active')) App.navigate('sc-active-shift');
+        if (ev.target.closest('#sh-log-missed-empty')) App.navigate('sc-log-shift');
       };
       return;
     }
 
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>';
+    // Log Missed Shift entry point lives here so the sidebar stays focused on
+    // the live-shift workflow (Active Shift). Active Shift is for the shift
+    // happening now; this button covers the rare case of back-filling a shift
+    // that was missed or run before Bar Cop was set up.
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-log-missed">Log Missed Shift</button>'
+      + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:8px;">Export PDF</button>';
 
     const rows = this.filtered();
     const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);
@@ -75,7 +83,7 @@ S.ShiftHistory = {
       + '<div class="calc-item"><div class="calc-label">Shifts</div><div class="calc-val">' + rows.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + App.fmtCurrency(totRev) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Covers</div><div class="calc-val">' + totCov + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</div></div>'
       + '</div>';
 
     const filters = '<div class="card"><div class="card-title">Filter</div>'
@@ -104,11 +112,11 @@ S.ShiftHistory = {
           : '<span class="badge badge-dim">Closed</span>';
         return '<tr class="sh-row" data-id="' + s.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-          + '<td>' + esc(s.shift_type || '—') + '</td>'
-          + '<td>' + esc(s.manager || '—') + '</td>'
+          + '<td>' + esc(s.shift_type || '-') + '</td>'
+          + '<td>' + esc(s.manager || '-') + '</td>'
           + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-          + '<td>' + (s.covers != null ? s.covers : '—') + '</td>'
-          + '<td>' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '—') + '</td>'
+          + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
+          + '<td>' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + '</td>'
           + '<td>' + status + '</td></tr>';
       }).join('');
       table = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -120,6 +128,7 @@ S.ShiftHistory = {
     this.container.innerHTML = '<div class="screen">' + summary + filters + table + '</div>';
 
     document.getElementById('sh-export')?.addEventListener('click', () => window.print());
+    document.getElementById('sh-log-missed')?.addEventListener('click', () => App.navigate('sc-log-shift'));
     this.container.onclick = ev => {
       const row = ev.target.closest('.sh-row');
       if (ev.target.closest('#sh-f-clear')) {
@@ -163,18 +172,18 @@ S.ShiftHistory = {
       + '<div class="card"><div class="card-title">'
       + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
       + '<div class="calc" style="margin-bottom:0;">'
-      + meta('Manager', esc(s.manager || '—'))
+      + meta('Manager', esc(s.manager || '-'))
       + meta('Status', s.status === 'Open' ? 'Open' : 'Closed')
-      + meta('Staff on Floor', s.staff_on_floor != null ? s.staff_on_floor : '—')
-      + meta('Opening Bank', s.opening_bank != null ? App.fmtCurrency(s.opening_bank) : '—')
+      + meta('Staff on Floor', s.staff_on_floor != null ? s.staff_on_floor : '-')
+      + meta('Opening Bank', s.opening_bank != null ? App.fmtCurrency(s.opening_bank) : '-')
       + '</div></div>'
       + '<div class="card"><div class="card-title">Revenue</div>'
       + '<div class="calc" style="margin-bottom:0;">'
       + field('Bar Revenue', App.fmtCurrency(s.bar_revenue || 0))
       + field('Floor Revenue', App.fmtCurrency(s.floor_revenue || 0))
       + field('Total Revenue', App.fmtCurrency(s.total_revenue || 0))
-      + field('Covers', s.covers != null ? s.covers : '—')
-      + field('Check Average', checkAvg != null ? App.fmtCurrency(checkAvg) : '—')
+      + field('Covers', s.covers != null ? s.covers : '-')
+      + field('Check Average', checkAvg != null ? App.fmtCurrency(checkAvg) : '-')
       + '</div></div>'
       + notesCard
       + '<div class="card-actions" style="margin-top:4px;">'
