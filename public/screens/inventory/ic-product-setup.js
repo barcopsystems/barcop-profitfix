@@ -660,22 +660,6 @@ S.InventoryProducts = {
     document.getElementById('ip-vendor')?.addEventListener('change', () => this._refreshMissing());
     document.getElementById('ip-loc1')?.addEventListener('change', () => this._refreshMissing());
 
-    // On render: if we're editing an existing product, highlight required-
-    // but-empty fields so the operator sees what's missing at a glance.
-    if (this._editingExistingProduct) {
-      const cat = this._formCategory || '';
-      const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
-      this.applyMissingFieldHighlights(cat, spec);
-    }
-  },
-
-  _refreshMissing() {
-    if (!this._editingExistingProduct) return;
-    const cat = this._formCategory || '';
-    const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
-    this.applyMissingFieldHighlights(cat, spec);
-  },
-
     // Edit mode: changing the category dropdown re-renders the form for the
     // new category. Field values that map directly persist via the existing
     // product record. Operator should verify cost/size fields after a change
@@ -700,6 +684,21 @@ S.InventoryProducts = {
     });
 
     if (this.editId) this.calcProduct();
+
+    // On render: if we're editing an existing product, highlight required-
+    // but-empty fields so the operator sees what's missing at a glance.
+    if (this._editingExistingProduct) {
+      const cat = this._formCategory || '';
+      const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
+      this.applyMissingFieldHighlights(cat, spec);
+    }
+  },
+
+  _refreshMissing() {
+    if (!this._editingExistingProduct) return;
+    const cat = this._formCategory || '';
+    const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
+    this.applyMissingFieldHighlights(cat, spec);
   },
 
   getOz() {
