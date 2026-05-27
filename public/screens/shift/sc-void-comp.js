@@ -18,6 +18,32 @@ S.ShiftVoidComp = {
     if (!Array.isArray(App.shiftData.sc_void_comps)) App.shiftData.sc_void_comps = [];
     return App.shiftData.sc_void_comps;
   },
+  products() {
+    return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
+  },
+  productById(id) {
+    return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
+  },
+  productOptions(selectedId) {
+    const prods = this.products();
+    const cats = [...new Set(prods.map(p => p.category || 'Other'))]
+      .sort((a, b) => {
+        const order = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+        const ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+    let h = '<option value="">Not linked to a tracked product</option>';
+    cats.forEach(cat => {
+      h += '<optgroup label="' + esc(cat) + '">';
+      prods.filter(p => (p.category || 'Other') === cat)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .forEach(p => {
+          h += '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+        });
+      h += '</optgroup>';
+    });
+    return h;
+  },
   shiftTypes() {
     return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
   },
@@ -145,6 +171,18 @@ S.ShiftVoidComp = {
       + 'inputmode="decimal" value="' + v(r?.amount) + '" style="height:44px;font-size:16px;"/></div></div>'
       + '</div>'
 
+      // Linked product + units. Comps with a linked product subtract those
+      // units from the Inventory Variance Report "used" total so a known
+      // comp does not show up as a theft signal. Voids stay logged but do
+      // not subtract from variance (assumption: voided drinks were not
+      // poured). Linking a void is still useful for theft analytics.
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="flex:1;min-width:240px;"><label>Linked Product <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+      + '<select id="vc-product" style="height:44px;">' + this.productOptions(r?.product_id) + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Units</label>'
+      + '<input type="number" id="vc-units" min="0" step="0.01" inputmode="decimal" value="' + v(r?.units != null ? r.units : (r ? '' : 1)) + '" placeholder="1" style="height:44px;font-size:16px;"/></div>'
+      + '</div>'
+
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Server</label>'
       + '<input type="text" id="vc-server" value="' + esc(r?.server || '') + '" placeholder="Name" style="height:44px;"/></div>'
@@ -187,6 +225,11 @@ S.ShiftVoidComp = {
     const amount = parseFloat(document.getElementById('vc-amount')?.value);
     if (isNaN(amount) || amount < 0) { fail('Enter the amount.'); return; }
 
+    const productId = document.getElementById('vc-product')?.value || '';
+    const product = productId ? this.productById(productId) : null;
+    const unitsRaw = parseFloat(document.getElementById('vc-units')?.value);
+    const units = isNaN(unitsRaw) ? null : unitsRaw;
+
     const rec = {
       id:            this.editId || App.uid(),
       date,
@@ -194,6 +237,9 @@ S.ShiftVoidComp = {
       shift_type:    document.getElementById('vc-shift')?.value || '',
       item,
       amount,
+      product_id:    productId,
+      product_name:  product?.name || '',
+      units,
       server:        document.getElementById('vc-server')?.value.trim() || '',
       authorized_by: document.getElementById('vc-auth')?.value.trim() || '',
       check_number:  document.getElementById('vc-check')?.value.trim() || '',
