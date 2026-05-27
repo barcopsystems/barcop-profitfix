@@ -1,1687 +1,343 @@
 'use strict';
 
-/* ── Tooltip engine ── */
-const TT = {
-  _cur: null,
-  _box: document.getElementById('tt-box'),
-  defs: {
-    'container-size': {t:'Container Size',b:'The total size of the bottle, can, or keg you purchase. Pick from the list, Bar Cop converts to ounces automatically.',e:'750ml bottle of vodka = 25.4 oz'},
-    'std-pour':       {t:'Standard Pour',b:'How many ounces you pour per drink. Used to calculate Cost Per Pour and track inventory variance.',e:'Spirits: 1.5 oz · Wine: 5 oz · Draft: 16 oz'},
-    'unit-cost':      {t:'Unit Cost',b:'What you pay per bottle, can, or keg. Use your invoice price.',e:'Case of Tito\'s 750ml costs $180 = $15/bottle'},
-    'menu-price':     {t:'Menu Price',b:'What you charge the guest per drink or serving.',e:'$10 for a cocktail · $6 for a draft beer'},
-    'pour-cost-pct':  {t:'Pour Cost %',b:'Cost Per Pour divided by Menu Price. Lower is better. Industry benchmark 18-22%.',e:'$0.35 cost / $8 menu price = 4.4%'},
-    'sh-bar-pour':    {t:'Bar Pour Cost % Target',b:'The pour cost percentage you are trying to hit on bar product. Industry benchmark is 22%. High-volume bars run 18-20%. If you are above 26% you have a cost or theft problem. Adjust this to match your ownership goal.',e:'22% is the standard starting benchmark'},
-    'sh-food-cost':   {t:'Food Cost % Target',b:'Food cost as a percentage of food revenue. Industry benchmark is 28-32% depending on concept. Full-service restaurants typically run 30-32%. Fast casual runs lower. Set this to your target, not your current number.',e:'32% is the standard starting benchmark'},
-    'sh-bar-labor':   {t:'Bar Labor % Target',b:'Bar staff payroll divided by bar revenue. Includes bartenders, barbacks, and bar management. Does not include kitchen or floor staff. Industry benchmark is 25-30%.',e:'28% is the standard starting benchmark'},
-    'sh-food-labor':  {t:'Food Labor % Target',b:'Kitchen and food staff payroll divided by food revenue. Includes cooks, prep, and kitchen management. Full-service kitchen benchmark is 28-32%.',e:'30% is the standard starting benchmark'},
-    'sh-prime-cost':  {t:'Prime Cost % Target',b:'Combined COGS and labor as a percentage of total revenue. The single most important number in your operation. Below 60% is healthy. Above 65% and you have a problem that weekly data will surface fast.',e:'60% is the standard starting benchmark'},
-    'sh-cash-tol':    {t:'Cash Over/Short Tolerance',b:'The maximum dollar amount you treat as acceptable for a drawer to be off before flagging it. Cash Reconciliation uses this threshold to show green or red on each shift count.',e:'$10 is typical. Anything over $10 over or short triggers a flag'},
-    'hs-ann-bar-rev': {t:'Annual Bar Revenue',b:'Your total bar and beverage sales for the last 12 months. This is the base number Bar Cop multiplies against every bar metric to show the real dollar weight of each gap. A 2-point pour cost overage on $480,000 in bar sales is $9,600 a year walking out the door, not an abstract percentage. The audit, the weekly money readout, the recovery scoreboard, and every dashboard dollar figure scale off this number. Estimate is fine. Most operators know their bar number within a few thousand. The closer it is to your real top line, the more honest every weekly and annual figure in the app gets.',e:'$480,000 annual bar revenue scales a 2% pour cost gap to $9,600 per year'},
-    'hs-ann-food-rev':{t:'Annual Food Revenue',b:'Your total food sales for the last 12 months. Bar Cop scales every food cost gap, prime cost gap, and labor figure into annual dollar terms using this number. A 3-point food cost overage on $320,000 in food sales reads as $9,600 a year. Without it, Bar Cop can still calculate percentages but the dollar impact stays abstract. Estimate is fine if you do not have the exact figure on hand. Update it any time you pull a more accurate total off your books or your accountant gives you a year-end number.',e:'$320,000 annual food revenue scales a 3% food cost gap to $9,600 per year'},
-    'pours-bottle':   {t:'Pours Made',b:'Actual pours calculated from your inventory count. Bottles used × pours per bottle. This is what actually left the bar this week.',e:'3.4 bottles used × 16.9 pours per bottle = 57.5 pours made'},
-    'cost-pour':      {t:'Cost Per Pour',b:'Unit Cost ÷ Pours Per Bottle. What one drink costs you. Calculated automatically.',e:'$15 bottle ÷ 16.9 pours = $0.89/pour'},
-    'kitchen-unit':   {t:'Unit of Measure',b:'The unit you order and count this product in.',e:'Chicken: lb · Lime juice: each · Margarita mix: bag'},
-    'kitchen-cost':   {t:'Unit Cost',b:'What you pay per unit of this product.',e:'Chicken: $3.20/lb · Lime carton: $4.50/each'},
-    'recipe-pours':   {t:'Pours',b:'How many standard pours of this spirit go in this drink. 1 = one standard pour.',e:'1 pour rum + 0.5 pour triple sec'},
-    'recipe-bottles': {t:'Bottles',b:'How many full bottles go into the batch. Use decimals for partial bottles.',e:'2 bottles tequila + 0.5 bottle triple sec'},
-    'batch-yield':    {t:'Batch Yield',b:'Total amount this batch makes. Pick the unit, Bar Cop converts to oz to calculate servings.',e:'1 gallon frozen margarita mix = 128 oz'},
-    'serving-size':   {t:'Serving Size',b:'How much goes in one drink. Bar Cop divides yield by serving size to get servings per batch.',e:'5 oz per drink from 128 oz batch = 25.6 drinks'},
-    'servings-batch': {t:'Servings Per Batch',b:'Batch Yield ÷ Serving Size. Calculated automatically. Verify this makes sense.',e:'128 oz ÷ 5 oz = 25.6 drinks'},
-    'recipe-cost-pct':{t:'Recipe Cost %',b:'Total ingredient cost ÷ Menu Price.',e:'$1.20 cost ÷ $8 menu price = 15%'},
-    'plate-yield':    {t:'Plates Per Batch',b:'How many plates this recipe produces. Most single-plate recipes are 1.',e:'A pot of chili serving 10 = plate yield of 10'},
-    'bar-revenue':    {t:'Bar Revenue',b:'Total bar sales for the week from your POS. Include all drink sales.',e:'Your POS end-of-week bar department total'},
-    'bar-cogs':       {t:'COGS',b:'Cost of Goods Sold. What you spent on bar product. Invoices + transfers in − transfers out.',e:'Weekly liquor invoice total: $2,340'},
-    'bar-labor':      {t:'Labor',b:'Bar staff payroll. Bartenders, barbacks, bar manager. Not kitchen or floor staff.',e:'Bartender hours × hourly rate'},
-    'prime-cost':     {t:'Prime Cost %',b:'(Total Bar COGS + Total Food COGS + Total Labor) ÷ Total Revenue. The most important single number in your operation. Target: 60% or below. Above 65% is a warning sign.',e:'($4,200 bar COGS + $3,800 food COGS + $6,200 labor) ÷ $24,000 revenue = 60.0%'},
-    'theoretical':    {t:'Pours Sold (POS)',b:'Number of pours/shots of this product rung in on your POS this week. Pull from your POS sales mix report. Enter as individual shots, not bottles.',e:'POS shows 85 shots of Tito\'s vodka sold this week = enter 85'},
-    'variance-units': {t:'Variance (Pours)',b:'Pours Made minus Pours Sold. Near zero = controlled. Positive = more poured than sold (over-pouring or theft). Negative = more rung in than used (check POS entries).',e:'87 pours made, 85 sold = +2 variance (within normal range)'},
-    'prev-cost':      {t:'Previous Cost',b:'The Unit Cost currently on file. Pulled automatically from product setup.',e:'Tito\'s was $14.50/bottle'},
-    'new-cost':       {t:'New Invoice Cost',b:'The price on your most recent invoice for this product.',e:'New invoice shows $15.75/bottle'},
-    'weekly-usage':   {t:'Weekly Usage',b:'How many units you typically use per week. Used to calculate Annual Impact $.',e:'4 bottles of Tito\'s per week'},
-    'annual-impact':  {t:'Annual Impact $',b:'Cost Change $ × Weekly Usage × 52 weeks.',e:'+$1.25/bottle × 4/week × 52 = +$260/year'},
-    'inv-beg':        {t:'Beginning Inventory',b:'Count of bottles/units on hand at the start of this period. Carried forward from last week\'s ending count.',e:'You had 4.5 bottles of Tito\'s at start of week'},
-    'inv-purchases':  {t:'Purchases',b:'Bottles/units received from deliveries during the week. Count what arrived on invoices, not what was ordered.',e:'Received 6 bottles from your weekly liquor order'},
-    'inv-end':        {t:'Ending Inventory',b:'Physical count of bottles/units on hand right now. Count partial bottles as decimals.',e:'3.5 bottles remaining = 3 full + one half-full'},
-    'inv-used':       {t:'Units Used',b:'Beginning + Purchases − Ending = actual consumption. Calculated automatically. In bottles for bar products.',e:'4.5 + 6 − 3.5 = 7 bottles used this week'},
-    'shift-cogs':     {t:'Shift COGS (Product Only)',b:'Bar product cost for this shift: spirits, beer, wine. Do not include labor. Estimate from your weekly invoices divided by number of shifts, or use your POS cost report if available.',e:'Weekly $2,400 bar COGS ÷ 6 shifts = $400/shift'},
-    'opening-bank':   {t:'Opening Bank',b:'Cash in the drawer at shift start. Your starting float. Not counted as revenue.',e:'Standard opening bank: $200'},
-    'expected-cash':  {t:'Expected Cash from POS',b:'Cash sales total from your POS for this shift.',e:'POS shows $840 in cash sales for the PM shift'},
-    'cash-tolerance': {t:'Over/Short Tolerance',b:'Max dollar amount you treat as acceptable for a drawer to be off.',e:'$10 tolerance: $9 over or short = OK. $11 = flagged'},
-    // Revenue Recovery tooltips
-    'r-bar-revenue':    {t:'Bar Revenue',b:'Total bar sales for the week from your POS. Include all drink and beverage sales from the bar department.',e:'Your POS end-of-week bar department total'},
-    'r-floor-revenue':  {t:'Floor Revenue',b:'Total dining room or floor sales for the week. Food and beverage sold tableside by servers.',e:'Your POS end-of-week dining room or floor department total'},
-    'r-covers':         {t:'Covers',b:'Total guests served during the week. Used to calculate check average. Pull from your POS end-of-week guest count.',e:'POS shows 412 guests served this week'},
-    'r-check-avg':      {t:'Check Average',b:'Total Revenue divided by Covers. What the average guest spent. This is the most controllable revenue number in your operation. Industry benchmark for a full-service bar and restaurant is $35 to $45. If you are below your target, your team is not suggestive selling or your menu mix is pulling low.',e:'$14,800 revenue / 412 covers = $35.92 check average'},
-    'r-bar-labor':      {t:'Bar Labor %',b:'Bar staff payroll divided by bar revenue. Includes bartenders, barbacks, and bar management. Industry benchmark is 25 to 30%. Above 32% means you are over-scheduled relative to volume or not driving enough bar revenue per shift.',e:'$3,200 bar labor / $11,400 bar revenue = 28%'},
-    'r-kitchen-labor':  {t:'Kitchen Labor %',b:'Kitchen and prep staff payroll divided by food revenue. Includes line cooks, prep cooks, dishwashers, and kitchen management. Full-service kitchen benchmark is 28 to 32%. Below 26% can mean understaffing that affects quality and speed.',e:'$3,800 kitchen labor / $12,600 food revenue = 30%'},
-    'r-floor-labor':    {t:'Floor Labor %',b:'Front-of-house service staff payroll divided by floor revenue. Includes servers, food runners, hosts, and floor management. Benchmark is 28 to 34%. High floor labor percentage usually means too many servers on the floor relative to covers or low check averages pulling revenue down.',e:'$2,900 floor labor / $9,200 floor revenue = 31.5%'},
-    'r-lunch-rplh':     {t:'Lunch RPLH Target',b:'Revenue Per Labor Hour target for your lunch daypart. Lunch RPLH is typically lower than dinner because checks are smaller and the meal period is shorter. Set this based on your average lunch check and typical cover counts per server.',e:'$9,400 lunch revenue / 188 hours = $50 RPLH'},
-    'r-dinner-rplh':    {t:'Dinner RPLH Target',b:'Revenue Per Labor Hour target for your dinner daypart. Dinner RPLH should be higher than lunch due to larger checks, more upsell opportunity, and longer seat times with higher beverage attachment. Benchmark for full-service dinner is $65 to $85.',e:'$14,800 dinner revenue / 197 hours = $75 RPLH'},
-    'r-bar-rplh':       {t:'Bar RPLH Target',b:'Revenue Per Labor Hour target for your bar. Bar RPLH can be high when volume is strong because a single bartender handles multiple covers simultaneously. Benchmark is $55 to $75. Low bar RPLH usually means too many bartenders on shift for the volume.',e:'$8,400 bar revenue / 129 hours = $65 RPLH'},
-    'r-event-close':    {t:'Event Close Rate',b:'Percentage of event inquiries that convert to confirmed bookings. This is your sales conversion rate for the events and catering pipeline. Industry benchmark is 35 to 45%. Below 30% means your follow-up process, pricing, or proposal quality needs attention.',e:'18 inquiries, 8 booked = 44% close rate'},
-    // This Week shared tooltips
-    'tw-week-num':      {t:'Week Number',b:'Sequential week number for your records. Week 1 is your first week entering data. Bar Cop carries this forward automatically each week. Only adjust if you are entering a catch-up week out of sequence.',e:'Week 12 means you have 12 weeks of data in Bar Cop'},
-    'tw-period-end':    {t:'Period End Date',b:'The last day of the week you are entering. Most operations close their week on Sunday. Be consistent week over week so your trend data lines up correctly.',e:'Sunday October 13 closes a Monday through Sunday accounting week'},
-    'r-sv-covers':      {t:'Server Covers',b:'Total guests this server personally served during the week. Pull from your POS server sales report. This is the denominator in check average, so it must be guest count, not table count.',e:'Server handled 148 guests this week'},
-    'r-sv-sales':       {t:'Server Total Sales',b:'Total dollar sales this server rang during the week. Pull from your POS server sales report. Food and beverage combined.',e:'Server rang $5,340 in total sales this week = $36.08 check average'},
-    't-ig-followers':   {t:'Instagram Followers',b:'Your current total follower count on Instagram. Log weekly to track growth rate. A consistent upward trend means your content is reaching new people. Flat or declining means posting frequency or content quality needs attention.',e:'1,240 followers this week vs 1,210 last week = 30 new followers'},
-    't-fb-followers':   {t:'Facebook Followers',b:'Your current total follower count on your Facebook business page. Facebook reach is lower than Instagram for most bars but the page matters for the 35-plus demographic, event promotion, and local search signals.',e:'2,100 Facebook page followers'},
-    // Audit intake tooltips
-    'at-ann-bar-rev':   {t:'Annual Bar Revenue',b:'Your total bar and beverage sales for the last 12 months. Used to calculate your annual dollar gap on pour cost and prime cost. Estimate is fine. The audit converts percentage gaps into real dollar figures using this number.',e:'$480,000 annual bar revenue, a 2% pour cost gap = $9,600 per year recoverable'},
-    'at-ann-food-rev':  {t:'Annual Food Revenue',b:'Your total food sales for the last 12 months. Used to calculate your annual dollar gap on food cost. The more accurate the number, the more precise your gap calculations will be.',e:'$320,000 annual food revenue, a 3% food cost gap = $9,600 per year recoverable'},
-    'at-pos-bev':       {t:'POS Sales Report (Beverages)',b:'Your bar department sales from your POS. Daily or weekly beverage revenue by category. Minimum 4 weeks. Export from Toast, Square, Aloha, or any POS as Excel or CSV.',e:'Toast: Reports > Sales > Sales by Category > Bar'},
-    'at-bar-inv':       {t:'Bar Inventory Count Sheets',b:'Physical bar inventory counts with opening count, purchases received, and closing count per product. Minimum 1 week. Best results with 4 weeks.',e:'Opening 12 bottles + 6 purchased - 14 closing = 4 used'},
-    'at-exception':     {t:'POS Exception Report',b:'Voids, comps, and no-sale transactions by employee. Shows which employees are voiding checks, issuing comps without approval, and opening the drawer without a sale.',e:'Toast: Reports > Labor > Exception Report'},
-    'at-cash':          {t:'Cash Drawer Reconciliation',b:'Daily or weekly cash variance records showing how much each drawer was over or short per shift. Used to identify cash handling gaps and shift-level patterns.',e:'Drawer over $12 on Friday close, repeated pattern over 4 weeks'},
-    'at-bev-inv':       {t:'Beverage Invoices',b:'All beverage delivery invoices for the audit period. Used to verify what was delivered versus ordered and to track price changes from your distributors.',e:'Your weekly liquor distributor invoices'},
-    'at-vendor':        {t:'Vendor Price List',b:'Current pricing from your distributors or your most recent invoices. Used to identify price drift and negotiation opportunities. 4 weeks shows recent changes. 12 weeks shows the full drift pattern.',e:'Your distributor price sheet or line items on recent invoices'},
-    'at-pos-food':      {t:'POS Sales Report (Food)',b:'Kitchen department sales from your POS. Daily or weekly food revenue by category. Send the same date range as your beverage POS report.',e:'Toast: Reports > Sales > Sales by Category > Food'},
-    'at-kit-inv':       {t:'Kitchen Inventory Count Sheets',b:'Physical kitchen counts with opening count, purchases, and closing count by product. Used to calculate actual food cost and identify waste and variance.',e:'Opening 10 lbs beef + 5 purchased - 8 closing = 7 lbs used'},
-    'at-food-inv':      {t:'Food Invoices',b:'All food delivery invoices for the audit period. Used to verify delivery accuracy and track food cost against purchases.',e:'Your Sysco, US Foods, or produce vendor invoices'},
-    'at-recipe':        {t:'Recipe Costing Sheet',b:'Your current recipe costs with ingredients, quantities, and cost per dish. The highest-value file in the audit. Without it, food cost analysis is category-level only. With it the audit calculates yield-corrected cost on every dish and ranks every repricing opportunity by annual dollar impact.',e:'Recipe card showing your burger costs $4.20 to make and sells for $14'},
-    'at-prep':          {t:'Daily Prep Sheets',b:'Production logs showing what was prepped versus used by shift. Used to identify production loss, over-prep waste, and yield issues by station.',e:'Prep sheet showing 40 portions prepped, 28 sold, 12 unaccounted'},
-    'at-waste':         {t:'Daily Waste Logs',b:'Waste recorded by category for the audit period. Used to calculate weekly spoilage cost and identify waste patterns by product or station.',e:'Waste log showing $340 in produce waste last week'},
-    'at-payroll':       {t:'Payroll or Time Clock Data',b:'Hours worked by employee and shift for the audit period. Used to calculate verified prime cost, labor percentage by department, and RPLH. Weekly totals accepted if shift-level detail is not available.',e:'Toast: Reports > Labor > Timeclock Detail'},
-    'ra-ann-bar-rev':   {t:'Annual Bar Revenue',b:'Your total bar and beverage sales for the last 12 months. Used to calculate annual revenue gaps and scale check average impact to annual dollar figures. Estimate is fine.',e:'$480,000 annual bar revenue, a $2 check average gap x 15,000 covers = $30,000 per year recoverable'},
-    'ra-ann-food-rev':  {t:'Annual Food Revenue',b:'Your total food and dining room sales for the last 12 months. Used alongside bar revenue to calculate total operation size and scale gap calculations to annual dollar impact.',e:'$320,000 annual food revenue'},
-    'ra-pos-daily':     {t:'POS Daily Sales Summary',b:'Total revenue by day broken down by category: food, beverage, total. The most important file in the revenue audit. Minimum 4 weeks. Export from your POS as Excel or CSV.',e:'Toast: Reports > Sales > Daily Sales Summary'},
-    'ra-menu-mix':      {t:'Menu Sales Mix Report',b:'Items sold and revenue by menu item or category. Item-level detail gives the most complete analysis. Used to identify category concentration and menu engineering opportunities.',e:'Toast: Reports > Menu > Item Selection Report'},
-    'ra-menu-prices':   {t:'Menu Price List',b:'Your current menu with item names and selling prices. Used to identify pricing gaps and contribution margin opportunities.',e:'Your current printed menu or a PDF of your menu'},
-    'ra-server-sales':  {t:'Server Sales Report',b:'Check average, covers served, and total sales by server for the audit period. The highest-value file in the revenue audit. Unlocks two full scored sections on server performance.',e:'Toast: Reports > Labor > Server Sales Report'},
-    'ra-upsell':        {t:'Server Upsell Report',b:'Appetizer captures, dessert captures, and add-on revenue by server per shift. Shows which servers are executing the upsell sequence and which are not.',e:'Toast: Reports > Labor > Product Mix by Server'},
-    'ra-preshift':      {t:'Pre-Shift Briefing Log',b:'Any records showing whether pre-shift briefings are running and what is covered. Used to assess whether a performance standard is being communicated to the team.',e:'A weekly pre-shift agenda document or meeting notes'},
-    'ra-labor-sched':   {t:'Weekly Labor Schedule',b:'Scheduled hours by position and department with labor cost. Used to calculate RPLH, labor percentage, and schedule efficiency against revenue.',e:'Your scheduling software export (7shifts, HotSchedules, Excel)'},
-    'ra-timeclock':     {t:'Time Clock Actuals',b:'Actual hours worked by employee and shift for the audit period. Used to identify clock drift, actual versus scheduled hours, and verified overtime cost.',e:'Toast: Reports > Labor > Timeclock Detail'},
-    'ra-labor-dept':    {t:'Labor by Department',b:'Separate labor cost tracking for bar, kitchen, and floor. Used to identify which department is driving labor overage and to set department-level targets.',e:'Payroll breakdown showing bar $3,200, kitchen $4,100, floor $2,800'},
-    'ra-events':        {t:'Event Revenue Records',b:'One record per event with date, covers, F&B minimum, and actual spend. Minimum 3 months. Used to calculate event frequency, average event revenue, and minimum compliance rate.',e:'Private dining log showing 8 events last month at average $3,400 spend'},
-    'ra-catering':      {t:'Catering Revenue Records',b:'One record per catering booking with date, guests, package type, and total revenue. Used to assess catering program performance and repeat client rate.',e:'Catering log or your booking software export'},
-    'ra-rate-card':     {t:'Private Dining Rate Card',b:'Current pricing for private dining including room fees, F&B minimums, and per-head options. Used to assess pricing position and minimum structure against market benchmarks.',e:'Your private dining or events package PDF'},
-    'ta-gbp-profile':    {t:'GBP Full Profile Screenshot',b:'A screenshot of your Google Business Profile as it appears in Google Maps or Search. Capture the full listing including name, address, phone, hours, website link, category, and the photo and review summary. Phone screenshots are fine.',e:'Search your bar name on Google Maps and screenshot the full listing panel'},
-    'ta-gbp-insights':   {t:'GBP Insights Export',b:'Monthly impressions, search queries, direction requests, and phone calls from your GBP dashboard. Go to your Google Business Profile, click Performance, and screenshot or export the overview. Shows how many people found you and what they did next.',e:'GBP dashboard: Performance > Overview > Screenshot'},
-    'ta-analytics':      {t:'Website Analytics',b:'Monthly sessions, bounce rate, top pages, and menu page performance. Export from Google Analytics, Squarespace, Wix, or any analytics platform. A screenshot of the overview dashboard is accepted. This is the highest-value file in the traffic audit.',e:'Google Analytics: Reports > Overview > Screenshot or Export'},
-    'ta-mobile-site':    {t:'Mobile Homepage Screenshot',b:'A screenshot of your homepage as it appears on a phone. Open your website on your phone and take a screenshot. Shows whether your phone number, address, and call-to-action are visible without scrolling.',e:'Open your website on your phone and screenshot what appears above the fold'},
-    'ta-google-reviews': {t:'Google Review Page Screenshot',b:'Screenshot of your Google listing showing your star rating, total review count, and the most recent 5 to 10 reviews. In Google Maps click your listing and scroll down to Reviews. Capture the rating, review count, and recent review text.',e:'Google Maps > Your Listing > Scroll to Reviews > Screenshot'},
-    'ta-yelp':           {t:'Yelp Listing Screenshot',b:'Screenshot of your Yelp business page showing star rating, review count, and recent reviews. Submit if you have a Yelp listing. Skip this if you do not have one.',e:'yelp.com > Search your bar name > Screenshot your listing'},
-    'ta-search':         {t:'Search Results Screenshots',b:'Open an incognito or private browser window so your personal search history does not affect results. Search for your bar type and city, then your neighborhood and bar. Screenshot the full results page including the Google Maps pack at the top.',e:'Incognito Chrome: search "sports bar Austin" > screenshot full results page'},
-    'ta-instagram':      {t:'Instagram Profile Screenshot',b:'Screenshot of your Instagram profile showing follower count, post count, bio, and the most recent 9 to 12 posts in grid view. Go to your profile page and screenshot. Phone screenshot is fine.',e:'Open Instagram > Your Profile > Screenshot the full profile page'},
-    'ta-facebook':       {t:'Facebook Page Screenshot',b:'Screenshot of your Facebook business page showing follower count and recent posts. Go to your Facebook page and screenshot the overview.',e:'Facebook > Your Business Page > Screenshot'},
-    'ta-ig-analytics':   {t:'Instagram Analytics Screenshot',b:'Screenshot from Instagram Insights showing reach, impressions, and engagement for the last 30 days. Only available on business or creator accounts. In Instagram go to Professional Dashboard and select Insights.',e:'Instagram > Professional Dashboard > Insights > Screenshot'},
-    'ta-delivery':       {t:'Delivery Platform Dashboard Screenshot',b:'Screenshot of your merchant dashboard on DoorDash, Uber Eats, or Grubhub showing your current rating, photo count, and menu status. Log into the merchant portal for each platform and screenshot the overview page. Submit one screenshot per platform.',e:'DoorDash Merchant Portal > Your Restaurant > Overview > Screenshot'},
-    'ta-email':          {t:'Email Platform Screenshot',b:'Screenshot of your email platform dashboard showing list size, last send date, and any campaign performance visible on the overview screen. Works with Mailchimp, Klaviyo, Constant Contact, or any email platform.',e:'Mailchimp > Audience > Overview > Screenshot showing list size and last send'},
-    'ta-email-analytics':{t:'Email Analytics Export',b:'Campaign performance history showing open rate, click rate, and unsubscribe rate for the last 6 to 12 months. Export from your email platform as PDF or CSV.',e:'Mailchimp: Reports > All Campaigns > Export CSV'},
-    'r-labor-hours':    {t:'Labor Hours',b:'Total hours worked by all staff in this department for the week. Pull from your scheduling system or time clock.',e:'8 bartenders × avg 30 hrs = 240 bar labor hours'},
-    'r-labor-cost':     {t:'Labor Cost',b:'Total wages paid to this department for the week. Exclude tips unless you have a tip pool that affects your payroll cost.',e:'240 hours × $15/hr avg = $3,600 bar labor cost'},
-    'r-labor-pct':      {t:'Labor %',b:'Labor Cost ÷ Revenue for this department. Compare to your target. Over target means you are overstaffed or understaffed in productivity.',e:'$3,600 labor ÷ $12,000 bar revenue = 30%'},
-    'r-rplh':           {t:'RPLH',b:'Revenue Per Labor Hour. Revenue ÷ Hours Worked. Measures how efficiently your labor is generating revenue. Low RPLH means overstaffed relative to volume.',e:'$8,400 dinner revenue ÷ 112 hours = $75 RPLH'},
-    'r-rplh-target':    {t:'RPLH Target',b:'Your goal for revenue generated per labor hour by daypart. Set in Settings. Lunch targets are typically lower than dinner due to lower average checks.',e:'Dinner target $75 RPLH · Lunch target $50 RPLH'},
-    'r-spread':         {t:'Performance Spread',b:'Top server check average minus bottom server check average. Under $10 indicates a consistent team. Over $20 means no coaching standard is being enforced.',e:'Top server $52 avg, bottom $24 avg = $28 spread'},
-    'r-contrib-margin': {t:'Contribution Margin',b:'Menu Price minus Food or Pour Cost. What each item actually contributes to covering overhead and profit after product cost.',e:'$14 burger − $4.20 cost = $9.80 contribution margin'},
-    'r-cost-pct':       {t:'Cost %',b:'Item Cost ÷ Menu Price. How much of each sale goes to product. Lower is better. Target varies by category.',e:'$4.20 cost ÷ $14.00 price = 30% food cost'},
-    'r-wkly-covers':    {t:'Weekly Covers',b:'How many times this item is sold in a typical week. Used in Menu Engineering to calculate volume ranking and total weekly contribution.',e:'House burger sells 85 times per week'},
-    'r-fb-minimum':     {t:'F&B Minimum',b:'The minimum food and beverage spend required to book the private dining room or event space for that date and time.',e:'Saturday dinner buyout requires $3,500 F&B minimum'},
-    'r-event-revenue':  {t:'Event Revenue',b:'Actual total spent by the event party including food, beverages, and any room fee. Compare to the F&B minimum to track compliance.',e:'Party spent $4,200 vs $3,500 minimum, 20% above minimum'},
-    'r-daypart-rev':    {t:'Daypart Revenue',b:'Total revenue generated during this specific daypart from your POS. Bar = all bar department sales. Lunch = all dining room sales during lunch service. Dinner = all dining room sales during dinner service.',e:'Dinner POS total for the week: $8,400'},
-    'r-daypart-hrs':    {t:'Daypart Labor Hours',b:'Total hours worked by all staff scheduled to this daypart. Pull from your scheduling system or time clock by job code or shift.',e:'6 servers x 5 hr lunch shift = 30 lunch labor hours'},
-    'r-upsell-calc':    {t:'Upsell Revenue Calculator',b:'Shows the weekly and annual revenue gap between your current team check average and your target. Use this number in pre-shift to make the gap visible to your team.',e:'$33 current avg vs $38 target x 400 covers = $2,000/week gap'},
-    'r-price-new':      {t:'Proposed New Price',b:'The price you are considering for this item. The calculator shows you the margin impact and breakeven before you commit to the change.',e:'Current price $13.00, considering raising to $15.00'},
-    'r-vol-change':     {t:'Estimated Volume Change',b:'How much you expect covers to change as a percentage if you change the price. Negative means fewer covers. Use 0 if you expect no change.',e:'-10% means you expect to sell 10% fewer of this item at the new price'},
-    'r-contrib-margin-eng': {t:'Contribution Margin',b:'Menu price minus item cost. What each sale contributes to covering overhead and profit after product cost is deducted.',e:'$15 price - $4.50 cost = $10.50 contribution margin'},
-    'r-event-covers':   {t:'Event Covers',b:'Total guests at the event. Used with F&B minimum to calculate per-head minimum and track whether events are on pace.',e:'40-guest corporate dinner'},
-    // Traffic Recovery tooltips
-    't-google-rating':  {t:'Google Rating',b:'Your current star rating on Google. The industry benchmark is 4.3 or higher. Below 4.0 is a direct revenue impact. Guests filter by rating before choosing a venue.',e:'4.6 stars from 312 reviews'},
-    't-review-vel':     {t:'Review Velocity',b:'New reviews received per month. Consistent new reviews signal to Google that your business is active and relevant. Target 8 or more per month.',e:'12 new reviews this month'},
-    't-response-rate':  {t:'Response Rate',b:'Percentage of reviews you have responded to. Industry benchmark is 75 percent or higher. Responding to every review, positive and negative, is a direct ranking signal.',e:'Responded to 38 of 50 reviews = 76%'},
-    't-monthly-sessions':{t:'Monthly Website Sessions',b:'Total visits to your website per month. Benchmark is 2,000 or more for a typical bar or restaurant. Under 500 means your digital presence is not driving real discovery traffic.',e:'1,840 sessions last month'},
-    't-bounce-rate':    {t:'Bounce Rate',b:'Percentage of visitors who leave without viewing a second page. Above 70 percent means your homepage is not converting visitors to menu, reservations, or contact.',e:'62% bounce rate'},
-    't-social-posts':   {t:'Monthly Posts',b:'Total posts across Instagram and Facebook combined for the month. Benchmark is 12 or more. Consistency matters more than volume. Posting 3 times per week beats a burst of daily posts followed by silence.',e:'14 posts last month (10 IG, 4 FB)'},
-    't-digital-score':  {t:'Digital Presence Score',b:'Composite score across all 7 traffic categories: Google Business Profile, website, reviews, search and SEO, social media, delivery platforms, and email. Industry average is 58. Target is 65 or higher.',e:'Score of 71 puts you in the top 30% of operators in your market'},
-    't-google-total':   {t:'Google Reviews',b:'Your all-time total review count on Google. A high total builds trust before a guest reads a single review. New reviews each month matter more for ranking, but the running total is the first number guests see.',e:'312 total reviews at 4.6 stars'},
-    't-yelp-rating':    {t:'Yelp Rating',b:'Your current star rating on Yelp. Yelp ratings run lower than Google because the platform filters reviews aggressively, but anything under 4.0 costs you bookings. Many guests still check Yelp first.',e:'4.1 stars on Yelp from 88 reviews'},
-    't-yelp-total':     {t:'Yelp Reviews',b:'Your all-time total review count on Yelp. A thin Yelp listing signals a business that is not engaged. Even when Google is your main channel, keep the Yelp count growing.',e:'88 total Yelp reviews'},
-    't-delivery-active':{t:'Delivery Platform Active',b:'Whether you currently have a live, order-taking listing on this delivery platform. Each platform is its own discovery channel where guests browse and order from whoever shows up. Being absent means missed orders.',e:'Set Yes once your menu is live and accepting orders'},
-    't-delivery-rating':{t:'Delivery Platform Rating',b:'Your current star rating on this delivery platform. Delivery ratings drive feed placement. A low rating pushes your listing down where fewer guests see it. Benchmark is 4.5 stars or higher.',e:'4.6 stars on DoorDash'},
-    't-delivery-photos':{t:'Photo Count',b:'Number of photos on this delivery platform listing. Platforms favor listings with strong food photography in search and feed placement. Aim for 20 or more clear, well-lit shots.',e:'24 photos on the DoorDash menu'},
-    't-email-list':     {t:'Email List Size',b:'Total contacts on your email marketing list. An owned email list is the one marketing channel no algorithm controls. Benchmark is 500 or more for an established bar or restaurant.',e:'740 contacts on the list'},
-    't-emails-sent':    {t:'Emails Sent Per Month',b:'How many marketing emails or campaigns you sent in the last month. A list you never email is a dead asset. Send at least once a month, and weekly when you have offers or events.',e:'4 emails sent this month, one per week'},
-    't-email-open':     {t:'Email Open Rate',b:'Percentage of recipients who opened your most recent email. Industry benchmark is 20% or higher. A low open rate usually means weak subject lines or sending at the wrong time.',e:'28 of 100 recipients opened = 28% open rate'},
-    't-loyalty-active': {t:'Loyalty Program',b:'Whether you run a loyalty or rewards program for repeat guests. A simple loyalty program turns one-time delivery and walk-in guests into regulars and gives you a reason to collect contact info.',e:'Set Yes if you run points, punch cards, or a rewards app'},
-    't-loyalty-members':{t:'Loyalty Members',b:'How many guests are enrolled in your loyalty program. Track this weekly. A growing membership means your sign-up process is working at the table and at checkout.',e:'420 enrolled loyalty members'},
-    't-gbp-photos':     {t:'Photo Count',b:'Total photos on your Google Business Profile. Listings with more photos get more clicks and direction requests. Benchmark is 100 or more across food, drinks, the room, and the exterior.',e:'GBP shows 134 photos across all categories'},
-    't-gbp-posts':      {t:'GBP Posts Per Month',b:'How many Google Business Profile posts you published in the last month. Posts such as offers, events, and updates signal to Google that the listing is active. Benchmark is 8 or more per month.',e:'10 GBP posts this month: 4 events, 6 offers'},
-    't-review-age':     {t:'Most Recent Review Age',b:'How many days ago your newest review was posted, on any platform. If the most recent review is more than 14 days old, your review flow has gone quiet. Prompt guests this week.',e:'Newest review posted 6 days ago'},
-    't-review-patterns':{t:'Negative Patterns Noted',b:'Recurring complaints or themes you see across recent reviews, such as slow service, noise, or a specific dish. Logging the pattern is the first step. Fix the root cause in the operation, not just the public reply.',e:'"Slow service on weekends" appears in 4 of the last 10 reviews'},
-    't-search-keyword': {t:'Primary Local Keyword',b:'The exact phrase a guest would type into Google to find a bar like yours. Pick one phrase that names your city and concept, then use it in your Google Business Profile, page titles, and posts.',e:'"austin sports bar" or "downtown nashville cocktail bar"'},
-    't-search-citations':{t:'Citation Count',b:'Roughly how many online directories list your business, including Google, Yelp, Apple Maps, TripAdvisor, and local sites. More consistent citations build local search authority. Benchmark is 40 or more.',e:'Listed on about 35 directories'},
-    't-web-duration':   {t:'Avg Session Duration',b:'The average number of seconds a visitor spends on your website per visit. Short sessions mean visitors are not finding what they came for. Benchmark is 90 seconds or more.',e:'Google Analytics shows a 105 second average session'},
-    't-web-source':     {t:'Top Traffic Source',b:'Where most of your website visitors come from. Strong local SEO should make Organic Search your leading source. If Direct or Social leads, you are relying on people who already know you rather than new discovery.',e:'Analytics shows Organic Search drives 52% of sessions'},
-    't-social-engagement':{t:'IG Engagement Rate',b:'Likes, comments, saves, and shares as a percentage of your follower count, averaged across recent posts. Benchmark is 2% or higher. Low engagement means followers see your posts but do not interact.',e:'31 average interactions on 1,200 followers = 2.6%'},
-    't-social-fbposts': {t:'Facebook Posts Per Month',b:'How many posts you published on your Facebook page in the last month. Facebook reach is lower than Instagram, but the page still matters for events and the 35-plus crowd. Cross-post to keep it warm.',e:'8 Facebook posts this month'},
-    't-social-mix':     {t:'Content Mix',b:'An honest read on what your recent posts mostly show. A balanced mix of food, people, and the room outperforms a feed that is all promotions or all reposts. Pick the option that best describes your last 10 posts.',e:'Mostly food close-ups with a few event flyers = Balanced'},
-    't-email-lastsend': {t:'Last Send Date',b:'The date you last sent a marketing email to your list. If it has been more than a month, the list is going cold, recipients forget who you are, and open rates fall.',e:'Last campaign sent October 8'},
-    't-email-frequency':{t:'Send Frequency',b:'How often you typically email your list. Weekly or every two weeks keeps the list warm and engaged. Rarely or Never means the list is a dead asset, so move to at least monthly.',e:'A weekly Thursday email announcing the weekend lineup'},
-    't-email-growth':   {t:'List Growth Mechanism',b:'How new contacts get added to your email list. A passive list shrinks over time. A website signup form, an in-store capture point, or WiFi login capture all keep it growing.',e:'WiFi login capture adds about 30 contacts a week'},
-    't-gbp-views':      {t:'GBP Views/Mo',b:'Total monthly views of your Google Business Profile from your GBP Insights dashboard. The number of people who saw your listing in Google Search or Maps. This is the discovery metric Bar Cop multiplies against your conversion rate and check average to calculate Traffic recovery dollars from GBP work.',e:'GBP Insights shows 2,400 profile views this month'},
-    't-social-profile-visits':{t:'Profile Visits/Mo',b:'Total monthly visits to your social profile pages, combined across Instagram and Facebook. Pull from Instagram Insights (Professional Dashboard) and Facebook Page Insights. A profile visit is a stronger signal than a like or a follow because it shows someone clicked through from a post to learn more about the bar.',e:'IG Insights 380 profile visits + FB 120 = 500 total profile visits'},
-    't-delivery-orders':{t:'Total Orders/Mo',b:'Total monthly delivery orders across all active platforms (DoorDash, Uber Eats, Grubhub). Pull from each merchant dashboard and sum. This is the volume metric the Recovery Scoreboard uses to dollarize delivery fixes.',e:'120 DoorDash + 80 Uber Eats + 30 Grubhub = 230 total monthly orders'},
-    't-delivery-avg-order':{t:'Avg Order Value',b:'Average dollar value per delivery order, blended across all your active platforms. Pull from each platform\'s merchant dashboard. The Recovery Scoreboard multiplies your order volume by this value when calculating dollarized recovery from delivery improvements.',e:'$34 avg order across DoorDash, Uber Eats, and Grubhub'},
-    'hs-conv-web':      {t:'Website Session to Visit %',b:'Of all visitors who land on your website, how many show up at the bar within a reasonable window. Industry default is 3% for bar and restaurant sites. The Recovery Scoreboard uses this to dollarize website traffic improvements: weekly session lift × this rate × your check average × 52 = annual recovered dollars. Override once you have your own data.',e:'3% default. A strong site with clear call-to-action buttons runs higher.'},
-    'hs-conv-gbp':      {t:'GBP View to Visit %',b:'Of all guests who view your Google Business Profile listing, how many actually visit the bar. Industry default is 2%. The Recovery Scoreboard uses this to dollarize GBP improvements: monthly view lift × this rate × your check average × 12 = annual recovered dollars.',e:'2% default. A complete profile with strong photos converts higher.'},
-    'hs-conv-social':   {t:'Social Profile to Visit %',b:'Of guests who click through from a social post to your IG or FB profile, how many actually visit. Industry default is 1%. Social-to-visit conversion is lower than search-based channels because the intent is weaker. The Recovery Scoreboard uses this to dollarize social growth.',e:'1% default. Local-content-heavy accounts run higher.'},
-    'hs-conv-email':    {t:'Email Open to Visit %',b:'Of subscribers who open your marketing email, how many visit the bar within a reasonable window. Industry default is 1%. The Recovery Scoreboard uses this with list size and open rate to dollarize email work.',e:'1% default. Lists with strong personal-tone content and consistent monthly sends run higher.'},
-    // Inventory Control tooltips
-    'ic-par-level':     {t:'Par Level',b:'The target quantity to keep on hand for this product. When a count drops below par, the Order Sheet flags it for reordering. Set it to cover normal usage between deliveries plus a small safety buffer.',e:'You use 6 bottles of well vodka a week and order weekly, so par is 8'},
-    'ic-reorder-point': {t:'Reorder Point',b:'The on-hand quantity that should trigger a reorder. Set it a little above zero so you never run out before the next delivery arrives. The Order Sheet flags any product at or below this point.',e:'A reorder point of 2 bottles means you reorder once only 2 are left'},
-    'ic-pours-container':{t:'Pours Per Container',b:'Container Size divided by Pour Size. How many standard pours one full container yields. Calculated automatically.',e:'A 750ml bottle of 25.4 oz at a 1.5 oz pour = 16.9 pours'},
-    'ic-product-name':  {t:'Product Name',b:'How this product shows up everywhere in Bar Cop: Take Inventory, Order Sheet, Receive Delivery, Profit Recovery reports. Use the name your bar staff would say at a glance, not the distributor SKU.',e:'Use "Tito\'s Handmade Vodka 750ml" rather than "TITOS-VOD-750-USA"'},
-    'ic-brand':         {t:'Brand',b:'The producer or label, kept separate from product name so reports can group by brand. Optional, leave blank if it does not apply.',e:'Tito\'s · Republic National · Austin Beerworks'},
-    'ic-subcategory':   {t:'Sub-Category',b:'How you organize products within a category. Lets you slice reports by style without polluting the main category list. Free text, pick what makes sense for your bar.',e:'Liquor: Vodka, Bourbon, Tequila · Wine: Red, White, Sparkling · Bottle Beer: Domestic, Import, Craft'},
-    'ic-primary-vendor':{t:'Primary Vendor',b:'The vendor you order this product from. Set up vendors on the Vendors screen first. The Order Sheet groups reorder suggestions by vendor, and Email to Vendor pulls the right contact info from this field.',e:'Republic National for spirits, Glazer\'s for beer, Sysco for food'},
-    'ic-primary-location':{t:'Primary Location',b:'The physical spot in your bar or kitchen where this product lives. Set up locations on the Locations screen. Take Inventory walks you through one location at a time so counting matches the way you move through the room.',e:'Front Bar · Back Bar · Walk-In Cooler · Dry Storage'},
-    'ic-bottle-size':   {t:'Bottle Size',b:'The size of one bottle in ounces. For spirits and wine this drives how many pours you get per bottle and the cost per pour. Pick from the list, Bar Cop converts ml to oz automatically.',e:'750ml = 25.4 oz · 1L = 33.8 oz · 1.75L = 59.2 oz'},
-    'ic-bottle-size-beer':{t:'Bottle Size',b:'How big each individual bottle is. The cost-per-pour math for bottle beer uses Cost per Case divided by Case Size, not this field, but it is here so reports can show what is in the bottle.',e:'12 oz domestic · 16 oz tall boy · 22 oz bomber'},
-    'ic-keg-size':      {t:'Keg Size',b:'The total volume of one full keg. 1/2 BBL is the standard size (1984 oz, about 124 pints). 1/4 BBL is half that. 1/6 BBL is one-third. Pick from the list, Bar Cop converts to ounces.',e:'1/2 BBL = 1984 oz · 1/4 BBL = 992 oz · 1/6 BBL = 661 oz'},
-    'ic-case-size':     {t:'Case Size',b:'How many bottles come in one case. Bottle beer is ordered, received, and counted in cases, so this is the number Bar Cop divides your cost-per-case by to get the per-bottle cost the math needs.',e:'Common case sizes: 6, 12, 18, 24, 30'},
-    'ic-unit-type':     {t:'Unit Type',b:'The unit you buy and count this item in. Picking the right unit keeps par levels and cost-per-unit consistent across vendors and reports.',e:'lb for items by weight · each for items counted individually · case or bag for bulk · gallon or quart for liquids'},
-    'ic-cost-per-bottle':{t:'Cost per Bottle',b:'What you pay your vendor for one bottle, taken straight off the invoice. Bar Cop divides by pours per bottle to get the cost per pour the menu math needs.',e:'Case of Tito\'s 750ml at $180 = $15 per bottle'},
-    'ic-cost-per-case': {t:'Cost per Case',b:'What you pay for one full case. Bar Cop divides by Case Size to get the per-bottle cost, so pour cost percentage stays accurate. Enter per-case, not per-bottle.',e:'A case of 24 Modelo Especial at $32.40 = $32.40 per case (Bar Cop figures the $1.35 per bottle)'},
-    'ic-cost-per-keg':  {t:'Cost per Keg',b:'What you pay your distributor for one full keg. Bar Cop divides by pours per keg (keg size divided by pour size) to get the cost-per-pour the menu math needs.',e:'1/2 BBL of Pearl Snap at $165 with a 16 oz pour: 1984 oz / 16 = 124 pours, $165 / 124 = $1.33 per pint'},
-    'ic-cost-per-unit': {t:'Cost per Unit',b:'What you pay per unit you set in Unit Type. Pull from your most recent invoice for that item.',e:'Ground beef at $4.20 per pound, romaine at $22 per case, simple syrup at $3.50 per quart'},
-    'ic-draft-pour':    {t:'Standard Pour',b:'Your standard glass size for this draft, usually 16 oz for a pint. Cost per Pour uses this number. If you also serve pitchers, growlers, or half-pours, each one is a separate menu item in Revenue Recovery with its own recipe that draws the right ounces from this keg (a 60 oz pitcher recipe pulls 60 oz). Variance against your POS adds them all up correctly.',e:'16 oz pint is standard. 12 oz "small" and 60 oz pitcher live as separate menu items in Revenue Recovery'},
-    'ic-notes':         {t:'Notes',b:'Free-form notes for your own reference. Anything that helps you or a new manager understand this product. Does not show up on operational screens.',e:'Substitute for Espolon when out, vendor only delivers Tuesday, holiday seasonal item'},
-    'ic-cost-per-bottle-calc':{t:'Cost per Bottle',b:'Cost per Case divided by Case Size. Per-bottle cost Bar Cop uses for pour cost math.',e:'$32.40 case / 24 bottles = $1.35 per bottle'},
-    'ic-bottles-per-case':{t:'Bottles per Case',b:'Echo of the Case Size you set above, shown alongside the per-bottle cost for quick sanity check.',e:'24 bottles in a case of standard domestic beer'},
+/* ── Inventory Control — Variance Report (ic_counts + ic_deliveries + POS) ────
+   Compares what was used (from inventory counts) against what was sold (from a
+   POS sales CSV). Two views: Sales Variance (dollars) and Usage Variance (oz).
+   POS sales are imported with the reusable CSVMapper; the import stays in
+   memory for the session. */
+
+S.InventoryVarianceReport = {
+  tab: 'sales',
+  endCountId: null,
+  posRows: null,        // [{name, qty, sales}]
+  manualMap: {},        // { posName(lowercased): productId }
+
+  countsAsc() {
+    return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
+      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
   },
-  show(icon) {
-    const id = icon.dataset.tt;
-    const def = this.defs[id];
-    if (!def) return;
-    if (this._cur === icon) { this.hide(); return; }
-    this._cur = icon;
-    document.getElementById('tt-title').textContent = def.t;
-    document.getElementById('tt-body').textContent  = def.b;
-    const eg = document.getElementById('tt-eg');
-    if (def.e) { eg.textContent = 'Example: ' + def.e; eg.style.display = ''; }
-    else eg.style.display = 'none';
-    this._box.style.display = 'block';
-    this._box.classList.remove('on');
-    const rect = icon.getBoundingClientRect();
-    const bw = 260, bh = this._box.offsetHeight || 100;
-    let left = rect.right + 8, top = rect.top - 4;
-    if (left + bw > window.innerWidth - 12) left = rect.left - bw - 8;
-    if (top + bh > window.innerHeight - 12) top = window.innerHeight - bh - 12;
-    if (top < 8) top = 8;
-    this._box.style.left = left + 'px';
-    this._box.style.top = top + 'px';
-    requestAnimationFrame(() => this._box.classList.add('on'));
+  deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
+  voidComps() { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
+  waste()     { return ((App.shiftData && App.shiftData.sc_waste) || []); },
+  allProducts() { return ((App.inventoryData && App.inventoryData.ic_products) || []); },
+  productById(id) { return this.allProducts().find(p => p.id === id); },
+  fmtDate(str) {
+    if (!str) return '-';
+    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
-  hide() {
-    this._cur = null;
-    this._box.classList.remove('on');
-    setTimeout(() => { if (!this._box.classList.contains('on')) this._box.style.display = 'none'; }, 150);
+
+  // ── Usage for the selected period ─────────────────────────────────────────
+  currentPeriod() {
+    const asc = this.countsAsc();
+    if (asc.length < 2) return null;
+    let i = asc.findIndex(c => c.id === this.endCountId);
+    if (i < 1) i = asc.length - 1;
+    return { startC: asc[i - 1], endC: asc[i] };
+  },
+
+  // Sum comp units + waste units per product across the count period.
+  // Voids are intentionally NOT subtracted (assumed pre-pour). Waste covers
+  // every spill / dump / break logged on sc-waste. Both deductions come out
+  // of the "used" number before it gets compared to POS sold, so legit
+  // non-revenue product loss does not show up as theft variance.
+  // Draft beer waste is stored in oz on sc_waste (because partial keg loss
+  // is the realistic case); convert to kegs by dividing container_size_oz.
+  adjustmentsMap(startDate, endDate) {
+    const out = {};
+    const bump = (pid, units) => {
+      if (!pid || !units) return;
+      if (!out[pid]) out[pid] = { comp_units: 0, waste_units: 0 };
+      return out[pid];
+    };
+    this.voidComps().forEach(v => {
+      if (!v.product_id || v.units == null) return;
+      if (v.type !== 'Comp') return;
+      if (v.date <= startDate || v.date > endDate) return;
+      const entry = bump(v.product_id, v.units);
+      entry.comp_units += parseFloat(v.units) || 0;
+    });
+    this.waste().forEach(w => {
+      if (!w.product_id || w.units == null) return;
+      if (w.date <= startDate || w.date > endDate) return;
+      const entry = bump(w.product_id, w.units);
+      // Draft waste comes in as oz; convert to keg-units using the product's
+      // container_size_oz so the subtraction unit-matches "used" (kegs).
+      const p = this.productById(w.product_id) || {};
+      if (p.category === 'Draft Beer' && p.container_size_oz) {
+        entry.waste_units += (parseFloat(w.units) || 0) / p.container_size_oz;
+      } else {
+        entry.waste_units += parseFloat(w.units) || 0;
+      }
+    });
+    return out;
+  },
+
+  usageMap() {
+    const period = this.currentPeriod();
+    if (!period) return {};
+    const { startC, endC } = period;
+    const sMap = {}; (startC.items || []).forEach(it => sMap[it.product_id] = it);
+    const eMap = {}; (endC.items   || []).forEach(it => eMap[it.product_id] = it);
+    const purch = {};
+    this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
+      .forEach(d => (d.line_items || []).forEach(li => {
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
+      }));
+    const adj = this.adjustmentsMap(startC.date, endC.date);
+    const map = {};
+    Object.keys(eMap).forEach(pid => {
+      if (!sMap[pid]) return;
+      const p = this.productById(pid) || {};
+      const rawUsed = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
+      const a = adj[pid] || { comp_units: 0, waste_units: 0 };
+      const adjustments = (a.comp_units || 0) + (a.waste_units || 0);
+      const used = Math.max(rawUsed - adjustments, 0);
+      const ppc = p.pours_per_container || null;
+      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
+      map[pid] = {
+        product: p, name: eMap[pid].name,
+        rawUsed, adjustments,
+        compUnits: a.comp_units || 0,
+        wasteUnits: a.waste_units || 0,
+        used,
+        poursMade: ppc != null ? used * ppc : null,
+        ouncesUsed: p.container_size_oz != null ? used * p.container_size_oz : null,
+        usageCost: bottleCost != null ? used * bottleCost : null
+      };
+    });
+    return map;
+  },
+
+  // ── POS matching ──────────────────────────────────────────────────────────
+  posByProduct() {
+    const result = {};
+    if (!this.posRows) return result;
+    const byName = {};
+    this.allProducts().forEach(p => { byName[p.name.toLowerCase().trim()] = p; });
+    this.posRows.forEach(pr => {
+      let p = byName[pr.name.toLowerCase().trim()];
+      if (!p && this.manualMap[pr.name.toLowerCase().trim()]) p = this.productById(this.manualMap[pr.name.toLowerCase().trim()]);
+      if (p) {
+        if (!result[p.id]) result[p.id] = { qty: 0, sales: 0 };
+        result[p.id].qty += pr.qty; result[p.id].sales += pr.sales;
+      }
+    });
+    return result;
+  },
+
+  unmatchedPos() {
+    if (!this.posRows) return [];
+    const byName = {};
+    this.allProducts().forEach(p => { byName[p.name.toLowerCase().trim()] = true; });
+    return this.posRows.filter(pr =>
+      !byName[pr.name.toLowerCase().trim()] && !this.manualMap[pr.name.toLowerCase().trim()]);
+  },
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  render(container, actions) {
+    this.container = container;
+    this.actions = actions;
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button>';
+    document.getElementById('vr-export')?.addEventListener('click', () => window.print());
+    this.draw();
+  },
+
+  draw() {
+    const asc = this.countsAsc();
+    if (asc.length < 2) {
+      this.container.innerHTML = '<div class="screen"><div class="empty">'
+        + '<div class="empty-title">Not enough counts yet</div>'
+        + '<div class="empty-sub">Variance compares usage between two counts against POS sales. '
+        + 'Submit at least two inventory counts first.</div>'
+        + '<button class="btn btn-primary" id="vr-take">Take Inventory</button></div></div>';
+      this.container.onclick = ev => { if (ev.target.closest('#vr-take')) App.navigate('ic-take-inventory'); };
+      return;
+    }
+
+    const period = this.currentPeriod();
+    const periodOpts = asc.slice(1).map((c, i) =>
+      '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
+      + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
+
+    const controls = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:260px;">'
+      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div></div>';
+
+    let body;
+    if (!this.posRows) {
+      body = '<div class="card"><div class="card-title">Import POS Sales</div>'
+        + '<div id="vr-import"></div></div>';
+    } else {
+      body = this.matchSummary() + this.unmatchedCard() + this.tabsAndBody();
+    }
+
+    this.container.innerHTML = '<div class="screen">' + controls + body + '</div>';
+
+    document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
+
+    if (!this.posRows) {
+      CSVMapper.mount(document.getElementById('vr-import'), {
+        hint: 'Export a product sales report from your POS (Toast, Square, Aloha, Lightspeed, or any system) '
+          + 'and upload it here. Map the product name, quantity sold, and sales amount columns.',
+        confirmLabel: 'Import POS Sales',
+        fields: [
+          { key: 'name',  label: 'Product Name',   required: true,  match: ['product','item','name','description','menu item'] },
+          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['qty','quantity','sold','units','count'] },
+          { key: 'sales', label: 'Sales Amount',   required: false, match: ['sales','amount','revenue','net sales','total'] }
+        ],
+        onComplete: rows => {
+          this.posRows = rows.map(r => ({
+            name: String(r.name || '').trim(),
+            qty: parseFloat(String(r.qty || '').replace(/[^0-9.]/g, '')) || 0,
+            sales: parseFloat(String(r.sales || '').replace(/[^0-9.-]/g, '')) || 0
+          })).filter(r => r.name);
+          this.manualMap = {};
+          this.draw();
+        }
+      });
+    } else {
+      this.wireBody();
+    }
+  },
+
+  matchSummary() {
+    const matched = Object.keys(this.posByProduct()).length;
+    const unmatched = this.unmatchedPos().length;
+    return '<div class="alert-bar" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div class="alert-text">' + this.posRows.length + ' POS rows imported &middot; '
+      + matched + ' matched to products' + (unmatched ? ' &middot; ' + unmatched + ' unmatched' : '') + '.</div>'
+      + '<button class="btn btn-ghost btn-sm" id="vr-reimport">Re-import</button></div>';
+  },
+
+  unmatchedCard() {
+    const un = this.unmatchedPos();
+    if (!un.length) return '';
+    const prodOpts = '<option value="">Skip: not a tracked product</option>'
+      + this.allProducts().slice().sort((a, b) => a.name.localeCompare(b.name))
+          .map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+    const rows = un.map(pr => '<div class="form-row" style="gap:12px;align-items:center;margin-bottom:8px;">'
+      + '<div style="width:240px;font-size:13px;color:var(--t1);font-weight:600;flex-shrink:0;">' + esc(pr.name) + '</div>'
+      + '<div class="f" style="width:240px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
+      + prodOpts + '</select></div></div>').join('');
+    return '<div class="card"><div class="card-title">Unmatched POS Products</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS product names did not match a '
+      + 'product in your master list. Map each to the right product, or leave it skipped.</div>' + rows + '</div>';
+  },
+
+  tabsAndBody() {
+    const tabBtn = (k, label) => '<button class="vr-tab" data-tab="' + k + '" style="background:none;border:none;'
+      + 'border-bottom:2px solid ' + (this.tab === k ? 'var(--gold)' : 'transparent') + ';'
+      + 'color:' + (this.tab === k ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
+      + 'letter-spacing:0.5px;text-transform:uppercase;padding:9px 14px;cursor:pointer;">' + label + '</button>';
+    return '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;">'
+      + tabBtn('sales', 'Sales Variance') + tabBtn('usage', 'Usage Variance') + '</div>'
+      + '<div id="vr-body">' + (this.tab === 'usage' ? this.tabUsage() : this.tabSales()) + '</div>';
+  },
+
+  wireBody() {
+    document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = {}; this.draw(); });
+    this.container.querySelectorAll('.vr-map').forEach(sel =>
+      sel.addEventListener('change', e => {
+        const pos = e.target.dataset.pos;
+        if (e.target.value) this.manualMap[pos] = e.target.value;
+        else delete this.manualMap[pos];
+        this.draw();
+      }));
+    this.container.querySelectorAll('.vr-tab').forEach(btn =>
+      btn.addEventListener('click', () => { this.tab = btn.dataset.tab; this.draw(); }));
+  },
+
+  // ── Status ────────────────────────────────────────────────────────────────
+  status(pct) {
+    const a = Math.abs(pct || 0);
+    if (a < 5)  return { label: 'OK',    color: 'var(--gold)' };
+    if (a <= 15) return { label: 'Watch', color: 'var(--steel)' };
+    return { label: 'Flag', color: 'var(--red)' };
+  },
+  badge(pct) {
+    const s = this.status(pct);
+    return '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:'
+      + s.color + ';border:1px solid ' + s.color + ';border-radius:3px;padding:2px 6px;">' + s.label + '</span>';
+  },
+  cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
+  pct(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : v.toFixed(1) + '%'; },
+
+  // ── Sales Variance ────────────────────────────────────────────────────────
+  tabSales() {
+    const usage = this.usageMap();
+    const pos = this.posByProduct();
+    const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
+      const u = usage[pid], pr = pos[pid], p = u.product;
+      const registerSales = pr.sales;
+      const theoSales = u.poursMade != null && p.menu_price ? u.poursMade * p.menu_price : null;
+      const salesVar = theoSales != null ? theoSales - registerSales : null;
+      const varPct = theoSales ? salesVar / theoSales * 100 : null;
+      const actualCostPct = registerSales && u.usageCost != null ? u.usageCost / registerSales * 100 : null;
+      const actualProfit = u.usageCost != null ? registerSales - u.usageCost : null;
+      return { name: u.name, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit };
+    });
+    if (!rows.length) return this.emptyMatch();
+    const body = rows.map(r => '<tr>'
+      + '<td><div class="val">' + esc(r.name) + '</div></td>'
+      + '<td>' + this.cur(r.registerSales) + '</td>'
+      + '<td>' + this.cur(r.theoSales) + '</td>'
+      + '<td>' + this.cur(r.salesVar) + '</td>'
+      + '<td>' + this.pct(r.varPct) + '</td>'
+      + '<td>' + this.pct(r.actualCostPct) + '</td>'
+      + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
+      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
+      + '</tr>').join('');
+    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
+      + 'Theoretical sales is what the product poured should have rung up. A large positive variance means '
+      + 'product left the bar without a matching sale.</div>'
+      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
+      + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th>Status</th>'
+      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  },
+
+  // ── Usage Variance ────────────────────────────────────────────────────────
+  tabUsage() {
+    const usage = this.usageMap();
+    const pos = this.posByProduct();
+    const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
+      const u = usage[pid], pr = pos[pid], p = u.product;
+      const ouncesSold = p.pour_size_oz != null ? pr.qty * p.pour_size_oz : null;
+      const ounceVar = u.ouncesUsed != null && ouncesSold != null ? u.ouncesUsed - ouncesSold : null;
+      const varPct = ounceVar != null && u.ouncesUsed ? ounceVar / u.ouncesUsed * 100 : null;
+      return { name: u.name, ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade,
+        rawUsed: u.rawUsed, compUnits: u.compUnits, wasteUnits: u.wasteUnits,
+        used: u.used, ounceVar, varPct };
+    });
+    if (!rows.length) return this.emptyMatch();
+    const n = (v, d) => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d);
+    const dim = v => !v ? '<span style="color:var(--t4);">0</span>' : Number(v).toFixed(2).replace(/\.?0+$/, '');
+    const body = rows.map(r => '<tr>'
+      + '<td><div class="val">' + esc(r.name) + '</div></td>'
+      + '<td>' + n(r.ouncesSold) + '</td>'
+      + '<td>' + n(r.ouncesUsed) + '</td>'
+      + '<td>' + n(r.poursMade, 0) + '</td>'
+      + '<td>' + n(r.rawUsed) + '</td>'
+      + '<td>' + dim(r.compUnits) + '</td>'
+      + '<td>' + dim(r.wasteUnits) + '</td>'
+      + '<td>' + n(r.used) + '</td>'
+      + '<td>' + n(r.ounceVar) + '</td>'
+      + '<td>' + this.pct(r.varPct) + '</td>'
+      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
+      + '</tr>').join('');
+    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged in Shift Control. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error).'
+      + '</div>'
+      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
+      + '<th>Used (Raw)</th><th>Comps</th><th>Waste</th><th>Adjusted Used</th>'
+      + '<th>Oz Variance</th><th>Variance %</th><th>Status</th>'
+      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  },
+
+  emptyMatch() {
+    return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
+      + 'No products have both usage data for this period and a matched POS sales row. '
+      + 'Check the count period and the unmatched-product mapping above.</div>';
   }
 };
-
-document.addEventListener('click', ev => {
-  const icon = ev.target.closest('.tt');
-  if (icon) { ev.stopPropagation(); TT.show(icon); }
-  else TT.hide();
-});
-document.addEventListener('scroll', () => TT.hide(), true);
-
-/* ── App ── */
-const App = {
-  data: null,
-  inventoryData: null,   // ic_ keys — ic_data table (see Rule 21)
-  laborData: null,       // lc_ keys — lc_data table
-  shiftData: null,       // sc_ keys — sc_data table
-  subscription: { status: 'inactive', plan: null, active_modules: [], period_end: null },
-
-  async init() {
-    await DB.init();
-    window.onerror = (msg, src, line, col, err) => {
-      const el = document.getElementById('content-area');
-      if (el) el.innerHTML = '<div class="screen" style="color:var(--red);font-family:monospace;font-size:12px;white-space:pre-wrap;">ERROR: ' + msg + '\nLine: ' + line + '\n' + (err ? err.stack : '') + '</div>';
-    };
-
-    // Browser back/forward walks the in-app history stack instead of leaving
-    // the site. _navigationLock suppresses re-pushing while popstate handles
-    // the navigation so we don't grow the history stack on every back-step.
-    window.addEventListener('popstate', (e) => {
-      if (!e.state) return;
-      this._navigationLock = true;
-      try {
-        if (e.state.mode === 'hub') {
-          this.showHub();
-        } else if (e.state.screen) {
-          if (e.state.module && e.state.module !== this._activeModule) this.showApp(e.state.module);
-          this.navigate(e.state.screen);
-        }
-      } finally {
-        this._navigationLock = false;
-      }
-    });
-    this._wireSyncLifecycle();
-    if (new URLSearchParams(window.location.search).get('demo') === '1') {
-      await this.startDemo();
-      return;
-    }
-    if (!window.SUPABASE_URL) {
-      await this.loadAllData();
-      this.boot();
-      return;
-    }
-    // Check if this is a password recovery OR invite link before checking session.
-    // Recovery: Supabase fires PASSWORD_RECOVERY. Invite: Supabase fires SIGNED_IN
-    // (but the user has no password yet, so we still show the set-password panel
-    // so they can sign in normally next time).
-    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-    const linkType = hashParams.get('type');
-    const needsPasswordSetup = linkType === 'recovery' || linkType === 'invite';
-    if (needsPasswordSetup) {
-      this.showAuth();
-      let inviteSetupArmed = linkType === 'invite';
-      DB.onAuthChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && inviteSetupArmed)) {
-          // Show the set-password panel (used by both recovery and first-invite flows)
-          ['auth-login','auth-reset','auth-set-password'].forEach(x => {
-            const el = document.getElementById(x);
-            if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
-          });
-          inviteSetupArmed = false;  // consume the one invite SIGNED_IN event
-        } else if (event === 'SIGNED_IN' && session) {
-          await this.loadAllData();
-          this.subscription = await DB.getSubscription();
-          this.boot();
-        } else if (event === 'SIGNED_OUT') {
-          this.data = null;
-          this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
-          this.showAuth();
-        }
-      });
-      return;
-    }
-    const session = await DB.getSession();
-    if (session) {
-      await this.loadAllData();
-      this.subscription = await DB.getSubscription();
-      this.boot();
-    } else {
-      this.showAuth();
-    }
-    DB.onAuthChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // Show password reset screen instead of booting into the app
-        document.getElementById('auth-screen').style.display = 'flex';
-        document.getElementById('app').classList.add('hidden');
-        document.getElementById('ob-overlay').classList.add('hidden');
-        const hw = document.getElementById('hub-wrapper');
-        if (hw) hw.style.display = 'none';
-        // Switch to the set-new-password panel
-        ['auth-login','auth-reset','auth-set-password'].forEach(x => {
-          const el = document.getElementById(x);
-          if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
-        });
-      } else if (event === 'SIGNED_IN' && session) {
-        await this.loadAllData();
-        this.subscription = await DB.getSubscription();
-        this.boot();
-      } else if (event === 'SIGNED_OUT') {
-        this.data = null;
-        this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
-        this.showAuth();
-      }
-    });
-  },
-
-  /* ── Demo mode ────────────────────────────────────────────────────────────
-     ?demo=1 boots a sandboxed, fully populated demo: no auth, no persistence,
-     resets on every load. Paid-value actions (running audits, PDF export, AI
-     insights) are gated behind sign-up via demoBlock(). */
-  demoMode: false,
-
-  async startDemo() {
-    this.demoMode = true;
-    DB._demo = true;
-    this.data          = DB._defaultData();
-    this.inventoryData = {};
-    this.laborData     = {};
-    this.shiftData     = {};
-    this.subscription  = { status:'demo', plan:'demo', active_modules:['profit','revenue','traffic'], period_end:null };
-    await S.HubSettings.loadSample();
-    window.print = function () { App.demoBlock('Exporting to PDF'); };
-    this._mountDemoBanner();
-    this.showHub();
-  },
-
-  _mountDemoBanner() {
-    if (document.getElementById('demo-banner')) return;
-    document.body.classList.add('demo');
-    const style = document.createElement('style');
-    style.id = 'demo-css';
-    style.textContent =
-      'body.demo #app{margin-top:40px;height:calc(100vh - 40px);}'
-      + 'body.demo #hub-wrapper{top:40px !important;}'
-      + '#demo-banner{position:fixed;top:0;left:0;right:0;height:40px;z-index:200;'
-      + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--gold);'
-      + 'color:#000;box-shadow:0 2px 8px rgba(0,0,0,0.45);}';
-    document.head.appendChild(style);
-    const bar = document.createElement('div');
-    bar.id = 'demo-banner';
-    bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
-      + 'Bar Cop demo. Explore every screen freely. Running audits, exporting PDFs, and AI insights are sign-up only.</span>'
-      + '<button id="demo-signup-btn" style="background:#000;color:var(--gold);border:none;border-radius:3px;'
-      + 'font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:7px 16px;cursor:pointer;flex-shrink:0;">Sign Up Now</button>';
-    document.body.appendChild(bar);
-    document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
-  },
-
-  // Gate a paid-value action in demo mode. Returns true (and shows a sign-up
-  // prompt) when blocked, false when the action may proceed.
-  demoBlock(actionLabel) {
-    if (!this.demoMode) return false;
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
-    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
-      + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">Sign Up to Continue</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(actionLabel)
-      + ' is part of the full Bar Cop platform. The demo lets you explore every screen freely, with sample data, before you sign up.</div>'
-      + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Sign Up Now</button>'
-      + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
-      + '</div>';
-    document.body.appendChild(m);
-    m.querySelector('#demo-go').addEventListener('click', () => { window.location.href = '/'; });
-    m.querySelector('#demo-stay').addEventListener('click', () => m.remove());
-    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
-    return true;
-  },
-
-  boot() {
-    document.getElementById('auth-screen').style.display = 'none';
-    this.updatePeriod();
-    // Sidebar toggle — assign (not addEventListener) so repeated boot() calls
-    // don't stack handlers and cancel each other out
-    const toggleBtn = document.getElementById('sidebar-toggle');
-    if (toggleBtn) toggleBtn.onclick = () => {
-      document.getElementById('app').classList.toggle('sidebar-collapsed');
-    };
-    // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
-    // (a simplified tile view of their accessible tasks across all modules).
-    // Admin and viewer get the normal flow.
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (role === 'staff') {
-      this.showStaffHub();
-      this._promptSync();
-      return;
-    }
-    if (!this.data.settings.onboarding_complete) {
-      Onboarding.start();
-    } else if (!this.setupMeetsThreshold() && window.S && S.HubGettingStarted) {
-      // Returning user, onboarding done, but setup hasn't crossed the
-      // Foundation + 1 audit threshold yet. Default-land on Getting Started
-      // so the next action is one click away. They can still navigate to
-      // the Hub Dashboard manually via the sidebar.
-      S.HubGettingStarted.open();
-      this._promptSync();
-    } else {
-      this.showHub();
-      this._promptSync();
-    }
-    this._renderViewerBanner();
-    this.renderAccountSwitcher();
-  },
-
-  // Persistent banner shown to viewer role so they know writes are blocked.
-  _renderViewerBanner() {
-    const existing = document.getElementById('viewer-banner');
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (role !== 'viewer') { if (existing) existing.remove(); return; }
-    if (existing) return;
-    const bar = document.createElement('div');
-    bar.id = 'viewer-banner';
-    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9400;background:rgba(20,20,20,0.92);color:var(--gold);border-bottom:1px solid var(--gold);text-align:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 10px;';
-    bar.textContent = 'Viewer access — read-only';
-    document.body.appendChild(bar);
-  },
-
-  // Offline sync prompt (Section 14). If a write failed while offline, the
-  // local copy was kept and the store marked pending. On load, offer to push
-  // those changes to the server. The local data is already loaded, so nothing
-  // is lost if the operator defers.
-  async _promptSync() {
-    if (!DB.hasPendingSync() || document.getElementById('sync-banner')) return;
-    const bar = document.createElement('div');
-    bar.id = 'sync-banner';
-    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9500;background:var(--gold);'
-      + 'color:#000;display:flex;align-items:center;gap:14px;padding:9px 18px;'
-      + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
-    const btnDark = 'background:#000;color:var(--gold);border:none;';
-    const btnGhost = 'background:transparent;border:1px solid rgba(0,0,0,0.45);color:#000;';
-    const btnBase = 'border-radius:3px;font-size:11px;font-weight:800;letter-spacing:1px;'
-      + 'text-transform:uppercase;padding:6px 14px;cursor:pointer;flex-shrink:0;';
-    bar.innerHTML = '<span style="flex:1;">Changes you saved on this device while offline have not reached the server yet.</span>'
-      + '<button id="sync-now" style="' + btnDark + btnBase + '">Sync Now</button>'
-      + '<button id="sync-later" style="' + btnGhost + btnBase + '">Later</button>';
-    document.body.appendChild(bar);
-    document.getElementById('sync-later').onclick = () => bar.remove();
-    document.getElementById('sync-now').onclick = async () => {
-      const btn = document.getElementById('sync-now');
-      btn.disabled = true; btn.textContent = 'Syncing...';
-      const r = await DB.syncPending();
-      if (r.ok) {
-        bar.innerHTML = '<span style="flex:1;">All offline changes are synced.</span>';
-        setTimeout(() => bar.remove(), 2500);
-      } else {
-        btn.disabled = false; btn.textContent = 'Retry';
-        const span = bar.querySelector('span');
-        if (span) span.textContent = 'Still cannot reach the server. Your changes are safe on this device. '
-          + 'Try again once you have a connection.';
-      }
-    };
-  },
-
-  // ── Offline sync lifecycle ──────────────────────────────────────────────────
-  // Three pieces wired once at init time:
-  //   Fix A — offline indicator pill while navigator.onLine is false
-  //   Fix B — auto-fire syncPending() on the online event
-  //   Fix C — surface the sync banner the moment a write lands in the pending
-  //           queue (rather than waiting for next page reload)
-  _wireSyncLifecycle() {
-    window.addEventListener('offline', () => this._showOfflinePill());
-    window.addEventListener('online', () => {
-      this._hideOfflinePill();
-      this._autoSync();
-    });
-    window.addEventListener('bcop:pending-write', () => {
-      if (this.data) this._promptSync();
-    });
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      this._showOfflinePill();
-    }
-  },
-
-  _showOfflinePill() {
-    if (document.getElementById('offline-pill')) return;
-    const pill = document.createElement('div');
-    pill.id = 'offline-pill';
-    pill.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
-      + 'background:rgba(20,20,20,0.92);color:var(--gold);border:1px solid var(--gold);'
-      + 'border-radius:14px;padding:5px 14px;font-size:11px;font-weight:700;letter-spacing:1px;'
-      + 'text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
-    pill.textContent = 'Offline. Saves staying on this device.';
-    document.body.appendChild(pill);
-  },
-
-  _hideOfflinePill() {
-    const pill = document.getElementById('offline-pill');
-    if (pill) pill.remove();
-  },
-
-  async _autoSync() {
-    if (!DB.hasPendingSync()) return;
-    const r = await DB.syncPending();
-    if (r.ok && r.synced > 0) {
-      const existing = document.getElementById('sync-banner');
-      if (existing) existing.remove();
-      const toast = document.createElement('div');
-      toast.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
-        + 'background:var(--gold);color:#000;border-radius:3px;padding:7px 16px;'
-        + 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
-        + 'box-shadow:0 2px 10px rgba(0,0,0,0.5);';
-      toast.textContent = 'Synced ' + r.synced + ' offline ' + (r.synced === 1 ? 'change.' : 'changes.');
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2800);
-    } else if (!r.ok) {
-      // Auto-sync failed even though we are online. Surface the manual banner
-      // so the operator can retry on their own time.
-      this._promptSync();
-    }
-  },
-
-  showHub(opts) {
-    opts = opts || {};
-    // If a Hub overlay modal is currently open, close it (returns user to
-    // the dashboard already rendered underneath). Skip when called via
-    // {fromOverlayClose: true} so we don't recurse.
-    if (!opts.fromOverlayClose) {
-      const modal = document.getElementById('hub-modal');
-      if (modal && modal.style.display === 'flex') {
-        this.closeHubOverlay();
-        return;
-      }
-    }
-    // Staff role: real Hub shows financial data they shouldn't see. Redirect
-    // to the Staff Hub (tile view of their accessible tasks).
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (role === 'staff') {
-      this.showStaffHub();
-      return;
-    }
-    // Full screen hub - hide the app shell, show a standalone container
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('ob-overlay').classList.add('hidden');
-    // Hide the sidebar/topbar shell, render hub directly into body
-    document.getElementById('app').classList.add('hidden');
-    let hubWrap = document.getElementById('hub-wrapper');
-    if (!hubWrap) {
-      hubWrap = document.createElement('div');
-      hubWrap.id = 'hub-wrapper';
-      hubWrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
-      document.body.appendChild(hubWrap);
-    }
-    hubWrap.style.display = 'block';
-    // Clear any blur from a prior overlay open
-    hubWrap.style.filter = '';
-    hubWrap.style.pointerEvents = '';
-    S.Hub.render(hubWrap);
-    this.renderAccountSwitcher();
-    this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
-  },
-
-  // ── Hub overlay modal (Phase 2 polish) ──────────────────────────────────────
-  // Open a Hub-owned screen (Settings, Help, Getting Started, etc.) as a modal
-  // overlay on top of the Hub Dashboard instead of replacing the dashboard
-  // entirely. The dashboard stays visible underneath with a blur filter so the
-  // operator never loses their context.
-  openHubOverlay(renderFn) {
-    // Ensure Hub Dashboard is rendered first (showing the user the layout
-    // behind the modal). If we're in a module view or auth, call showHub first.
-    const wrap = document.getElementById('hub-wrapper');
-    const wrapVisible = wrap && wrap.style.display !== 'none';
-    if (!wrapVisible) this.showHub();
-    const hubWrap = document.getElementById('hub-wrapper');
-    // Apply blur to dashboard behind
-    if (hubWrap) {
-      hubWrap.style.filter = 'blur(5px)';
-      hubWrap.style.pointerEvents = 'none';
-    }
-    // Create or reuse modal
-    let modal = document.getElementById('hub-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'hub-modal';
-      modal.style.cssText = 'position:fixed;inset:0;z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.55);';
-      document.body.appendChild(modal);
-      modal.addEventListener('click', (ev) => {
-        if (ev.target === modal) this.closeHubOverlay();
-      });
-    }
-    // Build a fresh panel each open so prior content is cleared
-    modal.innerHTML = '<div class="hub-modal-panel" style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:920px;width:100%;max-height:calc(100vh - 80px);overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.55);"></div>';
-    const panel = modal.querySelector('.hub-modal-panel');
-    modal.style.display = 'flex';
-    // Install Esc-to-close once
-    if (!this._hubOverlayEscWired) {
-      document.addEventListener('keydown', (ev) => {
-        const m = document.getElementById('hub-modal');
-        if (ev.key === 'Escape' && m && m.style.display === 'flex') {
-          this.closeHubOverlay();
-        }
-      });
-      this._hubOverlayEscWired = true;
-    }
-    // Render the screen content into the panel
-    if (typeof renderFn === 'function') renderFn(panel);
-  },
-
-  closeHubOverlay() {
-    const modal = document.getElementById('hub-modal');
-    if (modal) {
-      modal.style.display = 'none';
-      modal.innerHTML = '';
-    }
-    const wrap = document.getElementById('hub-wrapper');
-    if (wrap) {
-      wrap.style.filter = '';
-      wrap.style.pointerEvents = '';
-    }
-  },
-
-  // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
-  // Renders a dropdown in the topbar showing all bars the user belongs to.
-  // Hidden when the user has only one account. Switching reloads the page so
-  // every cached data structure starts fresh under the new account context.
-  // Called from boot(), showApp(), and the Hub render.
-  async renderAccountSwitcher() {
-    if (!window.DB || !DB.listMyAccounts) return;
-    const accounts = await DB.listMyAccounts();
-    const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
-    // Both topbars (module + hub) have their own switcher slot — populate both
-    ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
-      const slot = document.getElementById(slotId);
-      if (!slot) return;
-      if (!accounts || accounts.length <= 1) {
-        slot.style.display = 'none';
-        slot.innerHTML = '';
-        return;
-      }
-      const active = accounts.find(a => a.id === activeId) || accounts[0];
-      const options = accounts.map(a => {
-        const sel = a.id === active.id ? ' selected' : '';
-        return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
-      }).join('');
-      slot.style.display = 'flex';
-      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:14px;';
-      slot.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Viewing</span>'
-        + '<select class="acct-switcher" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--w);font-family:inherit;font-size:12px;font-weight:600;padding:6px 10px;cursor:pointer;outline:none;">' + options + '</select>';
-      const sel = slot.querySelector('.acct-switcher');
-      sel.addEventListener('change', (ev) => {
-        const newId = ev.target.value;
-        if (newId && newId !== active.id) DB.setActiveAccount(newId);
-      });
-    });
-  },
-
-  // ── Role-based access (Phase 2 Items 25 + 25b) ─────────────────────────────
-  // Per-screen access goes through DB's granular permission system. Each
-  // screen maps to a permission group (DB.SCREEN_GROUPS). Each non-admin user
-  // has a permissions object stored on their membership: { groupKey: 'add' |
-  // 'edit' }. Helpers here just delegate to DB. Admin sees all; Viewer sees
-  // all read-only; Staff sees only what their permissions grant.
-  // Hub-level always-accessible screens (settings, getting-started, etc.) are
-  // listed separately because they're not in SCREEN_GROUPS.
-  HUB_ALWAYS: new Set(['hub-help', 'hub-support', 'hub-report-bug']),
-
-  canAccess(screenId) {
-    if (this.HUB_ALWAYS.has(screenId)) return true;
-    return (window.DB && DB.screenAllowed) ? DB.screenAllowed(screenId) : true;
-  },
-
-  canSeeModule(module) {
-    // A module is visible if the user has access to at least one screen in it.
-    if (!window.DB || !DB.SCREEN_GROUPS) return true;
-    for (const [screen, group] of Object.entries(DB.SCREEN_GROUPS)) {
-      const prefix = screen.split('-')[0];
-      const moduleOfScreen = (prefix === 'ic') ? 'inventory'
-        : (prefix === 'lc') ? 'labor'
-        : (prefix === 'sc') ? 'shift'
-        : (prefix === 'r') ? 'revenue'
-        : (prefix === 't') ? 'traffic'
-        : 'profit';
-      if (moduleOfScreen === module && DB.screenAllowed(screen)) return true;
-    }
-    return false;
-  },
-
-  canWrite() {
-    return !(window.DB && DB.role && DB.role() === 'viewer');
-  },
-
-  canEdit(screen) {
-    return (window.DB && DB.screenCanEdit) ? DB.screenCanEdit(screen) : true;
-  },
-
-  canAdd(screen) {
-    return (window.DB && DB.screenCanAdd) ? DB.screenCanAdd(screen) : true;
-  },
-
-  // Staff Hub tiles: one per permission group, in display order.
-  // Used by showStaffHub() to render the staff landing page.
-  STAFF_TILES: [
-    // Inventory Control
-    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-dashboard',         moduleName:'Inventory Control' },
-    { group:'take-inventory',      label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
-    { group:'receive-delivery',    label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
-    { group:'place-orders',        label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
-    { group:'spot-check',          label:'Spot Check',               module:'inventory', screen:'ic-spot-check',        moduleName:'Inventory Control' },
-    { group:'manage-products',     label:'Manage Products & Vendors',module:'inventory', screen:'ic-product-setup',     moduleName:'Inventory Control' },
-    { group:'inventory-reports',   label:'Inventory Reports',        module:'inventory', screen:'ic-report-stock',      moduleName:'Inventory Control' },
-    // Labor Control
-    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-dashboard',         moduleName:'Labor Control' },
-    { group:'log-hours',           label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
-    { group:'log-tips',            label:'Log Tips',                 module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
-    { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
-    { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
-    { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster',      moduleName:'Labor Control' },
-    { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
-    { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
-    // Shift Control
-    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
-    { group:'log-shift',           label:'Log Shift',                module:'shift',     screen:'sc-log-shift',         moduleName:'Shift Control' },
-    { group:'active-shift',        label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
-    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-drop',         moduleName:'Shift Control' },
-    { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-opening-checklist', moduleName:'Shift Control' },
-    { group:'86-list',             label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
-    { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
-    { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
-    { group:'shift-reports',       label:'Shift Reports',            module:'shift',     screen:'sc-reports-shift',     moduleName:'Shift Control' },
-    // Recovery
-    { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
-    { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
-    { group:'traffic-recovery',    label:'Traffic Recovery',         module:'traffic',   screen:'t-dashboard',          moduleName:'Traffic Recovery' }
-  ],
-
-  // Pick the first accessible screen as a non-admin user's landing.
-  // Falls back to ic-take-inventory if nothing matches (shouldn't happen for
-  // a properly-permissioned staff user).
-  staffLanding() {
-    for (const t of this.STAFF_TILES) {
-      if (this.canAccess(t.screen)) return { module: t.module, screen: t.screen };
-    }
-    return { module: 'inventory', screen: 'ic-take-inventory' };
-  },
-
-  // Staff Hub: simplified landing page with one tile per accessible screen.
-  // Replaces the real Hub (financial overview) for staff role since they
-  // shouldn't see financial data, AND gives them a way to move between the
-  // operational modules (without it they'd be stuck in one module's sidebar).
-  showStaffHub() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('ob-overlay').classList.add('hidden');
-    document.getElementById('app').classList.add('hidden');
-    let wrap = document.getElementById('hub-wrapper');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'hub-wrapper';
-      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
-      document.body.appendChild(wrap);
-    }
-    wrap.style.display = 'block';
-    wrap.style.overflowY = 'auto';
-
-    const userEmail = DB._user?.email || '';
-    const accessibleTiles = this.STAFF_TILES.filter(t => this.canAccess(t.screen));
-
-    const tiles = accessibleTiles.map(t => {
-      return '<div class="staff-tile" data-screen="' + t.screen + '" data-module="' + t.module + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;cursor:pointer;transition:border-color 0.15s, background 0.15s;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;">' + t.label + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:6px;letter-spacing:0.5px;">' + t.moduleName + '</div>'
-        + '</div>';
-    }).join('');
-
-    const empty = accessibleTiles.length === 0
-      ? '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;font-size:13px;color:var(--t2);line-height:1.6;">You do not have access to any sections yet. Ask the account admin to grant you access from the User Accounts page.</div>'
-      : '';
-
-    wrap.innerHTML = '<div style="max-width:880px;margin:0 auto;padding:40px 24px;">'
-      + '<div style="font-size:18px;font-weight:800;color:var(--w);letter-spacing:0.5px;margin-bottom:6px;">Welcome back</div>'
-      + (userEmail ? '<div style="font-size:12px;color:var(--t3);margin-bottom:30px;">Signed in as ' + userEmail + '</div>' : '<div style="margin-bottom:30px;"></div>')
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Your Tasks</div>'
-      + (tiles ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">' + tiles + '</div>' : empty)
-      + '<div style="margin-top:40px;padding-top:20px;border-top:1px solid var(--b2);display:flex;justify-content:flex-end;">'
-      +   '<button class="btn btn-ghost" id="staff-signout">Sign Out</button>'
-      + '</div>'
-      + '</div>';
-
-    wrap.querySelectorAll('.staff-tile').forEach(tile => {
-      tile.addEventListener('click', () => {
-        const mod = tile.dataset.module;
-        const screen = tile.dataset.screen;
-        this.showApp(mod);
-        this.navigate(screen);
-      });
-      tile.addEventListener('mouseenter', () => { tile.style.borderColor = 'var(--gold)'; });
-      tile.addEventListener('mouseleave', () => { tile.style.borderColor = 'var(--b1)'; });
-    });
-    document.getElementById('staff-signout')?.addEventListener('click', async () => {
-      await DB.signOut();
-      this.showAuth();
-    });
-  },
-
-  showApp(module) {
-    // Close any open Hub overlay modal before entering a module view
-    this.closeHubOverlay && this.closeHubOverlay();
-    if (!this.canSeeModule(module)) {
-      // Staff trying to enter a non-operational module — bounce to their landing
-      const land = this.staffLanding();
-      module = land.module;
-      this._pendingStaffRedirect = land.screen;
-    }
-    document.getElementById('app').classList.remove('hidden');
-    document.getElementById('ob-overlay').classList.add('hidden');
-    document.getElementById('auth-screen').style.display = 'none';
-    const hw = document.getElementById('hub-wrapper');
-    if (hw) hw.style.display = 'none';
-    // Swap sidebar nav based on module
-    this._activeModule = module || this._activeModule || 'profit';
-    this._renderNav(this._activeModule);
-    this.renderAccountSwitcher();
-    if (this._pendingStaffRedirect) {
-      const target = this._pendingStaffRedirect;
-      this._pendingStaffRedirect = null;
-      setTimeout(() => this.navigate(target), 0);
-    }
-  },
-
-  _activeModule: 'profit',
-
-  _renderNav(module) {
-    const nav = document.getElementById('sidebar-nav');
-    if (!nav) return;
-    if (module === 'revenue') {
-      nav.innerHTML = Revenue.navHTML();
-    } else if (module === 'traffic') {
-      nav.innerHTML = Traffic.navHTML();
-    } else if (module === 'inventory') {
-      nav.innerHTML = Inventory.navHTML();
-    } else if (module === 'shift') {
-      nav.innerHTML = Shift.navHTML();
-    } else if (module === 'labor') {
-      nav.innerHTML = Labor.navHTML();
-    } else {
-      nav.innerHTML = ProfitNav.html();
-    }
-    // Rewire nav click handlers, filtering out items the current role can't access
-    nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
-      if (!App.canAccess(el.dataset.screen)) {
-        el.style.display = 'none';
-      } else {
-        el.addEventListener('click', () => App.navigate(el.dataset.screen));
-      }
-    });
-    nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
-      el.addEventListener('click', () => App.showHub());
-    });
-    // Hide section headers with no visible items below them
-    nav.querySelectorAll('.nav-section').forEach(sec => {
-      let hasVisible = false;
-      let sib = sec.nextElementSibling;
-      while (sib && !sib.classList.contains('nav-section')) {
-        if (sib.classList.contains('nav-item') && sib.style.display !== 'none') {
-          hasVisible = true; break;
-        }
-        sib = sib.nextElementSibling;
-      }
-      if (!hasVisible) sec.style.display = 'none';
-    });
-  },
-
-  // Which module a screen id belongs to (by prefix; profit screens have none)
-  _moduleOf(id) {
-    if (/^ic-/.test(id)) return 'inventory';
-    if (/^lc-/.test(id)) return 'labor';
-    if (/^sc-/.test(id)) return 'shift';
-    if (/^r-/.test(id))  return 'revenue';
-    if (/^t-/.test(id))  return 'traffic';
-    return 'profit';
-  },
-
-  // Navigate to any screen, switching the active module first if needed.
-  // The deep-link target of every Fix Layer step and every Getting Started Go button.
-  openScreen(id) {
-    if (!id) return;
-    // Hub-owned screens open as modal overlays, not as module screens.
-    // navigate() already handles these but we still need to short-circuit so
-    // showApp isn't called (which would briefly flash a module shell).
-    if (id === 'settings') { S.HubSettings.open(); return; }
-    if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
-    const mod = this._moduleOf(id);
-    // Show the app shell if we're not already in it (e.g., coming from a Hub
-    // overlay modal, where the app shell is hidden). showApp also closes any
-    // open overlay so the user actually sees the navigated screen.
-    const appHidden = document.getElementById('app')?.classList.contains('hidden');
-    if (mod !== this._activeModule || appHidden) this.showApp(mod);
-    this.navigate(id);
-  },
-
-  // ── Breadcrumb back-link state ───────────────────────────────────────────
-  // The topbar shows "[Page Title] | Back to [last page]" so the operator can
-  // jump back to the last location with a single click, no matter how deep
-  // the cross-module deep-link took them. Browser back also walks the
-  // history stack pushed below.
-  _currentLocation: null,
-  _previousLocation: null,
-  _navigationLock: false,
-
-  _pushHistory(loc) {
-    if (this._navigationLock) return;
-    try { history.pushState({ screen: loc.screen, module: loc.module, mode: loc.mode }, ''); }
-    catch (e) { /* ignore history failures */ }
-  },
-
-  _updateBackLink() {
-    const sub = document.getElementById('topbar-sub');
-    if (!sub) return;
-    if (!this._previousLocation) { sub.innerHTML = ''; return; }
-    const label = String(this._previousLocation.label || 'previous')
-      .replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    sub.innerHTML = '<span class="topbar-sep">|</span>'
-      + '<a class="topbar-back-link" id="topbar-back-link">Back to ' + label + '</a>';
-    document.getElementById('topbar-back-link')?.addEventListener('click', () => this._goBackOne());
-  },
-
-  _goBackOne() {
-    if (!this._previousLocation) return;
-    const t = this._previousLocation;
-    if (t.mode === 'hub') {
-      this.showHub();
-    } else {
-      if (t.module && t.module !== this._activeModule) this.showApp(t.module);
-      this.navigate(t.screen);
-    }
-  },
-
-  _recordLocation(newLoc) {
-    // Same location as before — just refresh the back link (label may have
-    // changed) without rotating previous/current.
-    const cur = this._currentLocation;
-    if (cur && cur.mode === newLoc.mode && cur.module === newLoc.module && cur.screen === newLoc.screen) {
-      this._currentLocation = newLoc;
-      this._updateBackLink();
-      return;
-    }
-    this._previousLocation = this._currentLocation;
-    this._currentLocation = newLoc;
-    this._updateBackLink();
-    this._pushHistory(newLoc);
-  },
-
-  _afterNavigate(id) {
-    const title = document.getElementById('topbar-title')?.textContent || id;
-    this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
-  },
-
-  showAuth() {
-    document.getElementById('auth-screen').style.display = 'flex';
-    document.getElementById('app').classList.add('hidden');
-    document.getElementById('ob-overlay').classList.add('hidden');
-    const hw = document.getElementById('hub-wrapper');
-    if (hw) hw.style.display = 'none';
-    // Show success banner if landing from Stripe checkout
-    const params = new URLSearchParams(window.location.search);
-    const banner = document.getElementById('checkout-success-msg');
-    if (banner) banner.style.display = params.get('checkout') === 'success' ? 'block' : 'none';
-    // Clean up the URL
-    if (params.get('checkout')) window.history.replaceState({}, '', '/');
-  },
-
-  async save() {
-    const r = await DB.writeData(this.data);
-    if (!r.ok) console.error('Save failed:', r.error);
-    return r.ok;
-  },
-
-  async saveKey(key) {
-    const r = await DB.writeKey(key, this.data[key]);
-    if (!r.ok) console.error('saveKey failed:', r.error);
-    return r.ok;
-  },
-
-  // Mark a Hub Getting Started task as complete. Called from every save
-  // handler that corresponds to a setup task — saving targets, generating
-  // an audit, logging a shift, etc. Idempotent: re-calling on an already-
-  // done task is a no-op so callers can be liberal.
-  markSetupDone(taskId) {
-    if (!taskId || !this.data) return;
-    this.data.hub_setup_progress = this.data.hub_setup_progress || {};
-    if (this.data.hub_setup_progress[taskId]) return;
-    this.data.hub_setup_progress[taskId] = new Date().toISOString();
-    this.saveKey('hub_setup_progress');
-  },
-
-  // Is setup "meaningful enough" to default-land on the Hub Dashboard? Yes
-  // once Foundation is complete (profile + targets) AND at least one audit
-  // has run. Below that threshold, returning users default-land on Hub
-  // Getting Started so they have a clear next action. Catch-up banner on
-  // the Hub Dashboard handles the manual-navigation case for partial setups.
-  setupMeetsThreshold() {
-    if (!this.data) return false;
-    // Operator explicitly dismissed the Getting Started auto-redirect.
-    if (this.data.settings && this.data.settings.gs_dismissed) return true;
-    const p = this.data.hub_setup_progress || {};
-    // Count how many setup items the operator has actually checked off.
-    const checkedCount = Object.keys(p).filter(k => k.indexOf('gs_') === 0 && p[k]).length;
-    // Lenient path: 3+ items checked = operator is engaged, stop forcing them
-    // back to Getting Started on every signin. (Onboarding auto-checks one
-    // item on landing, so this is really "2 more clicks" to dismiss.)
-    if (checkedCount >= 3) return true;
-    // Strict path: Profile + Targets + at least one Audit (the original rule).
-    if (!p.gs_profile || !p.gs_targets) return false;
-    return !!(p.gs_p_audit || p.gs_r_audit || p.gs_t_audit);
-  },
-
-  // Load Recovery data plus the three Control data stores (Rule 21)
-  async loadAllData() {
-    this.data          = await DB.readData();
-    this.inventoryData = await DB.readInventoryData();
-    this.laborData     = await DB.readLaborData();
-    this.shiftData     = await DB.readShiftData();
-    // Pre-fetch the accounts list so the Hub sidebar can render the
-    // Locations section synchronously (multi-account users only).
-    if (DB.listMyAccounts) { await DB.listMyAccounts(); }
-  },
-
-  // Convert a delivery line_items[i] entry to total bottles. Used wherever
-  // inventory math needs raw-bottle counts (usage, variance, COGS, vendor
-  // watch annual usage, top movers, books inventory valuation, etc.).
-  //
-  // New deliveries store total_units pre-computed and display_unit='case'
-  // when the product is bottle beer with case_size set. Old deliveries
-  // (pre case-tracking) just have qty which was always in bottles.
-  bottlesFromDeliveryLine(li) {
-    if (!li) return 0;
-    if (li.total_units != null) {
-      const t = parseFloat(li.total_units);
-      if (!isNaN(t)) return t;
-    }
-    if (li.display_unit === 'case' && li.case_size_at_receive) {
-      return (parseFloat(li.qty) || 0) * (parseFloat(li.case_size_at_receive) || 1);
-    }
-    return parseFloat(li.qty) || 0;
-  },
-
-  // Per-bottle cost for any product. For case-tracked Bottle Beer (case_size
-  // > 0), unit_cost is stored as cost-per-case; divide by case_size to get
-  // per-bottle. For everything else unit_cost is already per single
-  // container, so pass through. Used everywhere inventory math multiplies
-  // bottle counts by a cost (usage cost, COGS, stock value, variance dollars,
-  // spot check, books inventory valuation).
-  bottleCost(p) {
-    if (!p || p.unit_cost == null) return null;
-    const cost = parseFloat(p.unit_cost);
-    if (isNaN(cost)) return null;
-    if (p.category === 'Bottle Beer' && p.case_size && p.case_size > 0) {
-      return cost / p.case_size;
-    }
-    return cost;
-  },
-
-  // Per-bottle cost resolved from a count item snapshot. Used when the
-  // source product was deleted/disabled and we fall back to the historical
-  // unit_cost saved on the count item. Mirrors bottleCost but reads the
-  // snapshot's category and case_size_at_count fields.
-  bottleCostFromCountItem(it) {
-    if (!it || it.unit_cost == null) return null;
-    const cost = parseFloat(it.unit_cost);
-    if (isNaN(cost)) return null;
-    if (it.category === 'Bottle Beer' && it.case_size_at_count && it.case_size_at_count > 0) {
-      return cost / it.case_size_at_count;
-    }
-    return cost;
-  },
-
-  // True when every Getting Started step is checked off. The Hub sidebar uses
-  // this to hide the Getting Started nav item once setup is fully complete,
-  // so it does not clutter the sidebar for operators who have already worked
-  // through the entire setup. Help and FAQ still deep-links to the screen for
-  // anyone who wants to revisit. Auto-resurfaces if a new step is ever added.
-  isSetupComplete() {
-    if (!this.data) return false;
-    const tasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
-    if (!tasks.length) return false;
-    const prog = this.data.hub_setup_progress || {};
-    return tasks.every(t => !!prog[t.id]);
-  },
-
-  async saveInventory() {
-    const r = await DB.writeInventoryData(this.inventoryData);
-    if (!r.ok) console.error('saveInventory failed:', r.error);
-    return r.ok;
-  },
-
-  async saveLabor() {
-    const r = await DB.writeLaborData(this.laborData);
-    if (!r.ok) console.error('saveLabor failed:', r.error);
-    return r.ok;
-  },
-
-  async saveShift() {
-    const r = await DB.writeShiftData(this.shiftData);
-    if (!r.ok) console.error('saveShift failed:', r.error);
-    return r.ok;
-  },
-
-  navigate(id) {
-    // Role-based block: staff can't navigate to disallowed screens.
-    // Bounce them to the Staff Hub so they can pick something they CAN do.
-    if (!this.canAccess(id)) {
-      const role = (window.DB && DB.role && DB.role()) || null;
-      if (role === 'staff') { this.showStaffHub(); return; }
-      const land = this.staffLanding();
-      if (this._activeModule !== land.module) {
-        this.showApp(land.module);
-        return;
-      }
-      id = land.screen;
-    }
-    // Settings and Getting Started are Hub-owned views, never module screens —
-    // open them in the Hub container regardless of where the call came from.
-    if (id === 'settings') { S.HubSettings.open(); return; }
-    if (id === 'getting-started') {
-      S.HubGettingStarted.open();
-      return;
-    }
-    try {
-    this.updateNav(id);
-    const content = document.getElementById('content-area');
-    const actions = document.getElementById('topbar-actions');
-    actions.innerHTML = '';
-
-    // Revenue module screens
-    if (this._activeModule === 'revenue') {
-      const revTitles = {
-        'hub':                    ['Recovery Hub', ''],
-        'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
-        'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
-        'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
-        'r-this-week':            ['This Week', 'Weekly Entry'],
-        'r-server-check':         ['Server Check', ''],
-        'r-menu-items':           ['Menu Items', ''],
-        'r-menu-engineering':     ['Menu Engineering', ''],
-        'r-pricing':              ['Price Calculator', ''],
-        'r-dog-test':             ['Dog Test Tracker', ''],
-        'r-rplh':                 ['RPLH Tracker', ''],
-        'r-check-average':        ['Check Average', ''],
-        'r-events':               ['Events and Catering', ''],
-        'r-reports':              ['Reports and History', ''],
-        'r-help':                 ['Help and FAQ', ''],
-      };
-      const revScreens = {
-        'r-audit':            S.RevenueAudit,
-        'r-fix':              S.RevenueFix,
-        'r-dashboard':        S.RevenueDashboard,
-        'r-this-week':        S.RevenueThisWeek,
-        'r-server-check':     S.RevenueServerCheck,
-        'r-menu-items':       S.RevenueMenuItems,
-        'r-menu-engineering': S.RevenueMenuEngineering,
-        'r-pricing':          S.RevenuePricing,
-        'r-dog-test':         S.RevenueDogTest,
-        'r-rplh':             S.RevenueRPLH,
-        'r-check-average':    S.RevenueCheckAverage,
-        'r-events':           S.RevenueEvents,
-        'r-reports':          S.RevenueReports,
-        'r-help':             S.RevenueHelp,
-      };
-      const [title, sub] = revTitles[id] || [id, ''];
-      document.getElementById('topbar-title').textContent = title;
-      document.getElementById('topbar-sub').textContent = sub;
-      const screen = revScreens[id];
-      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
-      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-      return;
-    }
-
-    // Traffic module screens
-    if (this._activeModule === 'traffic') {
-      const trafficTitles = {
-        'hub':              ['Recovery Hub', ''],
-        't-dashboard':      ['Dashboard', 'Traffic Recovery'],
-        't-audit':          ['Traffic Audit', 'Monthly Score and Progress'],
-        't-fix':            ['Traffic Fix', 'Fix Process and Guidance'],
-        't-this-week':      ['This Week', 'Weekly Entry'],
-        't-gbp':            ['Google Business Profile', ''],
-        't-reviews':        ['Review Tracker', ''],
-        't-search':         ['Search and SEO', ''],
-        't-website':        ['Website Scorecard', ''],
-        't-social':         ['Social Media', ''],
-        't-delivery':       ['Delivery Platforms', ''],
-        't-email':          ['Email and Loyalty', ''],
-        't-reports':        ['Reports and History', ''],
-        't-help':           ['Help and FAQ', ''],
-      };
-      const trafficScreens = {
-        't-dashboard':      S.TrafficDashboard,
-        't-audit':          S.TrafficAudit,
-        't-fix':            S.TrafficFix,
-        't-this-week':      S.TrafficThisWeek,
-        't-gbp':            S.TrafficGBP,
-        't-reviews':        S.TrafficReviews,
-        't-search':         S.TrafficSearch,
-        't-website':        S.TrafficWebsite,
-        't-social':         S.TrafficSocial,
-        't-delivery':       S.TrafficDelivery,
-        't-email':          S.TrafficEmail,
-        't-reports':        S.TrafficReports,
-        't-help':           S.TrafficHelp,
-      };
-      const [title, sub] = trafficTitles[id] || [id, ''];
-      document.getElementById('topbar-title').textContent = title;
-      document.getElementById('topbar-sub').textContent = sub;
-      const screen = trafficScreens[id];
-      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
-      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-      return;
-    }
-
-    // Inventory Control module screens
-    if (this._activeModule === 'inventory') {
-      const icTitles = {
-        'hub':                 ['Recovery Hub', ''],
-        'ic-dashboard':        ['Dashboard', 'Inventory Control'],
-        'ic-product-setup':    ['Products', 'Inventory Control'],
-        'ic-locations':        ['Locations', 'Inventory Control'],
-        'ic-vendors':          ['Vendors', 'Inventory Control'],
-        'ic-take-inventory':   ['Take Inventory', 'Inventory Control'],
-        'ic-count-history':    ['Count History', 'Inventory Control'],
-        'ic-spot-check':       ['Spot Check', 'Inventory Control'],
-        'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
-        'ic-delivery-history': ['Delivery History', 'Inventory Control'],
-        'ic-order-sheet':      ['Order Sheet', 'Inventory Control'],
-        'ic-order-history':    ['Order History', 'Inventory Control'],
-        'ic-report-usage':     ['Usage Report', 'Inventory Control'],
-        'ic-report-variance':  ['Variance Report', 'Inventory Control'],
-        'ic-report-stock':     ['Stock Report', 'Inventory Control'],
-        'ic-report-movers':    ['Top Movers', 'Inventory Control'],
-        'ic-help':             ['Help and FAQ', 'Inventory Control'],
-      };
-      const icScreens = {
-        'ic-dashboard':      S.InventoryDashboard,
-        'ic-product-setup':  S.InventoryProducts,
-        'ic-locations':      S.InventoryLocations,
-        'ic-vendors':        S.InventoryVendors,
-        'ic-take-inventory': S.InventoryTakeInventory,
-        'ic-count-history':  S.InventoryCountHistory,
-        'ic-spot-check':     S.InventorySpotCheck,
-        'ic-receive-delivery': S.InventoryReceiveDelivery,
-        'ic-delivery-history': S.InventoryDeliveryHistory,
-        'ic-order-sheet':     S.InventoryOrderSheet,
-        'ic-order-history':   S.InventoryOrderHistory,
-        'ic-report-usage':    S.InventoryUsageReport,
-        'ic-report-variance': S.InventoryVarianceReport,
-        'ic-report-stock':    S.InventoryStockReport,
-        'ic-report-movers':   S.InventoryMoversReport,
-        'ic-help':            S.InventoryHelp,
-      };
-      const [icTitle, icSub] = icTitles[id] || [id, ''];
-      document.getElementById('topbar-title').textContent = icTitle;
-      document.getElementById('topbar-sub').textContent = icSub;
-      const icScreen = icScreens[id];
-      if (icScreen) { icScreen.render(content, actions); this._exportBtn(id, actions); }
-      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-      return;
-    }
-
-    // Shift Control module screens
-    if (this._activeModule === 'shift') {
-      const scTitles = {
-        'hub':                   ['Recovery Hub', ''],
-        'sc-dashboard':          ['Dashboard', 'Shift Control'],
-        'sc-active-shift':       ['Active Shift', 'Shift Control'],
-        'sc-log-shift':          ['Log a Shift', 'Shift Control'],
-        'sc-shift-history':      ['Shift History', 'Shift Control'],
-        'sc-cash-drop':          ['Cash Drop', 'Shift Control'],
-        'sc-safe-log':           ['Safe Log', 'Shift Control'],
-        'sc-variance-log':       ['Variance Log', 'Shift Control'],
-        'sc-86-list':            ['86 List', 'Shift Control'],
-        'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
-        'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
-        'sc-opening-checklist':  ['Opening Checklist', 'Shift Control'],
-        'sc-closing-checklist':  ['Closing Checklist', 'Shift Control'],
-        'sc-checklist-templates':['Checklist Templates', 'Shift Control'],
-        'sc-reports-shift':      ['Shift Reports', 'Shift Control'],
-        'sc-reports-cash':       ['Cash Reports', 'Shift Control'],
-        'sc-reports-ops':        ['Operations Reports', 'Shift Control'],
-        'sc-help':               ['Help and FAQ', 'Shift Control'],
-      };
-      const scScreens = {
-        'sc-dashboard': S.ShiftDashboard,
-        'sc-active-shift': S.ShiftActiveShift,
-        'sc-log-shift': S.ShiftLogShift,
-        'sc-shift-history': S.ShiftHistory,
-        'sc-cash-drop': S.ShiftCashDrop,
-        'sc-safe-log': S.ShiftSafeLog,
-        'sc-variance-log': S.ShiftVarianceLog,
-        'sc-86-list': S.Shift86List,
-        'sc-void-comp': S.ShiftVoidComp,
-        'sc-maintenance': S.ShiftMaintenance,
-        'sc-opening-checklist': S.ShiftOpeningChecklist,
-        'sc-closing-checklist': S.ShiftClosingChecklist,
-        'sc-checklist-templates': S.ShiftChecklistTemplates,
-        'sc-reports-shift': S.ShiftReportsShift,
-        'sc-reports-cash': S.ShiftReportsCash,
-        'sc-reports-ops': S.ShiftReportsOps,
-        'sc-help': S.ShiftHelp,
-      };
-      const [scTitle, scSub] = scTitles[id] || [id, ''];
-      document.getElementById('topbar-title').textContent = scTitle;
-      document.getElementById('topbar-sub').textContent = scSub;
-      const scScreen = scScreens[id];
-      if (scScreen) { scScreen.render(content, actions); this._exportBtn(id, actions); }
-      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-      return;
-    }
-
-    // Labor Control module screens
-    if (this._activeModule === 'labor') {
-      const lcTitles = {
-        'hub':                   ['Recovery Hub', ''],
-        'lc-dashboard':          ['Dashboard', 'Labor Control'],
-        'lc-build-schedule':     ['Build Schedule', 'Labor Control'],
-        'lc-schedule-templates': ['Schedule Templates', 'Labor Control'],
-        'lc-schedule-history':   ['Schedule History', 'Labor Control'],
-        'lc-log-hours':          ['Log Hours', 'Labor Control'],
-        'lc-daily-view':         ['Daily View', 'Labor Control'],
-        'lc-weekly-summary':     ['Weekly Summary', 'Labor Control'],
-        'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
-        'lc-positions':          ['Positions', 'Labor Control'],
-        'lc-tip-log':            ['Tip Log', 'Labor Control'],
-        'lc-tip-pool':           ['Tip Pool Calculator', 'Labor Control'],
-        'lc-tip-history':        ['Tip History', 'Labor Control'],
-        'lc-reports':            ['Labor Reports', 'Labor Control'],
-        'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
-        'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
-        'lc-help':               ['Help and FAQ', 'Labor Control'],
-      };
-      const lcScreens = {
-        'lc-dashboard': S.LaborDashboard,
-        'lc-positions': S.LaborPositions,
-        'lc-staff-roster': S.LaborStaffRoster,
-        'lc-build-schedule': S.LaborBuildSchedule,
-        'lc-schedule-history': S.LaborScheduleHistory,
-        'lc-schedule-templates': S.LaborScheduleTemplates,
-        'lc-log-hours': S.LaborLogHours,
-        'lc-daily-view': S.LaborDailyView,
-        'lc-weekly-summary': S.LaborWeeklySummary,
-        'lc-tip-log': S.LaborTipLog,
-        'lc-tip-pool': S.LaborTipPool,
-        'lc-tip-history': S.LaborTipHistory,
-        'lc-overtime-watch': S.LaborOvertimeWatch,
-        'lc-callout-log': S.LaborCalloutLog,
-        'lc-reports': S.LaborReports,
-        'lc-help': S.LaborHelp,
-      };
-      const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
-      document.getElementById('topbar-title').textContent = lcTitle;
-      document.getElementById('topbar-sub').textContent = lcSub;
-      const lcScreen = lcScreens[id];
-      if (lcScreen) { lcScreen.render(content, actions); this._exportBtn(id, actions); }
-      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-      return;
-    }
-
-    const titles = {
-      'hub':           ['Recovery Hub', ''],
-      'dashboard':     ['Dashboard', 'Profit Recovery'],
-      'this-week':     ['This Week', 'Weekly Entry'],
-      'bar-products':  ['Bar Products', ''],
-      'kitchen-products': ['Kitchen Products', ''],
-      'recipe-library':['Recipe Library', ''],
-      'vendor-watch':  ['Vendor Watch', ''],
-      'vendor-discrepancy': ['Vendor Discrepancies', ''],
-      'theft-risk':    ['Theft Risk Scorecard', ''],
-      'cash-recon':    ['Cash Reconciliation', ''],
-      'reports':       ['Reports & History', ''],
-      'help':          ['Help and FAQ', ''],
-      'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
-      'profit-fix':    ['Profit Fix', 'Fix Process and Guidance']
-    };
-
-    const screens = {
-      'hub':           S.Hub,
-      'dashboard':     S.Dashboard,
-      'this-week':     S.ThisWeek,
-      'bar-products':  S.BarProducts,
-      'kitchen-products': S.KitchenProducts,
-      'recipe-library':S.RecipeLibrary,
-      'vendor-watch':  S.VendorWatch,
-      'vendor-discrepancy': S.VendorDiscrepancy,
-      'theft-risk':    S.TheftRisk,
-      'cash-recon':    S.CashRecon,
-      'reports':       S.Reports,
-      'help':          S.Help,
-      'audit-tracker': S.AuditTracker,
-      'profit-fix':    S.ProfitFix
-    };
-
-    const [title, sub] = titles[id] || [id, ''];
-    document.getElementById('topbar-title').textContent = title;
-    document.getElementById('topbar-sub').textContent = sub;
-
-    const screen = screens[id];
-    if (screen) screen.render(content, actions);
-    else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-    } finally {
-      this._afterNavigate(id);
-    }
-  },
-
-  /* Report screens carry an Export to PDF button (Rule 10). The print
-     stylesheet in index.html flips the theme light and hides the chrome and
-     all buttons, so window.print() yields a clean PDF of the report content.
-     The set is every screen in a module's REPORTS section plus the three
-     Recovery Reports and History screens. */
-  _REPORT_SCREENS: {
-    'reports': 1, 'r-reports': 1, 't-reports': 1,
-    'ic-report-usage': 1, 'ic-report-variance': 1, 'ic-report-stock': 1, 'ic-report-movers': 1,
-    'lc-reports': 1, 'lc-overtime-watch': 1, 'lc-callout-log': 1,
-    'sc-reports-shift': 1, 'sc-reports-cash': 1, 'sc-reports-ops': 1
-  },
-  _exportBtn(id, actions) {
-    if (!this._REPORT_SCREENS[id] || !actions) return;
-    if (actions.querySelector('.export-pdf-btn')) return;
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-ghost btn-sm export-pdf-btn';
-    btn.textContent = 'Export to PDF';
-    btn.addEventListener('click', () => window.print());
-    actions.appendChild(btn);
-  },
-
-  updateNav(id) {
-    document.querySelectorAll('.nav-item, .sidebar-btn').forEach(el => el.classList.remove('active'));
-    const el = document.getElementById('nav-' + id);
-    if (el) el.classList.add('active');
-  },
-
-  updatePeriod() {
-    const el = document.getElementById('sidebar-period');
-    if (!el) return;
-    const weeks = this.data?.weeks || [];
-    if (weeks.length > 0) {
-      const w = weeks[weeks.length - 1];
-      el.textContent = 'Week ' + w.week_num + '   ' + (w.period_end || '');
-    } else {
-      el.textContent = 'No data yet';
-    }
-  },
-
-  fmtCurrency(n, decimals) {
-    if (isNaN(n) || n == null) return ' ';
-    const d = decimals !== undefined ? decimals : (Math.abs(n) < 10 ? 2 : 0);
-    return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
-  },
-
-  fmtPct(n, d=1) {
-    if (isNaN(n) || n == null) return ' ';
-    return Number(n).toFixed(d) + '%';
-  },
-
-  /* ── Dollarize a percentage gap (Section 10.2) ───────────────────────────
-     The shared helper that puts a dollar figure on a percentage. Pass the
-     metric, its target, and the annual revenue base it applies to. Returns
-     the signed gap in points and dollars (annual and weekly), where a
-     positive figure means the metric sits above target. Returns null when
-     any input is missing, so callers never print a fabricated number. */
-  dollarize(metric, target, annualBase) {
-    if (metric == null || target == null || !annualBase || isNaN(annualBase)) return null;
-    const gapPts = metric - target;
-    const annual = (gapPts / 100) * annualBase;
-    return { gapPts: gapPts, annual: annual, weekly: annual / 52 };
-  },
-
-  /* ── Unified audit score system (0-100) ──────────────────────────────────
-     One scale for every audit score in all three sections:
-       70-100  Strong        gold
-       50-69   Below Target  white
-       0-49    Critical      red                                          */
-  // Strong scores use green (success), below-target stays white, critical red.
-  // Gold is reserved for brand accents and CTAs, not "doing well" state.
-  scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red)'; },
-  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#9A5D34'      : '#C03828'; },
-  scoreLabel(s) { s = Number(s) || 0; return s >= 70 ? 'Strong'       : s >= 50 ? 'Below Target' : 'Critical'; },
-
-  // Slim 0-100 scale bar with red / amber / green zones and a marker at the score.
-  scoreBar(score) {
-    const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
-    return '<div style="margin-top:10px;max-width:300px;">'
-      + '<div style="display:flex;height:7px;border-radius:4px;overflow:hidden;">'
-      +   '<div style="width:50%;background:var(--red);"></div>'
-      +   '<div style="width:20%;background:var(--amber);"></div>'
-      +   '<div style="width:30%;background:var(--green);"></div>'
-      + '</div>'
-      + '<div style="position:relative;height:0;">'
-      +   '<div style="position:absolute;top:-10px;left:' + s + '%;width:3px;height:13px;background:var(--w);border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 0 1.5px var(--surface);"></div>'
-      + '</div>'
-      + '<div style="display:flex;margin-top:6px;font-size:8px;font-weight:700;letter-spacing:0.5px;color:var(--t3);">'
-      +   '<span style="width:50%;">CRITICAL</span>'
-      +   '<span style="width:20%;text-align:center;">BELOW TGT</span>'
-      +   '<span style="width:30%;text-align:right;">STRONG</span>'
-      + '</div>'
-    + '</div>';
-  },
-
-  /* ── Reusable trend chart ─────────────────────────────────────────────────
-     opts: { title, points:[{label,value}], target (optional), suffix (optional) }
-     Returns a chart-card. Needs 2+ non-null values or shows a prompt.        */
-  trendChart(opts) {
-    const pts  = (opts.points || []).filter(Boolean);
-    const vals = pts.map(p => p.value).filter(v => v != null);
-    const title = opts.title || 'Trend';
-    const head = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">' + esc(title) + '</div>';
-    if (vals.length < 2) {
-      return '<div class="chart-card" style="padding:20px 24px 16px;">' + head
-        + '<div style="text-align:center;padding:16px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see this trend</div></div>';
-    }
-    const W = 700, H = 170, PAD = { t:24, r:18, b:34, l:46 };
-    const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
-    let minV = Math.min(...vals), maxV = Math.max(...vals);
-    if (opts.target != null) { minV = Math.min(minV, opts.target); maxV = Math.max(maxV, opts.target); }
-    const span = (maxV - minV) * 0.15 || 1;
-    const minY = minV - span, maxY = maxV + span;
-    const xs = i => PAD.l + (pts.length > 1 ? (i/(pts.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
-    const valid = pts.map((p,i) => p.value != null ? { x:xs(i), y:ys(p.value) } : null).filter(Boolean);
-    let d = 'M' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
-    for (let i = 1; i < valid.length; i++) {
-      const cp = (valid[i].x - valid[i-1].x) * 0.35;
-      d += ' C' + (valid[i-1].x+cp).toFixed(1) + ',' + valid[i-1].y.toFixed(1) + ' ' + (valid[i].x-cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
-    }
-    // Gradient area fill under the line — matches the module dashboard charts
-    const base = (PAD.t + ch).toFixed(1);
-    const area = d.replace('M' + valid[0].x.toFixed(1) + ',', 'M' + valid[0].x.toFixed(1) + ',' + base + ' L' + valid[0].x.toFixed(1) + ',')
-      + ' L' + valid[valid.length-1].x.toFixed(1) + ',' + base + ' Z';
-    const gid = 'tg' + Math.random().toString(36).slice(2,7);
-    const dots = pts.map((p,i) => p.value != null ? '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p.value).toFixed(1) + '" r="4" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>' : '').join('');
-    const xl = pts.map((p,i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H-8) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + esc(String(p.label||'')) + '</text>').join('');
-    const yt = [minY, (minY+maxY)/2, maxY].map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (PAD.l-8) + '" y="' + (ys(v)+4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (Math.round(v*10)/10) + '</text>').join('');
-    const tl = opts.target != null
-      ? '<line x1="' + PAD.l + '" y1="' + ys(opts.target).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(opts.target).toFixed(1) + '" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/><text x="' + (W-PAD.r+4) + '" y="' + (ys(opts.target)+4).toFixed(1) + '" fill="rgba(219,171,70,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
-      : '';
-    return '<div class="chart-card" style="padding:20px 24px 14px;">' + head
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible;">'
-      + '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
-      + yt + tl
-      + '<path d="' + area + '" fill="url(#' + gid + ')" stroke="none"/>'
-      + '<path d="' + d + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
-      + dots + xl
-      + '</svg></div>';
-  },
-
-  nextWeekNum() {
-    const weeks = this.data?.weeks || [];
-    if (weeks.length === 0) return 1;
-    return Math.max(...weeks.map(w => w.week_num || 0)) + 1;
-  },
-
-  nextSunday() {
-    const d = new Date();
-    const diff = (7 - d.getDay()) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().slice(0, 10);
-  },
-
-  uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  }
-};
-
-/* ── Global screen namespace (declared in index.html before screen scripts) ── */
-
-/* ── Tooltip helper ── */
-function tt(id) {
-  return '<span class="tt" data-tt="' + id + '">?</span>';
-}
-
-/* ── HTML escape ── */
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-/* ── Reviewed-on staleness note ── */
-function reviewedNote(iso) {
-  if (!iso) return '';
-  const then = new Date(iso);
-  if (isNaN(then.getTime())) return '';
-  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
-  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
-  const stale = days > 30;
-  return '<div style="font-size:11px;color:' + (stale ? 'var(--gold)' : 'var(--t3)')
-    + ';margin-bottom:10px;">Last reviewed ' + when
-    + (stale ? ', update it' : '') + '</div>';
-}
-
-/* ── Auth UI ── */
-function wireAuth() {
-  const show = (id) => {
-    ['auth-login','auth-reset'].forEach(x => document.getElementById(x).style.display = x===id?'':'none');
-  };
-  document.getElementById('show-reset')?.addEventListener('click',  () => show('auth-reset'));
-  document.getElementById('show-login2')?.addEventListener('click', () => show('auth-login'));
-
-  document.getElementById('login-btn')?.addEventListener('click', async () => {
-    const email = document.getElementById('login-email').value.trim();
-    const pass  = document.getElementById('login-password').value;
-    const err   = document.getElementById('login-error');
-    const btn   = document.getElementById('login-btn');
-    if (!email || !pass) { err.textContent='Enter email and password.'; err.style.display='block'; return; }
-    btn.textContent='Signing in...'; btn.disabled=true;
-    const {error} = await DB.signIn(email, pass);
-    btn.textContent='Sign In'; btn.disabled=false;
-    if (error) { err.textContent=error.message; err.style.display='block'; }
-    else err.style.display='none';
-  });
-
-  ['login-email','login-password'].forEach(id => {
-    document.getElementById(id)?.addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-btn')?.click(); });
-  });
-
-  document.getElementById('reset-btn')?.addEventListener('click', async () => {
-    const email = document.getElementById('reset-email').value.trim();
-    const msg   = document.getElementById('reset-msg');
-    const btn   = document.getElementById('reset-btn');
-    if (!email) { msg.style.color='var(--red)'; msg.textContent='Enter your email.'; msg.style.display='block'; return; }
-    btn.textContent='Sending...'; btn.disabled=true;
-    const {error} = await DB.resetPassword(email);
-    btn.textContent='Send Reset Link'; btn.disabled=false;
-    msg.style.color = error ? 'var(--red)' : 'var(--gold)';
-    msg.textContent = error ? error.message : 'Reset link sent. Check your email.';
-    msg.style.display='block';
-  });
-
-  document.getElementById('set-pw-btn')?.addEventListener('click', async () => {
-    const pw1 = document.getElementById('set-pw1').value;
-    const pw2 = document.getElementById('set-pw2').value;
-    const msg = document.getElementById('set-pw-msg');
-    const btn = document.getElementById('set-pw-btn');
-    if (!pw1 || pw1.length < 8) { msg.style.color='var(--red)'; msg.textContent='Password must be at least 8 characters.'; msg.style.display='block'; return; }
-    if (pw1 !== pw2) { msg.style.color='var(--red)'; msg.textContent='Passwords do not match.'; msg.style.display='block'; return; }
-    btn.textContent='Saving...'; btn.disabled=true;
-    const { data: updateData, error } = await DB._sb.auth.updateUser({ password: pw1 });
-    if (error) {
-      btn.textContent='Set Password and Sign In'; btn.disabled=false;
-      msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block';
-    } else {
-      msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block';
-      // Manually boot since SIGNED_IN may not re-fire after updateUser
-      await App.loadAllData();
-      App.subscription = await DB.getSubscription();
-      App.boot();
-    }
-  });
-
-  document.getElementById('signout-btn')?.addEventListener('click', async () => {
-    await DB.signOut();
-    App.showAuth();
-  });
-}
-
-/* ── Boot ── */
-document.addEventListener('DOMContentLoaded', () => {
-  // Nav items are injected dynamically   wired in App._renderNav()
-  // Settings is one unified platform-wide screen (Hub-owned)
-  document.getElementById('nav-settings')?.addEventListener('click', () => {
-    App.navigate('settings');
-  });
-  wireAuth();
-  App.init();
-});
