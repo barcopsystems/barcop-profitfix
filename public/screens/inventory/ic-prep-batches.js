@@ -169,6 +169,9 @@ S.PrepBatches = {
   showForm(id) {
     this.editId = id || null;
     const b = id ? this.byId(id) : null;
+    // Field-missing highlights fire ONLY when editing an incomplete batch.
+    // Add-new and edit-of-complete keep the form clean.
+    this._editingIncomplete = !!(b && this.missingFields(b).size > 0);
     this.rows = (b?.ingredients || []).map(i => {
       const p = this.prodById(i.product_id);
       return { product_id: i.product_id, quantity: i.quantity, cost_per_unit: this.unitCost(p), total_cost: this.unitCost(p) * (i.quantity || 0) };
@@ -262,7 +265,10 @@ S.PrepBatches = {
     if (!b?.category) out.add('pb-cat');
     return out;
   },
+  // Field-missing highlights only fire when EDITING an incomplete batch.
+  // Add-new flow + edit-of-complete flow both stay clean.
   applyMissingFieldHighlights() {
+    if (!this._editingIncomplete) return;
     const b = this.byId(this.editId);
     if (!b) return;
     const missing = this.missingFields(b);
@@ -274,6 +280,7 @@ S.PrepBatches = {
     });
   },
   refreshFieldMissing() {
+    if (!this._editingIncomplete) return;
     const synthetic = {
       name:     document.getElementById('pb-name')?.value.trim() || '',
       category: document.getElementById('pb-cat')?.value || ''
@@ -392,11 +399,18 @@ S.PrepBatches = {
     this.renderList();
   },
 
-  deleteBatch(id) {
+  async deleteBatch(id) {
     const b = this.byId(id);
     if (!b) return;
-    if (!confirm('Delete "' + b.name + '"? Menu item recipes that use it will fall back to ingredient-only cost.')) return;
+    const ok = await App.confirm({
+      title: 'Delete "' + b.name + '"?',
+      message: 'Menu item recipes that use it will fall back to ingredient-only cost.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    });
+    if (!ok) return;
     App.inventoryData.ic_prep_batches = this.list().filter(x => x.id !== id);
-    App.saveInventory().then(() => this.renderList());
+    await App.saveInventory();
+    this.renderList();
   }
 };
