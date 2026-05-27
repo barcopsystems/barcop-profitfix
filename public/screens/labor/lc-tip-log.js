@@ -7,7 +7,7 @@
 S.LaborTipLog = {
   editId: null,
   _pendingDelId: null,
-  SHIFTS: ['', 'Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+  get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
   tips() {
     if (!App.laborData) App.laborData = {};
