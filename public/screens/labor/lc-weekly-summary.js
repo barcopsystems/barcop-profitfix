@@ -111,16 +111,24 @@ S.LaborWeeklySummary = {
       staffCard = '<div class="card"><div class="card-title">By Staff</div>'
         + '<div style="font-size:13px;color:var(--t3);">No hours logged for this week.</div></div>';
     } else {
+      const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = staffKeys.sort((a, b) => byStaff[b].cost - byStaff[a].cost).map(k => {
         const s = byStaff[k];
+        // Find this staff member's lc_actuals records this week for inline edit
+        const recs = weekActuals.filter(a => (a.staff_id || a.name) === k);
+        const anyLocked = recs.some(r => r.locked);
+        const editBtn = canEdit && !anyLocked && recs.length > 0
+          ? '<button class="btn btn-ghost btn-sm ws-edit" data-key="' + esc(k) + '">Edit Hours</button>'
+          : anyLocked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
         return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
           + '<td>' + Object.keys(s.days).length + '</td>'
           + '<td>' + s.hours.toFixed(1) + '</td>'
-          + '<td class="val">' + App.fmtCurrency(s.cost) + '</td></tr>';
+          + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
+          + '<td>' + editBtn + '</td></tr>';
       }).join('');
       staffCard = '<div class="card"><div class="card-title">By Staff</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th>'
+        + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -141,7 +149,8 @@ S.LaborWeeklySummary = {
       + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Cost</th>'
       + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summary + staffCard + dayCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + dateCard + summary + staffCard + dayCard + '</div>'
+      + this.editModalHtml();
 
     document.getElementById('ws-start')?.addEventListener('change', e => {
       this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00'));
@@ -155,5 +164,60 @@ S.LaborWeeklySummary = {
       this.weekStart = this.addDays(this.weekStart, 7);
       this.draw();
     });
+    // Inline edit modal for a staff member's hours this week
+    this.container.querySelectorAll('.ws-edit').forEach(btn => {
+      btn.addEventListener('click', () => this.openEditModal(btn.dataset.key, weekActuals));
+    });
+  },
+
+  // ── Inline Edit Modal (per-staff per-week list) ─────────────────────
+  editModalHtml() {
+    return '<div id="ws-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;padding:20px;">'
+      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:560px;width:100%;">'
+      + '<div id="ws-em-title" style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;">Edit Hours</div>'
+      + '<div id="ws-em-body"></div>'
+      + '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">'
+        + '<button class="btn btn-ghost" id="ws-em-cancel">Cancel</button>'
+        + '<button class="btn btn-primary" id="ws-em-save">Save All</button>'
+      + '</div></div></div>';
+  },
+
+  openEditModal(key, weekActuals) {
+    const recs = weekActuals.filter(a => (a.staff_id || a.name) === key && !a.locked);
+    if (!recs.length) return;
+    const modal = document.getElementById('ws-edit-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.getElementById('ws-em-title').textContent = 'Edit Hours · ' + (recs[0].name || '');
+    const body = document.getElementById('ws-em-body');
+    body.innerHTML = recs.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r, i) =>
+      '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:10px;" data-id="' + r.id + '">'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Date</label>'
+          + '<div style="font-size:12px;color:var(--t2);padding:8px 0;">' + esc(this.fmtDay(r.date)) + '</div></div>'
+        + '<div class="f" style="width:100px;flex-shrink:0;"><label>Hours</label>'
+          + '<input type="number" class="ws-em-hours" min="0" step="0.25" value="' + (r.hours != null ? r.hours : '') + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:140px;"><label>Notes</label>'
+          + '<input type="text" class="ws-em-notes" value="' + esc(r.notes || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+    ).join('');
+    document.getElementById('ws-em-cancel').onclick = () => { modal.style.display = 'none'; };
+    document.getElementById('ws-em-save').onclick = async () => {
+      body.querySelectorAll('.form-row').forEach(row => {
+        const id = row.dataset.id;
+        const rec = this.actuals().find(a => a.id === id);
+        if (!rec) return;
+        const newH = parseFloat(row.querySelector('.ws-em-hours')?.value);
+        if (!isNaN(newH) && newH >= 0) {
+          rec.hours = newH;
+          const wage = rec.wage != null ? rec.wage : (App.wageForStaffOn ? App.wageForStaffOn(rec.staff_id, rec.date) : 0);
+          rec.cost = newH * wage;
+        }
+        rec.notes = (row.querySelector('.ws-em-notes')?.value || '').trim();
+        rec.updated_at = new Date().toISOString();
+      });
+      modal.style.display = 'none';
+      await App.saveLabor();
+      this.draw();
+    };
   }
 };
