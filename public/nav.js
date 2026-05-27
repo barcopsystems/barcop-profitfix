@@ -402,6 +402,19 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Dashboard</span>
       </div>
+      <div class="nav-section">Setup</div>
+      <div class="nav-item" data-screen="sc-drawers" id="nav-sc-drawers">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="5" width="13" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M5.5 9h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Drawers / Registers</span>
+      </div>
+      <div class="nav-item" data-screen="sc-cash-settings" id="nav-sc-cash-settings">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5.5v6M6.5 7.5h3.5a1 1 0 0 1 0 2H7a1 1 0 0 0 0 2h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Cash Tolerances</span>
+      </div>
+      <div class="nav-item" data-screen="sc-checklist-templates" id="nav-sc-checklist-templates">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Checklist Templates</span>
+      </div>
       <div class="nav-section">Shifts</div>
       <div class="nav-item" data-screen="sc-active-shift" id="nav-sc-active-shift">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 5.5l4.5 3-4.5 3z" fill="currentColor"/></svg>
@@ -453,10 +466,6 @@ const Shift = {
       <div class="nav-item" data-screen="sc-closing-checklist" id="nav-sc-closing-checklist">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="7.5" width="11" height="7" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.3 7.5V5.5a3.2 3.2 0 0 1 6.4 0v2" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Closing Checklist</span>
-      </div>
-      <div class="nav-item" data-screen="sc-checklist-templates" id="nav-sc-checklist-templates">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Templates</span>
       </div>
       <div class="nav-section">Reports</div>
       <div class="nav-item" data-screen="sc-reports-shift" id="nav-sc-reports-shift">
