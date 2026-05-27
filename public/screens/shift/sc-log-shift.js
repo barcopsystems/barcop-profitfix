@@ -8,7 +8,10 @@
 S.ShiftLogShift = {
   editId: null,
   _pendingDelId: null,
-  SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+  // SHIFT_TYPES kept as a backward-compat alias to App.SHIFT_TYPES. The
+  // canonical list lives on App.SHIFT_TYPES now; consumers should read from
+  // there. Old call sites that hit S.ShiftLogShift.SHIFT_TYPES still work.
+  get SHIFT_TYPES() { return App.SHIFT_TYPES; },
 
   shifts() {
     if (!App.shiftData) App.shiftData = {};
