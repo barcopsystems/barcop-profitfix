@@ -265,7 +265,7 @@ const DB = {
     'dashboard':'profit-recovery','this-week':'profit-recovery',
     'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
     'cash-recon':'profit-recovery','theft-risk':'profit-recovery',
-    'recipe-library':'profit-recovery','vendor-watch':'profit-recovery','vendor-discrepancy':'profit-recovery',
+    'recipe-cost-analysis':'profit-recovery','vendor-watch':'profit-recovery','vendor-discrepancy':'profit-recovery',
     'bar-products':'profit-recovery','kitchen-products':'profit-recovery',
     'reports':'profit-recovery','help':'_always',
     // Revenue Recovery
@@ -675,12 +675,9 @@ const DB = {
       bar_products: [], kitchen_products: [],
       // Menu items: the unified store for everything sellable on the menu.
       // Recipes live embedded as the optional `recipe` field on each item.
-      // Two doors edit this store (r-menu-items and recipe-library) so the
-      // menu data is reachable from both Profit and Revenue contexts.
+      // Edited from r-menu-items (Revenue Recovery) — the single edit
+      // surface. Profit Recovery's Recipe Cost Analysis is read-only.
       menu_items: [],
-      // Prep batches: frozen margarita mix, simple syrup, etc. Not menu
-      // items themselves; produce a yield consumed by recipes.
-      batches: [],
       weeks: [], shifts: [], reconciliations: [],
       theft_scores: [], vendor_log: [], last_theft_score_date: null,
       vendor_discrepancies: [],
