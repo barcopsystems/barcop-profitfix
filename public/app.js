@@ -1228,13 +1228,15 @@ const App = {
   // recipe is present, the item's cost auto-computes from current product
   // prices; otherwise the manually-entered cost field is used.
   //
-  // Two doors edit the same record:
-  //   - r-menu-items (Revenue Recovery): menu-engineering / pricing context
-  //   - recipe-library (Profit Recovery): cost-out context
-  // Both write to App.data.menu_items.
+  // App.data.menu_items is the canonical store for everything sellable on the
+  // menu. Each item has an OPTIONAL embedded `recipe` field (ingredients +
+  // plate_yield). Edited from ONE screen: r-menu-items (Revenue Recovery).
+  // Profit Recovery's Recipe Cost Analysis is a read-only ranked view that
+  // bounces back to r-menu-items for any edits.
   //
   // Prep batches (frozen margarita mix, simple syrup, marinara base) are
-  // NOT menu items; they live in App.data.batches as their own concept.
+  // reference data under Inventory Control per Rule 21 — App.inventoryData.
+  // ic_prep_batches. Recipes can use them as ingredients alongside products.
   menuItems() {
     if (!this.data) return [];
     if (!Array.isArray(this.data.menu_items)) this.data.menu_items = [];
@@ -1243,36 +1245,56 @@ const App = {
   menuItemById(id) {
     return this.menuItems().find(m => m.id === id) || null;
   },
-  batches() {
-    if (!this.data) return [];
-    if (!Array.isArray(this.data.batches)) this.data.batches = [];
-    return this.data.batches;
+  prepBatches() {
+    if (!this.inventoryData) return [];
+    if (!Array.isArray(this.inventoryData.ic_prep_batches)) this.inventoryData.ic_prep_batches = [];
+    return this.inventoryData.ic_prep_batches;
   },
+  prepBatchById(id) {
+    return this.prepBatches().find(b => b.id === id) || null;
+  },
+  // Backward-compat alias for sc-86-list and any other consumer still
+  // referencing the old top-level batches array. Resolves to the new
+  // ic_prep_batches home.
+  batches() { return this.prepBatches(); },
 
   // Compute effective cost for a menu item. If item.recipe is set with
   // ingredients, recompute from current product prices (per-pour for bar
-  // products, per-bottle for case beer, unit_cost for kitchen). Otherwise
-  // return the manually-entered cost.
+  // products, per-bottle for case beer, unit_cost for kitchen) or prep
+  // batch cost_per_serving. Otherwise return the manually-entered cost.
+  //
+  // Ingredient row shape: { source: 'product'|'batch', id, quantity }.
+  // Legacy shape { product_id, quantity } is still recognized (treated as
+  // source='product').
   menuItemCost(item) {
     if (!item) return null;
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
-      const isBar = pid => {
-        const p = prods.find(x => x.id === pid);
-        if (!p) return false;
-        return ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
-      };
+      const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
+      const isBar = p => p && ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
+
       const ingCost = ing => {
-        const p = prods.find(x => x.id === ing.product_id);
-        if (!p) return (parseFloat(ing.cost_per_unit) || 0) * (parseFloat(ing.quantity) || 0);
-        // For bar items in a single drink, quantity is in "pours" so use
-        // cost_per_pour. For food items, quantity is in the product's unit
-        // so use unit_cost. Bottle beer case-tracking falls back to bottleCost.
+        const qty = parseFloat(ing.quantity) || 0;
+        const src = ing.source || (ing.product_id ? 'product' : null);
+        const id  = ing.id || ing.product_id;
+        if (!src || !id) return (parseFloat(ing.cost_per_unit) || 0) * qty;
+
+        if (src === 'batch') {
+          const b = batches.find(x => x.id === id);
+          if (!b) return 0;
+          return (b.cost_per_serving || 0) * qty;
+        }
+        // product
+        const p = prods.find(x => x.id === id);
+        if (!p) return (parseFloat(ing.cost_per_unit) || 0) * qty;
         const unitCost = isBar(p)
-          ? (p.cost_per_pour != null ? p.cost_per_pour : (this.bottleCost(p) || 0))
+          ? (item.recipe.mode === 'single'
+              ? (p.cost_per_pour != null ? p.cost_per_pour : (this.bottleCost(p) || 0))
+              : (this.bottleCost(p) != null ? this.bottleCost(p) : (p.unit_cost || 0)))
           : (p.unit_cost || 0);
-        return unitCost * (parseFloat(ing.quantity) || 0);
+        return unitCost * qty;
       };
+
       const tc = item.recipe.ingredients.reduce((s, ing) => s + ingCost(ing), 0);
       if (item.recipe.mode === 'food' && item.recipe.plate_yield > 0) {
         return tc / item.recipe.plate_yield;
@@ -1430,9 +1452,10 @@ const App = {
       const icTitles = {
         'hub':                 ['Recovery Hub', ''],
         'ic-dashboard':        ['Dashboard', 'Inventory Control'],
-        'ic-product-setup':    ['Products', 'Inventory Control'],
-        'ic-locations':        ['Locations', 'Inventory Control'],
-        'ic-vendors':          ['Vendors', 'Inventory Control'],
+        'ic-product-setup':    ['Add Products', 'Inventory Control'],
+        'ic-prep-batches':     ['Prep Batches', 'Inventory Control'],
+        'ic-locations':        ['Set Locations', 'Inventory Control'],
+        'ic-vendors':          ['List Vendors', 'Inventory Control'],
         'ic-take-inventory':   ['Take Inventory', 'Inventory Control'],
         'ic-count-history':    ['Count History', 'Inventory Control'],
         'ic-spot-check':       ['Spot Check', 'Inventory Control'],
@@ -1449,6 +1472,7 @@ const App = {
       const icScreens = {
         'ic-dashboard':      S.InventoryDashboard,
         'ic-product-setup':  S.InventoryProducts,
+        'ic-prep-batches':   S.PrepBatches,
         'ic-locations':      S.InventoryLocations,
         'ic-vendors':        S.InventoryVendors,
         'ic-take-inventory': S.InventoryTakeInventory,
@@ -1585,7 +1609,7 @@ const App = {
       'this-week':     ['This Week', 'Weekly Entry'],
       'bar-products':  ['Bar Products', ''],
       'kitchen-products': ['Kitchen Products', ''],
-      'recipe-library':['Recipe Library', ''],
+      'recipe-cost-analysis':['Recipe Cost Analysis', ''],
       'vendor-watch':  ['Vendor Watch', ''],
       'vendor-scorecard': ['Vendor Scorecard', ''],
       'vendor-discrepancy': ['Vendor Discrepancies', ''],
@@ -1603,7 +1627,7 @@ const App = {
       'this-week':     S.ThisWeek,
       'bar-products':  S.BarProducts,
       'kitchen-products': S.KitchenProducts,
-      'recipe-library':S.RecipeLibrary,
+      'recipe-cost-analysis':S.RecipeCostAnalysis,
       'vendor-watch':  S.VendorWatch,
       'vendor-scorecard': S.VendorScorecard,
       'vendor-discrepancy': S.VendorDiscrepancy,
