@@ -76,7 +76,31 @@ S.ShiftWaste = {
     exportBtn.textContent = 'Export PDF';
     exportBtn.addEventListener('click', () => window.print());
     actions.appendChild(exportBtn);
+    const printBlankBtn = document.createElement('button');
+    printBlankBtn.className = 'btn btn-ghost btn-sm';
+    printBlankBtn.style.marginLeft = '8px';
+    printBlankBtn.textContent = 'Print Blank Sheet';
+    printBlankBtn.addEventListener('click', () => this.printBlank());
+    actions.appendChild(printBlankBtn);
     this.renderList();
+  },
+
+  // ── Print blank sheet — for shift use ─────────────────────────────────
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Waste and Spill Log',
+      subtitle: 'Log every spill, broken bottle, dumped drink, or expired item. Manager enters each row into Bar Cop after shift close.',
+      columns: [
+        { label: 'Time',     width: '10%' },
+        { label: 'Product',  width: '28%' },
+        { label: 'Qty',      width: '8%' },
+        { label: 'Unit',     width: '8%' },
+        { label: 'Reason',   width: '22%' },
+        { label: 'By',       width: '14%' },
+        { label: 'Initials', width: '10%' }
+      ],
+      rows: 20
+    });
   },
 
   renderList() {
