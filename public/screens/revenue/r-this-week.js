@@ -182,25 +182,54 @@ S.RevenueThisWeek = {
     d.notes = v('rw-notes');
   },
 
-  pullRevenue() {
+  // True when the current input differs from the incoming value by enough
+  // to call it a real override (covers integer compare; dollars by 50 cents).
+  _isOverride(id, incoming) {
+    const cur = parseFloat(document.getElementById(id)?.value);
+    if (isNaN(cur) || cur === 0) return false;
+    const inc = parseFloat(incoming);
+    if (isNaN(inc)) return false;
+    const tol = id === 'rw-cov' ? 0.5 : 0.5;
+    return Math.abs(cur - inc) > tol;
+  },
+
+  async pullRevenue() {
     const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
     const sf = this.shiftFeed(pe);
-    if (sf) {
-      const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-      set('rw-brev', sf.bar.toFixed(2));
-      set('rw-frev', sf.floor.toFixed(2));
-      set('rw-cov', sf.covers ? String(sf.covers) : '');
+    if (!sf) return;
+    const incoming = { 'rw-brev': sf.bar, 'rw-frev': sf.floor, 'rw-cov': sf.covers || 0 };
+    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    if (conflicted) {
+      const ok = await App.confirm({
+        title: 'Overwrite your numbers?',
+        message: 'You\'ve already typed values into Bar Revenue, Floor Revenue, or Covers that don\'t match Shift Control. Pulling latest will replace them.',
+        confirmText: 'Overwrite', cancelText: 'Keep Mine'
+      });
+      if (!ok) return;
     }
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    set('rw-brev', sf.bar.toFixed(2));
+    set('rw-frev', sf.floor.toFixed(2));
+    set('rw-cov', sf.covers ? String(sf.covers) : '');
     this.onInput();
   },
-  pullLabor() {
+  async pullLabor() {
     const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
     const lf = this.laborFeed(pe);
-    if (lf) {
-      const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-      set('rw-lhrs', lf.hours.toFixed(2));
-      set('rw-lcost', lf.cost.toFixed(2));
+    if (!lf) return;
+    const incoming = { 'rw-lhrs': lf.hours, 'rw-lcost': lf.cost };
+    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    if (conflicted) {
+      const ok = await App.confirm({
+        title: 'Overwrite your labor numbers?',
+        message: 'Your typed Labor Hours or Labor Cost don\'t match what\'s logged in Labor Control. Pulling latest will replace them.',
+        confirmText: 'Overwrite', cancelText: 'Keep Mine'
+      });
+      if (!ok) return;
     }
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    set('rw-lhrs', lf.hours.toFixed(2));
+    set('rw-lcost', lf.cost.toFixed(2));
     this.onInput();
   },
 
