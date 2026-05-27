@@ -96,7 +96,7 @@ S.ShiftLogShift = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="ls-date" value="' + esc(s?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
       + '<div class="f w-md"><label>Shift Type</label><select id="ls-type">' + typeOpts + '</select></div>'
-      + '<div class="f w-md"><label>Manager</label><input type="text" id="ls-mgr" value="' + esc(s?.manager || '') + '" placeholder="On duty"/></div>'
+      + '<div class="f w-md"><label>Manager on Duty</label><select id="ls-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
@@ -160,7 +160,8 @@ S.ShiftLogShift = {
       id:             this.editId || App.uid(),
       date,
       shift_type:     document.getElementById('ls-type')?.value || '',
-      manager:        document.getElementById('ls-mgr')?.value.trim() || '',
+      manager_id:     document.getElementById('ls-mgr')?.value || '',
+      manager:        (App.staffById(document.getElementById('ls-mgr')?.value) || {}).name || '',
       bar_revenue:    bar,
       floor_revenue:  floor,
       total_revenue:  bar + floor,
