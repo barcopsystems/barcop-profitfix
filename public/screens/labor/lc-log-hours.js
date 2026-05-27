@@ -75,17 +75,21 @@ S.LaborLogHours = {
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + totHours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Labor Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div>';
-      const rows = list.slice(0, 100).map(a => '<tr class="lo-row" data-id="' + a.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
+      const rows = list.slice(0, 100).map(a => {
+        const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
+        const actions = a.locked
+          ? '<span style="font-size:10px;color:var(--t3);">Pay period closed</span>'
+          : (App.canEdit('lc-log-hours') ? '<button class="btn btn-ghost btn-sm lo-edit" data-id="' + a.id + '">Edit</button>' : '')
+            + (App.canEdit('lc-log-hours') ? '<button class="btn btn-danger btn-sm lo-del" data-id="' + a.id + '">Delete</button>' : '');
+        return '<tr class="lo-row" data-id="' + a.id + '" style="cursor:' + (a.locked ? 'default' : 'pointer') + ';">'
+        + '<td><div class="val">' + this.fmtDate(a.date) + lockedBadge + '</div></td>'
         + '<td>' + esc(a.name || '-') + '</td>'
         + '<td>' + esc(a.shift_type || '-') + '</td>'
         + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
         + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td>'
-        + '<td><div class="row-actions">'
-        + (App.canEdit('lc-log-hours') ? '<button class="btn btn-ghost btn-sm lo-edit" data-id="' + a.id + '">Edit</button>' : '')
-        + (App.canEdit('lc-log-hours') ? '<button class="btn btn-danger btn-sm lo-del" data-id="' + a.id + '">Delete</button>' : '')
-        + '</div></td></tr>').join('');
+        + '<td><div class="row-actions">' + actions + '</div></td></tr>';
+      }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
@@ -122,6 +126,17 @@ S.LaborLogHours = {
     if (id && !App.canEdit('lc-log-hours')) return;
     this.editId = id || null;
     const a = id ? this.actuals().find(x => x.id === id) : null;
+    // Phase 5: locked records belong to a closed pay period. Refuse edits
+    // and tell the operator to reopen the period first.
+    if (a && a.locked) {
+      App.confirm({
+        title: 'This entry is locked.',
+        message: 'This record is in a closed pay period. Reopen the period in Pay Periods first, then edit here.',
+        confirmText: 'OK', cancelText: 'Cancel'
+      });
+      this.editId = null;
+      return;
+    }
     const shiftOpts = this.SHIFTS.map(s =>
       '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
     const v = val => (val != null && val !== '') ? val : '';
@@ -138,8 +153,7 @@ S.LaborLogHours = {
       + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Hours</label>'
-      + '<input type="number" id="lo-hours" min="0" step="0.25" value="' + v(a?.hours) + '" '
-      + 'oninput="S.LaborLogHours.calc()"/></div>'
+      + '<input type="number" id="lo-hours" min="0" step="0.25" value="' + v(a?.hours) + '"/></div>'
       + '<div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="lo-notes" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div>'
       + '</div>'
@@ -155,6 +169,8 @@ S.LaborLogHours = {
 
     this.container.onclick = null;
     document.getElementById('lo-staff')?.addEventListener('change', () => this.calc());
+    document.getElementById('lo-date')?.addEventListener('change', () => this.calc());
+    document.getElementById('lo-hours')?.addEventListener('input', () => this.calc());
     document.getElementById('lo-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('lo-save')?.addEventListener('click', () => this.save());
     this.calc();
@@ -162,7 +178,10 @@ S.LaborLogHours = {
 
   calc() {
     const staff = this.staffById(document.getElementById('lo-staff')?.value);
-    const wage = staff && staff.wage != null ? staff.wage : null;
+    const date  = document.getElementById('lo-date')?.value || '';
+    // Wage in effect on the entry's date — handles past-dated entries after
+    // a raise (uses the wage that was in effect on that day, not today's).
+    const wage  = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0)) : null;
     const hours = parseFloat(document.getElementById('lo-hours')?.value) || 0;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('lo-c-wage', wage != null ? App.fmtCurrency(wage) + '/hr' : '-');
@@ -179,7 +198,8 @@ S.LaborLogHours = {
     const hours = parseFloat(document.getElementById('lo-hours')?.value);
     if (isNaN(hours) || hours <= 0) { fail('Enter hours worked.'); return; }
 
-    const wage = staff.wage != null ? staff.wage : 0;
+    // Resolve wage at the date the hours were worked (not today's wage)
+    const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0);
     const rec = {
       id:          this.editId || App.uid(),
       date,
@@ -251,10 +271,11 @@ S.LaborLogHours = {
         skipped.push(r.name || '(blank)');
         return;
       }
-      const wage = staff.wage != null ? staff.wage : 0;
+      const recDate = this.normDate(r.date);
+      const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0);
       this.actuals().push({
         id:          App.uid(),
-        date:        this.normDate(r.date),
+        date:        recDate,
         staff_id:    staff.id,
         name:        staff.name,
         position_id: staff.position_id || '',
@@ -295,6 +316,15 @@ S.LaborLogHours = {
   },
 
   confirmDel(id) {
+    const rec = this.actuals().find(x => x.id === id);
+    if (rec && rec.locked) {
+      App.confirm({
+        title: 'This entry is locked.',
+        message: 'This record is in a closed pay period. Reopen the period in Pay Periods first to delete it.',
+        confirmText: 'OK', cancelText: 'Cancel'
+      });
+      return;
+    }
     this._pendingDelId = id;
     const modal = document.getElementById('lo-del-modal');
     if (modal) modal.style.display = 'flex';
