@@ -204,8 +204,8 @@ S.Shift86List = {
       + '<input type="date" id="e86-date" value="' + esc(i.date_86 || '') + '"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time 86\'d</label>'
       + '<input type="time" id="e86-time" value="' + esc(i.time_86 || '') + '"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Reported By</label>'
-      + '<input type="text" id="e86-by" value="' + esc(i.reported_by || '') + '" placeholder="Name"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reported By</label>'
+      + '<select id="e86-by">' + App.staffOptions(i.reported_by_id || i.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Reason</label>'
       + '<input type="text" id="e86-reason" value="' + esc(i.reason || '') + '" placeholder="Optional"/></div></div>'
@@ -237,7 +237,8 @@ S.Shift86List = {
         category:    document.getElementById('e86-cat')?.value || 'Other',
         date_86:     document.getElementById('e86-date')?.value || list[i].date_86,
         time_86:     document.getElementById('e86-time')?.value || '',
-        reported_by: document.getElementById('e86-by')?.value.trim() || '',
+        reported_by_id: document.getElementById('e86-by')?.value || '',
+        reported_by:    (App.staffById(document.getElementById('e86-by')?.value) || {}).name || '',
         reason:      document.getElementById('e86-reason')?.value.trim() || '',
         notes:       document.getElementById('e86-notes')?.value.trim() || ''
       };
