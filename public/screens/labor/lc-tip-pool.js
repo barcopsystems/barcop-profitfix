@@ -20,8 +20,15 @@ S.LaborTipPool = {
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
   tips() { return ((App.laborData && App.laborData.lc_tips) || []); },
+  actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
+  // Pull hours worked for a staff member on a given date from lc_actuals.
+  hoursFor(staffId, date) {
+    if (!staffId || !date) return null;
+    const a = this.actuals().find(x => x.staff_id === staffId && x.date === date);
+    return a ? (a.hours_actual || a.hours_scheduled || null) : null;
+  },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -60,7 +67,7 @@ S.LaborTipPool = {
       + '<input type="number" class="tp-hours" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"'
       + (equal ? ' disabled' : '') + '/></div>'
       + '<div class="f" style="flex:1;min-width:130px;"><label>&nbsp;</label>'
-      + '<div class="tp-share" style="font-size:15px;font-weight:600;font-family:\'Barlow Condensed\';color:var(--gold);padding-bottom:6px;">—</div></div>'
+      + '<div class="tp-share" style="font-size:15px;font-weight:600;font-family:\'Barlow Condensed\';color:var(--gold);padding-bottom:6px;">-</div></div>'
       + '<button class="btn btn-ghost btn-sm tp-remove" style="margin-bottom:6px;">Remove</button>'
       + '</div>').join('');
 
@@ -97,7 +104,25 @@ S.LaborTipPool = {
 
     const rowsEl = document.getElementById('tp-rows');
     rowsEl.addEventListener('input', () => { this.collect(); this.recalc(); });
-    rowsEl.addEventListener('change', () => { this.collect(); this.recalc(); });
+    rowsEl.addEventListener('change', ev => {
+      this.collect();
+      // When the staff dropdown on a row changes, auto-fill that row's hours
+      // from lc_actuals if the hours input is empty. Operator can still
+      // override afterwards for tipped-vs-non-tipped hour adjustments.
+      if (ev.target.classList && ev.target.classList.contains('tp-staff')) {
+        const row = ev.target.closest('.tp-row');
+        const idx = row ? parseInt(row.dataset.idx, 10) : -1;
+        const hoursInp = row?.querySelector('.tp-hours');
+        if (idx >= 0 && hoursInp && !hoursInp.value && this.date) {
+          const hrs = this.hoursFor(ev.target.value, this.date);
+          if (hrs != null && hrs > 0) {
+            hoursInp.value = hrs;
+            if (this.rows[idx]) this.rows[idx].hours = hrs;
+          }
+        }
+      }
+      this.recalc();
+    });
     rowsEl.addEventListener('click', ev => {
       if (ev.target.closest('.tp-remove')) {
         this.collect();
@@ -115,7 +140,12 @@ S.LaborTipPool = {
       this.method = e.target.value;
       this.renderMain();
     });
-    document.getElementById('tp-date')?.addEventListener('change', e => { this.date = e.target.value; });
+    document.getElementById('tp-date')?.addEventListener('change', e => {
+      this.date = e.target.value;
+      // Auto-load tip log for the new date — operator doesn't have to press
+      // a button to do the obvious next step.
+      this.loadFromTipLog(true);
+    });
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
     this.container.onclick = ev => {
@@ -144,24 +174,32 @@ S.LaborTipPool = {
     }
   },
 
-  loadFromTipLog() {
+  // Load participants + pool amount from the tip log entries for the current
+  // date. If quiet=true, silently no-op when no entries exist (used for the
+  // date-change auto-load so it doesn't pop an error every time). Hours
+  // auto-fill from lc_actuals when the tip-log entry didn't capture them.
+  loadFromTipLog(quiet) {
     this.collect();
     const date = this.date;
     const dayTips = this.tips().filter(t => t.date === date);
     if (dayTips.length === 0) {
-      const err = document.getElementById('tp-err');
-      if (err) { err.textContent = 'No tip log entries found for ' + this.fmtDate(date) + '.'; err.style.display = 'inline'; }
+      if (!quiet) {
+        const err = document.getElementById('tp-err');
+        if (err) { err.textContent = 'No tip log entries found for ' + this.fmtDate(date) + '.'; err.style.display = 'inline'; }
+      }
       return;
     }
     const pool = dayTips.reduce((t, x) => t + (x.total_tips || 0), 0);
     this.pool = pool ? String(pool) : '';
-    // one participant row per staff member with a tip-log entry that day
+    // One participant row per staff member with a tip-log entry that day.
+    // Hours come from the tip-log entry first, then fall back to lc_actuals.
     const seen = {};
     this.rows = [];
     dayTips.forEach(t => {
       if (!t.staff_id || seen[t.staff_id]) return;
       seen[t.staff_id] = true;
-      this.rows.push({ staff_id: t.staff_id, hours: t.hours != null ? t.hours : '' });
+      const hrs = (t.hours != null && t.hours > 0) ? t.hours : (this.hoursFor(t.staff_id, date) || '');
+      this.rows.push({ staff_id: t.staff_id, hours: hrs });
     });
     this.renderMain();
   },
@@ -192,7 +230,7 @@ S.LaborTipPool = {
       const s = shares[i];
       if (!s) return;
       const shareEl = el.querySelector('.tp-share');
-      if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share) : '—';
+      if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share) : '-';
       alloc += s.share;
       totalHours += s.hours;
       if (s.staff_id) count++;
@@ -226,9 +264,18 @@ S.LaborTipPool = {
       return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share };
     });
 
+    // Auto-link to a shift if the pool's date matches one. Prefer the most
+    // recent matching shift. Lets Form 8027 + Tip History group pool splits
+    // by shift the same way the Shift Close wizard does.
+    const matchShift = ((App.shiftData?.sc_shifts) || [])
+      .filter(sh => sh.date === this.date)
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+
     const rec = {
       id:          App.uid(),
+      shift_id:    matchShift ? matchShift.id : '',
       date:        this.date,
+      shift_type:  matchShift ? (matchShift.shift_type || '') : '',
       method:      this.method,
       pool_amount: pool,
       total_hours: totalHours,
@@ -276,8 +323,8 @@ S.LaborTipPool = {
     document.getElementById('tp-export')?.addEventListener('click', () => window.print());
 
     const rows = (p.participants || []).map(pt => '<tr>'
-      + '<td><div class="val">' + esc(pt.name || '—') + '</div></td>'
-      + '<td>' + (pt.hours != null ? pt.hours : '—') + '</td>'
+      + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
+      + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
       + '<td class="val">' + App.fmtCurrency(pt.share || 0) + '</td></tr>').join('');
 
     this.container.innerHTML = '<div class="screen">'
