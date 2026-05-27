@@ -68,8 +68,10 @@ S.InventoryTransfers = {
 
   renderList() {
     this.editId = null;
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>';
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" id="tr-print-blank" style="margin-left:8px;">Print Blank Sheet</button>';
     document.getElementById('tr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
 
     if (this.products().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -357,5 +359,24 @@ S.InventoryTransfers = {
     App.inventoryData.ic_transfers = this.transfers().filter(x => x.id !== id);
     await App.saveInventory();
     this.renderList();
+  },
+
+  // ── Print blank sheet — for shift use ─────────────────────────────────
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Transfer Log',
+      subtitle: 'Log every product moved between locations during the shift. Manager enters each row into Bar Cop after close.',
+      columns: [
+        { label: 'Time',          width: '10%' },
+        { label: 'Product',       width: '24%' },
+        { label: 'Qty',           width: '8%' },
+        { label: 'Unit',          width: '8%' },
+        { label: 'From',          width: '15%' },
+        { label: 'To',            width: '15%' },
+        { label: 'By',            width: '12%' },
+        { label: 'Witnessed',     width: '8%' }
+      ],
+      rows: 20
+    });
   }
 };
