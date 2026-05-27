@@ -63,8 +63,8 @@ S.HubGettingStarted = {
     // ── Phase 4: Weekly Work — the operational rhythm from week one onward
     { group:'weekly', id:'gs_p_week', screen:'this-week',
       label:'Confirm your first week in Profit This Week. Most figures auto-fill from your Control modules.' },
-    { group:'weekly', id:'gs_p_recipes', screen:'recipe-library',
-      label:'Cost your top recipes in Recipe Library.' },
+    { group:'weekly', id:'gs_p_recipes', screen:'r-menu-items',
+      label:'Cost your top menu items with ingredient recipes in Menu Items.' },
     { group:'weekly', id:'gs_p_fix', screen:'profit-fix',
       label:'Open Profit Fix and walk the fix process for your biggest gap area.' },
     { group:'weekly', id:'gs_r_menu', screen:'r-menu-items',
