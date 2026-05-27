@@ -354,6 +354,10 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Weekly Summary</span>
       </div>
+      <div class="nav-item" data-screen="lc-pay-periods" id="nav-lc-pay-periods">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M6 11h2M10 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Pay Periods</span>
+      </div>
       <div class="nav-section">Tips</div>
       <div class="nav-item" data-screen="lc-tip-log" id="nav-lc-tip-log">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M5.5 5h5a2 2 0 0 1 0 4H6a2 2 0 0 0 0 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
