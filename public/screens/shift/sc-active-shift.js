@@ -26,7 +26,7 @@ S.ShiftActiveShift = {
     return ((App.shiftData && App.shiftData[key]) || []).filter(r => r.date === date);
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   },
@@ -156,6 +156,7 @@ S.ShiftActiveShift = {
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + action('sc-cash-drop', 'Cash Drop')
       + action('sc-void-comp', 'Void / Comp')
+      + action('sc-waste', 'Waste / Spill')
       + action('sc-86-list', '86 an Item')
       + action('sc-safe-log', 'Safe Log')
       + action('sc-maintenance', 'Maintenance')
@@ -194,8 +195,8 @@ S.ShiftActiveShift = {
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="ae-notes" rows="2" placeholder="Optional">' + esc(s.notes || '') + '</textarea></div></div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val good" id="ae-total">—</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="ae-check">—</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val good" id="ae-total">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="ae-check">-</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="ae-close">Close Shift</button>'
@@ -216,7 +217,7 @@ S.ShiftActiveShift = {
     const covers = num('ae-covers');
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     set('ae-total', App.fmtCurrency(total));
-    set('ae-check', covers > 0 ? App.fmtCurrency(total / covers) : '—');
+    set('ae-check', covers > 0 ? App.fmtCurrency(total / covers) : '-');
   },
 
   async closeShift(s) {
