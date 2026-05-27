@@ -1472,6 +1472,8 @@ const App = {
         'ic-count-history':    ['Count History', 'Inventory Control'],
         'ic-spot-check':       ['Spot Check', 'Inventory Control'],
         'ic-transfers':        ['Transfer Log', 'Inventory Control'],
+        'ic-empties':          ['Empties Log', 'Inventory Control'],
+        'ic-par-suggestions':  ['Par Suggestions', 'Inventory Control'],
         'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
         'ic-delivery-history': ['Delivery History', 'Inventory Control'],
         'ic-order-sheet':      ['Order Sheet', 'Inventory Control'],
@@ -1492,6 +1494,8 @@ const App = {
         'ic-count-history':  S.InventoryCountHistory,
         'ic-spot-check':     S.InventorySpotCheck,
         'ic-transfers':      S.InventoryTransfers,
+        'ic-empties':        S.InventoryEmpties,
+        'ic-par-suggestions': S.InventoryParSuggestions,
         'ic-receive-delivery': S.InventoryReceiveDelivery,
         'ic-delivery-history': S.InventoryDeliveryHistory,
         'ic-order-sheet':     S.InventoryOrderSheet,
@@ -1827,6 +1831,61 @@ const App = {
     // entry is what the staff member earned at that time.
     const oldest = history[history.length - 1];
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
+  },
+
+  // Print a blank log sheet — opens a new tab with a styled HTML form,
+  // ~20 blank rows by default, then auto-fires window.print(). For the
+  // bar/restaurant operator workflow: print before shift, staff fills the
+  // sheet by hand during service, manager enters into the app after close.
+  // Usage: App.printBlankSheet({ title, subtitle, columns: [{label, width?}], rows? });
+  printBlankSheet(opts) {
+    opts = opts || {};
+    const title    = opts.title    || 'Log Sheet';
+    const subtitle = opts.subtitle || '';
+    const cols     = opts.columns  || [];
+    const rows     = opts.rows     || 20;
+    const barName  = (this.data?.settings?.bar_name) || '';
+    const when     = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    const headerRow = cols.map(c =>
+      '<th style="border:1px solid #888;padding:6px 8px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;text-align:left;background:#f0f0f0;' + (c.width ? 'width:' + c.width + ';' : '') + '">' + (c.label || '') + '</th>'
+    ).join('');
+    const blankCells = cols.map(c =>
+      '<td style="border:1px solid #888;padding:14px 8px;' + (c.width ? 'width:' + c.width + ';' : '') + '">&nbsp;</td>'
+    ).join('');
+    const blankRows = Array.from({ length: rows }, () => '<tr>' + blankCells + '</tr>').join('');
+
+    const html = '<!DOCTYPE html><html><head><title>' + title + ' — Blank Sheet</title>'
+      + '<style>'
+      + '@page { margin: 0.4in; }'
+      + 'body { font-family: Arial, sans-serif; color:#000; margin:0; padding:0; }'
+      + 'h1 { font-size:18px; margin:0 0 4px 0; letter-spacing:0.5px; }'
+      + '.sub { font-size:11px; color:#444; margin-bottom:12px; }'
+      + '.meta { display:flex; gap:24px; font-size:11px; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid #888; }'
+      + 'table { width:100%; border-collapse:collapse; }'
+      + '.footer { margin-top:14px; font-size:10px; color:#666; }'
+      + '@media print { .noprint { display:none; } }'
+      + '</style></head><body>'
+      + '<h1>' + esc(title) + '</h1>'
+      + (subtitle ? '<div class="sub">' + esc(subtitle) + '</div>' : '')
+      + '<div class="meta">'
+      + (barName ? '<div><strong>' + esc(barName) + '</strong></div>' : '')
+      + '<div>Date: ' + esc(when) + '</div>'
+      + '<div>Sheet completed by: ____________________</div>'
+      + '</div>'
+      + '<table>'
+      + '<thead><tr>' + headerRow + '</tr></thead>'
+      + '<tbody>' + blankRows + '</tbody>'
+      + '</table>'
+      + '<div class="footer">Enter completed entries into Bar Cop after shift close.</div>'
+      + '<script>setTimeout(function(){ window.print(); }, 100);<\/script>'
+      + '</body></html>';
+
+    const w = window.open('', '_blank');
+    if (!w) { alert('Pop-up blocked. Allow pop-ups for this site to print log sheets.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
   },
 
   // In-app confirmation modal — replaces window.confirm() so dialogs match
