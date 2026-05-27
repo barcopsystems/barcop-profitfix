@@ -352,7 +352,7 @@ S.Shift86List = {
       .sort((a, b) => new Date(b.created_at || b.date_86).getTime() - new Date(a.created_at || a.date_86).getTime());
     const back = all.filter(i => i.status === 'Back')
       .sort((a, b) => new Date(b.date_back || b.created_at || 0).getTime() - new Date(a.date_back || a.created_at || 0).getTime())
-      .slice(0, 12);
+      .slice(0, 50);
 
     let activeCards;
     if (active.length === 0) {
