@@ -1258,16 +1258,30 @@ const App = {
   // ic_prep_batches home.
   batches() { return this.prepBatches(); },
 
-  // Compute effective cost for a menu item. If item.recipe is set with
-  // ingredients, recompute from current product prices (per-pour for bar
-  // products, per-bottle for case beer, unit_cost for kitchen) or prep
-  // batch cost_per_serving. Otherwise return the manually-entered cost.
+  // Compute effective cost for a menu item. Priority order:
+  //   1. linked_product_id  → bottle/unit cost from the linked IC product
+  //                            (used for Beer/Wine/NA — direct-pour items)
+  //   2. recipe.ingredients → sum of ingredient costs at current prices
+  //                            (used for cocktails / food plates)
+  //   3. manual item.cost   → operator-typed fallback (Other category)
   //
   // Ingredient row shape: { source: 'product'|'batch', id, quantity }.
-  // Legacy shape { product_id, quantity } is still recognized (treated as
-  // source='product').
+  // Legacy shape { product_id, quantity } is still recognized.
   menuItemCost(item) {
     if (!item) return null;
+
+    // Linked product takes priority. For Bottle Beer with case_size,
+    // bottleCost handles the per-case → per-bottle conversion.
+    if (item.linked_product_id) {
+      const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+      const p = prods.find(x => x.id === item.linked_product_id);
+      if (p) {
+        const bc = this.bottleCost ? this.bottleCost(p) : null;
+        if (bc != null) return bc;
+        return p.unit_cost || 0;
+      }
+    }
+
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
