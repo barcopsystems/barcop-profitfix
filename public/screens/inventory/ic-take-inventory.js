@@ -115,7 +115,8 @@ S.InventoryTakeInventory = {
       + '<div class="card"><div class="card-title">Start an Inventory Count</div>'
       + locPicker
       + '<div class="form-row" style="gap:16px;margin-top:14px;">'
-      + '<div class="f w-md"><label>Counted By</label><input type="text" id="ti-by" placeholder="Optional"/></div>'
+      + '<div class="f w-md"><label>Counted By</label>'
+      + '<select id="ti-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="card-actions">'
       + (locs.length > 0 ? '<button class="btn btn-primary" id="ti-start">Start Count</button>' : '')
@@ -182,10 +183,13 @@ S.InventoryTakeInventory = {
     const isFull = picked.length === allLocs.length && allLocs.length > 0;
     const type = isFull ? 'Full' : (picked.length === 1 ? picked[0] : 'Multi-Location');
 
+    const counterId = document.getElementById('ti-by')?.value || '';
+    const counterName = (App.staffById(counterId) || {}).name || '';
     this.draft = {
       type,
       custom_locations: picked,
-      counted_by: document.getElementById('ti-by')?.value.trim() || '',
+      counted_by_id: counterId,
+      counted_by: counterName,
       counts: {},
       started_at: new Date().toISOString(),
       _view: 'counting',
@@ -479,7 +483,8 @@ S.InventoryTakeInventory = {
       id:          App.uid(),
       date:        new Date().toISOString().slice(0, 10),
       type:        this.draft.type,
-      counted_by:  this.draft.counted_by || '',
+      counted_by_id: this.draft.counted_by_id || '',
+      counted_by:  this.draft.counted_by || (App.staffById(this.draft.counted_by_id) || {}).name || '',
       locations:   [...new Set(rows.map(r => r.p.primary_location || 'Unassigned'))],
       items,
       item_count:  items.length,
