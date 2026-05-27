@@ -9,7 +9,7 @@ S.LaborLogHours = {
   editId: null,
   _pendingDelId: null,
   mode: 'list',
-  SHIFTS: ['', 'Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+  get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
   actuals() {
     if (!App.laborData) App.laborData = {};
