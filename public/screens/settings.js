@@ -1818,14 +1818,26 @@ S.HubSettings = {
     });
     App.laborData.lc_tips = lcTips;
 
-    // ── Tip pools — three recent close-outs, split by hours ──
+    // ── Tip pools — three recent close-outs, split by hours, linked to shifts.
+    // Phase 3: shift_id ties each pool to the closing shift so Books Form 8027
+    // pulls per-employee taxable allocations from the pool split (not the raw
+    // tip log), and Tip History can group by shift.
     const mkPool = (d, amount) => {
+      const poolDate = dateStr(d);
+      const matched = scShifts.find(s => s.date === poolDate);
       const parts = lcTipped.map(st => ({ staff_id:st.id, name:st.name,
         hours:posNameOf(st.position_id) === 'Server' ? 5 : 7 }));
       const totH = parts.reduce((s, p) => s + p.hours, 0);
       parts.forEach(p => p.share = +(amount * p.hours / totH).toFixed(2));
-      return { id:uid(), date:dateStr(d), method:'hours', pool_amount:amount,
-        total_hours:totH, participants:parts, created_at:daysAgoISO(d) };
+      return { id:uid(),
+        shift_id:    matched ? matched.id : '',
+        date:        poolDate,
+        shift_type:  matched ? (matched.shift_type || '') : 'Dinner',
+        method:      'hours',
+        pool_amount: amount,
+        total_hours: totH,
+        participants: parts,
+        created_at:  daysAgoISO(d) };
     };
     App.laborData.lc_tip_pools = [ mkPool(4, 980), mkPool(11, 1120), mkPool(18, 1040) ];
 
