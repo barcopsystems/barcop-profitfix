@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Inventory Control — Par Suggestions ──────────────────────────────────────
+/* ── Inventory Control — Dynamic Pars ─────────────────────────────────────────
    Dynamic par recommendations from real usage. Operator's biggest cash-flow
    leak is over-ordering (dead stock tying up cash, spoilage in the kitchen).
    This screen surfaces a suggested par for each product based on:
