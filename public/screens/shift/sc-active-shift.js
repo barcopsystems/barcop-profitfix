@@ -382,19 +382,27 @@ S.ShiftActiveShift = {
   },
 
   // ── Step 4: Tip Reconciliation ────────────────────────────────────────────
-  // Phase 2 stub. Phase 3 will auto-fire the Tip Pool calc from this step
-  // using the shift's logged staff. For now we surface the numbers and link
-  // to the existing Tip Pool screen so the operator can still reconcile.
+  // Tips logged via Labor Control roll up here. POS variance gets captured.
+  // The Tip Pool Calculator is INLINE — participants pre-load from the
+  // shift's logged tip entries (with hours from lc_actuals), so the operator
+  // splits the pool right here without leaving the wizard. Save Pool writes
+  // an lc_tip_pools record with shift_id, linking it permanently to this shift.
   stepTips(s) {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
-    const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || t.date === s.date);
+    const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
     const tipsTotal = tips.reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0);
     const tipsCash  = tips.reduce((t, r) => t + (parseFloat(r.cash_tips) || 0), 0);
     const tipsCard  = tips.reduce((t, r) => t + (parseFloat(r.card_tips) || 0), 0);
 
+    // Hydrate the pool draft. If a saved pool already exists for this shift,
+    // load it. Otherwise build from logged tips (with lc_actuals hours).
+    this._ensurePoolDraft(s, tips, tipsTotal);
+    const pool = d.pool;
+    const savedExisting = !!pool.saved_id;
+
     return '<div class="card"><div class="card-title">Step 4 of 5 &middot; Tip Reconciliation</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Tips logged in Labor Control for this shift roll up here. Enter the total tips your POS reported so the variance is on record.</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Tips logged in Labor Control for this shift roll up here. Enter the total tips your POS reported, then split the pool with the inline calculator below.</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Logged Cash Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCash) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Logged Card Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCard) + '</div></div>'
@@ -407,10 +415,232 @@ S.ShiftActiveShift = {
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Variance vs Logged</label>'
           + '<div class="calc-val" id="aw-tip-var" style="height:44px;display:flex;align-items:center;">-</div></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.6;">Need to split the pool? Open the Tip Pool Calculator and the entries for tonight will be loadable there. Phase 3 will auto-fire the pool from this step.</div>'
-      + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="aw-tip-pool">Open Tip Pool Calculator</button></div>'
+
+      // Inline Tip Pool Calculator
+      + '<div style="border-top:1px solid var(--b2);margin-top:18px;padding-top:18px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">'
+          + '<div>'
+            + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Tip Pool Split</div>'
+            + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (savedExisting ? 'Pool saved. Edit below to update.' : 'Splits the pool across the staff who worked this shift.') + '</div>'
+          + '</div>'
+        + '</div>'
+
+        + '<div class="form-row" style="gap:16px;">'
+          + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
+            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="aw-pool-amount" min="0" step="0.01" value="' + esc(pool.amount || '') + '"/></div></div>'
+          + '<div class="f" style="width:170px;flex-shrink:0;"><label>Method</label>'
+            + '<select id="aw-pool-method"><option value="hours"' + (pool.method === 'hours' ? ' selected' : '') + '>By Hours Worked</option>'
+            + '<option value="equal"' + (pool.method === 'equal' ? ' selected' : '') + '>Equal Split</option></select></div>'
+        + '</div>'
+
+        + '<div id="aw-pool-rows" style="margin-top:8px;"></div>'
+        + '<button class="btn btn-ghost btn-sm" id="aw-pool-add" style="margin-top:8px;">+ Add Participant</button>'
+
+        + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+          + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="aw-pool-count">0</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val" id="aw-pool-hours">0</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="aw-pool-alloc">$0</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="aw-pool-rem">$0</div></div>'
+        + '</div>'
+
+        + '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">'
+          + '<button class="btn btn-primary btn-sm" id="aw-pool-save">' + (savedExisting ? 'Update Pool' : 'Save Pool') + '</button>'
+          + '<span id="aw-pool-status" style="font-size:11px;color:var(--gold);' + (savedExisting ? '' : 'display:none;') + '">Pool saved for this shift.</span>'
+          + '<span id="aw-pool-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+        + '</div>'
+      + '</div>'
+
       + '<div class="card-actions"><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button></div>'
     + '</div>';
+  },
+
+  // ── Pool draft helpers ────────────────────────────────────────────────────
+  _ensurePoolDraft(s, tips, tipsTotal) {
+    const d = this._closeDraft;
+    if (d.pool) return; // already hydrated for this wizard run
+
+    const existing = ((App.laborData && App.laborData.lc_tip_pools) || []).find(p => p.shift_id === s.id);
+    if (existing) {
+      d.pool = {
+        method:        existing.method || 'hours',
+        amount:        String(existing.pool_amount || ''),
+        participants:  (existing.participants || []).map(p => ({ staff_id: p.staff_id, name: p.name, hours: p.hours, share: p.share })),
+        saved_id:      existing.id
+      };
+      return;
+    }
+
+    // Fresh draft. Participants come from: tips logged for this shift (most
+    // accurate — those are the tipped staff). Fall back to lc_actuals filtered
+    // to this shift's date if no tips logged yet.
+    const actuals = ((App.laborData && App.laborData.lc_actuals) || []).filter(a => a.date === s.date);
+    const staffMap = new Map();
+    tips.forEach(t => {
+      if (!t.staff_id) return;
+      const hrs = (t.hours != null && t.hours > 0)
+        ? t.hours
+        : (actuals.find(a => a.staff_id === t.staff_id) || {});
+      const hoursVal = (typeof hrs === 'number') ? hrs : (hrs.hours_actual || hrs.hours_scheduled || 0);
+      if (!staffMap.has(t.staff_id)) staffMap.set(t.staff_id, { staff_id: t.staff_id, name: t.name, hours: hoursVal || 0, share: 0 });
+    });
+    // If no tip entries at all, fall back to staff who clocked in
+    if (staffMap.size === 0) {
+      actuals.forEach(a => {
+        if (!a.staff_id) return;
+        const staff = (App.laborData?.lc_staff || []).find(x => x.id === a.staff_id);
+        staffMap.set(a.staff_id, { staff_id: a.staff_id, name: staff?.name || '', hours: a.hours_actual || a.hours_scheduled || 0, share: 0 });
+      });
+    }
+
+    d.pool = {
+      method:        'hours',
+      amount:        tipsTotal > 0 ? String(tipsTotal.toFixed(2)) : '',
+      participants:  [...staffMap.values()],
+      saved_id:      ''
+    };
+  },
+
+  // Render the participant rows for the inline pool. Same shape as standalone
+  // calculator, just wired into the wizard's IDs.
+  renderPoolRows() {
+    const area = document.getElementById('aw-pool-rows');
+    if (!area) return;
+    const d = this._closeDraft;
+    const pool = d.pool;
+    if (!pool) return;
+    const equal = pool.method === 'equal';
+    const allStaff = (App.laborData?.lc_staff || []).filter(s => s.status !== 'Inactive');
+    const staffOpts = sel => '<option value="">Select staff...</option>'
+      + allStaff.map(s => '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+
+    area.innerHTML = pool.participants.map((r, i) =>
+      '<div class="aw-pool-row" data-idx="' + i + '" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px solid var(--b1);border-radius:4px;margin-bottom:6px;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
+        + '<select class="aw-pool-staff">' + staffOpts(r.staff_id) + '</select></div>'
+      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Hours</label>'
+        + '<input type="number" class="aw-pool-hours" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + '/></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Share</label>'
+        + '<div class="aw-pool-share" style="font-size:15px;font-weight:600;font-family:\'Barlow Condensed\';color:var(--gold);padding-bottom:6px;">' + (r.share > 0 ? App.fmtCurrency(r.share) : '-') + '</div></div>'
+      + '<button class="btn btn-ghost btn-sm aw-pool-remove" style="margin-bottom:6px;">Remove</button>'
+      + '</div>'
+    ).join('') || '<div style="font-size:11px;color:var(--t3);padding:6px 0;">No participants yet. Click + Add Participant.</div>';
+  },
+
+  collectPool() {
+    const d = this._closeDraft;
+    if (!d.pool) return;
+    d.pool.amount = document.getElementById('aw-pool-amount')?.value || '';
+    d.pool.method = document.getElementById('aw-pool-method')?.value || 'hours';
+    const rows = [...document.querySelectorAll('.aw-pool-row')];
+    if (rows.length) {
+      d.pool.participants = rows.map(el => ({
+        staff_id: el.querySelector('.aw-pool-staff')?.value || '',
+        name:     (App.laborData?.lc_staff || []).find(s => s.id === (el.querySelector('.aw-pool-staff')?.value || ''))?.name || '',
+        hours:    parseFloat(el.querySelector('.aw-pool-hours')?.value) || 0,
+        share:    0
+      }));
+    }
+  },
+
+  computePoolShares() {
+    const d = this._closeDraft;
+    if (!d.pool) return;
+    const pool = d.pool;
+    const amount = parseFloat(pool.amount) || 0;
+    const equal = pool.method === 'equal';
+    const valid = pool.participants.filter(p => p.staff_id);
+    let totalHours = 0;
+    pool.participants.forEach(p => { totalHours += parseFloat(p.hours) || 0; });
+    pool.participants.forEach(p => {
+      if (!p.staff_id) { p.share = 0; return; }
+      if (equal) p.share = valid.length > 0 ? amount / valid.length : 0;
+      else {
+        const h = parseFloat(p.hours) || 0;
+        p.share = totalHours > 0 ? amount * (h / totalHours) : 0;
+      }
+    });
+  },
+
+  refreshPoolCalc() {
+    this.collectPool();
+    this.computePoolShares();
+    const d = this._closeDraft;
+    const pool = d.pool;
+    if (!pool) return;
+    // Update share displays in-place without re-rendering the rows (preserves
+    // input focus while the operator types).
+    const rows = [...document.querySelectorAll('.aw-pool-row')];
+    rows.forEach((el, i) => {
+      const p = pool.participants[i];
+      if (!p) return;
+      const sh = el.querySelector('.aw-pool-share');
+      if (sh) sh.textContent = p.share > 0 ? App.fmtCurrency(p.share) : '-';
+    });
+    const amount = parseFloat(pool.amount) || 0;
+    const alloc = pool.participants.reduce((s, p) => s + (p.share || 0), 0);
+    const totalHours = pool.participants.reduce((s, p) => s + (parseFloat(p.hours) || 0), 0);
+    const count = pool.participants.filter(p => p.staff_id).length;
+    const rem = amount - alloc;
+    const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    set('aw-pool-count', count);
+    set('aw-pool-hours', totalHours.toFixed(2).replace(/\.00$/, ''));
+    set('aw-pool-alloc', App.fmtCurrency(alloc));
+    set('aw-pool-rem', App.fmtCurrency(rem), Math.abs(rem) > 0.01 ? 'warn' : 'good');
+  },
+
+  async savePoolInline(s) {
+    this.collectPool();
+    this.computePoolShares();
+    const d = this._closeDraft;
+    const pool = d.pool;
+    if (!pool) return;
+    const err = document.getElementById('aw-pool-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+
+    const amount = parseFloat(pool.amount) || 0;
+    if (amount <= 0) { fail('Enter the pool amount.'); return; }
+    const valid = pool.participants.filter(p => p.staff_id);
+    if (valid.length === 0) { fail('Add at least one participant.'); return; }
+    if (pool.method === 'hours' && valid.every(p => (parseFloat(p.hours) || 0) <= 0)) {
+      fail('Enter hours for the hours-based split.'); return;
+    }
+    if (err) err.style.display = 'none';
+
+    const totalHours = valid.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0);
+    const rec = {
+      id:          pool.saved_id || App.uid(),
+      shift_id:    s.id,
+      date:        s.date,
+      shift_type:  s.shift_type || '',
+      method:      pool.method,
+      pool_amount: amount,
+      total_hours: totalHours,
+      participants: valid.map(p => ({ staff_id: p.staff_id, name: p.name, hours: parseFloat(p.hours) || 0, share: p.share || 0 })),
+      updated_at:  new Date().toISOString(),
+      created_at:  pool.saved_id ? undefined : new Date().toISOString()
+    };
+
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_tip_pools)) App.laborData.lc_tip_pools = [];
+    const list = App.laborData.lc_tip_pools;
+    if (pool.saved_id) {
+      const i = list.findIndex(x => x.id === pool.saved_id);
+      if (i > -1) list[i] = { ...list[i], ...rec };
+    } else {
+      list.push(rec);
+    }
+    pool.saved_id = rec.id;
+
+    const btn = document.getElementById('aw-pool-save');
+    const status = document.getElementById('aw-pool-status');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.saveLabor();
+    if (btn) { btn.disabled = false; btn.textContent = 'Update Pool'; }
+    if (ok) {
+      if (status) { status.textContent = 'Pool saved for this shift.'; status.style.display = 'inline'; }
+    } else {
+      fail('Save failed. Try again.');
+    }
   },
 
   // ── Step 5: Handoff Notes + Final Close ───────────────────────────────────
@@ -524,10 +754,10 @@ S.ShiftActiveShift = {
       }));
     }
 
-    // Step 4: live tip variance + Tip Pool link
+    // Step 4: live tip variance + inline Tip Pool calculator
     if (d.step === 'tips') {
-      const recalc = () => {
-        const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || t.date === s.date);
+      const recalcVar = () => {
+        const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
         const tipsTotal = tips.reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0);
         const pos = parseFloat(document.getElementById('aw-pos-tips')?.value) || 0;
         const variance = pos - tipsTotal;
@@ -537,9 +767,38 @@ S.ShiftActiveShift = {
           el.style.color = pos > 0 ? (Math.abs(variance) < 5 ? 'var(--gold)' : 'var(--red)') : '';
         }
       };
-      document.getElementById('aw-pos-tips')?.addEventListener('input', recalc);
-      document.getElementById('aw-tip-pool')?.addEventListener('click', () => App.navigate('lc-tip-pool'));
-      recalc();
+      document.getElementById('aw-pos-tips')?.addEventListener('input', recalcVar);
+      recalcVar();
+
+      // Inline pool calculator wiring
+      this.renderPoolRows();
+      this.refreshPoolCalc();
+
+      // Pool inputs delegate listeners (per-row + amount/method)
+      const rowsEl = document.getElementById('aw-pool-rows');
+      rowsEl?.addEventListener('input', () => this.refreshPoolCalc());
+      rowsEl?.addEventListener('change', () => this.refreshPoolCalc());
+      rowsEl?.addEventListener('click', ev => {
+        if (ev.target.closest('.aw-pool-remove')) {
+          this.collectPool();
+          d.pool.participants.splice(parseInt(ev.target.closest('.aw-pool-row').dataset.idx, 10), 1);
+          this.renderPoolRows();
+          this.refreshPoolCalc();
+        }
+      });
+      document.getElementById('aw-pool-add')?.addEventListener('click', () => {
+        this.collectPool();
+        d.pool.participants.push({ staff_id: '', name: '', hours: 0, share: 0 });
+        this.renderPoolRows();
+        this.refreshPoolCalc();
+      });
+      document.getElementById('aw-pool-amount')?.addEventListener('input', () => this.refreshPoolCalc());
+      document.getElementById('aw-pool-method')?.addEventListener('change', () => {
+        d.pool.method = document.getElementById('aw-pool-method').value;
+        this.renderPoolRows();
+        this.refreshPoolCalc();
+      });
+      document.getElementById('aw-pool-save')?.addEventListener('click', () => this.savePoolInline(s));
     }
   },
 
