@@ -520,6 +520,17 @@ S.RevenueMenuItems = {
         + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '" placeholder=""/></div>'
       + '</div>'
 
+      // Pour Size Override — for multi-size offerings on the same product
+      // (Pint vs Pitcher both drawing from one Heineken Draft keg). Defaults
+      // to the linked product's pour_size_oz; operator overrides for the
+      // larger size. Drives Variance Report consumption math.
+      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="fw"><input class="suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div>'
+        + '<div class="f" style="flex:1;"><label>&nbsp;</label>'
+        + '<div style="font-size:11px;color:var(--t3);padding-bottom:8px;line-height:1.5;">Defaults to the linked product\'s pour size. Override for multi-size offerings — e.g., Pint (16 oz) and Pitcher (60 oz) drawing from the same keg.</div></div>'
+      + '</div>'
+
       // Notes sits at the bottom — last row before the save buttons
       + '<div class="f" style="margin-top:8px;margin-bottom:0;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
 
@@ -804,6 +815,14 @@ S.RevenueMenuItems = {
       computedCost = App.menuItemCost(tmp) || 0;
     }
 
+    // Phase 7: capture optional pour_size_oz override on direct-pour items
+    // (Inventory form only). Drives Variance Report multi-size math.
+    let pourSizeOz = null;
+    if (type === 'inventory') {
+      const pourVal = parseFloat(document.getElementById('ri-pour')?.value);
+      if (!isNaN(pourVal) && pourVal > 0) pourSizeOz = pourVal;
+    }
+
     const entry = {
       id:                 existing?.id || App.uid(),
       name,
@@ -814,6 +833,7 @@ S.RevenueMenuItems = {
       notes,
       recipe,
       linked_product_id:  linkedProductId,
+      pour_size_oz:       pourSizeOz,
       target_cost_pct:    targetPct,
       created_at:         existing?.created_at || new Date().toISOString(),
       updated_at:         new Date().toISOString()
