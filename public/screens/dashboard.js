@@ -26,8 +26,16 @@ S.Dashboard = {
       }
     }
 
-    // Flagged recipes
-    const flagged = (data.recipes||[]).filter(r=>r.flagged).length;
+    // Flagged recipes: count menu items whose recipe-computed cost is over
+    // their target_cost_pct (or the default per category).
+    const flagged = (data.menu_items||[]).filter(i => {
+      if (!i.recipe || !Array.isArray(i.recipe.ingredients) || !i.recipe.ingredients.length || !i.price) return false;
+      const cost = App.menuItemCost(i);
+      if (!cost) return false;
+      const pct = (cost / i.price) * 100;
+      const tgt = i.target_cost_pct || (i.recipe.mode === 'food' ? 32 : 22);
+      return pct > tgt;
+    }).length;
 
     // Chart — annotated 8-week trend
     const chartHtml = this.buildChart(weeks.slice(-8), targets);
