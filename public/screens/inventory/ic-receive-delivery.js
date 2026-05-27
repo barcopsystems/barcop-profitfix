@@ -509,7 +509,7 @@ S.InventoryReceiveDelivery = {
       const prevPrice = p.unit_cost != null ? p.unit_cost : null;
       const unitPrice = isNaN(price) ? prevPrice : price;
       const changed = prevPrice != null && unitPrice != null && Math.abs(unitPrice - prevPrice) > 0.001;
-      if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice }); }
+      if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice, prevPrice }); }
       // Short count: ordered_qty came from the matched order (data attribute);
       // a delivered qty under the ordered qty flags this line for the
       // Vendor Discrepancy auto-fill in Phase 4.
@@ -541,19 +541,16 @@ S.InventoryReceiveDelivery = {
 
     if (lineItems.length === 0) { fail('Add at least one line item with a product and quantity.'); return; }
 
-    // Apply price changes to the product master. For case-tracked Bottle
-    // Beer, newPrice is per-case (operator enters per-case in the form), so
-    // divide by case_size before computing cost_per_pour and pour_cost_pct.
-    productUpdates.forEach(({ product, newPrice }) => {
-      product.unit_cost = newPrice;
-      const pours = product.container_size_oz && product.pour_size_oz
-        ? product.container_size_oz / product.pour_size_oz : null;
-      product.pours_per_container = pours;
-      const perBottle = App.bottleCost(product);
-      product.cost_per_pour = pours && perBottle != null ? perBottle / pours : null;
-      product.pour_cost_pct = product.cost_per_pour != null && product.menu_price
-        ? product.cost_per_pour / product.menu_price * 100 : null;
-    });
+    // Phase 1: confirm price-master updates before they apply. Operator can
+    // uncheck any change they want to dispute (file as discrepancy) without
+    // committing the new price to the product master. Unchecked changes stay
+    // on the delivery record only.
+    let appliedUpdates = productUpdates;
+    if (productUpdates.length > 0) {
+      const selectedSet = await this._confirmPriceChanges(productUpdates);
+      if (selectedSet === null) return;  // operator cancelled the save
+      appliedUpdates = productUpdates.filter((_, i) => selectedSet.has(i));
+    }
 
     const matchedOrderId = document.getElementById('rd-order')?.value || '';
 
@@ -567,12 +564,38 @@ S.InventoryReceiveDelivery = {
       line_items:     lineItems,
       item_count:     lineItems.length,
       total:          lineItems.reduce((s, i) => s + (i.extended || 0), 0),
-      price_change_count: priceChanges,
+      price_change_count:         priceChanges,
+      price_change_applied_count: appliedUpdates.length,
       short_count_count:  shortCounts,
       matched_order_id:   matchedOrderId || null,
       has_discrepancy: priceChanges > 0 || shortCounts > 0,
       created_at:     new Date().toISOString()
     };
+
+    // Apply selected price changes to the product master. For case-tracked
+    // Bottle Beer, newPrice is per-case (operator enters per-case in the
+    // form), so divide by case_size before computing cost_per_pour and
+    // pour_cost_pct. Every applied update appends a cost_history entry so
+    // price drift is auditable.
+    appliedUpdates.forEach(({ product, newPrice, prevPrice }) => {
+      product.unit_cost = newPrice;
+      const pours = product.container_size_oz && product.pour_size_oz
+        ? product.container_size_oz / product.pour_size_oz : null;
+      product.pours_per_container = pours;
+      const perBottle = App.bottleCost(product);
+      product.cost_per_pour = pours && perBottle != null ? perBottle / pours : null;
+      product.pour_cost_pct = product.cost_per_pour != null && product.menu_price
+        ? product.cost_per_pour / product.menu_price * 100 : null;
+      if (!Array.isArray(product.cost_history)) product.cost_history = [];
+      product.cost_history.push({
+        date:        record.date,
+        old_cost:    prevPrice,
+        new_cost:    newPrice,
+        vendor,
+        delivery_id: record.id,
+        source:      'delivery'
+      });
+    });
 
     const btn = document.getElementById('rd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -603,6 +626,18 @@ S.InventoryReceiveDelivery = {
   },
 
   renderDone(record) {
+    const applied = record.price_change_applied_count || 0;
+    const total   = record.price_change_count || 0;
+    let priceLine = '';
+    if (applied > 0) {
+      priceLine = '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:8px;">'
+        + applied + ' price change' + (applied === 1 ? '' : 's')
+        + ' applied to the product master &middot; flagged for Vendor Watch</div>';
+    } else if (total > 0) {
+      priceLine = '<div style="font-size:11px;color:var(--t3);font-weight:700;margin-top:8px;">'
+        + total + ' price change' + (total === 1 ? '' : 's')
+        + ' logged on this delivery only &middot; product master cost unchanged</div>';
+    }
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
@@ -611,11 +646,7 @@ S.InventoryReceiveDelivery = {
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">Delivery Recorded</div>'
       + '<div style="font-size:12px;color:var(--t3);">' + esc(record.vendor) + ' &middot; ' + record.item_count
       + ' line item' + (record.item_count === 1 ? '' : 's') + ' &middot; ' + App.fmtCurrency(record.total) + '</div>'
-      + (record.price_change_count
-          ? '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:8px;">'
-            + record.price_change_count + ' price change' + (record.price_change_count === 1 ? '' : 's')
-            + ' applied to the product master &middot; flagged for Vendor Watch</div>'
-          : '')
+      + priceLine
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;">'
       + '<button class="btn btn-ghost" id="rd-again">Receive Another</button>'
@@ -624,5 +655,67 @@ S.InventoryReceiveDelivery = {
     this.container.onclick = null;
     document.getElementById('rd-again')?.addEventListener('click', () => this.renderForm());
     document.getElementById('rd-history')?.addEventListener('click', () => App.navigate('ic-delivery-history'));
+  },
+
+  // Promise-based confirmation: returns null if operator cancelled, or a Set
+  // of indexes the operator confirmed to apply to the product master. The
+  // delivery itself still saves with the original per-line price either way;
+  // this only controls whether the new price becomes the new master cost.
+  _confirmPriceChanges(updates) {
+    return new Promise(resolve => {
+      const m = document.createElement('div');
+      m.id = 'rdp-modal';
+      m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
+
+      const rows = updates.map((u, i) => {
+        const isCase = (u.product.category === 'Bottle Beer') && u.product.case_size && u.product.case_size > 0;
+        const unit = isCase ? '/case' : '';
+        const up = u.newPrice > u.prevPrice;
+        const arrow = up ? '&#9650;' : '&#9660;';
+        const color = up ? 'var(--red)' : 'var(--gold)';
+        const delta = Math.abs(u.newPrice - u.prevPrice);
+        const pct = u.prevPrice > 0 ? Math.round(delta / u.prevPrice * 100) : 0;
+        return '<label style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
+          + '<input type="checkbox" class="rdp-chk" data-idx="' + i + '" checked style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
+          + '<div style="flex:1;">'
+            + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(u.product.name) + '</div>'
+            + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">'
+              + App.fmtCurrency(u.prevPrice) + unit + ' &rarr; '
+              + '<span style="color:' + color + ';font-weight:700;">' + App.fmtCurrency(u.newPrice) + unit + ' ' + arrow + ' ' + pct + '%</span>'
+            + '</div>'
+          + '</div>'
+        + '</label>';
+      }).join('');
+
+      m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:520px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
+        + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:10px;">Update Product Master Costs?</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">'
+          + 'Bar Cop spotted ' + updates.length + ' price change' + (updates.length === 1 ? '' : 's') + ' on this delivery. '
+          + 'Apply the ones that should become the new cost going forward. Uncheck anything you plan to dispute, and file a discrepancy on those lines after saving.'
+        + '</div>'
+        + '<div style="max-height:320px;overflow-y:auto;margin-bottom:18px;">' + rows + '</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+          + '<div style="display:flex;gap:10px;">'
+            + '<button type="button" class="btn btn-ghost btn-sm" id="rdp-all">Check All</button>'
+            + '<button type="button" class="btn btn-ghost btn-sm" id="rdp-none">Uncheck All</button>'
+          + '</div>'
+          + '<div style="display:flex;gap:10px;">'
+            + '<button type="button" id="rdp-cancel" class="btn btn-ghost">Back to Edit</button>'
+            + '<button type="button" id="rdp-confirm" class="btn btn-primary">Save Delivery</button>'
+          + '</div>'
+        + '</div>'
+      + '</div>';
+
+      document.body.appendChild(m);
+      const close = result => { m.remove(); resolve(result); };
+      const setAll = val => { m.querySelectorAll('.rdp-chk').forEach(c => { c.checked = val; }); };
+      document.getElementById('rdp-all')?.addEventListener('click', () => setAll(true));
+      document.getElementById('rdp-none')?.addEventListener('click', () => setAll(false));
+      document.getElementById('rdp-cancel').addEventListener('click', () => close(null));
+      document.getElementById('rdp-confirm').addEventListener('click', () => {
+        const checked = [...m.querySelectorAll('.rdp-chk:checked')].map(c => parseInt(c.dataset.idx, 10));
+        close(new Set(checked));
+      });
+    });
   }
 };
