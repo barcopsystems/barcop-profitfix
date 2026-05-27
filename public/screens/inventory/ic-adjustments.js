@@ -1,0 +1,429 @@
+'use strict';
+
+/* ── Inventory Control — Adjustment Log (writes ic_adjustments) ───────────────
+   Captures every documented inventory adjustment — damaged in storage, theft
+   confirmed, expired, found later, or other one-off corrections — so the
+   operator can reconcile counts to physical reality without destroying the
+   count history.
+
+   Reason codes drive intent:
+     - Damage     (decrease)
+     - Theft      (decrease, also feeds Theft Risk)
+     - Expiration (decrease)
+     - Found      (increase — discovered stock not previously counted)
+     - Other      (operator picks direction)
+
+   Each record: { id, date_time, product_id, product_name, category, quantity,
+   unit, direction:'in'|'out', reason, unit_cost_at_adjustment, value,
+   performed_by_id, performed_by, witnessed_by_id, witnessed_by, notes,
+   created_at }. Variance math does NOT auto-subtract these — the report
+   surfaces them separately so the operator sees the attribution. */
+
+S.InventoryAdjustments = {
+  editId: null,
+  filterFrom: '',
+  filterTo: '',
+  filterProductId: '',
+  filterReason: '',
+
+  REASONS: ['Damage', 'Theft', 'Expiration', 'Found', 'Other'],
+  // Default direction per reason — operator can override on Other.
+  _dirFor(reason) {
+    if (reason === 'Found') return 'in';
+    return 'out';
+  },
+
+  adjustments() {
+    if (!App.inventoryData) App.inventoryData = {};
+    if (!Array.isArray(App.inventoryData.ic_adjustments)) App.inventoryData.ic_adjustments = [];
+    return App.inventoryData.ic_adjustments;
+  },
+  products() {
+    return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
+  },
+  productById(id) {
+    return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
+  },
+  staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
+  staffById(id) { return this.staff().find(s => s.id === id); },
+
+  fmtDate(str) {
+    if (!str) return '-';
+    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  },
+  fmtDateTime(str) {
+    if (!str) return '-';
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return esc(str);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  },
+  nowDateTime() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+      + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  },
+
+  render(container, actions) {
+    this.container = container;
+    this.actions = actions;
+    this.renderList();
+  },
+
+  // ── List ────────────────────────────────────────────────────────────
+  renderList() {
+    this.editId = null;
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>';
+    document.getElementById('adj-export')?.addEventListener('click', () => window.print());
+
+    if (this.products().length === 0) {
+      this.container.innerHTML = '<div class="screen"><div class="empty">'
+        + '<div class="empty-title">Set up products first</div>'
+        + '<div class="empty-sub">An adjustment writes off or finds a documented quantity of a real product. Add products under Setup, then log adjustments here.</div>'
+        + '<button class="btn btn-primary" id="adj-go-products">Add Products</button></div></div>';
+      this.container.onclick = ev => { if (ev.target.closest('#adj-go-products')) App.navigate('ic-product-setup'); };
+      return;
+    }
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-primary btn-sm';
+    addBtn.textContent = '+ Log Adjustment';
+    addBtn.addEventListener('click', () => this.showForm());
+    this.actions.appendChild(addBtn);
+
+    const all = this.adjustments();
+    const filtered = this.applyFilters(all);
+    filtered.sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+
+    const signed = (rec) => rec.direction === 'in' ? Math.abs(rec.value || 0) : -Math.abs(rec.value || 0);
+    const totalOut = filtered.filter(r => r.direction === 'out').reduce((s, r) => s + Math.abs(r.value || 0), 0);
+    const totalIn  = filtered.filter(r => r.direction === 'in').reduce((s, r) => s + Math.abs(r.value || 0), 0);
+    const netLoss  = totalOut - totalIn;
+
+    const byReason = this.REASONS.reduce((map, r) => { map[r] = 0; return map; }, {});
+    filtered.forEach(r => { if (byReason[r.reason] != null) byReason[r.reason] += Math.abs(r.value || 0) * (r.direction === 'out' ? 1 : 0); });
+
+    const summary = '<div class="calc" style="margin-bottom:14px;">'
+      + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Loss Value</div><div class="calc-val warn">' + App.fmtCurrency(totalOut) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Found Value</div><div class="calc-val good">' + App.fmtCurrency(totalIn) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Net Loss</div><div class="calc-val ' + (netLoss > 0 ? 'warn' : 'good') + '">' + App.fmtCurrency(netLoss) + '</div></div>'
+      + '</div>';
+
+    const breakdown = '<div class="card"><div class="card-title">Loss by Reason</div>'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+      + this.REASONS.filter(r => r !== 'Found').map(r => {
+          const v = byReason[r] || 0;
+          return '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:10px 14px;min-width:140px;">'
+            + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + esc(r) + '</div>'
+            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + (v > 0 ? 'var(--red)' : 'var(--t4)') + ';">' + App.fmtCurrency(v) + '</div></div>';
+        }).join('')
+      + '</div></div>';
+
+    let html;
+    if (all.length === 0) {
+      html = '<div class="empty"><div class="empty-title">No adjustments logged yet</div>'
+        + '<div class="empty-sub">When you find damaged stock, confirm theft, expire product, or discover missing inventory, log it here. Counts stay clean, the loss gets attributed to a real cause, and the bookkeeper has a proper shrinkage trail.</div>'
+        + '<button class="btn btn-primary" id="adj-add-first">Log Your First Adjustment</button></div>';
+    } else if (filtered.length === 0) {
+      html = summary + breakdown + this.filterCard() + '<div class="empty"><div class="empty-title">No adjustments match the filters</div>'
+        + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
+    } else {
+      const rows = filtered.slice(0, 200).map(r => {
+        const dirBadge = r.direction === 'in'
+          ? '<span class="badge badge-ok">Found</span>'
+          : '<span class="badge badge-warn">Loss</span>';
+        const valStr = r.direction === 'in'
+          ? '<span class="pos">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
+          : '<span class="neg">-' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>';
+        return '<tr class="adj-row" data-id="' + r.id + '" style="cursor:pointer;">'
+          + '<td><div class="val">' + this.fmtDateTime(r.date_time) + '</div></td>'
+          + '<td><div class="val">' + esc(r.product_name || '-') + '</div>'
+          + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
+          + '<td>' + (r.quantity != null ? r.quantity : '-') + ' ' + esc(r.unit || '') + '</td>'
+          + '<td>' + esc(r.reason || '-') + ' ' + dirBadge + '</td>'
+          + '<td class="val">' + valStr + '</td>'
+          + '<td>' + esc(r.performed_by || '-') + '</td>'
+          + '<td><div class="row-actions">'
+          + (App.canEdit('ic-adjustments') ? '<button class="btn btn-ghost btn-sm adj-edit" data-id="' + r.id + '">Edit</button>' : '')
+          + (App.canEdit('ic-adjustments') ? '<button class="btn btn-danger btn-sm adj-del" data-id="' + r.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
+      }).join('');
+      html = summary + breakdown + this.filterCard()
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + html + '</div>';
+    this.wireList();
+  },
+
+  filterCard() {
+    const reasonOpts = '<option value="">All reasons</option>'
+      + this.REASONS.map(r => '<option value="' + esc(r) + '"' + (this.filterReason === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
+    const prodOpts = '<option value="">All products</option>'
+      + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+          .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
+    return '<div class="card"><div class="card-title">Filter</div>'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="adj-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="adj-f-to" value="' + esc(this.filterTo) + '"/></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Product</label><select id="adj-f-prod">' + prodOpts + '</select></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="adj-f-reason">' + reasonOpts + '</select></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="adj-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+      + '</div></div>';
+  },
+
+  applyFilters(list) {
+    return list.filter(r => {
+      const date = (r.date_time || '').slice(0, 10);
+      if (this.filterFrom && date < this.filterFrom) return false;
+      if (this.filterTo && date > this.filterTo) return false;
+      if (this.filterProductId && r.product_id !== this.filterProductId) return false;
+      if (this.filterReason && r.reason !== this.filterReason) return false;
+      return true;
+    });
+  },
+
+  wireList() {
+    this.container.onclick = ev => {
+      const row  = ev.target.closest('.adj-row');
+      const edit = ev.target.closest('.adj-edit');
+      const del  = ev.target.closest('.adj-del');
+      const addF = ev.target.closest('#adj-add-first');
+      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
+      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
+      else if (row && App.canEdit('ic-adjustments')) this.showForm(row.dataset.id);
+      else if (addF) this.showForm();
+    };
+    document.getElementById('adj-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('adj-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+    document.getElementById('adj-f-prod')?.addEventListener('change',   e => { this.filterProductId = e.target.value || ''; this.renderList(); });
+    document.getElementById('adj-f-reason')?.addEventListener('change', e => { this.filterReason     = e.target.value || ''; this.renderList(); });
+    document.getElementById('adj-f-clear')?.addEventListener('click', () => {
+      this.filterFrom = this.filterTo = this.filterProductId = this.filterReason = '';
+      this.renderList();
+    });
+  },
+
+  // ── Form ────────────────────────────────────────────────────────────
+  productOptions(selectedId) {
+    const prods = this.products();
+    if (!prods.length) return '<option value="">No products set up</option>';
+    const cats = (S.InventoryProducts && S.InventoryProducts.CATEGORIES) || ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    let h = '<option value="">Select product...</option>';
+    cats.forEach(cat => {
+      const inCat = prods.filter(p => (p.category || '') === cat).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!inCat.length) return;
+      h += '<optgroup label="' + esc(cat) + '">';
+      inCat.forEach(p => {
+        h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+      });
+      h += '</optgroup>';
+    });
+    return h;
+  },
+
+  unitOptions(productCategory, selected) {
+    let opts = ['bottles', 'units'];
+    if (productCategory === 'Bottle Beer') opts = ['bottles', 'cases'];
+    else if (productCategory === 'Draft Beer') opts = ['kegs'];
+    else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
+    return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
+  },
+
+  showForm(id) {
+    if (id && !App.canEdit('ic-adjustments')) return;
+    this.editId = id || null;
+    const r = id ? this.adjustments().find(x => x.id === id) : null;
+    const v = val => (val != null && val !== '') ? val : '';
+
+    const initialProdId = r?.product_id || '';
+    const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
+    const initialUnit = r?.unit || (initialCat === 'Bottle Beer' ? 'bottles' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles');
+    const initialReason = r?.reason || 'Damage';
+    const initialDir = r?.direction || this._dirFor(initialReason);
+
+    const reasonOpts = this.REASONS.map(rs =>
+      '<option' + (rs === initialReason ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
+
+    this.container.innerHTML = '<div class="screen"><div class="card">'
+      + '<div class="card-title">' + (id ? 'Edit Adjustment' : 'Log an Adjustment') + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.55;">'
+      + 'Use this when stock left or came back into the inventory outside of normal sale. Damaged in storage, theft confirmed, product expired, or found stock that was never counted. Counts stay clean and the loss gets attributed to a real cause.'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Date / Time</label>'
+          + '<input type="datetime-local" id="adj-when" value="' + esc((r?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Reason</label>'
+          + '<select id="adj-reason">' + reasonOpts + '</select></div>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Direction</label>'
+          + '<select id="adj-dir">'
+            + '<option value="out"' + (initialDir === 'out' ? ' selected' : '') + '>Loss (out)</option>'
+            + '<option value="in"'  + (initialDir === 'in'  ? ' selected' : '') + '>Found (in)</option>'
+          + '</select></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label>'
+          + '<select id="adj-prod">' + this.productOptions(initialProdId) + '</select></div>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Quantity</label>'
+          + '<input type="number" id="adj-qty" min="0" step="0.5" value="' + v(r?.quantity) + '" placeholder="0"/></div>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Unit</label>'
+          + '<select id="adj-unit">' + this.unitOptions(initialCat, initialUnit) + '</select></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Performed By</label>'
+          + '<select id="adj-by">' + App.staffOptions(r?.performed_by_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
+        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<select id="adj-witness">' + App.staffOptions(r?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
+      + '</div>'
+
+      + '<div class="calc" style="margin-top:6px;">'
+        + '<div class="calc-item"><div class="calc-label">Estimated Value</div><div class="calc-val" id="adj-c-value">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Unit Cost</div><div class="calc-val dim" id="adj-c-unitcost">-</div></div>'
+      + '</div>'
+
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
+        + '<textarea id="adj-notes" rows="2" placeholder="Optional context. What happened, who was around, anything that helps next year\'s review.">' + esc(r?.notes || '') + '</textarea></div>'
+
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="adj-save">' + (id ? 'Update Adjustment' : 'Log Adjustment') + '</button>'
+        + '<button class="btn btn-ghost" id="adj-cancel">Cancel</button>'
+        + '<span id="adj-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div></div>';
+
+    this.container.onclick = null;
+    document.getElementById('adj-cancel')?.addEventListener('click', () => this.renderList());
+    document.getElementById('adj-save')?.addEventListener('click', () => this.save());
+
+    // Reason change → set default direction (operator can still override on Other)
+    document.getElementById('adj-reason')?.addEventListener('change', e => {
+      const dirSel = document.getElementById('adj-dir');
+      if (dirSel) dirSel.value = this._dirFor(e.target.value);
+      this.recalc();
+    });
+
+    // Product change → re-pop unit options + recalc value
+    document.getElementById('adj-prod')?.addEventListener('change', e => {
+      const p = this.productById(e.target.value);
+      const unitSel = document.getElementById('adj-unit');
+      if (unitSel && p) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'bottles' : (p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+      this.recalc();
+    });
+
+    ['adj-qty', 'adj-unit', 'adj-dir'].forEach(fid =>
+      document.getElementById(fid)?.addEventListener('input', () => this.recalc()));
+
+    this.recalc();
+  },
+
+  // Live calc: estimated value = qty × per-unit cost. For Bottle Beer cases we
+  // expand to bottles before multiplying so the math matches the rest of IC.
+  recalc() {
+    const prodId = document.getElementById('adj-prod')?.value;
+    const product = this.productById(prodId);
+    const qty = parseFloat(document.getElementById('adj-qty')?.value) || 0;
+    const unit = document.getElementById('adj-unit')?.value || '';
+    const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+
+    if (!product || qty <= 0) {
+      set('adj-c-value', '-');
+      set('adj-c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
+      return;
+    }
+    // For bottle beer with case_size, the operator picks bottles OR cases
+    let bottles = qty;
+    if (product.category === 'Bottle Beer' && unit === 'cases' && product.case_size) {
+      bottles = qty * product.case_size;
+    }
+    const perBottleCost = (App.bottleCost ? App.bottleCost(product) : (product.unit_cost || 0)) || 0;
+    const value = bottles * perBottleCost;
+    set('adj-c-value', value > 0 ? App.fmtCurrency(value) : '-');
+    set('adj-c-unitcost', perBottleCost > 0 ? App.fmtCurrency(perBottleCost) + (product.category === 'Bottle Beer' ? '/bottle' : '/unit') : '-', 'dim');
+  },
+
+  async save() {
+    const err = document.getElementById('adj-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+
+    const dateTime = document.getElementById('adj-when')?.value;
+    if (!dateTime) { fail('Date and time are required.'); return; }
+    const productId = document.getElementById('adj-prod')?.value;
+    if (!productId) { fail('Pick a product.'); return; }
+    const product = this.productById(productId);
+    if (!product) { fail('Product not found.'); return; }
+    const quantity = parseFloat(document.getElementById('adj-qty')?.value);
+    if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
+    const reason = document.getElementById('adj-reason')?.value;
+    if (!reason) { fail('Pick a reason.'); return; }
+    const direction = document.getElementById('adj-dir')?.value || this._dirFor(reason);
+    const unit = document.getElementById('adj-unit')?.value || '';
+    const performedById = document.getElementById('adj-by')?.value;
+    if (!performedById) { fail('Pick who logged the adjustment.'); return; }
+    const performedBy = (this.staffById(performedById) || {}).name || '';
+    const witnessedById = document.getElementById('adj-witness')?.value || '';
+    const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
+
+    // Snapshot cost so the value is honest even after future cost changes.
+    let bottles = quantity;
+    if (product.category === 'Bottle Beer' && unit === 'cases' && product.case_size) {
+      bottles = quantity * product.case_size;
+    }
+    const perBottleCost = (App.bottleCost ? App.bottleCost(product) : (product.unit_cost || 0)) || 0;
+    const value = bottles * perBottleCost;
+
+    const rec = {
+      id:                       this.editId || App.uid(),
+      date_time:                dateTime,
+      product_id:               product.id,
+      product_name:             product.name,
+      category:                 product.category || '',
+      quantity,
+      unit,
+      direction,
+      reason,
+      unit_cost_at_adjustment:  perBottleCost,
+      value,
+      performed_by_id:          performedById,
+      performed_by:             performedBy,
+      witnessed_by_id:          witnessedById,
+      witnessed_by:             witnessedBy,
+      notes:                    document.getElementById('adj-notes')?.value.trim() || ''
+    };
+    if (!this.editId) rec.created_at = new Date().toISOString();
+    else rec.updated_at = new Date().toISOString();
+
+    const list = this.adjustments();
+    if (this.editId) {
+      const i = list.findIndex(x => x.id === this.editId);
+      if (i > -1) list[i] = { ...list[i], ...rec };
+    } else {
+      list.push(rec);
+    }
+
+    const btn = document.getElementById('adj-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.saveInventory();
+    this.editId = null;
+    if (ok) {
+      this.renderList();
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Log Adjustment'; }
+      fail('Save failed. Try again.');
+    }
+  },
+
+  async confirmDel(id) {
+    const ok = await App.confirm({ title: 'Delete this adjustment entry?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
+    App.inventoryData.ic_adjustments = this.adjustments().filter(x => x.id !== id);
+    await App.saveInventory();
+    this.renderList();
+  }
+};
