@@ -207,6 +207,11 @@ S.ShiftCashDrop = {
     const coins = parseFloat(document.getElementById('cd-coins')?.value);
     if (!isNaN(coins) && coins > 0) denominations.coins = coins;
 
+    const editing = !!this.editId;
+    const list = this.drops();
+    const existing = editing ? list.find(x => x.id === this.editId) : null;
+    const oldSafeLogId = existing ? existing.safe_log_id : null;
+
     const rec = {
       id:            this.editId || App.uid(),
       date,
@@ -217,17 +222,24 @@ S.ShiftCashDrop = {
       witness:       document.getElementById('cd-witness')?.value.trim() || '',
       amount,
       denominations,
-      notes:         document.getElementById('cd-notes')?.value.trim() || ''
+      notes:         document.getElementById('cd-notes')?.value.trim() || '',
+      safe_log_id:   oldSafeLogId || null
     };
-    if (!this.editId) rec.created_at = new Date().toISOString();
+    if (!editing) rec.created_at = new Date().toISOString();
 
-    const list = this.drops();
-    if (this.editId) {
+    if (editing) {
       const i = list.findIndex(x => x.id === this.editId);
       if (i > -1) list[i] = { ...list[i], ...rec };
     } else {
       list.push(rec);
     }
+
+    // Auto-feed Safe Log: a cash drop physically moves money INTO the safe,
+    // so the safe ledger must reflect it. Without this link the safe running
+    // balance is wrong and the safe screen feels orphaned. On edit, update
+    // the linked entry in place; on new, create it and store the id back on
+    // the cash drop record.
+    rec.safe_log_id = this._syncSafeLog(rec);
 
     const btn = document.getElementById('cd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -242,6 +254,36 @@ S.ShiftCashDrop = {
     }
   },
 
+  // Mirror this cash drop into sc_safe_log as a Cash Drop entry. Returns the
+  // safe log entry id so the cash drop record can link to it for later
+  // updates and deletes. If a safe entry already exists for this drop
+  // (edit path), update it; otherwise create a new one.
+  _syncSafeLog(dropRec) {
+    if (!App.shiftData) App.shiftData = {};
+    if (!Array.isArray(App.shiftData.sc_safe_log)) App.shiftData.sc_safe_log = [];
+    const log = App.shiftData.sc_safe_log;
+    const fields = {
+      date:         dropRec.date,
+      time:         dropRec.drop_time || '',
+      txn_type:     'Cash Drop',
+      direction:    'in',
+      amount:       dropRec.amount,
+      reference:    'Drawer: ' + (dropRec.drawer || '-') + (dropRec.shift_type ? ' / ' + dropRec.shift_type : ''),
+      performed_by: dropRec.performed_by || '',
+      witness:      dropRec.witness || '',
+      notes:        dropRec.notes || '',
+      source:       'cash-drop',
+      source_id:    dropRec.id
+    };
+    if (dropRec.safe_log_id) {
+      const i = log.findIndex(x => x.id === dropRec.safe_log_id);
+      if (i > -1) { log[i] = { ...log[i], ...fields }; return log[i].id; }
+    }
+    const newEntry = { id: App.uid(), ...fields, created_at: new Date().toISOString() };
+    log.push(newEntry);
+    return newEntry.id;
+  },
+
   confirmDel(id) {
     this._pendingDelId = id;
     const modal = document.getElementById('cd-del-modal');
@@ -251,6 +293,11 @@ S.ShiftCashDrop = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
+      // Remove linked safe log entry so the safe running balance stays honest.
+      const drop = this.drops().find(x => x.id === delId);
+      if (drop && drop.safe_log_id && Array.isArray(App.shiftData.sc_safe_log)) {
+        App.shiftData.sc_safe_log = App.shiftData.sc_safe_log.filter(e => e.id !== drop.safe_log_id);
+      }
       App.shiftData.sc_cash_drops = this.drops().filter(x => x.id !== delId);
       await App.saveShift();
       this.renderList();
