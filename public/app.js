@@ -1710,6 +1710,100 @@ const App = {
     return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
   },
 
+  // Phase 7: explode a menu item into per-product ounces consumed.
+  // For 1 unit of the menu item sold, returns { product_id: oz } showing
+  // exactly how much of each tracked inventory product was drawn down.
+  //
+  // Handles three menu item shapes:
+  //   - Linked direct-pour (Beer/Wine/NA): uses menu_item.pour_size_oz if set,
+  //     else the linked product's pour_size_oz, else container_size_oz (whole
+  //     bottle). Returns { linked_id: oz }.
+  //   - Recipe with product ingredients: for single-drink recipes, quantity is
+  //     in pours so oz = qty × pour_size_oz. For food recipes, quantity is in
+  //     product units (bottles, units) — oz = qty × container_size_oz for
+  //     bar items, qty (as-is) for kitchen items measured in their own unit.
+  //   - Recipe with prep batch ingredients: recursively explode the batch.
+  //     batch contributes (qty / servings_per_batch) × each batch ingredient.
+  //
+  // Total result is then multiplied by sold_qty in the caller.
+  explodeMenuItem(item, soldQty) {
+    const result = {};
+    if (!item) return result;
+    soldQty = parseFloat(soldQty) || 0;
+    if (soldQty <= 0) return result;
+    const prods = (this.inventoryData?.ic_products) || [];
+    const batches = (this.inventoryData?.ic_prep_batches) || [];
+    const prodById  = (id) => prods.find(p => p.id === id);
+    const batchById = (id) => batches.find(b => b.id === id);
+
+    // Direct-pour linked item — one menu item sale draws one pour from the linked product
+    if (item.linked_product_id) {
+      const p = prodById(item.linked_product_id);
+      if (p) {
+        const oz = parseFloat(item.pour_size_oz) || parseFloat(p.pour_size_oz) || parseFloat(p.container_size_oz) || 0;
+        if (oz > 0) result[p.id] = (result[p.id] || 0) + (oz * soldQty);
+      }
+      return result;
+    }
+
+    // Recipe with ingredients
+    if (item.recipe && Array.isArray(item.recipe.ingredients)) {
+      const isSingleDrink = item.recipe.mode === 'single';
+      const plateYield = (item.recipe.mode === 'food' && item.recipe.plate_yield > 0) ? item.recipe.plate_yield : 1;
+      const perUnit = soldQty / plateYield; // for food, plate_yield converts recipe into per-plate
+
+      item.recipe.ingredients.forEach(ing => {
+        const src = ing.source || (ing.product_id ? 'product' : null);
+        const id  = ing.id || ing.product_id;
+        const qty = parseFloat(ing.quantity) || 0;
+        if (!src || !id || qty <= 0) return;
+
+        if (src === 'batch') {
+          const b = batchById(id);
+          if (!b || !Array.isArray(b.ingredients)) return;
+          // qty here is in "servings" — the batch yields servings_per_batch servings total.
+          const spb = parseFloat(b.servings_per_batch) || 1;
+          // Per batch serving, each batch ingredient contributes its quantity / spb.
+          b.ingredients.forEach(bi => {
+            const bp = prodById(bi.product_id || bi.id);
+            if (!bp) return;
+            const biQty = parseFloat(bi.quantity) || 0;
+            if (biQty <= 0) return;
+            // Batch ingredients are typically in product units (bottles/units).
+            // Convert to oz when the underlying product has container_size_oz.
+            const sizeOz = parseFloat(bp.container_size_oz) || 0;
+            const unitsPerBatchServing = biQty / spb;
+            const ozPerBatchServing = sizeOz > 0 ? unitsPerBatchServing * sizeOz : unitsPerBatchServing;
+            result[bp.id] = (result[bp.id] || 0) + (ozPerBatchServing * qty * perUnit);
+          });
+          return;
+        }
+
+        // source === 'product'
+        const p = prodById(id);
+        if (!p) return;
+        const isBar = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
+        let oz = 0;
+        if (isBar && isSingleDrink) {
+          // qty is in "pours" — multiply by pour_size_oz
+          oz = qty * (parseFloat(p.pour_size_oz) || 0);
+        } else if (isBar) {
+          // Food / non-single use of bar product — qty is in bottles
+          oz = qty * (parseFloat(p.container_size_oz) || 0);
+        } else if (p.category === 'Misc' && isSingleDrink && p.pour_size_oz) {
+          // Misc with a pour size acts like a bar mixer in cocktails
+          oz = qty * (parseFloat(p.pour_size_oz) || 0);
+        } else {
+          // Kitchen / Misc without pour — qty is in the product's native unit
+          oz = qty;
+        }
+        result[p.id] = (result[p.id] || 0) + (oz * perUnit);
+      });
+    }
+
+    return result;
+  },
+
   // Phase 5: resolve the wage in effect for a staff member on a given date.
   // Walks wage_history newest-first: any entry with effective_date <= the
   // queried date means the new_wage applied from then onward. Falls back to
