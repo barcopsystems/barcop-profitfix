@@ -85,10 +85,13 @@ S.PrepBatches = {
     return h;
   },
   // For batches, ingredient quantity is in the product's unit (bottle / unit),
-  // so cost basis is unit_cost (not cost_per_pour).
+  // so cost basis is unit_cost (not cost_per_pour). Sized bar products
+  // (Liquor/Wine/Beer with case-tracking) use App.bottleCost; everything
+  // else falls back to unit_cost.
+  SIZED_BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
   unitCost(prod) {
     if (!prod) return 0;
-    if (this.IC_BAR.includes(prod.category) && App.bottleCost) {
+    if (this.SIZED_BAR_CATS.includes(prod.category) && App.bottleCost) {
       const bc = App.bottleCost(prod);
       if (bc != null) return bc;
     }
@@ -96,7 +99,7 @@ S.PrepBatches = {
   },
   unitLabel(prod) {
     if (!prod) return '-';
-    return this.IC_BAR.includes(prod.category) ? 'bottles' : 'units';
+    return this.SIZED_BAR_CATS.includes(prod.category) ? 'bottles' : 'units';
   },
 
   computeRows(rows, batch_yield, batch_yield_unit, serving_size, serving_size_unit) {
