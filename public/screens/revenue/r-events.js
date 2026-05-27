@@ -164,14 +164,14 @@ S.RevenueEvents = {
     });
   },
 
-  _delRC(i, btn) {
-    if (!confirm('Delete this package?')) return;
+  async _delRC(i, btn) {
+    const ok = await App.confirm({ title: 'Delete this package?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
     App.data.revenue_rate_cards.splice(i, 1);
-    App.saveKey('revenue_rate_cards').then(() => {
-      const c = document.getElementById('content-area');
-      const a = document.getElementById('topbar-actions');
-      S.RevenueEvents.render(c, a);
-    });
+    await App.saveKey('revenue_rate_cards');
+    const c = document.getElementById('content-area');
+    const a = document.getElementById('topbar-actions');
+    S.RevenueEvents.render(c, a);
   },
 
   renderCateringCalc(container, actions) {
