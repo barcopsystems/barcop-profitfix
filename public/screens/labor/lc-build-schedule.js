@@ -37,6 +37,18 @@ S.LaborBuildSchedule = {
     return mins / 60;
   },
 
+  // Look up the live forecast for a given week_start. The Build Schedule
+  // screen reads this — it does NOT capture a forecast anymore. Forecasts
+  // live in Revenue Recovery (one canonical store).
+  forecastForWeek(weekStart) {
+    if (!weekStart) return null;
+    return (App.forecastForWeek ? App.forecastForWeek(weekStart) : null);
+  },
+  forecastTotal(weekStart) {
+    const f = this.forecastForWeek(weekStart);
+    return f && f.total != null ? Number(f.total) || 0 : 0;
+  },
+
   // ── Draft lifecycle ─────────────────────────────────────────────────────────
   loadDraft() {
     if (this.editId) {
@@ -44,7 +56,6 @@ S.LaborBuildSchedule = {
       if (sched) {
         return {
           week_start: sched.week_start || '',
-          revenue_forecast: sched.revenue_forecast != null ? String(sched.revenue_forecast) : '',
           shifts: (sched.shifts || []).map(sh => ({
             staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end
           })),
@@ -53,7 +64,7 @@ S.LaborBuildSchedule = {
       }
     }
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
-    return { week_start: '', revenue_forecast: '', shifts: [], notes: '' };
+    return { week_start: '', shifts: [], notes: '' };
   },
   saveDraft() {
     if (this.editId) return;
@@ -110,14 +121,27 @@ S.LaborBuildSchedule = {
       ? d.shifts.map((sh, i) => this.shiftRow(sh, i)).join('')
       : '<div style="font-size:12px;color:var(--t3);margin-bottom:8px;">No shifts yet. Add the first shift below.</div>';
 
+    const fcTotal = this.forecastTotal(d.week_start);
+    const hasFc = fcTotal > 0;
+    const forecastBlock = !d.week_start
+      ? '<div style="font-size:11px;color:var(--t3);padding-bottom:10px;">Pick the week to see its forecast.</div>'
+      : hasFc
+        ? '<div style="display:flex;align-items:baseline;gap:8px;padding-bottom:6px;">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--gold);" id="bs-forecast-disp">' + App.fmtCurrency(fcTotal) + '</div>'
+          + '<button class="btn btn-ghost btn-sm" id="bs-forecast-edit" style="font-size:10px;letter-spacing:1px;padding:4px 8px;">Edit Forecast</button>'
+          + '</div>'
+        : '<div style="display:flex;align-items:center;gap:10px;padding-bottom:6px;flex-wrap:wrap;">'
+          + '<div style="font-size:11px;color:var(--red);font-weight:700;letter-spacing:0.5px;">No forecast set for this week.</div>'
+          + '<button class="btn btn-ghost btn-sm" id="bs-forecast-edit" style="font-size:10px;letter-spacing:1px;padding:4px 8px;">Set Forecast</button>'
+          + '</div>';
+
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title">Schedule Period</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
       + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '" oninput="S.LaborBuildSchedule.onInput()"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Revenue Forecast</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-forecast" min="0" step="0.01" '
-      + 'value="' + esc(d.revenue_forecast) + '" oninput="S.LaborBuildSchedule.onInput()"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:220px;"><label>Revenue Forecast <span style="color:var(--t4);font-weight:400;">(from Revenue Recovery)</span></label>'
+      + forecastBlock + '</div>'
       + '</div></div>'
 
       + '<div class="card"><div class="card-title">Shifts</div>'
@@ -163,13 +187,23 @@ S.LaborBuildSchedule = {
       this.editId = null;
       App.navigate('lc-schedule-history');
     });
+    document.getElementById('bs-forecast-edit')?.addEventListener('click', () => {
+      this.collect();
+      this.saveDraft();
+      // Hand the week to the forecast screen so the operator lands on the
+      // right week without picking it again.
+      if (S.RevenueForecast && this.draft.week_start) {
+        S.RevenueForecast.hydrate(this.draft.week_start);
+      }
+      App.navigate('r-forecast');
+    });
     this.recalc();
   },
 
   collect() {
     const d = this.draft;
+    const prevWeek = d.week_start;
     d.week_start = document.getElementById('bs-week')?.value || '';
-    d.revenue_forecast = document.getElementById('bs-forecast')?.value || '';
     d.notes = document.getElementById('bs-notes')?.value || '';
     const rows = [...document.querySelectorAll('.bs-row')];
     if (rows.length) {
@@ -180,11 +214,15 @@ S.LaborBuildSchedule = {
         end:      r.querySelector('.bs-end')?.value || ''
       }));
     }
+    return { weekChanged: prevWeek !== d.week_start };
   },
 
   onInput() {
-    this.collect();
+    const r = this.collect();
     this.saveDraft();
+    // When the operator picks a different week, redraw so the forecast block
+    // shows the new week's forecast (or the missing-forecast prompt).
+    if (r && r.weekChanged) { this.draw(); return; }
     this.recalc();
   },
 
@@ -255,9 +293,9 @@ S.LaborBuildSchedule = {
         warnEl.remove();
       }
     });
-    const forecast = parseFloat(document.getElementById('bs-forecast')?.value) || 0;
+    const forecast = this.forecastTotal(this.draft.week_start);
     const pct = forecast > 0 ? totalCost / forecast * 100 : null;
-    const rplh = totalHours > 0 ? forecast / totalHours : null;
+    const rplh = totalHours > 0 && forecast > 0 ? forecast / totalHours : null;
     const target = this.laborTarget();
 
     const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
@@ -289,7 +327,7 @@ S.LaborBuildSchedule = {
         hours: c.hours, wage: c.wage, cost: c.cost
       };
     });
-    const forecast = parseFloat(d.revenue_forecast) || 0;
+    const forecast = this.forecastTotal(d.week_start);
 
     const rec = {
       id:               this.editId || App.uid(),
@@ -299,7 +337,7 @@ S.LaborBuildSchedule = {
       total_hours:      totalHours,
       total_cost:       totalCost,
       labor_pct:        forecast > 0 ? totalCost / forecast * 100 : null,
-      rplh:             totalHours > 0 ? forecast / totalHours : null,
+      rplh:             totalHours > 0 && forecast > 0 ? forecast / totalHours : null,
       notes:            d.notes || '',
       status:           'Posted'
     };
