@@ -166,6 +166,9 @@ S.ThisWeek = {
       + this.sectionCard('Food', 'f', d.food)
       + '<div class="card"><div class="card-title">Review</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="tw-totrev">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Forecast</div><div class="calc-val" id="tw-fcst">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val" id="tw-fcgap">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Prime Cost %</div><div class="calc-val" id="tw-prime">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + (App.data.settings.targets?.prime_cost_pct ?? 60) + '%</div></div>'
       + '</div>'
@@ -244,6 +247,14 @@ S.ThisWeek = {
     const tCost = num('tw-bc') + num('tw-fc') + num('tw-bl') + num('tw-fl');
     const prime = tRev > 0 ? tCost / tRev * 100 : null;
     const pTarget = t.prime_cost_pct ?? 60;
+    set('tw-totrev', tRev > 0 ? App.fmtCurrency(tRev) : '-');
+    // Forecast vs actual: read this week's forecast keyed by week_start
+    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
+    const fc = (pe && App.forecastForWeek) ? App.forecastForWeek(pe) : null;
+    const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
+    set('tw-fcst', fcTotal > 0 ? App.fmtCurrency(fcTotal) : '-', fcTotal > 0 ? 'dim' : '');
+    const fcGap = fcTotal > 0 && tRev > 0 ? tRev - fcTotal : null;
+    set('tw-fcgap', fcGap != null ? (fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap) : '-', fcGap != null ? (fcGap >= 0 ? 'good' : 'warn') : '');
     set('tw-prime', prime != null ? App.fmtPct(prime) : '-', prime != null ? (prime > pTarget ? 'warn' : 'good') : '');
   },
 
