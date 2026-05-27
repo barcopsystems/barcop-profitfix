@@ -184,10 +184,10 @@ S.ShiftVoidComp = {
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Server</label>'
-      + '<input type="text" id="vc-server" value="' + esc(r?.server || '') + '" placeholder="Name" style="height:44px;"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Authorized By</label>'
-      + '<input type="text" id="vc-auth" value="' + esc(r?.authorized_by || '') + '" placeholder="Manager" style="height:44px;"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label>'
+      + '<select id="vc-server" style="height:44px;">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Authorized By</label>'
+      + '<select id="vc-auth" style="height:44px;">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Check #</label>'
       + '<input type="text" id="vc-check" value="' + esc(r?.check_number || '') + '" placeholder="Optional" style="height:44px;"/></div>'
       + '</div>'
@@ -240,8 +240,10 @@ S.ShiftVoidComp = {
       product_id:    productId,
       product_name:  product?.name || '',
       units,
-      server:        document.getElementById('vc-server')?.value.trim() || '',
-      authorized_by: document.getElementById('vc-auth')?.value.trim() || '',
+      staff_id:         document.getElementById('vc-server')?.value || '',
+      server:           (App.staffById(document.getElementById('vc-server')?.value) || {}).name || '',
+      authorized_by_id: document.getElementById('vc-auth')?.value || '',
+      authorized_by:    (App.staffById(document.getElementById('vc-auth')?.value) || {}).name || '',
       check_number:  document.getElementById('vc-check')?.value.trim() || '',
       reason:        document.getElementById('vc-reason')?.value || '',
       notes:         document.getElementById('vc-notes')?.value.trim() || ''
