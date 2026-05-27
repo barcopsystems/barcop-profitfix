@@ -95,9 +95,9 @@ FIX.revenue = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
-          title: 'Start the schedule from a revenue forecast',
-          detail: 'Open Build Schedule in Labor Control and enter the coming week\'s revenue forecast by day and daypart. The screen turns the forecast into a labor budget in hours for each department. That budget is the input the whole schedule is built from, so set it before you write a single name.' },
+        { kind: 'action', target: 'r-forecast', targetLabel: 'Revenue Forecast',
+          title: 'Set the revenue forecast for the coming week',
+          detail: 'Open Revenue Forecast in Revenue Recovery and set what you expect to bring in each day Monday through Sunday. Bar Cop pre-fills each day from the last 8 same-weekday weeks, so you are tuning a real number, not guessing. Build Schedule reads this forecast automatically when you lay shifts in.' },
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
           title: 'Staff to the budget, department by department',
           detail: 'Fill must-have coverage first, then build out to the budgeted hours. Build Schedule flags any shift that runs more than 5% over budget. Bar, kitchen, and floor have different labor economics, so budget and watch each one on its own. A blended number lets one department running over hide behind the others.' },
