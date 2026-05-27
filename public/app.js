@@ -1382,6 +1382,7 @@ const App = {
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
         'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
         'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
+        'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
         'r-this-week':            ['This Week', 'Weekly Entry'],
         'r-server-check':         ['Server Check', ''],
         'r-menu-items':           ['Menu Items', ''],
@@ -1397,6 +1398,7 @@ const App = {
         'r-audit':            S.RevenueAudit,
         'r-fix':              S.RevenueFix,
         'r-dashboard':        S.RevenueDashboard,
+        'r-forecast':         S.RevenueForecast,
         'r-this-week':        S.RevenueThisWeek,
         'r-server-check':     S.RevenueServerCheck,
         'r-menu-items':       S.RevenueMenuItems,
@@ -1831,6 +1833,88 @@ const App = {
     // entry is what the staff member earned at that time.
     const oldest = history[history.length - 1];
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
+  },
+
+  // Day-of-week labels used by Revenue Forecast and the schedule builder.
+  // Monday-first because most independent operators set their week that way.
+  DAYS_MON_FIRST: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+
+  // Resolve the Monday of the week containing a given date string. Forecast
+  // records are keyed by week_start (Monday) so every screen converts a
+  // period_end (Sunday) or any in-week date to the canonical Monday key.
+  weekStartFor(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(String(dateStr).length <= 10 ? dateStr + 'T00:00:00' : dateStr);
+    if (isNaN(d.getTime())) return '';
+    const wd = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - wd);
+    return d.toISOString().slice(0, 10);
+  },
+
+  // Convert a Monday week_start to the Sunday period_end of the same week.
+  periodEndFor(weekStart) {
+    if (!weekStart) return '';
+    const d = new Date(weekStart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().slice(0, 10);
+  },
+
+  // Return the saved revenue_forecasts record for a given week_start (Monday),
+  // or null. Accepts either a week_start or any in-week date.
+  forecastForWeek(dateStr) {
+    const ws = this.weekStartFor(dateStr);
+    if (!ws) return null;
+    const list = (this.data && Array.isArray(this.data.revenue_forecasts)) ? this.data.revenue_forecasts : [];
+    return list.find(f => f.week_start === ws) || null;
+  },
+
+  // Auto-defaults for a coming week's forecast. Looks at the same weekday in
+  // the last 8 weeks worth of shift revenue (sc_shifts), weighted toward the
+  // newer weeks (linear 1..8). Returns per-day numbers plus the total. Used
+  // when the operator opens the forecast screen for a week with no record yet.
+  forecastDefaultsFor(weekStart) {
+    const ws = this.weekStartFor(weekStart);
+    if (!ws) return { per_day: {}, total: 0 };
+    const shifts = (this.shiftData && this.shiftData.sc_shifts) || [];
+    // Group revenue by date, summing bar + floor
+    const revByDate = {};
+    shifts.forEach(s => {
+      if (!s.date) return;
+      const r = (parseFloat(s.bar_revenue) || 0) + (parseFloat(s.floor_revenue) || 0);
+      if (r <= 0) return;
+      revByDate[s.date] = (revByDate[s.date] || 0) + r;
+    });
+
+    const start = new Date(ws + 'T00:00:00');
+    const perDay = {};
+    let total = 0;
+    this.DAYS_MON_FIRST.forEach((day, idx) => {
+      const target = new Date(start.getTime());
+      target.setDate(target.getDate() + idx);
+      const samples = [];
+      // Look back up to 8 same-weekday occurrences before this week's day
+      for (let back = 1; back <= 8; back++) {
+        const probe = new Date(target.getTime());
+        probe.setDate(probe.getDate() - back * 7);
+        const key = probe.toISOString().slice(0, 10);
+        if (revByDate[key] != null) samples.push(revByDate[key]);
+      }
+      let avg = 0;
+      if (samples.length) {
+        // Newest sample is samples[0]. Weight newer higher: weights = N..1.
+        let wsum = 0, vsum = 0;
+        samples.forEach((v, i) => {
+          const w = samples.length - i;
+          vsum += v * w;
+          wsum += w;
+        });
+        avg = wsum > 0 ? Math.round(vsum / wsum) : 0;
+      }
+      perDay[day] = avg;
+      total += avg;
+    });
+    return { per_day: perDay, total: total };
   },
 
   // Print a blank log sheet — opens a new tab with a styled HTML form,
