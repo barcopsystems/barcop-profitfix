@@ -812,17 +812,13 @@ S.HubSettings = {
     App.data.revenue_weeks = window.ANCHOR.weeks.map(a => {
       const dep   = window.ANCHOR.laborDepts(a);
       const hours = a.bar_labor/16 + dep.kitchen/15 + dep.floor/14;
-      const serverEntries = rServers.map((nm,i) => {
-        const cv = Math.round(a.covers * rSrvWeight[i]);
-        return { name:nm, covers:cv, sales:+(cv * a.check_avg * rSrvCheckMul[i]).toFixed(2) };
-      });
       return {
         id:uid(), week_num:a.wk, period_end:dateStr((12 - a.wk) * 7),
         bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
         total_labor_cost:a.bar_labor + a.food_labor, total_hours:+hours.toFixed(1),
         labor_pct_blended:a.labor_pct_blended, rplh_blended:+(a.total_rev / hours).toFixed(2),
         rplh_lunch:0, rplh_dinner:0, rplh_bar:0,
-        server_entries:serverEntries, notes:'', saved_at:new Date().toISOString()
+        notes:'', saved_at:new Date().toISOString()
       };
     });
 
@@ -1719,6 +1715,19 @@ S.HubSettings = {
       if (match) vc.staff_id = match.id;
     });
     App.shiftData.sc_void_comps = scVoidComps;
+
+    // Phase 4: patch staff_id + shift_id onto every revenue_server_checks
+    // record so the Server Scorecard joins cleanly to lc_staff and sc_shifts.
+    (App.data.revenue_server_checks || []).forEach(c => {
+      if (!c.staff_id && c.server_name) {
+        const match = lcStaff.find(s => s.name === c.server_name);
+        if (match) c.staff_id = match.id;
+      }
+      if (!c.shift_id && c.date) {
+        const matchShift = scShifts.find(s => s.date === c.date && (!c.shift || s.shift_type === c.shift));
+        if (matchShift) c.shift_id = matchShift.id;
+      }
+    });
 
     const lcByPos = (...names) => {
       const ids = names.map(lcPos);
