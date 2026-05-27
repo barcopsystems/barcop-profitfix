@@ -20,7 +20,7 @@ S.ShiftVarianceLog = {
     return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
   },
   tolerance() {
-    const t = App.data && App.data.settings && App.data.settings.cash_tolerance;
+    const t = App.cashToleranceForShift(null);
     return (t != null && !isNaN(t)) ? Number(t) : 10;
   },
   statusOf(variance) {
@@ -137,8 +137,8 @@ S.ShiftVarianceLog = {
       + '<input type="date" id="vl-date" value="' + esc(v?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label>'
       + '<select id="vl-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Drawer / Register</label>'
-      + '<input type="text" id="vl-drawer" value="' + esc(v?.drawer || '') + '" placeholder="e.g. Bar 1"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Drawer / Register</label>'
+      + '<select id="vl-drawer">' + App.drawerOptions(v?.drawer_id || v?.drawer, { placeholder: 'Select drawer...' }) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Cashier</label>'
       + '<select id="vl-cashier">' + App.staffOptions(v?.cashier_id || v?.cashier, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
@@ -208,7 +208,8 @@ S.ShiftVarianceLog = {
       id:            this.editId || App.uid(),
       date,
       shift_type:    document.getElementById('vl-type')?.value || '',
-      drawer:        document.getElementById('vl-drawer')?.value.trim() || '',
+      drawer_id:     document.getElementById('vl-drawer')?.value || '',
+      drawer:        (App.drawerById(document.getElementById('vl-drawer')?.value) || {}).name || '',
       cashier_id:    document.getElementById('vl-cashier')?.value || '',
       cashier:       (App.staffById(document.getElementById('vl-cashier')?.value) || {}).name || '',
       expected_cash: exp,
