@@ -253,7 +253,6 @@ S.RevenueThisWeek = {
       rplh_lunch:        0,
       rplh_dinner:       0,
       rplh_bar:          0,
-      server_entries:    [],
       notes:             d.notes || '',
       saved_at:          new Date().toISOString()
     };
