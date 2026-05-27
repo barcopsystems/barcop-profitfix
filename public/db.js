@@ -672,7 +672,15 @@ const DB = {
         // it now. See sc-cash-settings.js + App.cashToleranceForShift().
         onboarding_complete: false
       },
-      bar_products: [], kitchen_products: [], recipes: [],
+      bar_products: [], kitchen_products: [],
+      // Menu items: the unified store for everything sellable on the menu.
+      // Recipes live embedded as the optional `recipe` field on each item.
+      // Two doors edit this store (r-menu-items and recipe-library) so the
+      // menu data is reachable from both Profit and Revenue contexts.
+      menu_items: [],
+      // Prep batches: frozen margarita mix, simple syrup, etc. Not menu
+      // items themselves; produce a yield consumed by recipes.
+      batches: [],
       weeks: [], shifts: [], reconciliations: [],
       theft_scores: [], vendor_log: [], last_theft_score_date: null,
       vendor_discrepancies: [],
@@ -697,7 +705,6 @@ const DB = {
       revenue_weeks: [],
       revenue_audits: [],
       revenue_server_checks: [],
-      revenue_menu_items: [],
       menu_dog_tests: [],
       revenue_price_log: [],
       revenue_events: [],
