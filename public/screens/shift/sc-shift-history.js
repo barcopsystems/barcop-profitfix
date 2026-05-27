@@ -72,7 +72,7 @@ S.ShiftHistory = {
     const totCov = rows.reduce((t, s) => t + (s.covers || 0), 0);
     const avgChk = totCov > 0 ? totRev / totCov : null;
 
-    const SHIFT_TYPES = (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
+    const SHIFT_TYPES = App.SHIFT_TYPES;
     const typeOpts = '<option value="">All shift types</option>'
       + SHIFT_TYPES.map(t => '<option' + (this.filterType === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const statusOpts = ['', 'Open', 'Closed'].map(s =>
