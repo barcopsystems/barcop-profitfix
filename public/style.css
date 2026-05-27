@@ -275,6 +275,14 @@ input,select,textarea{color-scheme:dark;}
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
 .f input:focus,.f select:focus,.f textarea:focus{border-color:var(--gold);}
+/* Required-field highlighting for incomplete records. Apply class to the .f
+   wrapper of a missing required input. Operator sees at a glance which cells
+   need filling when editing a flagged record. */
+.f.field-missing input,
+.f.field-missing select,
+.f.field-missing textarea{border-color:var(--red);background:rgba(192,56,40,0.04);}
+.f.field-missing label{color:var(--red);}
+.f.field-missing label::after{content:" \00b7 required";font-size:8px;letter-spacing:1px;color:var(--red);opacity:0.85;}
 .f input[type=number]{-moz-appearance:textfield;}
 .f input[type=number]::-webkit-inner-spin-button,
 .f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
