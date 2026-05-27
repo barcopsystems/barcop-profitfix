@@ -130,10 +130,6 @@ const Revenue = {
         <span class="nav-label">RPLH Tracker</span>
       </div>
       <div class="nav-section">Revenue</div>
-      <div class="nav-item" data-screen="r-check-average" id="nav-r-check-average">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M4 5.5h7a2 2 0 0 1 0 4H6a2 2 0 0 0 0 4h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Check Average</span>
-      </div>
       <div class="nav-item" data-screen="r-events" id="nav-r-events">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 10h6M5.5 12.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Events and Catering</span>
