@@ -1501,6 +1501,56 @@ S.HubSettings = {
       ]),
     ];
 
+    // ── Inventory Adjustment Log ─────────────────────────────────────────
+    // A few documented adjustments across the trailing 8 weeks: a couple of
+    // bottles broken behind the bar, one expiration write-off, one confirmed
+    // theft event (feeds Theft Risk), and a found-stock entry. Gives the
+    // operator a realistic view of how the log accumulates without making the
+    // numbers ugly.
+    const adjAt = (daysAgo, hour, min) => {
+      const d = new Date();
+      d.setDate(d.getDate() - daysAgo);
+      d.setHours(hour, min, 0, 0);
+      return d.toISOString().slice(0, 16);
+    };
+    const adjValue = (product, qty, unit) => {
+      let bottles = qty;
+      if (product.category === 'Bottle Beer' && unit === 'cases' && product.case_size) bottles = qty * product.case_size;
+      const perBottleCost = product.unit_cost != null
+        ? (product.category === 'Bottle Beer' && product.case_size ? product.unit_cost / product.case_size : product.unit_cost)
+        : 0;
+      return { bottles, perBottleCost, value: bottles * perBottleCost };
+    };
+    const mkAdj = (daysAgo, hour, min, productIdx, qty, unit, direction, reason, performed, notes) => {
+      const p = icProducts[productIdx];
+      const v = adjValue(p, qty, unit);
+      return {
+        id: uid(),
+        date_time: adjAt(daysAgo, hour, min),
+        product_id: p.id, product_name: p.name, category: p.category || '',
+        quantity: qty, unit,
+        direction, reason,
+        unit_cost_at_adjustment: v.perBottleCost,
+        value: v.value,
+        performed_by_id: '', performed_by: performed,
+        witnessed_by_id: '', witnessed_by: '',
+        notes,
+        created_at: new Date().toISOString()
+      };
+    };
+    App.inventoryData.ic_adjustments = [
+      mkAdj(48, 22, 10, 0, 1, 'bottles', 'out', 'Damage', 'Maria G.',
+        'Bartender knocked it off the back bar mid-shift. No injuries.'),
+      mkAdj(32, 14, 30, 3, 2, 'units', 'out', 'Expiration', 'Carlos P.',
+        'Past expiration on the back shelf. Pulled and trashed.'),
+      mkAdj(18, 9, 45, 1, 1, 'bottles', 'out', 'Theft', 'Jake T.',
+        'Found empty in the dumpster, never on a check. Reviewing camera footage.'),
+      mkAdj(6, 11, 20, 2, 0.5, 'bottles', 'out', 'Damage', 'Maria G.',
+        'Cracked bottle during a transfer from storage.'),
+      mkAdj(3, 16, 0, 0, 1, 'bottles', 'in', 'Found', 'Carlos P.',
+        'Found a bottle behind a stack in the liquor room. Adding it back.')
+    ];
+
     // ════════════════════════════════════════════════════════════════════
     //  SHIFT CONTROL — derived from the Anchor profile. Each week's sc_shifts
     //  revenue and covers sum to that week's bar_rev, food_rev and covers, so
