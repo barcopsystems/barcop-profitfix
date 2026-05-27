@@ -11,7 +11,7 @@ S.ShiftOpeningChecklist = {
     'Unlock doors and disarm alarm',
     'Turn on lights, music, TVs, and signage',
     'Check walk-in and reach-in cooler temperatures',
-    'Stock bar — liquor, beer, wine, garnishes',
+    'Stock bar: liquor, beer, wine, garnishes',
     'Fill ice wells',
     'Set up POS terminals and count opening cash banks',
     'Check restrooms stocked and clean',
@@ -35,7 +35,7 @@ S.ShiftOpeningChecklist = {
     return t.filter(x => x.type === this.TYPE);
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -94,8 +94,8 @@ S.ShiftOpeningChecklist = {
       + '<select id="oc-tpl">' + tplOpts + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="oc-date" value="' + esc(this._run.date) + '"/></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Completed By</label>'
-      + '<input type="text" id="oc-by" value="' + esc(this._run.completed_by) + '" placeholder="Manager on duty"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Completed By</label>'
+      + '<select id="oc-by">' + App.staffOptions(this._run.completed_by_id || this._run.completed_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div style="margin:8px 0 14px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;">'
@@ -126,7 +126,7 @@ S.ShiftOpeningChecklist = {
         return '<tr class="oc-hrow" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
           + '<td>' + esc(r.template_name || 'Opening Checklist') + '</td>'
-          + '<td>' + esc(r.completed_by || '—') + '</td>'
+          + '<td>' + esc(r.completed_by || '-') + '</td>'
           + '<td>' + badge + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-danger btn-sm oc-hdel" data-id="' + r.id + '">Delete</button>'
@@ -162,7 +162,8 @@ S.ShiftOpeningChecklist = {
   _bindRunner() {
     const sync = () => {
       this._run.date = document.getElementById('oc-date')?.value || this._run.date;
-      this._run.completed_by = document.getElementById('oc-by')?.value || '';
+      this._run.completed_by_id = document.getElementById('oc-by')?.value || '';
+      this._run.completed_by    = (App.staffById(this._run.completed_by_id) || {}).name || '';
       this._run.notes = document.getElementById('oc-notes')?.value || '';
     };
     document.getElementById('oc-items')?.addEventListener('click', ev => {
@@ -188,7 +189,7 @@ S.ShiftOpeningChecklist = {
   async save() {
     const err = document.getElementById('oc-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!this._run.completed_by.trim()) { fail('Enter who completed the checklist.'); return; }
+    if (!this._run.completed_by_id) { fail('Pick who completed the checklist.'); return; }
 
     const tpl = this.templates().find(t => t.id === this._run.templateId);
     const items = this._run.items;
@@ -198,7 +199,8 @@ S.ShiftOpeningChecklist = {
       template_id:   this._run.templateId || '',
       template_name: tpl ? tpl.name : 'Default Opening Checklist',
       date:          this._run.date,
-      completed_by:  this._run.completed_by.trim(),
+      completed_by_id: this._run.completed_by_id || '',
+      completed_by:    this._run.completed_by || '',
       items:         items.map(i => ({ text: i.text, done: !!i.done })),
       done_count:    items.filter(i => i.done).length,
       total_count:   items.length,
@@ -227,14 +229,14 @@ S.ShiftOpeningChecklist = {
     const itemRows = (r.items || []).map(it =>
       '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--b2);">'
       + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? 'var(--gold)' : 'var(--t4)') + ';width:48px;">'
-      + (it.done ? 'DONE' : '—') + '</span>'
+      + (it.done ? 'DONE' : '-') + '</span>'
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="oc-back">&#8592; Back to Opening Checklist</button></div>'
       + '<div class="card"><div class="card-title">' + esc(r.template_name || 'Opening Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
       + '</div>'
       + itemRows
