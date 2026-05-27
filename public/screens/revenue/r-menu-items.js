@@ -1,889 +1,476 @@
-'use strict';
-
-/* ── Revenue Recovery — Menu Items (THE single edit surface) ──────────────────
-   Landing screen mirrors IC Add Products: three cards on top (one per menu
-   item type) + three tabs to filter the unified list below.
-
-     Card 1 / Tab 1 — Plate Items     (food: Appetizers/Entrees/Desserts/Specials)
-     Card 2 / Tab 2 — Cocktail Items  (Cocktails — single drink recipes)
-     Card 3 / Tab 3 — Inventory Items (direct-pour: Beer/Wine/NA — picks from
-                                       ic_products, cost auto-fills)
-
-   Each card opens a form tailored to that type. No cross-type confusion —
-   the Plate form never offers a single drink recipe, the Cocktail form's
-   category is fixed, the Inventory form has no recipe builder. */
-
-S.RevenueMenuItems = {
-  // ── State ─────────────────────────────────────────────────────────────
-  activeTab:        'plate',     // 'plate' | 'cocktail' | 'inventory'
-  editIdx:          null,
-  formType:         null,        // 'plate' | 'cocktail' | 'inventory'
-  rows:             [],          // recipe ingredient rows
-  mode:             null,        // 'single' | 'food' — recipe mode
-  linkedProductId:  '',          // for inventory items
-  recipeOptOut:     false,
-  _saving:          false,
-
-  // ── Constants ─────────────────────────────────────────────────────────
-  // Plate form's category dropdown — food-side categories only
-  PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
-
-  // IC categories that can ingredients for cocktail recipes
-  COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
-  PLATE_ING_CATS:    ['Food', 'Misc'],
-
-  // Direct-pour mapping: what IC categories show on the Inventory form,
-  // grouped by their MENU category for the picker.
-  INVENTORY_GROUPS: [
-    { menuCat: 'Beer',         icCats: ['Bottle Beer', 'Draft Beer'] },
-    { menuCat: 'Wine',         icCats: ['Wine'] },
-    { menuCat: 'NA Beverages', icCats: ['Misc'] }
-  ],
-  // Reverse map: IC product category → menu category (auto-derived on save)
-  IC_TO_MENU_CAT: {
-    'Bottle Beer':  'Beer',
-    'Draft Beer':   'Beer',
-    'Wine':         'Wine',
-    'Misc':         'NA Beverages'
-  },
-
-  // ── Data helpers ──────────────────────────────────────────────────────
-  items() {
-    if (!App.data.menu_items) App.data.menu_items = [];
-    return App.data.menu_items;
-  },
-  products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
-  prodById(id) { return this.products().find(p => p.id === id) || null; },
-  prepBatches() { return (App.prepBatches && App.prepBatches()) || []; },
-  batchById(id) { return this.prepBatches().find(b => b.id === id) || null; },
-
-  // Classify an existing menu item into the right tab/form type.
-  // Used by edit routing and tab filtering.
-  classifyItem(item) {
-    if (!item) return 'plate';
-    if (item.linked_product_id) return 'inventory';
-    if (item.recipe && item.recipe.mode === 'single') return 'cocktail';
-    if (item.category === 'Cocktails') return 'cocktail';
-    return 'plate';
-  },
-
-  // ── Ingredient picker helpers (shared by Plate + Cocktail forms) ─────
-  ingredientOptions(selKey, mode) {
-    const prods = this.products();
-    const batches = this.prepBatches();
-    let h = '<option value="">Select ingredient...</option>';
-
-    const catList = mode === 'food' ? this.PLATE_ING_CATS : this.COCKTAIL_ING_CATS;
-    catList.forEach(cat => {
-      const inCat = prods.filter(p => (p.category || '') === cat && p.active !== false)
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      if (!inCat.length) return;
-      h += '<optgroup label="' + esc(cat) + '">';
-      inCat.forEach(p => {
-        h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>';
-      });
-      h += '</optgroup>';
-    });
-    if (batches.length) {
-      h += '<optgroup label="Prep Batches">';
-      batches.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(b => {
-        h += '<option value="b:' + b.id + '"' + (selKey === 'b:' + b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>';
-      });
-      h += '</optgroup>';
-    }
-    return h;
-  },
-  ingredientCostBasis(row, mode) {
-    if (row.source === 'batch') {
-      const b = this.batchById(row.id);
-      if (!b) return { unit: 'servings', costPerUnit: 0 };
-      return { unit: 'servings', costPerUnit: b.cost_per_serving || 0 };
-    }
-    const p = this.prodById(row.id);
-    if (!p) return { unit: '-', costPerUnit: 0 };
-    const isLiquorish = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
-    if (isLiquorish && mode === 'single') {
-      return { unit: 'pours', costPerUnit: (p.cost_per_pour != null ? p.cost_per_pour : (App.bottleCost ? (App.bottleCost(p) || 0) : 0)) };
-    }
-    if (isLiquorish) {
-      return { unit: 'bottles', costPerUnit: (App.bottleCost ? (App.bottleCost(p) || 0) : (p.unit_cost || 0)) };
-    }
-    if (p.category === 'Misc' && mode === 'single' && p.cost_per_pour != null) {
-      return { unit: 'pours', costPerUnit: p.cost_per_pour };
-    }
-    return { unit: 'units', costPerUnit: p.unit_cost || 0 };
-  },
-
-  // ── Inventory product picker (Card 3 / Inventory form) ───────────────
-  inventoryProductOptions(selectedId) {
-    const prods = this.products().filter(p => p.active !== false);
-    let h = '<option value="">Select inventory product...</option>';
-    let totalShown = 0;
-    this.INVENTORY_GROUPS.forEach(grp => {
-      grp.icCats.forEach(icCat => {
-        const inCat = prods.filter(p => (p.category || '') === icCat)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        if (!inCat.length) return;
-        totalShown += inCat.length;
-        h += '<optgroup label="' + esc(icCat) + ' (' + esc(grp.menuCat) + ')">';
-        inCat.forEach(p => {
-          h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
-        });
-        h += '</optgroup>';
-      });
-    });
-    if (!totalShown) h += '<option value="" disabled>No Beer / Wine / NA products in Inventory Control yet</option>';
-    return h;
-  },
-
-  // ── Required-field validation (shared) ───────────────────────────────
-  missingFields(item, formType) {
-    const out = new Set();
-    if (!item) return out;
-    if (formType === 'inventory') {
-      if (!item.linked_product_id) out.add('ri-linked-prod');
-      if (!(parseFloat(item.price) > 0)) out.add('ri-price');
-      // Name is auto-derived from linked product but operator can edit;
-      // empty is still a problem if they cleared it.
-      if (!item.name) out.add('ri-name');
-      return out;
-    }
-    // Plate + Cocktail
-    if (!item.name) out.add('ri-name');
-    if (formType === 'plate' && !item.category) out.add('ri-cat');
-    if (!(parseFloat(item.price) > 0)) out.add('ri-price');
-    const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-    const hasCost   = parseFloat(item.cost) > 0;
-    if (!hasRecipe && !hasCost) out.add('ri-cost');
-    return out;
-  },
-  applyMissingFieldHighlights(item, formType) {
-    if (!item) return;
-    const missing = this.missingFields(item, formType);
-    missing.forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const wrap = el.closest('.f');
-      if (wrap) wrap.classList.add('field-missing');
-    });
-  },
-  refreshFieldMissing() {
-    const synthetic = {
-      name:               document.getElementById('ri-name')?.value.trim() || '',
-      category:           document.getElementById('ri-cat')?.value || '',
-      price:              parseFloat(document.getElementById('ri-price')?.value) || 0,
-      cost:               parseFloat(document.getElementById('ri-cost')?.value) || 0,
-      recipe:             this.rows.length && this.mode ? { mode: this.mode, ingredients: this.rows.filter(r => r.id) } : null,
-      linked_product_id:  this.linkedProductId || ''
-    };
-    const missing = this.missingFields(synthetic, this.formType);
-    ['ri-name', 'ri-cat', 'ri-price', 'ri-cost', 'ri-linked-prod'].forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const wrap = el.closest('.f');
-      if (!wrap) return;
-      if (missing.has(id)) wrap.classList.add('field-missing');
-      else wrap.classList.remove('field-missing');
-    });
-  },
-
-  // ── Entry point ───────────────────────────────────────────────────────
-  render(container, actions) {
-    this.container = container;
-    this.actions = actions;
-    // External focus from Recipe Cost Analysis — drop into the right form for the item.
-    if (App._menuItemFocus) {
-      const focusId = App._menuItemFocus;
-      App._menuItemFocus = null;
-      const idx = this.items().findIndex(i => i.id === focusId);
-      if (idx >= 0) { this.showFormForIdx(idx); return; }
-    }
-    this.renderLanding();
-  },
-
-  // ── Landing: three cards + tabs + filtered table ─────────────────────
-  renderLanding() {
-    this.actions.innerHTML = '';
-    const impBtn = document.createElement('button');
-    impBtn.className = 'btn btn-ghost btn-sm';
-    impBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-right:5px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Import';
-    impBtn.addEventListener('click', () => this.showImport());
-    this.actions.appendChild(impBtn);
-
-    const all = this.items();
-    const counts = {
-      plate:     all.filter(i => this.classifyItem(i) === 'plate').length,
-      cocktail:  all.filter(i => this.classifyItem(i) === 'cocktail').length,
-      inventory: all.filter(i => this.classifyItem(i) === 'inventory').length
-    };
-
-    const card = (type, label, sub) => {
-      const n = counts[type] || 0;
-      return '<div class="mi-card" data-type="' + type + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px 22px 22px;cursor:pointer;text-align:center;transition:border-color 0.15s;">'
-        + '<div style="font-size:18px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">' + esc(label) + '</div>'
-        + '<div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">' + esc(sub) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">' + n + ' item' + (n === 1 ? '' : 's') + '</div>'
-        + '<span class="mi-card-add" data-type="' + type + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add ' + esc(label.split(' ')[0]) + '</span>'
-        + '</div>';
-    };
-
-    const cardsBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">'
-      + card('plate',     'Menu Plate Item',     'Appetizer, Entree, Dessert, Special')
-      + card('cocktail',  'Menu Cocktail Item',  'Built drink with ingredients')
-      + card('inventory', 'Menu Inventory Item', 'Beer, Wine, NA — direct pour')
-      + '</div>';
-
-    // Tabs
-    const tabBtn = (k, label) => {
-      const active = this.activeTab === k;
-      return '<button class="mi-tab" data-tab="' + k + '" style="background:none;border:none;'
-        + 'border-bottom:2px solid ' + (active ? 'var(--gold)' : 'transparent') + ';'
-        + 'color:' + (active ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-        + 'letter-spacing:0.5px;text-transform:uppercase;padding:10px 14px;cursor:pointer;">'
-        + esc(label) + ' &middot; ' + (counts[k] || 0)
-        + '</button>';
-    };
-    const tabsBlock = '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;">'
-      + tabBtn('plate', 'Plate Items')
-      + tabBtn('cocktail', 'Cocktail Items')
-      + tabBtn('inventory', 'Inventory Items')
-      + '</div>';
-
-    // Filtered list for active tab
-    const itemsHere = all.filter(i => this.classifyItem(i) === this.activeTab);
-    const incomplete = itemsHere.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
-
-    let listHtml;
-    if (itemsHere.length === 0) {
-      const blurb = {
-        plate:     'No plate items yet. Click "Menu Plate Item" above to add your first one.',
-        cocktail:  'No cocktail items yet. Click "Menu Cocktail Item" above to add your first one.',
-        inventory: 'No inventory items yet. Click "Menu Inventory Item" above to add your first one.'
-      };
-      listHtml = '<div class="empty"><div class="empty-title">Nothing here yet</div>'
-        + '<div class="empty-sub">' + esc(blurb[this.activeTab] || '') + '</div></div>';
-    } else {
-      const rows = itemsHere.map((item) => {
-        const cost = App.menuItemCost(item) || 0;
-        const cm   = (item.price && cost) ? (item.price - cost) : null;
-        const pct  = (item.price && cost) ? (cost / item.price * 100).toFixed(1) : null;
-        const ok   = item.price && cost;
-        const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-        const hasLinked = !!item.linked_product_id;
-        const badgeStyle = 'font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 5px;margin-left:6px;';
-        const tagBadge = hasRecipe
-          ? '<span style="' + badgeStyle + '">RECIPE</span>'
-          : (hasLinked ? '<span style="' + badgeStyle + '">LINKED</span>' : '');
-        const costFrom = hasRecipe ? '<div style="font-size:9px;color:var(--t3);">from recipe</div>'
-                       : (hasLinked ? '<div style="font-size:9px;color:var(--t3);">from linked product</div>' : '');
-        return '<tr class="' + (!ok ? 'row-incomplete' : '') + '">'
-          + '<td style="width:36px;"><input type="checkbox" class="ri-chk" data-id="' + item.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
-          + '<td style="font-weight:600;color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + tagBadge + (!ok ? ' <span style="font-size:10px;font-weight:700;color:var(--red);">INCOMPLETE</span>' : '') + '</td>'
-          + '<td>' + esc(item.category || '') + '</td>'
-          + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
-          + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + costFrom + '</td>'
-          + '<td>' + (pct ? pct + '%' : '-') + '</td>'
-          + '<td>' + (cm ? App.fmtCurrency(cm) : '-') + '</td>'
-          + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
-          + '<td style="white-space:nowrap;">'
-          + '<button class="btn btn-ghost btn-sm ri-edit" data-id="' + item.id + '" style="margin-right:4px;">Edit</button>'
-          + '<button class="btn btn-danger btn-sm ri-del" data-id="' + item.id + '">Del</button>'
-          + '</td></tr>';
-      }).join('');
-
-      listHtml = (incomplete > 0 ? '<div class="alert-bar"><div class="alert-text">' + incomplete + ' item' + (incomplete > 1 ? 's' : '') + ' missing price or cost. Incomplete items cannot be used in Menu Engineering.</div></div>' : '')
-        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="ri-sel-all">Select All</button>'
-        + '<button class="btn btn-danger btn-sm" id="ri-del-sel" style="display:none;">Delete Selected</button>'
-        + '<span id="ri-sel-count" style="font-size:11px;color:var(--t3);"></span>'
-        + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th style="width:36px;"></th>'
-        + '<th>Item Name</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Contrib. Margin</th><th>Wkly Covers</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-    }
-
-    this.container.innerHTML = '<div class="screen">'
-      + cardsBlock
-      + tabsBlock
-      + listHtml
-      + '</div>';
-
-    // Wire cards + tabs + list actions
-    this.container.querySelectorAll('.mi-card, .mi-card-add').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        const type = el.dataset.type;
-        if (type) this.showForm(type, null);
-      });
-    });
-    this.container.querySelectorAll('.mi-tab').forEach(b =>
-      b.addEventListener('click', () => { this.activeTab = b.dataset.tab; this.renderLanding(); })
-    );
-    this.container.querySelectorAll('.ri-edit').forEach(btn => {
-      btn.addEventListener('click', () => this.showFormForId(btn.dataset.id));
-    });
-    this.container.querySelectorAll('.ri-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const ok = await App.confirm({ title: 'Delete this item?', confirmText: 'Delete', cancelText: 'Cancel' });
-        if (!ok) return;
-        App.data.menu_items = this.items().filter(i => i.id !== btn.dataset.id);
-        await App.saveKey('menu_items');
-        this.renderLanding();
-      });
-    });
-
-    // Multi-select
-    const updateSel = () => {
-      const checked = this.container.querySelectorAll('.ri-chk:checked');
-      const delBtn  = document.getElementById('ri-del-sel');
-      const count   = document.getElementById('ri-sel-count');
-      if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
-      if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
-    };
-    document.getElementById('ri-sel-all')?.addEventListener('click', () => {
-      const all = this.container.querySelectorAll('.ri-chk');
-      const anyUnchecked = [...all].some(c => !c.checked);
-      all.forEach(c => { c.checked = anyUnchecked; });
-      updateSel();
-    });
-    this.container.addEventListener('change', e => { if (e.target.classList.contains('ri-chk')) updateSel(); });
-    document.getElementById('ri-del-sel')?.addEventListener('click', async () => {
-      const ids = [...this.container.querySelectorAll('.ri-chk:checked')].map(c => c.dataset.id);
-      if (!ids.length) return;
-      const ok = await App.confirm({ title: 'Delete ' + ids.length + ' item' + (ids.length > 1 ? 's' : '') + '?', confirmText: 'Delete', cancelText: 'Cancel' });
-      if (!ok) return;
-      App.data.menu_items = this.items().filter(i => !ids.includes(i.id));
-      await App.saveKey('menu_items');
-      this.renderLanding();
-    });
-  },
-
-  // ── Form routing ──────────────────────────────────────────────────────
-  showFormForId(id) {
-    const idx = this.items().findIndex(i => i.id === id);
-    if (idx < 0) return;
-    this.showFormForIdx(idx);
-  },
-  showFormForIdx(idx) {
-    const item = this.items()[idx];
-    if (!item) return;
-    const type = this.classifyItem(item);
-    this.editIdx = idx;
-    this.showForm(type, item);
-  },
-
-  showForm(type, item) {
-    this.formType = type;
-    this.editIdx  = item ? this.items().findIndex(i => i.id === item.id) : null;
-    this.recipeOptOut = false;
-    this.linkedProductId = item?.linked_product_id || '';
-    const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-    this.mode = hasRecipe ? item.recipe.mode : (type === 'cocktail' ? 'single' : type === 'plate' ? 'food' : null);
-    this.rows = hasRecipe
-      ? item.recipe.ingredients.map(i => ({ source: i.source || 'product', id: i.id || i.product_id, quantity: i.quantity }))
-      : [];
-
-    if (type === 'plate')     this.renderPlateForm(item);
-    if (type === 'cocktail')  this.renderCocktailForm(item);
-    if (type === 'inventory') this.renderInventoryForm(item);
-  },
-
-  // ── Plate Form ────────────────────────────────────────────────────────
-  renderPlateForm(item) {
-    const catOpts = this.PLATE_CATEGORIES.map(c =>
-      '<option' + (item?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
-    const hasRecipe = this.rows.length > 0 && this.mode;
-    const target = item?.target_cost_pct || 32;
-
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="ri-back">&#8592; Back to Menu Items</button></div>'
-      + '<div class="card">'
-      + '<div class="sh">' + (item ? 'Edit Plate Item' : 'Add Menu Plate Item') + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-lg"><label>Item Name</label><input type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="Anchor Burger"/></div>'
-        + '<div class="f w-md"><label>Category</label><select id="ri-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f w-md"><label>Cost ' + (hasRecipe ? '<span style="color:var(--t4);font-weight:400;">(auto from recipe)</span>' : '') + '</label>'
-        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + ((hasRecipe ? (App.menuItemCost(item) || 0).toFixed(2) : item?.cost) || '') + '" step="0.01" placeholder="0.00"' + (hasRecipe ? ' disabled' : '') + '/></div></div>'
-        + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '" placeholder=""/></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:18px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
-
-      + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:18px;margin-top:8px;"></div>'
-
-      + '<div style="display:flex;gap:10px;margin-top:18px;">'
-        + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
-        + '<button class="btn btn-ghost" id="ri-cancel">Cancel</button>'
-        + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>'
-      + '</div></div>';
-
-    // Default to food recipe builder open with one blank row
-    if (!hasRecipe && !this.recipeOptOut) {
-      this.mode = 'food';
-      this.rows = [{ source: 'product', id: '', quantity: '' }];
-    }
-    this.renderRecipeSection(item, target);
-
-    this._wireSharedForm(item);
-    if (item) this.applyMissingFieldHighlights(item, 'plate');
-  },
-
-  // ── Cocktail Form ─────────────────────────────────────────────────────
-  renderCocktailForm(item) {
-    const hasRecipe = this.rows.length > 0 && this.mode;
-    const target = item?.target_cost_pct || 22;
-
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="ri-back">&#8592; Back to Menu Items</button></div>'
-      + '<div class="card">'
-      + '<div class="sh">' + (item ? 'Edit Cocktail Item' : 'Add Menu Cocktail Item') + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-lg"><label>Item Name</label><input type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
-        + '<div class="f w-md"><label>Category</label>'
-          + '<div style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);padding:8px 10px;color:var(--t1);font-size:13px;">Cocktails</div>'
-        + '</div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f w-md"><label>Cost ' + (hasRecipe ? '<span style="color:var(--t4);font-weight:400;">(auto from recipe)</span>' : '') + '</label>'
-        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + ((hasRecipe ? (App.menuItemCost(item) || 0).toFixed(2) : item?.cost) || '') + '" step="0.01" placeholder="0.00"' + (hasRecipe ? ' disabled' : '') + '/></div></div>'
-        + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '" placeholder=""/></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:18px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
-
-      + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:18px;margin-top:8px;"></div>'
-
-      + '<div style="display:flex;gap:10px;margin-top:18px;">'
-        + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
-        + '<button class="btn btn-ghost" id="ri-cancel">Cancel</button>'
-        + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>'
-      + '</div></div>';
-
-    if (!hasRecipe && !this.recipeOptOut) {
-      this.mode = 'single';
-      this.rows = [{ source: 'product', id: '', quantity: '' }];
-    }
-    this.renderRecipeSection(item, target);
-
-    this._wireSharedForm(item);
-    if (item) this.applyMissingFieldHighlights(item, 'cocktail');
-  },
-
-  // ── Inventory Form ────────────────────────────────────────────────────
-  renderInventoryForm(item) {
-    const linkedId = this.linkedProductId || item?.linked_product_id || '';
-    const linkedProd = linkedId ? this.prodById(linkedId) : null;
-    const autoCost = linkedProd ? (App.bottleCost ? (App.bottleCost(linkedProd) || linkedProd.unit_cost || 0) : (linkedProd.unit_cost || 0)) : 0;
-
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="ri-back">&#8592; Back to Menu Items</button></div>'
-      + '<div class="card">'
-      + '<div class="sh">' + (item ? 'Edit Inventory Item' : 'Add Menu Inventory Item') + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.55;">'
-        + 'Direct-pour menu items: beer, wine, NA beverages. Pick the inventory product first — name and cost auto-fill, and cost stays in sync whenever you update the product in Inventory Control.'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f" style="flex:1;min-width:240px;"><label>Inventory Product</label>'
-          + '<select id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-lg"><label>Item Name <span style="color:var(--t4);font-weight:400;">(editable)</span></label>'
-          + '<input type="text" id="ri-name" value="' + esc(item?.name || linkedProd?.name || '') + '" placeholder="Picks up from Inventory Product"/></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f w-md"><label>Cost <span style="color:var(--t4);font-weight:400;">(auto from linked product)</span></label>'
-        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
-        + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '" placeholder=""/></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:18px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
-
-      + '<div style="display:flex;gap:10px;margin-top:18px;">'
-        + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
-        + '<button class="btn btn-ghost" id="ri-cancel">Cancel</button>'
-        + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>'
-      + '</div></div>';
-
-    // Wire inventory product picker → auto-fills name + cost
-    document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
-      this.linkedProductId = e.target.value || '';
-      const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
-      // Cost auto-fill
-      const costInp = document.getElementById('ri-cost');
-      if (costInp) {
-        if (p) {
-          const bc = App.bottleCost ? (App.bottleCost(p) || p.unit_cost || 0) : (p.unit_cost || 0);
-          costInp.value = bc > 0 ? bc.toFixed(2) : '';
-        } else {
-          costInp.value = '';
-        }
-      }
-      // Name auto-fill ONLY if currently empty — don't overwrite operator's
-      // custom name like "Bud Light Pitcher".
-      const nameInp = document.getElementById('ri-name');
-      if (nameInp && !nameInp.value.trim() && p) nameInp.value = p.name;
-      this.refreshFieldMissing();
-    });
-
-    this._wireSharedForm(item);
-    if (item) this.applyMissingFieldHighlights(item, 'inventory');
-  },
-
-  // Common form wiring (Back, Cancel, Save, field-missing inputs)
-  _wireSharedForm(item) {
-    document.getElementById('ri-back')?.addEventListener('click', () => this.renderLanding());
-    document.getElementById('ri-cancel')?.addEventListener('click', () => this.renderLanding());
-    document.getElementById('ri-save')?.addEventListener('click', () => this._save(item));
-    ['ri-name', 'ri-price', 'ri-cost'].forEach(id =>
-      document.getElementById(id)?.addEventListener('input', () => this.refreshFieldMissing())
-    );
-    document.getElementById('ri-cat')?.addEventListener('change', () => this.refreshFieldMissing());
-  },
-
-  // ── Recipe section (used by Plate + Cocktail forms) ──────────────────
-  renderRecipeSection(item, target) {
-    const sec = document.getElementById('ri-recipe-section');
-    if (!sec) return;
-    const hasRows = this.rows.length > 0 && this.mode;
-
-    if (!hasRows) {
-      // Operator opted out of recipe — show "+ Add recipe" link only
-      sec.innerHTML = '<div class="sh">Recipe</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
-          + 'No recipe attached. Cost uses the manual entry above.'
-        + '</div>'
-        + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe</a>';
-      document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
-        ev.preventDefault();
-        this.recipeOptOut = false;
-        this.mode = this.formType === 'cocktail' ? 'single' : 'food';
-        this.rows = [{ source: 'product', id: '', quantity: '' }];
-        this.renderRecipeSection(item, target);
-        this.refreshFieldMissing();
-      });
-      return;
-    }
-
-    const modeLabel = this.mode === 'food' ? 'Food Plate' : 'Single Drink';
-    const plateYieldField = this.mode === 'food'
-      ? '<div class="f" style="width:130px;flex-shrink:0;"><label>Plates Per Batch</label>'
-        + '<input type="number" id="ri-plate-yield" value="' + (item?.recipe?.plate_yield || 1) + '" min="1"/></div>'
-      : '';
-
-    sec.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">'
-        + '<div>'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Recipe &middot; ' + modeLabel + '</div>'
-          + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Cost auto-computes from current product + prep batch prices.</div>'
-        + '</div>'
-        + '<div><button class="btn btn-ghost btn-sm" id="ri-remove-recipe">No Recipe</button></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Target Cost %</label>'
-          + '<div class="fw"><input class="suf" type="number" id="ri-target-pct" value="' + target + '" step="0.5"/><span class="suf">%</span></div></div>'
-        + plateYieldField
-      + '</div>'
-      + '<div class="sh" style="margin-top:4px;">' + (this.mode === 'food' ? 'Kitchen' : 'Bar') + ' Ingredients</div>'
-      + '<div id="ri-ings" style="margin-bottom:12px;"></div>'
-      + '<button class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
-      + '<div class="calc" style="margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="ri-tc">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="ri-cps">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="ri-cpct">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim" id="ri-tgt-d">-</div></div>'
-      + '</div>';
-
-    this.renderRows();
-    this.calcRecipe();
-
-    document.getElementById('ri-remove-recipe')?.addEventListener('click', async () => {
-      const ok = await App.confirm({
-        title: 'Skip the recipe?',
-        message: 'Cost will fall back to manual entry.',
-        confirmText: 'Skip recipe',
-        cancelText: 'Keep'
-      });
-      if (!ok) return;
-      this.rows = [];
-      this.mode = null;
-      this.recipeOptOut = true;
-      const costInp = document.getElementById('ri-cost');
-      if (costInp) { costInp.disabled = false; costInp.value = ''; }
-      this.renderRecipeSection(item, target);
-      this.refreshFieldMissing();
-    });
-    document.getElementById('ri-add-ing')?.addEventListener('click', () => { this.addRow(); this.calcRecipe(); });
-    document.getElementById('ri-target-pct')?.addEventListener('input', () => this.calcRecipe());
-    document.getElementById('ri-plate-yield')?.addEventListener('input', () => this.calcRecipe());
-  },
-
-  renderRows() {
-    const area = document.getElementById('ri-ings');
-    if (!area) return;
-    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<table class="ing-tbl"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
-      + '<tbody>' + this.rows.map((r, idx) => {
-        const selKey = r.id ? (r.source === 'batch' ? 'b:' : 'p:') + r.id : '';
-        const basis = this.ingredientCostBasis(r, this.mode);
-        const qty = parseFloat(r.quantity) || 0;
-        const lineCost = qty * (basis.costPerUnit || 0);
-        const costD = basis.costPerUnit > 0 ? App.fmtCurrency(basis.costPerUnit) : (r.id ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
-        const lineD = lineCost > 0 ? App.fmtCurrency(lineCost) : '-';
-        return '<tr>'
-          + '<td style="min-width:220px;"><select class="form-input ri-ing-src" data-i="' + idx + '" style="width:100%;">' + this.ingredientOptions(selKey, this.mode) + '</select></td>'
-          + '<td style="width:90px;"><input class="form-input ri-ing-qty" type="number" data-i="' + idx + '" value="' + (r.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
-          + '<td style="width:80px;color:var(--t2);font-size:12px;">' + basis.unit + '</td>'
-          + '<td style="width:100px;font-size:12px;">' + costD + '</td>'
-          + '<td style="width:100px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
-          + '<td style="width:36px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '" style="padding:4px 8px;">&times;</button></td>'
-          + '</tr>';
-      }).join('') + '</tbody></table></div>';
-
-    area.querySelectorAll('.ri-ing-src').forEach(sel => sel.addEventListener('change', () => this.onSrcChange(sel)));
-    area.querySelectorAll('.ri-ing-qty').forEach(inp => inp.addEventListener('input', () => this.calcRecipe()));
-    area.querySelectorAll('.ri-rm-ing').forEach(btn => btn.addEventListener('click', () => this.removeRow(parseInt(btn.dataset.i))));
-  },
-
-  onSrcChange(sel) {
-    const idx = parseInt(sel.dataset.i);
-    const v = sel.value;
-    if (!v) {
-      this.rows[idx].source = 'product';
-      this.rows[idx].id = '';
-    } else if (v.startsWith('b:')) {
-      this.rows[idx].source = 'batch';
-      this.rows[idx].id = v.slice(2);
-    } else {
-      this.rows[idx].source = 'product';
-      this.rows[idx].id = v.slice(2);
-    }
-    this.renderRows();
-    this.calcRecipe();
-  },
-  addRow() {
-    this.rows.push({ source: 'product', id: '', quantity: '' });
-    this.renderRows();
-  },
-  removeRow(idx) {
-    this.rows.splice(idx, 1);
-    if (!this.rows.length) {
-      this.mode = null;
-      const item = this.editIdx !== null ? this.items()[this.editIdx] : null;
-      const target = item?.target_cost_pct || (this.formType === 'cocktail' ? 22 : 32);
-      this.renderRecipeSection(item, target);
-      this.refreshFieldMissing();
-      return;
-    }
-    this.renderRows();
-    this.calcRecipe();
-  },
-
-  calcRecipe() {
-    document.querySelectorAll('.ri-ing-qty').forEach(el => {
-      const idx = parseInt(el.dataset.i);
-      if (this.rows[idx]) this.rows[idx].quantity = parseFloat(el.value) || 0;
-    });
-    let tc = 0;
-    this.rows.forEach((r, idx) => {
-      const basis = this.ingredientCostBasis(r, this.mode);
-      const qty = parseFloat(r.quantity) || 0;
-      const line = qty * (basis.costPerUnit || 0);
-      tc += line;
-      const le = document.getElementById('ri-lc-' + idx);
-      if (le) le.textContent = line > 0 ? App.fmtCurrency(line) : '-';
-    });
-    const py = this.mode === 'food' ? (parseFloat(document.getElementById('ri-plate-yield')?.value) || 1) : 1;
-    const cps = (this.mode === 'food' && py > 0) ? tc / py : tc;
-    const mp  = parseFloat(document.getElementById('ri-price')?.value) || 0;
-    const tpct = parseFloat(document.getElementById('ri-target-pct')?.value) || 0;
-    const cpct = mp > 0 ? (cps / mp * 100) : null;
-    const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
-    set('ri-tc', tc > 0 ? App.fmtCurrency(tc) : '-');
-    set('ri-cps', cps > 0 ? App.fmtCurrency(cps) : '-');
-    set('ri-cpct', cpct != null ? cpct.toFixed(1) + '%' : '-', cpct != null && tpct > 0 ? (cpct > tpct ? 'warn' : 'good') : '');
-    set('ri-tgt-d', tpct > 0 ? tpct.toFixed(1) + '%' : '-');
-    const costInp = document.getElementById('ri-cost');
-    if (costInp && this.rows.length) {
-      costInp.value = cps > 0 ? cps.toFixed(2) : '';
-      costInp.disabled = true;
-    }
-    this.refreshFieldMissing();
-  },
-
-  // ── Save ──────────────────────────────────────────────────────────────
-  async _save(existing) {
-    if (this._saving) return;
-    this._saving = true;
-    setTimeout(() => { this._saving = false; }, 1000);
-
-    const err = document.getElementById('ri-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } this._saving = false; };
-
-    const type = this.formType;
-    const name = document.getElementById('ri-name')?.value.trim();
-    const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
-    const covers = parseFloat(document.getElementById('ri-cov')?.value) || 0;
-    const notes = document.getElementById('ri-notes')?.value || '';
-
-    if (!name) { fail('Item name required.'); return; }
-    if (!(price > 0)) { fail('Menu price required.'); return; }
-
-    let category = '';
-    let recipe = null;
-    let linkedProductId = '';
-    let computedCost = 0;
-    let targetPct = existing?.target_cost_pct;
-
-    if (type === 'plate') {
-      category = document.getElementById('ri-cat')?.value || '';
-      if (!category) { fail('Category required.'); return; }
-      const recipeIngs = (this.rows.length && this.mode)
-        ? this.rows.filter(r => r.id && (parseFloat(r.quantity) || 0) > 0).map(r => ({ source: r.source, id: r.id, quantity: parseFloat(r.quantity) || 0 }))
-        : [];
-      if (recipeIngs.length > 0) {
-        recipe = {
-          mode: 'food',
-          ingredients: recipeIngs,
-          plate_yield: parseFloat(document.getElementById('ri-plate-yield')?.value) || 1
-        };
-        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || 32;
-        const tmp = { recipe };
-        computedCost = App.menuItemCost(tmp) || 0;
-      } else {
-        computedCost = parseFloat(document.getElementById('ri-cost')?.value) || 0;
-      }
-    } else if (type === 'cocktail') {
-      category = 'Cocktails';
-      const recipeIngs = (this.rows.length && this.mode)
-        ? this.rows.filter(r => r.id && (parseFloat(r.quantity) || 0) > 0).map(r => ({ source: r.source, id: r.id, quantity: parseFloat(r.quantity) || 0 }))
-        : [];
-      if (recipeIngs.length > 0) {
-        recipe = { mode: 'single', ingredients: recipeIngs, plate_yield: null };
-        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || 22;
-        const tmp = { recipe };
-        computedCost = App.menuItemCost(tmp) || 0;
-      } else {
-        computedCost = parseFloat(document.getElementById('ri-cost')?.value) || 0;
-      }
-    } else if (type === 'inventory') {
-      linkedProductId = this.linkedProductId || document.getElementById('ri-linked-prod')?.value || '';
-      if (!linkedProductId) { fail('Pick an inventory product.'); return; }
-      const p = this.prodById(linkedProductId);
-      if (!p) { fail('Linked product not found.'); return; }
-      category = this.IC_TO_MENU_CAT[p.category] || 'Other';
-      const tmp = { linked_product_id: linkedProductId };
-      computedCost = App.menuItemCost(tmp) || 0;
-    }
-
-    const entry = {
-      id:                 existing?.id || App.uid(),
-      name,
-      category,
-      price,
-      cost:               computedCost,
-      weekly_covers:      covers,
-      notes,
-      recipe,
-      linked_product_id:  linkedProductId,
-      target_cost_pct:    targetPct,
-      created_at:         existing?.created_at || new Date().toISOString(),
-      updated_at:         new Date().toISOString()
-    };
-
-    if (this.editIdx !== null) this.items()[this.editIdx] = entry;
-    else this.items().push(entry);
-
-    await App.saveKey('menu_items');
-    App.markSetupDone('gs_r_menu');
-    if (recipe) App.markSetupDone('gs_p_recipes');
-    this.editIdx = null;
-    this.rows = [];
-    this.mode = null;
-    this.linkedProductId = '';
-    this.formType = null;
-    // Land back on the tab matching what we just saved
-    this.activeTab = type;
-    this.renderLanding();
-  },
-
-  // ── Import (CSV/Excel) ───────────────────────────────────────────────
-  showImport() {
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="rmi-imp-back">&#8592; Back to Menu Items</button></div>'
-      + '<div class="card-title">Import Menu Items from File</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">Upload a CSV or Excel file with your menu items. Bar Cop reads your columns and maps them. Items import without recipes attached; you can edit each item afterwards to build recipes or link inventory products.</div>'
-      + '<details style="margin-bottom:16px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'
-      + '<strong style="color:var(--t1);">First row must be column headers.</strong> One row per item.<br><br>'
-      + '<strong style="color:var(--t1);">Columns Bar Cop recognizes:</strong><br>'
-      + '&bull; <strong>Name / Item / Product / Description</strong> required<br>'
-      + '&bull; <strong>Category / Type / Group</strong> optional<br>'
-      + '&bull; <strong>Price / Menu Price / Sell Price</strong> optional<br>'
-      + '&bull; <strong>Cost / Item Cost / COGS</strong> optional<br>'
-      + '&bull; <strong>Covers / Weekly Covers / Volume / Qty</strong> optional<br><br>'
-      + '<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)'
-      + '</div></details>'
-      + '<input type="file" id="rmi-imp-file" accept=".csv,.xlsx,.xls" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;margin-bottom:12px;"/>'
-      + '<div id="rmi-imp-status" style="font-size:12px;color:var(--t2);margin-bottom:12px;display:none;"></div>'
-      + '<div style="display:flex;gap:10px;">'
-      + '<button class="btn btn-primary" id="rmi-imp-btn">Import Items</button>'
-      + '<button class="btn btn-ghost" id="rmi-imp-cancel">Cancel</button>'
-      + '</div></div></div>';
-
-    const back = () => this.renderLanding();
-    document.getElementById('rmi-imp-back')?.addEventListener('click', back);
-    document.getElementById('rmi-imp-cancel')?.addEventListener('click', back);
-    document.getElementById('rmi-imp-btn')?.addEventListener('click', async () => {
-      const file = document.getElementById('rmi-imp-file')?.files?.[0];
-      const status = document.getElementById('rmi-imp-status');
-      if (!file) { if (status) { status.style.display = 'block'; status.textContent = 'Select a file first.'; } return; }
-      if (status) { status.style.display = 'block'; status.textContent = 'Reading file...'; }
-      const text = await file.text();
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      if (lines.length < 2) { status.textContent = 'File appears empty.'; return; }
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
-      const nameIdx  = headers.findIndex(h => ['name', 'item', 'product', 'description'].some(k => h.includes(k)));
-      const catIdx   = headers.findIndex(h => ['category', 'type', 'group'].some(k => h.includes(k)));
-      const priceIdx = headers.findIndex(h => ['price', 'menu price', 'sell'].some(k => h.includes(k)));
-      const costIdx  = headers.findIndex(h => ['cost', 'cogs'].some(k => h.includes(k)));
-      const covIdx   = headers.findIndex(h => ['cover', 'volume', 'qty', 'count'].some(k => h.includes(k)));
-      if (nameIdx < 0) { status.textContent = 'Could not find a Name column. Make sure row 1 has headers.'; return; }
-      const imported = [];
-      lines.slice(1).forEach(line => {
-        const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
-        const name = cols[nameIdx];
-        if (!name) return;
-        imported.push({
-          id: App.uid(), name,
-          category:      catIdx  >= 0 ? cols[catIdx]  : '',
-          price:         priceIdx >= 0 ? parseFloat(cols[priceIdx]) || 0 : 0,
-          cost:          costIdx  >= 0 ? parseFloat(cols[costIdx])  || 0 : 0,
-          weekly_covers: covIdx   >= 0 ? parseFloat(cols[covIdx])   || 0 : 0,
-          notes:         '',
-          recipe:        null,
-          linked_product_id: '',
-          created_at:    new Date().toISOString(),
-          updated_at:    new Date().toISOString()
-        });
-      });
-      this.items().push(...imported);
-      await App.saveKey('menu_items');
-      App.markSetupDone('gs_r_menu');
-      status.textContent = imported.length + ' items imported.';
-      setTimeout(() => this.renderLanding(), 1000);
-    });
-  }
-};
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap');
+
+:root {
+  --bg:        #000000;
+  --surface:   #070E15;
+  --input:     #06111c;
+  --panel:     #08111A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
+  --hover:     rgba(255,255,255,0.05);
+  --nav-act:   #0d1e2e;
+
+  --gold:      #DBAB46;
+  --gold-h:    #C29638;
+  --gold-bg:   rgba(219,171,70,0.10);
+  --red:       #C03828;
+  --red-bg:    rgba(192,56,40,0.13);
+  --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
+  --steel:     #4888A8;
+  --green:     #518A79;                /* Success: on-target, strong scores, positive trend */
+  --green-bg:  rgba(81,138,121,0.12);
+  --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
+  --blue-bg:   rgba(76,142,171,0.10);
+  --amber:     #9A5D34;                /* Warn/watch state: muted burnt brown, between red (bad) and green (good) */
+  --amber-bg:  rgba(154,93,52,0.12);
+
+  --w:         #ffffff;
+  --t1:        rgba(200,216,232,0.94);
+  --t2:        rgba(200,216,232,0.66);
+  --t3:        rgba(255,255,255,0.38);
+  --t4:        rgba(255,255,255,0.22);
+  --b1:        rgba(255,255,255,0.11);
+  --b2:        rgba(255,255,255,0.06);
+  --b-edge:    #22282F;                /* Outer borders that touch the black page bg */
+
+  --r:  4px;
+  --r2: 3px;
+  --sp: 28px;
+
+  --sidebar-w:      220px;
+  --sidebar-w-coll: 52px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--w);font-family:'Barlow',-apple-system,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;}
+
+/* ── Dark all inputs everywhere ── */
+input,select,textarea{color-scheme:dark;}
+.app input:not([type=file]),.app select,.app textarea{
+  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--w);font-family:'Barlow',sans-serif;color-scheme:dark;
+}
+.app input:not([type=file]):focus,.app select:focus,.app textarea:focus{border-color:var(--gold);outline:none;}
+.form-input{
+  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
+  padding:7px 9px;outline:none;appearance:none;-webkit-appearance:none;
+  transition:border-color 0.12s;color-scheme:dark;width:100%;
+}
+.form-input:focus{border-color:var(--gold);}
+.form-input[type=number]{-moz-appearance:textfield;}
+.form-input[type=number]::-webkit-inner-spin-button,
+.form-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+
+/* ── Utility ── */
+.hidden{display:none!important;}
+.pos{color:var(--gold);}
+.neg{color:var(--red);}
+.val{color:var(--w);}
+.dim{color:var(--t3);}
+
+/* ══ APP SHELL ══ */
+.app{display:flex;height:100vh;overflow:hidden;}
+
+/* ══ SIDEBAR ══ */
+.sidebar{
+  width:var(--sidebar-w);
+  min-width:var(--sidebar-w);
+  height:100vh;
+  background:var(--surface);
+  border-right:1px solid var(--b-edge);
+  display:flex;flex-direction:column;
+  overflow:hidden;flex-shrink:0;
+  transition:width 0.2s ease,min-width 0.2s ease;
+}
+.app.sidebar-collapsed .sidebar{
+  width:var(--sidebar-w-coll);
+  min-width:var(--sidebar-w-coll);
+}
+
+/* Logo area */
+.sidebar-logo{
+  padding:14px 12px 12px;
+  border-bottom:1px solid var(--b2);
+  flex-shrink:0;
+  overflow:hidden;
+  height:52px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.sidebar-logo-full{height:24px;width:auto;display:block;flex-shrink:0;}
+.sidebar-logo-icon{
+  height:26px;width:auto;display:none;flex-shrink:0;
+}
+.app.sidebar-collapsed .sidebar-logo-full{display:none;}
+.app.sidebar-collapsed .sidebar-logo-icon{display:none;}
+/* Collapsed: the toggle button is the only visible child; center it where
+   the Bar Cop icon used to sit. */
+.app.sidebar-collapsed .sidebar-logo{justify-content:center;}
+
+/* The collapse toggle lives inside the sidebar-logo box, right-aligned when
+   expanded, centered when collapsed (replaces the old topbar-toggle). */
+.sidebar-logo-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:26px;height:26px;
+  background:transparent;
+  border:1px solid var(--b1);
+  border-radius:var(--r2);
+  color:var(--t3);cursor:pointer;
+  flex-shrink:0;
+  transition:border-color 0.1s,color 0.1s;
+}
+.sidebar-logo-toggle:hover{border-color:rgba(255,255,255,0.25);color:var(--t2);}
+
+/* Nav */
+.sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 0;scrollbar-width:none;}
+.sidebar-nav::-webkit-scrollbar{display:none;}
+
+.nav-section{
+  padding:10px 14px 2px;
+  font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--t4);white-space:nowrap;overflow:hidden;
+  transition:opacity 0.15s;
+}
+.app.sidebar-collapsed .nav-section{opacity:0;height:0;padding:0;margin:0;}
+
+.nav-item{
+  display:flex;align-items:center;
+  gap:10px;
+  padding:7px 14px;
+  cursor:pointer;
+  border-radius:0;
+  transition:background 0.12s;
+  user-select:none;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.nav-item:hover{background:var(--hover);}
+.nav-item.active{background:var(--nav-act);}
+
+/* In collapsed mode center the icon */
+.app.sidebar-collapsed .nav-item{
+  padding:8px 0;
+  justify-content:center;
+  gap:0;
+}
+
+.nav-icon{
+  width:17px;height:17px;flex-shrink:0;
+  color:var(--t3);
+  transition:color 0.12s;
+}
+.nav-item:hover  .nav-icon{color:var(--t1);}
+.nav-item.active .nav-icon{color:var(--gold);}
+
+.nav-label{
+  font-size:11px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;
+  color:var(--t2);transition:color 0.12s,opacity 0.15s,width 0.2s;
+  overflow:hidden;white-space:nowrap;
+}
+.nav-item:hover  .nav-label{color:var(--w);}
+.nav-item.active .nav-label{color:var(--w);}
+.app.sidebar-collapsed .nav-label{width:0;opacity:0;overflow:hidden;}
+
+/* Footer */
+.sidebar-footer{
+  padding:10px 12px 12px;
+  border-top:1px solid var(--b2);
+  flex-shrink:0;overflow:hidden;
+}
+.period-label{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t4);margin-bottom:2px;white-space:nowrap;}
+.period-val{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;white-space:nowrap;}
+.app.sidebar-collapsed .period-label,
+.app.sidebar-collapsed .period-val{display:none;}
+
+.sidebar-btn{
+  display:flex;align-items:center;gap:8px;
+  background:transparent;
+  border:none;
+  color:var(--t3);
+  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  padding:6px 2px;cursor:pointer;
+  width:100%;margin-bottom:4px;
+  transition:color 0.12s;
+  white-space:nowrap;overflow:hidden;
+}
+.sidebar-btn:hover{color:var(--t1);}
+.sidebar-btn.active{color:var(--gold);}
+.sidebar-btn .nav-icon{width:16px;height:16px;flex-shrink:0;}
+.app.sidebar-collapsed .sidebar-btn{justify-content:center;padding:6px 0;}
+.app.sidebar-collapsed .sidebar-btn-label{display:none;}
+
+/* Toggle button */
+.topbar-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;
+  background:transparent;
+  border:1px solid var(--b1);
+  border-radius:var(--r2);
+  color:var(--t3);cursor:pointer;
+  transition:all 0.1s;
+  flex-shrink:0;margin-right:10px;
+}
+.topbar-toggle:hover{border-color:rgba(255,255,255,0.25);color:var(--t2);}
+
+/* ══ MAIN ══ */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.topbar{
+  height:50px;min-height:50px;
+  background:var(--surface);border-bottom:1px solid var(--b-edge);
+  display:flex;align-items:center;padding:0 var(--sp);flex-shrink:0;
+}
+.topbar-left{flex:1;display:flex;align-items:center;gap:0;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.topbar-title{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);}
+/* topbar-sub holds the "| Back to [last page]" breadcrumb link after the
+   white title. Resets letter-spacing/text-transform so the inline link
+   reads cleanly in mixed case. */
+.topbar-sub{font-size:11px;font-weight:600;color:var(--t3);margin-left:10px;display:flex;align-items:center;gap:8px;}
+.topbar-sep{color:var(--t4);font-weight:400;}
+.topbar-back-link{
+  color:var(--t3);font-family:'Barlow',sans-serif;font-size:11px;font-weight:600;
+  text-decoration:none;cursor:pointer;transition:color 0.12s;
+}
+.topbar-back-link:hover{color:var(--t1);}
+/* Global Settings tab strip — matches the breadcrumb link palette so the
+   tab affordances feel like part of the same nav system. Hover lifts an
+   inactive tab from t3 to t1; the active tab is held at t1 by JS plus the
+   gold underline indicator. */
+.hs-tab{outline:none;}
+.hs-tab:hover{color:var(--t1) !important;}
+
+/* ══ CONTENT ══ */
+.content{flex:1;overflow-y:auto;background:var(--bg);}
+.screen{padding:24px var(--sp) 56px;max-width:980px;width:100%;}
+
+/* ══ BUTTONS ══ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;padding:8px 18px;line-height:1;white-space:nowrap;transition:background 0.12s,color 0.12s,border-color 0.12s;}
+.btn-primary{background:var(--gold);color:#fff;}
+.btn-primary:hover{background:var(--gold-h);}
+.btn-ghost{background:transparent;border:1px solid var(--b1);color:var(--t2);}
+.btn-ghost:hover{border-color:rgba(255,255,255,0.28);color:var(--w);}
+.btn-danger{background:transparent;border:1px solid rgba(192,56,40,0.4);color:var(--red);}
+.btn-danger:hover{background:var(--red-bg);}
+.btn-sm{padding:5px 12px;font-size:10px;}
+.btn-lg{padding:10px 24px;font-size:12px;}
+
+/* ══ CARD ══ */
+.card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:20px;margin-bottom:16px;}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);}
+.card-actions{display:flex;gap:8px;padding-top:14px;margin-top:14px;border-top:1px solid var(--b2);align-items:center;}
+.tw-nav{display:flex;gap:12px;justify-content:space-between;margin-top:16px;align-items:center;}
+
+/* ══ FORM SYSTEM ══ */
+/* All form rows: flex, wrap allowed, consistent gap */
+.form-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+.form-row:last-of-type{margin-bottom:0;}
+
+/* Individual field */
+.f{display:flex;flex-direction:column;gap:5px;}
+.f label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.f input,.f select,.f textarea{
+  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
+  padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;
+  transition:border-color 0.12s;color-scheme:dark;width:100%;
+}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--gold);}
+/* Kill Chrome's autofill yellow tint on every form input. Chrome paints
+   autofilled inputs yellow by default to signal "this is autofilled" —
+   but on a dark theme it shows up as a muddy color change. Force the
+   inset shadow to match our input background so the field stays consistent
+   whether or not Chrome autofilled it. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill{
+  -webkit-box-shadow:0 0 0 1000px var(--input) inset !important;
+  -webkit-text-fill-color:var(--w) !important;
+  caret-color:var(--w);
+  transition:background-color 5000s ease-in-out 0s;
+}
+/* Required-field highlighting — applied ONLY when editing an incomplete
+   record. Red border on the cell, nothing else. No "required" word, no
+   red label text. Just the red border tells the operator what's missing.
+   Do NOT override input background — that breaks color-scheme:dark on
+   the native <select> dropdown panel (Chrome would render it light). */
+.f.field-missing input,
+.f.field-missing select,
+.f.field-missing textarea{border-color:var(--red);}
+.f input[type=number]{-moz-appearance:textfield;}
+.f input[type=number]::-webkit-inner-spin-button,
+.f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+/* Date inputs: color-scheme:dark makes the native calendar icon render light
+   on its own. Do NOT add filter:invert() here — that would flip the already
+   light icon back to black and make it invisible on the dark field. */
+input[type="date"]{color-scheme:dark;}
+input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
+.f select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;padding-right:26px;cursor:pointer;
+}
+.f textarea{resize:vertical;min-height:72px;}
+
+/* Dollar/percent wrappers */
+.fw{position:relative;display:flex;align-items:center;width:100%;}
+.fw span.pre,.fw span.suf{position:absolute;font-size:12px;font-weight:600;color:var(--t3);pointer-events:none;z-index:1;}
+.fw span.pre{left:9px;} .fw span.suf{right:9px;}
+.fw input.pre{padding-left:22px;} .fw input.suf{padding-right:22px;}
+
+/* Joined input+select */
+.fj{display:flex;}
+.fj input:first-child{border-radius:var(--r2) 0 0 var(--r2);border-right:none;flex:1;}
+.fj select:last-child{border-radius:0 var(--r2) var(--r2) 0;width:90px;flex-shrink:0;}
+
+/* Read-only display */
+.f-display{background:var(--input);border:1px solid var(--b2);border-radius:var(--r2);padding:8px 10px;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:var(--gold);line-height:1;min-height:36px;display:flex;align-items:center;}
+
+/* Semantic widths */
+.w-date{width:150px;} .w-xs{width:72px;} .w-sm{width:115px;} .w-md{width:170px;} .w-lg{width:230px;} .w-xl{width:310px;} .w-grow{flex:1;min-width:130px;}
+
+/* ══ SECTION HEADING ══ */
+.sh{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;}
+
+/* ══ CALC PANEL ══ */
+.calc{background:var(--input);border:1px solid var(--b2);border-radius:var(--r);padding:14px 18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+.calc-item{display:flex;flex-direction:column;gap:4px;}
+.calc-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.calc-val{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;color:var(--w);line-height:1;}
+.calc-val.good{color:var(--gold);} .calc-val.warn{color:var(--red);} .calc-val.dim{color:var(--t3);}
+
+/* ══ METRIC CARDS ══ */
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.metric-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px;text-align:center;}
+.metric-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;}
+.metric-val{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:600;letter-spacing:-0.5px;line-height:1;margin-bottom:6px;color:var(--w);}
+.metric-val.on-target{color:var(--w);} .metric-val.over-target{color:var(--red);}
+/* Supporting lines all share the quiet uppercase label treatment, so the
+   metric number stays the only colored element in the card. */
+.metric-target,.metric-impact,.metric-trend{
+  font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--t3);margin-bottom:4px;
+}
+.metric-trend{margin-bottom:0;}
+.metric-impact.neg,.metric-impact.pos,
+.metric-trend.trend-up,.metric-trend.trend-dn{color:var(--t3);}
+.trend-up{color:var(--gold);} .trend-dn{color:var(--red);}
+
+/* ══ ALERT ══ */
+.alert-bar{background:var(--red);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.alert-text{flex:1;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--w);line-height:1.5;}
+.alert-dismiss{display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.2);border:none;border-radius:var(--r);color:var(--w);font-family:'Barlow',-apple-system,sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;padding:8px 18px;line-height:1;white-space:nowrap;flex-shrink:0;}
+
+/* ══ TABLE ══ */
+.tbl-wrap{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:9px 12px;border-bottom:1px solid var(--b2);white-space:nowrap;background:var(--surface);}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--b2);color:var(--t2);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:var(--hover);}
+.row-actions{display:flex;gap:6px;}
+
+/* ══ SUMMARY TABLE ══ */
+.sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
+
+.sum-tbl td{padding:8px 12px;text-align:left;color:var(--t2);border-bottom:1px solid rgba(255,255,255,0.03);}
+.lb-tbl td{padding:14px 12px !important;}
+.sum-tbl td:first-child{text-align:left;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.38);}
+.sum-tbl .total td{color:var(--w);font-weight:600;border-top:1px solid var(--b1);}
+
+/* ══ BADGE ══ */
+.badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:var(--r2);white-space:nowrap;}
+.badge-ok{background:var(--gold-bg);color:var(--gold);}
+.badge-warn{background:var(--red-bg);color:var(--red);}
+.badge-dim{background:rgba(255,255,255,0.06);color:var(--t3);}
+
+/* ══ DIVIDER ══ */
+.divider{height:1px;background:var(--b2);margin:18px 0;}
+
+/* ══ QUICK ACTIONS ══ */
+.qa{display:flex;gap:10px;flex-wrap:wrap;}
+
+/* ══ STEP INDICATOR ══ */
+.steps{display:flex;align-items:center;margin-bottom:22px;max-width:460px;}
+.step-dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--b1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--t3);flex-shrink:0;transition:all 0.15s;}
+.step-dot.active{border-color:var(--gold);background:var(--gold);color:#000;}
+.step-dot.done{border-color:var(--t3);}
+.step-line{flex:1;height:1px;background:var(--b2);}
+.step-line.done{background:var(--t3);}
+
+/* ══ CHART ══ */
+.chart-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px;margin-bottom:18px;}
+.chart-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t2);}
+.legend-line{width:18px;height:2px;}
+
+/* ══ EMPTY STATE ══ */
+.empty{text-align:center;padding:48px 20px;}
+.empty-title{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
+.empty-sub{font-size:13px;color:var(--t4);margin-bottom:20px;line-height:1.6;max-width:380px;margin-left:auto;margin-right:auto;}
+
+/* ══ SCORE ROWS ══ */
+.score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.score-num{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--t3);width:20px;flex-shrink:0;text-align:center;padding-top:2px;}
+.score-body{flex:1;}
+.score-main{font-size:12px;color:var(--t1);margin-bottom:3px;}
+.score-sub{font-size:11px;color:var(--t3);}
+.score-btns{display:flex;gap:4px;flex-shrink:0;}
+.sc-btn{width:26px;height:26px;border-radius:var(--r2);border:1px solid var(--b1);background:transparent;color:var(--t3);font-size:10px;font-weight:800;cursor:pointer;transition:all 0.1s;display:flex;align-items:center;justify-content:center;}
+.sc-btn.sel{background:var(--gold);border-color:var(--gold);color:#000;}
+
+/* ══ TOOLTIP ══ */
+.tt{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.3);font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:border-color 0.1s,color 0.1s;user-select:none;vertical-align:middle;}
+.tt:hover{border-color:var(--gold);color:var(--gold);}
+.tt-box{position:fixed;z-index:9999;background:#0d1c2c;border:1px solid var(--b1);border-radius:var(--r);padding:11px 14px;max-width:260px;box-shadow:0 8px 28px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity 0.15s;display:none;}
+.tt-box.on{opacity:1;}
+.tt-title{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}
+.tt-body{font-size:12px;color:var(--t2);line-height:1.6;}
+.tt-eg{font-size:11px;color:var(--t3);margin-top:6px;font-style:italic;}
+
+/* ══ SETTINGS ══ */
+.settings-section{margin-bottom:26px;}
+.settings-title{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--b2);}
+
+/* ══ ONBOARDING ══ */
+.ob-overlay{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
+.ob-panel{width:100%;max-width:540px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:32px;margin:auto;}
+.ob-logo{margin-bottom:22px;text-align:center;}
+.ob-heading{font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
+.ob-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;max-width:350px;margin-left:auto;margin-right:auto;}
+.ob-pips{display:flex;gap:4px;margin-bottom:22px;}
+.ob-pip{flex:1;height:3px;background:var(--b2);border-radius:2px;}
+.ob-pip.on{background:var(--gold);}
+.ob-pip.done{background:rgba(219,171,70,0.35);}
+.ob-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+
+/* ══ AUTH ══ */
+.auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;}
+.auth-panel{width:400px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:36px;}
+.auth-logo{display:flex;justify-content:center;margin-bottom:24px;}
+.auth-heading{font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
+.auth-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.5;}
+.auth-link{background:none;border:none;color:var(--steel);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
+.auth-link:hover{color:var(--w);}
+
+/* ══ ING TABLE ══ */
+.ing-tbl{width:100%;border-collapse:collapse;}
+.ing-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--b2);white-space:nowrap;}
+.ing-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;color:var(--t2);}
+.ing-tbl tr:last-child td{border-bottom:none;}
+
+/* ══ PROG BAR ══ */
+.prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
+
+/* ══ SCROLLBAR ══
+   Unified across the app: subtle white-tinted thumb on transparent track,
+   slightly stronger on hover. Matches the Hub dashboard PAI scrollbar feel
+   so every scrollbar in Bar Cop reads as the same component. */
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.06) transparent;}
+*::-webkit-scrollbar{width:6px;height:6px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:3px;}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.11);}
