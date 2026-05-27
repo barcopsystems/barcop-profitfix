@@ -141,6 +141,8 @@ S.RevenueThisWeek = {
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="rw-c-rev">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Forecast</div><div class="calc-val" id="rw-c-fc">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val" id="rw-c-fcgap">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="rw-c-ca">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">$' + (this.targets().check_avg || 35) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val" id="rw-c-cagap">-</div></div>'
@@ -210,6 +212,13 @@ S.RevenueThisWeek = {
     const checkAvg = covers > 0 ? totalRev / covers : null;
     const targetCA = this.targets().check_avg || 35;
     set('rw-c-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '-');
+    // Forecast comparison: read this week's forecast (keyed by Monday week_start)
+    const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
+    const fc = (pe && App.forecastForWeek) ? App.forecastForWeek(pe) : null;
+    const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
+    set('rw-c-fc', fcTotal > 0 ? App.fmtCurrency(fcTotal) : '-', fcTotal > 0 ? 'dim' : '');
+    const fcGap = fcTotal > 0 && totalRev > 0 ? totalRev - fcTotal : null;
+    set('rw-c-fcgap', fcGap != null ? (fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap) : '-', fcGap != null ? (fcGap >= 0 ? 'good' : 'warn') : '');
     set('rw-c-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg != null ? (checkAvg >= targetCA ? 'good' : 'warn') : '');
     const caGap = checkAvg != null ? checkAvg - targetCA : null;
     set('rw-c-cagap', caGap != null ? (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) : '-', caGap != null ? (caGap >= 0 ? 'good' : 'warn') : '');
@@ -250,9 +259,6 @@ S.RevenueThisWeek = {
       total_hours:       laborHrs,
       labor_pct_blended: parseFloat(laborPct.toFixed(2)),
       rplh_blended:      parseFloat(rplh.toFixed(2)),
-      rplh_lunch:        0,
-      rplh_dinner:       0,
-      rplh_bar:          0,
       notes:             d.notes || '',
       saved_at:          new Date().toISOString()
     };
