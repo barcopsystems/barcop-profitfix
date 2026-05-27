@@ -1092,6 +1092,78 @@ const App = {
     return cost;
   },
 
+  // Staff picker <option> markup. Used by every form that asks for a person
+  // (manager, cashier, server, witness, recorded-by, etc.) so the operator
+  // picks from the roster instead of free-typing a name that might not
+  // match anyone. Returns option HTML; caller wraps in <select id=...>.
+  //
+  // selectedId can be either a staff_id (preferred, post-Phase-0) or a
+  // legacy name string from records that pre-date the staff_id field. The
+  // helper resolves a legacy name to its staff_id automatically and selects
+  // that option, so edit-mode forms preselect the right person.
+  //
+  // opts:
+  //   placeholder   First-option label. Default: "Select staff..."
+  //   optional      If true, placeholder reads as the empty pick.
+  //   filter        Function(staff) returning bool. Limit to a subset
+  //                 (e.g., only managers, only tipped staff).
+  //
+  // App.staffById(id) resolves an id back to the staff record at save time.
+  staffOptions(selectedId, opts) {
+    opts = opts || {};
+    const all = ((this.laborData && this.laborData.lc_staff) || [])
+      .filter(s => s.status !== 'Inactive');
+    const filtered = opts.filter ? all.filter(opts.filter) : all;
+
+    const positions = ((this.laborData && this.laborData.lc_positions) || []);
+    const posNameOf = pid => (positions.find(p => p.id === pid) || {}).name || 'Other';
+
+    // Resolve legacy name → id so old records preselect correctly.
+    let resolvedId = selectedId || '';
+    if (resolvedId && !filtered.some(s => s.id === resolvedId)) {
+      const byName = filtered.find(s => s.name === resolvedId);
+      if (byName) resolvedId = byName.id;
+    }
+
+    const groups = {};
+    filtered.forEach(s => {
+      const p = posNameOf(s.position_id);
+      if (!groups[p]) groups[p] = [];
+      groups[p].push(s);
+    });
+    const order = ['Manager', 'Bartender', 'Barback', 'Server', 'Host', 'Line Cook', 'Prep Cook'];
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const ai = order.indexOf(a), bi = order.indexOf(b);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    });
+
+    let h = '<option value="">' + esc(opts.placeholder || 'Select staff...') + '</option>';
+    groupKeys.forEach(g => {
+      h += '<optgroup label="' + esc(g) + '">';
+      groups[g].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
+        h += '<option value="' + esc(s.id) + '"' + (resolvedId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+      });
+      h += '</optgroup>';
+    });
+
+    // Preserve a legacy free-text name that has no matching active staff so
+    // the operator does not lose the record on edit.
+    if (selectedId && !filtered.some(s => s.id === selectedId) && !filtered.some(s => s.name === selectedId)) {
+      h += '<option value="' + esc(selectedId) + '" selected>' + esc(selectedId) + ' (not on roster)</option>';
+    }
+
+    return h;
+  },
+
+  // Resolve a staff_id (or legacy name) to the staff record. Save handlers
+  // call this to denormalize the picked staff into a name field for display
+  // alongside the id for joins.
+  staffById(id) {
+    if (!id) return null;
+    const list = ((this.laborData && this.laborData.lc_staff) || []);
+    return list.find(s => s.id === id) || list.find(s => s.name === id) || null;
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
