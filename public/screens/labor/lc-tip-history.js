@@ -9,6 +9,9 @@ S.LaborTipHistory = {
   filterTo: '',
 
   tips() { return ((App.laborData && App.laborData.lc_tips) || []); },
+  pools() { return ((App.laborData && App.laborData.lc_tip_pools) || []); },
+  shifts() { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
+  shiftById(id) { return this.shifts().find(s => s.id === id); },
   inRange(t) {
     if (this.filterFrom && (t.date || '') < this.filterFrom) return false;
     if (this.filterTo && (t.date || '') > this.filterTo) return false;
@@ -22,7 +25,7 @@ S.LaborTipHistory = {
     return d.toISOString().slice(0, 10);
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(str + 'T00:00:00');
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -73,7 +76,7 @@ S.LaborTipHistory = {
         + '<div class="calc-item"><div class="calc-label">Card</div><div class="calc-val">' + App.fmtCurrency(card) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg / Entry</div><div class="calc-val">' + App.fmtCurrency(rows.length ? total / rows.length : 0) + '</div></div>'
         + '</div>';
-      body = summary + this.byStaff(rows) + this.byWeek(rows);
+      body = summary + this.byStaff(rows) + this.byShift(rows) + this.byWeek(rows);
     }
 
     this.container.innerHTML = '<div class="screen">' + filterCard + body + '</div>';
@@ -96,7 +99,7 @@ S.LaborTipHistory = {
     const g = {};
     rows.forEach(t => {
       const k = t.staff_id || t.name || '?';
-      if (!g[k]) g[k] = { name: t.name || '—', count: 0, cash: 0, card: 0 };
+      if (!g[k]) g[k] = { name: t.name || '-', count: 0, cash: 0, card: 0 };
       g[k].count++;
       g[k].cash += (t.cash_tips || 0);
       g[k].card += (t.card_tips || 0);
@@ -116,6 +119,58 @@ S.LaborTipHistory = {
     return '<div class="card"><div class="card-title">By Staff</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Avg / Entry</th>'
+      + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
+  },
+
+  // By-shift aggregation — surfaces the shift_id linkage Phase 3 added.
+  // Tip entries with a shift_id group under the matching shift; orphans
+  // (legacy entries with no shift_id) get bucketed under "Unlinked Date".
+  byShift(rows) {
+    const linked = rows.filter(t => t.shift_id);
+    if (!linked.length) return '';  // hide the section entirely if no linkage exists in range
+    const g = {};
+    linked.forEach(t => {
+      const k = t.shift_id;
+      if (!g[k]) {
+        const s = this.shiftById(k);
+        g[k] = {
+          shift_id: k,
+          date: t.date,
+          shift_type: t.shift_type || (s ? s.shift_type : '') || '',
+          manager: s ? (s.manager || '') : '',
+          count: 0, cash: 0, card: 0,
+          pool_amount: null
+        };
+      }
+      g[k].count++;
+      g[k].cash += (t.cash_tips || 0);
+      g[k].card += (t.card_tips || 0);
+    });
+    // Layer in pool data — when a pool exists for the shift, show it alongside
+    // the raw tips so the operator can see the split was saved.
+    this.pools().forEach(p => {
+      if (g[p.shift_id]) g[p.shift_id].pool_amount = p.pool_amount;
+    });
+    const trs = Object.keys(g)
+      .sort((a, b) => (g[b].date || '').localeCompare(g[a].date || ''))
+      .map(k => {
+        const x = g[k];
+        const total = x.cash + x.card;
+        const poolCell = x.pool_amount != null
+          ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">POOL ' + App.fmtCurrency(x.pool_amount) + '</span>'
+          : '<span style="font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;">No pool saved</span>';
+        return '<tr><td><div class="val">' + (x.date ? new Date(x.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-') + '</div>'
+          + (x.shift_type ? '<div style="font-size:10px;color:var(--t3);">' + esc(x.shift_type) + '</div>' : '') + '</td>'
+          + '<td>' + x.count + '</td>'
+          + '<td>' + App.fmtCurrency(x.cash) + '</td>'
+          + '<td>' + App.fmtCurrency(x.card) + '</td>'
+          + '<td class="val">' + App.fmtCurrency(total) + '</td>'
+          + '<td>' + poolCell + '</td></tr>';
+      }).join('');
+    return '<div class="card"><div class="card-title">By Shift</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Tip entries linked to a shift. POOL column shows whether the pool split was saved for that shift (taxable allocation per employee).</div>'
+      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<th>Shift</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Pool</th>'
       + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
   },
 
