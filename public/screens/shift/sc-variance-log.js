@@ -139,8 +139,8 @@ S.ShiftVarianceLog = {
       + '<select id="vl-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Drawer / Register</label>'
       + '<input type="text" id="vl-drawer" value="' + esc(v?.drawer || '') + '" placeholder="e.g. Bar 1"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Cashier</label>'
-      + '<input type="text" id="vl-cashier" value="' + esc(v?.cashier || '') + '" placeholder="Name"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Cashier</label>'
+      + '<select id="vl-cashier">' + App.staffOptions(v?.cashier_id || v?.cashier, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
@@ -209,7 +209,8 @@ S.ShiftVarianceLog = {
       date,
       shift_type:    document.getElementById('vl-type')?.value || '',
       drawer:        document.getElementById('vl-drawer')?.value.trim() || '',
-      cashier:       document.getElementById('vl-cashier')?.value.trim() || '',
+      cashier_id:    document.getElementById('vl-cashier')?.value || '',
+      cashier:       (App.staffById(document.getElementById('vl-cashier')?.value) || {}).name || '',
       expected_cash: exp,
       counted_cash:  cnt,
       variance,
