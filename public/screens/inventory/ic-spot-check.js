@@ -117,15 +117,21 @@ S.InventorySpotCheck = {
     this._seq = 0;
     const today = new Date().toISOString().slice(0, 10);
 
+    // Pre-fill from the active shift when one is running — that's the most
+    // common case for a mid-service spot check. Operator can still pick a
+    // different shift type and a different person before saving.
+    const active = App.activeShift();
+    const defaultShift = active && active.shift_type ? active.shift_type : 'Dinner';
+    const shiftOpts = (App.SHIFT_TYPES || ['Brunch','Lunch','Dinner','Late Night','Full Day'])
+      .map(t => '<option' + (t === defaultShift ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const setup = '<div class="card"><div class="card-title">Spot Check</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="sp-date" value="' + today + '" style="height:44px;"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label>'
-      + '<select id="sp-shift" style="height:44px;"><option>Brunch</option><option>Lunch</option>'
-      + '<option selected>Dinner</option><option>Late Night</option><option>Full Day</option></select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Checked By</label>'
-      + '<input type="text" id="sp-by" placeholder="Name" style="height:44px;"/></div>'
+      + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
+      + '<select id="sp-by" style="height:44px;">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div></div>';
 
     const productsCard = '<div class="card"><div class="card-title">Products Checked</div>'
@@ -321,7 +327,8 @@ S.InventorySpotCheck = {
       id:           App.uid(),
       date,
       shift:        document.getElementById('sp-shift')?.value || '',
-      checked_by:   document.getElementById('sp-by')?.value.trim() || '',
+      checked_by_id: document.getElementById('sp-by')?.value || '',
+      checked_by:   (App.staffById(document.getElementById('sp-by')?.value) || {}).name || '',
       items,
       product_count:  items.length,
       flagged_count:  items.filter(i => i.flagged).length,
