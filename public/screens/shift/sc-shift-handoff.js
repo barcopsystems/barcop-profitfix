@@ -82,7 +82,7 @@ S.ShiftHandoff = {
       lines.push('CASH RECONCILIATION');
       lines.push('  Skipped this shift.');
     } else if (cr.variance != null) {
-      const tol = (App.data?.settings?.cash_tolerance) || 10;
+      const tol = App.cashToleranceForShift(shift);
       const status = Math.abs(cr.variance) <= tol ? 'WITHIN TOLERANCE' : cr.variance < 0 ? 'SHORT' : 'OVER';
       lines.push('CASH RECONCILIATION - ' + status);
       lines.push('  Opening Bank: ' + fmt$(cr.opening_bank) + '   Drops Out: ' + fmt$(cr.drops_total));
@@ -140,7 +140,7 @@ S.ShiftHandoff = {
     const tr = shift.tip_recon  || {};
     const ex = this._gatherExceptions(shift);
     const checkAvg = (shift.covers && shift.covers > 0) ? (shift.total_revenue || 0) / shift.covers : null;
-    const tol = (App.data?.settings?.cash_tolerance) || 10;
+    const tol = App.cashToleranceForShift(shift);
 
     const fmt$ = v => v == null ? '<span class="muted">-</span>' : '$' + Number(v).toFixed(2);
     const num  = v => v == null ? '<span class="muted">-</span>' : String(v);
