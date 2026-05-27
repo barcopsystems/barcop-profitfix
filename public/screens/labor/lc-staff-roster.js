@@ -178,17 +178,36 @@ S.LaborStaffRoster = {
     const posId = document.getElementById('sr-pos')?.value;
     if (!posId) { fail('Choose a position.'); return; }
     const wage = parseFloat(document.getElementById('sr-wage')?.value);
+    const newWage = isNaN(wage) ? null : wage;
+
+    // Phase 5: maintain wage_history. When the wage changes on an existing
+    // staff member, append a row to wage_history with the prior wage and the
+    // effective date of the new wage. App.wageForStaffOn(staffId, date) reads
+    // this history so past-dated entries cost out at the wage in effect on
+    // that date, not the current rate.
+    const existing = this.editId ? this.staff().find(x => x.id === this.editId) : null;
+    const today = new Date().toISOString().slice(0, 10);
+    let wageHistory = Array.isArray(existing?.wage_history) ? existing.wage_history.slice() : [];
+    if (existing && existing.wage != null && newWage != null && existing.wage !== newWage) {
+      wageHistory.push({
+        prior_wage:     existing.wage,
+        new_wage:       newWage,
+        effective_date: today,
+        changed_at:     new Date().toISOString()
+      });
+    }
 
     const rec = {
-      id:          this.editId || App.uid(),
+      id:           this.editId || App.uid(),
       name,
-      position_id: posId,
-      wage:        isNaN(wage) ? null : wage,
-      status:      document.getElementById('sr-status')?.value || 'Active',
-      hire_date:   document.getElementById('sr-hire')?.value || '',
-      phone:       document.getElementById('sr-phone')?.value.trim() || '',
-      email:       document.getElementById('sr-email')?.value.trim() || '',
-      notes:       document.getElementById('sr-notes')?.value.trim() || ''
+      position_id:  posId,
+      wage:         newWage,
+      wage_history: wageHistory,
+      status:       document.getElementById('sr-status')?.value || 'Active',
+      hire_date:    document.getElementById('sr-hire')?.value || '',
+      phone:        document.getElementById('sr-phone')?.value.trim() || '',
+      email:        document.getElementById('sr-email')?.value.trim() || '',
+      notes:        document.getElementById('sr-notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
 
