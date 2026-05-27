@@ -57,26 +57,61 @@ S.Shift86List = {
       && new Date((i.date_86 || '') + 'T00:00:00') >= cutoff).length;
   },
 
-  // Product dropdown options. Grouped by category (canonical Inventory
-  // Control order). The "Custom" entry at the top of the list is the
-  // operator's escape hatch for 86'ing something that does not exist in
-  // ic_products (a menu item that is a recipe, an out-of-stock supply that
-  // is not tracked, etc.).
+  // Item dropdown: Menu Items first (most common 86 case — chef 86's the
+  // specialty cocktail or daily special), then Raw Products, then Batches,
+  // then a Custom entry as the escape hatch for anything Bar Cop does not
+  // track yet. Selected value can be a product id, menu_item id (prefixed
+  // "mi:"), batch id (prefixed "b:"), or "__custom".
   productOptions(selectedId) {
     const prods = this.products();
+    const menuItems = (App.menuItems && App.menuItems()) || [];
+    const batches = (App.batches && App.batches()) || [];
     const cats = this.categories();
     let h = '<option value="">Select item...</option>';
-    h += '<optgroup label="Custom"><option value="__custom"' + (this.customMode ? ' selected' : '') + '>Type a custom item</option></optgroup>';
+
+    // Menu Items first — most operators 86 menu items (a specialty cocktail,
+    // a special, an entree). Grouped by menu category.
+    if (menuItems.length) {
+      const byMenuCat = {};
+      menuItems.forEach(m => {
+        const c = m.category || 'Other';
+        if (!byMenuCat[c]) byMenuCat[c] = [];
+        byMenuCat[c].push(m);
+      });
+      Object.keys(byMenuCat).sort().forEach(c => {
+        h += '<optgroup label="Menu &middot; ' + esc(c) + '">';
+        byMenuCat[c].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(m => {
+          const v = 'mi:' + m.id;
+          h += '<option value="' + v + '"' + (selectedId === v ? ' selected' : '') + '>' + esc(m.name) + '</option>';
+        });
+        h += '</optgroup>';
+      });
+    }
+
+    // Raw products — for ingredient-level 86s ("Tito's bottle ran out").
     cats.forEach(cat => {
       const inCat = prods.filter(p => (p.category || '') === cat)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!inCat.length) return;
-      h += '<optgroup label="' + esc(cat) + '">';
+      h += '<optgroup label="Product &middot; ' + esc(cat) + '">';
       inCat.forEach(p => {
         h += '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>';
       });
       h += '</optgroup>';
     });
+
+    // Batches — frozen margarita mix, simple syrup, etc.
+    if (batches.length) {
+      h += '<optgroup label="Batches">';
+      batches.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(b => {
+        const v = 'b:' + b.id;
+        h += '<option value="' + v + '"' + (selectedId === v ? ' selected' : '') + '>' + esc(b.name) + '</option>';
+      });
+      h += '</optgroup>';
+    }
+
+    // Custom escape hatch — operator types a name for anything else.
+    h += '<optgroup label="Custom"><option value="__custom"' + (this.customMode ? ' selected' : '') + '>Type a custom item</option></optgroup>';
     return h;
   },
 
@@ -104,13 +139,26 @@ S.Shift86List = {
     const i = editing ? this.items().find(x => x.id === this.editId) : null;
     const activeMgr = (this.activeShift() || {}).manager_id || '';
 
-    // Resolve the saved item back to a product if possible. Legacy items
-    // saved as free text get matched by name; new items have product_id.
-    const savedProductId = i?.product_id || '';
-    const savedItemName  = i?.item || '';
-    const matchedByName  = savedItemName && this.products().find(p => p.name === savedItemName);
-    const initialProductId = savedProductId || (matchedByName ? matchedByName.id : '');
-    const isCustomItem = editing && !initialProductId && !!savedItemName;
+    // Resolve the saved item back to its source (menu item, product, batch).
+    // Legacy items saved as free text get matched by name to a product or
+    // menu item; new items have a typed source_id.
+    const savedSourceType = i?.source_type || (i?.product_id ? 'product' : '');
+    const savedSourceId   = i?.menu_item_id || i?.product_id || i?.batch_id || '';
+    const savedItemName   = i?.item || '';
+    let initialPickedValue = '';
+    if (savedSourceType === 'menu_item' || (i?.menu_item_id)) initialPickedValue = 'mi:' + (i.menu_item_id || savedSourceId);
+    else if (savedSourceType === 'batch' || (i?.batch_id))    initialPickedValue = 'b:' + (i.batch_id || savedSourceId);
+    else if (savedSourceId)                                    initialPickedValue = savedSourceId;
+    else if (savedItemName) {
+      // Legacy: try to match free-text name to a menu item, then a product
+      const mi = ((App.menuItems && App.menuItems()) || []).find(m => m.name === savedItemName);
+      if (mi) initialPickedValue = 'mi:' + mi.id;
+      else {
+        const p = this.products().find(x => x.name === savedItemName);
+        if (p) initialPickedValue = p.id;
+      }
+    }
+    const isCustomItem = editing && !initialPickedValue && !!savedItemName;
     this.customMode = isCustomItem;
 
     const dateVal = i?.date_86 || new Date().toISOString().slice(0, 10);
@@ -125,7 +173,7 @@ S.Shift86List = {
       // primary action. Custom text field appears below when "Custom" picked.
       + '<div class="form-row" style="gap:14px;align-items:flex-end;">'
         + '<div class="f" style="flex:1;min-width:240px;"><label>Item</label>'
-        + '<select id="qa-item" style="height:48px;font-size:15px;">' + this.productOptions(initialProductId) + '</select></div>'
+        + '<select id="qa-item" style="height:48px;font-size:15px;">' + this.productOptions(initialPickedValue) + '</select></div>'
       + '</div>'
       + '<div id="qa-custom-wrap" class="form-row" style="gap:14px;' + (isCustomItem ? '' : 'display:none;') + '">'
         + '<div class="f" style="flex:1;min-width:240px;"><label>Custom Item Name</label>'
@@ -273,18 +321,39 @@ S.Shift86List = {
     let itemName = '';
     let category = '';
     let productId = '';
+    let menuItemId = '';
+    let batchId = '';
+    let sourceType = '';
 
     const pickedValue = document.getElementById('qa-item')?.value || '';
     if (pickedValue === '__custom' || this.customMode) {
       itemName = document.getElementById('qa-custom')?.value.trim() || '';
       category = document.getElementById('qa-custom-cat')?.value || 'Misc';
+      sourceType = 'custom';
       if (!itemName) { fail('Type a custom item name.'); return; }
+    } else if (pickedValue.startsWith('mi:')) {
+      const id = pickedValue.slice(3);
+      const m = (App.menuItems && App.menuItems().find(x => x.id === id)) || null;
+      if (!m) { fail('Pick a menu item.'); return; }
+      itemName    = m.name;
+      category    = m.category || 'Menu Item';
+      menuItemId  = m.id;
+      sourceType  = 'menu_item';
+    } else if (pickedValue.startsWith('b:')) {
+      const id = pickedValue.slice(2);
+      const b = (App.batches && App.batches().find(x => x.id === id)) || null;
+      if (!b) { fail('Pick a batch.'); return; }
+      itemName   = b.name;
+      category   = b.category || 'Batch';
+      batchId    = b.id;
+      sourceType = 'batch';
     } else if (pickedValue) {
       const p = this.productById(pickedValue);
       if (!p) { fail('Pick a product.'); return; }
-      itemName  = p.name;
-      category  = p.category || 'Misc';
-      productId = p.id;
+      itemName   = p.name;
+      category   = p.category || 'Misc';
+      productId  = p.id;
+      sourceType = 'product';
     } else {
       fail('Pick an item to 86.');
       return;
@@ -298,31 +367,25 @@ S.Shift86List = {
     const notes  = document.getElementById('qa-notes')?.value.trim() || '';
 
     const list = this.items();
+    const baseFields = {
+      item: itemName, category,
+      product_id:   productId,
+      menu_item_id: menuItemId,
+      batch_id:     batchId,
+      source_type:  sourceType,
+      date_86: date, time_86: time,
+      reported_by_id: reportedById, reported_by: reportedBy,
+      reason, notes
+    };
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) {
-        list[i] = {
-          ...list[i],
-          item: itemName, category, product_id: productId,
-          date_86: date, time_86: time,
-          reported_by_id: reportedById, reported_by: reportedBy,
-          reason, notes
-        };
-      }
+      if (i > -1) list[i] = { ...list[i], ...baseFields };
     } else {
       list.push({
         id:           App.uid(),
-        item:         itemName,
-        category,
-        product_id:   productId,
-        date_86:      date,
-        time_86:      time,
-        reported_by_id: reportedById,
-        reported_by:    reportedBy,
-        reason,
+        ...baseFields,
         status:       '86',
         date_back:    '',
-        notes,
         created_at:   new Date().toISOString()
       });
     }
