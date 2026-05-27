@@ -272,7 +272,7 @@ const DB = {
     'bar-products':'profit-recovery','kitchen-products':'profit-recovery',
     'reports':'profit-recovery','help':'_always',
     // Revenue Recovery
-    'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery',
+    'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery','r-forecast':'revenue-recovery',
     'r-audit':'revenue-recovery','r-fix':'revenue-recovery',
     'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
     'r-menu-engineering':'revenue-recovery','r-pricing':'revenue-recovery',
