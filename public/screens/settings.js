@@ -312,9 +312,13 @@ S.HubSettings = {
     const when = backup.exported_at
       ? new Date(backup.exported_at).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
       : 'an unknown date';
-    if (!confirm('Restore the backup from ' + when + '?\n\nThis replaces every record currently in your account: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.')) {
-      return;
-    }
+    const ok = await App.confirm({
+      title: 'Restore the backup from ' + when + '?',
+      message: 'This replaces every record currently in your account: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.',
+      confirmText: 'Restore',
+      cancelText: 'Cancel'
+    });
+    if (!ok) return;
     this._backupMsg('Restoring backup...', 'var(--t3)');
     try {
       App.data          = backup.data;
@@ -1848,7 +1852,13 @@ S.HubSettings = {
   },
 
   async clearAll() {
-    if (!confirm('This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.\n\nClear all data?')) return;
+    const ok = await App.confirm({
+      title: 'Clear all data?',
+      message: 'This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.',
+      confirmText: 'Clear all data',
+      cancelText: 'Cancel'
+    });
+    if (!ok) return;
     const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--t3)'; msg.textContent = 'Clearing...'; msg.style.display = 'block'; }
 
