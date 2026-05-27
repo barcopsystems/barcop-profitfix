@@ -1164,6 +1164,59 @@ const App = {
     return list.find(s => s.id === id) || list.find(s => s.name === id) || null;
   },
 
+  // Resolve cash variance tolerance for a given shift record. Looks up in
+  // priority order: per-shift override → per-shift-type default → overall
+  // default → legacy 10. Every cash-related screen calls this so changes to
+  // the lookup logic land in one place.
+  cashToleranceForShift(shift) {
+    if (shift && shift.cash_tolerance != null && shift.cash_tolerance !== '') {
+      const n = parseFloat(shift.cash_tolerance);
+      if (!isNaN(n)) return n;
+    }
+    const ss = (this.shiftData && this.shiftData.settings) || {};
+    if (shift && shift.shift_type && ss.tolerances_by_type && ss.tolerances_by_type[shift.shift_type] != null) {
+      const n = parseFloat(ss.tolerances_by_type[shift.shift_type]);
+      if (!isNaN(n)) return n;
+    }
+    if (ss.cash_tolerance != null) {
+      const n = parseFloat(ss.cash_tolerance);
+      if (!isNaN(n)) return n;
+    }
+    return 10;
+  },
+
+  // Drawer / register <option> markup for cash forms. Same pattern as
+  // staffOptions: handles legacy free-text values, sorts alphabetical,
+  // appends "(unsaved)" for any value not on the saved list so historical
+  // records do not lose their drawer association on edit.
+  drawerOptions(selectedId, opts) {
+    opts = opts || {};
+    const all = ((this.shiftData && this.shiftData.sc_drawers) || [])
+      .filter(d => d.active !== false);
+
+    let resolvedId = selectedId || '';
+    if (resolvedId && !all.some(d => d.id === resolvedId)) {
+      const byName = all.find(d => d.name === resolvedId);
+      if (byName) resolvedId = byName.id;
+    }
+
+    let h = '<option value="">' + esc(opts.placeholder || 'Select drawer...') + '</option>';
+    all.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(d => {
+      h += '<option value="' + esc(d.id) + '"' + (resolvedId === d.id ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+    });
+
+    if (selectedId && !all.some(d => d.id === selectedId) && !all.some(d => d.name === selectedId)) {
+      h += '<option value="' + esc(selectedId) + '" selected>' + esc(selectedId) + ' (unsaved)</option>';
+    }
+    return h;
+  },
+
+  drawerById(id) {
+    if (!id) return null;
+    const list = ((this.shiftData && this.shiftData.sc_drawers) || []);
+    return list.find(d => d.id === id) || list.find(d => d.name === id) || null;
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
@@ -1374,6 +1427,8 @@ const App = {
         'sc-opening-checklist':  ['Opening Checklist', 'Shift Control'],
         'sc-closing-checklist':  ['Closing Checklist', 'Shift Control'],
         'sc-checklist-templates':['Checklist Templates', 'Shift Control'],
+        'sc-drawers':            ['Drawers / Registers', 'Shift Control'],
+        'sc-cash-settings':      ['Cash Tolerances', 'Shift Control'],
         'sc-reports-shift':      ['Shift Reports', 'Shift Control'],
         'sc-reports-cash':       ['Cash Reports', 'Shift Control'],
         'sc-reports-ops':        ['Operations Reports', 'Shift Control'],
@@ -1395,6 +1450,8 @@ const App = {
         'sc-opening-checklist': S.ShiftOpeningChecklist,
         'sc-closing-checklist': S.ShiftClosingChecklist,
         'sc-checklist-templates': S.ShiftChecklistTemplates,
+        'sc-drawers': S.ShiftDrawers,
+        'sc-cash-settings': S.ShiftCashSettings,
         'sc-reports-shift': S.ShiftReportsShift,
         'sc-reports-cash': S.ShiftReportsCash,
         'sc-reports-ops': S.ShiftReportsOps,
