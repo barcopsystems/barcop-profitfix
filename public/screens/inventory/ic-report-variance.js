@@ -19,8 +19,11 @@ S.InventoryVarianceReport = {
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   voidComps() { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
   waste()     { return ((App.shiftData && App.shiftData.sc_waste) || []); },
+  spotChecks(){ return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
   allProducts() { return ((App.inventoryData && App.inventoryData.ic_products) || []); },
   productById(id) { return this.allProducts().find(p => p.id === id); },
+  menuItems() { return ((App.data && App.data.menu_items) || []); },
+  menuItemById(id) { return this.menuItems().find(m => m.id === id); },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -110,17 +113,54 @@ S.InventoryVarianceReport = {
   },
 
   // ── POS matching ──────────────────────────────────────────────────────────
+  // Phase 7: extended to recognize menu items as well as products. When a
+  // POS row matches a menu item (or is manually mapped to one), the menu
+  // item is exploded through its recipe / linked product so each ingredient
+  // contributes its share of ounces to the right product.
+  //
+  // Output per product: { ouncesSold, qty, sales, directSales, fromMenu }
+  //   ouncesSold = sum of all oz attributed to this product across rows
+  //   qty        = sum of POS qty for DIRECT product matches (legacy field)
+  //   sales      = total sales attributed (direct only; menu item shares
+  //                aren't split across ingredients — see note in tabSales)
+  //   fromMenu   = true if any of the oz came from a menu item explosion
   posByProduct() {
     const result = {};
     if (!this.posRows) return result;
-    const byName = {};
-    this.allProducts().forEach(p => { byName[p.name.toLowerCase().trim()] = p; });
+    const productByName  = {};
+    this.allProducts().forEach(p => { productByName[p.name.toLowerCase().trim()] = p; });
+    const menuItemByName = {};
+    this.menuItems().forEach(m => { if (m && m.name) menuItemByName[m.name.toLowerCase().trim()] = m; });
+
+    const addProduct = (productId, ouncesSold, qty, sales, fromMenu) => {
+      if (!result[productId]) result[productId] = { ouncesSold: 0, qty: 0, sales: 0, fromMenu: false };
+      result[productId].ouncesSold += ouncesSold || 0;
+      result[productId].qty        += qty        || 0;
+      result[productId].sales      += sales      || 0;
+      if (fromMenu) result[productId].fromMenu = true;
+    };
+
     this.posRows.forEach(pr => {
-      let p = byName[pr.name.toLowerCase().trim()];
-      if (!p && this.manualMap[pr.name.toLowerCase().trim()]) p = this.productById(this.manualMap[pr.name.toLowerCase().trim()]);
+      const key = pr.name.toLowerCase().trim();
+      // Resolve target: direct product, then menu item, then manual map.
+      // Manual map values can point to either a product id or a menu item id.
+      let p  = productByName[key];
+      let mi = menuItemByName[key];
+      if (!p && !mi && this.manualMap[key]) {
+        const mappedId = this.manualMap[key];
+        p  = this.productById(mappedId);
+        if (!p) mi = this.menuItemById(mappedId);
+      }
       if (p) {
-        if (!result[p.id]) result[p.id] = { qty: 0, sales: 0 };
-        result[p.id].qty += pr.qty; result[p.id].sales += pr.sales;
+        // Direct product match — qty × pour_size_oz oz
+        const oz = (parseFloat(pr.qty) || 0) * (parseFloat(p.pour_size_oz) || 0);
+        addProduct(p.id, oz, pr.qty, pr.sales, false);
+      } else if (mi) {
+        // Menu item match — explode into per-product oz
+        const explosion = App.explodeMenuItem ? App.explodeMenuItem(mi, pr.qty) : {};
+        Object.keys(explosion).forEach(pid => {
+          addProduct(pid, explosion[pid], 0, 0, true);
+        });
       }
     });
     return result;
@@ -128,10 +168,36 @@ S.InventoryVarianceReport = {
 
   unmatchedPos() {
     if (!this.posRows) return [];
-    const byName = {};
-    this.allProducts().forEach(p => { byName[p.name.toLowerCase().trim()] = true; });
-    return this.posRows.filter(pr =>
-      !byName[pr.name.toLowerCase().trim()] && !this.manualMap[pr.name.toLowerCase().trim()]);
+    const productByName = {};
+    this.allProducts().forEach(p => { productByName[p.name.toLowerCase().trim()] = true; });
+    const menuItemByName = {};
+    this.menuItems().forEach(m => { if (m && m.name) menuItemByName[m.name.toLowerCase().trim()] = true; });
+    return this.posRows.filter(pr => {
+      const k = pr.name.toLowerCase().trim();
+      return !productByName[k] && !menuItemByName[k] && !this.manualMap[k];
+    });
+  },
+
+  // Phase 7: sum spot check variance per product across the period. Spot
+  // checks are mid-period audits that capture pre/post counts + restock +
+  // POS pours sold for one product. Displayed in the variance row as a
+  // secondary signal — informational, doesn't modify the period math.
+  spotChecksByProduct() {
+    const period = this.currentPeriod();
+    if (!period) return {};
+    const { startC, endC } = period;
+    const startDate = startC.date, endDate = endC.date;
+    const result = {};
+    this.spotChecks().forEach(sc => {
+      if (!sc.product_id) return;
+      const d = sc.date || sc.created_at?.slice(0, 10) || '';
+      if (d <= startDate || d > endDate) return;
+      if (!result[sc.product_id]) result[sc.product_id] = { count: 0, variance_pours: 0, variance_dollars: 0 };
+      result[sc.product_id].count++;
+      result[sc.product_id].variance_pours   += parseFloat(sc.variance) || 0;
+      result[sc.product_id].variance_dollars += parseFloat(sc.variance_dollars) || 0;
+    });
+    return result;
   },
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -212,16 +278,25 @@ S.InventoryVarianceReport = {
   unmatchedCard() {
     const un = this.unmatchedPos();
     if (!un.length) return '';
-    const prodOpts = '<option value="">Skip: not a tracked product</option>'
-      + this.allProducts().slice().sort((a, b) => a.name.localeCompare(b.name))
-          .map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+    const sortedProds = this.allProducts().slice().sort((a, b) => a.name.localeCompare(b.name));
+    const sortedMenu  = this.menuItems().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    let opts = '<option value="">Skip: not a tracked item</option>';
+    if (sortedMenu.length) {
+      opts += '<optgroup label="Menu Items">';
+      sortedMenu.forEach(m => { opts += '<option value="' + m.id + '">' + esc(m.name) + '</option>'; });
+      opts += '</optgroup>';
+    }
+    if (sortedProds.length) {
+      opts += '<optgroup label="Inventory Products">';
+      sortedProds.forEach(p => { opts += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; });
+      opts += '</optgroup>';
+    }
     const rows = un.map(pr => '<div class="form-row" style="gap:12px;align-items:center;margin-bottom:8px;">'
       + '<div style="width:240px;font-size:13px;color:var(--t1);font-weight:600;flex-shrink:0;">' + esc(pr.name) + '</div>'
-      + '<div class="f" style="width:240px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
-      + prodOpts + '</select></div></div>').join('');
+      + '<div class="f" style="width:260px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
+      + opts + '</select></div></div>').join('');
     return '<div class="card"><div class="card-title">Unmatched POS Products</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS product names did not match a '
-      + 'product in your master list. Map each to the right product, or leave it skipped.</div>' + rows + '</div>';
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS rows did not match a product or menu item. Map each to the right one — menu items explode through their recipe so cocktails and food plates contribute correctly to ingredient variance.</div>' + rows + '</div>';
   },
 
   tabsAndBody() {
@@ -263,33 +338,39 @@ S.InventoryVarianceReport = {
   pct(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : v.toFixed(1) + '%'; },
 
   // ── Sales Variance ────────────────────────────────────────────────────────
+  // Note: per-product sales attribution is only honest for direct-pour items
+  // (bottle beer, draft pours, wine glasses). For cocktail/food ingredients
+  // that flow through menu items, the register sale belongs to the menu item,
+  // not the ingredient product. Those rows show "via menu" — Sales Variance
+  // is null because the dollar attribution can't be reliably split.
   tabSales() {
     const usage = this.usageMap();
     const pos = this.posByProduct();
     const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
       const u = usage[pid], pr = pos[pid], p = u.product;
+      const viaMenu = pr.fromMenu && pr.sales === 0;
       const registerSales = pr.sales;
       const theoSales = u.poursMade != null && p.menu_price ? u.poursMade * p.menu_price : null;
-      const salesVar = theoSales != null ? theoSales - registerSales : null;
-      const varPct = theoSales ? salesVar / theoSales * 100 : null;
-      const actualCostPct = registerSales && u.usageCost != null ? u.usageCost / registerSales * 100 : null;
-      const actualProfit = u.usageCost != null ? registerSales - u.usageCost : null;
-      return { name: u.name, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit };
+      const salesVar = (!viaMenu && theoSales != null) ? theoSales - registerSales : null;
+      const varPct = (!viaMenu && theoSales) ? salesVar / theoSales * 100 : null;
+      const actualCostPct = (!viaMenu && registerSales && u.usageCost != null) ? u.usageCost / registerSales * 100 : null;
+      const actualProfit = (!viaMenu && u.usageCost != null) ? registerSales - u.usageCost : null;
+      return { name: u.name, viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit };
     });
     if (!rows.length) return this.emptyMatch();
     const body = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.name) + '</div></td>'
-      + '<td>' + this.cur(r.registerSales) + '</td>'
-      + '<td>' + this.cur(r.theoSales) + '</td>'
-      + '<td>' + this.cur(r.salesVar) + '</td>'
-      + '<td>' + this.pct(r.varPct) + '</td>'
-      + '<td>' + this.pct(r.actualCostPct) + '</td>'
-      + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
-      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
+      + '<td><div class="val">' + esc(r.name) + (r.viaMenu ? ' <span style="font-size:9px;color:var(--t3);font-weight:700;letter-spacing:1px;">VIA MENU</span>' : '') + '</div></td>'
+      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.registerSales)) + '</td>'
+      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.theoSales)) + '</td>'
+      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.salesVar)) + '</td>'
+      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.pct(r.varPct)) + '</td>'
+      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.pct(r.actualCostPct)) + '</td>'
+      + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.actualProfit)) + '</td>'
+      + '<td>' + (r.viaMenu ? '-' : (r.varPct != null ? this.badge(r.varPct) : '-')) + '</td>'
       + '</tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'Theoretical sales is what the product poured should have rung up. A large positive variance means '
-      + 'product left the bar without a matching sale.</div>'
+    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+      + 'Theoretical sales is what the product poured should have rung up. A large positive variance means product left the bar without a matching sale. Products marked VIA MENU were consumed through menu item recipes (cocktails, food plates); their sales belong to the menu item, not the ingredient — see Usage Variance for the ounce-level analysis on those.'
+      + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
       + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th>Status</th>'
@@ -300,20 +381,27 @@ S.InventoryVarianceReport = {
   tabUsage() {
     const usage = this.usageMap();
     const pos = this.posByProduct();
+    const spot = this.spotChecksByProduct();
     const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
       const u = usage[pid], pr = pos[pid], p = u.product;
-      const ouncesSold = p.pour_size_oz != null ? pr.qty * p.pour_size_oz : null;
-      const ounceVar = u.ouncesUsed != null && ouncesSold != null ? u.ouncesUsed - ouncesSold : null;
+      // Phase 7: oz sold comes from posByProduct directly (which already
+      // accounts for direct POS rows AND menu-item explosions).
+      const ouncesSold = pr.ouncesSold || 0;
+      const ounceVar = u.ouncesUsed != null ? u.ouncesUsed - ouncesSold : null;
       const varPct = ounceVar != null && u.ouncesUsed ? ounceVar / u.ouncesUsed * 100 : null;
-      return { name: u.name, ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade,
+      // Approximate "pours sold" from ounces (for display continuity)
+      const poursSold = p.pour_size_oz ? ouncesSold / p.pour_size_oz : null;
+      const sc = spot[pid] || null;
+      return { name: u.name, fromMenu: pr.fromMenu,
+        ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade,
         rawUsed: u.rawUsed, compUnits: u.compUnits, wasteUnits: u.wasteUnits,
-        used: u.used, ounceVar, varPct };
+        used: u.used, ounceVar, varPct, spot: sc };
     });
     if (!rows.length) return this.emptyMatch();
     const n = (v, d) => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d);
     const dim = v => !v ? '<span style="color:var(--t4);">0</span>' : Number(v).toFixed(2).replace(/\.?0+$/, '');
     const body = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.name) + '</div></td>'
+      + '<td><div class="val">' + esc(r.name) + (r.fromMenu ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : '') + '</div></td>'
       + '<td>' + n(r.ouncesSold) + '</td>'
       + '<td>' + n(r.ouncesUsed) + '</td>'
       + '<td>' + n(r.poursMade, 0) + '</td>'
@@ -323,15 +411,16 @@ S.InventoryVarianceReport = {
       + '<td>' + n(r.used) + '</td>'
       + '<td>' + n(r.ounceVar) + '</td>'
       + '<td>' + this.pct(r.varPct) + '</td>'
+      + '<td>' + (r.spot ? r.spot.count + ' check' + (r.spot.count === 1 ? '' : 's') + (r.spot.variance_dollars ? ' &middot; ' + App.fmtCurrency(r.spot.variance_dollars) : '') : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged in Shift Control. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error).'
+      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error). FROM RECIPE products were consumed through menu item recipes — POS rows for those menu items get exploded through the recipe so each ingredient gets its share. Spot Checks column counts mid-period audits that ran on this product and the variance dollars they found.'
       + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
       + '<th>Used (Raw)</th><th>Comps</th><th>Waste</th><th>Adjusted Used</th>'
-      + '<th>Oz Variance</th><th>Variance %</th><th>Status</th>'
+      + '<th>Oz Variance</th><th>Variance %</th><th>Spot Checks</th><th>Status</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
