@@ -67,13 +67,29 @@ S.ShiftActiveShift = {
       + 'inputmode="decimal" style="height:48px;font-size:16px;"/></div></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Staff on Floor</label>'
       + '<input type="number" id="as-staff" min="0" inputmode="numeric" style="height:48px;font-size:16px;"/></div>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Cash Tolerance <span style="color:var(--t4);font-weight:400;">(this shift)</span></label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="as-tol" min="0" step="0.5" '
+      + 'inputmode="decimal" value="' + this._defaultToleranceFor(this.shiftTypes()[0]) + '" style="height:48px;font-size:16px;"/></div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="as-start">Start Shift</button>'
       + '<span id="as-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
     this.container.onclick = null;
+    // When operator changes shift type, re-pre-fill the tolerance field
+    // with that shift type's default. Operator can still type a custom one
+    // after to override for tonight.
+    document.getElementById('as-type')?.addEventListener('change', e => {
+      const tolEl = document.getElementById('as-tol');
+      if (tolEl) tolEl.value = this._defaultToleranceFor(e.target.value);
+    });
     document.getElementById('as-start')?.addEventListener('click', () => this.startShift());
+  },
+
+  // Pre-fill default tolerance for the picked shift type. Reads from
+  // Shift Control settings (per-shift-type → overall default → 10).
+  _defaultToleranceFor(shiftType) {
+    return App.cashToleranceForShift({ shift_type: shiftType });
   },
 
   async startShift() {
@@ -91,6 +107,7 @@ S.ShiftActiveShift = {
       manager:        (App.staffById(document.getElementById('as-mgr')?.value) || {}).name || '',
       opening_bank:   num('as-bank'),
       staff_on_floor: num('as-staff'),
+      cash_tolerance: num('as-tol'),
       bar_revenue:    0,
       floor_revenue:  0,
       total_revenue:  0,
@@ -285,7 +302,7 @@ S.ShiftActiveShift = {
   stepCash(s) {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
-    const tolerance = (App.data?.settings?.cash_tolerance) || 10;
+    const tolerance = App.cashToleranceForShift(s);
     return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Opening bank and shift drops are filled in for you. Enter the POS cash sales total and what you counted in the drawer at close.</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
@@ -480,7 +497,7 @@ S.ShiftActiveShift = {
         const expected = (d.opening_bank || 0) + num('aw-sales-cash') - (d.drops_total || 0);
         const counted  = num('aw-counted');
         const variance = counted - expected;
-        const tol = (App.data?.settings?.cash_tolerance) || 10;
+        const tol = App.cashToleranceForShift(s);
         const status = skipped ? 'SKIPPED' : Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER';
         const color = skipped ? 'var(--t3)' : status === 'OK' ? 'var(--gold)' : 'var(--red)';
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -541,7 +558,7 @@ S.ShiftActiveShift = {
     const bar = d.bar_revenue || 0, floor = d.floor_revenue || 0;
     const expected = (d.opening_bank || 0) + (d.sales_cash || 0) - (d.drops_total || 0);
     const cashVariance = d.cash_skipped ? null : ((d.counted_cash || 0) - expected);
-    const tol = (App.data?.settings?.cash_tolerance) || 10;
+    const tol = App.cashToleranceForShift(s);
 
     const snapshot = { ...list[i] };
     list[i] = {
@@ -620,7 +637,7 @@ S.ShiftActiveShift = {
   renderClosed(s) {
     const cv = s.cash_recon ? s.cash_recon.variance : null;
     const cashLine = (cv == null) ? ''
-      : '<div style="font-size:11px;color:' + (Math.abs(cv) <= ((App.data?.settings?.cash_tolerance) || 10) ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;margin-top:6px;">'
+      : '<div style="font-size:11px;color:' + (Math.abs(cv) <= App.cashToleranceForShift(s) ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;margin-top:6px;">'
         + 'Cash variance ' + (cv >= 0 ? '+' : '') + App.fmtCurrency(cv) + ' &middot; auto-logged to Variance Log</div>';
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
