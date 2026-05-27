@@ -34,7 +34,7 @@ S.RevenueDogTest = {
     const decided = all.filter(t => t.status !== 'Testing')
       .sort((a, b) => (b.decided_at || '').localeCompare(a.decided_at || ''));
 
-    const items = (App.data.revenue_menu_items || []).filter(m => m && m.name);
+    const items = (App.data.menu_items || []).filter(m => m && m.name);
     const opts = '<option value="">Select a menu item...</option>'
       + items.map(m => '<option value="' + esc(m.name) + '">' + esc(m.name) + '</option>').join('');
     const today = new Date().toISOString().slice(0, 10);
@@ -76,7 +76,7 @@ S.RevenueDogTest = {
           + '<div class="prog" style="margin-bottom:10px;"><div class="prog-fill" style="width:' + pct + '%;"></div></div>'
           + (t.change_notes ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:10px;">' + esc(t.change_notes) + '</div>' : '')
           + '<div class="form-row" style="margin-bottom:10px;align-items:flex-end;">'
-          +   '<div class="f" style="width:150px;"><label>Baseline Weekly</label><div style="font-size:13px;color:var(--t2);padding:8px 0;">' + (t.baseline_volume != null ? t.baseline_volume + ' units' : '—') + '</div></div>'
+          +   '<div class="f" style="width:150px;"><label>Baseline Weekly</label><div style="font-size:13px;color:var(--t2);padding:8px 0;">' + (t.baseline_volume != null ? t.baseline_volume + ' units' : '-') + '</div></div>'
           +   '<div class="f" style="width:160px;"><label>Current Weekly Units</label><input type="number" class="dt-cur" data-id="' + esc(t.id) + '" value="' + (cur != null ? cur : '') + '" step="1" placeholder="Update"/></div>'
           +   (liftLine ? '<div class="f" style="flex:1;min-width:140px;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t2);padding:8px 0;">' + liftLine + '</div></div>' : '')
           + '</div>'
@@ -97,10 +97,10 @@ S.RevenueDogTest = {
           : '<span class="badge badge-warn">Removed</span>';
         const lift = (t.current_volume != null && t.baseline_volume != null) ? (t.current_volume - t.baseline_volume) : null;
         return '<tr><td class="val">' + esc(t.item_name) + '</td>'
-          + '<td>' + esc(t.start_date || '—') + '</td>'
-          + '<td>' + (t.baseline_volume != null ? t.baseline_volume : '—') + '</td>'
-          + '<td>' + (t.current_volume != null ? t.current_volume : '—') + '</td>'
-          + '<td class="' + (lift == null ? '' : lift >= 0 ? 'pos' : 'neg') + '">' + (lift == null ? '—' : (lift >= 0 ? '+' : '') + lift) + '</td>'
+          + '<td>' + esc(t.start_date || '-') + '</td>'
+          + '<td>' + (t.baseline_volume != null ? t.baseline_volume : '-') + '</td>'
+          + '<td>' + (t.current_volume != null ? t.current_volume : '-') + '</td>'
+          + '<td class="' + (lift == null ? '' : lift >= 0 ? 'pos' : 'neg') + '">' + (lift == null ? '-' : (lift >= 0 ? '+' : '') + lift) + '</td>'
           + '<td>' + badge + '</td>'
           + '<td><button class="btn btn-ghost btn-sm dt-del" data-id="' + esc(t.id) + '">Remove</button></td></tr>';
       }).join('');
