@@ -1217,6 +1217,11 @@ const App = {
     return list.find(d => d.id === id) || list.find(d => d.name === id) || null;
   },
 
+  // Canonical shift types. Every consumer reads from here so the list never
+  // drifts. Previously this list was duplicated as a fallback in 11
+  // different files, which would silently desync the moment one changed.
+  SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
