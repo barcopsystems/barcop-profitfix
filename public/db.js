@@ -668,7 +668,8 @@ const DB = {
           bar_pour_cost_pct: 22, food_cost_pct: 32,
           bar_labor_cost_pct: 28, food_labor_cost_pct: 30, prime_cost_pct: 60
         },
-        cash_tolerance: 10,
+        // Cash tolerance moved to App.shiftData.settings — Shift Control owns
+        // it now. See sc-cash-settings.js + App.cashToleranceForShift().
         onboarding_complete: false
       },
       bar_products: [], kitchen_products: [], recipes: [],
