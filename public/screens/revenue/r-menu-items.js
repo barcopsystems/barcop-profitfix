@@ -52,8 +52,14 @@ S.RevenueMenuItems = {
     'Beer':         'none',  // direct-pour: no recipe by default
     'Wine':         'none',
     'NA Beverages': 'none',
-    'Specials':     'pick',  // operator chooses (could be a dish or a drink)
-    'Other':        'pick'
+    // Specials default to food (most operators mean food specials). If the
+    // special is a cocktail, operator can override by clicking "+ Add" link
+    // and picking single drink. No on-screen buttons cluttering the form.
+    'Specials':     'food',
+    // Other = genuinely unknown. Skip recipe by default; "+ Add a recipe"
+    // link reveals the builder seeded as food (operator can switch with
+    // the No Recipe → "+ Add a recipe" cycle if they want a different mode).
+    'Other':        'none'
   },
   modeForCategory(cat) { return this.MENU_CAT_TO_MODE[cat] || 'pick'; },
 
@@ -324,20 +330,27 @@ S.RevenueMenuItems = {
     document.getElementById('ri-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(item));
 
-    // Category change: auto-set recipe mode if no recipe in progress, and
-    // re-render the recipe section. Driven by the MENU_CAT_TO_MODE mapping.
+    // Category change: ALWAYS re-render the recipe section so the form
+    // matches the new category. If the operator has entered real ingredient
+    // data (any row with a real id), confirm before discarding it.
     document.getElementById('ri-cat')?.addEventListener('change', e => {
       const newCat = e.target.value;
-      const auto = this.modeForCategory(newCat);
-      // Only auto-switch when the operator hasn't started entering a recipe.
-      // (If they have rows in flight, leave them alone — switching would
-      // throw away their work.)
-      if (this.rows.length === 0) {
-        this.mode = (auto === 'single' || auto === 'food') ? auto : null;
-        this.recipeOptOut = false;  // fresh category, fresh decision
-        const newTarget = this.mode === 'food' ? 32 : 22;
-        this.renderRecipeSection(item, newTarget);
+      const hasRealData = this.rows.some(r => r.id || (parseFloat(r.quantity) > 0));
+      if (hasRealData) {
+        const ok = confirm('Switching category will clear the ingredients you already entered. Continue?');
+        if (!ok) {
+          // Revert the dropdown to the prior category
+          const prior = item?.category || '';
+          e.target.value = prior;
+          return;
+        }
       }
+      // Reset recipe state and reload based on new category
+      this.rows = [];
+      this.mode = null;
+      this.recipeOptOut = false;
+      const newTarget = this.modeForCategory(newCat) === 'food' ? 32 : 22;
+      this.renderRecipeSection(item, newTarget);
       // Re-evaluate field-missing on the cost field (Beer/Wine/NA don't need cost)
       this.refreshFieldMissing();
     });
@@ -405,35 +418,32 @@ S.RevenueMenuItems = {
       const cat = document.getElementById('ri-cat')?.value || item?.category || '';
       const auto = this.modeForCategory(cat);
 
-      // Beer / Wine / NA Beverages — direct-pour items, no recipe needed.
+      // Categories that default to no recipe (Beer/Wine/NA = direct-pour;
+      // Other = generic catch-all). Different messaging by category.
       if (auto === 'none') {
+        const isDirectPour = ['Beer', 'Wine', 'NA Beverages'].includes(cat);
+        const note = isDirectPour
+          ? esc(cat) + ' menu items are direct-pour. Cost comes from the inventory product directly — no recipe needed.'
+          : 'No recipe attached. Cost uses the manual entry above. Add a recipe below if this item has an ingredient breakdown.';
         sec.innerHTML = '<div class="sh">Recipe</div>'
-          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
-            + esc(cat) + ' menu items are direct-pour. Cost comes from the inventory product directly — no recipe needed.'
-          + '</div>'
-          + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe anyway</a>';
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">' + note + '</div>'
+          + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe</a>';
         document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
           ev.preventDefault();
-          // Operator override: default to single drink builder for bar categories
-          this.startRecipe('single', item, target);
+          // Operator override: bar-flavor cats start single drink, others start food.
+          const startMode = isDirectPour ? 'single' : 'food';
+          this.startRecipe(startMode, item, target);
         });
         return;
       }
 
-      // Specials / Other / no category — operator picks the mode
-      if (!cat || auto === 'pick') {
+      // No category yet — quiet prompt to pick one. The category picker
+      // drives everything; no buttons here.
+      if (!cat) {
         sec.innerHTML = '<div class="sh">Recipe</div>'
-          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">'
-            + (cat
-                ? 'Pick the recipe type for this ' + esc(cat) + ' item.'
-                : 'Pick a category above to load the right recipe builder, or choose a recipe type here.')
-          + '</div>'
-          + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-            + '<button class="btn btn-ghost btn-sm" id="ri-build-single">Single Drink Recipe</button>'
-            + '<button class="btn btn-ghost btn-sm" id="ri-build-food">Food Plate Recipe</button>'
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
+            + 'Pick a category above to load the right recipe builder.'
           + '</div>';
-        document.getElementById('ri-build-single')?.addEventListener('click', () => this.startRecipe('single', item, target));
-        document.getElementById('ri-build-food')?.addEventListener('click', () => this.startRecipe('food', item, target));
         return;
       }
 
