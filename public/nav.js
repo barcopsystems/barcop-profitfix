@@ -262,6 +262,10 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Spot Check</span>
       </div>
+      <div class="nav-item" data-screen="ic-transfers" id="nav-ic-transfers">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5.5h10l-2.5-2.5M14.5 11.5h-10l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Transfer Log</span>
+      </div>
       <div class="nav-section">Receiving</div>
       <div class="nav-item" data-screen="ic-receive-delivery" id="nav-ic-receive-delivery">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5h2.5l2 2.5v2h-4.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
