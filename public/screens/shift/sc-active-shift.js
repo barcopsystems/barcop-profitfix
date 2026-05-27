@@ -131,6 +131,34 @@ S.ShiftActiveShift = {
     }
   },
 
+  // Per-shift labor so far for the active-shift dashboard. Two sources, in
+  // priority order: logged lc_actuals for today's date win when present
+  // (operator clocked staff in/out and logged hours during the shift).
+  // Falls back to the day's scheduled labor from lc_schedules so the tile
+  // still shows the budget commitment when nothing has been logged yet.
+  laborSoFar(s) {
+    const actuals = ((App.laborData && App.laborData.lc_actuals) || []).filter(a => a.date === s.date);
+    if (actuals.length) {
+      const cost = actuals.reduce((t, a) => t + (parseFloat(a.cost) || 0), 0);
+      const hours = actuals.reduce((t, a) => t + (parseFloat(a.hours) || 0), 0);
+      return { cost, hours, source: 'logged', count: actuals.length };
+    }
+    // Fall back to scheduled labor for today
+    const ws = App.weekStartFor ? App.weekStartFor(s.date) : '';
+    if (!ws) return { cost: 0, hours: 0, source: 'none', count: 0 };
+    const sched = ((App.laborData && App.laborData.lc_schedules) || []).find(x => x.week_start === ws);
+    if (!sched || !Array.isArray(sched.shifts)) return { cost: 0, hours: 0, source: 'none', count: 0 };
+    // Resolve day-of-week label (Mon..Sun) for s.date
+    const days = App.DAYS_MON_FIRST || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const d = new Date(s.date + 'T00:00:00');
+    const wd = (d.getDay() + 6) % 7;
+    const dayLabel = days[wd];
+    const todays = sched.shifts.filter(sh => sh.day === dayLabel);
+    const cost = todays.reduce((t, sh) => t + (parseFloat(sh.cost) || 0), 0);
+    const hours = todays.reduce((t, sh) => t + (parseFloat(sh.hours) || 0), 0);
+    return { cost, hours, source: 'scheduled', count: todays.length };
+  },
+
   // ── Active shift dashboard ──────────────────────────────────────────────────
   renderActive(s) {
     this.mode = 'active';
@@ -140,6 +168,12 @@ S.ShiftActiveShift = {
     const vcTotal = vc.reduce((t, r) => t + (r.amount || 0), 0);
     const active86 = ((App.shiftData && App.shiftData.sc_86_list) || []).filter(i => i.status !== 'Back').length;
     const openMaint = ((App.shiftData && App.shiftData.sc_maintenance) || []).filter(m => m.status !== 'Resolved').length;
+    const labor = this.laborSoFar(s);
+    const laborSub = labor.source === 'logged'
+      ? labor.hours.toFixed(1) + ' hrs logged'
+      : labor.source === 'scheduled'
+        ? labor.hours.toFixed(1) + ' hrs scheduled'
+        : 'No hours yet';
 
     const stat = (label, val, sub) =>
       '<div style="flex:1;min-width:130px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:14px;">'
@@ -164,6 +198,7 @@ S.ShiftActiveShift = {
 
       + '<div class="card"><div class="card-title">This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      + stat('Labor So Far', App.fmtCurrency(labor.cost), laborSub)
       + stat('Cash Drops', drops.length, App.fmtCurrency(dropTotal) + ' dropped')
       + stat('Voids &amp; Comps', vc.length, App.fmtCurrency(vcTotal) + ' total')
       + stat('86\'d Items', active86, active86 === 1 ? 'item out' : 'items out')
