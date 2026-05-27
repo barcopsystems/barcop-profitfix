@@ -34,8 +34,9 @@ S.VendorDiscrepancy = {
     }, 0);
 
     const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
-      .map(v => v && v.name).filter(Boolean);
-    const vendorList = vendors.map(n => '<option value="' + esc(n) + '"></option>').join('');
+      .map(v => v && v.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const vendorList = '<option value="">Select vendor...</option>'
+      + vendors.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
     const typeOpts = this.TYPES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
 
     // Manual filing form — hidden by default since most discrepancies now
@@ -53,7 +54,7 @@ S.VendorDiscrepancy = {
       + '</div>'
       + '<div class="form-row">'
       + '<div class="f" style="width:150px;"><label>Delivery Date</label><input type="date" id="vd-date"/></div>'
-      + '<div class="f" style="width:200px;"><label>Vendor</label><input type="text" id="vd-vendor" list="vd-vendors" placeholder="Vendor name"/><datalist id="vd-vendors">' + vendorList + '</datalist></div>'
+      + '<div class="f" style="width:220px;"><label>Vendor</label><select id="vd-vendor">' + vendorList + '</select></div>'
       + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="vd-ref" placeholder="Optional"/></div>'
       + '<div class="f" style="width:180px;"><label>Type</label><select id="vd-type">' + typeOpts + '</select></div>'
       + '</div>'
