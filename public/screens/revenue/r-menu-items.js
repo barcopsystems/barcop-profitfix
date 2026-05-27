@@ -342,6 +342,12 @@ S.RevenueMenuItems = {
         + '<div class="f w-lg"><label>Item Name</label><input type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Burger"/></div>'
         + '<div class="f w-md"><label>Category</label><select id="ri-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
       + '</div>'
+
+      // ── Cost source section — sits right under Category so the linked
+      // product picker (or recipe builder) is the immediate next step after
+      // the operator picks a category. No scrolling to find it.
+      + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:18px;margin-top:4px;margin-bottom:18px;"></div>'
+
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
         + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
         + '<div class="f w-md"><label>Cost ' + (hasRecipe ? '<span style="color:var(--t4);font-weight:400;">(auto from recipe)</span>' : (item?.linked_product_id ? '<span style="color:var(--t4);font-weight:400;">(auto from linked product)</span>' : '')) + '</label>'
@@ -349,9 +355,6 @@ S.RevenueMenuItems = {
         + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '" placeholder=""/></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:18px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
-
-      // ── Recipe section (auto-loaded based on category) ──
-      + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:18px;margin-top:8px;"></div>'
 
       + '<div style="display:flex;gap:10px;margin-top:18px;">'
         + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
@@ -369,11 +372,16 @@ S.RevenueMenuItems = {
     // Category change: ALWAYS re-render the recipe section so the form
     // matches the new category. If the operator has entered real ingredient
     // data (any row with a real id), confirm before discarding it.
-    document.getElementById('ri-cat')?.addEventListener('change', e => {
+    document.getElementById('ri-cat')?.addEventListener('change', async e => {
       const newCat = e.target.value;
       const hasRealData = this.rows.some(r => r.id || (parseFloat(r.quantity) > 0));
       if (hasRealData) {
-        const ok = confirm('Switching category will clear the ingredients you already entered. Continue?');
+        const ok = await App.confirm({
+          title: 'Switch category?',
+          message: 'Switching will clear the ingredients you already entered.',
+          confirmText: 'Switch',
+          cancelText: 'Stay'
+        });
         if (!ok) {
           // Revert the dropdown to the prior category
           const prior = item?.category || '';
@@ -497,6 +505,14 @@ S.RevenueMenuItems = {
         document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
           this.linkedProductId = e.target.value || '';
           pushCostFromLinked(this.linkedProductId);
+          // Auto-fill Item Name from the linked product so the operator doesn't
+          // have to type the same thing twice. Only fills if name is empty —
+          // never overwrites operator-typed text (e.g. "Bud Light Draft").
+          const nameInp = document.getElementById('ri-name');
+          if (nameInp && !nameInp.value.trim() && this.linkedProductId) {
+            const p = this.prodById(this.linkedProductId);
+            if (p) nameInp.value = p.name;
+          }
           this.refreshFieldMissing();
         });
         document.getElementById('ri-link-skip')?.addEventListener('click', ev => {
@@ -562,8 +578,14 @@ S.RevenueMenuItems = {
     this.renderRows();
     this.calcRecipe();
 
-    document.getElementById('ri-remove-recipe')?.addEventListener('click', () => {
-      if (!confirm('Skip the recipe? Cost will fall back to manual entry.')) return;
+    document.getElementById('ri-remove-recipe')?.addEventListener('click', async () => {
+      const ok = await App.confirm({
+        title: 'Skip the recipe?',
+        message: 'Cost will fall back to manual entry.',
+        confirmText: 'Skip recipe',
+        cancelText: 'Keep'
+      });
+      if (!ok) return;
       this.rows = [];
       this.mode = null;
       this.recipeOptOut = true;
@@ -672,12 +694,15 @@ S.RevenueMenuItems = {
     set('ri-cps', cps > 0 ? App.fmtCurrency(cps) : '-');
     set('ri-cpct', cpct != null ? cpct.toFixed(1) + '%' : '-', cpct != null && tpct > 0 ? (cpct > tpct ? 'warn' : 'good') : '');
     set('ri-tgt-d', tpct > 0 ? tpct.toFixed(1) + '%' : '-');
-    // Push computed cost into the disabled Cost field
+    // Push computed cost into the disabled Cost field, then refresh the
+    // field-missing highlighting so the red border clears once the recipe
+    // produces a real number.
     const costInp = document.getElementById('ri-cost');
     if (costInp && this.rows.length) {
       costInp.value = cps > 0 ? cps.toFixed(2) : '';
       costInp.disabled = true;
     }
+    this.refreshFieldMissing();
   },
 
   // No recipe attached: keep the manual cost field active and update the
