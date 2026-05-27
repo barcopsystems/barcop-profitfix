@@ -74,16 +74,21 @@ S.LaborOvertimeWatch = {
     }
 
     const rows = Object.values(map).map(e => {
-      const staff = this.staffById(e.id);
-      const wage = staff && staff.wage != null ? staff.wage
-        : (weekActuals.find(a => (a.staff_id || a.name) === e.id) || {}).wage || 0;
+      // Wage in effect at the start of the week — covers wage changes mid-week
+      const wage = App.wageForStaffOn ? App.wageForStaffOn(e.id, ws)
+        : ((this.staffById(e.id) || {}).wage || (weekActuals.find(a => (a.staff_id || a.name) === e.id) || {}).wage || 0);
       const projected = Math.max(e.actual, e.scheduled);
       const otHours = Math.max(0, projected - this.OT_THRESHOLD);
       const otCost = otHours * wage * 0.5; // the OT premium (extra half-time)
       let status = 'OK';
       if (projected > this.OT_THRESHOLD) status = 'Over';
       else if (projected >= this.APPROACHING) status = 'Approaching';
-      return { ...e, wage, projected, otHours, otCost, status };
+      // Actionable: how many hours to cut from remaining shifts to clear OT.
+      // Only meaningful when projection includes future scheduled hours that
+      // can actually be reduced. cutHours = projected - 40 (must cut at least
+      // this many from the remaining schedule).
+      const cutHours = otHours;
+      return { ...e, wage, projected, otHours, otCost, status, cutHours };
     }).sort((a, b) => b.projected - a.projected);
 
     const over = rows.filter(r => r.status === 'Over');
@@ -120,6 +125,13 @@ S.LaborOvertimeWatch = {
         const badge = r.status === 'Over' ? '<span class="badge badge-warn">Over</span>'
           : r.status === 'Approaching' ? '<span class="badge badge-warn">Approaching</span>'
           : '<span class="badge badge-ok">OK</span>';
+        // Actionable suggestion: when over OT, tell the operator the exact
+        // cut needed to clear the threshold. Saves them doing the math.
+        const action = r.status === 'Over'
+          ? '<span style="color:var(--red);font-weight:700;">Cut ' + r.cutHours.toFixed(1) + ' hr</span>'
+          : r.status === 'Approaching'
+            ? '<span style="color:var(--gold);">Watch — ' + (this.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
+            : '<span style="color:var(--t3);">-</span>';
         return '<tr>'
           + '<td><div class="val">' + esc(r.name) + '</div></td>'
           + '<td>' + r.actual.toFixed(1) + '</td>'
@@ -127,16 +139,18 @@ S.LaborOvertimeWatch = {
           + '<td class="' + (r.status === 'Over' ? 'neg' : '') + '">' + r.projected.toFixed(1) + '</td>'
           + '<td class="' + (r.otHours > 0 ? 'neg' : '') + '">' + (r.otHours > 0 ? r.otHours.toFixed(1) : '-') + '</td>'
           + '<td class="' + (r.otCost > 0 ? 'neg' : '') + '">' + (r.otCost > 0 ? App.fmtCurrency(r.otCost) : '-') + '</td>'
-          + '<td>' + badge + '</td></tr>';
+          + '<td>' + badge + '</td>'
+          + '<td>' + action + '</td></tr>';
       }).join('');
       table = '<div class="card"><div class="card-title">Hours Projection</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
-        + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th>'
+        + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
-        + 'Projected is the greater of hours logged and hours scheduled. Overtime threshold ' + this.OT_THRESHOLD
-        + ' hrs/week; extra OT cost is the half-time premium on projected overtime hours.</div></div>';
+        + 'Projected is the greater of hours logged and hours scheduled. Threshold ' + this.OT_THRESHOLD
+        + ' hrs/week; extra OT cost is the half-time premium on projected overtime hours. The Suggested Action column shows the exact cut needed to clear the threshold.</div>'
+        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + dateCard + summary + table + '</div>';
@@ -146,5 +160,6 @@ S.LaborOvertimeWatch = {
     });
     document.getElementById('ow-prev')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, -7); this.draw(); });
     document.getElementById('ow-next')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, 7); this.draw(); });
+    document.getElementById('ow-view-schedule')?.addEventListener('click', () => App.navigate('lc-build-schedule'));
   }
 };
