@@ -176,6 +176,14 @@ S.ShiftMaintenance = {
     this.container.onclick = null;
     document.getElementById('mt-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('mt-save')?.addEventListener('click', () => this.save());
+    // When the operator flips status to Resolved, auto-fill today's date if
+    // the resolution date is blank. Operator can override before saving.
+    document.getElementById('mt-status')?.addEventListener('change', e => {
+      if (e.target.value === 'Resolved') {
+        const resEl = document.getElementById('mt-resolved');
+        if (resEl && !resEl.value) resEl.value = new Date().toISOString().slice(0, 10);
+      }
+    });
   },
 
   async save() {
@@ -186,6 +194,12 @@ S.ShiftMaintenance = {
     const equipment = document.getElementById('mt-equip')?.value.trim();
     if (!equipment) { fail('Equipment / item is required.'); return; }
 
+    const status = document.getElementById('mt-status')?.value || 'Open';
+    const dateResolved = document.getElementById('mt-resolved')?.value || '';
+    if (status === 'Resolved' && !dateResolved) {
+      fail('Resolved issues need a resolution date. Set Date Resolved or change the status.');
+      return;
+    }
     const cost = parseFloat(document.getElementById('mt-cost')?.value);
     const rec = {
       id:            this.editId || App.uid(),
@@ -194,13 +208,13 @@ S.ShiftMaintenance = {
       location:      document.getElementById('mt-loc')?.value.trim() || '',
       issue:         document.getElementById('mt-issue')?.value.trim() || '',
       priority:      document.getElementById('mt-priority')?.value || 'Normal',
-      status:        document.getElementById('mt-status')?.value || 'Open',
+      status,
       reported_by_id: document.getElementById('mt-by')?.value || '',
       reported_by:    (App.staffById(document.getElementById('mt-by')?.value) || {}).name || '',
       // Assigned To stays free text because maintenance is often assigned to
       // an external vendor (HVAC repair, plumber) who is not on staff roster.
       assigned_to:    document.getElementById('mt-assigned')?.value.trim() || '',
-      date_resolved: document.getElementById('mt-resolved')?.value || '',
+      date_resolved: dateResolved,
       cost:          isNaN(cost) ? null : cost,
       notes:         document.getElementById('mt-notes')?.value.trim() || ''
     };
