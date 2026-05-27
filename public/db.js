@@ -274,7 +274,7 @@ const DB = {
     'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
     'r-menu-engineering':'revenue-recovery','r-pricing':'revenue-recovery',
     'r-rplh':'revenue-recovery','r-dog-test':'revenue-recovery',
-    'r-events':'revenue-recovery','r-check-average':'revenue-recovery',
+    'r-events':'revenue-recovery',
     'r-reports':'revenue-recovery','r-help':'_always',
     // Traffic Recovery
     't-dashboard':'traffic-recovery','t-this-week':'traffic-recovery',
