@@ -44,25 +44,44 @@ S.PrepBatches = {
   },
   byId(id) { return this.list().find(b => b.id === id) || null; },
 
-  IC_BAR: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
+  // Batch category drives the ingredient filter automatically. Drink-side
+  // batches (Cocktail Mix, Syrup) pull only bar ingredients; kitchen batches
+  // (Sauce, Marinade, Stock, Dressing) pull only kitchen ingredients. No
+  // chicken in your margarita mix dropdown.
+  BAR_CATS:  ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
+  FOOD_CATS: ['Food', 'Misc'],
+  BATCH_CAT_TO_MODE: {
+    'Cocktail Mix': 'bar',
+    'Syrup':        'bar',
+    'Sauce':        'food',
+    'Marinade':     'food',
+    'Stock':        'food',
+    'Dressing':     'food',
+    'Other':        'all'
+  },
+  modeForBatchCategory(cat) { return this.BATCH_CAT_TO_MODE[cat] || 'all'; },
+
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   prodById(id) { return this.products().find(p => p.id === id) || null; },
-  prodOpts(selId) {
-    const all = this.products();
+  prodOpts(selId, mode) {
+    const all = this.products().filter(p => p.active !== false);
     if (!all.length) return '<option value="">No products set up</option>';
-    const bar = all.filter(p => this.IC_BAR.includes(p.category));
-    const kit = all.filter(p => !this.IC_BAR.includes(p.category));
+    let cats;
+    if (mode === 'bar')       cats = this.BAR_CATS;
+    else if (mode === 'food') cats = this.FOOD_CATS;
+    else                      cats = [...new Set([...this.BAR_CATS, ...this.FOOD_CATS])]; // 'all'
+
     let h = '<option value="">Select ingredient...</option>';
-    if (bar.length) {
-      h += '<optgroup label="Bar Products">';
-      bar.forEach(p => { h += '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
+    cats.forEach(cat => {
+      const inCat = all.filter(p => (p.category || '') === cat)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!inCat.length) return;
+      h += '<optgroup label="' + esc(cat) + '">';
+      inCat.forEach(p => {
+        h += '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+      });
       h += '</optgroup>';
-    }
-    if (kit.length) {
-      h += '<optgroup label="Kitchen / Mixers">';
-      kit.forEach(p => { h += '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
-      h += '</optgroup>';
-    }
+    });
     return h;
   },
   // For batches, ingredient quantity is in the product's unit (bottle / unit),
@@ -203,16 +222,75 @@ S.PrepBatches = {
     this.container.addEventListener('change', ev => {
       if (ev.target.classList.contains('pb-ing-prod')) this.onProdChange(ev.target);
       if (['pb-yield', 'pb-yield-unit', 'pb-serv', 'pb-serv-unit'].includes(ev.target.id)) this.calc();
+      if (ev.target.id === 'pb-cat') {
+        // Batch category changed — clear any selected ingredient that no longer
+        // belongs in the filter (e.g. switched from Cocktail Mix to Sauce),
+        // then re-render the ingredient picker with the new filter.
+        const mode = this.modeForBatchCategory(ev.target.value);
+        const allowed = mode === 'bar' ? this.BAR_CATS : mode === 'food' ? this.FOOD_CATS : null;
+        if (allowed) {
+          this.rows = this.rows.map(r => {
+            const p = r.product_id ? this.prodById(r.product_id) : null;
+            if (p && !allowed.includes(p.category)) return { product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 };
+            return r;
+          });
+        }
+        this.renderRows();
+        this.calc();
+        this.refreshFieldMissing();
+      }
+      if (ev.target.id === 'pb-name') this.refreshFieldMissing();
     });
     this.container.addEventListener('input', ev => {
       if (ev.target.classList.contains('pb-ing-qty')) this.calc();
       if (['pb-yield', 'pb-serv'].includes(ev.target.id)) this.calc();
+      if (ev.target.id === 'pb-name') this.refreshFieldMissing();
+    });
+
+    // Highlight missing required fields when EDITING an incomplete record.
+    if (this.editId) this.applyMissingFieldHighlights();
+  },
+
+  // Required = name + category. Ingredient list is operationally needed but
+  // the operator can save a stub and fill ingredients later.
+  missingFields(b) {
+    const out = new Set();
+    if (!b?.name)     out.add('pb-name');
+    if (!b?.category) out.add('pb-cat');
+    return out;
+  },
+  applyMissingFieldHighlights() {
+    const b = this.byId(this.editId);
+    if (!b) return;
+    const missing = this.missingFields(b);
+    missing.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const wrap = el.closest('.f');
+      if (wrap) wrap.classList.add('field-missing');
+    });
+  },
+  refreshFieldMissing() {
+    const synthetic = {
+      name:     document.getElementById('pb-name')?.value.trim() || '',
+      category: document.getElementById('pb-cat')?.value || ''
+    };
+    const missing = this.missingFields(synthetic);
+    ['pb-name', 'pb-cat'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const wrap = el.closest('.f');
+      if (!wrap) return;
+      if (missing.has(id)) wrap.classList.add('field-missing');
+      else wrap.classList.remove('field-missing');
     });
   },
 
   renderRows() {
     const area = document.getElementById('pb-ings');
     if (!area) return;
+    const currentCat = document.getElementById('pb-cat')?.value || '';
+    const mode = this.modeForBatchCategory(currentCat);
     area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
       + '<table class="ing-tbl"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
       + '<tbody>' + this.rows.map((ing, idx) => {
@@ -221,7 +299,7 @@ S.PrepBatches = {
         const cost = this.unitCost(prod);
         const costD = cost > 0 ? App.fmtCurrency(cost) : (prod ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
         const lineD = ing.total_cost > 0 ? App.fmtCurrency(ing.total_cost) : '-';
-        return '<tr><td style="min-width:200px;"><select class="form-input pb-ing-prod" data-i="' + idx + '" style="width:100%;">' + this.prodOpts(ing.product_id) + '</select></td>'
+        return '<tr><td style="min-width:200px;"><select class="form-input pb-ing-prod" data-i="' + idx + '" style="width:100%;">' + this.prodOpts(ing.product_id, mode) + '</select></td>'
           + '<td style="width:90px;"><input class="form-input pb-ing-qty" type="number" data-i="' + idx + '" value="' + (ing.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
           + '<td style="width:80px;color:var(--t2);font-size:12px;">' + unit + '</td>'
           + '<td style="width:100px;font-size:12px;">' + costD + '</td>'
