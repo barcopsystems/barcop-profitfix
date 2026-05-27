@@ -127,8 +127,8 @@ S.ShiftCashDrop = {
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Drawer / Register</label>'
-      + '<input type="text" id="cd-drawer" value="' + esc(d?.drawer || '') + '" placeholder="e.g. Bar 1" style="height:44px;"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Drawer / Register</label>'
+      + '<select id="cd-drawer" style="height:44px;">' + App.drawerOptions(d?.drawer_id || d?.drawer, { placeholder: 'Select drawer...' }) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Performed By</label>'
       + '<select id="cd-by" style="height:44px;">' + App.staffOptions(d?.performed_by_id || d?.performed_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witness</label>'
@@ -217,7 +217,8 @@ S.ShiftCashDrop = {
       date,
       shift_type:    document.getElementById('cd-type')?.value || '',
       drop_time:     document.getElementById('cd-time')?.value || '',
-      drawer:        document.getElementById('cd-drawer')?.value.trim() || '',
+      drawer_id:     document.getElementById('cd-drawer')?.value || '',
+      drawer:        (App.drawerById(document.getElementById('cd-drawer')?.value) || {}).name || '',
       performed_by_id: document.getElementById('cd-by')?.value || '',
       performed_by:    (App.staffById(document.getElementById('cd-by')?.value) || {}).name || '',
       witness_id:      document.getElementById('cd-witness')?.value || '',
