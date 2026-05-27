@@ -239,6 +239,8 @@ const DB = {
     'ic-order-sheet':'place-orders','ic-order-history':'place-orders',
     'ic-spot-check':'spot-check',
     'ic-transfers':'inventory-counts',
+    'ic-empties':'inventory-counts',
+    'ic-par-suggestions':'inventory-reports',
     'ic-product-setup':'manage-products','ic-locations':'manage-products','ic-vendors':'manage-products',
     'ic-report-stock':'inventory-reports','ic-report-movers':'inventory-reports',
     'ic-report-usage':'inventory-reports','ic-report-variance':'inventory-reports',
