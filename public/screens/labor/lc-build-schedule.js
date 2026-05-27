@@ -188,16 +188,45 @@ S.LaborBuildSchedule = {
     this.recalc();
   },
 
-  // compute one shift's hours, wage, cost
+  // compute one shift's hours, wage, cost. Uses the wage in effect at the
+  // week's start date so past-week schedules cost out at the right rate.
   shiftCalc(sh) {
     const staff = this.staffById(sh.staff_id);
     const hours = this.hoursOf(sh.start, sh.end);
-    const wage = staff && staff.wage != null ? staff.wage : 0;
+    const wkDate = this.draft.week_start || new Date().toISOString().slice(0, 10);
+    const wage = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, wkDate) : (staff.wage || 0)) : 0;
     return { staff, hours, wage, cost: hours * wage };
+  },
+
+  // Phase 5: detect schedule conflicts for one shift against the others in
+  // the draft. Returns null if clean, or an object with a warning message.
+  shiftConflict(sh, idx) {
+    if (!sh.staff_id) return null;
+    const staff = this.staffById(sh.staff_id);
+    if (staff && staff.status === 'Inactive') {
+      return { kind: 'inactive', msg: esc(staff.name) + ' is marked Inactive.' };
+    }
+    if (!sh.start || !sh.end) return null;
+    // Time overlap with another shift for the same staff member on the same day
+    const startMin = (s) => { const [h, m] = (s || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+    const myStart = startMin(sh.start);
+    const myEnd   = startMin(sh.end);
+    if (myEnd <= myStart) return null;
+    const overlap = this.draft.shifts.find((other, i) => {
+      if (i === idx) return false;
+      if (other.staff_id !== sh.staff_id) return false;
+      if (other.day !== sh.day) return false;
+      if (!other.start || !other.end) return false;
+      const oStart = startMin(other.start), oEnd = startMin(other.end);
+      return oStart < myEnd && oEnd > myStart;
+    });
+    if (overlap) return { kind: 'overlap', msg: 'Already scheduled ' + esc(sh.day) + ' ' + esc(overlap.start) + '-' + esc(overlap.end) + '.' };
+    return null;
   },
 
   recalc() {
     let totalHours = 0, totalCost = 0;
+    let conflictCount = 0;
     [...document.querySelectorAll('.bs-row')].forEach((row, i) => {
       const sh = this.draft.shifts[i];
       if (!sh) return;
@@ -209,6 +238,21 @@ S.LaborBuildSchedule = {
         calcEl.textContent = c.hours > 0
           ? c.hours.toFixed(1) + ' hrs · ' + App.fmtCurrency(c.cost) + (c.staff ? ' @ ' + App.fmtCurrency(c.wage) + '/hr' : '')
           : (c.staff ? 'Set start and end times.' : 'Pick a staff member.');
+      }
+      // Conflict warning per row
+      const warn = this.shiftConflict(sh, i);
+      let warnEl = row.querySelector('.bs-rowwarn');
+      if (warn) {
+        conflictCount++;
+        if (!warnEl) {
+          warnEl = document.createElement('div');
+          warnEl.className = 'bs-rowwarn';
+          warnEl.style.cssText = 'font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-top:4px;';
+          row.appendChild(warnEl);
+        }
+        warnEl.textContent = '⚠ ' + warn.msg;
+      } else if (warnEl) {
+        warnEl.remove();
       }
     });
     const forecast = parseFloat(document.getElementById('bs-forecast')?.value) || 0;
