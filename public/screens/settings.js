@@ -18,8 +18,7 @@ S.HubSettings = {
       { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true },
       { id:'traffic', title:'Traffic Targets',           body:this.secTraffic(),       save:true },
       { id:'links',   title:'Operation Links',           body:this.secLinks(),         save:true },
-      { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true },
-      { id:'shift',   title:'Shift Preferences',         body:this.secShift(),         save:true }
+      { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true }
     ];
     container.scrollTop = 0;
 
@@ -149,12 +148,9 @@ S.HubSettings = {
       + '</div>';
   },
 
-  secShift() {
-    const s = App.data.settings || {};
-    return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:180px;"><label>Cash Variance Tolerance ' + tt('sh-cash-tol') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-ct" value="' + (s.cash_tolerance ?? 10) + '"/></div></div>'
-      + '</div>';
-  },
+  // secShift removed. Cash variance tolerance now lives in Shift Control's
+  // own Setup section (Cash Tolerances) so all Control setup stays with the
+  // module it controls. Hub Settings keeps only genuinely cross-system fields.
 
   secNotifications() {
     return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Alerts surface automatically on the Hub: metric breaches, forward-looking warnings, and Traffic activity reminders. There are no notification toggles to configure yet. When email or push delivery is added, its controls will live here.</div>';
@@ -246,9 +242,6 @@ S.HubSettings = {
         email_open_to_visit:     numOr('hs-conv-email',  1)
       });
       keys.push('traffic_settings');
-    } else if (which === 'shift') {
-      App.data.settings.cash_tolerance = numOr('hs-ct', 10);
-      keys.push('settings');
     } else {
       return;
     }
@@ -353,7 +346,6 @@ S.HubSettings = {
     App.data.settings.annual_bar_revenue = 624000;
     App.data.settings.annual_food_revenue= 374400;
     App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, bar_labor_cost_pct:28, food_labor_cost_pct:30, prime_cost_pct:60 };
-    App.data.settings.cash_tolerance     = 10;
     App.data.settings.onboarding_complete= true;
 
     // ── Bar Products ──
@@ -1271,6 +1263,9 @@ S.HubSettings = {
         container_size_oz:null, pour_size_oz:null, menu_price:null,
         pours_per_container:pours, cost_per_pour:cpp,
         pour_cost_pct:(cpp != null && p.menu_price) ? cpp/p.menu_price*100 : null,
+        // Phase 0: cost_history captures every auto-update from Receive Delivery
+        // price changes. Empty on fresh data; populated as deliveries log price moves.
+        cost_history:[],
         ...p };
     });
     App.inventoryData.ic_products = icProducts;
@@ -1419,6 +1414,29 @@ S.HubSettings = {
     const dayW  = [0.10, 0.10, 0.12, 0.14, 0.20, 0.22, 0.12]; // Mon..Sun
     const mgrs  = ['Maria G.', 'Jake T.', 'Carlos P.'];
 
+    // ── Cash settings + Drawers (Phase 0.5) ────────────────────────────────
+    if (!App.shiftData.settings) App.shiftData.settings = {};
+    App.shiftData.settings.cash_tolerance = 10;
+    App.shiftData.settings.tolerances_by_type = {
+      'Brunch':     10,
+      'Lunch':      10,
+      'Dinner':     15,
+      'Late Night': 20,
+      'Full Day':   15
+    };
+
+    // Drawers reference table. Seeded with realistic registers so the
+    // dropdowns on Cash Drop and Variance Log render with options out of
+    // the box. Default opening bank pre-fills the Start a Shift bank field
+    // when the matching drawer is the one tonight runs on.
+    App.shiftData.sc_drawers = [
+      { id: App.uid(), name: 'Main Bar Register',     location: 'Main Bar',       default_opening_bank: 300, notes: '', active: true, created_at: new Date().toISOString() },
+      { id: App.uid(), name: 'Service Bar Register',  location: 'Back Bar',       default_opening_bank: 200, notes: 'Server-only well', active: true, created_at: new Date().toISOString() },
+      { id: App.uid(), name: 'Floor Register 1',      location: 'Front of House', default_opening_bank: 250, notes: '', active: true, created_at: new Date().toISOString() },
+      { id: App.uid(), name: 'Floor Register 2',      location: 'Front of House', default_opening_bank: 250, notes: '', active: true, created_at: new Date().toISOString() }
+    ];
+    const scDrawers = App.shiftData.sc_drawers;
+
     const scShifts = [];
     ANCHS.weeks.forEach(a => {
       const baseAgo = (12 - a.wk) * 7;
@@ -1429,11 +1447,18 @@ S.HubSettings = {
         const floor  = last ? foodLeft : Math.round(a.food_rev * w);
         const covers = last ? covLeft  : Math.round(a.covers   * w);
         barLeft -= bar; foodLeft -= floor; covLeft -= covers;
+        // Phase 0: event_tag + weather_tag give Profit / Revenue audits real
+        // context so a low-revenue Friday during a thunderstorm reads as bad
+        // luck, not bad ops. Mostly empty; a few salted with realistic tags.
+        const isLastWeek = a.wk === 12;
+        const eventTag   = (isLastWeek && di === 4) ? 'live music' : '';
+        const weatherTag = (a.wk === 10 && di === 4) ? 'thunderstorm' : '';
         scShifts.push({
           id:uid(), date:dateStr(baseAgo + 6 - di), shift_type:'Full Day',
           manager:mgrs[di % 3], bar_revenue:bar, floor_revenue:floor,
           total_revenue:bar + floor, covers:covers, opening_bank:300,
           staff_on_floor:di >= 4 ? 8 : 6, status:'Closed', notes:'',
+          event_tag:eventTag, weather_tag:weatherTag,
           created_at:new Date().toISOString()
         });
       });
@@ -1452,7 +1477,9 @@ S.HubSettings = {
           : Math.round((Math.random() - 0.75) * 30);
         scVariances.push({
           id:uid(), date:dateStr(baseAgo + dayOff), shift_type:'Close',
-          drawer:'Drawer ' + (vi + 1), cashier:mgrs[(a.wk + vi) % 3],
+          drawer_id: scDrawers[vi % scDrawers.length].id,
+          drawer:    scDrawers[vi % scDrawers.length].name,
+          cashier:mgrs[(a.wk + vi) % 3],
           expected_cash:exp, counted_cash:exp + variance, variance:variance,
           tolerance:10, status:Math.abs(variance) <= 10 ? 'OK' : variance < 0 ? 'Short' : 'Over',
           reason:'', notes:'', created_at:new Date().toISOString()
@@ -1462,7 +1489,13 @@ S.HubSettings = {
     App.shiftData.sc_variances = scVariances;
 
     // Voids and comps — fewer events and all manager-authorized after the fix.
+    // Phase 0: comp records carry product_id + units so the Inventory Variance
+    // Report can subtract comp pours from "used." Voids stay product-less
+    // (assumed pre-pour, not subtracted from variance). staff_id gets patched
+    // in after lcStaff is built (below).
     const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Derek W.', 'Carlos P.'];
+    const compProductNames = ['Tito\'s Handmade Vodka', 'House Cabernet', "Hendrick's Gin", 'Bulleit Bourbon'];
+    const findProdId = (name) => (icProducts.find(p => p.name === name) || {}).id || '';
     const scVoidComps = [];
     ANCHS.weeks.forEach(a => {
       const baseAgo = (12 - a.wk) * 7;
@@ -1470,11 +1503,16 @@ S.HubSettings = {
       const n = improving ? 2 : 4;
       for (let k = 0; k < n; k++) {
         const isComp = k % 2 === 1;
+        const compProdName = isComp ? compProductNames[(a.wk + k) % compProductNames.length] : '';
         scVoidComps.push({
           id:uid(), date:dateStr(baseAgo + (k + 1)), type:isComp ? 'Comp' : 'Void',
-          shift_type:'Dinner', item:isComp ? 'Guest recovery' : 'Wrong item rung',
+          shift_type:'Dinner', item:isComp ? compProdName + ' (guest recovery)' : 'Wrong item rung',
           amount:isComp ? 8 + Math.round(Math.random() * 22) : 6 + Math.round(Math.random() * 16),
+          product_id:isComp ? findProdId(compProdName) : '',
+          product_name:isComp ? compProdName : '',
+          units:isComp ? 1 : null,
           server:vcServers[(a.wk + k) % 5],
+          staff_id:'',  // patched below after lcStaff is built
           authorized_by:improving ? mgrs[(a.wk + k) % 3] : (k === 0 ? '' : mgrs[k % 3]),
           check_number:'', reason:isComp ? 'Service recovery' : 'Order error',
           notes:'', created_at:new Date().toISOString()
@@ -1489,7 +1527,8 @@ S.HubSettings = {
       const baseAgo = (12 - a.wk) * 7;
       scCashDrops.push({
         id:uid(), date:dateStr(baseAgo + 1), shift_type:'Close', drop_time:'23:30',
-        drawer:'Drawer 1', performed_by:mgrs[a.wk % 3], witness:mgrs[(a.wk + 1) % 3],
+        drawer_id: scDrawers[0].id, drawer: scDrawers[0].name,
+        performed_by:mgrs[a.wk % 3], witness:mgrs[(a.wk + 1) % 3],
         amount:900 + Math.round(Math.random() * 500), denominations:{}, notes:'',
         created_at:new Date().toISOString()
       });
@@ -1601,9 +1640,13 @@ S.HubSettings = {
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
 
+    // Phase 0: wage_history captures every wage change so historical labor
+    // cost reads correctly off the wage in effect on the entry date, not the
+    // current wage. Empty on fresh hires (their current wage is the starting wage).
     const mkStaff = (name, posName, wage, hiredDaysAgo) => ({
       id:uid(), name:name, position_id:lcPos(posName), wage:wage, status:'Active',
-      hire_date:dateStr(hiredDaysAgo), phone:'', email:'', created_at:new Date().toISOString()
+      hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
+      wage_history:[], created_at:new Date().toISOString()
     });
     const lcStaff = [
       mkStaff('Maria G.',   'Bartender', 16,   320),
@@ -1622,6 +1665,16 @@ S.HubSettings = {
       mkStaff('Carlos P.',  'Manager',   28,   520),
     ];
     App.laborData.lc_staff = lcStaff;
+
+    // Phase 0: now that lcStaff exists, patch staff_id onto every sc_void_comps
+    // record so the Server Scorecard (Phase 4) can show comps per server with
+    // a real foreign-key link. Same patch lets Theft Risk run by-employee math.
+    scVoidComps.forEach(vc => {
+      if (!vc.server) return;
+      const match = lcStaff.find(s => s.name === vc.server);
+      if (match) vc.staff_id = match.id;
+    });
+    App.shiftData.sc_void_comps = scVoidComps;
 
     const lcByPos = (...names) => {
       const ids = names.map(lcPos);
@@ -1698,15 +1751,22 @@ S.HubSettings = {
     ];
 
     // ── Tips — recent shifts for every tipped staff member ──
+    // Phase 0: every tip carries shift_id linked to the sc_shifts record on
+    // the same date. Shift Close (Phase 2-3) reconciles tips against this link;
+    // Books Form 8027 pulls per-employee allocations through it; Server
+    // Scorecard (Phase 4) shows tips % per server through it.
     const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server'].includes(posNameOf(st.position_id)));
     const lcTips = [];
     [3, 5, 8, 10, 12].forEach(d => {
+      const tipDate = dateStr(d);
+      const matchedShift = scShifts.find(s => s.date === tipDate);
+      const shiftId = matchedShift ? matchedShift.id : '';
       lcTipped.forEach(st => {
         const role = posNameOf(st.position_id);
         const base = role === 'Bartender' ? 135 : role === 'Server' ? 100 : 55;
         const cash = Math.round(base * (0.30 + Math.random() * 0.22));
         const card = Math.round(base * (0.92 + Math.random() * 0.40));
-        lcTips.push({ id:uid(), date:dateStr(d), staff_id:st.id, name:st.name,
+        lcTips.push({ id:uid(), date:tipDate, shift_id:shiftId, staff_id:st.id, name:st.name,
           position_id:st.position_id, shift_type:'Dinner',
           cash_tips:cash, card_tips:card, total_tips:cash + card,
           hours:role === 'Server' ? 5 : 7, notes:'', created_at:daysAgoISO(d) });
