@@ -597,33 +597,38 @@ S.InventoryProducts = {
              'Draft Beer':'Craft', 'Food':'Protein', 'Misc':'Mixer' }[cat] || '';
   },
 
-  // Required fields per category. Driver for the .field-missing highlighting
-  // that surfaces what's incomplete on an edit. All categories require name,
-  // vendor, location, and unit cost. Sized categories (Liquor/Wine/Draft Beer/
-  // Bottle Beer) require container size + pour size; bottle beer needs case
-  // size too. Par level and reorder point are operational follow-ons, not
-  // required for the product record itself.
-  _requiredFieldIds(cat, spec) {
-    const ids = ['ip-name', 'ip-vendor', 'ip-loc1', 'ip-cost'];
-    if (spec?.sizeGroup) {
-      ids.push('ip-size');
-      if (spec.showPour !== false) ids.push('ip-pour');
+  // Required fields per category — matches isComplete() exactly so the
+  // .field-missing highlights surface the same items as the Incomplete badge.
+  // All categories require name + unit cost. Pourable (Liquor/Wine/Draft
+  // Beer) also require container size, pour size, and menu price. Bottle
+  // Beer requires container size + case size. Food/Misc just need basics.
+  _requiredFieldIds(cat) {
+    const ids = ['ip-name', 'ip-cost'];
+    if (cat === 'Bottle Beer') {
+      ids.push('ip-size', 'ip-case-size');
+    } else if (this.isPourable(cat)) {
+      ids.push('ip-size', 'ip-pour', 'ip-price');
     }
-    if (cat === 'Bottle Beer') ids.push('ip-case-size');
     return ids;
   },
-  // Value check: is a given input "filled"?
+  // Value check: is a given input "filled"? Handles the size dropdown's
+  // "custom" option by also checking the linked custom-oz input.
   _isFilled(id) {
     const el = document.getElementById(id);
     if (!el) return true; // not rendered in this category — not required
     const v = (el.value || '').trim();
     if (!v) return false;
+    // Size dropdown: if value is "custom", the actual size lives in ip-coz
+    if (id === 'ip-size' && v === 'custom') {
+      const cozEl = document.getElementById('ip-coz');
+      return !!(cozEl && parseFloat(cozEl.value) > 0);
+    }
     // For numeric inputs, zero counts as not-filled
     if (el.type === 'number') return parseFloat(v) > 0;
     return true;
   },
-  applyMissingFieldHighlights(cat, spec) {
-    const ids = this._requiredFieldIds(cat, spec);
+  applyMissingFieldHighlights(cat) {
+    const ids = this._requiredFieldIds(cat);
     ids.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -688,17 +693,13 @@ S.InventoryProducts = {
     // On render: if we're editing an existing product, highlight required-
     // but-empty fields so the operator sees what's missing at a glance.
     if (this._editingExistingProduct) {
-      const cat = this._formCategory || '';
-      const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
-      this.applyMissingFieldHighlights(cat, spec);
+      this.applyMissingFieldHighlights(this._formCategory || '');
     }
   },
 
   _refreshMissing() {
     if (!this._editingExistingProduct) return;
-    const cat = this._formCategory || '';
-    const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
-    this.applyMissingFieldHighlights(cat, spec);
+    this.applyMissingFieldHighlights(this._formCategory || '');
   },
 
   getOz() {
