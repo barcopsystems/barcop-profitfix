@@ -364,6 +364,22 @@ S.InventoryReceiveDelivery = {
   // lands in App.data.vendor_discrepancies and surfaces on the Profit
   // Recovery Vendor Discrepancies screen. Operator stays on Receive Delivery
   // throughout — modal closes back to the same screen on save or cancel.
+  // Vendor dropdown options for the discrepancy modal. Selected vendor
+  // pre-fills from the parent Receive Delivery form. Preserves any legacy
+  // vendor name that no longer matches a saved record.
+  _vendorOptionsForModal(selected) {
+    const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    let h = '<option value="">Select vendor...</option>';
+    vendors.forEach(v => {
+      h += '<option value="' + esc(v.name) + '"' + (selected === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>';
+    });
+    if (selected && !vendors.some(v => v.name === selected)) {
+      h += '<option value="' + esc(selected) + '" selected>' + esc(selected) + ' (unsaved)</option>';
+    }
+    return h;
+  },
+
   openDiscrepancyModal(line) {
     if (!line) return;
     const vendor = document.getElementById('rd-vendor')?.value || '';
@@ -409,7 +425,7 @@ S.InventoryReceiveDelivery = {
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Fill this with what was wrong, then save. The discrepancy goes to Profit Recovery > Vendor Discrepancies for credit recovery follow-up. You can adjust the numbers if needed.</div>'
       + '<div class="form-row" style="gap:12px;">'
         + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="rd-disc-date" value="' + esc(date) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><input type="text" id="rd-disc-vendor" value="' + esc(vendor) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><select id="rd-disc-vendor">' + this._vendorOptionsForModal(vendor) + '</select></div>'
         + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="rd-disc-ref" value="' + esc(invoice) + '"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
