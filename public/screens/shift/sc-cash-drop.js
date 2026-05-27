@@ -23,7 +23,7 @@ S.ShiftCashDrop = {
     return App.shiftData.sc_cash_drops;
   },
   shiftTypes() {
-    return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
+    return App.SHIFT_TYPES;
   },
   fmtDate(str) {
     if (!str) return '-';
