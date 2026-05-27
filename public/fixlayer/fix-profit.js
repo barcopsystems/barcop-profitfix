@@ -96,9 +96,9 @@ FIX.profit = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'recipe-library', targetLabel: 'Recipe Library',
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Build yield-adjusted recipe cost cards',
-          detail: 'In Recipe Library, cost every menu item. Ingredient costs pull from your products, so proteins and produce are costed on real prices. Costing on purchase price without a yield adjustment understates every protein on the menu.' },
+          detail: 'In Menu Items, open each menu item and attach an ingredient recipe. Ingredient costs pull from your products and prep batches, so proteins and produce are costed on real prices. Costing on purchase price without a yield adjustment understates every protein on the menu.' },
         { kind: 'action', target: 'ic-take-inventory', targetLabel: 'Take Inventory',
           title: 'Count food on the same weekly schedule as the bar',
           detail: 'Run a Kitchen or Full count in Take Inventory, the same day every week, valued at cost. The count is the foundation every food cost number depends on.' },
@@ -117,9 +117,9 @@ FIX.profit = [
         { kind: 'result', target: 'reports', targetLabel: 'Reports and History',
           title: 'Review the trend with the kitchen manager',
           detail: 'Each week, open Reports and History with the kitchen manager. The weekly table shows food cost against target and the dollar gap. Cross-reference it against the Waste and Spill Log entries and the portion audit findings from the past week, and set one specific action with a named owner.' },
-        { kind: 'action', target: 'recipe-library', targetLabel: 'Recipe Library',
+        { kind: 'action', target: 'recipe-cost-analysis', targetLabel: 'Recipe Cost Analysis',
           title: 'Reprice the items above target',
-          detail: 'When food cost is above target, open Recipe Library and reprice the items flagged above their cost target. A surgical increase on those items is less visible to guests than an across-the-board raise.' }
+          detail: 'When food cost is above target, open Recipe Cost Analysis to see exactly which items are pulling cost up. Open Item from there to reprice on the Menu Items screen. A surgical increase on those items is less visible to guests than an across-the-board raise.' }
       ]
     },
 
