@@ -19,7 +19,6 @@ S.InventoryVarianceReport = {
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   voidComps() { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
   waste()     { return ((App.shiftData && App.shiftData.sc_waste) || []); },
-  spotChecks(){ return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
   allProducts() { return ((App.inventoryData && App.inventoryData.ic_products) || []); },
   productById(id) { return this.allProducts().find(p => p.id === id); },
   menuItems() { return ((App.data && App.data.menu_items) || []); },
@@ -178,27 +177,6 @@ S.InventoryVarianceReport = {
     });
   },
 
-  // Phase 7: sum spot check variance per product across the period. Spot
-  // checks are mid-period audits that capture pre/post counts + restock +
-  // POS pours sold for one product. Displayed in the variance row as a
-  // secondary signal — informational, doesn't modify the period math.
-  spotChecksByProduct() {
-    const period = this.currentPeriod();
-    if (!period) return {};
-    const { startC, endC } = period;
-    const startDate = startC.date, endDate = endC.date;
-    const result = {};
-    this.spotChecks().forEach(sc => {
-      if (!sc.product_id) return;
-      const d = sc.date || sc.created_at?.slice(0, 10) || '';
-      if (d <= startDate || d > endDate) return;
-      if (!result[sc.product_id]) result[sc.product_id] = { count: 0, variance_pours: 0, variance_dollars: 0 };
-      result[sc.product_id].count++;
-      result[sc.product_id].variance_pours   += parseFloat(sc.variance) || 0;
-      result[sc.product_id].variance_dollars += parseFloat(sc.variance_dollars) || 0;
-    });
-    return result;
-  },
 
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
@@ -381,7 +359,6 @@ S.InventoryVarianceReport = {
   tabUsage() {
     const usage = this.usageMap();
     const pos = this.posByProduct();
-    const spot = this.spotChecksByProduct();
     const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
       const u = usage[pid], pr = pos[pid], p = u.product;
       // Phase 7: oz sold comes from posByProduct directly (which already
@@ -389,13 +366,10 @@ S.InventoryVarianceReport = {
       const ouncesSold = pr.ouncesSold || 0;
       const ounceVar = u.ouncesUsed != null ? u.ouncesUsed - ouncesSold : null;
       const varPct = ounceVar != null && u.ouncesUsed ? ounceVar / u.ouncesUsed * 100 : null;
-      // Approximate "pours sold" from ounces (for display continuity)
-      const poursSold = p.pour_size_oz ? ouncesSold / p.pour_size_oz : null;
-      const sc = spot[pid] || null;
       return { name: u.name, fromMenu: pr.fromMenu,
         ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade,
         rawUsed: u.rawUsed, compUnits: u.compUnits, wasteUnits: u.wasteUnits,
-        used: u.used, ounceVar, varPct, spot: sc };
+        used: u.used, ounceVar, varPct };
     });
     if (!rows.length) return this.emptyMatch();
     const n = (v, d) => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d);
@@ -411,16 +385,15 @@ S.InventoryVarianceReport = {
       + '<td>' + n(r.used) + '</td>'
       + '<td>' + n(r.ounceVar) + '</td>'
       + '<td>' + this.pct(r.varPct) + '</td>'
-      + '<td>' + (r.spot ? r.spot.count + ' check' + (r.spot.count === 1 ? '' : 's') + (r.spot.variance_dollars ? ' &middot; ' + App.fmtCurrency(r.spot.variance_dollars) : '') : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error). FROM RECIPE products were consumed through menu item recipes — POS rows for those menu items get exploded through the recipe so each ingredient gets its share. Spot Checks column counts mid-period audits that ran on this product and the variance dollars they found.'
+      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error). FROM RECIPE products were consumed through menu item recipes — POS rows for those menu items get exploded through the recipe so each ingredient gets its share.'
       + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
       + '<th>Used (Raw)</th><th>Comps</th><th>Waste</th><th>Adjusted Used</th>'
-      + '<th>Oz Variance</th><th>Variance %</th><th>Spot Checks</th><th>Status</th>'
+      + '<th>Oz Variance</th><th>Variance %</th><th>Status</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
