@@ -20,7 +20,10 @@ S.RevenueMenuEngineering = {
   },
 
   renderMatrix(container) {
-    const items = (App.data.revenue_menu_items||[]).filter(i=>i.price&&i.cost&&i.weekly_covers);
+    // Inject the effective cost (auto-computed from recipe when attached,
+    // else the manually-entered cost) so menu engineering math always sees
+    // a current number even when product prices have drifted.
+    const items = (App.data.menu_items||[]).map(i => ({...i, cost: App.menuItemCost(i) || 0})).filter(i=>i.price&&i.cost&&i.weekly_covers);
     // Running Menu Engineering with enough data to actually classify items
     // counts as completing the Getting Started task. No save action exists
     // on this screen — the view itself is the work.
@@ -122,7 +125,8 @@ S.RevenueMenuEngineering = {
     if (isNaN(t)) return { status: 'old-format' };
     const weeks = Math.floor((Date.now() - t) / (7 * 86400000));
     if (weeks < 3) return { status: 'pending', weeks: Math.max(weeks, 0) };
-    const item = (App.data.revenue_menu_items || []).find(i => i.id === entry.item_id);
+    const baseItem = (App.data.menu_items || []).find(i => i.id === entry.item_id);
+    const item = baseItem ? {...baseItem, cost: App.menuItemCost(baseItem) || baseItem.cost} : null;
     if (!item || item.weekly_covers == null) return { status: 'no-item' };
     const coversThen = entry.covers_at_change, coversNow = item.weekly_covers;
     if (!coversThen) return { status: 'no-baseline' };
@@ -163,7 +167,7 @@ S.RevenueMenuEngineering = {
   },
 
   renderPriceSensitivity(container) {
-    const items = (App.data.revenue_menu_items||[]).filter(i=>i.price&&i.cost);
+    const items = (App.data.menu_items||[]).map(i => ({...i, cost: App.menuItemCost(i) || 0})).filter(i=>i.price&&i.cost);
     const log   = (App.data.revenue_price_log||[]).slice().reverse();
     const itemOpts = items.map((i,idx)=>'<option value="'+idx+'">'+esc(i.name)+'   $'+i.price+'</option>').join('');
 
@@ -240,11 +244,11 @@ S.RevenueMenuEngineering = {
         predicted_vol_pct:volChg2, predicted_weekly_impact:predWk, saved_at:new Date().toISOString() };
       if (!App.data.revenue_price_log) App.data.revenue_price_log=[];
       App.data.revenue_price_log.push(entry);
-      const allItems = App.data.revenue_menu_items||[];
+      const allItems = App.data.menu_items||[];
       const ri = allItems.findIndex(i=>i.id===item.id);
       if(ri>=0) allItems[ri].price=newPrice;
       await App.saveKey('revenue_price_log');
-      await App.saveKey('revenue_menu_items');
+      await App.saveKey('menu_items');
       // Refresh log table inline
       const tbody = document.getElementById('rps-log-table');
       if (tbody) {
