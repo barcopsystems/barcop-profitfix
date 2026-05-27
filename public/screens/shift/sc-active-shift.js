@@ -20,7 +20,7 @@ S.ShiftActiveShift = {
       .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())[0] || null;
   },
   shiftTypes() {
-    return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
+    return App.SHIFT_TYPES;
   },
   byDate(key, date) {
     return ((App.shiftData && App.shiftData[key]) || []).filter(r => r.date === date);
