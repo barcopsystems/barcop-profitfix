@@ -39,6 +39,18 @@ S.ShiftCashControl = {
     }, 0);
   },
 
+  // Net safe movement inside the active date range. Lifetime balance stays
+  // the headline number; this sub-figure shows how the safe shifted during
+  // the window the operator is filtering to.
+  netInWindow() {
+    const start = this.startDate();
+    return this.safeLog().reduce((sum, e) => {
+      if (start && e.date < start) return sum;
+      const amt = parseFloat(e.amount) || 0;
+      return sum + (e.direction === 'out' ? -amt : amt);
+    }, 0);
+  },
+
   // Merge drops + variances + safe entries into one chronological activity
   // stream, filtered to the active range, newest first. Each row carries the
   // metadata needed to jump back to its source screen for edit.
@@ -108,6 +120,7 @@ S.ShiftCashControl = {
 
   draw() {
     const balance     = this.currentSafeBalance();
+    const netWin      = this.netInWindow();
     const stream      = this.activityStream();
     const drops       = stream.filter(s => s.category === 'safe' && s.type === 'Cash Drop');
     const safeOut     = stream.filter(s => s.category === 'safe' && s.direction === 'out');
@@ -138,12 +151,20 @@ S.ShiftCashControl = {
       + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val ' + (flagged.length > 0 ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
     + '</div>';
 
-    const controls = '<div class="form-row" style="margin-bottom:14px;align-items:center;gap:14px;">'
+    const netColor = netWin > 0 ? 'var(--gold)' : netWin < 0 ? 'var(--red)' : 'var(--t3)';
+    const netLabel = this.range === 'all' ? 'Net All Time' : 'Net In Window';
+    const controls = '<div class="form-row" style="margin-bottom:14px;align-items:center;gap:14px;flex-wrap:wrap;">'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Date Range</label>'
       + '<select id="cc-range">' + this.rangeOptions() + '</select></div>'
-      + '<div style="font-size:11px;color:var(--t3);align-self:flex-end;padding-bottom:10px;">'
+      + '<div style="font-size:11px;color:var(--t3);align-self:flex-end;padding-bottom:10px;flex:1;min-width:180px;">'
         + (this.range === 'all' ? 'All cash activity on file.' : 'Activity from ' + this.fmtDate(this.startDate()) + ' to today.')
-      + '</div></div>';
+      + '</div>'
+      + '<div style="align-self:flex-end;padding-bottom:6px;text-align:right;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + netLabel + '</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">'
+        + (netWin >= 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div>'
+      + '</div>'
+      + '</div>';
 
     let body;
     if (stream.length === 0) {
