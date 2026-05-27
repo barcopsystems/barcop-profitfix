@@ -17,6 +17,8 @@ S.InventoryVarianceReport = {
       .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
   },
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
+  voidComps() { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
+  waste()     { return ((App.shiftData && App.shiftData.sc_waste) || []); },
   allProducts() { return ((App.inventoryData && App.inventoryData.ic_products) || []); },
   productById(id) { return this.allProducts().find(p => p.id === id); },
   fmtDate(str) {
@@ -34,6 +36,43 @@ S.InventoryVarianceReport = {
     return { startC: asc[i - 1], endC: asc[i] };
   },
 
+  // Sum comp units + waste units per product across the count period.
+  // Voids are intentionally NOT subtracted (assumed pre-pour). Waste covers
+  // every spill / dump / break logged on sc-waste. Both deductions come out
+  // of the "used" number before it gets compared to POS sold, so legit
+  // non-revenue product loss does not show up as theft variance.
+  // Draft beer waste is stored in oz on sc_waste (because partial keg loss
+  // is the realistic case); convert to kegs by dividing container_size_oz.
+  adjustmentsMap(startDate, endDate) {
+    const out = {};
+    const bump = (pid, units) => {
+      if (!pid || !units) return;
+      if (!out[pid]) out[pid] = { comp_units: 0, waste_units: 0 };
+      return out[pid];
+    };
+    this.voidComps().forEach(v => {
+      if (!v.product_id || v.units == null) return;
+      if (v.type !== 'Comp') return;
+      if (v.date <= startDate || v.date > endDate) return;
+      const entry = bump(v.product_id, v.units);
+      entry.comp_units += parseFloat(v.units) || 0;
+    });
+    this.waste().forEach(w => {
+      if (!w.product_id || w.units == null) return;
+      if (w.date <= startDate || w.date > endDate) return;
+      const entry = bump(w.product_id, w.units);
+      // Draft waste comes in as oz; convert to keg-units using the product's
+      // container_size_oz so the subtraction unit-matches "used" (kegs).
+      const p = this.productById(w.product_id) || {};
+      if (p.category === 'Draft Beer' && p.container_size_oz) {
+        entry.waste_units += (parseFloat(w.units) || 0) / p.container_size_oz;
+      } else {
+        entry.waste_units += parseFloat(w.units) || 0;
+      }
+    });
+    return out;
+  },
+
   usageMap() {
     const period = this.currentPeriod();
     if (!period) return {};
@@ -45,15 +84,23 @@ S.InventoryVarianceReport = {
       .forEach(d => (d.line_items || []).forEach(li => {
         purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
       }));
+    const adj = this.adjustmentsMap(startC.date, endC.date);
     const map = {};
     Object.keys(eMap).forEach(pid => {
       if (!sMap[pid]) return;
       const p = this.productById(pid) || {};
-      const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
+      const rawUsed = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
+      const a = adj[pid] || { comp_units: 0, waste_units: 0 };
+      const adjustments = (a.comp_units || 0) + (a.waste_units || 0);
+      const used = Math.max(rawUsed - adjustments, 0);
       const ppc = p.pours_per_container || null;
       const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
       map[pid] = {
-        product: p, name: eMap[pid].name, used,
+        product: p, name: eMap[pid].name,
+        rawUsed, adjustments,
+        compUnits: a.comp_units || 0,
+        wasteUnits: a.waste_units || 0,
+        used,
         poursMade: ppc != null ? used * ppc : null,
         ouncesUsed: p.container_size_oz != null ? used * p.container_size_oz : null,
         usageCost: bottleCost != null ? used * bottleCost : null
@@ -258,25 +305,32 @@ S.InventoryVarianceReport = {
       const ouncesSold = p.pour_size_oz != null ? pr.qty * p.pour_size_oz : null;
       const ounceVar = u.ouncesUsed != null && ouncesSold != null ? u.ouncesUsed - ouncesSold : null;
       const varPct = ounceVar != null && u.ouncesUsed ? ounceVar / u.ouncesUsed * 100 : null;
-      return { name: u.name, ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade, used: u.used, ounceVar, varPct };
+      return { name: u.name, ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade,
+        rawUsed: u.rawUsed, compUnits: u.compUnits, wasteUnits: u.wasteUnits,
+        used: u.used, ounceVar, varPct };
     });
     if (!rows.length) return this.emptyMatch();
     const n = (v, d) => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d);
+    const dim = v => !v ? '<span style="color:var(--t4);">0</span>' : Number(v).toFixed(2).replace(/\.?0+$/, '');
     const body = rows.map(r => '<tr>'
       + '<td><div class="val">' + esc(r.name) + '</div></td>'
       + '<td>' + n(r.ouncesSold) + '</td>'
       + '<td>' + n(r.ouncesUsed) + '</td>'
       + '<td>' + n(r.poursMade, 0) + '</td>'
+      + '<td>' + n(r.rawUsed) + '</td>'
+      + '<td>' + dim(r.compUnits) + '</td>'
+      + '<td>' + dim(r.wasteUnits) + '</td>'
       + '<td>' + n(r.used) + '</td>'
       + '<td>' + n(r.ounceVar) + '</td>'
       + '<td>' + this.pct(r.varPct) + '</td>'
       + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'Ounces used comes from your counts; ounces sold comes from POS quantity at each product\'s pour size. '
-      + 'A positive variance is product poured but not sold.</div>'
+    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged in Shift Control. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error).'
+      + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th><th>Bottles Used</th>'
+      + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
+      + '<th>Used (Raw)</th><th>Comps</th><th>Waste</th><th>Adjusted Used</th>'
       + '<th>Oz Variance</th><th>Variance %</th><th>Status</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
