@@ -37,9 +37,9 @@ const ProfitNav = {
         <span class="nav-label">Kitchen Products</span>
       </div>
       <div class="nav-section">Costing</div>
-      <div class="nav-item" data-screen="recipe-library" id="nav-recipe-library">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Recipe Library</span>
+      <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Recipe Cost Analysis</span>
       </div>
       <div class="nav-item" data-screen="vendor-watch" id="nav-vendor-watch">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5l6-2 6 2v5.5c0 3.5-6 5.5-6 5.5s-6-2-6-5.5v-5.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2 3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -239,15 +239,19 @@ const Inventory = {
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-screen="ic-product-setup" id="nav-ic-product-setup">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Products</span>
+        <span class="nav-label">Add Products</span>
+      </div>
+      <div class="nav-item" data-screen="ic-prep-batches" id="nav-ic-prep-batches">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 4h9v3a4.5 4.5 0 0 1-4.5 4.5A4.5 4.5 0 0 1 4 7V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 14h12M7 11.5v2.5M10 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Prep Batches</span>
       </div>
       <div class="nav-item" data-screen="ic-locations" id="nav-ic-locations">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 15s5-4.2 5-8a5 5 0 0 0-10 0c0 3.8 5 8 5 8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="7" r="1.8" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Locations</span>
+        <span class="nav-label">Set Locations</span>
       </div>
       <div class="nav-item" data-screen="ic-vendors" id="nav-ic-vendors">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 4.5v4c0 3.5 5.5 6.5 5.5 6.5s5.5-3 5.5-6.5v-4L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Vendors</span>
+        <span class="nav-label">List Vendors</span>
       </div>
       <div class="nav-section">Counts</div>
       <div class="nav-item" data-screen="ic-take-inventory" id="nav-ic-take-inventory">
