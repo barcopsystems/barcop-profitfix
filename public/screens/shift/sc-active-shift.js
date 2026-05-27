@@ -58,8 +58,8 @@ S.ShiftActiveShift = {
       + '<input type="date" id="as-date" value="' + new Date().toISOString().slice(0, 10) + '" style="height:48px;"/></div>'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Shift Type</label>'
       + '<select id="as-type" style="height:48px;">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label>'
-      + '<input type="text" id="as-mgr" placeholder="On duty" style="height:48px;"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager on Duty</label>'
+      + '<select id="as-mgr" style="height:48px;">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Opening Bank</label>'
@@ -87,7 +87,8 @@ S.ShiftActiveShift = {
       id:             App.uid(),
       date,
       shift_type:     document.getElementById('as-type')?.value || '',
-      manager:        document.getElementById('as-mgr')?.value.trim() || '',
+      manager_id:     document.getElementById('as-mgr')?.value || '',
+      manager:        (App.staffById(document.getElementById('as-mgr')?.value) || {}).name || '',
       opening_bank:   num('as-bank'),
       staff_on_floor: num('as-staff'),
       bar_revenue:    0,
