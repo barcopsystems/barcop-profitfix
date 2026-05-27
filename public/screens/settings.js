@@ -817,10 +817,67 @@ S.HubSettings = {
         bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
         total_labor_cost:a.bar_labor + a.food_labor, total_hours:+hours.toFixed(1),
         labor_pct_blended:a.labor_pct_blended, rplh_blended:+(a.total_rev / hours).toFixed(2),
-        rplh_lunch:0, rplh_dinner:0, rplh_bar:0,
         notes:'', saved_at:new Date().toISOString()
       };
     });
+
+    // ── Revenue Forecasts — one record per Monday for the last 6 weeks plus
+    // the coming week. Each weekly forecast is built from the same actuals
+    // we just generated, with a small ±4% nudge so the operator-facing
+    // "vs Forecast" tile shows a realistic variance rather than a zero.
+    // Per-day split uses the same weekday-weight curve other sample data uses
+    // (heavier Fri/Sat, lighter Mon/Tue).
+    const fcDayWeights = { Mon:0.10, Tue:0.10, Wed:0.12, Thu:0.13, Fri:0.18, Sat:0.22, Sun:0.15 };
+    const fcDays       = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const monStartFor  = (dStr) => {
+      const d = new Date(dStr + 'T00:00:00');
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd);
+      return d.toISOString().slice(0,10);
+    };
+    const lastSix = App.data.revenue_weeks.slice(-6);
+    App.data.revenue_forecasts = lastSix.map((wk, i) => {
+      // Forecast was set the Saturday BEFORE the week, so it's a forward
+      // projection that landed close to but not exactly on actuals.
+      const total = (wk.bar_revenue + wk.floor_revenue) * (i % 2 === 0 ? 0.96 : 1.04);
+      const per_day = {};
+      fcDays.forEach(d => { per_day[d] = Math.round(total * fcDayWeights[d]); });
+      const week_start = monStartFor(wk.period_end);
+      return {
+        id: uid(),
+        week_start,
+        per_day,
+        total: +total.toFixed(2),
+        method: 'manual',
+        notes: '',
+        created_at: new Date(week_start + 'T18:00:00').toISOString(),
+        updated_at: new Date(week_start + 'T18:00:00').toISOString()
+      };
+    });
+    // Plus a coming-week forecast so the schedule builder has something to read
+    // when the operator opens it on the demo data.
+    (() => {
+      const last = App.data.revenue_weeks[App.data.revenue_weeks.length - 1];
+      const ref  = (last.bar_revenue + last.floor_revenue) * 1.02;
+      const nextMon = (() => {
+        const d = new Date();
+        const wd = (d.getDay() + 6) % 7;
+        d.setDate(d.getDate() + (7 - wd));
+        return d.toISOString().slice(0,10);
+      })();
+      const per_day = {};
+      fcDays.forEach(d => { per_day[d] = Math.round(ref * fcDayWeights[d]); });
+      App.data.revenue_forecasts.push({
+        id: uid(),
+        week_start: nextMon,
+        per_day,
+        total: +ref.toFixed(2),
+        method: 'manual',
+        notes: 'Coming week. Adjust per event or weather.',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    })();
 
     // ── Menu — the Anchor's full card, costed for Menu Engineering ──
     const rMenu = [
