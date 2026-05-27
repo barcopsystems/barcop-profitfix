@@ -408,7 +408,13 @@ S.InventoryProducts = {
   },
 
   // ── Form ──────────────────────────────────────────────────────────────────
+  // Track whether the form is being opened to EDIT an existing product
+  // (id provided) vs ADD a new one. Drives field-missing highlights —
+  // we only show them on edit, since a fresh form is empty by definition.
+  _setEditFlag(id) { this._editingExistingProduct = !!id; },
+
   showForm(category, id) {
+    this._setEditFlag(id);
     if (!this.CATEGORIES.includes(category)) category = 'Liquor';
     this.editId = id || null;
     this._formCategory = category;
@@ -591,6 +597,43 @@ S.InventoryProducts = {
              'Draft Beer':'Craft', 'Food':'Protein', 'Misc':'Mixer' }[cat] || '';
   },
 
+  // Required fields per category. Driver for the .field-missing highlighting
+  // that surfaces what's incomplete on an edit. All categories require name,
+  // vendor, location, and unit cost. Sized categories (Liquor/Wine/Draft Beer/
+  // Bottle Beer) require container size + pour size; bottle beer needs case
+  // size too. Par level and reorder point are operational follow-ons, not
+  // required for the product record itself.
+  _requiredFieldIds(cat, spec) {
+    const ids = ['ip-name', 'ip-vendor', 'ip-loc1', 'ip-cost'];
+    if (spec?.sizeGroup) {
+      ids.push('ip-size');
+      if (spec.showPour !== false) ids.push('ip-pour');
+    }
+    if (cat === 'Bottle Beer') ids.push('ip-case-size');
+    return ids;
+  },
+  // Value check: is a given input "filled"?
+  _isFilled(id) {
+    const el = document.getElementById(id);
+    if (!el) return true; // not rendered in this category — not required
+    const v = (el.value || '').trim();
+    if (!v) return false;
+    // For numeric inputs, zero counts as not-filled
+    if (el.type === 'number') return parseFloat(v) > 0;
+    return true;
+  },
+  applyMissingFieldHighlights(cat, spec) {
+    const ids = this._requiredFieldIds(cat, spec);
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const wrap = el.closest('.f');
+      if (!wrap) return;
+      if (!this._isFilled(id)) wrap.classList.add('field-missing');
+      else wrap.classList.remove('field-missing');
+    });
+  },
+
   _wireForm() {
     document.getElementById('ip-back')?.addEventListener('click', () => this.renderLanding());
     document.getElementById('ip-cancel')?.addEventListener('click', () => this.renderLanding());
@@ -601,14 +644,37 @@ S.InventoryProducts = {
       const cw = document.getElementById('ip-cw');
       if (cw) cw.style.display = document.getElementById('ip-size').value === 'custom' ? '' : 'none';
       this.calcProduct();
+      this._refreshMissing();
     });
     document.getElementById('ip-unit')?.addEventListener('change', () => {
       const uw = document.getElementById('ip-uw');
       if (uw) uw.style.display = document.getElementById('ip-unit').value === 'custom' ? '' : 'none';
     });
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
-      document.getElementById(fid)?.addEventListener('input', () => this.calcProduct())
+      document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
+    // Field-missing refresh on the other required inputs
+    ['ip-name', 'ip-vendor', 'ip-loc1'].forEach(fid =>
+      document.getElementById(fid)?.addEventListener('input', () => this._refreshMissing())
+    );
+    document.getElementById('ip-vendor')?.addEventListener('change', () => this._refreshMissing());
+    document.getElementById('ip-loc1')?.addEventListener('change', () => this._refreshMissing());
+
+    // On render: if we're editing an existing product, highlight required-
+    // but-empty fields so the operator sees what's missing at a glance.
+    if (this._editingExistingProduct) {
+      const cat = this._formCategory || '';
+      const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
+      this.applyMissingFieldHighlights(cat, spec);
+    }
+  },
+
+  _refreshMissing() {
+    if (!this._editingExistingProduct) return;
+    const cat = this._formCategory || '';
+    const spec = (this.FORM_SPEC && this.FORM_SPEC[cat]) || {};
+    this.applyMissingFieldHighlights(cat, spec);
+  },
 
     // Edit mode: changing the category dropdown re-renders the form for the
     // new category. Field values that map directly persist via the existing
