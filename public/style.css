@@ -291,16 +291,14 @@ select:-webkit-autofill{
   caret-color:var(--w);
   transition:background-color 5000s ease-in-out 0s;
 }
-/* Required-field highlighting for incomplete records. Apply class to the .f
-   wrapper of a missing required input. Operator sees at a glance which cells
-   need filling when editing a flagged record. Border + label only — do NOT
-   override input background, because that breaks color-scheme:dark on the
-   native <select> dropdown panel (Chrome would render it light). */
+/* Required-field highlighting — applied ONLY when editing an incomplete
+   record. Red border on the cell, nothing else. No "required" word, no
+   red label text. Just the red border tells the operator what's missing.
+   Do NOT override input background — that breaks color-scheme:dark on
+   the native <select> dropdown panel (Chrome would render it light). */
 .f.field-missing input,
 .f.field-missing select,
 .f.field-missing textarea{border-color:var(--red);}
-.f.field-missing label{color:var(--red);}
-.f.field-missing label::after{content:" \00b7 required";font-size:8px;letter-spacing:1px;color:var(--red);opacity:0.85;}
 .f input[type=number]{-moz-appearance:textfield;}
 .f input[type=number]::-webkit-inner-spin-button,
 .f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
