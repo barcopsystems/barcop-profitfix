@@ -1578,6 +1578,7 @@ const App = {
         'lc-log-hours':          ['Log Hours', 'Labor Control'],
         'lc-daily-view':         ['Daily View', 'Labor Control'],
         'lc-weekly-summary':     ['Weekly Summary', 'Labor Control'],
+        'lc-pay-periods':        ['Pay Periods', 'Labor Control'],
         'lc-positions':          ['Add Positions', 'Labor Control'],
         'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
         'lc-tip-log':            ['Tip Log', 'Labor Control'],
@@ -1598,6 +1599,7 @@ const App = {
         'lc-log-hours': S.LaborLogHours,
         'lc-daily-view': S.LaborDailyView,
         'lc-weekly-summary': S.LaborWeeklySummary,
+        'lc-pay-periods':    S.LaborPayPeriods,
         'lc-tip-log': S.LaborTipLog,
         'lc-tip-pool': S.LaborTipPool,
         'lc-tip-history': S.LaborTipHistory,
@@ -1706,6 +1708,29 @@ const App = {
     if (isNaN(n) || n == null) return ' ';
     const d = decimals !== undefined ? decimals : (Math.abs(n) < 10 ? 2 : 0);
     return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+  },
+
+  // Phase 5: resolve the wage in effect for a staff member on a given date.
+  // Walks wage_history newest-first: any entry with effective_date <= the
+  // queried date means the new_wage applied from then onward. Falls back to
+  // the staff member's current wage when no history is on file or every
+  // entry's effective_date is after the queried date (meaning the wage was
+  // the prior wage from the oldest entry — or the current wage if no history).
+  wageForStaffOn(staffId, dateStr) {
+    const staff = (this.laborData?.lc_staff || []).find(s => s.id === staffId);
+    if (!staff) return 0;
+    if (!dateStr) return staff.wage || 0;
+    const history = Array.isArray(staff.wage_history) ? staff.wage_history.slice() : [];
+    if (!history.length) return staff.wage || 0;
+    // Sort newest effective_date first
+    history.sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''));
+    // Find the most recent change that took effect on or before the queried date
+    const applies = history.find(h => (h.effective_date || '') <= dateStr);
+    if (applies) return applies.new_wage != null ? applies.new_wage : (staff.wage || 0);
+    // The queried date is BEFORE all changes — the prior_wage on the oldest
+    // entry is what the staff member earned at that time.
+    const oldest = history[history.length - 1];
+    return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
   },
 
   // In-app confirmation modal — replaces window.confirm() so dialogs match
