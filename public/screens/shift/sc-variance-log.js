@@ -17,7 +17,7 @@ S.ShiftVarianceLog = {
     return App.shiftData.sc_variances;
   },
   shiftTypes() {
-    return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
+    return App.SHIFT_TYPES;
   },
   tolerance() {
     const t = App.cashToleranceForShift(null);
