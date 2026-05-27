@@ -19,6 +19,7 @@ S.TheftRisk = {
   spotChecks() { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
   voidComps()  { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
   variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
+  adjustments() { return ((App.inventoryData && App.inventoryData.ic_adjustments) || []); },
 
   manualScore(level) {
     const m = this.MANUAL_LEVELS.find(x => x.label === level);
@@ -69,6 +70,30 @@ S.TheftRisk = {
     return {
       score: Math.min(100, Math.round(rate * 150)),
       count: vars.length, shorts: shorts.length, rate, netShort
+    };
+  },
+
+  // Confirmed theft from the Inventory Adjustment log (reason='Theft'). These
+  // are documented losses the operator has already attributed — strongest
+  // signal of all four because there's no inference, just acknowledged events.
+  // 90-day window so the score reflects what's recently happening, not
+  // permanent history from years ago.
+  theftConfirmedSignal() {
+    const all = this.adjustments();
+    if (all.length === 0) return { score: null, count: 0 };
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const recent = all.filter(a => {
+      if (a.reason !== 'Theft') return false;
+      const date = (a.date_time || '').slice(0, 10);
+      return date >= cutoffStr;
+    });
+    const totalValue = recent.reduce((t, a) => t + Math.abs(a.value || 0), 0);
+    // 25 points per confirmed event, capped at 100. Stack value as context.
+    return {
+      score: recent.length > 0 ? Math.min(100, recent.length * 25) : 0,
+      count: recent.length,
+      totalValue
     };
   },
 
@@ -173,7 +198,8 @@ S.TheftRisk = {
 
   renderMain() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
-    const autoScores = [pour.score, voids.score, cash.score].filter(s => s != null);
+    const confirmed = this.theftConfirmedSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score].filter(s => s != null);
     const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
     const manScore = this.manualScore(this._manual.level);
 
@@ -230,9 +256,19 @@ S.TheftRisk = {
         + (cash.rate > 0.3 ? 'Repeated shortages from the same drawers or cashiers warrant a closer look.'
            : 'Shortage rate is within a normal range.');
 
+    const confirmedBody = confirmed.score == null
+      ? 'No inventory adjustments logged yet. Documented theft events from the Adjustment Log feed this signal directly.'
+      : confirmed.count === 0
+        ? 'No theft events logged in the last 90 days. Adjustments with other reasons (damage, expiration, found) do not score here.'
+        : confirmed.count + ' confirmed theft event' + (confirmed.count === 1 ? '' : 's')
+          + ' logged in the last 90 days, totaling ' + App.fmtCurrency(confirmed.totalValue) + '. '
+          + (confirmed.count >= 3 ? 'Multiple confirmed events points to an ongoing problem, not a one-off.'
+             : 'Documented but contained. Keep an eye on whether it repeats.');
+
     const signals = signalCard('Pour Variance &middot; Spot Checks', pour, pourBody)
       + signalCard('Voids &amp; Comps', voids, voidBody)
-      + signalCard('Cash Variance', cash, cashBody);
+      + signalCard('Cash Variance', cash, cashBody)
+      + signalCard('Confirmed Theft &middot; Adjustment Log', confirmed, confirmedBody);
 
     // ── Manual judgment ──
     const levelOpts = '<option value="">No manual judgment</option>'
@@ -325,7 +361,8 @@ S.TheftRisk = {
 
   async save() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
-    const autoScores = [pour.score, voids.score, cash.score].filter(s => s != null);
+    const confirmed = this.theftConfirmedSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score].filter(s => s != null);
     const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
     const manScore = this.manualScore(this._manual.level);
     let overall;
@@ -340,7 +377,7 @@ S.TheftRisk = {
       id: App.uid(),
       date: new Date().toISOString(),
       auto_score: autoScore,
-      signals: { pour: pour.score, voids: voids.score, cash: cash.score },
+      signals: { pour: pour.score, voids: voids.score, cash: cash.score, confirmed: confirmed.score },
       manual_level: this._manual.level,
       manual_score: manScore,
       notes: this._manual.notes,
