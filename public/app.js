@@ -1476,7 +1476,7 @@ const App = {
         'ic-transfers':        ['Transfer Log', 'Inventory Control'],
         'ic-empties':          ['Empties Log', 'Inventory Control'],
         'ic-adjustments':      ['Adjustment Log', 'Inventory Control'],
-        'ic-par-suggestions':  ['Par Suggestions', 'Inventory Control'],
+        'ic-par-suggestions':  ['Dynamic Pars', 'Inventory Control'],
         'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
         'ic-delivery-history': ['Delivery History', 'Inventory Control'],
         'ic-order-sheet':      ['Order Sheet', 'Inventory Control'],
