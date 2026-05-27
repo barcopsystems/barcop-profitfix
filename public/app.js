@@ -1710,6 +1710,40 @@ const App = {
     return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
   },
 
+  // In-app confirmation modal — replaces window.confirm() so dialogs match
+  // Bar Cop's visual language (no jarring native browser prompts). Returns
+  // a Promise that resolves to true (confirmed) or false (cancelled).
+  // Usage: if (!(await App.confirm({title, message, confirmText, danger}))) return;
+  confirm(opts) {
+    opts = opts || {};
+    const title       = opts.title       || 'Are you sure?';
+    const message     = opts.message     || '';
+    const confirmText = opts.confirmText || 'Confirm';
+    const cancelText  = opts.cancelText  || 'Cancel';
+    const danger      = opts.danger !== false; // default to danger (red) confirm button
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+      overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + esc(title) + '</div>'
+        + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+          + '<button class="btn btn-ghost" data-act="cancel">' + esc(cancelText) + '</button>'
+          + '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" data-act="confirm">' + esc(confirmText) + '</button>'
+        + '</div></div>';
+      document.body.appendChild(overlay);
+      const cleanup = (val) => { document.body.removeChild(overlay); resolve(val); };
+      overlay.addEventListener('click', e => {
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        if (act === 'confirm') cleanup(true);
+        else if (act === 'cancel' || e.target === overlay) cleanup(false);
+      });
+      // Esc cancels
+      const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); cleanup(false); } };
+      document.addEventListener('keydown', onKey);
+    });
+  },
+
   fmtPct(n, d=1) {
     if (isNaN(n) || n == null) return ' ';
     return Number(n).toFixed(d) + '%';
