@@ -822,8 +822,9 @@ S.HubBooks = {
     const COL_WIDTHS = [{ wch: 60 }, { wch: 18 }, { wch: 42 }, { wch: 16 }, { wch: 22 }];
 
     const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
-    const tips   = (App.laborData?.lc_tips   || []).filter(t => inMonth(t.date));
-    const shifts = (App.shiftData?.sc_shifts || []).filter(s => inMonth(s.date));
+    const tips   = (App.laborData?.lc_tips       || []).filter(t => inMonth(t.date));
+    const pools  = (App.laborData?.lc_tip_pools  || []).filter(p => inMonth(p.date));
+    const shifts = (App.shiftData?.sc_shifts     || []).filter(s => inMonth(s.date));
 
     const grossReceipts = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
     const totalChargedTips = tips.reduce((s, t) => s + (parseFloat(t.card_tips) || 0), 0);
@@ -883,11 +884,30 @@ S.HubBooks = {
       });
     }
 
-    // Per-employee monthly totals + suggested allocation
+    // Per-employee monthly totals + suggested allocation.
+    // Source priority per shift:
+    //   1. lc_tip_pools (shift's saved pool split) — what each employee actually took home
+    //   2. lc_tips (raw tip log) — only when no pool exists for the shift
+    // This matches what Form 8027 should reflect: the taxable allocation per
+    // employee, not just what came in across the bar.
     const byEmp = {};
+    const shiftIdsWithPools = new Set(pools.map(p => p.shift_id).filter(Boolean));
+
+    // Pool-based allocations (preferred)
+    pools.forEach(p => {
+      (p.participants || []).forEach(pt => {
+        const name = pt.name || '(unnamed)';
+        if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0, source: 'pool' };
+        byEmp[name].tips  += parseFloat(pt.share) || 0;
+        byEmp[name].hours += parseFloat(pt.hours) || 0;
+      });
+    });
+
+    // Raw tip log — only count entries from shifts that DON'T have a pool
     sortedTips.forEach(t => {
+      if (t.shift_id && shiftIdsWithPools.has(t.shift_id)) return; // covered by pool
       const name = t.name || '(unnamed)';
-      if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0 };
+      if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0, source: 'log' };
       byEmp[name].tips  += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
       byEmp[name].hours += parseFloat(t.hours) || 0;
     });
@@ -906,7 +926,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Labor Control tip log (per-shift tip entries) and Shift Control shifts (gross receipts).',
+      'Source: Labor Control tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and Shift Control shifts for gross receipts.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
