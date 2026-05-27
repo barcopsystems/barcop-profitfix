@@ -9,12 +9,13 @@
 S.CashRecon = {
   drops()     { return ((App.shiftData && App.shiftData.sc_cash_drops) || []); },
   variances() { return ((App.shiftData && App.shiftData.sc_variances) || []); },
-  tolerance() {
-    const t = App.data && App.data.settings && App.data.settings.cash_tolerance;
-    return (t != null && !isNaN(t)) ? Number(t) : 10;
-  },
+  // Cash variance tolerance now lives in Shift Control's own setup. Use the
+  // App helper so the priority order (per-shift > per-shift-type > default)
+  // is applied in one place. Called without a shift = read the overall
+  // default for screen-wide threshold display.
+  tolerance(shift) { return App.cashToleranceForShift(shift || null); },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -41,7 +42,7 @@ S.CashRecon = {
       + '<div style="display:flex;align-items:center;gap:10px;">'
       + '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--gold);"></span>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
-      + 'Cash drops and end-of-shift variances are captured in Shift Control and flow here automatically — '
+      + 'Cash drops and end-of-shift variances are captured in Shift Control and flow here automatically, '
       + 'no double entry. ' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + ' and '
       + variances.length + ' variance' + (variances.length === 1 ? '' : 's') + ' synced.'
       + '</div></div></div>';
@@ -75,9 +76,9 @@ S.CashRecon = {
             ? '<span class="badge badge-dim">Over</span>'
             : '<span class="badge badge-warn">Short</span>';
         return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
-          + '<td>' + esc(v.shift_type || '—') + '</td>'
-          + '<td>' + esc(v.drawer || '—') + '</td>'
-          + '<td>' + esc(v.cashier || '—') + '</td>'
+          + '<td>' + esc(v.shift_type || '-') + '</td>'
+          + '<td>' + esc(v.drawer || '-') + '</td>'
+          + '<td>' + esc(v.cashier || '-') + '</td>'
           + '<td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
           + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td>'
           + '<td class="' + cls + '">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</td>'
@@ -101,9 +102,9 @@ S.CashRecon = {
         + 'Control will appear here.</div></div>';
     } else {
       const rows = drops.slice(0, 40).map(d => '<tr><td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
-        + '<td>' + esc(d.shift_type || '—') + '</td>'
-        + '<td>' + esc(d.drawer || '—') + '</td>'
-        + '<td>' + esc(d.performed_by || '—') + '</td>'
+        + '<td>' + esc(d.shift_type || '-') + '</td>'
+        + '<td>' + esc(d.drawer || '-') + '</td>'
+        + '<td>' + esc(d.performed_by || '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td></tr>').join('');
       dropCard = '<div class="card"><div class="card-title">Cash Drops</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
