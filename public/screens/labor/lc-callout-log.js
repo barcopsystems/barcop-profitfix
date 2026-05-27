@@ -8,7 +8,10 @@ S.LaborCalloutLog = {
   editId: null,
   _pendingDelId: null,
   TYPES: ['No-Show', 'Called Out Sick', 'Late Arrival', 'Left Early', 'Other'],
-  SHIFTS: ['', 'Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+  // Reads canonical SHIFT_TYPES from App with a leading '' for "all shifts"
+  // filter option. Defined as a getter so any future change to App.SHIFT_TYPES
+  // is picked up automatically.
+  get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
   callouts() {
     if (!App.laborData) App.laborData = {};
