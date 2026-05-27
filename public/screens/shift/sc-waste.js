@@ -27,7 +27,7 @@ S.ShiftWaste = {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
   },
   shiftTypes() {
-    return (S.ShiftLogShift && S.ShiftLogShift.SHIFT_TYPES) || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'];
+    return App.SHIFT_TYPES;
   },
   fmtDate(str) {
     if (!str) return '-';
