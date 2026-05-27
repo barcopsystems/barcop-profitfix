@@ -158,10 +158,10 @@ S.ShiftSafeLog = {
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Performed By</label>'
-      + '<input type="text" id="sl-by" value="' + esc(e?.performed_by || '') + '" placeholder="Name"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Witness</label>'
-      + '<input type="text" id="sl-witness" value="' + esc(e?.witness || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Performed By</label>'
+      + '<select id="sl-by">' + App.staffOptions(e?.performed_by_id || e?.performed_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witness</label>'
+      + '<select id="sl-witness">' + App.staffOptions(e?.witness_id || e?.witness, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
@@ -205,8 +205,10 @@ S.ShiftSafeLog = {
       direction:    this.dirOf(txnType),
       amount,
       reference:    document.getElementById('sl-ref')?.value.trim() || '',
-      performed_by: document.getElementById('sl-by')?.value.trim() || '',
-      witness:      document.getElementById('sl-witness')?.value.trim() || '',
+      performed_by_id: document.getElementById('sl-by')?.value || '',
+      performed_by:    (App.staffById(document.getElementById('sl-by')?.value) || {}).name || '',
+      witness_id:      document.getElementById('sl-witness')?.value || '',
+      witness:         (App.staffById(document.getElementById('sl-witness')?.value) || {}).name || '',
       notes:        document.getElementById('sl-notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
