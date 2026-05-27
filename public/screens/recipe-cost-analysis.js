@@ -30,8 +30,10 @@ S.RecipeCostAnalysis = {
       return;
     }
 
-    const withRecipe = items.filter(i => i.recipe && Array.isArray(i.recipe.ingredients) && i.recipe.ingredients.length);
-    const noRecipe   = items.filter(i => !(i.recipe && Array.isArray(i.recipe.ingredients) && i.recipe.ingredients.length));
+    const hasRecipeFn = i => i.recipe && Array.isArray(i.recipe.ingredients) && i.recipe.ingredients.length;
+    const withRecipe  = items.filter(hasRecipeFn);
+    const linked      = items.filter(i => !hasRecipeFn(i) && !!i.linked_product_id);
+    const noRecipe    = items.filter(i => !hasRecipeFn(i) && !i.linked_product_id);
 
     // Rank items WITH recipes by recipe cost % vs target (over-target first).
     const ranked = withRecipe.map(i => {
@@ -103,10 +105,37 @@ S.RecipeCostAnalysis = {
         + '</tr></thead><tbody>' + nrRows + '</tbody></table></div>';
     }
 
+    // Linked Inventory items — Beer / Wine / NA. Show in a dim section so the
+    // operator sees them but understands they don't need a recipe (cost flows
+    // from the linked product directly).
+    let linkedSection = '';
+    if (linked.length) {
+      const lRows = linked.map(i => {
+        const cost = App.menuItemCost(i) || 0;
+        const pct  = (i.price > 0 && cost > 0) ? (cost / i.price * 100) : null;
+        return '<tr>'
+          + '<td><div class="val">' + esc(i.name) + '</div></td>'
+          + '<td>' + esc(i.category || '-') + '</td>'
+          + '<td>' + (i.price ? App.fmtCurrency(i.price) : '-') + '</td>'
+          + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + ' <span style="font-size:9px;color:var(--gold);">(linked product)</span></td>'
+          + '<td>' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
+          + '<td><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Open Item</button></td>'
+          + '</tr>';
+      }).join('');
+      linkedSection = '<div class="sh" style="margin-top:24px;">Linked Inventory Items</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+          + 'Direct-pour items (Beer / Wine / NA Beverages). Cost flows from the linked inventory product — no recipe needed. When the product price changes in Inventory Control, these menu items auto-update.'
+        + '</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+          + '<th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost %</th><th></th>'
+        + '</tr></thead><tbody>' + lRows + '</tbody></table></div>';
+    }
+
     this.container.innerHTML = '<div class="screen">'
       + summary
       + rankedTable
       + noRecipeSection
+      + linkedSection
       + '</div>';
 
     this.container.querySelectorAll('.rca-edit').forEach(btn => {
