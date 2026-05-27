@@ -77,17 +77,19 @@ S.InventoryParSuggestions = {
     const cycleWeeks = (settings.cycle_days || 7) / 7;
     const buffer = (settings.buffer_pct || 0) / 100;
     let suggested = usage.avg_weekly * cycleWeeks * (1 + buffer);
-    // For Bottle Beer with case_size, round up to nearest case
+    // For Bottle Beer with case_size, round up to nearest case (par stored in cases)
     if (product.category === 'Bottle Beer' && product.case_size > 0) {
-      const cases = Math.ceil(suggested / product.case_size);
-      suggested = cases; // par_level is stored in cases for case-tracked items
+      suggested = Math.ceil(suggested / product.case_size);
     } else {
-      suggested = Math.ceil(suggested * 10) / 10; // one decimal place, round up
+      // Every other category: round UP to a whole unit. Operators order in
+      // whole bottles, kegs, cases, lbs — partial units don't exist on a
+      // vendor sheet. Ceiling means we err on the side of not running out.
+      suggested = Math.ceil(suggested);
     }
-    const current = parseFloat(product.par_level) || 0;
+    const current = Math.round(parseFloat(product.par_level) || 0);
     const delta = suggested - current;
     let status = 'No Change';
-    if (Math.abs(delta) >= 1 || (current === 0 && suggested > 0)) {
+    if (delta !== 0) {
       status = delta > 0 ? 'Increase' : 'Reduce';
     }
     return { ...usage, suggested, current, delta, status,
