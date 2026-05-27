@@ -48,9 +48,9 @@ S.InventoryVendors = {
           + '<td><button class="iv-open" data-id="' + v.id + '" '
           + 'style="padding:0;border:none;background:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer;">'
           + esc(v.name) + '</button></td>'
-          + '<td>' + esc(v.rep || '—') + '</td>'
-          + '<td>' + esc(v.phone || '—') + '</td>'
-          + '<td>' + esc(v.payment_terms || '—') + '</td>'
+          + '<td>' + esc(v.rep || '-') + '</td>'
+          + '<td>' + esc(v.phone || '-') + '</td>'
+          + '<td>' + esc(v.payment_terms || '-') + '</td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm iv-edit" data-id="' + v.id + '">Edit</button>'
@@ -88,7 +88,7 @@ S.InventoryVendors = {
     this.editId = id || null;
     const v = id ? this.vendors().find(x => x.id === id) : null;
     const termOpts = this.TERMS.map(t =>
-      '<option value="' + t + '"' + (v && v.payment_terms === t ? ' selected' : '') + '>' + (t || '—') + '</option>').join('');
+      '<option value="' + t + '"' + (v && v.payment_terms === t ? ' selected' : '') + '>' + (t || '-') + '</option>').join('');
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Vendor</div>'
@@ -203,7 +203,7 @@ S.InventoryVendors = {
     const info = (label, val) =>
       '<div style="display:flex;padding:8px 0;border-bottom:1px solid var(--b2);">'
       + '<div style="width:150px;flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding-top:2px;">' + label + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);">' + esc(val || '—') + '</div></div>';
+      + '<div style="font-size:13px;color:var(--t2);">' + esc(val || '-') + '</div></div>';
 
     const contactCard = '<div class="card"><div class="card-title">Vendor Details</div>'
       + info('Rep', v.rep) + info('Phone', v.phone) + info('Email', v.email)
@@ -219,15 +219,62 @@ S.InventoryVendors = {
             + '<th>Product</th><th>Category</th><th>Unit Cost</th>'
             + '</tr></thead><tbody>'
             + prods.map(p => '<tr><td><div class="val">' + esc(p.name) + '</div></td>'
-                + '<td>' + esc(p.category || '—') + '</td>'
-                + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">—</span>') + '</td></tr>').join('')
+                + '<td>' + esc(p.category || '-') + '</td>'
+                + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>').join('')
             + '</tbody></table></div>')
       + '</div>';
 
+    // Flatten cost_history[] across this vendor's products into one chronological
+    // list, newest first. Each delivery line with a price change writes an entry
+    // on ic_products.cost_history (see ic-receive-delivery._applyCostChanges).
+    const priceRows = [];
+    prods.forEach(p => {
+      (p.cost_history || []).forEach(h => {
+        priceRows.push({
+          date: h.date || h.changed_at || '',
+          product: p.name,
+          category: p.category || '',
+          old_cost: h.old_cost != null ? h.old_cost : (h.prior_cost != null ? h.prior_cost : null),
+          new_cost: h.new_cost != null ? h.new_cost : null,
+          source:   h.source || ''
+        });
+      });
+    });
+    priceRows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const recent = priceRows.slice(0, 5);
+
+    const fmtDelta = (oldC, newC) => {
+      if (oldC == null || newC == null) return '-';
+      const delta = newC - oldC;
+      const pct = oldC > 0 ? (delta / oldC) * 100 : 0;
+      const sign = delta >= 0 ? '+' : '';
+      const cls = delta > 0 ? 'neg' : delta < 0 ? 'pos' : '';
+      return '<span class="' + cls + '">' + sign + App.fmtCurrency(delta) + ' (' + sign + pct.toFixed(1) + '%)</span>';
+    };
+    const fmtDate = str => {
+      if (!str) return '-';
+      const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+      return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
     const priceCard = '<div class="card"><div class="card-title">Recent Price Changes</div>'
-      + '<div style="font-size:12px;color:var(--t3);">Price history populates here as you record deliveries '
-      + 'from this vendor in Receive Delivery. The most recent five changes are shown, and the same data '
-      + 'feeds Profit Recovery Vendor Watch.</div></div>';
+      + (recent.length === 0
+        ? '<div style="font-size:12px;color:var(--t3);">No price changes recorded yet for this vendor. '
+          + 'Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</div>'
+        : '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
+          + '</tr></thead><tbody>'
+          + recent.map(r => '<tr>'
+            + '<td>' + fmtDate(r.date) + '</td>'
+            + '<td><div class="val">' + esc(r.product) + '</div>'
+            + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
+            + '<td>' + (r.old_cost != null ? App.fmtCurrency(r.old_cost) : '-') + '</td>'
+            + '<td>' + (r.new_cost != null ? App.fmtCurrency(r.new_cost) : '-') + '</td>'
+            + '<td class="val">' + fmtDelta(r.old_cost, r.new_cost) + '</td>'
+            + '</tr>').join('')
+          + '</tbody></table></div>'
+          + '<div style="font-size:10px;color:var(--t3);margin-top:8px;">Same data feeds Profit Recovery Vendor Watch and the Vendor Scorecard.</div>')
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="iv-back">&#8592; Back to Vendors</button></div>'
