@@ -266,18 +266,6 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Spot Check</span>
       </div>
-      <div class="nav-item" data-screen="ic-transfers" id="nav-ic-transfers">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5.5h10l-2.5-2.5M14.5 11.5h-10l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Transfer Log</span>
-      </div>
-      <div class="nav-item" data-screen="ic-empties" id="nav-ic-empties">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6L13 6v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6l1.5-3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 9.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Empties Log</span>
-      </div>
-      <div class="nav-item" data-screen="ic-adjustments" id="nav-ic-adjustments">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5h7M8.5 5v7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Adjustment Log</span>
-      </div>
       <div class="nav-section">Receiving</div>
       <div class="nav-item" data-screen="ic-receive-delivery" id="nav-ic-receive-delivery">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5h2.5l2 2.5v2h-4.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
@@ -296,7 +284,24 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
         <span class="nav-label">Order History</span>
       </div>
+      <div class="nav-section">Operations</div>
+      <div class="nav-item" data-screen="ic-transfers" id="nav-ic-transfers">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5.5h10l-2.5-2.5M14.5 11.5h-10l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Transfer Log</span>
+      </div>
+      <div class="nav-item" data-screen="ic-empties" id="nav-ic-empties">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6L13 6v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6l1.5-3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 9.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Empties Log</span>
+      </div>
+      <div class="nav-item" data-screen="ic-adjustments" id="nav-ic-adjustments">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5h7M8.5 5v7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Adjustment Log</span>
+      </div>
       <div class="nav-section">Reports</div>
+      <div class="nav-item" data-screen="ic-par-suggestions" id="nav-ic-par-suggestions">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 12V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7" stroke="currentColor" stroke-width="1.3"/><path d="M2 12h13M6.5 8h4M5.5 10h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Dynamic Pars</span>
+      </div>
       <div class="nav-item" data-screen="ic-report-usage" id="nav-ic-report-usage">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Usage Report</span>
@@ -312,10 +317,6 @@ const Inventory = {
       <div class="nav-item" data-screen="ic-report-movers" id="nav-ic-report-movers">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11l3.5-3.5 2.5 2.5L13 4M10 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Top Movers</span>
-      </div>
-      <div class="nav-item" data-screen="ic-par-suggestions" id="nav-ic-par-suggestions">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 12V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7" stroke="currentColor" stroke-width="1.3"/><path d="M2 12h13M6.5 8h4M5.5 10h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Par Suggestions</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="ic-help" id="nav-ic-help">
