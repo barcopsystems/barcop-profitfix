@@ -42,26 +42,57 @@ S.RevenueMenuItems = {
   prodById(id) { return this.products().find(p => p.id === id) || null; },
   batchById(id) { return this.prepBatches().find(b => b.id === id) || null; },
 
-  // Category → recipe mode auto-mapping. Drives both the picker filter AND
-  // the auto-load behavior on the Menu Items form. Single source of truth.
-  MENU_CAT_TO_MODE: {
-    'Cocktails':    'single',
-    'Appetizers':   'food',
-    'Entrees':      'food',
-    'Desserts':     'food',
-    'Beer':         'none',  // direct-pour: no recipe by default
-    'Wine':         'none',
-    'NA Beverages': 'none',
-    // Specials default to food (most operators mean food specials). If the
-    // special is a cocktail, operator can override by clicking "+ Add" link
-    // and picking single drink. No on-screen buttons cluttering the form.
-    'Specials':     'food',
-    // Other = genuinely unknown. Skip recipe by default; "+ Add a recipe"
-    // link reveals the builder seeded as food (operator can switch with
-    // the No Recipe → "+ Add a recipe" cycle if they want a different mode).
-    'Other':        'none'
+  // Category → cost source auto-mapping. Three sources:
+  //   'recipe-single' = single drink recipe builder (Cocktails)
+  //   'recipe-food'   = food plate recipe builder (Apps/Entrees/Desserts/Specials)
+  //   'linked'        = pick a linked inventory product (Beer/Wine/NA — direct-pour)
+  //   'manual'        = manual cost entry (Other — operator types a number)
+  MENU_CAT_TO_SOURCE: {
+    'Cocktails':    'recipe-single',
+    'Appetizers':   'recipe-food',
+    'Entrees':      'recipe-food',
+    'Desserts':     'recipe-food',
+    'Specials':     'recipe-food',
+    'Beer':         'linked',
+    'Wine':         'linked',
+    'NA Beverages': 'linked',
+    'Other':        'manual'
   },
-  modeForCategory(cat) { return this.MENU_CAT_TO_MODE[cat] || 'pick'; },
+  sourceForCategory(cat) { return this.MENU_CAT_TO_SOURCE[cat] || 'manual'; },
+  // Recipe mode derived from cost source (for the ingredient editor).
+  modeForCategory(cat) {
+    const src = this.sourceForCategory(cat);
+    if (src === 'recipe-single') return 'single';
+    if (src === 'recipe-food')   return 'food';
+    if (src === 'linked')        return 'none';
+    return 'none';
+  },
+
+  // Beer / Wine / NA menu items pick from these IC product categories.
+  LINKED_CATS_FOR_MENU: {
+    'Beer':         ['Bottle Beer', 'Draft Beer'],
+    'Wine':         ['Wine'],
+    'NA Beverages': ['Misc']  // sodas, juices, NA drinks tracked here
+  },
+  linkedProductOptions(menuCat, selectedId) {
+    const allowedCats = this.LINKED_CATS_FOR_MENU[menuCat] || [];
+    const prods = this.products().filter(p => p.active !== false && allowedCats.includes(p.category));
+    let h = '<option value="">Select inventory product...</option>';
+    if (!prods.length) {
+      h += '<option value="" disabled>No ' + esc(menuCat) + ' products set up in Inventory Control</option>';
+      return h;
+    }
+    allowedCats.forEach(cat => {
+      const inCat = prods.filter(p => p.category === cat).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!inCat.length) return;
+      h += '<optgroup label="' + esc(cat) + '">';
+      inCat.forEach(p => {
+        h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+      });
+      h += '</optgroup>';
+    });
+    return h;
+  },
 
   // Recipe ingredient dropdown filtered by recipe mode.
   ingredientOptions(selKey, mode) {
@@ -173,15 +204,17 @@ S.RevenueMenuItems = {
       const pct  = (item.price && cost) ? (cost / item.price * 100).toFixed(1) : null;
       const ok   = item.price && cost;
       const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
+      const hasLinked = !!item.linked_product_id;
+      const badgeStyle = 'font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 5px;margin-left:6px;';
       const recipeBadge = hasRecipe
-        ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 5px;margin-left:6px;">RECIPE</span>'
-        : '';
+        ? '<span style="' + badgeStyle + '">RECIPE</span>'
+        : (hasLinked ? '<span style="' + badgeStyle + '">LINKED</span>' : '');
       return '<tr class="' + (!ok ? 'row-incomplete' : '') + '">'
         + '<td style="width:36px;"><input type="checkbox" class="ri-chk" data-id="' + item.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
         + '<td style="font-weight:600;color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + recipeBadge + (!ok ? ' <span style="font-size:10px;font-weight:700;color:var(--red);">INCOMPLETE</span>' : '') + '</td>'
         + '<td>' + esc(item.category || '') + '</td>'
         + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
-        + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + (hasRecipe ? '<div style="font-size:9px;color:var(--t3);">from recipe</div>' : '') + '</td>'
+        + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + (hasRecipe ? '<div style="font-size:9px;color:var(--t3);">from recipe</div>' : (hasLinked ? '<div style="font-size:9px;color:var(--t3);">from linked product</div>' : '')) + '</td>'
         + '<td>' + (pct ? pct + '%' : '-') + '</td>'
         + '<td>' + (cm ? App.fmtCurrency(cm) : '-') + '</td>'
         + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
@@ -252,9 +285,11 @@ S.RevenueMenuItems = {
     if (!item.name)     out.add('ri-name');
     if (!item.category) out.add('ri-cat');
     if (!(parseFloat(item.price) > 0)) out.add('ri-price');
-    const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-    const mode = this.modeForCategory(item.category);
-    if (!hasRecipe && mode !== 'none' && !(parseFloat(item.cost) > 0)) out.add('ri-cost');
+    // Cost is satisfied by ANY of: recipe with ingredients, linked product, manual cost > 0
+    const hasRecipe  = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
+    const hasLinked  = !!item.linked_product_id;
+    const hasCost    = parseFloat(item.cost) > 0;
+    if (!hasRecipe && !hasLinked && !hasCost) out.add('ri-cost');
     return out;
   },
 
@@ -276,6 +311,7 @@ S.RevenueMenuItems = {
     this.editIdx = idx !== null && idx >= 0 ? idx : null;
     const item = this.editIdx !== null ? this.items()[this.editIdx] : null;
     this.recipeOptOut = false;  // reset per-edit
+    this.linkedProductId = item?.linked_product_id || '';  // reset per-edit
     const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
     // Mode resolution priority: existing recipe → its mode; else category → auto mode.
     if (hasRecipe) {
@@ -308,8 +344,8 @@ S.RevenueMenuItems = {
       + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
         + '<div class="f w-md"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f w-md"><label>Cost ' + (hasRecipe ? '<span style="color:var(--t4);font-weight:400;">(auto from recipe)</span>' : '') + '</label>'
-        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + ((hasRecipe ? (App.menuItemCost(item) || 0).toFixed(2) : item?.cost) || '') + '" step="0.01" placeholder="0.00"' + (hasRecipe ? ' disabled' : '') + '/></div></div>'
+        + '<div class="f w-md"><label>Cost ' + (hasRecipe ? '<span style="color:var(--t4);font-weight:400;">(auto from recipe)</span>' : (item?.linked_product_id ? '<span style="color:var(--t4);font-weight:400;">(auto from linked product)</span>' : '')) + '</label>'
+        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ri-cost" value="' + (((hasRecipe || item?.linked_product_id) ? (App.menuItemCost(item) || 0).toFixed(2) : item?.cost) || '') + '" step="0.01" placeholder="0.00"' + ((hasRecipe || item?.linked_product_id) ? ' disabled' : '') + '/></div></div>'
         + '<div class="f w-md"><label>Avg Weekly Covers</label><input type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '" placeholder=""/></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:18px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
@@ -345,10 +381,14 @@ S.RevenueMenuItems = {
           return;
         }
       }
-      // Reset recipe state and reload based on new category
+      // Reset recipe + linked state and reload based on new category
       this.rows = [];
       this.mode = null;
       this.recipeOptOut = false;
+      this.linkedProductId = '';
+      // Also clear the cost field — the new category's source will repopulate
+      const costInp = document.getElementById('ri-cost');
+      if (costInp) { costInp.value = ''; costInp.disabled = false; }
       const newTarget = this.modeForCategory(newCat) === 'food' ? 32 : 22;
       this.renderRecipeSection(item, newTarget);
       // Re-evaluate field-missing on the cost field (Beer/Wine/NA don't need cost)
@@ -368,11 +408,12 @@ S.RevenueMenuItems = {
   refreshFieldMissing() {
     // Build a synthetic item from current values
     const synthetic = {
-      name:     document.getElementById('ri-name')?.value.trim() || '',
-      category: document.getElementById('ri-cat')?.value || '',
-      price:    parseFloat(document.getElementById('ri-price')?.value) || 0,
-      cost:     parseFloat(document.getElementById('ri-cost')?.value) || 0,
-      recipe:   this.rows.length && this.mode ? { mode: this.mode, ingredients: this.rows.filter(r => r.id) } : null
+      name:               document.getElementById('ri-name')?.value.trim() || '',
+      category:           document.getElementById('ri-cat')?.value || '',
+      price:              parseFloat(document.getElementById('ri-price')?.value) || 0,
+      cost:               parseFloat(document.getElementById('ri-cost')?.value) || 0,
+      recipe:             this.rows.length && this.mode ? { mode: this.mode, ingredients: this.rows.filter(r => r.id) } : null,
+      linked_product_id:  this.linkedProductId || ''
     };
     const missing = this.missingFields(synthetic);
     ['ri-name', 'ri-cat', 'ri-price', 'ri-cost'].forEach(id => {
@@ -385,19 +426,17 @@ S.RevenueMenuItems = {
     });
   },
 
-  // The recipe section auto-loads based on this.mode (driven by item category).
-  //   'single' / 'food'  → render the matching ingredient editor right away
-  //   'none'             → recipe hidden by default (Beer/Wine/NA Beverages)
-  //                        with a small "+ Add recipe anyway" link
-  //   null + no category → empty prompt asking operator to pick a category
-  //   null + pick category (Specials/Other) → small inline mode picker
+  // Cost source section auto-loads based on category source mapping:
+  //   recipe-single / recipe-food → seed builder + render editor
+  //   linked                      → Linked Inventory Product picker
+  //   manual                      → "type cost above" prompt + Add link
   renderRecipeSection(item, target) {
     const sec = document.getElementById('ri-recipe-section');
     if (!sec) return;
     const hasRecipeRows = this.rows.length > 0 && this.mode;
 
     if (!hasRecipeRows) {
-      // Operator explicitly opted out — respect the choice, don't auto-rebuild
+      // Operator explicitly opted out of recipe — respect it
       if (this.recipeOptOut) {
         sec.innerHTML = '<div class="sh">Recipe</div>'
           + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
@@ -409,49 +448,87 @@ S.RevenueMenuItems = {
           this.recipeOptOut = false;
           const cat = document.getElementById('ri-cat')?.value || item?.category || '';
           const auto = this.modeForCategory(cat);
-          const startMode = (auto === 'single' || auto === 'food') ? auto : 'single';
+          const startMode = (auto === 'single' || auto === 'food') ? auto : 'food';
           this.startRecipe(startMode, item, target);
         });
         return;
       }
 
       const cat = document.getElementById('ri-cat')?.value || item?.category || '';
-      const auto = this.modeForCategory(cat);
+      const source = this.sourceForCategory(cat);
 
-      // Categories that default to no recipe (Beer/Wine/NA = direct-pour;
-      // Other = generic catch-all). Different messaging by category.
-      if (auto === 'none') {
-        const isDirectPour = ['Beer', 'Wine', 'NA Beverages'].includes(cat);
-        const note = isDirectPour
-          ? esc(cat) + ' menu items are direct-pour. Cost comes from the inventory product directly — no recipe needed.'
-          : 'No recipe attached. Cost uses the manual entry above. Add a recipe below if this item has an ingredient breakdown.';
-        sec.innerHTML = '<div class="sh">Recipe</div>'
-          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">' + note + '</div>'
-          + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe</a>';
-        document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
-          ev.preventDefault();
-          // Operator override: bar-flavor cats start single drink, others start food.
-          const startMode = isDirectPour ? 'single' : 'food';
-          this.startRecipe(startMode, item, target);
-        });
-        return;
-      }
-
-      // No category yet — quiet prompt to pick one. The category picker
-      // drives everything; no buttons here.
+      // No category yet — quiet prompt
       if (!cat) {
-        sec.innerHTML = '<div class="sh">Recipe</div>'
+        sec.innerHTML = '<div class="sh">Cost Source</div>'
           + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
-            + 'Pick a category above to load the right recipe builder.'
+            + 'Pick a category above to load the cost source.'
           + '</div>';
         return;
       }
 
-      // Auto mode resolved but no rows yet — seed the empty builder so the
-      // operator drops straight into the ingredient table.
-      this.mode = auto;
+      // Linked inventory product (Beer / Wine / NA Beverages)
+      if (source === 'linked') {
+        const linkedId = this.linkedProductId != null ? this.linkedProductId : (item?.linked_product_id || '');
+        sec.innerHTML = '<div class="sh">Linked Inventory Product</div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.55;">'
+            + esc(cat) + ' menu items are direct-pour. Pick the inventory product so cost auto-updates whenever the product price changes in Inventory Control.'
+          + '</div>'
+          + '<div class="form-row" style="gap:14px;">'
+            + '<div class="f" style="flex:1;min-width:240px;"><label>Inventory Product</label>'
+              + '<select id="ri-linked-prod">' + this.linkedProductOptions(cat, linkedId) + '</select></div>'
+          + '</div>'
+          + '<div style="margin-top:10px;font-size:11px;color:var(--t3);">'
+            + 'Not a stocked product? <a href="#" id="ri-link-skip" style="color:var(--gold);">Enter cost manually instead</a>.'
+          + '</div>';
+
+        // If a linked product is already set, push its cost into the field now
+        const pushCostFromLinked = (pid) => {
+          const costInp = document.getElementById('ri-cost');
+          if (!costInp) return;
+          if (!pid) { costInp.value = ''; costInp.disabled = false; return; }
+          const p = this.prodById(pid);
+          if (!p) { costInp.value = ''; costInp.disabled = false; return; }
+          const bc = App.bottleCost ? App.bottleCost(p) : null;
+          const cost = bc != null ? bc : (p.unit_cost || 0);
+          costInp.value = cost > 0 ? cost.toFixed(2) : '';
+          costInp.disabled = true;
+        };
+
+        document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
+          this.linkedProductId = e.target.value || '';
+          pushCostFromLinked(this.linkedProductId);
+          this.refreshFieldMissing();
+        });
+        document.getElementById('ri-link-skip')?.addEventListener('click', ev => {
+          ev.preventDefault();
+          this.linkedProductId = '';
+          this.recipeOptOut = true;
+          const costInp = document.getElementById('ri-cost');
+          if (costInp) costInp.disabled = false;
+          this.renderRecipeSection(item, target);
+          this.refreshFieldMissing();
+        });
+        if (linkedId) pushCostFromLinked(linkedId);
+        return;
+      }
+
+      // Manual cost (Other) — cost field above is enabled; offer + Add as escape
+      if (source === 'manual') {
+        sec.innerHTML = '<div class="sh">Recipe</div>'
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
+            + 'Type the cost above. Add a recipe below if this item has an ingredient breakdown.'
+          + '</div>'
+          + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe</a>';
+        document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
+          ev.preventDefault();
+          this.startRecipe('food', item, target);
+        });
+        return;
+      }
+
+      // Recipe source — seed empty builder, fall through to editor render
+      this.mode = source === 'recipe-single' ? 'single' : 'food';
       this.rows = [{ source: 'product', id: '', quantity: '' }];
-      // Fall through to the editor render below.
     }
 
     const modeLabel = this.mode === 'food' ? 'Food Plate' : 'Single Drink';
@@ -642,22 +719,27 @@ S.RevenueMenuItems = {
     const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
     const targetPct = recipe ? (parseFloat(document.getElementById('ri-target-pct')?.value) || (this.mode === 'food' ? 32 : 22)) : (existing?.target_cost_pct);
 
-    // Build temp item to compute final cost via App.menuItemCost
-    const temp = { recipe, cost: existing?.cost || 0 };
-    const computedCost = recipe ? (App.menuItemCost(temp) || 0) : (parseFloat(document.getElementById('ri-cost')?.value) || 0);
+    // Linked product (Beer/Wine/NA path). Mutex with recipe — if a recipe was
+    // built, drop any linked link. Save the cost from the linked product if
+    // present, otherwise from the recipe, otherwise from manual entry.
+    const linkedProductId = (this.linkedProductId && !recipe) ? this.linkedProductId : '';
+    const temp = { recipe, linked_product_id: linkedProductId, cost: existing?.cost || 0 };
+    const sourceCost = (recipe || linkedProductId) ? (App.menuItemCost(temp) || 0) : 0;
+    const computedCost = sourceCost > 0 ? sourceCost : (parseFloat(document.getElementById('ri-cost')?.value) || 0);
 
     const entry = {
-      id:               existing?.id || App.uid(),
+      id:                 existing?.id || App.uid(),
       name,
-      category:         document.getElementById('ri-cat')?.value || '',
+      category:           document.getElementById('ri-cat')?.value || '',
       price,
-      cost:             computedCost,
-      weekly_covers:    parseFloat(document.getElementById('ri-cov')?.value) || 0,
-      notes:            document.getElementById('ri-notes')?.value || '',
+      cost:               computedCost,
+      weekly_covers:      parseFloat(document.getElementById('ri-cov')?.value) || 0,
+      notes:              document.getElementById('ri-notes')?.value || '',
       recipe,
-      target_cost_pct:  targetPct,
-      created_at:       existing?.created_at || new Date().toISOString(),
-      updated_at:       new Date().toISOString()
+      linked_product_id:  linkedProductId,
+      target_cost_pct:    targetPct,
+      created_at:         existing?.created_at || new Date().toISOString(),
+      updated_at:         new Date().toISOString()
     };
 
     if (this.editIdx !== null) this.items()[this.editIdx] = entry;
@@ -669,6 +751,7 @@ S.RevenueMenuItems = {
     this.editIdx = null;
     this.rows = [];
     this.mode = null;
+    this.linkedProductId = '';
     this.render(this.container, this.actions);
   },
 
