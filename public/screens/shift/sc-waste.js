@@ -192,8 +192,8 @@ S.ShiftWaste = {
       + '<div class="fw"><input class="suf" type="number" id="wl-units" min="0" step="0.01" inputmode="decimal" value="' + v(r?.units) + '" placeholder="0" style="height:44px;font-size:16px;"/><span class="suf" id="wl-unit-label">' + esc(initialUnitLabel) + '</span></div></div>'
       + '<div class="f" style="width:240px;flex-shrink:0;"><label>Reason</label>'
       + '<select id="wl-reason" style="height:44px;">' + this.reasonOptions(r?.reason) + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Recorded By</label>'
-      + '<input type="text" id="wl-by" value="' + esc(r?.recorded_by || '') + '" placeholder="Name" style="height:44px;"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label>'
+      + '<select id="wl-by" style="height:44px;">' + App.staffOptions(r?.recorded_by_id || r?.recorded_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
@@ -241,7 +241,8 @@ S.ShiftWaste = {
       units,
       cost,
       reason,
-      recorded_by:  document.getElementById('wl-by')?.value.trim() || '',
+      recorded_by_id: document.getElementById('wl-by')?.value || '',
+      recorded_by:    (App.staffById(document.getElementById('wl-by')?.value) || {}).name || '',
       notes:        document.getElementById('wl-notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
