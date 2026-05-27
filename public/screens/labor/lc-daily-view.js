@@ -84,15 +84,22 @@ S.LaborDailyView = {
       actualsCard = '<div class="card"><div class="card-title">Logged Hours</div>'
         + '<div style="font-size:13px;color:var(--t3);">No hours logged for this day. Log them in Log Hours.</div></div>';
     } else {
-      const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a =>
-        '<tr><td><div class="val">' + esc(a.name || '-') + '</div></td>'
+      const canEdit = App.canEdit && App.canEdit('lc-log-hours');
+      const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a => {
+        const locked = !!a.locked;
+        const editBtn = canEdit && !locked
+          ? '<button class="btn btn-ghost btn-sm dv-edit" data-id="' + a.id + '">Edit Hours</button>'
+          : locked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
+        return '<tr><td><div class="val">' + esc(a.name || '-') + '</div></td>'
         + '<td>' + esc(a.shift_type || '-') + '</td>'
         + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
         + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td></tr>').join('');
+        + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td>'
+        + '<td>' + editBtn + '</td></tr>';
+      }).join('');
       actualsCard = '<div class="card"><div class="card-title">Logged Hours</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th>'
+        + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -110,10 +117,67 @@ S.LaborDailyView = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summary + actualsCard + schedCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + dateCard + summary + actualsCard + schedCard + '</div>'
+      + this.editModalHtml();
     document.getElementById('dv-date')?.addEventListener('change', e => {
       this.date = e.target.value || this.date;
       this.draw();
     });
+    // Inline edit on logged hours rows — opens the actuals editor in a modal
+    // so the operator never leaves Daily View.
+    this.container.querySelectorAll('.dv-edit').forEach(btn => {
+      btn.addEventListener('click', () => this.openEditModal(btn.dataset.id));
+    });
+  },
+
+  // ── Inline Hours Edit Modal ────────────────────────────────────────────
+  editModalHtml() {
+    return '<div id="dv-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;padding:20px;">'
+      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:480px;width:100%;">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;" id="dv-em-title">Edit Hours</div>'
+      + '<div class="form-row" style="gap:14px;">'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Hours</label>'
+          + '<input type="number" id="dv-em-hours" min="0" step="0.25"/></div>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>Notes</label>'
+          + '<input type="text" id="dv-em-notes" placeholder="Optional"/></div>'
+      + '</div>'
+      + '<div id="dv-em-cost" style="font-size:11px;color:var(--t3);margin-top:6px;"></div>'
+      + '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">'
+        + '<button class="btn btn-ghost" id="dv-em-cancel">Cancel</button>'
+        + '<button class="btn btn-primary" id="dv-em-save">Save</button>'
+      + '</div></div></div>';
+  },
+
+  openEditModal(actualId) {
+    const a = this.actuals().find(x => x.id === actualId);
+    if (!a) return;
+    const modal = document.getElementById('dv-edit-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.getElementById('dv-em-title').textContent = 'Edit Hours · ' + (a.name || '');
+    const hoursInp = document.getElementById('dv-em-hours');
+    const notesInp = document.getElementById('dv-em-notes');
+    const costEl   = document.getElementById('dv-em-cost');
+    if (hoursInp) hoursInp.value = a.hours != null ? a.hours : '';
+    if (notesInp) notesInp.value = a.notes || '';
+    const wage = a.wage != null ? a.wage : (App.wageForStaffOn ? App.wageForStaffOn(a.staff_id, a.date) : 0);
+    const updateCost = () => {
+      const h = parseFloat(hoursInp?.value) || 0;
+      if (costEl) costEl.textContent = wage > 0 ? 'Cost: ' + App.fmtCurrency(h * wage) + ' (' + App.fmtCurrency(wage) + '/hr)' : '';
+    };
+    updateCost();
+    hoursInp?.addEventListener('input', updateCost);
+    document.getElementById('dv-em-cancel').onclick = () => { modal.style.display = 'none'; };
+    document.getElementById('dv-em-save').onclick = async () => {
+      const newHours = parseFloat(hoursInp?.value);
+      if (isNaN(newHours) || newHours < 0) return;
+      a.hours = newHours;
+      a.cost  = newHours * wage;
+      a.notes = (notesInp?.value || '').trim();
+      a.updated_at = new Date().toISOString();
+      modal.style.display = 'none';
+      await App.saveLabor();
+      this.draw();
+    };
   }
 };
