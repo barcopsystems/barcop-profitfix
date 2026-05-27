@@ -151,10 +151,10 @@ S.ShiftMaintenance = {
       + '<select id="mt-priority">' + prioOpts + '</select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label>'
       + '<select id="mt-status">' + statOpts + '</select></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Reported By</label>'
-      + '<input type="text" id="mt-by" value="' + esc(r?.reported_by || '') + '" placeholder="Name"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Assigned To</label>'
-      + '<input type="text" id="mt-assigned" value="' + esc(r?.assigned_to || '') + '" placeholder="Person / vendor"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reported By</label>'
+      + '<select id="mt-by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Assigned To</label>'
+      + '<input type="text" id="mt-assigned" value="' + esc(r?.assigned_to || '') + '" placeholder="Person or vendor"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
@@ -195,8 +195,11 @@ S.ShiftMaintenance = {
       issue:         document.getElementById('mt-issue')?.value.trim() || '',
       priority:      document.getElementById('mt-priority')?.value || 'Normal',
       status:        document.getElementById('mt-status')?.value || 'Open',
-      reported_by:   document.getElementById('mt-by')?.value.trim() || '',
-      assigned_to:   document.getElementById('mt-assigned')?.value.trim() || '',
+      reported_by_id: document.getElementById('mt-by')?.value || '',
+      reported_by:    (App.staffById(document.getElementById('mt-by')?.value) || {}).name || '',
+      // Assigned To stays free text because maintenance is often assigned to
+      // an external vendor (HVAC repair, plumber) who is not on staff roster.
+      assigned_to:    document.getElementById('mt-assigned')?.value.trim() || '',
       date_resolved: document.getElementById('mt-resolved')?.value || '',
       cost:          isNaN(cost) ? null : cost,
       notes:         document.getElementById('mt-notes')?.value.trim() || ''
