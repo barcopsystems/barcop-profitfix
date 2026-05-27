@@ -11,7 +11,7 @@ S.RevenuePricing = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
-    this.items = (App.data.revenue_menu_items || []).filter(m => m && m.name);
+    this.items = (App.data.menu_items || []).map(m => ({...m, cost: App.menuItemCost(m) || m.cost})).filter(m => m && m.name);
     const opts = '<option value="">Enter values manually...</option>'
       + this.items.map((m, i) => '<option value="' + i + '">' + esc(m.name) + '</option>').join('');
 
@@ -65,8 +65,8 @@ S.RevenuePricing = {
 
     const floorCard = '<div class="card"><div class="card-title">Cost Floor</div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Current Cost %</div><div class="calc-val ' + (belowFloor ? 'warn' : 'good') + '">' + (curPct != null ? App.fmtPct(curPct) : '—') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Price Floor at ' + (target || 0) + '%</div><div class="calc-val">' + (floor != null ? App.fmtCurrency(floor, 2) : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Current Cost %</div><div class="calc-val ' + (belowFloor ? 'warn' : 'good') + '">' + (curPct != null ? App.fmtPct(curPct) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Price Floor at ' + (target || 0) + '%</div><div class="calc-val">' + (floor != null ? App.fmtCurrency(floor, 2) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Margin per Unit</div><div class="calc-val">' + App.fmtCurrency(curMargin, 2) + '</div></div>'
       + '</div>'
       + (belowFloor
