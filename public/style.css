@@ -275,6 +275,22 @@ input,select,textarea{color-scheme:dark;}
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
 .f input:focus,.f select:focus,.f textarea:focus{border-color:var(--gold);}
+/* Kill Chrome's autofill yellow tint on every form input. Chrome paints
+   autofilled inputs yellow by default to signal "this is autofilled" —
+   but on a dark theme it shows up as a muddy color change. Force the
+   inset shadow to match our input background so the field stays consistent
+   whether or not Chrome autofilled it. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill{
+  -webkit-box-shadow:0 0 0 1000px var(--input) inset !important;
+  -webkit-text-fill-color:var(--w) !important;
+  caret-color:var(--w);
+  transition:background-color 5000s ease-in-out 0s;
+}
 /* Required-field highlighting for incomplete records. Apply class to the .f
    wrapper of a missing required input. Operator sees at a glance which cells
    need filling when editing a flagged record. Border + label only — do NOT
