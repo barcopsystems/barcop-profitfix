@@ -1222,6 +1222,66 @@ const App = {
   // different files, which would silently desync the moment one changed.
   SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
 
+  // ── Menu Items ───────────────────────────────────────────────────────────
+  // Single canonical store for every sellable thing on the menu. Each item
+  // can OPTIONALLY have a recipe attached (ingredient breakdown). When a
+  // recipe is present, the item's cost auto-computes from current product
+  // prices; otherwise the manually-entered cost field is used.
+  //
+  // Two doors edit the same record:
+  //   - r-menu-items (Revenue Recovery): menu-engineering / pricing context
+  //   - recipe-library (Profit Recovery): cost-out context
+  // Both write to App.data.menu_items.
+  //
+  // Prep batches (frozen margarita mix, simple syrup, marinara base) are
+  // NOT menu items; they live in App.data.batches as their own concept.
+  menuItems() {
+    if (!this.data) return [];
+    if (!Array.isArray(this.data.menu_items)) this.data.menu_items = [];
+    return this.data.menu_items;
+  },
+  menuItemById(id) {
+    return this.menuItems().find(m => m.id === id) || null;
+  },
+  batches() {
+    if (!this.data) return [];
+    if (!Array.isArray(this.data.batches)) this.data.batches = [];
+    return this.data.batches;
+  },
+
+  // Compute effective cost for a menu item. If item.recipe is set with
+  // ingredients, recompute from current product prices (per-pour for bar
+  // products, per-bottle for case beer, unit_cost for kitchen). Otherwise
+  // return the manually-entered cost.
+  menuItemCost(item) {
+    if (!item) return null;
+    if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
+      const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+      const isBar = pid => {
+        const p = prods.find(x => x.id === pid);
+        if (!p) return false;
+        return ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
+      };
+      const ingCost = ing => {
+        const p = prods.find(x => x.id === ing.product_id);
+        if (!p) return (parseFloat(ing.cost_per_unit) || 0) * (parseFloat(ing.quantity) || 0);
+        // For bar items in a single drink, quantity is in "pours" so use
+        // cost_per_pour. For food items, quantity is in the product's unit
+        // so use unit_cost. Bottle beer case-tracking falls back to bottleCost.
+        const unitCost = isBar(p)
+          ? (p.cost_per_pour != null ? p.cost_per_pour : (this.bottleCost(p) || 0))
+          : (p.unit_cost || 0);
+        return unitCost * (parseFloat(ing.quantity) || 0);
+      };
+      const tc = item.recipe.ingredients.reduce((s, ing) => s + ingCost(ing), 0);
+      if (item.recipe.mode === 'food' && item.recipe.plate_yield > 0) {
+        return tc / item.recipe.plate_yield;
+      }
+      return tc;
+    }
+    return parseFloat(item.cost) || 0;
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
