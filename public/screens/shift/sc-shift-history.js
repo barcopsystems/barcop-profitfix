@@ -153,8 +153,12 @@ S.ShiftHistory = {
     const s = this.shifts().find(x => x.id === id);
     if (!s) { this.renderList(); return; }
 
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>';
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-handoff">Handoff Report</button>'
+      + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:8px;">Export PDF</button>';
     document.getElementById('sh-export')?.addEventListener('click', () => window.print());
+    document.getElementById('sh-handoff')?.addEventListener('click', () => {
+      if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id);
+    });
 
     const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
     const meta = (label, val) =>
