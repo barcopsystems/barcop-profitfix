@@ -1475,6 +1475,7 @@ const App = {
         'ic-spot-check':       ['Spot Check', 'Inventory Control'],
         'ic-transfers':        ['Transfer Log', 'Inventory Control'],
         'ic-empties':          ['Empties Log', 'Inventory Control'],
+        'ic-adjustments':      ['Adjustment Log', 'Inventory Control'],
         'ic-par-suggestions':  ['Par Suggestions', 'Inventory Control'],
         'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
         'ic-delivery-history': ['Delivery History', 'Inventory Control'],
@@ -1497,6 +1498,7 @@ const App = {
         'ic-spot-check':     S.InventorySpotCheck,
         'ic-transfers':      S.InventoryTransfers,
         'ic-empties':        S.InventoryEmpties,
+        'ic-adjustments':    S.InventoryAdjustments,
         'ic-par-suggestions': S.InventoryParSuggestions,
         'ic-receive-delivery': S.InventoryReceiveDelivery,
         'ic-delivery-history': S.InventoryDeliveryHistory,
@@ -1833,6 +1835,23 @@ const App = {
     // entry is what the staff member earned at that time.
     const oldest = history[history.length - 1];
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
+  },
+
+  // Currently-open shift, if any. The 3rd+ consumer of this pattern, so it
+  // lives in App so dropdowns can auto-fill manager / reported-by / counted-by
+  // from one source of truth. Returns the most recently-started Open shift,
+  // or null.
+  activeShift() {
+    const list = (this.shiftData && this.shiftData.sc_shifts) || [];
+    const open = list.filter(s => s.status === 'Open');
+    if (!open.length) return null;
+    return open.slice().sort((a, b) =>
+      new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime()
+    )[0];
+  },
+  activeManagerId() {
+    const s = this.activeShift();
+    return s ? (s.manager_id || '') : '';
   },
 
   // Day-of-week labels used by Revenue Forecast and the schedule builder.
