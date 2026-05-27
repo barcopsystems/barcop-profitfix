@@ -28,53 +28,59 @@ S.RevenueMenuItems = {
   },
 
   // ── Ingredient source helpers ────────────────────────────────────────────
-  IC_BAR: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
+  // Category sets:
+  //   Bar mode pulls Liquor + Wine + Bottle Beer + Draft Beer + Misc
+  //     (Misc is the canonical home for mixers / syrups / juices / bitters)
+  //   Food mode pulls Food + Misc
+  //     (Misc covers oils / sauces / seasonings that aren't strictly food)
+  // No cross-mode bleed: bar recipes don't show chicken, food recipes don't
+  // show vodka. Cleaner picker, no scrolling through irrelevant items.
+  BAR_CATS:  ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
+  FOOD_CATS: ['Food', 'Misc'],
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   prepBatches() { return (App.prepBatches && App.prepBatches()) || []; },
   prodById(id) { return this.products().find(p => p.id === id) || null; },
   batchById(id) { return this.prepBatches().find(b => b.id === id) || null; },
-  isBarProd(p) { return !!(p && this.IC_BAR.includes(p.category)); },
 
-  // What's the operator picking? Build a unified ingredient dropdown.
+  // Category → recipe mode auto-mapping. Drives both the picker filter AND
+  // the auto-load behavior on the Menu Items form. Single source of truth.
+  MENU_CAT_TO_MODE: {
+    'Cocktails':    'single',
+    'Appetizers':   'food',
+    'Entrees':      'food',
+    'Desserts':     'food',
+    'Beer':         'none',  // direct-pour: no recipe by default
+    'Wine':         'none',
+    'NA Beverages': 'none',
+    'Specials':     'pick',  // operator chooses (could be a dish or a drink)
+    'Other':        'pick'
+  },
+  modeForCategory(cat) { return this.MENU_CAT_TO_MODE[cat] || 'pick'; },
+
+  // Recipe ingredient dropdown filtered by recipe mode.
   ingredientOptions(selKey, mode) {
     // selKey shape: "p:<productId>" or "b:<batchId>" or ""
     const prods = this.products();
     const batches = this.prepBatches();
     let h = '<option value="">Select ingredient...</option>';
 
-    // For Single Drink recipes, default to bar products. For Food Plate, default to kitchen.
-    // But ALL options are always available — the operator picks.
-    const barProds = prods.filter(p => this.isBarProd(p));
-    const kitProds = prods.filter(p => !this.isBarProd(p));
-
-    if (mode === 'food') {
-      if (kitProds.length) {
-        h += '<optgroup label="Kitchen Products">';
-        kitProds.forEach(p => { h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
-        h += '</optgroup>';
-      }
-      if (barProds.length) {
-        h += '<optgroup label="Bar Products (use sparingly in food)">';
-        barProds.forEach(p => { h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
-        h += '</optgroup>';
-      }
-    } else {
-      // single drink
-      if (barProds.length) {
-        h += '<optgroup label="Bar Products">';
-        barProds.forEach(p => { h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
-        h += '</optgroup>';
-      }
-      if (kitProds.length) {
-        h += '<optgroup label="Mixers / Kitchen">';
-        kitProds.forEach(p => { h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
-        h += '</optgroup>';
-      }
-    }
+    const catList = mode === 'food' ? this.FOOD_CATS : this.BAR_CATS;
+    catList.forEach(cat => {
+      const inCat = prods.filter(p => (p.category || '') === cat && p.active !== false)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!inCat.length) return;
+      h += '<optgroup label="' + esc(cat) + '">';
+      inCat.forEach(p => {
+        h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+      });
+      h += '</optgroup>';
+    });
 
     if (batches.length) {
       h += '<optgroup label="Prep Batches">';
-      batches.forEach(b => { h += '<option value="b:' + b.id + '"' + (selKey === 'b:' + b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; });
+      batches.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(b => {
+        h += '<option value="b:' + b.id + '"' + (selKey === 'b:' + b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>';
+      });
       h += '</optgroup>';
     }
     return h;
@@ -90,15 +96,21 @@ S.RevenueMenuItems = {
     // product
     const p = this.prodById(row.id);
     if (!p) return { unit: '-', costPerUnit: 0 };
-    if (this.isBarProd(p)) {
+    const isLiquorish = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
+    if (isLiquorish && mode === 'single') {
       // Single drink: quantity is pours; cost is per-pour
-      if (mode === 'single') {
-        return { unit: 'pours', costPerUnit: (p.cost_per_pour != null ? p.cost_per_pour : (App.bottleCost ? (App.bottleCost(p) || 0) : 0)) };
-      }
-      // Food plate using a bar product (rare): quantity is bottles
+      return { unit: 'pours', costPerUnit: (p.cost_per_pour != null ? p.cost_per_pour : (App.bottleCost ? (App.bottleCost(p) || 0) : 0)) };
+    }
+    if (isLiquorish) {
+      // Bar item in non-single context — quantity in bottles, cost per bottle
       return { unit: 'bottles', costPerUnit: (App.bottleCost ? (App.bottleCost(p) || 0) : (p.unit_cost || 0)) };
     }
-    // kitchen
+    // Misc / Food — quantity in units, cost per unit. For Misc with a pour
+    // size set (lime juice, simple syrup) the operator may want per-pour math
+    // in cocktail mode. Use cost_per_pour when available + mode is single.
+    if (p.category === 'Misc' && mode === 'single' && p.cost_per_pour != null) {
+      return { unit: 'pours', costPerUnit: p.cost_per_pour };
+    }
     return { unit: 'units', costPerUnit: p.unit_cost || 0 };
   },
 
@@ -224,12 +236,51 @@ S.RevenueMenuItems = {
     });
   },
 
+  // Required-but-missing fields for a record. Drives the .field-missing
+  // highlighting on the form so the operator sees what to fill at a glance.
+  // Required = name + category + price; cost is required when category is
+  // not a direct-pour type (Beer/Wine/NA) AND no recipe is attached.
+  missingFields(item) {
+    if (!item) return new Set();
+    const out = new Set();
+    if (!item.name)     out.add('ri-name');
+    if (!item.category) out.add('ri-cat');
+    if (!(parseFloat(item.price) > 0)) out.add('ri-price');
+    const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
+    const mode = this.modeForCategory(item.category);
+    if (!hasRecipe && mode !== 'none' && !(parseFloat(item.cost) > 0)) out.add('ri-cost');
+    return out;
+  },
+
+  // Apply .field-missing to the .f wrapper of each missing required field.
+  applyMissingFieldHighlights(item) {
+    if (!item) return;
+    const missing = this.missingFields(item);
+    if (!missing.size) return;
+    missing.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const wrap = el.closest('.f');
+      if (wrap) wrap.classList.add('field-missing');
+    });
+  },
+
   // ── Inline Item Form (with recipe editor) ────────────────────────────────
   showForm(idx) {
     this.editIdx = idx !== null && idx >= 0 ? idx : null;
     const item = this.editIdx !== null ? this.items()[this.editIdx] : null;
+    this.recipeOptOut = false;  // reset per-edit
     const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-    this.mode = hasRecipe ? item.recipe.mode : null;
+    // Mode resolution priority: existing recipe → its mode; else category → auto mode.
+    if (hasRecipe) {
+      this.mode = item.recipe.mode;
+    } else {
+      const cat = item?.category || '';
+      const auto = this.modeForCategory(cat);
+      // 'single'/'food' auto-load the matching builder. 'none' (Beer/Wine/NA) =
+      // no recipe by default. 'pick' (Specials/Other) = wait for operator pick.
+      this.mode = (auto === 'single' || auto === 'food') ? auto : null;
+    }
     this.rows = hasRecipe
       ? item.recipe.ingredients.map(i => ({ source: i.source || 'product', id: i.id || i.product_id, quantity: i.quantity }))
       : [];
@@ -257,7 +308,7 @@ S.RevenueMenuItems = {
       + '</div>'
       + '<div class="f" style="margin-bottom:18px;"><label>Notes</label><input type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>'
 
-      // ── Recipe section ──
+      // ── Recipe section (auto-loaded based on category) ──
       + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:18px;margin-top:8px;"></div>'
 
       + '<div style="display:flex;gap:10px;margin-top:18px;">'
@@ -273,29 +324,124 @@ S.RevenueMenuItems = {
     document.getElementById('ri-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(item));
 
-    ['ri-price', 'ri-cost'].forEach(id =>
-      document.getElementById(id)?.addEventListener('input', () => this.recalcInlineCost(item)));
+    // Category change: auto-set recipe mode if no recipe in progress, and
+    // re-render the recipe section. Driven by the MENU_CAT_TO_MODE mapping.
+    document.getElementById('ri-cat')?.addEventListener('change', e => {
+      const newCat = e.target.value;
+      const auto = this.modeForCategory(newCat);
+      // Only auto-switch when the operator hasn't started entering a recipe.
+      // (If they have rows in flight, leave them alone — switching would
+      // throw away their work.)
+      if (this.rows.length === 0) {
+        this.mode = (auto === 'single' || auto === 'food') ? auto : null;
+        this.recipeOptOut = false;  // fresh category, fresh decision
+        const newTarget = this.mode === 'food' ? 32 : 22;
+        this.renderRecipeSection(item, newTarget);
+      }
+      // Re-evaluate field-missing on the cost field (Beer/Wine/NA don't need cost)
+      this.refreshFieldMissing();
+    });
+
+    ['ri-price', 'ri-cost', 'ri-name'].forEach(id =>
+      document.getElementById(id)?.addEventListener('input', () => { this.recalcInlineCost(item); this.refreshFieldMissing(); }));
     this.recalcInlineCost(item);
+
+    // Highlight missing required fields when EDITING an incomplete record.
+    // For brand-new items, fields are empty by definition — no highlight noise.
+    if (item) this.applyMissingFieldHighlights(item);
   },
 
-  // The recipe section either prompts to build one OR shows the full editor.
+  // Recompute field-missing based on current form values (called on input).
+  refreshFieldMissing() {
+    // Build a synthetic item from current values
+    const synthetic = {
+      name:     document.getElementById('ri-name')?.value.trim() || '',
+      category: document.getElementById('ri-cat')?.value || '',
+      price:    parseFloat(document.getElementById('ri-price')?.value) || 0,
+      cost:     parseFloat(document.getElementById('ri-cost')?.value) || 0,
+      recipe:   this.rows.length && this.mode ? { mode: this.mode, ingredients: this.rows.filter(r => r.id) } : null
+    };
+    const missing = this.missingFields(synthetic);
+    ['ri-name', 'ri-cat', 'ri-price', 'ri-cost'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const wrap = el.closest('.f');
+      if (!wrap) return;
+      if (missing.has(id)) wrap.classList.add('field-missing');
+      else wrap.classList.remove('field-missing');
+    });
+  },
+
+  // The recipe section auto-loads based on this.mode (driven by item category).
+  //   'single' / 'food'  → render the matching ingredient editor right away
+  //   'none'             → recipe hidden by default (Beer/Wine/NA Beverages)
+  //                        with a small "+ Add recipe anyway" link
+  //   null + no category → empty prompt asking operator to pick a category
+  //   null + pick category (Specials/Other) → small inline mode picker
   renderRecipeSection(item, target) {
     const sec = document.getElementById('ri-recipe-section');
     if (!sec) return;
-    const hasRecipe = this.rows.length > 0 && this.mode;
+    const hasRecipeRows = this.rows.length > 0 && this.mode;
 
-    if (!hasRecipe) {
-      sec.innerHTML = '<div class="sh">Recipe</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">'
-          + 'Add an ingredient breakdown to auto-compute this item\'s cost from current product prices. Without a recipe, the manual Cost field above is used.'
-        + '</div>'
-        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-          + '<button class="btn btn-ghost btn-sm" id="ri-build-single">+ Build Recipe — Single Drink</button>'
-          + '<button class="btn btn-ghost btn-sm" id="ri-build-food">+ Build Recipe — Food Plate</button>'
-        + '</div>';
-      document.getElementById('ri-build-single')?.addEventListener('click', () => this.startRecipe('single', item, target));
-      document.getElementById('ri-build-food')?.addEventListener('click', () => this.startRecipe('food', item, target));
-      return;
+    if (!hasRecipeRows) {
+      // Operator explicitly opted out — respect the choice, don't auto-rebuild
+      if (this.recipeOptOut) {
+        sec.innerHTML = '<div class="sh">Recipe</div>'
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
+            + 'No recipe attached. Cost uses the manual entry above.'
+          + '</div>'
+          + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe</a>';
+        document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
+          ev.preventDefault();
+          this.recipeOptOut = false;
+          const cat = document.getElementById('ri-cat')?.value || item?.category || '';
+          const auto = this.modeForCategory(cat);
+          const startMode = (auto === 'single' || auto === 'food') ? auto : 'single';
+          this.startRecipe(startMode, item, target);
+        });
+        return;
+      }
+
+      const cat = document.getElementById('ri-cat')?.value || item?.category || '';
+      const auto = this.modeForCategory(cat);
+
+      // Beer / Wine / NA Beverages — direct-pour items, no recipe needed.
+      if (auto === 'none') {
+        sec.innerHTML = '<div class="sh">Recipe</div>'
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
+            + esc(cat) + ' menu items are direct-pour. Cost comes from the inventory product directly — no recipe needed.'
+          + '</div>'
+          + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe anyway</a>';
+        document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
+          ev.preventDefault();
+          // Operator override: default to single drink builder for bar categories
+          this.startRecipe('single', item, target);
+        });
+        return;
+      }
+
+      // Specials / Other / no category — operator picks the mode
+      if (!cat || auto === 'pick') {
+        sec.innerHTML = '<div class="sh">Recipe</div>'
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">'
+            + (cat
+                ? 'Pick the recipe type for this ' + esc(cat) + ' item.'
+                : 'Pick a category above to load the right recipe builder, or choose a recipe type here.')
+          + '</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+            + '<button class="btn btn-ghost btn-sm" id="ri-build-single">Single Drink Recipe</button>'
+            + '<button class="btn btn-ghost btn-sm" id="ri-build-food">Food Plate Recipe</button>'
+          + '</div>';
+        document.getElementById('ri-build-single')?.addEventListener('click', () => this.startRecipe('single', item, target));
+        document.getElementById('ri-build-food')?.addEventListener('click', () => this.startRecipe('food', item, target));
+        return;
+      }
+
+      // Auto mode resolved but no rows yet — seed the empty builder so the
+      // operator drops straight into the ingredient table.
+      this.mode = auto;
+      this.rows = [{ source: 'product', id: '', quantity: '' }];
+      // Fall through to the editor render below.
     }
 
     const modeLabel = this.mode === 'food' ? 'Food Plate' : 'Single Drink';
@@ -309,7 +455,7 @@ S.RevenueMenuItems = {
           + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Recipe &middot; ' + modeLabel + '</div>'
           + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Cost auto-computes from current product + prep batch prices.</div>'
         + '</div>'
-        + '<div><button class="btn btn-danger btn-sm" id="ri-remove-recipe">Remove Recipe</button></div>'
+        + '<div><button class="btn btn-ghost btn-sm" id="ri-remove-recipe">No Recipe</button></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Target Cost %</label>'
@@ -330,11 +476,13 @@ S.RevenueMenuItems = {
     this.calcRecipe();
 
     document.getElementById('ri-remove-recipe')?.addEventListener('click', () => {
-      if (!confirm('Remove the recipe? Cost will fall back to manual entry.')) return;
+      if (!confirm('Skip the recipe? Cost will fall back to manual entry.')) return;
       this.rows = [];
       this.mode = null;
+      this.recipeOptOut = true;
       this.renderRecipeSection(item, target);
       this.recalcInlineCost(item);
+      this.refreshFieldMissing();
     });
     document.getElementById('ri-add-ing')?.addEventListener('click', () => { this.addRow(); this.calcRecipe(); });
     document.getElementById('ri-target-pct')?.addEventListener('input', () => this.calcRecipe());
