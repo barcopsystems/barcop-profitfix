@@ -4,6 +4,12 @@ S.RevenueMenuEngineering = {
 
   render(container, actions) {
     actions.innerHTML = '';
+    // Consume the cross-screen tab focus flag set by r-pricing (collapsed
+    // landing card that deep-links to the canonical Price Sensitivity view).
+    if (App._menuEngineeringTab) {
+      this.activeTab = App._menuEngineeringTab;
+      App._menuEngineeringTab = null;
+    }
     const tabs = document.createElement('div');
     tabs.style.cssText = 'display:flex;gap:8px;';
     [['matrix','Matrix'],['price-sensitivity','Price Sensitivity']].forEach(([id, label]) => {
