@@ -50,24 +50,15 @@ S.HubBarCopAudit = {
     if (window.S && S.Hub && S.Hub._enter) S.Hub._enter(screen, mod);
   },
 
-  // Page header for the full-page Hub screen. Mirrors the recovery audit
-  // detail header pattern (title left, action button right). Back to
-  // Dashboard re-renders the Hub Dashboard since clicking it leaves the
-  // sidebar mounted and just swaps the content area.
-  _header(title) {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 16px;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">' + esc(title || 'Bar Cop Audit') + '</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="bca-back-dash">Back to Dashboard</button>'
-      + '</div>';
-  },
-
   // ── Public entry ────────────────────────────────────────────────────────
-  // Renders into the Hub content area (sidebar stays mounted + interactive).
+  // Renders into the Hub content area as a full-page screen. The Hub topbar
+  // shows "BAR COP AUDIT | Back to Dashboard" mirroring the module shell
+  // pattern. Sidebar stays mounted + interactive on the left.
   open() {
-    App.openHubFullPage((mount) => {
+    App.openHubFullPage('Bar Cop Audit', (mount) => {
       this.container = mount;
       this._viewingId = null;
-      this._renderLanding();
+      this.renderMain();
     });
   },
 
@@ -781,88 +772,212 @@ S.HubBarCopAudit = {
   },
 
   // ── Render: landing ─────────────────────────────────────────────────────
-  _renderLanding() {
-    const list = this.audits();
+  // ── Render: landing ─────────────────────────────────────────────────────
+  // Mirrors the audit-tracker.js renderMain pattern exactly so all four
+  // audits feel familiar: requestCard at the top with description and
+  // countdown or Generate button, latestCard with score and View Full
+  // Audit, score history chart, audit history table.
+  renderMain() {
+    const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const latest = audits[0] || null;
     const enough = this._hasEnoughData();
-    const gate = this._canRunAudit();
     const earliest = this._earliestDataDate();
     const daysOfData = earliest ? this._daysSince(earliest) : 0;
 
-    let intro = '';
-    let cta   = '';
+    const daysSince = latest && latest.date
+      ? Math.floor((Date.now() - new Date(latest.date).getTime()) / 86400000)
+      : Infinity;
+    const canRunAudit = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
+    const daysLeft    = canRunAudit ? 0 : (enough ? this.AUDIT_INTERVAL_DAYS - daysSince : 0);
+
+    let requestRight = '';
     if (!enough) {
       const daysShort = Math.max(0, this.MIN_DATA_DAYS - daysOfData);
-      intro = '<div class="card" style="padding:32px 28px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Analysis</div>'
-        + '<div style="font-size:22px;font-weight:800;color:var(--t1);margin-bottom:14px;">Bar Cop Audit</div>'
-        + '<div style="font-size:13px;color:var(--t2);line-height:1.7;max-width:640px;">'
-        +   'The monthly executive read on the entire operation. Six sub-scores covering operational discipline, cash integrity, inventory execution, labor hygiene, recovery action, and operational consistency. Top exposures and recurring patterns surfaced across every system.'
-        + '</div>'
-        + '<div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--b2);">'
-        +   '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Not Enough History Yet</div>'
-        +   '<div style="font-size:12px;color:var(--t3);line-height:1.7;">Bar Cop Audit opens after the operation has ' + this.MIN_DATA_DAYS + ' days of logged data across Inventory Control, Labor Control, and Shift Control. '
-        +     (daysOfData > 0
-              ? 'You have ' + daysOfData + ' days of data so far. ' + daysShort + ' more day' + (daysShort === 1 ? '' : 's') + ' to go.'
-              : 'No Control data logged yet. Start with Take Inventory, Log Shift, and Log Hours to build the baseline.')
-        +   '</div>'
-        + '</div>'
-        + '</div>';
+      requestRight = '<div style="text-align:right;flex-shrink:0;">'
+        + '<div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysShort + ' day' + (daysShort === 1 ? '' : 's') + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until audit unlocks</div></div>';
+    } else if (canRunAudit) {
+      requestRight = '<button class="btn btn-primary" id="bca-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>';
     } else {
-      intro = '<div class="card" style="padding:28px;margin-bottom:16px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;">'
-        +   '<div style="flex:1;min-width:240px;">'
-        +     '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Analysis</div>'
-        +     '<div style="font-size:22px;font-weight:800;color:var(--t1);margin-bottom:6px;">Bar Cop Audit</div>'
-        +     '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Executive monthly read on the entire operation. One audit every ' + this.AUDIT_INTERVAL_DAYS + ' days.</div>'
-        +   '</div>'
-        +   '<div style="flex-shrink:0;">'
-        +     (gate.ok
-              ? '<button class="btn btn-primary" id="bca-generate">Generate This Month\'s Audit</button>'
-              : '<div style="text-align:right;">'
-                + '<button class="btn btn-ghost" disabled style="opacity:0.65;cursor:not-allowed;">Generate Audit</button>'
-                + '<div style="font-size:10px;color:var(--t3);margin-top:6px;">Next available in ' + gate.daysUntil + ' day' + (gate.daysUntil === 1 ? '' : 's') + '</div>'
-                + '</div>')
-        +   '</div>'
-        + '</div>'
-        + '</div>';
+      requestRight = '<div style="text-align:right;flex-shrink:0;">'
+        + '<div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit</div></div>';
     }
 
-    // History table
-    let history = '';
-    if (list.length) {
-      const sorted = list.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-      const rows = sorted.map(a => {
-        const col = App.scoreColor(a.overall_score || 0);
-        return '<tr class="bca-row" data-id="' + esc(a.id) + '" style="cursor:pointer;">'
-          + '<td>' + this._fmtDate(a.date) + '</td>'
-          + '<td><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:' + col + ';">' + (a.overall_score || 0) + '</span></td>'
-          + '<td>' + (a.exposures ? a.exposures.length : 0) + ' exposures</td>'
-          + '<td>' + (a.patterns ? a.patterns.length : 0) + ' patterns</td>'
-          + '<td><div class="row-actions">'
-          +   '<button class="btn btn-ghost btn-sm bca-view" data-id="' + esc(a.id) + '">View</button>'
-          + '</div></td></tr>';
+    const requestBody = enough
+      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. Executive operational read across every system. Six sub-scores, top exposures, recurring patterns, and the recovery activity snapshot. Print or save as a PDF from your browser.'
+      : 'Bar Cop Audit opens after the operation has ' + this.MIN_DATA_DAYS + ' days of logged data across Inventory, Labor, and Shift Control. '
+        + (daysOfData > 0
+            ? 'You have ' + daysOfData + ' day' + (daysOfData === 1 ? '' : 's') + ' of data so far.'
+            : 'No Control data logged yet. Start with Take Inventory, Log Shift, and Log Hours.');
+
+    const requestCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div style="flex:1;min-width:200px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Bar Cop Audit</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:560px;">' + requestBody + '</div>'
+      + '</div>'
+      + requestRight
+      + '</div></div>';
+
+    let latestCard = '';
+    if (latest) {
+      const prev = audits[1] || null;
+      const scoreColor = App.scoreColor(latest.overall_score || 0);
+      const scoreLabel = App.scoreLabel(latest.overall_score || 0);
+
+      let progressBanner = '';
+      if (prev) {
+        const diff = (latest.overall_score || 0) - (prev.overall_score || 0);
+        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + diff + ' pts</div>'
+          + '<div style="font-size:12px;color:var(--t2);">' + prev.overall_score + ' to ' + latest.overall_score + '</div>'
+          + '</div>';
+      }
+
+      const sections = latest.sections || {};
+      const sectionRows = Object.entries(sections).map(([name, score]) => {
+        const ps   = prev?.sections?.[name];
+        const diff = ps != null ? score - ps : null;
+        const bar  = Math.min(100, Math.max(0, score));
+        return '<tr>'
+          + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
+          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + App.scoreColor(score) + ';border-radius:3px;"></div></div></td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(score) + ';padding:8px 12px;">' + score + '</td>'
+          + (diff != null ? '<td style="font-size:12px;color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding:8px 12px;">' + (diff >= 0 ? '+' : '') + diff + '</td>' : '<td></td>')
+          + '</tr>';
       }).join('');
-      history = '<div class="card" style="margin-top:16px;">'
-        + '<div class="card-title">Audit History</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Score</th><th>Exposures</th><th>Patterns</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+
+      latestCard = '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
+        + '<div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Bar Cop Audit</div>'
+        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name || App.data.settings.bar_name || 'Your Operation') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div>'
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score || 0) + '</div>'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
+        + '<button class="btn btn-ghost btn-sm bca-view-btn" data-idx="0">View Full Audit</button>'
+        + '</div>'
+        + '</div>'
+        + progressBanner
+        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
+          + '<thead><tr>'
+          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
+          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
+          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
+          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
+          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
         + '</div>';
     }
 
-    this.container.innerHTML = ''
-      + this._header('Bar Cop Audit')
-      + '<div class="screen" style="padding:0;">' + intro + history + '</div>';
-    document.getElementById('bca-back-dash')?.addEventListener('click', () => App.showHub());
-    document.getElementById('bca-generate')?.addEventListener('click', () => this._generate());
-    this.container.querySelectorAll('.bca-row, .bca-view').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = el.dataset.id;
-        const audit = this.audits().find(a => a.id === id);
-        if (audit) this._renderDetail(audit);
-      });
+    const emptyState = !latest && enough
+      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
+        + '<div class="empty-sub">Generate your first Bar Cop Audit above. Sub-scores, exposures, and recurring patterns appear once the snapshot is built.</div></div>'
+      : '';
+
+    let historyCard = '';
+    if (audits.length > 1) {
+      const rows = audits.map((a, i) => {
+        const p    = audits[i + 1];
+        const diff = p ? (a.overall_score || 0) - (p.overall_score || 0) : null;
+        return '<tr>'
+          + '<td>' + (a.date || '').slice(0, 10) + '</td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score || 0) + ';">' + (a.overall_score || 0) + '</td>'
+          + (diff != null ? '<td style="color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + diff + ' pts</td>' : '<td></td>')
+          + '<td>' + (a.exposures ? a.exposures.length : 0) + '</td>'
+          + '<td>' + (a.patterns ? a.patterns.length : 0) + '</td>'
+          + '<td><button class="btn btn-ghost btn-sm bca-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
+          + '</tr>';
+      }).join('');
+      historyCard = '<div class="card">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
+        + '</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Exposures</th><th>Patterns</th><th></th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>'
+        + '</div>';
+    }
+
+    let scoreChart = '';
+    if (audits.length >= 2) {
+      scoreChart = this._renderScoreChart(audits);
+    }
+
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + historyCard + '</div>';
+
+    document.getElementById('bca-new-btn')?.addEventListener('click', () => this._generate());
+    this.container.querySelectorAll('.bca-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx)));
     });
+  },
+
+  _viewAuditByIdx(idx) {
+    const sorted = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const audit = sorted[idx];
+    if (audit) this._renderDetail(audit);
+  },
+
+  // Audit score history chart. Mirrors the audit-tracker renderScoreChart
+  // pattern so the visual matches across all four audits.
+  _renderScoreChart(audits) {
+    const sorted = audits.slice().sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    const W = 700, H = 180, PAD = { t: 24, r: 20, b: 36, l: 40 };
+    const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
+    const scores = sorted.map(a => a.overall_score || 0);
+    const minY = Math.max(0, Math.min(...scores) - 10);
+    const maxY = Math.min(100, Math.max(...scores) + 10);
+    const xs = i => PAD.l + (sorted.length > 1 ? (i / (sorted.length - 1)) * cw : cw / 2);
+    const ys = v => PAD.t + ch - ((v - minY) / (maxY - minY || 1)) * ch;
+
+    const smoothPath = pts => {
+      const valid = pts.map((v, i) => v != null ? { x: xs(i), y: ys(v) } : null).filter(Boolean);
+      if (valid.length < 2) return valid.length === 1 ? 'M' + valid[0].x + ',' + valid[0].y : '';
+      let d = 'M' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
+      for (let i = 1; i < valid.length; i++) {
+        const cp = (valid[i].x - valid[i - 1].x) * 0.35;
+        d += ' C' + (valid[i - 1].x + cp).toFixed(1) + ',' + valid[i - 1].y.toFixed(1) + ' ' + (valid[i].x - cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
+      }
+      return d;
+    };
+    const areaPath = pts => {
+      const valid = pts.map((v, i) => v != null ? { x: xs(i), y: ys(v) } : null).filter(Boolean);
+      if (valid.length < 2) return '';
+      let d = 'M' + valid[0].x.toFixed(1) + ',' + ys(minY).toFixed(1) + ' L' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
+      for (let i = 1; i < valid.length; i++) {
+        const cp = (valid[i].x - valid[i - 1].x) * 0.35;
+        d += ' C' + (valid[i - 1].x + cp).toFixed(1) + ',' + valid[i - 1].y.toFixed(1) + ' ' + (valid[i].x - cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
+      }
+      d += ' L' + valid[valid.length - 1].x.toFixed(1) + ',' + ys(minY).toFixed(1) + ' Z';
+      return d;
+    };
+
+    const ticks = [minY, Math.round((minY + maxY) / 2), maxY].filter((v, i, a) => a.indexOf(v) === i);
+    const uid  = 'bcasc' + Math.random().toString(36).slice(2, 6);
+    const linePath = smoothPath(scores);
+    const fillPath = areaPath(scores);
+    const xLabels  = sorted.map((a, i) =>
+      '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (a.date || '').slice(0, 7) + '</text>'
+    ).join('');
+    const dots = sorted.map((a, i) => {
+      const v   = a.overall_score || 0;
+      const col = App.scoreHex(v);
+      return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(v).toFixed(1) + '" r="5" fill="#0A1520" stroke="' + col + '" stroke-width="2.5"/>'
+        + '<text x="' + xs(i).toFixed(1) + '" y="' + (ys(v) - 10).toFixed(1) + '" text-anchor="middle" fill="' + col + '" font-family="\'Barlow Condensed\',sans-serif" font-size="13" font-weight="700">' + v + '</text>';
+    }).join('');
+
+    return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Bar Cop Score History</div>'
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible;">'
+      + '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
+      + ticks.map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (PAD.l - 6) + '" y="' + (ys(v) + 4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + Math.round(v) + '</text>').join('')
+      + (fillPath ? '<path d="' + fillPath + '" fill="url(#' + uid + ')"/>' : '')
+      + (linePath ? '<path d="' + linePath + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' : '')
+      + dots + xLabels
+      + '</svg></div>';
   },
 
   // ── Render: single audit detail (single-page layout) ────────────────────
@@ -973,11 +1088,9 @@ S.HubBarCopAudit = {
       + 'Open each for fix detail.'
       + '</div>';
 
-    // Action bar — sits below the page header. Back returns to the audit
-    // landing view; Print opens the browser dialog.
-    this.container.innerHTML = ''
-      + this._header('Bar Cop Audit')
-      + '<div class="screen" style="padding:0;">'
+    // Action bar — Back returns to the audit landing inside the same Hub
+    // page; Print opens the browser dialog.
+    this.container.innerHTML = '<div class="screen">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
       +   '<button class="btn btn-ghost btn-sm" id="bca-back">Back to Audit History</button>'
       +   '<button class="btn btn-ghost btn-sm" id="bca-print">Print / Save PDF</button>'
@@ -1011,11 +1124,9 @@ S.HubBarCopAudit = {
       + patternCard
       + recoveryCard
 
-      + '</div>'
       + '</div>';
 
-    document.getElementById('bca-back-dash')?.addEventListener('click', () => App.showHub());
-    document.getElementById('bca-back')?.addEventListener('click', () => this._renderLanding());
+    document.getElementById('bca-back')?.addEventListener('click', () => this.renderMain());
     document.getElementById('bca-print')?.addEventListener('click', () => window.print());
     this.container.querySelectorAll('.bca-nav').forEach(btn => {
       btn.addEventListener('click', () => this._navTo(btn.dataset.screen));
