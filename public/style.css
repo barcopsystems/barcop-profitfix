@@ -2,7 +2,7 @@
 
 :root {
   --bg:        #070E15;
-  --surface:   #08131E;
+  --surface:   #08111A;
   --input:     #06111c;
   --panel:     #08111A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   --hover:     rgba(255,255,255,0.05);
