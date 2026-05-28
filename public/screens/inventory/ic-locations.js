@@ -55,6 +55,7 @@ S.InventoryLocations = {
           + esc(l.name) + '</button></td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm il-view" data-id="' + l.id + '">View</button>'
           + '<button class="btn btn-ghost btn-sm il-arrange" data-id="' + l.id + '">Arrange Products</button>'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
           + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
@@ -85,6 +86,7 @@ S.InventoryLocations = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       const open = ev.target.closest('.il-open');
+      const view = ev.target.closest('.il-view');
       const arr  = ev.target.closest('.il-arrange');
       const edit = ev.target.closest('.il-edit');
       const arch = ev.target.closest('.il-archive');
@@ -92,6 +94,7 @@ S.InventoryLocations = {
       const addF = ev.target.closest('#il-add-first');
       const addD = ev.target.closest('#il-add-defaults');
       if (open)      this.showDetail(open.dataset.id);
+      else if (view) this.showDetail(view.dataset.id);
       else if (arr)  this.showDetail(arr.dataset.id);
       else if (edit) this.showForm(edit.dataset.id);
       else if (arch) this.confirmDelete(arch.dataset.id);
