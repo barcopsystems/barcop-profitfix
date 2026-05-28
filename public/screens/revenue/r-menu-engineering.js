@@ -277,7 +277,8 @@ S.RevenueMenuEngineering = {
         id:        App.uid(),
         module:    'revenue',
         gap_id:    'pricing',
-        fix_date:  new Date().toISOString().slice(0, 10),
+        gap_name:  'Pricing',
+        date:      new Date().toISOString().slice(0, 10),
         source:    'price-change',
         source_id: entry.id,
         note:      'Price change logged: ' + (item.name || '') + ' ' + App.fmtCurrency(item.price) + ' to ' + App.fmtCurrency(newPrice)
