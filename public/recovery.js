@@ -88,11 +88,15 @@ window.Recovery = {
     },
 
     // ── Traffic Recovery metrics ─────────────────────────────────────────────
-    // Five Traffic gap-areas dollarize using operator-set conversion rates from
-    // traffic_settings.conversion_rates × check_avg from revenue_settings as the
-    // per-visit value. Monthly-tracked metrics are divided by 4.33 to convert
-    // to weekly so improvement × base × 52 yields an annual figure. Reviews
-    // and SEO stay absent (their dollar path is too indirect to defend).
+    // Three Traffic gap-areas dollarize: Website (monthly_sessions), Email
+    // and Loyalty (list × open_rate × conv), and Delivery (orders × AOV).
+    // Reviews, SEO, GBP, and Social stay absent and show as Fix Logged
+    // markers on the chart without dollar credit. GBP + Social previously
+    // dollarized from weekly gbp_views and social_profile_visits, but those
+    // fields were killed from the weekly wizard during the Traffic deep dive
+    // (operators don't pull those numbers weekly). Their fix_log entries still
+    // record the work and show as chart markers; dollar credit waits until
+    // those gaps have a weekly signal worth typing.
 
     // Website — monthly_sessions ÷ 4.33 weekly × (web_session_to_visit% × check_avg) × 52 = annual $
     'website': {
@@ -101,26 +105,6 @@ window.Recovery = {
       base:  () => ((Recovery._tconv().web_session_to_visit ?? 3) / 100) * Recovery._checkAvg(),
       baseKind: 'unit',
       target: () => ((App.data.traffic_settings || {}).targets || {}).monthly_sessions ?? 2000,
-      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
-    },
-
-    // Google Business Profile — gbp_views ÷ 4.33 × (gbp_view_to_visit% × check_avg) × 52
-    'gbp': {
-      series: 'traffic_weeks', label: 'GBP Views', lowerBetter: false,
-      value: w => w.gbp_views != null ? w.gbp_views / 4.33 : null,
-      base:  () => ((Recovery._tconv().gbp_view_to_visit ?? 2) / 100) * Recovery._checkAvg(),
-      baseKind: 'unit',
-      target: () => null,
-      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
-    },
-
-    // Social Media — social_profile_visits ÷ 4.33 × (social_profile_to_visit% × check_avg) × 52
-    'social': {
-      series: 'traffic_weeks', label: 'Social Profile Visits', lowerBetter: false,
-      value: w => w.social_profile_visits != null ? w.social_profile_visits / 4.33 : null,
-      base:  () => ((Recovery._tconv().social_profile_to_visit ?? 1) / 100) * Recovery._checkAvg(),
-      baseKind: 'unit',
-      target: () => null,
       fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
     },
 
