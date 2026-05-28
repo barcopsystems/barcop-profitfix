@@ -25,27 +25,14 @@ S.RevenueMenuItems = {
   _saving:          false,
 
   // ── Constants ─────────────────────────────────────────────────────────
-  // Plate form's category dropdown — food-side categories only
-  PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
-
-  // IC categories that can ingredients for cocktail recipes
-  COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
-  PLATE_ING_CATS:    ['Food', 'Misc'],
-
-  // Direct-pour mapping: what IC categories show on the Inventory form,
-  // grouped by their MENU category for the picker.
-  INVENTORY_GROUPS: [
-    { menuCat: 'Beer',         icCats: ['Bottle Beer', 'Draft Beer'] },
-    { menuCat: 'Wine',         icCats: ['Wine'] },
-    { menuCat: 'NA Beverages', icCats: ['Misc'] }
-  ],
-  // Reverse map: IC product category → menu category (auto-derived on save)
-  IC_TO_MENU_CAT: {
-    'Bottle Beer':  'Beer',
-    'Draft Beer':   'Beer',
-    'Wine':         'Wine',
-    'Misc':         'NA Beverages'
-  },
+  // All menu category groupings now live on App so they never drift across
+  // the screens that consume them (r-menu-items, r-menu-engineering, r-pricing,
+  // r-dog-test, recipe-cost-analysis). Read App.MENU_* directly.
+  get PLATE_CATEGORIES()   { return App.MENU_PLATE_CATEGORIES; },
+  get COCKTAIL_ING_CATS()  { return App.MENU_COCKTAIL_ING_CATS; },
+  get PLATE_ING_CATS()     { return App.MENU_PLATE_ING_CATS; },
+  get INVENTORY_GROUPS()   { return App.MENU_INVENTORY_GROUPS; },
+  get IC_TO_MENU_CAT()     { return App.MENU_IC_TO_CAT; },
 
   // ── Data helpers ──────────────────────────────────────────────────────
   items() {
@@ -402,7 +389,7 @@ S.RevenueMenuItems = {
     const catOpts = this.PLATE_CATEGORIES.map(c =>
       '<option' + (item?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
     const hasRecipe = this.rows.length > 0 && this.mode;
-    const target = item?.target_cost_pct || 32;
+    const target = item?.target_cost_pct || App.MENU_TARGET_COST_PCT.plate;
 
     this.actions.innerHTML = '';
     this.container.innerHTML = '<div class="screen">'
@@ -446,7 +433,7 @@ S.RevenueMenuItems = {
   // ── Cocktail Form ─────────────────────────────────────────────────────
   renderCocktailForm(item) {
     const hasRecipe = this.rows.length > 0 && this.mode;
-    const target = item?.target_cost_pct || 22;
+    const target = item?.target_cost_pct || App.MENU_TARGET_COST_PCT.cocktail;
 
     this.actions.innerHTML = '';
     this.container.innerHTML = '<div class="screen">'
@@ -786,7 +773,7 @@ S.RevenueMenuItems = {
           ingredients: recipeIngs,
           plate_yield: parseFloat(document.getElementById('ri-plate-yield')?.value) || 1
         };
-        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || 32;
+        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || App.MENU_TARGET_COST_PCT.plate;
         const tmp = { recipe };
         computedCost = App.menuItemCost(tmp) || 0;
       } else {
@@ -799,7 +786,7 @@ S.RevenueMenuItems = {
         : [];
       if (recipeIngs.length > 0) {
         recipe = { mode: 'single', ingredients: recipeIngs, plate_yield: null };
-        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || 22;
+        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || App.MENU_TARGET_COST_PCT.cocktail;
         const tmp = { recipe };
         computedCost = App.menuItemCost(tmp) || 0;
       } else {
@@ -830,6 +817,8 @@ S.RevenueMenuItems = {
       price,
       cost:               computedCost,
       weekly_covers:      covers,
+      prev_weekly_covers: prevCovers,
+      weekly_covers_updated_at: coversUpdatedAt,
       notes,
       recipe,
       linked_product_id:  linkedProductId,
@@ -838,6 +827,17 @@ S.RevenueMenuItems = {
       created_at:         existing?.created_at || new Date().toISOString(),
       updated_at:         new Date().toISOString()
     };
+
+    // If this is an edit, snapshot the prior weekly_covers before overwriting
+    // so Menu Engineering can show the Menu Mix Delta column ("covers vs prior
+    // update"). Only snapshot when the value actually changes — typing the
+    // same number twice shouldn't reset the prior anchor.
+    let prevCovers = existing?.prev_weekly_covers ?? null;
+    let coversUpdatedAt = existing?.weekly_covers_updated_at || null;
+    if (existing && existing.weekly_covers != null && covers !== existing.weekly_covers) {
+      prevCovers = existing.weekly_covers;
+      coversUpdatedAt = new Date().toISOString();
+    }
 
     // If this is an edit and the price changed, auto-write a revenue_price_log
     // entry + a fix_log entry so Menu Engineering's Pricing Review Log and the
