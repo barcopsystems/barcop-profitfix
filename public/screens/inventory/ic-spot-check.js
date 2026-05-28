@@ -182,8 +182,10 @@ S.InventorySpotCheck = {
     document.getElementById('sp-save')?.addEventListener('click', () => this.save());
     this.container.onclick = ev => {
       const hrow = ev.target.closest('.sp-hrow');
+      const hview = ev.target.closest('.sp-hview');
       const hdel = ev.target.closest('.sp-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
     };
   },
@@ -363,6 +365,7 @@ S.InventorySpotCheck = {
         + '<td class="' + (c.flagged_count ? 'neg' : '') + '">' + (c.flagged_count || 0) + '</td>'
         + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd) + '</td>'
         + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm sp-hview" data-id="' + c.id + '">View</button>'
         + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
