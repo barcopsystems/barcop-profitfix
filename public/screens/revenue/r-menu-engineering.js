@@ -95,18 +95,33 @@ S.RevenueMenuEngineering = {
     const quadSections = ['STAR','PLOWHORSE','PUZZLE','DOG'].map(q => {
       const qItems = classified.filter(i=>i.quad===q);
       if (!qItems.length) return '';
-      const rows = qItems.map(i =>
-        '<tr><td style="font-weight:600;">' + esc(i.name) + '</td>'
-        + '<td>' + esc(i.category||'') + '</td>'
-        + '<td>' + App.fmtCurrency(i.price) + '</td>'
-        + '<td>' + i.pct + '%</td>'
-        + '<td>' + App.fmtCurrency(i.cm) + '</td>'
-        + '<td>' + i.weekly_covers + '</td>'
-        + '</tr>'
-      ).join('');
+      const rows = qItems.map(i => {
+        // Menu Mix Delta: compare current weekly_covers to prev_weekly_covers
+        // (snapshot stamped on r-menu-items save when the value changes).
+        // Empty cell on items the operator hasn't updated since launch — the
+        // delta is meaningful only once a prior anchor exists.
+        let deltaCell = '<span style="color:var(--t4);">-</span>';
+        if (i.prev_weekly_covers != null && i.weekly_covers != null) {
+          const delta = i.weekly_covers - i.prev_weekly_covers;
+          const pct = i.prev_weekly_covers > 0 ? (delta / i.prev_weekly_covers * 100) : null;
+          const col = delta > 0 ? 'var(--gold)' : delta < 0 ? 'var(--red)' : 'var(--t3)';
+          deltaCell = '<span style="color:' + col + ';font-weight:600;">'
+            + (delta >= 0 ? '+' : '') + delta
+            + (pct != null ? ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)' : '')
+            + '</span>';
+        }
+        return '<tr><td style="font-weight:600;">' + esc(i.name) + '</td>'
+          + '<td>' + esc(i.category||'') + '</td>'
+          + '<td>' + App.fmtCurrency(i.price) + '</td>'
+          + '<td>' + i.pct + '%</td>'
+          + '<td>' + App.fmtCurrency(i.cm) + '</td>'
+          + '<td>' + i.weekly_covers + '</td>'
+          + '<td>' + deltaCell + '</td>'
+          + '</tr>';
+      }).join('');
       return '<div class="card" style="margin-bottom:14px;border-left:4px solid '+colorMap[q]+';"><div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:'+colorMap[q]+';margin-bottom:12px;">'+q+'S</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th>Item</th><th>Category</th><th>Price</th><th>Cost % ' + tt('r-cost-pct') + '</th><th>Margin ' + tt('r-contrib-margin-eng') + '</th><th>Wkly Covers ' + tt('r-wkly-covers') + '</th>'
+        + '<th>Item</th><th>Category</th><th>Price</th><th>Cost % ' + tt('r-cost-pct') + '</th><th>Margin ' + tt('r-contrib-margin-eng') + '</th><th>Wkly Covers ' + tt('r-wkly-covers') + '</th><th>vs Last Update</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }).join('');
 
