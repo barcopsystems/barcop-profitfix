@@ -5,11 +5,9 @@
    read-only mirror of the Food / Misc products in ic_products. */
 
 S.KitchenProducts = {
-  IC_KITCHEN_CATS: ['Food', 'Misc'],
-
   icKitchenProducts() {
     return ((App.inventoryData && App.inventoryData.ic_products) || [])
-      .filter(p => this.IC_KITCHEN_CATS.includes(p.category));
+      .filter(p => App.KITCHEN_CATS.includes(p.category));
   },
 
   render(container, actions) {
@@ -32,10 +30,10 @@ S.KitchenProducts = {
       const rows = prods.map(p => '<tr>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-        + '<td>' + esc(p.category || '—') + '</td>'
-        + '<td>' + esc(p.sub_category || '—') + '</td>'
-        + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">—</span>') + '</td>'
-        + '<td>' + esc(p.vendor || '—') + '</td></tr>').join('');
+        + '<td>' + esc(p.category || '-') + '</td>'
+        + '<td>' + esc(p.sub_category || '-') + '</td>'
+        + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td>' + esc(p.vendor || '-') + '</td></tr>').join('');
       body = '<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1px;margin-bottom:12px;">'
         + 'MANAGED IN INVENTORY CONTROL'
         + '<span style="color:var(--t3);font-weight:600;letter-spacing:0.5px;"> &nbsp; Read-only view of the kitchen product master.</span></div>'
