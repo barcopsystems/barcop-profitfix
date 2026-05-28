@@ -649,6 +649,34 @@ const App = {
     }
   },
 
+  // ── Full-page Hub screen (sidebar stays mounted, content area swaps) ──
+  // Hub-level screens render into the Hub content area, replacing the
+  // dashboard tiles. The Hub sidebar stays mounted and interactive on the
+  // left so the operator can navigate to other Hub items. Use this for any
+  // Hub screen with enough content to deserve a real page (Bar Cop Audit,
+  // Books, Year-End, etc.). The legacy openHubOverlay modal pattern remains
+  // for screens not yet migrated.
+  //
+  // Each screen's header should include a "Back to Dashboard" control that
+  // calls App.showHub() to restore the dashboard tiles.
+  openHubFullPage(renderFn) {
+    const wrap = document.getElementById('hub-wrapper');
+    const wrapVisible = wrap && wrap.style.display !== 'none';
+    if (!wrapVisible) this.showHub();
+    // The Hub layout uses .hub-app .main .content as the dashboard content
+    // area. Replace its inner HTML with a fresh container the screen renders
+    // into. Sidebar (.hub-app .sidebar) stays untouched.
+    const content = document.querySelector('.hub-app .content');
+    if (!content) {
+      // Fall back to overlay if the dashboard layout is not present.
+      this.openHubOverlay(renderFn);
+      return;
+    }
+    content.innerHTML = '<div id="hub-fullpage-mount"></div>';
+    const mount = document.getElementById('hub-fullpage-mount');
+    if (typeof renderFn === 'function') renderFn(mount);
+  },
+
   // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
   // Renders a dropdown in the topbar showing all bars the user belongs to.
   // Hidden when the user has only one account. Switching reloads the page so
