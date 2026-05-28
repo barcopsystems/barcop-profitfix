@@ -102,37 +102,27 @@ S.Reports={
   // with QuickBooks, Xero, or any spreadsheet.
   // ─────────────────────────────────────────────────────────────────────
 
-  // Header pattern shared with every other Hub overlay screen (Books,
-  // User Accounts, App Settings, Help, etc.) so the operator sees the
-  // same container shape no matter which sidebar item they tapped.
-  _qboHeader(){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Weekly P&amp;L Brief</div>'
-      +   '<button id="qbo-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>';
-  },
-
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "WEEKLY P&L BRIEF | Back to Dashboard".
   _openQboModal(){
     const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
-    App.openHubOverlay((panel) => {
+    App.openHubFullPage('Weekly P&L Brief', (mount) => {
+      if (App.setHubTopbarActions) App.setHubTopbarActions('');
       if(weeks.length===0){
-        panel.innerHTML='<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-          + this._qboHeader()
-          + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+        mount.innerHTML='<div class="screen">'
+          + '<div class="card">'
             + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks saved yet. Save at least one week from Profit > This Week before exporting.</div>'
           + '</div>'
         + '</div>';
-        document.getElementById('qbo-close')?.addEventListener('click',()=>App.closeHubOverlay());
         return;
       }
-      this._renderQboPicker(panel, weeks);
+      this._renderQboPicker(mount, weeks);
     });
   },
 
   _renderQboPicker(panel, weeks){
-    panel.innerHTML='<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + this._qboHeader()
-      + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
+    panel.innerHTML='<div class="screen">'
+      + '<div class="card" style="margin-bottom:18px;">'
         +'<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Weekly P&amp;L Range</div>'
         +'<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Weekly revenue, COGS, and labor as an Excel file. Hand it to your bookkeeper or open in QuickBooks, Xero, or any spreadsheet software.</div>'
         +'<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
@@ -155,8 +145,6 @@ S.Reports={
         +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;line-height:1.5;"></div>'
       +'</div>'
     +'</div>';
-
-    document.getElementById('qbo-close')?.addEventListener('click',()=>App.closeHubOverlay());
 
     const rangeSel=document.getElementById('qbo-range');
     const customRow=document.getElementById('qbo-custom');
@@ -208,7 +196,6 @@ S.Reports={
       }
       const today=new Date().toISOString().slice(0,10);
       this._buildAndDownloadXlsx(filtered, today);
-      App.closeHubOverlay();
     });
   },
 
