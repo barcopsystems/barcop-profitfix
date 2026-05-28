@@ -88,7 +88,7 @@ S.LaborStaffRoster = {
       const addBtn = document.createElement('button');
       addBtn.className = 'btn btn-primary btn-sm';
       addBtn.textContent = 'Add Staff';
-      addBtn.addEventListener('click', () => this.showForm());
+      addBtn.addEventListener('click', () => this.renderUnified(null, 'edit'));
       this.actions.appendChild(addBtn);
     }
     const exportBtn = document.createElement('button');
@@ -125,6 +125,9 @@ S.LaborStaffRoster = {
         + '<div class="calc-item"><div class="calc-label">Active</div><div class="calc-val">' + active + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Inactive</div><div class="calc-val">' + (list.length - active) + '</div></div>'
         + '</div>';
+      // Row Edit button drops directly into edit mode on the unified page;
+      // row click lands in view mode. Both reach the same page — every staff
+      // section (profile, certifications, coaching) is visible on first open.
       const rows = list.map(s => {
         const pos = this.positionById(s.position_id);
         return '<tr class="sr-row" data-id="' + s.id + '" style="cursor:pointer;">'
@@ -136,7 +139,6 @@ S.LaborStaffRoster = {
               ? '<span class="badge badge-dim">Inactive</span>'
               : '<span class="badge badge-ok">Active</span>') + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm sr-view" data-id="' + s.id + '">View</button>'
           + '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>'
           + '</div></td></tr>';
@@ -157,23 +159,30 @@ S.LaborStaffRoster = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
       const row = ev.target.closest('.sr-row');
-      const view = ev.target.closest('.sr-view');
       const edit = ev.target.closest('.sr-edit');
       const del = ev.target.closest('.sr-del');
       const addF = ev.target.closest('#sr-add-first');
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit)  { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (view)  { ev.stopPropagation(); this.renderDetail(view.dataset.id); }
-      else if (row)   this.renderDetail(row.dataset.id);
-      else if (addF)  this.showForm();
+      else if (edit)  { ev.stopPropagation(); this.renderUnified(edit.dataset.id, 'edit'); }
+      else if (row)   this.renderUnified(row.dataset.id, 'view');
+      else if (addF)  this.renderUnified(null, 'edit');
     };
   },
 
-  // ── Staff detail view — profile summary + Certifications + Coaching Log
-  renderDetail(staffId) {
-    const s = this.staffById(staffId);
-    if (!s) { this.renderList(); return; }
-    this.detailId = staffId;
+  // ── Staff detail page (unified) — Profile + Certifications + Coaching Log
+  // One page, every section visible after first click. profileMode controls
+  // the Profile card's render: 'view' (read-only kv pairs) or 'edit' (inputs).
+  // For a brand-new staff member (staffId null), profileMode is 'edit' and the
+  // Cert + Coaching cards still render so the operator sees what they'll be
+  // able to add once the profile saves.
+  renderUnified(staffId, profileMode) {
+    profileMode = profileMode || 'view';
+    const isNew = !staffId;
+    const s = isNew ? null : this.staffById(staffId);
+    if (!isNew && !s) { this.renderList(); return; }
+
+    this.detailId = staffId || null;
+    this.profileMode = profileMode;
     this.actions.innerHTML = '';
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-ghost btn-sm';
@@ -181,8 +190,22 @@ S.LaborStaffRoster = {
     exportBtn.addEventListener('click', () => window.print());
     this.actions.appendChild(exportBtn);
 
+    const profileCard = (profileMode === 'edit')
+      ? this.renderProfileEditCard(s, isNew)
+      : this.renderProfileViewCard(s);
+    const certsCard = this.renderCertsCard(staffId, isNew);
+    const notesCard = this.renderNotesCard(staffId, isNew);
+
+    this.container.innerHTML = '<div class="screen">' + profileCard + certsCard + notesCard + '</div>';
+    this.wireUnified(staffId, profileMode);
+  },
+
+  // Backwards-compat alias for any caller that still references renderDetail.
+  renderDetail(staffId) { this.renderUnified(staffId, 'view'); },
+
+  renderProfileViewCard(s) {
     const pos = this.positionById(s.position_id);
-    const profileCard = '<div class="card">'
+    return '<div class="card">'
       + '<div class="card-title">' + esc(s.name || '-') + '</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:var(--t2);">'
       + this._kv('Position', pos ? pos.name : '-')
@@ -195,15 +218,49 @@ S.LaborStaffRoster = {
       + '</div>'
       + (s.notes ? '<div style="margin-top:12px;font-size:12px;color:var(--t3);line-height:1.6;"><strong style="color:var(--t2);">Notes:</strong> ' + esc(s.notes) + '</div>' : '')
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary btn-sm sr-edit-detail">Edit Profile</button>'
+        + '<button class="btn btn-primary btn-sm sr-edit-profile">Edit Profile</button>'
         + '<button class="btn btn-ghost btn-sm sr-back">&laquo; Back to Roster</button>'
       + '</div></div>';
+  },
 
-    const certsCard = this.renderCertsCard(staffId);
-    const notesCard = this.renderNotesCard(staffId);
+  renderProfileEditCard(s, isNew) {
+    const positions = this.positions();
+    const posOpts = positions.map(p =>
+      '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
+      + esc(p.name) + ', ' + esc(p.department || '') + '</option>').join('');
+    const defaultPos = s ? this.positionById(s.position_id) : positions[0];
+    const v = val => (val != null && val !== '') ? val : '';
+    const wage = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
 
-    this.container.innerHTML = '<div class="screen">' + profileCard + certsCard + notesCard + '</div>';
-    this.wireDetail(staffId);
+    return '<div class="card"><div class="card-title">' + (isNew ? 'Add Staff Member' : 'Edit Profile') + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Name</label>'
+      + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
+      + '<div class="f" style="width:230px;flex-shrink:0;"><label>Position</label>'
+      + '<select id="sr-pos">' + posOpts + '</select></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Wage</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage" min="0" step="0.01" '
+      + 'value="' + v(wage) + '" placeholder="0.00"/></div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="sr-status">'
+      + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
+      + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option>'
+      + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Hire Date</label>'
+      + '<input type="date" id="sr-hire" value="' + esc(s?.hire_date || '') + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Phone</label>'
+      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Email</label>'
+      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="sr-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="sr-save">' + (isNew ? 'Save Staff' : 'Update Profile') + '</button>'
+      + '<button class="btn btn-ghost" id="sr-cancel">Cancel</button>'
+      + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
   },
 
   _kv(label, val) {
@@ -213,26 +270,43 @@ S.LaborStaffRoster = {
       + '</div>';
   },
 
-  wireDetail(staffId) {
+  wireUnified(staffId, profileMode) {
     this.container.onclick = null;
+    // Profile card buttons
     this.container.querySelector('.sr-back')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
-    this.container.querySelector('.sr-edit-detail')?.addEventListener('click', () => this.showForm(staffId));
-    // Certs
+    this.container.querySelector('.sr-edit-profile')?.addEventListener('click', () => this.renderUnified(staffId, 'edit'));
+    this.container.querySelector('#sr-pos')?.addEventListener('change', e => {
+      const p = this.positionById(e.target.value);
+      const wEl = document.getElementById('sr-wage');
+      if (p && wEl) wEl.value = p.default_wage != null ? p.default_wage : '';
+    });
+    this.container.querySelector('#sr-cancel')?.addEventListener('click', () => {
+      if (staffId) this.renderUnified(staffId, 'view');
+      else { this.detailId = null; this.renderList(); }
+    });
+    this.container.querySelector('#sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
+    // Certs (active only on existing staff records)
     this.container.querySelector('#cert-add')?.addEventListener('click', () => { this.certEditId = null; this.renderCertForm(staffId); });
     this.container.querySelectorAll('.cert-edit').forEach(b => b.addEventListener('click', () => { this.certEditId = b.dataset.id; this.renderCertForm(staffId); }));
     this.container.querySelectorAll('.cert-del').forEach(b => b.addEventListener('click', () => this.confirmDelCert(b.dataset.id, staffId)));
-    // Notes
+    // Notes (active only on existing staff records)
     this.container.querySelector('#note-add')?.addEventListener('click', () => { this.noteEditId = null; this.renderNoteForm(staffId); });
     this.container.querySelectorAll('.note-edit').forEach(b => b.addEventListener('click', () => { this.noteEditId = b.dataset.id; this.renderNoteForm(staffId); }));
     this.container.querySelectorAll('.note-del').forEach(b => b.addEventListener('click', () => this.confirmDelNote(b.dataset.id, staffId)));
     this.container.querySelector('#note-filter')?.addEventListener('change', e => {
       this.noteFilterCategory = e.target.value || '';
-      this.renderDetail(staffId);
+      this.renderUnified(staffId, profileMode);
     });
   },
 
   // ── Certifications card + form ───────────────────────────────────────
-  renderCertsCard(staffId) {
+  renderCertsCard(staffId, isNew) {
+    if (isNew) {
+      return '<div class="card"><div class="card-title">Certifications &amp; Licenses</div>'
+        + '<div style="font-size:12px;color:var(--t3);">Save the profile above first. Once the staff record exists you can add TABC, food handler, RBS, ServSafe, and any other certs with expiration dates here. Bar Cop flags any expiring within 30 days on the dashboard.</div>'
+        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" disabled style="opacity:0.5;cursor:not-allowed;">+ Add Certification</button></div>'
+        + '</div>';
+    }
     const list = this.certsForStaff(staffId);
     let body;
     if (list.length === 0) {
@@ -342,7 +416,13 @@ S.LaborStaffRoster = {
   },
 
   // ── Coaching / notes card + form ─────────────────────────────────────
-  renderNotesCard(staffId) {
+  renderNotesCard(staffId, isNew) {
+    if (isNew) {
+      return '<div class="card"><div class="card-title">Coaching Log</div>'
+        + '<div style="font-size:12px;color:var(--t3);">Save the profile above first. Once the staff record exists you can log praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div>'
+        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" disabled style="opacity:0.5;cursor:not-allowed;">+ Add Note</button></div>'
+        + '</div>';
+    }
     const all = this.notesForStaff(staffId);
     const list = this.noteFilterCategory ? all.filter(n => n.category === this.noteFilterCategory) : all;
     const filterOpts = '<option value="">All categories</option>'
@@ -457,63 +537,11 @@ S.LaborStaffRoster = {
     this.renderDetail(staffId);
   },
 
-  showForm(id) {
-    this.editId = id || null;
-    const s = id ? this.staff().find(x => x.id === id) : null;
-    const positions = this.positions();
-    const posOpts = positions.map(p =>
-      '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
-      + esc(p.name) + ', ' + esc(p.department || '') + '</option>').join('');
-    const defaultPos = s ? this.positionById(s.position_id) : positions[0];
-    const v = val => (val != null && val !== '') ? val : '';
-    const wage = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Add') + ' Staff Member</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Name</label>'
-      + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
-      + '<div class="f" style="width:230px;flex-shrink:0;"><label>Position</label>'
-      + '<select id="sr-pos">' + posOpts + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Wage</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage" min="0" step="0.01" '
-      + 'value="' + v(wage) + '" placeholder="0.00"/></div></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="sr-status">'
-      + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
-      + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option>'
-      + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Hire Date</label>'
-      + '<input type="date" id="sr-hire" value="' + esc(s?.hire_date || '') + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Phone</label>'
-      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Email</label>'
-      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="sr-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="sr-save">' + (id ? 'Update' : 'Save Staff') + '</button>'
-      + '<button class="btn btn-ghost" id="sr-cancel">Cancel</button>'
-      + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    // Changing position resets wage to that position's default
-    document.getElementById('sr-pos')?.addEventListener('change', e => {
-      const p = this.positionById(e.target.value);
-      const wEl = document.getElementById('sr-wage');
-      if (p && wEl) wEl.value = p.default_wage != null ? p.default_wage : '';
-    });
-    document.getElementById('sr-cancel')?.addEventListener('click', () => {
-      if (this.detailId) this.renderDetail(this.detailId);
-      else this.renderList();
-    });
-    document.getElementById('sr-save')?.addEventListener('click', () => this.save());
-  },
-
-  async save() {
+  // Profile save — feeds the unified page's Save Staff / Update Profile button.
+  // Existing staff: lands back on the same page in 'view' mode. New staff:
+  // creates the record and lands on the same page (now with a staffId) in
+  // 'view' mode, with the Cert + Coaching cards now actionable.
+  async saveProfile(staffId) {
     const err = document.getElementById('sr-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById('sr-name')?.value.trim();
@@ -528,7 +556,7 @@ S.LaborStaffRoster = {
     // effective date of the new wage. App.wageForStaffOn(staffId, date) reads
     // this history so past-dated entries cost out at the wage in effect on
     // that date, not the current rate.
-    const existing = this.editId ? this.staff().find(x => x.id === this.editId) : null;
+    const existing = staffId ? this.staff().find(x => x.id === staffId) : null;
     const today = new Date().toISOString().slice(0, 10);
     let wageHistory = Array.isArray(existing?.wage_history) ? existing.wage_history.slice() : [];
     if (existing && existing.wage != null && newWage != null && existing.wage !== newWage) {
@@ -541,7 +569,7 @@ S.LaborStaffRoster = {
     }
 
     const rec = {
-      id:           this.editId || App.uid(),
+      id:           staffId || App.uid(),
       name,
       position_id:  posId,
       wage:         newWage,
@@ -552,11 +580,11 @@ S.LaborStaffRoster = {
       email:        document.getElementById('sr-email')?.value.trim() || '',
       notes:        document.getElementById('sr-notes')?.value.trim() || ''
     };
-    if (!this.editId) rec.created_at = new Date().toISOString();
+    if (!staffId) rec.created_at = new Date().toISOString();
 
     const list = this.staff();
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
+    if (staffId) {
+      const i = list.findIndex(x => x.id === staffId);
       if (i > -1) list[i] = { ...list[i], ...rec };
     } else {
       list.push(rec);
@@ -566,15 +594,11 @@ S.LaborStaffRoster = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveLabor();
     const savedId = rec.id;
-    this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_roster');
-      // If the operator came from the detail view, return to it so they keep
-      // working with the staff member rather than getting kicked back to list.
-      if (this.detailId) this.renderDetail(savedId);
-      else this.renderList();
+      this.renderUnified(savedId, 'view');
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Staff'; }
+      if (btn) { btn.disabled = false; btn.textContent = staffId ? 'Update Profile' : 'Save Staff'; }
       fail('Save failed. Try again.');
     }
   },
