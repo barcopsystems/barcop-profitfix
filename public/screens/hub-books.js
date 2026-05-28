@@ -396,16 +396,18 @@ S.HubBooks = {
 
     // Revenue
     rows.push(['Revenue', '', '']);
-    rows.push(r('  Bar Revenue',  M.barRev,  YTD.barRev));
-    rows.push(r('  Food Revenue', M.foodRev, YTD.foodRev));
+    rows.push(r('  Bar Revenue',      M.barRev,      YTD.barRev));
+    rows.push(r('  Food Revenue',     M.foodRev,     YTD.foodRev));
+    rows.push(r('  Catering Revenue', M.cateringRev, YTD.cateringRev));
     rows.push(r('  Less: Comps',  M.comps != null ? -Math.abs(M.comps) : null, YTD.comps != null ? -Math.abs(YTD.comps) : null));
     rows.push(r('Total Revenue (net of comps)', M.totalRev - (M.comps || 0), YTD.totalRev - (YTD.comps || 0)));
     rows.push(blank());
 
     // COGS
     rows.push(['Cost of Goods Sold', '', '']);
-    rows.push(r('  Bar COGS',  M.barCogs,  YTD.barCogs));
-    rows.push(r('  Food COGS', M.foodCogs, YTD.foodCogs));
+    rows.push(r('  Bar COGS',      M.barCogs,      YTD.barCogs));
+    rows.push(r('  Food COGS',     M.foodCogs,     YTD.foodCogs));
+    rows.push(r('  Catering COGS', M.cateringCogs, YTD.cateringCogs));
     rows.push(r('Total COGS', M.totalCogs, YTD.totalCogs));
     rows.push(blank());
 
@@ -414,8 +416,9 @@ S.HubBooks = {
 
     // Labor
     rows.push(['Labor', '', '']);
-    rows.push(r('  Bar Labor',  M.barLabor,  YTD.barLabor));
-    rows.push(r('  Food Labor', M.foodLabor, YTD.foodLabor));
+    rows.push(r('  Bar Labor',      M.barLabor,      YTD.barLabor));
+    rows.push(r('  Food Labor',     M.foodLabor,     YTD.foodLabor));
+    rows.push(r('  Catering Labor', M.cateringLabor, YTD.cateringLabor));
     rows.push(r('Total Labor', M.totalLabor, YTD.totalLabor));
     rows.push(blank());
 
@@ -429,6 +432,7 @@ S.HubBooks = {
     rows.push(r('  Insurance', null, null));
     rows.push(r('  Marketing and advertising', null, null));
     rows.push(r('  Repairs and maintenance', M.maintenance, YTD.maintenance));
+    rows.push(r('  3rd-party platform fees (DoorDash, UberEats, etc.)', M.platformFees, YTD.platformFees));
     rows.push(r('  Professional fees', null, null));
     rows.push(r('  Bank and credit card fees', null, null));
     rows.push(r('  Other operating expenses', null, null));
@@ -748,10 +752,13 @@ S.HubBooks = {
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
     rows.push(blank());
 
-    rows.push(['Date', 'Type', 'Shift', 'Item', 'Amount', 'Server', 'Authorized By', 'Check #', 'Reason']);
+    // Category column shows the operator's classification on each Comp row
+    // (Customer Comp, Service Recovery, Staff Meal, Shift Drink). Voids
+    // leave it blank.
+    rows.push(['Date', 'Type', 'Category', 'Shift', 'Item', 'Amount', 'Server', 'Authorized By', 'Reason']);
 
     let totalVoids = 0, totalComps = 0;
-    const byMgr = {}, byReason = {};
+    const byMgr = {}, byReason = {}, byCategory = {};
 
     if (records.length === 0) {
       rows.push(this._lineRow('(no voids or comps recorded this month)', COL_COUNT));
@@ -759,47 +766,57 @@ S.HubBooks = {
     } else {
       records.forEach(r => {
         const amt = parseFloat(r.amount) || 0;
-        rows.push([r.date || '', r.type || '', r.shift_type || '', r.item || '', amt, r.server || '', r.authorized_by || '', r.check_number || '', r.reason || '']);
         const type = (r.type || '').toLowerCase();
+        const cat = type === 'comp' ? (r.category || 'Customer Comp') : '';
+        rows.push([r.date || '', r.type || '', cat, r.shift_type || '', r.item || '', amt, r.server || '', r.authorized_by || '', r.reason || '']);
         if (type === 'void') totalVoids += amt;
         else if (type === 'comp') totalComps += amt;
         const mgr = r.authorized_by || '(none recorded)';
         byMgr[mgr] = (byMgr[mgr] || 0) + amt;
         const rea = r.reason || '(none recorded)';
         byReason[rea] = (byReason[rea] || 0) + amt;
+        if (cat) byCategory[cat] = (byCategory[cat] || 0) + amt;
       });
     }
 
     rows.push(blank());
     rows.push(['Monthly Totals by Type', '', '', '', '', '', '', '', '']);
-    rows.push(['  Total Voids',  '', '', '', totalVoids, '', '', '', '']);
-    rows.push(['  Total Comps',  '', '', '', totalComps, '', '', '', '']);
-    rows.push(['  Combined',     '', '', '', totalVoids + totalComps, '', '', '', '']);
+    rows.push(['  Total Voids',  '', '', '', '', totalVoids, '', '', '']);
+    rows.push(['  Total Comps',  '', '', '', '', totalComps, '', '', '']);
+    rows.push(['  Combined',     '', '', '', '', totalVoids + totalComps, '', '', '']);
+
+    if (Object.keys(byCategory).length) {
+      rows.push(blank());
+      rows.push(['Subtotal by Comp Category (loss vs policy expense)', '', '', '', '', 'Amount', '', '', '']);
+      Object.keys(byCategory).sort().forEach(cat => {
+        rows.push(['  ' + cat, '', '', '', '', byCategory[cat], '', '', '']);
+      });
+    }
 
     if (Object.keys(byMgr).length) {
       rows.push(blank());
-      rows.push(['Subtotal by Authorizer', 'Amount', '', '', '', '', '', '', '']);
+      rows.push(['Subtotal by Authorizer', '', '', '', '', 'Amount', '', '', '']);
       Object.keys(byMgr).sort().forEach(mgr => {
-        rows.push(['  ' + mgr, byMgr[mgr], '', '', '', '', '', '', '']);
+        rows.push(['  ' + mgr, '', '', '', '', byMgr[mgr], '', '', '']);
       });
     }
 
     if (Object.keys(byReason).length) {
       rows.push(blank());
-      rows.push(['Subtotal by Reason', 'Amount', '', '', '', '', '', '', '']);
+      rows.push(['Subtotal by Reason', '', '', '', '', 'Amount', '', '', '']);
       Object.keys(byReason).sort().forEach(rea => {
-        rows.push(['  ' + rea, byReason[rea], '', '', '', '', '', '', '']);
+        rows.push(['  ' + rea, '', '', '', '', byReason[rea], '', '', '']);
       });
     }
 
     this._pushFooter(rows, merges,
-      'Source: Shift Control void and comp log. Used for sales tax reconciliation and internal controls documentation.',
+      'Source: Shift Control void and comp log. Used for sales tax reconciliation and internal controls documentation. Staff Meal and Shift Drink categories are policy expense, not loss.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
     rows.forEach((row, i) => {
-      [1, 4].forEach(c => {
+      [5].forEach(c => {
         const addr = XLSX.utils.encode_cell({ r: i, c });
         const cell = ws[addr];
         if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
@@ -1409,19 +1426,30 @@ S.HubBooks = {
   },
 
   _sumWeeks(weeks) {
-    let barRev = 0, foodRev = 0, barCogs = 0, foodCogs = 0, barLabor = 0, foodLabor = 0;
+    let barRev = 0, foodRev = 0, cateringRev = 0;
+    let barCogs = 0, foodCogs = 0, cateringCogs = 0;
+    let barLabor = 0, foodLabor = 0, cateringLabor = 0;
+    let platformFees = 0;
     weeks.forEach(w => {
-      barRev    += parseFloat(w.bar?.revenue)  || 0;
-      foodRev   += parseFloat(w.food?.revenue) || 0;
-      barCogs   += parseFloat(w.bar?.cogs)     || 0;
-      foodCogs  += parseFloat(w.food?.cogs)    || 0;
-      barLabor  += parseFloat(w.bar?.labor)    || 0;
-      foodLabor += parseFloat(w.food?.labor)   || 0;
+      barRev      += parseFloat(w.bar?.revenue)       || 0;
+      foodRev     += parseFloat(w.food?.revenue)      || 0;
+      cateringRev += parseFloat(w.catering?.revenue)  || 0;
+      barCogs     += parseFloat(w.bar?.cogs)          || 0;
+      foodCogs    += parseFloat(w.food?.cogs)         || 0;
+      cateringCogs+= parseFloat(w.catering?.cogs)     || 0;
+      barLabor    += parseFloat(w.bar?.labor)         || 0;
+      foodLabor   += parseFloat(w.food?.labor)        || 0;
+      cateringLabor += parseFloat(w.catering?.labor)  || 0;
+      platformFees+= parseFloat(w.platform_fees)      || 0;
     });
     return {
-      barRev, foodRev, totalRev: barRev + foodRev,
-      barCogs, foodCogs, totalCogs: barCogs + foodCogs,
-      barLabor, foodLabor, totalLabor: barLabor + foodLabor
+      barRev, foodRev, cateringRev,
+      totalRev: barRev + foodRev + cateringRev,
+      barCogs, foodCogs, cateringCogs,
+      totalCogs: barCogs + foodCogs + cateringCogs,
+      barLabor, foodLabor, cateringLabor,
+      totalLabor: barLabor + foodLabor + cateringLabor,
+      platformFees
     };
   },
 
