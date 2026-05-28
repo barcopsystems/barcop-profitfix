@@ -5,6 +5,23 @@ S.TrafficSocial = {
   get CONTENT_MIX() { return App.TRAFFIC_SOCIAL_CONTENT_MIX; },
   get ENGAGEMENT_BENCHMARK() { return App.TRAFFIC_BENCHMARKS.engagement_rate; },
 
+  // Social Post Log — per-post detail across platforms. Replaces the typed
+  // IG Posts/Mo integer with a real count when at least one post is logged
+  // this month. Drives the social_posts_month target with real data.
+  PLATFORMS:     ['Instagram', 'Facebook', 'TikTok', 'X', 'Threads'],
+  CONTENT_TYPES: ['Food/Drink', 'Event/Promo', 'Behind-Scenes', 'Staff/Guest', 'Reel/Video', 'Story'],
+  addingPost: false,
+  editId: null,
+
+  socialPosts() {
+    if (!Array.isArray(App.data.traffic_social_posts)) App.data.traffic_social_posts = [];
+    return App.data.traffic_social_posts;
+  },
+  thisMonthSocialPosts() {
+    const ym = new Date().toISOString().slice(0, 7);
+    return this.socialPosts().filter(p => (p.date || '').slice(0, 7) === ym);
+  },
+
   render(container, actions) {
     actions.innerHTML = '';
     this.container = container;
@@ -34,9 +51,12 @@ S.TrafficSocial = {
     const noData = '<div class="metric-val" style="color:var(--t4);font-size:22px;">No data</div>';
 
     const igf = latest?.ig_followers ?? null;
-    const igp = latest?.ig_posts_month ?? null;
     const fbf = latest?.fb_followers ?? null;
     const eng = prof.social_ig_engagement != null ? prof.social_ig_engagement : null;
+    // IG Posts/Mo prefers a logged count (filtering Social Post Log to IG +
+    // current month) over the typed weekly figure when the log has entries.
+    const monthIgLog = this.thisMonthSocialPosts().filter(p => p.platform === 'Instagram').length;
+    const igp = monthIgLog > 0 ? monthIgLog : (latest?.ig_posts_month ?? null);
 
     const cards =
         card('Instagram Followers', igf != null ? onTargetVal(igf.toLocaleString(), null) : noData, 'Grow week over week', trend(igf, prev?.ig_followers))
@@ -101,14 +121,170 @@ S.TrafficSocial = {
       : '<div class="card"><div class="empty"><div class="empty-title">Social Is Active</div>'
         + '<div class="empty-sub">Posting schedule, engagement, and content mix are all on track. Keep it consistent.</div></div></div>';
 
+    const logCard = this.postLogCard(tSP);
+
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
       + followerChart + postsChart
       + formCard
+      + logCard
       + tipsCard
       + '</div>';
 
     document.getElementById('soc-save')?.addEventListener('click', () => this.save());
+    this.wireLog();
+  },
+
+  postLogCard(tSP) {
+    const all = this.socialPosts().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const recent = all.slice(0, 12);
+    const monthCount = this.thisMonthSocialPosts().length;
+
+    const rows = recent.length ? recent.map(p => {
+      const capSnippet = (p.caption || '').slice(0, 60) + ((p.caption || '').length > 60 ? '...' : '');
+      const linkHtml = p.link ? '<a href="' + esc(p.link) + '" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none;">Open</a>' : '<span style="color:var(--t4);">-</span>';
+      return '<tr class="spl-row" data-id="' + p.id + '" style="cursor:pointer;">'
+        + '<td>' + esc(p.date || '') + '</td>'
+        + '<td>' + esc(p.platform || '-') + '</td>'
+        + '<td>' + esc(p.content_type || '-') + '</td>'
+        + '<td style="color:var(--t2);">' + esc(capSnippet || '-') + '</td>'
+        + '<td>' + linkHtml + '</td>'
+        + '<td><div class="row-actions">'
+        +   '<button class="btn btn-ghost btn-sm spl-edit" data-id="' + p.id + '">Edit</button>'
+        +   '<button class="btn btn-danger btn-sm spl-del" data-id="' + p.id + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('') : '';
+
+    const tableHtml = recent.length
+      ? '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Platform</th><th>Type</th><th>Caption</th><th>Link</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + (all.length > recent.length ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Showing 12 of ' + all.length + ' logged posts.</div>' : '')
+      : '<div style="padding:14px 0;font-size:12px;color:var(--t3);line-height:1.55;">No social posts logged yet. Log a post when you publish one. The log replaces the typed weekly post count with a real count and gives you a record of what was posted, where.</div>';
+
+    const form = this.addingPost ? this.postForm() : '';
+    const headerActions = this.addingPost
+      ? ''
+      : '<button class="btn btn-ghost btn-sm" id="spl-print">Print Blank Sheet</button>'
+        + '<button class="btn btn-primary btn-sm" id="spl-add">+ Log Post</button>';
+
+    return '<div class="card">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">'
+      +   '<div class="card-title" style="margin-bottom:0;">Social Post Log</div>'
+      +   '<div style="display:flex;gap:8px;">' + headerActions + '</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + monthCount + ' posts logged this month (target ' + tSP + '/mo across platforms).</div>'
+      + form
+      + tableHtml
+      + '</div>';
+  },
+
+  postForm() {
+    const p = this.editId ? this.socialPosts().find(x => x.id === this.editId) : null;
+    const today = new Date().toISOString().slice(0, 10);
+    const platOpts = this.PLATFORMS.map(pl =>
+      '<option' + (p && p.platform === pl ? ' selected' : '') + '>' + esc(pl) + '</option>').join('');
+    const typeOpts = '<option value="">-</option>' + this.CONTENT_TYPES.map(c =>
+      '<option' + (p && p.content_type === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    return '<div style="background:var(--input);border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:14px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--t3);text-transform:uppercase;margin-bottom:10px;">' + (this.editId ? 'Edit Post' : 'Log a Social Post') + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+      +   '<div class="f" style="width:150px;"><label>Date</label><input type="date" id="spl-date" value="' + esc(p?.date || today) + '"/></div>'
+      +   '<div class="f" style="width:140px;"><label>Platform</label><select id="spl-platform">' + platOpts + '</select></div>'
+      +   '<div class="f" style="width:170px;"><label>Content Type</label><select id="spl-type">' + typeOpts + '</select></div>'
+      + '</div>'
+      + '<div class="f" style="margin-bottom:10px;"><label>Caption (snippet)</label>'
+      +   '<input type="text" id="spl-caption" value="' + esc(p?.caption || '') + '" placeholder="First few words of the post"/></div>'
+      + '<div class="f" style="margin-bottom:0;"><label>Link (optional)</label>'
+      +   '<input type="url" id="spl-link" value="' + esc(p?.link || '') + '" placeholder="https://instagram.com/p/..."/></div>'
+      + '<div class="card-actions" style="margin-top:12px;">'
+      +   '<button class="btn btn-primary btn-sm" id="spl-save">' + (this.editId ? 'Update' : 'Save Post') + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" id="spl-cancel">Cancel</button>'
+      +   '<span id="spl-err" style="color:var(--red);font-size:11px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  wireLog() {
+    const addBtn = document.getElementById('spl-add');
+    if (addBtn) addBtn.addEventListener('click', () => { this.addingPost = true; this.editId = null; this.draw(); });
+    const printBtn = document.getElementById('spl-print');
+    if (printBtn) printBtn.addEventListener('click', () => this.printBlankSheet());
+    const saveBtn = document.getElementById('spl-save');
+    if (saveBtn) saveBtn.addEventListener('click', () => this.savePost());
+    const cancelBtn = document.getElementById('spl-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { this.addingPost = false; this.editId = null; this.draw(); });
+    this.container.querySelectorAll('.spl-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.spl-edit') || e.target.closest('.spl-del') || e.target.tagName === 'A') return;
+        this.addingPost = true; this.editId = row.dataset.id; this.draw();
+      });
+    });
+    this.container.querySelectorAll('.spl-edit').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); this.addingPost = true; this.editId = btn.dataset.id; this.draw(); });
+    });
+    this.container.querySelectorAll('.spl-del').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!(await App.confirm({ title: 'Delete this social post entry?', confirmText: 'Delete' }))) return;
+        App.data.traffic_social_posts = this.socialPosts().filter(x => x.id !== btn.dataset.id);
+        await App.saveKey('traffic_social_posts');
+        this.draw();
+      });
+    });
+  },
+
+  printBlankSheet() {
+    App.printBlankSheet({
+      title: 'Social Post Log',
+      subtitle: 'Capture each social post during the week; type into Bar Cop after.',
+      columns: [
+        { label: 'Date',     width: '90px'  },
+        { label: 'Platform', width: '100px' },
+        { label: 'Type',     width: '110px' },
+        { label: 'Caption (snippet)' },
+        { label: 'Link',     width: '160px' }
+      ],
+      rows: 15
+    });
+  },
+
+  async savePost() {
+    const err = document.getElementById('spl-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date     = document.getElementById('spl-date')?.value;
+    const platform = document.getElementById('spl-platform')?.value;
+    const type     = document.getElementById('spl-type')?.value || '';
+    const caption  = document.getElementById('spl-caption')?.value.trim() || '';
+    const link     = document.getElementById('spl-link')?.value.trim() || '';
+    if (!date)     { fail('Date is required.'); return; }
+    if (!platform) { fail('Pick a platform.'); return; }
+
+    const tSP = (App.data.traffic_settings?.targets?.social_posts_month) || 12;
+    const beforeMonthCount = this.thisMonthSocialPosts().length;
+    const rec = {
+      id: this.editId || App.uid(),
+      date, platform, content_type: type, caption, link,
+      saved_at: new Date().toISOString()
+    };
+    const list = this.socialPosts();
+    if (this.editId) {
+      const i = list.findIndex(x => x.id === this.editId);
+      if (i > -1) list[i] = { ...list[i], ...rec };
+    } else {
+      list.push(rec);
+    }
+    const ok = await App.saveKey('traffic_social_posts');
+    if (ok) {
+      const afterMonthCount = this.thisMonthSocialPosts().length;
+      if (afterMonthCount >= tSP && beforeMonthCount < tSP) {
+        await App.emitTrafficFix('social', 'Logged ' + afterMonthCount + ' social posts this month (target ' + tSP + ')');
+      }
+      this.addingPost = false;
+      this.editId = null;
+      this.draw();
+    } else {
+      fail('Save failed. Try again.');
+    }
   },
 
   async save() {
