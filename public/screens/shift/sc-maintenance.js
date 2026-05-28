@@ -153,8 +153,13 @@ S.ShiftMaintenance = {
       + '<select id="mt-status">' + statOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reported By</label>'
       + '<select id="mt-by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Assigned To</label>'
-      + '<input type="text" id="mt-assigned" value="' + esc(r?.assigned_to || '') + '" placeholder="Person or vendor"/></div>'
+      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Assigned To</label>'
+      + '<input type="text" id="mt-assigned" list="mt-assigned-list" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/>'
+      + '<datalist id="mt-assigned-list">'
+      + ((App.laborData?.lc_staff || []).filter(s => s.status !== 'Inactive')
+          .map(s => '<option value="' + esc(s.name || '') + '"></option>').join(''))
+      + '</datalist>'
+      + '</div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
