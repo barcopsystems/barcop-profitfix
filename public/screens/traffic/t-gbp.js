@@ -4,6 +4,24 @@ S.TrafficGBP = {
   // sync with t-audit and any future screen that needs to read it.
   get TOGGLES() { return App.TRAFFIC_GBP_TOGGLES; },
 
+  // GBP Post Log — per-post detail (date, type, headline, link, cross-posted).
+  // Drives the gbp_posts/mo count instead of operator typing the integer.
+  // The Posts/Mo input on the profile form stays as a manual override for
+  // operators who haven't started logging yet; logged count takes precedence
+  // when there's at least one entry in the current month.
+  POST_TYPES: ['Offer', 'Event', 'Update'],
+  addingPost: false,
+  editId: null,
+
+  posts() {
+    if (!Array.isArray(App.data.traffic_gbp_posts)) App.data.traffic_gbp_posts = [];
+    return App.data.traffic_gbp_posts;
+  },
+  thisMonthPosts() {
+    const ym = new Date().toISOString().slice(0, 7);
+    return this.posts().filter(p => (p.date || '').slice(0, 7) === ym);
+  },
+
   render(container, actions) {
     actions.innerHTML = '';
     this.container = container;
@@ -21,7 +39,11 @@ S.TrafficGBP = {
     const checked    = this.TOGGLES.filter(([k]) => prof[k]).length;
     const completion = Math.round(checked / this.TOGGLES.length * 100);
     const photos = prof.gbp_photos != null ? prof.gbp_photos : null;
-    const posts  = prof.gbp_posts  != null ? prof.gbp_posts  : null;
+    // Posts/Mo prefers the logged count when the log has any entry this month;
+    // falls back to the operator-typed integer field on the profile form.
+    const monthLogPosts = this.thisMonthPosts().length;
+    const posts = monthLogPosts > 0 ? monthLogPosts : (prof.gbp_posts != null ? prof.gbp_posts : null);
+    const postsSource = monthLogPosts > 0 ? 'logged' : 'typed';
     const rating = latest?.google_rating ?? null;
     const reviews = latest?.google_total ?? null;
 
@@ -82,13 +104,168 @@ S.TrafficGBP = {
       : '<div class="card"><div class="empty"><div class="empty-title">Profile Looks Strong</div>'
         + '<div class="empty-sub">Every Google Business Profile item is complete and on benchmark. Keep posting and gathering reviews.</div></div></div>';
 
+    const logCard = this.postLogCard();
+
     container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
       + profileCard
+      + logCard
       + tipsCard
       + '</div>';
 
     document.getElementById('gbp-save')?.addEventListener('click', () => this.save());
+    this.wireLog();
+  },
+
+  postLogCard() {
+    const all = this.posts().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const recent = all.slice(0, 12);
+    const monthCount = this.thisMonthPosts().length;
+
+    const rows = recent.length ? recent.map(p => {
+      const headSnippet = (p.headline || '').slice(0, 70) + ((p.headline || '').length > 70 ? '...' : '');
+      const linkHtml = p.link ? '<a href="' + esc(p.link) + '" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none;">Open</a>' : '<span style="color:var(--t4);">-</span>';
+      return '<tr class="gpl-row" data-id="' + p.id + '" style="cursor:pointer;">'
+        + '<td>' + esc(p.date || '') + '</td>'
+        + '<td>' + esc(p.type || '-') + '</td>'
+        + '<td style="color:var(--t2);">' + esc(headSnippet || '-') + '</td>'
+        + '<td>' + linkHtml + '</td>'
+        + '<td>' + (p.cross_posted ? 'Yes' : 'No') + '</td>'
+        + '<td><div class="row-actions">'
+        +   '<button class="btn btn-ghost btn-sm gpl-edit" data-id="' + p.id + '">Edit</button>'
+        +   '<button class="btn btn-danger btn-sm gpl-del" data-id="' + p.id + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('') : '';
+
+    const tableHtml = recent.length
+      ? '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Type</th><th>Headline</th><th>Link</th><th>Cross-Posted</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + (all.length > recent.length ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Showing 12 of ' + all.length + ' logged posts.</div>' : '')
+      : '<div style="padding:14px 0;font-size:12px;color:var(--t3);line-height:1.55;">No GBP posts logged yet. Log a post when you publish one to Google. The log replaces the typed Posts/Mo number above with a real count, and gives you a record of what was posted, when.</div>';
+
+    const form = this.addingPost ? this.postForm() : '';
+    const headerActions = this.addingPost
+      ? ''
+      : '<button class="btn btn-ghost btn-sm" id="gpl-print">Print Blank Sheet</button>'
+        + '<button class="btn btn-primary btn-sm" id="gpl-add">+ Log Post</button>';
+
+    return '<div class="card">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">'
+      +   '<div class="card-title" style="margin-bottom:0;">GBP Post Log</div>'
+      +   '<div style="display:flex;gap:8px;">' + headerActions + '</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + monthCount + ' posts logged this month (benchmark 8/mo).</div>'
+      + form
+      + tableHtml
+      + '</div>';
+  },
+
+  postForm() {
+    const p = this.editId ? this.posts().find(x => x.id === this.editId) : null;
+    const today = new Date().toISOString().slice(0, 10);
+    const typeOpts = this.POST_TYPES.map(t =>
+      '<option' + (p && p.type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    return '<div style="background:var(--input);border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:14px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--t3);text-transform:uppercase;margin-bottom:10px;">' + (this.editId ? 'Edit Post' : 'Log a GBP Post') + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+      +   '<div class="f" style="width:150px;"><label>Date</label><input type="date" id="gpl-date" value="' + esc(p?.date || today) + '"/></div>'
+      +   '<div class="f" style="width:140px;"><label>Type</label><select id="gpl-type">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:240px;"><label>Headline</label><input type="text" id="gpl-headline" value="' + esc(p?.headline || '') + '" placeholder="Sunday brunch live music starts 11am"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;align-items:end;">'
+      +   '<div class="f" style="flex:1;min-width:240px;"><label>Link (optional)</label><input type="url" id="gpl-link" value="' + esc(p?.link || '') + '" placeholder="https://..."/></div>'
+      +   '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding-bottom:9px;">'
+      +     '<input type="checkbox" id="gpl-cross" ' + (p?.cross_posted ? 'checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>Cross-posted to Instagram or Facebook</label>'
+      + '</div>'
+      + '<div class="card-actions" style="margin-top:12px;">'
+      +   '<button class="btn btn-primary btn-sm" id="gpl-save">' + (this.editId ? 'Update' : 'Save Post') + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" id="gpl-cancel">Cancel</button>'
+      +   '<span id="gpl-err" style="color:var(--red);font-size:11px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  wireLog() {
+    const addBtn = document.getElementById('gpl-add');
+    if (addBtn) addBtn.addEventListener('click', () => { this.addingPost = true; this.editId = null; this.draw(); });
+    const printBtn = document.getElementById('gpl-print');
+    if (printBtn) printBtn.addEventListener('click', () => this.printBlankSheet());
+    const saveBtn = document.getElementById('gpl-save');
+    if (saveBtn) saveBtn.addEventListener('click', () => this.savePost());
+    const cancelBtn = document.getElementById('gpl-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { this.addingPost = false; this.editId = null; this.draw(); });
+    this.container.querySelectorAll('.gpl-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.gpl-edit') || e.target.closest('.gpl-del') || e.target.tagName === 'A') return;
+        this.addingPost = true; this.editId = row.dataset.id; this.draw();
+      });
+    });
+    this.container.querySelectorAll('.gpl-edit').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); this.addingPost = true; this.editId = btn.dataset.id; this.draw(); });
+    });
+    this.container.querySelectorAll('.gpl-del').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!(await App.confirm({ title: 'Delete this GBP post entry?', confirmText: 'Delete' }))) return;
+        App.data.traffic_gbp_posts = this.posts().filter(x => x.id !== btn.dataset.id);
+        await App.saveKey('traffic_gbp_posts');
+        this.draw();
+      });
+    });
+  },
+
+  printBlankSheet() {
+    App.printBlankSheet({
+      title: 'GBP Post Log',
+      subtitle: 'Capture each Google post during the week; type into Bar Cop after.',
+      columns: [
+        { label: 'Date',     width: '90px'  },
+        { label: 'Type',     width: '90px'  },
+        { label: 'Headline' },
+        { label: 'Link',     width: '160px' },
+        { label: 'Cross-Posted?', width: '110px' }
+      ],
+      rows: 12
+    });
+  },
+
+  async savePost() {
+    const err = document.getElementById('gpl-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date     = document.getElementById('gpl-date')?.value;
+    const type     = document.getElementById('gpl-type')?.value;
+    const headline = document.getElementById('gpl-headline')?.value.trim() || '';
+    const link     = document.getElementById('gpl-link')?.value.trim() || '';
+    const cross    = document.getElementById('gpl-cross')?.checked || false;
+    if (!date)     { fail('Date is required.'); return; }
+    if (!type)     { fail('Pick a post type.'); return; }
+    if (!headline) { fail('Headline is required.'); return; }
+
+    const beforeMonthCount = this.thisMonthPosts().length;
+    const rec = {
+      id: this.editId || App.uid(),
+      date, type, headline, link, cross_posted: cross,
+      saved_at: new Date().toISOString()
+    };
+    const list = this.posts();
+    if (this.editId) {
+      const i = list.findIndex(x => x.id === this.editId);
+      if (i > -1) list[i] = { ...list[i], ...rec };
+    } else {
+      list.push(rec);
+    }
+    const ok = await App.saveKey('traffic_gbp_posts');
+    if (ok) {
+      const afterMonthCount = this.thisMonthPosts().length;
+      if (afterMonthCount >= 8 && beforeMonthCount < 8) {
+        await App.emitTrafficFix('gbp', 'Logged ' + afterMonthCount + ' GBP posts this month (benchmark 8)');
+      }
+      this.addingPost = false;
+      this.editId = null;
+      this.draw();
+    } else {
+      fail('Save failed. Try again.');
+    }
   },
 
   async save() {
