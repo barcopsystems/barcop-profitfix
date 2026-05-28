@@ -149,6 +149,9 @@ S.ShiftHistory = {
   },
 
   // ── Detail ──────────────────────────────────────────────────────────────────
+  // Unified detail page — shows every section of the shift on first open:
+  // Profile/Revenue, Cash Reconciliation, Tip Reconciliation, Exceptions
+  // acknowledged, Mid-Shift Notes, Handoff Notes. No hidden data.
   renderDetail(id) {
     const s = this.shifts().find(x => x.id === id);
     if (!s) { this.renderList(); return; }
@@ -163,40 +166,123 @@ S.ShiftHistory = {
     const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
     const meta = (label, val) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
-    const field = (label, val) =>
-      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
 
+    // ── Cash Reconciliation card ─────────────────────────────────────────
+    let cashCard = '';
+    if (s.cash_recon) {
+      const cr = s.cash_recon;
+      const skipped = cr.skipped;
+      const variance = cr.variance;
+      const statusColor = skipped
+        ? 'var(--t3)'
+        : (variance == null ? 'var(--t3)'
+          : (Math.abs(variance) <= (App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10) ? 'var(--gold)' : 'var(--red)'));
+      const statusText = skipped ? 'SKIPPED'
+        : (variance == null ? 'NOT COUNTED'
+          : (Math.abs(variance) <= (App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10) ? 'OK'
+            : variance < 0 ? 'SHORT' : 'OVER'));
+      cashCard = '<div class="card"><div class="card-title">Cash Reconciliation</div>'
+        + '<div class="calc" style="margin-bottom:0;">'
+        + meta('Opening Bank', cr.opening_bank != null ? App.fmtCurrency(cr.opening_bank) : '-')
+        + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
+        + meta('Drops Out', cr.drops_total != null ? App.fmtCurrency(cr.drops_total) : '-')
+        + meta('Expected', cr.expected != null ? App.fmtCurrency(cr.expected) : '-')
+        + meta('Counted', cr.counted_cash != null ? App.fmtCurrency(cr.counted_cash) : '-')
+        + meta('Variance', skipped ? '-' : (variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
+        + meta('Status', '<span style="color:' + statusColor + ';font-weight:700;">' + statusText + '</span>')
+        + '</div></div>';
+    }
+
+    // ── Tip Reconciliation card ──────────────────────────────────────────
+    let tipCard = '';
+    if (s.tip_recon) {
+      const tr = s.tip_recon;
+      const variance = tr.variance;
+      tipCard = '<div class="card"><div class="card-title">Tip Reconciliation</div>'
+        + '<div class="calc" style="margin-bottom:0;">'
+        + meta('Logged Total', tr.logged_total != null ? App.fmtCurrency(tr.logged_total) : '-')
+        + meta('POS Reported', tr.pos_reported != null ? App.fmtCurrency(tr.pos_reported) : '-')
+        + meta('Variance', variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-')
+        + '</div></div>';
+    }
+
+    // ── Exception Review acknowledgments ─────────────────────────────────
+    let exCard = '';
+    if (s.exception_ack && Object.keys(s.exception_ack).length) {
+      const labels = { e86: '86\'d Items', vc: 'Big Voids & Comps', mt: 'Open Maintenance', cl: 'Closing Checklist' };
+      const ackRows = Object.entries(s.exception_ack)
+        .filter(([, v]) => v === true)
+        .map(([k]) => '<div style="font-size:12px;color:var(--t1);padding:6px 0;border-bottom:1px solid var(--b2);">&#10003; ' + esc(labels[k] || k) + ' acknowledged</div>')
+        .join('');
+      if (ackRows) {
+        exCard = '<div class="card"><div class="card-title">Exception Review</div>' + ackRows + '</div>';
+      }
+    }
+
+    // ── Mid-shift notes ──────────────────────────────────────────────────
+    let midNotesCard = '';
+    if (Array.isArray(s.shift_notes) && s.shift_notes.length) {
+      const fmtTime = iso => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      };
+      midNotesCard = '<div class="card"><div class="card-title">Shift Notes</div>'
+        + s.shift_notes.slice().reverse().map(n =>
+            '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--b2);">'
+            + '<div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;min-width:55px;padding-top:2px;">' + esc(fmtTime(n.at)) + '</div>'
+            + '<div style="flex:1;font-size:13px;color:var(--t1);line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
+            + '</div>').join('')
+        + '</div>';
+    }
+
+    // ── Closing notes and handoff ────────────────────────────────────────
     const notesCard = s.notes
       ? '<div class="card"><div class="card-title">Notes</div>'
         + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.notes) + '</div></div>'
       : '';
+    const handoffCard = s.handoff_notes
+      ? '<div class="card"><div class="card-title">Handoff Notes for the Opener</div>'
+        + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.handoff_notes) + '</div></div>'
+      : '';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sh-back">&#8592; Back to Shift History</button></div>'
+      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sh-back">&laquo; Back to Shift History</button></div>'
       + '<div class="card"><div class="card-title">'
       + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
       + '<div class="calc" style="margin-bottom:0;">'
       + meta('Manager', esc(s.manager || '-'))
       + meta('Status', s.status === 'Open' ? 'Open' : 'Closed')
       + meta('Staff on Floor', s.staff_on_floor != null ? s.staff_on_floor : '-')
+      + meta('Drawer', esc(s.drawer || '-'))
       + meta('Opening Bank', s.opening_bank != null ? App.fmtCurrency(s.opening_bank) : '-')
       + '</div></div>'
       + '<div class="card"><div class="card-title">Revenue</div>'
       + '<div class="calc" style="margin-bottom:0;">'
-      + field('Bar Revenue', App.fmtCurrency(s.bar_revenue || 0))
-      + field('Floor Revenue', App.fmtCurrency(s.floor_revenue || 0))
-      + field('Total Revenue', App.fmtCurrency(s.total_revenue || 0))
-      + field('Covers', s.covers != null ? s.covers : '-')
-      + field('Check Average', checkAvg != null ? App.fmtCurrency(checkAvg) : '-')
+      + meta('Bar Revenue', App.fmtCurrency(s.bar_revenue || 0))
+      + meta('Floor Revenue', App.fmtCurrency(s.floor_revenue || 0))
+      + meta('Total Revenue', App.fmtCurrency(s.total_revenue || 0))
+      + meta('Covers', s.covers != null ? s.covers : '-')
+      + meta('Check Average', checkAvg != null ? App.fmtCurrency(checkAvg) : '-')
       + '</div></div>'
+      + cashCard
+      + tipCard
+      + exCard
+      + midNotesCard
       + notesCard
+      + handoffCard
       + '<div class="card-actions" style="margin-top:4px;">'
       + '<button class="btn btn-ghost" id="sh-edit">Edit in Log a Shift</button></div>'
       + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sh-back')) this.renderList();
-      else if (ev.target.closest('#sh-edit')) App.navigate('sc-log-shift');
+      else if (ev.target.closest('#sh-edit')) {
+        // Hand the shift id to Log a Shift's edit flow so the form opens with
+        // this shift already loaded — no manual navigation back to find it.
+        if (S.ShiftLogShift) S.ShiftLogShift.editId = id;
+        App.navigate('sc-log-shift');
+      }
     };
   }
 };
