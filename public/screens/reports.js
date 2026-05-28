@@ -107,7 +107,7 @@ S.Reports={
   // same container shape no matter which sidebar item they tapped.
   _qboHeader(){
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Weekly P&amp;L Export</div>'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Weekly P&amp;L Brief</div>'
       +   '<button id="qbo-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
       + '</div>';
   },
@@ -134,7 +134,7 @@ S.Reports={
       + this._qboHeader()
       + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
         +'<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Weekly P&amp;L Range</div>'
-        +'<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Weekly revenue, COGS, and labor as a CSV. Hand it to your bookkeeper or import into QuickBooks, Xero, or any spreadsheet software.</div>'
+        +'<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Weekly revenue, COGS, and labor as an Excel file. Hand it to your bookkeeper or open in QuickBooks, Xero, or any spreadsheet software.</div>'
         +'<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
           +'<div class="f" style="width:240px;"><label>Range</label>'
             +'<select id="qbo-range">'
@@ -146,7 +146,7 @@ S.Reports={
               +'<option value="custom">Custom range</option>'
             +'</select>'
           +'</div>'
-          +'<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" id="qbo-download">Download CSV</button></div>'
+          +'<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" id="qbo-download">Download File</button></div>'
         +'</div>'
         +'<div id="qbo-custom" style="display:none;gap:12px;margin-top:14px;">'
           +'<div class="f" style="flex:1;max-width:200px;"><label>From</label><input type="date" id="qbo-from"/></div>'
@@ -197,9 +197,12 @@ S.Reports={
       const range=rangeSel.value;
       const filtered=this._filterWeeksByRange(weeks,range,fromInp.value,toInp.value);
       if(filtered.length===0) return;
-      const csv=this._buildQboCsv(filtered);
+      if(typeof XLSX==='undefined'){
+        alert('The file builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.');
+        return;
+      }
       const today=new Date().toISOString().slice(0,10);
-      this._downloadCsv(csv,'barcop-weekly-pnl-'+today+'.csv');
+      this._buildAndDownloadXlsx(filtered, today);
       App.closeHubOverlay();
     });
   },
@@ -231,52 +234,135 @@ S.Reports={
     return sorted;
   },
 
-  _buildQboCsv(weeks){
-    const num=v=>{
-      const n=parseFloat(v);
-      if(v==null||v===''||isNaN(n)) return '';
-      return n.toFixed(2);
-    };
-    const csvEsc=s=>{
-      const str=String(s==null?'':s);
-      return /[",\n\r]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str;
-    };
-    const header=['Week Ending','Week Number','Bar Revenue','Food Revenue','Total Revenue','Bar COGS','Food COGS','Total COGS','Bar Labor','Food Labor','Total Labor','Total Prime Cost','Bar Pour Cost %','Food Cost %','Prime Cost %'];
-    const lines=[header.map(csvEsc).join(',')];
-    weeks.forEach(w=>{
-      const bRev=parseFloat(w.bar?.revenue)||0;
-      const fRev=parseFloat(w.food?.revenue)||0;
-      const bCog=parseFloat(w.bar?.cogs)||0;
-      const fCog=parseFloat(w.food?.cogs)||0;
-      const bLab=parseFloat(w.bar?.labor)||0;
-      const fLab=parseFloat(w.food?.labor)||0;
-      const tRev=bRev+fRev;
-      const tCog=bCog+fCog;
-      const tLab=bLab+fLab;
-      const prime=tCog+tLab;
-      lines.push([
-        csvEsc(w.period_end||''),
-        csvEsc(w.week_num||''),
-        num(bRev),num(fRev),num(tRev),
-        num(bCog),num(fCog),num(tCog),
-        num(bLab),num(fLab),num(tLab),
-        num(prime),
-        num(w.bar?.cost_pct),num(w.food?.cost_pct),num(w.prime_cost_pct)
-      ].join(','));
-    });
-    return lines.join('\r\n');
-  },
+  // Build the XLSX in a Books-style sheet: title row, blank, header row, data
+  // rows, blank, source note, disclaimer footer. Column widths set so headers
+  // never clip on first open. Money + percent number formats applied.
+  _buildAndDownloadXlsx(weeks, today){
+    const COL_COUNT = 15;
+    const COL_WIDTHS = [
+      { wch: 14 }, // Week Ending
+      { wch: 13 }, // Week Number
+      { wch: 14 }, // Bar Revenue
+      { wch: 14 }, // Food Revenue
+      { wch: 16 }, // Total Revenue
+      { wch: 12 }, // Bar COGS
+      { wch: 12 }, // Food COGS
+      { wch: 14 }, // Total COGS
+      { wch: 12 }, // Bar Labor
+      { wch: 12 }, // Food Labor
+      { wch: 14 }, // Total Labor
+      { wch: 18 }, // Total Prime Cost
+      { wch: 17 }, // Bar Pour Cost %
+      { wch: 14 }, // Food Cost %
+      { wch: 14 }  // Prime Cost %
+    ];
 
-  _downloadCsv(csv,filename){
-    const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    const rows = [];
+    const merges = [];
+    const blankRow = () => { const r=[]; for(let i=0;i<COL_COUNT;i++) r.push(''); return r; };
+    const lineRow  = (text) => { const r=[text]; for(let i=1;i<COL_COUNT;i++) r.push(''); return r; };
+    const mergeFull = (rowIdx) => merges.push({ s:{ r:rowIdx, c:0 }, e:{ r:rowIdx, c:COL_COUNT-1 } });
+
+    const firstWeek = weeks[0]?.period_end || '';
+    const lastWeek  = weeks[weeks.length - 1]?.period_end || '';
+
+    // Title row (merged across full width so the bar name never gets clipped)
+    rows.push(lineRow(barName + ': Weekly P&L Brief, ' + firstWeek + ' through ' + lastWeek));
+    mergeFull(0);
+    rows.push(blankRow());
+
+    // Header row
+    rows.push([
+      'Week Ending', 'Week Number',
+      'Bar Revenue', 'Food Revenue', 'Total Revenue',
+      'Bar COGS',    'Food COGS',    'Total COGS',
+      'Bar Labor',   'Food Labor',   'Total Labor',
+      'Total Prime Cost',
+      'Bar Pour Cost %', 'Food Cost %', 'Prime Cost %'
+    ]);
+
+    // Data rows
+    const numOrNull = v => {
+      const n = parseFloat(v);
+      return (v == null || v === '' || isNaN(n)) ? null : n;
+    };
+    const pctOrNull = v => {
+      const n = parseFloat(v);
+      if (v == null || v === '' || isNaN(n)) return null;
+      // Stored values may be either 0.32 or 32 depending on source — both seen
+      // in weeks records. Treat any value > 1 as a percentage point figure and
+      // divide so Excel's % format renders correctly.
+      return n > 1 ? n / 100 : n;
+    };
+
+    weeks.forEach(w => {
+      const bRev = parseFloat(w.bar?.revenue)  || 0;
+      const fRev = parseFloat(w.food?.revenue) || 0;
+      const bCog = parseFloat(w.bar?.cogs)     || 0;
+      const fCog = parseFloat(w.food?.cogs)    || 0;
+      const bLab = parseFloat(w.bar?.labor)    || 0;
+      const fLab = parseFloat(w.food?.labor)   || 0;
+      const tRev = bRev + fRev;
+      const tCog = bCog + fCog;
+      const tLab = bLab + fLab;
+      const prime = tCog + tLab;
+      rows.push([
+        w.period_end || '',
+        w.week_num != null ? Number(w.week_num) : '',
+        bRev, fRev, tRev,
+        bCog, fCog, tCog,
+        bLab, fLab, tLab,
+        prime,
+        pctOrNull(w.bar?.cost_pct),
+        pctOrNull(w.food?.cost_pct),
+        pctOrNull(w.prime_cost_pct)
+      ]);
+    });
+
+    // Footer: blank, source note (merged), 3 disclaimer lines (each merged)
+    rows.push(blankRow());
+    rows.push(lineRow('Source: Profit > This Week weekly rollups. Revenue from Shift Control. COGS from Inventory Control. Labor from Labor Control.'));
+    mergeFull(rows.length - 1);
+    rows.push(lineRow('Generated from your input data on ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '.'));
+    mergeFull(rows.length - 1);
+    rows.push(lineRow('Bar Cop is a software tool, not a tax preparer, accountant, or CPA.'));
+    mergeFull(rows.length - 1);
+    rows.push(lineRow('Your accountant should review and verify before filing or closing your books.'));
+    mergeFull(rows.length - 1);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    // Money columns 2..11 (Bar Revenue..Total Prime Cost), percent columns 12..14
+    rows.forEach((row, i) => {
+      for (let c = 2; c <= 11; c++) {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      }
+      for (let c = 12; c <= 14; c++) {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = pctFmt;
+      }
+    });
+    ws['!cols']   = COL_WIDTHS;
+    ws['!merges'] = merges;
+    ws['!rows']   = [{ hpt: 22 }]; // taller title row
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Weekly P&L');
+    wb.Props = {
+      Title:       barName + ' Weekly P&L Brief',
+      Subject:     'Weekly P&L brief generated by Bar Cop from operator input data. Bar Cop is a software tool, not a tax preparer or CPA. Your accountant should review and verify before filing or closing your books.',
+      Author:      barName,
+      Company:     'Bar Cop',
+      CreatedDate: new Date()
+    };
+
+    const filename = barName + ' - Weekly P&L Brief - ' + today + '.xlsx';
+    XLSX.writeFile(wb, filename);
   },
 
   viewWeek(id){
