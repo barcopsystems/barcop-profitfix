@@ -5,7 +5,8 @@
    by name (Primary / Secondary Location). Stored in App.inventoryData. */
 
 S.InventoryLocations = {
-  editId: null,
+  detailId: null,
+  profileMode: 'view',
   DEFAULTS: ['Front Bar', 'Back Bar', 'Walk-In Cooler', 'Dry Storage', 'Office Storage'],
 
   locations() {
@@ -13,6 +14,7 @@ S.InventoryLocations = {
     if (!Array.isArray(App.inventoryData.ic_locations)) App.inventoryData.ic_locations = [];
     return App.inventoryData.ic_locations;
   },
+  locationById(id) { return this.locations().find(l => l.id === id); },
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   productCount(name) {
     return this.products().filter(p => p.primary_location === name || p.secondary_location === name).length;
@@ -26,7 +28,7 @@ S.InventoryLocations = {
     const addBtn = document.createElement('button');
     addBtn.className = 'btn btn-primary btn-sm';
     addBtn.textContent = 'Add Location';
-    addBtn.addEventListener('click', () => this.showForm());
+    addBtn.addEventListener('click', () => this.renderUnified(null, 'edit'));
     actions.appendChild(addBtn);
     this.renderList();
   },
@@ -55,8 +57,6 @@ S.InventoryLocations = {
           + esc(l.name) + '</button></td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm il-view" data-id="' + l.id + '">View</button>'
-          + '<button class="btn btn-ghost btn-sm il-arrange" data-id="' + l.id + '">Arrange Products</button>'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
           + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
@@ -86,20 +86,16 @@ S.InventoryLocations = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       const open = ev.target.closest('.il-open');
-      const view = ev.target.closest('.il-view');
-      const arr  = ev.target.closest('.il-arrange');
       const edit = ev.target.closest('.il-edit');
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
       const addF = ev.target.closest('#il-add-first');
       const addD = ev.target.closest('#il-add-defaults');
-      if (open)      this.showDetail(open.dataset.id);
-      else if (view) this.showDetail(view.dataset.id);
-      else if (arr)  this.showDetail(arr.dataset.id);
-      else if (edit) this.showForm(edit.dataset.id);
+      if (open)      this.renderUnified(open.dataset.id, 'view');
+      else if (edit) this.renderUnified(edit.dataset.id, 'edit');
       else if (arch) this.confirmDelete(arch.dataset.id);
       else if (un)   this.setArchived(un.dataset.id, false);
-      else if (addF) this.showForm();
+      else if (addF) this.renderUnified(null, 'edit');
       else if (addD) this.addDefaults();
     };
 
@@ -178,82 +174,64 @@ S.InventoryLocations = {
     this.renderList();
   },
 
-  // ── Add / edit form ───────────────────────────────────────────────────────
-  showForm(id) {
-    this.editId = id || null;
-    const l = id ? this.locations().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Location</div>'
+  // Unified location page. profileMode 'view' renders the name as a heading
+  // plus an Edit button; 'edit' renders the input + Save/Cancel. Arrange
+  // Products card is always visible — new locations show a placeholder, saved
+  // locations show the drag-to-reorder product list.
+  renderUnified(locId, profileMode) {
+    profileMode = profileMode || 'view';
+    const isNew = !locId;
+    const l = isNew ? null : this.locationById(locId);
+    if (!isNew && !l) { this.renderList(); return; }
+
+    this.detailId = locId || null;
+    this.profileMode = profileMode;
+
+    const nameCard = (profileMode === 'edit')
+      ? this.renderNameEditCard(l, isNew)
+      : this.renderNameViewCard(l);
+    const arrangeCard = isNew
+      ? '<div class="card"><div class="card-title">Arrange Products</div>'
+        + '<div style="font-size:12px;color:var(--t3);">Save the location above first. Once it exists, every product whose Primary Location is set to this location will appear here in a draggable list. Drag the handles to match your shelf or rail order so Take Inventory walks them in order.</div></div>'
+      : this.renderArrangeCard(l);
+
+    this.container.innerHTML = '<div class="screen">'
+      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="il-back">&laquo; Back to Locations</button></div>'
+      + nameCard + arrangeCard
+      + '</div>';
+    this.wireUnified(locId, profileMode, l);
+  },
+
+  // Back-compat aliases for any caller still using the old names.
+  showDetail(id) { this.renderUnified(id, 'view'); },
+  showForm(id) { this.renderUnified(id || null, 'edit'); },
+
+  renderNameViewCard(l) {
+    return '<div class="card"><div class="card-title">' + esc(l.name) + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + this.productCount(l.name) + ' product' + (this.productCount(l.name) === 1 ? '' : 's') + ' assigned to this location.</div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary btn-sm il-edit-name">Edit Location</button>'
+      + '</div></div>';
+  },
+
+  renderNameEditCard(l, isNew) {
+    return '<div class="card"><div class="card-title">' + (isNew ? 'New Location' : 'Edit Location') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f w-lg"><label>Location Name</label>'
       + '<input type="text" id="il-name" value="' + esc(l?.name || '') + '" placeholder="Walk-In Cooler"/></div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="il-save">' + (id ? 'Update' : 'Save') + '</button>'
+      + '<button class="btn btn-primary" id="il-save">' + (isNew ? 'Save Location' : 'Update Location') + '</button>'
       + '<button class="btn btn-ghost" id="il-cancel">Cancel</button>'
       + '<span id="il-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-    this.container.onclick = null;
-    const nameEl = document.getElementById('il-name');
-    nameEl?.focus();
-    nameEl?.addEventListener('keydown', e => { if (e.key === 'Enter') this.save(); });
-    document.getElementById('il-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('il-save')?.addEventListener('click', () => this.save());
+      + '</div></div>';
   },
 
-  async save() {
-    const name = document.getElementById('il-name')?.value.trim();
-    const err  = document.getElementById('il-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!name) { fail('Location name required.'); return; }
-    const dup = this.locations().some(l => l.id !== this.editId && l.name.toLowerCase() === name.toLowerCase());
-    if (dup) { fail('A location with that name already exists.'); return; }
-
-    if (this.editId) {
-      const l = this.locations().find(x => x.id === this.editId);
-      if (l) {
-        const old = l.name;
-        l.name = name;
-        // Keep product location references in sync with the rename
-        if (old !== name) {
-          this.products().forEach(p => {
-            if (p.primary_location === old)   p.primary_location = name;
-            if (p.secondary_location === old) p.secondary_location = name;
-          });
-        }
-      }
-    } else {
-      this.locations().push({ id: App.uid(), name, archived: false });
-    }
-
-    const btn = document.getElementById('il-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveInventory();
-    this.editId = null;
-    if (ok) {
-      App.markSetupDone('gs_ic_locations');
-      this.renderList();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-      fail('Save failed. Try again.');
-    }
-  },
-
-  // ── Location detail (products assigned here, in inventory-count order) ───
-  // Products are shown in the order they will appear during Take Inventory
-  // at this location. Operator drags rows by the grip handle on the left to
-  // match the physical shelf/rail order so counting flows the way they walk
-  // the bar instead of alphabetical.
-  showDetail(id) {
-    const l = this.locations().find(x => x.id === id);
-    if (!l) { this.renderList(); return; }
+  renderArrangeCard(l) {
     const prods = this.sortedProductsForLocation(l.name);
-
     let body;
     if (prods.length === 0) {
-      body = '<div class="empty"><div class="empty-title">No products assigned here</div>'
-        + '<div class="empty-sub">Assign products to ' + esc(l.name) + ' from the Products screen using the '
-        + 'Primary Location field.</div></div>';
+      body = '<div style="font-size:12px;color:var(--t3);">No products assigned here yet. Assign products to ' + esc(l.name) + ' from the Products screen using the Primary Location field, then come back to set their shelf order.</div>';
     } else {
       const rows = prods.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
         + DragReorder.handleCellHTML()
@@ -270,18 +248,25 @@ S.InventoryLocations = {
         + '<th style="width:32px;"></th><th style="width:36px;">#</th><th>Product</th><th>Category</th><th>Par</th>'
         + '</tr></thead><tbody id="il-arrange-body">' + rows + '</tbody></table></div>';
     }
+    return '<div class="card"><div class="card-title">Arrange Products</div>' + body + '</div>';
+  },
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="il-back">&#8592; Back to Locations</button></div>'
-      + '<div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:14px;">' + esc(l.name) + '</div>'
-      + body + '</div>';
-
-    this.container.onclick = ev => {
-      const back = ev.target.closest('#il-back');
-      if (back) this.renderList();
-    };
-
-    if (prods.length) {
+  wireUnified(locId, profileMode, l) {
+    this.container.onclick = null;
+    document.getElementById('il-back')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
+    this.container.querySelector('.il-edit-name')?.addEventListener('click', () => this.renderUnified(locId, 'edit'));
+    document.getElementById('il-cancel')?.addEventListener('click', () => {
+      if (locId) this.renderUnified(locId, 'view');
+      else { this.detailId = null; this.renderList(); }
+    });
+    document.getElementById('il-save')?.addEventListener('click', () => this.saveLocation(locId));
+    if (profileMode === 'edit') {
+      const nameEl = document.getElementById('il-name');
+      nameEl?.focus();
+      nameEl?.addEventListener('keydown', e => { if (e.key === 'Enter') this.saveLocation(locId); });
+    }
+    // Wire drag-to-reorder on the arrange card if there are products
+    if (l && this.sortedProductsForLocation(l.name).length) {
       const arrangeBody = document.getElementById('il-arrange-body');
       if (arrangeBody) {
         DragReorder.wire({
@@ -291,6 +276,44 @@ S.InventoryLocations = {
           onCommit:       (newOrderIds) => this._persistProductOrder(l.name, newOrderIds)
         });
       }
+    }
+  },
+
+  async saveLocation(locId) {
+    const name = document.getElementById('il-name')?.value.trim();
+    const err  = document.getElementById('il-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (!name) { fail('Location name required.'); return; }
+    const dup = this.locations().some(l => l.id !== locId && l.name.toLowerCase() === name.toLowerCase());
+    if (dup) { fail('A location with that name already exists.'); return; }
+
+    let savedId = locId;
+    if (locId) {
+      const l = this.locationById(locId);
+      if (l) {
+        const old = l.name;
+        l.name = name;
+        if (old !== name) {
+          this.products().forEach(p => {
+            if (p.primary_location === old)   p.primary_location = name;
+            if (p.secondary_location === old) p.secondary_location = name;
+          });
+        }
+      }
+    } else {
+      savedId = App.uid();
+      this.locations().push({ id: savedId, name, archived: false });
+    }
+
+    const btn = document.getElementById('il-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.saveInventory();
+    if (ok) {
+      App.markSetupDone('gs_ic_locations');
+      this.renderUnified(savedId, 'view');
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = locId ? 'Update Location' : 'Save Location'; }
+      fail('Save failed. Try again.');
     }
   },
 
