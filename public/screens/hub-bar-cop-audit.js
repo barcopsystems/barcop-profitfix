@@ -37,10 +37,9 @@ S.HubBarCopAudit = {
     return App.data.bar_cop_audits;
   },
 
-  // Cross-system navigation from Bar Cop Audit deep-links. Maps a screen id
-  // to its owning Recovery or Control system and hands off to S.Hub._enter
-  // so the operator lands inside the correct sidebar context, not just on a
-  // bare screen render.
+  // Cross-system navigation from Bar Cop Audit deep-links. Closes the Hub
+  // overlay first so the operator drops out of the modal cleanly, then
+  // hands off to S.Hub._enter to land inside the correct sidebar context.
   _navTo(screen) {
     if (!screen) return;
     const mod = screen.startsWith('ic-') ? 'inventory'
@@ -49,17 +48,30 @@ S.HubBarCopAudit = {
               : screen.startsWith('r-')  ? 'revenue'
               : screen.startsWith('t-')  ? 'traffic'
               : 'profit'; // Profit-domain screens carry no prefix
+    if (App.closeHubOverlay) App.closeHubOverlay();
     if (window.S && S.Hub && S.Hub._enter) S.Hub._enter(screen, mod);
   },
 
+  // Modal-overlay header with title + close button. Mirrors the Books +
+  // Year-End header pattern so all Hub-level screens feel familiar.
+  _header(title) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">' + esc(title || 'Bar Cop Audit') + '</div>'
+      +   '<button id="bca-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>';
+  },
+
   // ── Public entry ────────────────────────────────────────────────────────
+  // Hub-level screens render into the overlay panel handed in by
+  // App.openHubOverlay, NOT into the page-level content area. The container
+  // reference becomes the panel so the rest of the screen logic stays the
+  // same as a module-mounted screen.
   open() {
-    const container = document.getElementById('content-area')
-      || document.querySelector('.content')
-      || document.body;
-    this.container = container;
-    this._viewingId = null;
-    this._renderLanding();
+    App.openHubOverlay((panel) => {
+      this.container = panel;
+      this._viewingId = null;
+      this._renderLanding();
+    });
   },
 
   // ── Utilities ───────────────────────────────────────────────────────────
@@ -841,7 +853,11 @@ S.HubBarCopAudit = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + intro + history + '</div>';
+    this.container.innerHTML = '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+      + this._header('Bar Cop Audit')
+      + '<div class="screen" style="padding:0;">' + intro + history + '</div>'
+      + '</div>';
+    document.getElementById('bca-close')?.addEventListener('click', () => App.closeHubOverlay());
     document.getElementById('bca-generate')?.addEventListener('click', () => this._generate());
     this.container.querySelectorAll('.bca-row, .bca-view').forEach(el => {
       el.addEventListener('click', (e) => {
@@ -961,8 +977,11 @@ S.HubBarCopAudit = {
       + 'Open each for fix detail.'
       + '</div>';
 
-    // Action bar
-    this.container.innerHTML = '<div class="screen">'
+    // Action bar — sits below the overlay header. Back returns to the
+    // landing view inside the same overlay; Print opens the browser dialog.
+    this.container.innerHTML = '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+      + this._header('Bar Cop Audit')
+      + '<div class="screen" style="padding:0;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
       +   '<button class="btn btn-ghost btn-sm" id="bca-back">Back to Audit History</button>'
       +   '<button class="btn btn-ghost btn-sm" id="bca-print">Print / Save PDF</button>'
@@ -996,8 +1015,10 @@ S.HubBarCopAudit = {
       + patternCard
       + recoveryCard
 
+      + '</div>'
       + '</div>';
 
+    document.getElementById('bca-close')?.addEventListener('click', () => App.closeHubOverlay());
     document.getElementById('bca-back')?.addEventListener('click', () => this._renderLanding());
     document.getElementById('bca-print')?.addEventListener('click', () => window.print());
     this.container.querySelectorAll('.bca-nav').forEach(btn => {
