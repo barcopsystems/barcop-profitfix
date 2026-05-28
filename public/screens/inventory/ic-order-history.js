@@ -125,6 +125,7 @@ S.InventoryOrderHistory = {
         + '<td class="val">' + App.fmtCurrency(o.total || 0) + '</td>'
         + '<td>' + this.statusBadge(o.status) + '</td>'
         + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm oh-view" data-id="' + o.id + '">View</button>'
         + '<button class="btn btn-danger btn-sm oh-del" data-id="' + o.id + '">Delete</button>'
         + '</div></td></tr>').join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -143,9 +144,11 @@ S.InventoryOrderHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
       const row = ev.target.closest('.oh-row');
+      const view = ev.target.closest('.oh-view');
       const del = ev.target.closest('.oh-del');
       const sheet = ev.target.closest('#oh-sheet');
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
+      else if (view)  { ev.stopPropagation(); this.renderDetail(view.dataset.id); }
       else if (row)   this.renderDetail(row.dataset.id);
       else if (sheet) App.navigate('ic-order-sheet');
     };
