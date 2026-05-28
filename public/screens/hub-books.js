@@ -26,9 +26,10 @@ S.HubBooks = {
 
   // ── Entry point — called from the Hub sidebar ──────────────────────────────
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "BOOKS | Back to Dashboard". Action buttons live in topbar-right.
+  // shows "MONTH-END BOOKS | Back to Dashboard". Action buttons live next to
+  // the Close Month dropdown inside the picker card.
   open() {
-    App.openHubFullPage('Books', (mount) => this._render(mount));
+    App.openHubFullPage('Month-End Books', (mount) => this._render(mount));
   },
 
   // ── Render the picker screen ───────────────────────────────────────────────
@@ -41,26 +42,24 @@ S.HubBooks = {
 
     mount.innerHTML =
       '<div class="screen">'
-      + '<div style="max-width:880px;margin:0 auto;">'
-      + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
+      + '<div class="card" style="margin-bottom:18px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Month-End Books</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a month. Bar Cop pulls every number together into one file your accountant or bookkeeper can work from. Income statement, inventory value, cash variance, voids and comps, tip allocation worksheet for IRS Form 8027, shrinkage, and labor cost. All built from what you log in Bar Cop. Nothing to re-enter.</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
           + '<div class="f" style="width:240px;"><label>Close Month</label><select id="hb-month">' + monthOpts + '</select></div>'
+          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
+            + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
+            + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
+          + '</div>'
         + '</div>'
         + '<div id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
         + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before filing anything or closing the books.</div>'
       + '</div>'
       + this._whatsInsideCard()
-      + '</div>'
       + '</div>';
 
-    if (App.setHubTopbarActions) {
-      App.setHubTopbarActions(
-        '<button class="btn btn-ghost btn-sm" id="hb-pdf">Owner Summary (PDF)</button>'
-        + '<button class="btn btn-primary btn-sm" id="hb-generate" style="margin-left:8px;">Generate File</button>'
-      );
-    }
+    // No screen-specific topbar actions on this screen — buttons live in the card.
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
     document.getElementById('hb-pdf')?.addEventListener('click', () => this._openPdfSummary());
