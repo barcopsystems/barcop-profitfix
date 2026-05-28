@@ -10,32 +10,28 @@ S.HubReportBug = {
   _state: 'form',     // 'form' | 'success'
   _submitting: false,
 
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "REPORT A BUG | Back to Dashboard".
   open() {
     this._state = 'form';
-    App.openHubOverlay((panel) => this.render(panel));
+    App.openHubFullPage('Report a Bug', (mount) => this.render(mount));
   },
 
   render(container) {
     container.scrollTop = 0;
     this._container = container;
 
-    const header = '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Report a Bug</div>'
-      + '<button id="hrb-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>';
-
     const body = this._state === 'success' ? this._renderSuccess() : this._renderForm();
 
-    container.innerHTML = '<div style="max-width:720px;margin:0 auto;padding:0 24px 64px;">'
-      + header + body + '</div>';
+    container.innerHTML = '<div class="screen">' + body + '</div>';
 
-    document.getElementById('hrb-close')?.addEventListener('click', () => App.closeHubOverlay());
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     if (this._state === 'form') {
       document.getElementById('hrb-submit')?.addEventListener('click', () => this.submit());
-      document.getElementById('hrb-cancel')?.addEventListener('click', () => App.closeHubOverlay());
+      document.getElementById('hrb-cancel')?.addEventListener('click', () => App.showHub());
     } else {
-      document.getElementById('hrb-done')?.addEventListener('click', () => App.closeHubOverlay());
+      document.getElementById('hrb-done')?.addEventListener('click', () => App.showHub());
       document.getElementById('hrb-another')?.addEventListener('click', () => {
         this._state = 'form';
         this.render(container);
