@@ -1634,6 +1634,10 @@ const App = {
         't-social':         ['Social Media', ''],
         't-delivery':       ['Delivery Platforms', ''],
         't-email':          ['Email and Loyalty', ''],
+        't-regulars':       ['VIP Regulars', ''],
+        't-initiatives':    ['Slow-Night Initiatives', ''],
+        't-holidays':       ['Holiday and Events', ''],
+        't-inquiries':      ['Group Inquiries', ''],
         't-reports':        ['Reports and History', ''],
         't-help':           ['Help and FAQ', ''],
       };
@@ -1649,6 +1653,10 @@ const App = {
         't-social':         S.TrafficSocial,
         't-delivery':       S.TrafficDelivery,
         't-email':          S.TrafficEmail,
+        't-regulars':       S.TrafficRegulars,
+        't-initiatives':    S.TrafficInitiatives,
+        't-holidays':       S.TrafficHolidays,
+        't-inquiries':      S.TrafficInquiries,
         't-reports':        S.TrafficReports,
         't-help':           S.TrafficHelp,
       };
