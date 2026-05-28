@@ -11,7 +11,9 @@
 S.RevenueForecast = {
   weekStart: null,
   per_day: null,
+  covers_per_day: null,
   defaults: null,
+  cover_defaults: null,
   savedId: null,
   notes: '',
 
@@ -34,20 +36,62 @@ S.RevenueForecast = {
     return monday.toISOString().slice(0, 10);
   },
 
+  // Same-weekday cover defaults pulled from sc_shifts last 8 weeks. Parallel
+  // to App.forecastDefaultsFor (which does revenue), but for covers.
+  _coverDefaults() {
+    const shifts = (App.shiftData?.sc_shifts || []).filter(s => s && s.date && s.covers != null);
+    const buckets = {};
+    this.DAYS.forEach(d => { buckets[d] = []; });
+    const wsDate = new Date(this.weekStart + 'T00:00:00');
+    // Walk back up to 8 weeks of same-weekday shifts.
+    shifts.forEach(s => {
+      const d = new Date(String(s.date).length <= 10 ? s.date + 'T00:00:00' : s.date);
+      if (isNaN(d.getTime()) || d >= wsDate) return;
+      const daysBack = Math.round((wsDate.getTime() - d.getTime()) / 86400000);
+      if (daysBack > 56) return;  // 8 weeks
+      const idx = (d.getDay() + 6) % 7;
+      const key = this.DAYS[idx];
+      if (key && buckets[key]) buckets[key].push(parseFloat(s.covers) || 0);
+    });
+    const per_day = {};
+    let total = 0;
+    this.DAYS.forEach(d => {
+      const arr = buckets[d];
+      if (!arr.length) { per_day[d] = 0; return; }
+      // Weighted average — newer entries get higher weight (linear).
+      const sorted = arr.slice();
+      let weightedSum = 0, weightTotal = 0;
+      sorted.forEach((v, i) => {
+        const w = i + 1;
+        weightedSum += v * w;
+        weightTotal += w;
+      });
+      per_day[d] = Math.round(weightedSum / weightTotal);
+      total += per_day[d];
+    });
+    return { per_day, total };
+  },
+
   hydrate(weekStart) {
     this.DAYS = (App.DAYS_MON_FIRST || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']).slice();
     this.weekStart = App.weekStartFor(weekStart) || this.defaultWeekStart();
     this.defaults = App.forecastDefaultsFor(this.weekStart);
+    this.cover_defaults = this._coverDefaults();
 
     const saved = App.forecastForWeek(this.weekStart);
     if (saved) {
       this.savedId = saved.id;
       this.per_day = {};
-      this.DAYS.forEach(d => { this.per_day[d] = saved.per_day && saved.per_day[d] != null ? saved.per_day[d] : 0; });
+      this.covers_per_day = {};
+      this.DAYS.forEach(d => {
+        this.per_day[d] = saved.per_day && saved.per_day[d] != null ? saved.per_day[d] : 0;
+        this.covers_per_day[d] = saved.covers_per_day && saved.covers_per_day[d] != null ? saved.covers_per_day[d] : (this.cover_defaults.per_day[d] || 0);
+      });
       this.notes = saved.notes || '';
     } else {
       this.savedId = null;
       this.per_day = Object.assign({}, this.defaults.per_day);
+      this.covers_per_day = Object.assign({}, this.cover_defaults.per_day);
       this.notes = '';
     }
   },
@@ -93,23 +137,37 @@ S.RevenueForecast = {
     return this.DAYS.reduce((t, d) => t + (parseFloat(this.per_day[d]) || 0), 0);
   },
 
+  totalCovers() {
+    return this.DAYS.reduce((t, d) => t + (parseFloat(this.covers_per_day[d]) || 0), 0);
+  },
+
   rowsHtml() {
     return this.DAYS.map((d, i) => {
       const v = this.per_day[d] || 0;
+      const cv = this.covers_per_day[d] || 0;
       const sug = this.defaults.per_day[d] || 0;
+      const csug = this.cover_defaults.per_day[d] || 0;
       const sugHtml = sug > 0
         ? '<button class="btn btn-ghost btn-sm rf-apply" data-day="' + d + '" data-val="' + sug + '" '
           + 'style="margin-bottom:6px;font-size:10px;letter-spacing:1px;padding:4px 8px;">Use ' + this.fmt(sug) + '</button>'
-        : '<div style="font-size:10px;color:var(--t4);padding-bottom:8px;">No history yet</div>';
+        : '<div style="font-size:10px;color:var(--t4);padding-bottom:8px;">No history</div>';
+      const csugHtml = csug > 0
+        ? '<button class="btn btn-ghost btn-sm rf-capply" data-day="' + d + '" data-val="' + csug + '" '
+          + 'style="margin-bottom:6px;font-size:10px;letter-spacing:1px;padding:4px 8px;">Use ' + csug + '</button>'
+        : '<div style="font-size:10px;color:var(--t4);padding-bottom:8px;">No history</div>';
       return '<div class="rf-row" data-day="' + d + '" '
         + 'style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px solid var(--b1);border-radius:4px;margin-bottom:6px;">'
         + '<div class="f" style="width:170px;flex-shrink:0;"><label>' + esc(this.dayLabel(i)) + '</label>'
         + '<div style="font-size:10px;color:var(--t4);padding-bottom:8px;">' + esc(d) + '</div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Forecast Revenue</label>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Forecast Revenue</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre rf-val" type="number" min="0" step="0.01" '
         + 'inputmode="decimal" value="' + v + '"/></div></div>'
-        + '<div class="f" style="flex:1;min-width:140px;"><label>Suggested</label>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Suggested</label>'
         + sugHtml + '</div>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Cover Goal</label>'
+        + '<input class="rf-cval" type="number" min="0" inputmode="numeric" value="' + cv + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:100px;"><label>Suggested</label>'
+        + csugHtml + '</div>'
         + '</div>';
     }).join('');
   },
@@ -156,7 +214,9 @@ S.RevenueForecast = {
       + (prior != null ? (total - prior >= 0 ? '+' : '') + this.fmt(total - prior) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">vs Suggested</div><div class="calc-val" id="rf-vssug">'
       + (sugTotal > 0 ? (total - sugTotal >= 0 ? '+' : '') + this.fmt(total - sugTotal) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Cover Goal Total</div><div class="calc-val good" id="rf-covertotal">' + this.totalCovers() + '</div></div>'
       + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5;">Cover Goal is what you need to hit on covers, not just dollars. Active Shift will show live progress against the goal during service.</div>'
       + '</div>'
 
       + '<div class="card"><div class="card-title">Review</div>'
@@ -176,17 +236,27 @@ S.RevenueForecast = {
     const rowsEl = document.getElementById('rf-rows');
     rowsEl?.addEventListener('input', () => this.recalc());
     rowsEl?.addEventListener('click', ev => {
-      const apply = ev.target.closest('.rf-apply');
-      if (!apply) return;
-      const day = apply.dataset.day;
-      const val = parseFloat(apply.dataset.val) || 0;
-      const row = rowsEl.querySelector('.rf-row[data-day="' + day + '"]');
-      const inp = row?.querySelector('.rf-val');
-      if (inp) inp.value = val;
-      this.recalc();
+      const apply  = ev.target.closest('.rf-apply');
+      const capply = ev.target.closest('.rf-capply');
+      if (apply) {
+        const day = apply.dataset.day;
+        const val = parseFloat(apply.dataset.val) || 0;
+        const row = rowsEl.querySelector('.rf-row[data-day="' + day + '"]');
+        const inp = row?.querySelector('.rf-val');
+        if (inp) inp.value = val;
+        this.recalc();
+      } else if (capply) {
+        const day = capply.dataset.day;
+        const val = parseFloat(capply.dataset.val) || 0;
+        const row = rowsEl.querySelector('.rf-row[data-day="' + day + '"]');
+        const inp = row?.querySelector('.rf-cval');
+        if (inp) inp.value = val;
+        this.recalc();
+      }
     });
     document.getElementById('rf-reset')?.addEventListener('click', () => {
       this.per_day = Object.assign({}, this.defaults.per_day);
+      this.covers_per_day = Object.assign({}, this.cover_defaults.per_day);
       this.draw();
     });
     document.getElementById('rf-week')?.addEventListener('change', e => {
@@ -212,7 +282,9 @@ S.RevenueForecast = {
     rows.forEach(r => {
       const day = r.dataset.day;
       const val = parseFloat(r.querySelector('.rf-val')?.value) || 0;
+      const cval = parseFloat(r.querySelector('.rf-cval')?.value) || 0;
       this.per_day[day] = val;
+      this.covers_per_day[day] = cval;
     });
     this.notes = document.getElementById('rf-notes')?.value || '';
   },
@@ -226,6 +298,7 @@ S.RevenueForecast = {
     set('rf-total', this.fmt(total));
     set('rf-vsprior', prior != null ? (total - prior >= 0 ? '+' : '') + this.fmt(total - prior) : '-');
     set('rf-vssug', sugTotal > 0 ? (total - sugTotal >= 0 ? '+' : '') + this.fmt(total - sugTotal) : '-');
+    set('rf-covertotal', this.totalCovers());
   },
 
   async save() {
@@ -243,13 +316,15 @@ S.RevenueForecast = {
     const method = matchedDefaults ? 'auto' : 'manual';
 
     const rec = {
-      id:         this.savedId || App.uid(),
-      week_start: this.weekStart,
-      per_day:    Object.assign({}, this.per_day),
-      total:      Math.round(total * 100) / 100,
-      method:     method,
-      notes:      this.notes || '',
-      updated_at: new Date().toISOString()
+      id:             this.savedId || App.uid(),
+      week_start:     this.weekStart,
+      per_day:        Object.assign({}, this.per_day),
+      covers_per_day: Object.assign({}, this.covers_per_day),
+      total:          Math.round(total * 100) / 100,
+      total_covers:   this.totalCovers(),
+      method:         method,
+      notes:          this.notes || '',
+      updated_at:     new Date().toISOString()
     };
     if (!this.savedId) rec.created_at = new Date().toISOString();
 
