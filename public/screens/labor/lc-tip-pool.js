@@ -25,7 +25,7 @@ S.LaborTipPool = {
   hoursFor(staffId, date) {
     if (!staffId || !date) return null;
     const a = this.actuals().find(x => x.staff_id === staffId && x.date === date);
-    return a ? (a.hours_actual || a.hours_scheduled || null) : null;
+    return a ? (a.hours || null) : null;
   },
   fmtDate(str) {
     if (!str) return '-';
@@ -77,7 +77,7 @@ S.LaborTipPool = {
       + '<input type="date" id="tp-date" value="' + esc(this.date) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
-      + 'value="' + esc(this.pool) + '" oninput="S.LaborTipPool.onPoolInput()"/></div></div>'
+      + 'value="' + esc(this.pool) + '"/></div></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Method</label>'
       + '<select id="tp-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
       + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
@@ -148,6 +148,7 @@ S.LaborTipPool = {
     });
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
+    document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       const hrow = ev.target.closest('.tp-hrow');
       const hdel = ev.target.closest('.tp-hdel');
