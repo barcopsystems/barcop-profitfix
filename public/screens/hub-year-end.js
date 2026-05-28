@@ -1,0 +1,1088 @@
+'use strict';
+
+/* ── Hub Year-End Review — Annual operations review deliverable ───────────────
+   Sits alongside Month-End Books and Weekly P&L on the Hub Accounting menu.
+   Builds an annual XLSX workbook + a styled multi-page PDF Executive Summary
+   from data Bar Cop already has: revenue_weeks, weeks, lc_actuals, sc_shifts,
+   audits. Designed to fire alongside the December close but runnable for any
+   year that has data, so the operator can also pull a historical review.
+
+   Workbook sheets (in order):
+     1. Annual Summary       — headline P&L + percentages + YOY delta if prior year
+     2. P&L by Month         — 12-month columnar P&L + Total column
+     3. Inventory Valuation  — beginning/ending count value + monthly purchases
+     4. Labor Cost Trend     — by month: hours, OT, wages, labor %, RPLH
+     5. Tip Allocation       — Form 8027 Worksheet for the whole year
+     6. Cash Control Summary — variance totals by month + worst-offender shifts
+     7. Audit History        — every audit run in the year with score + opportunity
+     8. Operational Events   — voids/comps, walked tabs, incidents, call-outs, expired certs
+
+   PDF Executive Summary (~4 pages):
+     1. Headline numbers + YOY deltas
+     2. Monthly trend table (revenue/COGS/labor/prime by month)
+     3. Operational events + top 5 audit opportunities of the year
+     4. Year-end notes — strongest month, weakest month, biggest leak
+
+   Reuses S.HubBooks helpers (_aggregateMonth, _monthLabel, _monthEndDate,
+   _blankRow, _lineRow, _pushFooter, _disclaimerLines, _finishSheet) so the
+   aggregation and styling stay consistent across deliverables.
+
+   Legal protection: footer disclaimer on every sheet, disclaimer in PDF
+   footer, workbook Subject property carries the disclaimer too. */
+
+S.HubYearEnd = {
+
+  MONTHS_FULL: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+  MONTHS_SHORT: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+
+  // ── Entry point ────────────────────────────────────────────────────────────
+  open() {
+    App.openHubOverlay((panel) => this._render(panel));
+  },
+
+  // ── Render the picker screen ───────────────────────────────────────────────
+  _render(panel) {
+    const years = this._availableYears();
+    const defaultYear = years[0] || String(new Date().getFullYear() - 1);
+    const yearOpts = years.map(y =>
+      '<option value="' + y + '"' + (y === defaultYear ? ' selected' : '') + '>' + y + '</option>'
+    ).join('') || '<option value="' + defaultYear + '" selected>' + defaultYear + '</option>';
+
+    panel.innerHTML =
+      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
+      + this._header()
+      + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Year-End Operations Review</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a year. Bar Cop rolls 12 months of operations into one file your accountant, your CPA, your lender, or your business partner can read. P&L by month, inventory valuation, labor trend, tip allocation, cash control, audit history, and operational events. Run it alongside your December close, or pull any prior year for review.</div>'
+        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
+          + '<div class="f" style="width:160px;"><label>Year</label><select id="hy-year">' + yearOpts + '</select></div>'
+          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
+            + '<button class="btn btn-primary" id="hy-generate">Generate File</button>'
+            + '<button class="btn btn-ghost" id="hy-pdf">Executive Summary (PDF)</button>'
+          + '</div>'
+        + '</div>'
+        + '<div id="hy-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
+        + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA, tax preparer, or financial advisor. Your accountant should review and verify before filing anything or making material decisions.</div>'
+      + '</div>'
+      + this._whatsInsideCard()
+      + '</div>';
+
+    document.getElementById('hy-close')?.addEventListener('click', () => App.closeHubOverlay());
+    document.getElementById('hy-generate')?.addEventListener('click', () => this._generate());
+    document.getElementById('hy-pdf')?.addEventListener('click', () => this._openPdfSummary());
+  },
+
+  _header() {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Year-End Review</div>'
+      +   '<button id="hy-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>';
+  },
+
+  _whatsInsideCard() {
+    const rows = [
+      ['Annual Summary',       'Headline P&L. Total revenue, COGS, labor, prime cost. Year-over-year change if you have a prior year on file.'],
+      ['P&L by Month',         'Twelve months side by side. Revenue, costs, percentages. Spot the months that ran lean and the ones that ran hot.'],
+      ['Inventory Valuation',  'Year-start inventory value, year-end inventory value, total purchases. Schedule C ready.'],
+      ['Labor Cost Trend',     'Hours, overtime, wages, labor percent, revenue per labor hour. Month by month.'],
+      ['Tip Allocation',       'Annual Form 8027 Worksheet. Per-employee yearly totals. Your accountant transcribes to the actual IRS form.'],
+      ['Cash Control Summary', 'Variance totals by month. Worst-offender shifts. The cash story for the whole year on one page.'],
+      ['Audit History',        'Every audit you ran during the year. Score, monthly opportunity, top action items per audit.'],
+      ['Operational Events',   'Voids and comps, walked tabs, incidents, call-outs, certifications that lapsed during the year.']
+    ];
+    const listHtml = rows.map(r =>
+      '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
+      + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
+    ).join('');
+    return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
+      + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
+      + '</div>';
+  },
+
+  // ── Year list — years with at least one saved week ─────────────────────────
+  _availableYears() {
+    const weeks = (App.data?.weeks || []).filter(w => w && w.period_end);
+    if (!weeks.length) {
+      return [String(new Date().getFullYear() - 1)];
+    }
+    const set = new Set();
+    weeks.forEach(w => {
+      const y = String(w.period_end).slice(0, 4);
+      if (y) set.add(y);
+    });
+    return Array.from(set).sort().reverse();
+  },
+
+  _setStatus(text, color) {
+    const el = document.getElementById('hy-status');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color || 'var(--t3)';
+    el.style.display = 'block';
+  },
+
+  // ── Generate the workbook ──────────────────────────────────────────────────
+  async _generate() {
+    const year = document.getElementById('hy-year')?.value;
+    if (!year) return;
+    const btn = document.getElementById('hy-generate');
+
+    if (typeof XLSX === 'undefined') {
+      this._setStatus('The file builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Building...';
+    this._setStatus('Building your file...', 'var(--t3)');
+
+    try {
+      await new Promise(r => setTimeout(r, 50));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, this._buildAnnualSummary(year),     'Annual Summary');
+      XLSX.utils.book_append_sheet(wb, this._buildPnlByMonth(year),        'P&L by Month');
+      XLSX.utils.book_append_sheet(wb, this._buildInventoryValuation(year),'Inventory Valuation');
+      XLSX.utils.book_append_sheet(wb, this._buildLaborCostTrend(year),    'Labor Cost Trend');
+      XLSX.utils.book_append_sheet(wb, this._buildTipAllocation(year),     'Form 8027 Worksheet');
+      XLSX.utils.book_append_sheet(wb, this._buildCashControlSummary(year),'Cash Control Summary');
+      XLSX.utils.book_append_sheet(wb, this._buildAuditHistory(year),      'Audit History');
+      XLSX.utils.book_append_sheet(wb, this._buildOperationalEvents(year), 'Operational Events');
+
+      wb.Props = {
+        Title:        'Bar Cop Year-End Review, ' + year,
+        Subject:      'Year-end operations review generated by Bar Cop from operator input data. Bar Cop is a software tool, not a tax preparer or CPA. The accountant or bookkeeper should review and verify before filing or making material decisions.',
+        Author:       (App.data?.settings?.bar_name) || 'Bar Cop',
+        Company:      'Bar Cop',
+        CreatedDate:  new Date()
+      };
+
+      const filename = 'Bar Cop Year-End Review - ' + year + '.xlsx';
+      XLSX.writeFile(wb, filename);
+      this._setStatus('Downloaded ' + filename, 'var(--gold)');
+    } catch (e) {
+      console.error('Year-end generation error:', e);
+      this._setStatus('Could not build the file: ' + (e?.message || 'unknown error'), 'var(--red)');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate File';
+    }
+  },
+
+  // ── Year-period aggregation ────────────────────────────────────────────────
+  // Sums monthly aggregates from S.HubBooks (the same source Books uses), so
+  // numbers tie back across deliverables. Returns annual totals + 12-month
+  // breakout array.
+  _aggregateYear(year) {
+    const months = [];
+    let agg = {
+      barRev: 0, foodRev: 0, totalRev: 0,
+      barCogs: 0, foodCogs: 0, totalCogs: 0,
+      barLabor: 0, foodLabor: 0, totalLabor: 0,
+      comps: 0, maintenance: 0
+    };
+    for (let m = 1; m <= 12; m++) {
+      const monthKey = year + '-' + String(m).padStart(2, '0');
+      const M = S.HubBooks._aggregateMonth(monthKey);
+      months.push({ key: monthKey, monthNum: m, ...M });
+      agg.barRev     += M.barRev;
+      agg.foodRev    += M.foodRev;
+      agg.totalRev   += M.totalRev;
+      agg.barCogs    += M.barCogs;
+      agg.foodCogs   += M.foodCogs;
+      agg.totalCogs  += M.totalCogs;
+      agg.barLabor   += M.barLabor;
+      agg.foodLabor  += M.foodLabor;
+      agg.totalLabor += M.totalLabor;
+      agg.comps      += M.comps || 0;
+      agg.maintenance+= M.maintenance || 0;
+    }
+    return { months, ...agg };
+  },
+
+  // ── Shared sheet helpers (borrow from HubBooks for styling cohesion) ───────
+  _baseTitle(sheetName, year) {
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    return barName + ': ' + sheetName + ', ' + year;
+  },
+  _blankRow(c)   { return S.HubBooks._blankRow(c); },
+  _lineRow(t, c) { return S.HubBooks._lineRow(t, c); },
+  _pushFooter(rows, merges, sourceText, colCount) {
+    return S.HubBooks._pushFooter(rows, merges, sourceText, colCount);
+  },
+  _finishSheet(ws, rowsLen, merges, colWidths) {
+    return S.HubBooks._finishSheet(ws, rowsLen, merges, colWidths);
+  },
+
+  // ── Sheet 1 — Annual Summary ──────────────────────────────────────────────
+  _buildAnnualSummary(year) {
+    const COL_COUNT = 4;
+    const COL_WIDTHS = [{ wch: 42 }, { wch: 20 }, { wch: 20 }, { wch: 22 }];
+    const Y = this._aggregateYear(year);
+    const priorYear = String(parseInt(year, 10) - 1);
+    const P = this._aggregateYear(priorYear);
+    const hasPrior = P.totalRev > 0 || P.totalCogs > 0 || P.totalLabor > 0;
+
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Annual Summary', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(['', year, hasPrior ? priorYear : '', hasPrior ? 'YOY Change' : '']);
+    rows.push(blank());
+
+    const deltaPct = (cur, prev) => (hasPrior && prev !== 0) ? ((cur - prev) / Math.abs(prev)) : null;
+    const deltaCell = (cur, prev) => {
+      if (!hasPrior) return '';
+      const d = deltaPct(cur, prev);
+      if (d == null) return '';
+      const sign = d >= 0 ? '+' : '';
+      return sign + (d * 100).toFixed(1) + '%';
+    };
+
+    const row = (label, cur, prev) => rows.push([label, cur, hasPrior ? prev : '', deltaCell(cur, prev)]);
+
+    rows.push(['Revenue', '', '', '']);
+    row('  Bar Revenue',  Y.barRev,  P.barRev);
+    row('  Food Revenue', Y.foodRev, P.foodRev);
+    row('  Less: Comps',  Y.comps != null ? -Math.abs(Y.comps) : null, P.comps != null ? -Math.abs(P.comps) : null);
+    row('Total Revenue (net of comps)', Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0));
+    rows.push(blank());
+
+    rows.push(['Cost of Goods Sold', '', '', '']);
+    row('  Bar COGS',  Y.barCogs,  P.barCogs);
+    row('  Food COGS', Y.foodCogs, P.foodCogs);
+    row('Total COGS', Y.totalCogs, P.totalCogs);
+    rows.push(blank());
+
+    row('Gross Profit', Y.totalRev - Y.totalCogs - (Y.comps || 0), P.totalRev - P.totalCogs - (P.comps || 0));
+    rows.push(blank());
+
+    rows.push(['Labor', '', '', '']);
+    row('  Bar Labor',  Y.barLabor,  P.barLabor);
+    row('  Food Labor', Y.foodLabor, P.foodLabor);
+    row('Total Labor', Y.totalLabor, P.totalLabor);
+    rows.push(blank());
+
+    row('Prime Cost (COGS + Labor)', Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor);
+    row('Operating Margin (Net Revenue - Prime)', (Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor), (P.totalRev - (P.comps || 0)) - (P.totalCogs + P.totalLabor));
+    rows.push(blank());
+
+    // Percentages
+    const pct = (n, d) => d ? (n / d) : null;
+    const pctRow = (label, n, d, pn, pd) => {
+      const cur = pct(n, d);
+      const prev = pct(pn, pd);
+      const delta = (hasPrior && cur != null && prev != null) ? (cur - prev) : null;
+      const deltaStr = delta == null ? '' : ((delta >= 0 ? '+' : '') + (delta * 100).toFixed(1) + ' pts');
+      rows.push([label, cur, hasPrior ? prev : '', deltaStr]);
+    };
+    rows.push(['Key Cost Ratios', '', '', '']);
+    pctRow('  Pour Cost %',  Y.barCogs,  Y.barRev,  P.barCogs,  P.barRev);
+    pctRow('  Food Cost %',  Y.foodCogs, Y.foodRev, P.foodCogs, P.foodRev);
+    pctRow('  Labor %',      Y.totalLabor, Y.totalRev, P.totalLabor, P.totalRev);
+    pctRow('  Prime Cost %', Y.totalCogs + Y.totalLabor, Y.totalRev, P.totalCogs + P.totalLabor, P.totalRev);
+
+    this._pushFooter(rows, merges,
+      'Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals. Comps from Shift Control void and comp log.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    rows.forEach((r, i) => {
+      const label = String(r[0] || '');
+      const isPctRow = /%\s*$/.test(label) || /Cost Ratios/i.test(label);
+      [1, 2].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = isPctRow ? pctFmt : moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 2 — P&L by Month ────────────────────────────────────────────────
+  _buildPnlByMonth(year) {
+    const COL_COUNT = 14; // Item + 12 months + Total
+    const COL_WIDTHS = [{ wch: 32 }];
+    for (let i = 0; i < 12; i++) COL_WIDTHS.push({ wch: 13 });
+    COL_WIDTHS.push({ wch: 15 });
+
+    const Y = this._aggregateYear(year);
+    const rows = [];
+    const merges = [];
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+    const blank = () => this._blankRow(COL_COUNT);
+
+    rows.push(this._lineRow(this._baseTitle('P&L by Month', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    // Column headers
+    const headerRow = ['']; // Item label column
+    for (let i = 0; i < 12; i++) headerRow.push(this.MONTHS_SHORT[i]);
+    headerRow.push('Total');
+    rows.push(headerRow);
+    rows.push(blank());
+
+    const seriesRow = (label, fn) => {
+      const r = [label];
+      let total = 0;
+      Y.months.forEach(M => { const v = fn(M); r.push(v); total += v; });
+      r.push(total);
+      rows.push(r);
+    };
+    const seriesPctRow = (label, numFn, denFn) => {
+      const r = [label];
+      let totalNum = 0, totalDen = 0;
+      Y.months.forEach(M => {
+        const n = numFn(M), d = denFn(M);
+        totalNum += n; totalDen += d;
+        r.push(d ? (n / d) : null);
+      });
+      r.push(totalDen ? (totalNum / totalDen) : null);
+      rows.push(r);
+    };
+
+    rows.push(['Revenue', ...Array(13).fill('')]);
+    seriesRow('  Bar Revenue',  M => M.barRev);
+    seriesRow('  Food Revenue', M => M.foodRev);
+    seriesRow('  Comps',        M => -Math.abs(M.comps || 0));
+    seriesRow('Total Revenue (net)', M => M.totalRev - (M.comps || 0));
+    rows.push(blank());
+
+    rows.push(['COGS', ...Array(13).fill('')]);
+    seriesRow('  Bar COGS',  M => M.barCogs);
+    seriesRow('  Food COGS', M => M.foodCogs);
+    seriesRow('Total COGS', M => M.totalCogs);
+    rows.push(blank());
+
+    seriesRow('Gross Profit', M => M.totalRev - M.totalCogs - (M.comps || 0));
+    rows.push(blank());
+
+    rows.push(['Labor', ...Array(13).fill('')]);
+    seriesRow('  Bar Labor',  M => M.barLabor);
+    seriesRow('  Food Labor', M => M.foodLabor);
+    seriesRow('Total Labor', M => M.totalLabor);
+    rows.push(blank());
+
+    seriesRow('Prime Cost (COGS + Labor)', M => M.totalCogs + M.totalLabor);
+    rows.push(blank());
+
+    rows.push(['Key Cost Ratios', ...Array(13).fill('')]);
+    seriesPctRow('  Pour Cost %',  M => M.barCogs,  M => M.barRev);
+    seriesPctRow('  Food Cost %',  M => M.foodCogs, M => M.foodRev);
+    seriesPctRow('  Labor %',      M => M.totalLabor, M => M.totalRev);
+    seriesPctRow('  Prime %',      M => M.totalCogs + M.totalLabor, M => M.totalRev);
+
+    this._pushFooter(rows, merges, 'Each month is the sum of Profit weekly rollups (period_end in that month). Pour Cost = Bar COGS / Bar Revenue. Food Cost = Food COGS / Food Revenue. Labor % = Total Labor / Total Revenue.', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    rows.forEach((r, i) => {
+      const label = String(r[0] || '');
+      const isPctRow = /%\s*$/.test(label);
+      for (let c = 1; c <= 13; c++) {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = isPctRow ? pctFmt : moneyFmt;
+      }
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 3 — Inventory Valuation Trend ──────────────────────────────────
+  _buildInventoryValuation(year) {
+    const COL_COUNT = 4;
+    const COL_WIDTHS = [{ wch: 32 }, { wch: 18 }, { wch: 18 }, { wch: 36 }];
+    const yearStart = year + '-01-01';
+    const yearEnd = year + '-12-31';
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Inventory Valuation', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    const counts = (App.inventoryData?.ic_counts || []).slice()
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    const beginCount = counts.filter(c => c.date && c.date < yearStart).slice(-1)[0] || null;
+    const endCount   = counts.filter(c => c.date && c.date <= yearEnd).slice(-1)[0] || null;
+    const beginValue = beginCount ? (parseFloat(beginCount.total_value) || 0) : null;
+    const endValue   = endCount   ? (parseFloat(endCount.total_value)   || 0) : null;
+
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const yearDeliveries = (App.inventoryData?.ic_deliveries || []).filter(d => inYear(d.date));
+    const totalPurchases = yearDeliveries.reduce((s, d) => s + (parseFloat(d.total) || 0), 0);
+    const calcCogs = (beginValue != null && endValue != null) ? (beginValue + totalPurchases - endValue) : null;
+
+    rows.push(['Schedule C COGS Math', '', '', '']);
+    rows.push(['  Beginning inventory value', beginValue, '', beginCount ? ('Count dated ' + beginCount.date) : 'No count on file before ' + yearStart]);
+    rows.push(['  Total purchases',           totalPurchases, '', 'Sum of receive-delivery records for ' + year]);
+    rows.push(['  Ending inventory value',    endValue, '', endCount ? ('Count dated ' + endCount.date) : 'No count on file at or before ' + yearEnd]);
+    rows.push(['  Calculated COGS',           calcCogs, '', 'Begin + Purchases - End']);
+    rows.push(blank());
+
+    // Purchases by month
+    rows.push(['Purchases by Month', '', '', '']);
+    rows.push(['Month', 'Purchases', 'Deliveries Count', '']);
+    for (let m = 1; m <= 12; m++) {
+      const mk = year + '-' + String(m).padStart(2, '0');
+      const monthly = yearDeliveries.filter(d => String(d.date).slice(0, 7) === mk);
+      const monthlyTotal = monthly.reduce((s, d) => s + (parseFloat(d.total) || 0), 0);
+      rows.push([this.MONTHS_FULL[m - 1], monthlyTotal, monthly.length, '']);
+    }
+    rows.push(['Total', totalPurchases, yearDeliveries.length, '']);
+
+    this._pushFooter(rows, merges, 'Beginning and ending counts from Inventory Control count history. Purchases from receive-delivery log. Used for Schedule C Part III (Cost of Goods Sold) line items 35, 36, 41, 42.', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((r, i) => {
+      [1].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 4 — Labor Cost Trend ────────────────────────────────────────────
+  _buildLaborCostTrend(year) {
+    const COL_COUNT = 7;
+    const COL_WIDTHS = [{ wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }];
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Labor Cost Trend', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(['Month', 'Hours', 'OT Hours', 'Wages', 'Revenue', 'Labor %', 'RPLH']);
+
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const yearActuals = (App.laborData?.lc_actuals || []).filter(a => inYear(a.date));
+    const yearShifts = (App.shiftData?.sc_shifts || []).filter(s => inYear(s.date));
+
+    let totalHours = 0, totalOt = 0, totalWages = 0, totalRev = 0;
+
+    for (let m = 1; m <= 12; m++) {
+      const mk = year + '-' + String(m).padStart(2, '0');
+      const monthActuals = yearActuals.filter(a => String(a.date).slice(0, 7) === mk);
+      const monthShifts  = yearShifts.filter(s => String(s.date).slice(0, 7) === mk);
+
+      // Per-staff/per-week OT calc: sum hours per staff per week, anything over 40 = OT
+      let mHours = 0, mOt = 0, mWages = 0;
+      const byStaffWeek = {};
+      monthActuals.forEach(a => {
+        const hrs = parseFloat(a.hours) || 0;
+        const wage = parseFloat(a.wage) || (typeof App.wageForStaffOn === 'function' ? (App.wageForStaffOn(a.staff_id, a.date) || 0) : 0);
+        mHours += hrs;
+        const key = (a.staff_id || a.name || '') + '|' + this._weekKeyFor(a.date);
+        if (!byStaffWeek[key]) byStaffWeek[key] = { hours: 0, wage: wage };
+        byStaffWeek[key].hours += hrs;
+        // wages computed from per-week OT below
+      });
+      Object.values(byStaffWeek).forEach(b => {
+        const reg = Math.min(40, b.hours);
+        const ot  = Math.max(0, b.hours - 40);
+        mOt += ot;
+        mWages += reg * b.wage + ot * b.wage * 1.5;
+      });
+      const mRev = monthShifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+      const laborPct = mRev ? (mWages / mRev) : null;
+      const rplh = mHours ? (mRev / mHours) : null;
+
+      rows.push([this.MONTHS_FULL[m - 1], mHours, mOt, mWages, mRev, laborPct, rplh]);
+      totalHours += mHours; totalOt += mOt; totalWages += mWages; totalRev += mRev;
+    }
+
+    rows.push(blank());
+    rows.push(['Total', totalHours, totalOt, totalWages, totalRev,
+      totalRev ? (totalWages / totalRev) : null,
+      totalHours ? (totalRev / totalHours) : null]);
+
+    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per week (hours over 40 = OT, paid at 1.5x base wage). Revenue from Shift Control shifts. RPLH = Revenue per Labor Hour.', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    const hoursFmt = '#,##0.0';
+    rows.forEach((r, i) => {
+      const h = ws[XLSX.utils.encode_cell({ r: i, c: 1 })]; if (h && typeof h.v === 'number') h.z = hoursFmt;
+      const o = ws[XLSX.utils.encode_cell({ r: i, c: 2 })]; if (o && typeof o.v === 'number') o.z = hoursFmt;
+      const w = ws[XLSX.utils.encode_cell({ r: i, c: 3 })]; if (w && typeof w.v === 'number') w.z = moneyFmt;
+      const v = ws[XLSX.utils.encode_cell({ r: i, c: 4 })]; if (v && typeof v.v === 'number') v.z = moneyFmt;
+      const p = ws[XLSX.utils.encode_cell({ r: i, c: 5 })]; if (p && typeof p.v === 'number') p.z = pctFmt;
+      const rp= ws[XLSX.utils.encode_cell({ r: i, c: 6 })]; if (rp&& typeof rp.v=== 'number') rp.z = moneyFmt;
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  _weekKeyFor(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(String(dateStr).length <= 10 ? dateStr + 'T00:00:00' : dateStr);
+    if (isNaN(d.getTime())) return '';
+    // Monday-start week
+    const day = d.getDay();
+    const diff = (day + 6) % 7; // shift Sunday=0 to 6
+    const ws = new Date(d);
+    ws.setDate(d.getDate() - diff);
+    return ws.toISOString().slice(0, 10);
+  },
+
+  // ── Sheet 5 — Tip Allocation (Form 8027 Worksheet, annual) ───────────────
+  _buildTipAllocation(year) {
+    const COL_COUNT = 5;
+    const COL_WIDTHS = [{ wch: 60 }, { wch: 18 }, { wch: 42 }, { wch: 16 }, { wch: 22 }];
+
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const tips   = (App.laborData?.lc_tips      || []).filter(t => inYear(t.date));
+    const pools  = (App.laborData?.lc_tip_pools || []).filter(p => inYear(p.date));
+    const shifts = (App.shiftData?.sc_shifts    || []).filter(s => inYear(s.date));
+
+    const grossReceipts = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+    const totalChargedTips = tips.reduce((s, t) => s + (parseFloat(t.card_tips) || 0), 0);
+    const totalCashTips    = tips.reduce((s, t) => s + (parseFloat(t.cash_tips) || 0), 0);
+    const totalReported    = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
+    const line7  = grossReceipts * 0.08;
+    const line7a = Math.max(0, line7 - totalReported);
+
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Tip Allocation Worksheet (IRS Form 8027) Annual', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(this._lineRow('This is a worksheet. It is not the IRS form. Your accountant moves these numbers onto the actual Form 8027 and signs it.', COL_COUNT));
+    mergeFull(rows.length - 1);
+    rows.push(this._lineRow('Form 8027 is required for restaurants with more than 10 employees on a typical business day where tipping happens. Confirm with your accountant whether you have to file.', COL_COUNT));
+    mergeFull(rows.length - 1);
+    rows.push(blank());
+
+    rows.push(['Form 8027 Lines (figured for the year)', '', '', '', '']);
+    rows.push(['  Line 1: Total charged tips for the year',                       totalChargedTips, '', '', '']);
+    rows.push(['  Line 2: Total charge receipts on which charged tips were shown', null, '(your accountant fills. Bar Cop does not track this separately.)', '', '']);
+    rows.push(['  Line 3: Total service charges less than 10% paid as wages',      null, '(your accountant fills if it applies.)', '', '']);
+    rows.push(['  Line 4a: Tips reported by indirectly tipped employees',          null, '(your accountant sorts this. Bar Cop logs total tips per server.)', '', '']);
+    rows.push(['  Line 4b: Tips reported by directly tipped employees',            null, '(your accountant sorts this. Bar Cop logs total tips per server.)', '', '']);
+    rows.push(['  Line 5: Total tips reported (4a plus 4b)',                       totalReported, '', '', '']);
+    rows.push(['  Line 6: Gross receipts from food and beverage',                  grossReceipts, '', '', '']);
+    rows.push(['  Line 7: 8% of gross receipts (or your approved lower rate)',     line7,         '', '', '']);
+    rows.push(['  Line 7a: Allocated tips (Line 7 minus Line 5, never below zero)', line7a,       '', '', '']);
+    rows.push(blank());
+
+    rows.push(['Reference Totals', '', '', '', '']);
+    rows.push(['  Total Cash Tips logged',  totalCashTips,    '', '', '']);
+    rows.push(['  Total Card Tips logged',  totalChargedTips, '', '', '']);
+    rows.push(['  Combined Tips logged',    totalReported,    '', '', '']);
+    rows.push(blank());
+
+    // Per-employee annual totals + suggested allocation
+    const byEmp = {};
+    const shiftIdsWithPools = new Set(pools.map(p => p.shift_id).filter(Boolean));
+    pools.forEach(p => {
+      (p.participants || []).forEach(pt => {
+        const name = pt.name || '(unnamed)';
+        if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0 };
+        byEmp[name].tips  += parseFloat(pt.share) || 0;
+        byEmp[name].hours += parseFloat(pt.hours) || 0;
+      });
+    });
+    tips.forEach(t => {
+      if (t.shift_id && shiftIdsWithPools.has(t.shift_id)) return;
+      const name = t.name || '(unnamed)';
+      if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0 };
+      byEmp[name].tips  += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
+      byEmp[name].hours += parseFloat(t.hours) || 0;
+    });
+    if (Object.keys(byEmp).length) {
+      rows.push(['Per-Employee Annual Totals', '', '', '', '']);
+      rows.push(['Employee', 'Hours', 'Tips Reported', 'Share of Hours', 'Suggested Allocation (Line 7a x share)']);
+      const totalHours = Object.values(byEmp).reduce((s, e) => s + e.hours, 0);
+      Object.keys(byEmp).sort().forEach(name => {
+        const e = byEmp[name];
+        const share = totalHours > 0 ? (e.hours / totalHours) : 0;
+        const suggested = line7a * share;
+        rows.push([name, e.hours, e.tips, share, suggested]);
+      });
+    } else {
+      rows.push(this._lineRow('(no tip records on file for this year)', COL_COUNT));
+      mergeFull(rows.length - 1);
+    }
+
+    this._pushFooter(rows, merges, 'Source: Labor Control tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and Shift Control shifts for gross receipts.', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const pctFmt   = '0.0%';
+    const hoursFmt = '#,##0.0';
+    rows.forEach((r, i) => {
+      [1, 4].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (!cell || typeof cell.v !== 'number') return;
+        cell.z = moneyFmt;
+      });
+      // Hours column 1 and share column 3 specifically in the per-employee table
+      const c1 = ws[XLSX.utils.encode_cell({ r: i, c: 1 })];
+      const c3 = ws[XLSX.utils.encode_cell({ r: i, c: 3 })];
+      if (c1 && typeof c1.v === 'number' && String(r[0] || '').match(/^[A-Za-z]/) && !String(r[0] || '').startsWith('Line') && !String(r[0] || '').startsWith('  ')) {
+        // employee row — col 1 is hours
+        c1.z = hoursFmt;
+      }
+      if (c3 && typeof c3.v === 'number') c3.z = pctFmt;
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 6 — Cash Control Summary ────────────────────────────────────────
+  _buildCashControlSummary(year) {
+    const COL_COUNT = 6;
+    const COL_WIDTHS = [{ wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 18 }];
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Cash Control Summary', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const variances = (App.shiftData?.sc_variances || []).filter(v => inYear(v.date));
+    const drops     = (App.shiftData?.sc_cash_drops || []).filter(d => inYear(d.date));
+
+    rows.push(['Month', 'Drops $', 'Drops Count', 'Variance Total', 'Over Count', 'Short Count']);
+    let yrDrops = 0, yrVar = 0, yrOver = 0, yrShort = 0, yrDropCount = 0;
+    for (let m = 1; m <= 12; m++) {
+      const mk = year + '-' + String(m).padStart(2, '0');
+      const monthVar = variances.filter(v => String(v.date).slice(0, 7) === mk);
+      const monthDrops = drops.filter(d => String(d.date).slice(0, 7) === mk);
+      const dropsSum = monthDrops.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+      const varSum = monthVar.reduce((s, v) => s + (parseFloat(v.variance) || 0), 0);
+      const overCount  = monthVar.filter(v => (parseFloat(v.variance) || 0) > 0).length;
+      const shortCount = monthVar.filter(v => (parseFloat(v.variance) || 0) < 0).length;
+      rows.push([this.MONTHS_FULL[m - 1], dropsSum, monthDrops.length, varSum, overCount, shortCount]);
+      yrDrops += dropsSum; yrDropCount += monthDrops.length;
+      yrVar += varSum; yrOver += overCount; yrShort += shortCount;
+    }
+    rows.push(blank());
+    rows.push(['Total', yrDrops, yrDropCount, yrVar, yrOver, yrShort]);
+    rows.push(blank());
+
+    // Worst-offender shifts (top 10 by absolute variance)
+    rows.push(['Worst Variance Shifts (Top 10 by Absolute Variance)', '', '', '', '', '']);
+    rows.push(['Date', 'Shift', 'Cashier', 'Expected', 'Counted', 'Variance']);
+    const worst = variances.slice()
+      .sort((a, b) => Math.abs(parseFloat(b.variance) || 0) - Math.abs(parseFloat(a.variance) || 0))
+      .slice(0, 10);
+    if (worst.length === 0) {
+      rows.push(this._lineRow('(no cash variances logged this year)', COL_COUNT));
+      mergeFull(rows.length - 1);
+    } else {
+      worst.forEach(v => rows.push([
+        v.date || '',
+        v.shift_type || v.shift || '',
+        v.cashier || v.name || '',
+        parseFloat(v.expected) || null,
+        parseFloat(v.counted) || null,
+        parseFloat(v.variance) || null
+      ]));
+    }
+
+    this._pushFooter(rows, merges, 'Drops from Shift Control cash drop log. Variances from Shift Control variance log. Over = counted more than expected. Short = counted less than expected.', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((r, i) => {
+      [1, 3, 4, 5].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 7 — Audit History ───────────────────────────────────────────────
+  _buildAuditHistory(year) {
+    const COL_COUNT = 6;
+    const COL_WIDTHS = [{ wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 48 }];
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Audit History', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    rows.push(['Date', 'System', 'Score', 'Monthly Opp $', 'Annual Opp $', 'Top Action Item']);
+
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const buckets = [
+      { label: 'Profit',  list: App.data?.audits || [] },
+      { label: 'Revenue', list: App.data?.revenue_audits || [] },
+      { label: 'Traffic', list: App.data?.traffic_audits || [] }
+    ];
+    const allAudits = [];
+    buckets.forEach(b => {
+      b.list.filter(a => inYear(a.date)).forEach(a => allAudits.push({ system: b.label, audit: a }));
+    });
+    allAudits.sort((a, b) => (a.audit.date || '').localeCompare(b.audit.date || ''));
+
+    if (allAudits.length === 0) {
+      rows.push(this._lineRow('(no audits run during ' + year + ')', COL_COUNT));
+      mergeFull(rows.length - 1);
+    } else {
+      allAudits.forEach(({ system, audit }) => {
+        const items = audit.action_items || [];
+        const monthlyTotal = items.reduce((s, i) => s + (parseFloat(i.monthly_impact) || 0), 0);
+        const top = items.slice().sort((a, b) => (parseFloat(b.monthly_impact) || 0) - (parseFloat(a.monthly_impact) || 0))[0];
+        const topTitle = top ? (top.title || top.name || top.action || '(unnamed)') : '';
+        rows.push([
+          audit.date || '',
+          system,
+          audit.score != null ? Number(audit.score) : null,
+          monthlyTotal,
+          monthlyTotal * 12,
+          topTitle
+        ]);
+      });
+      // Annual roll-up by system
+      rows.push(blank());
+      rows.push(['Annual Totals by System', '', '', '', '', '']);
+      buckets.forEach(b => {
+        const yearList = b.list.filter(a => inYear(a.date));
+        const totalMonthly = yearList.reduce((sum, a) => {
+          return sum + (a.action_items || []).reduce((s, i) => s + (parseFloat(i.monthly_impact) || 0), 0);
+        }, 0);
+        rows.push(['', b.label, yearList.length + ' audits', totalMonthly, totalMonthly * 12, '']);
+      });
+    }
+
+    this._pushFooter(rows, merges, 'Source: Profit Audit, Revenue Audit, Traffic Audit records. Monthly Opportunity is the sum of action_items.monthly_impact at the time the audit was saved.', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((r, i) => {
+      [3, 4].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── Sheet 8 — Operational Events ──────────────────────────────────────────
+  _buildOperationalEvents(year) {
+    const COL_COUNT = 4;
+    const COL_WIDTHS = [{ wch: 32 }, { wch: 14 }, { wch: 16 }, { wch: 42 }];
+    const rows = [];
+    const merges = [];
+    const blank = () => this._blankRow(COL_COUNT);
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: COL_COUNT - 1 } });
+
+    rows.push(this._lineRow(this._baseTitle('Operational Events', year), COL_COUNT));
+    mergeFull(0);
+    rows.push(blank());
+
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const voidComps = (App.shiftData?.sc_void_comps || []).filter(v => inYear(v.date));
+    const voids = voidComps.filter(v => v.type === 'void' || v.type === 'Void');
+    const comps = voidComps.filter(v => v.type === 'comp' || v.type === 'Comp');
+    const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
+    const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
+    const incidents = (App.shiftData?.sc_incidents || []).filter(i => inYear(i.date));
+    const certs = (App.laborData?.lc_certs || []).filter(c => inYear(c.expiration_date));
+
+    const sum = (list, field) => list.reduce((s, r) => s + (parseFloat(r[field]) || 0), 0);
+
+    rows.push(['Counts and Totals for ' + year, '', '', '']);
+    rows.push(['Event', 'Count', 'Total $', 'Notes']);
+    rows.push(['Voids',          voids.length, sum(voids, 'amount'), 'Reversed sales']);
+    rows.push(['Comps',          comps.length, sum(comps, 'amount'), 'Contra-revenue or operating expense']);
+    rows.push(['Walked Tabs',    walked.length, sum(walked, 'amount'), 'Unpaid checks, mis-bills, lost tickets']);
+    rows.push(['Incidents',      incidents.length, '', 'Slip-and-fall, altercation, employee injury, regulatory visit']);
+    rows.push(['Call-Outs',      callouts.length, '', 'Staff call-outs and no-shows']);
+    rows.push(['Certs Lapsed',   certs.length, '', 'Certifications with expiration date in ' + year]);
+    rows.push(blank());
+
+    // Incident breakdown by type
+    if (incidents.length > 0) {
+      rows.push(['Incidents by Type', '', '', '']);
+      const byType = {};
+      incidents.forEach(i => {
+        const t = i.type || 'Other';
+        byType[t] = (byType[t] || 0) + 1;
+      });
+      Object.keys(byType).sort().forEach(t => rows.push(['  ' + t, byType[t], '', '']));
+      rows.push(blank());
+    }
+
+    // Lapsed certifications detail
+    if (certs.length > 0) {
+      rows.push(['Certifications Lapsed', '', '', '']);
+      rows.push(['Staff', 'Cert Type', 'Expiration Date', '']);
+      certs.slice()
+        .sort((a, b) => (a.expiration_date || '').localeCompare(b.expiration_date || ''))
+        .forEach(c => rows.push([
+          c.holder_name || (typeof App.staffById === 'function' ? (App.staffById(c.staff_id)?.name || '') : '') || '',
+          c.cert_type || '',
+          c.expiration_date || '',
+          ''
+        ]));
+      rows.push(blank());
+    }
+
+    // Worst-offender call-out staff (top 5)
+    if (callouts.length > 0) {
+      rows.push(['Call-Outs by Staff (Top 5)', '', '', '']);
+      const byStaff = {};
+      callouts.forEach(c => {
+        const name = c.name || (typeof App.staffById === 'function' ? (App.staffById(c.staff_id)?.name || 'Unknown') : 'Unknown');
+        byStaff[name] = (byStaff[name] || 0) + 1;
+      });
+      Object.keys(byStaff)
+        .sort((a, b) => byStaff[b] - byStaff[a])
+        .slice(0, 5)
+        .forEach(n => rows.push(['  ' + n, byStaff[n], '', '']));
+    }
+
+    this._pushFooter(rows, merges, 'Sources: Shift Control (voids, comps, walked tabs, incidents), Labor Control (call-outs, certifications).', COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((r, i) => {
+      [2].forEach(c => {
+        const addr = XLSX.utils.encode_cell({ r: i, c });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+      });
+    });
+    return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
+  },
+
+  // ── PDF Executive Summary ─────────────────────────────────────────────────
+  _openPdfSummary() {
+    const year = document.getElementById('hy-year')?.value;
+    if (!year) return;
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    const Y = this._aggregateYear(year);
+    const priorYear = String(parseInt(year, 10) - 1);
+    const P = this._aggregateYear(priorYear);
+    const hasPrior = P.totalRev > 0 || P.totalCogs > 0 || P.totalLabor > 0;
+
+    const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtPct = (v) => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
+    const fmtDeltaPct = (cur, prev) => {
+      if (!hasPrior || prev === 0 || cur == null || prev == null) return '';
+      const d = (cur - prev) / Math.abs(prev);
+      const sign = d >= 0 ? '+' : '';
+      const cls = d >= 0 ? 'delta-pos' : 'delta-neg';
+      return ' <span class="' + cls + '">(' + sign + (d * 100).toFixed(1) + '% vs ' + priorYear + ')</span>';
+    };
+    const fmtPtsDelta = (cur, prev) => {
+      if (!hasPrior || cur == null || prev == null) return '';
+      const d = cur - prev;
+      const sign = d >= 0 ? '+' : '';
+      const cls = d <= 0 ? 'delta-pos' : 'delta-neg'; // lower is better for cost ratios
+      return ' <span class="' + cls + '">(' + sign + (d * 100).toFixed(1) + ' pts vs ' + priorYear + ')</span>';
+    };
+
+    // Cost ratios
+    const pourCost = Y.barRev  ? (Y.barCogs  / Y.barRev)  : null;
+    const foodCost = Y.foodRev ? (Y.foodCogs / Y.foodRev) : null;
+    const laborPct = Y.totalRev ? (Y.totalLabor / Y.totalRev) : null;
+    const primeCost = Y.totalRev ? ((Y.totalCogs + Y.totalLabor) / Y.totalRev) : null;
+    const prevPour  = P.barRev  ? (P.barCogs  / P.barRev)  : null;
+    const prevFood  = P.foodRev ? (P.foodCogs / P.foodRev) : null;
+    const prevLabor = P.totalRev ? (P.totalLabor / P.totalRev) : null;
+    const prevPrime = P.totalRev ? ((P.totalCogs + P.totalLabor) / P.totalRev) : null;
+
+    // Operational counts
+    const inYear = (d) => d && String(d).slice(0, 4) === year;
+    const voidComps = (App.shiftData?.sc_void_comps || []).filter(v => inYear(v.date));
+    const voids = voidComps.filter(v => v.type === 'void' || v.type === 'Void');
+    const comps = voidComps.filter(v => v.type === 'comp' || v.type === 'Comp');
+    const variances = (App.shiftData?.sc_variances || []).filter(v => inYear(v.date));
+    const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
+    const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
+    const incidents = (App.shiftData?.sc_incidents || []).filter(i => inYear(i.date));
+    const tips = (App.laborData?.lc_tips || []).filter(t => inYear(t.date));
+    const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
+
+    // Strongest/weakest month
+    const netMonthlyRev = Y.months.map(M => M.totalRev - (M.comps || 0));
+    let strongIdx = -1, weakIdx = -1, strongVal = -Infinity, weakVal = Infinity;
+    netMonthlyRev.forEach((v, i) => {
+      if (v > strongVal) { strongVal = v; strongIdx = i; }
+      // Only consider months that have data when picking weakest
+      if (v > 0 && v < weakVal) { weakVal = v; weakIdx = i; }
+    });
+
+    // Audits — top 5 opportunities of the year across all systems
+    const allItems = [];
+    [
+      { label: 'Profit',  list: App.data?.audits || [] },
+      { label: 'Revenue', list: App.data?.revenue_audits || [] },
+      { label: 'Traffic', list: App.data?.traffic_audits || [] }
+    ].forEach(b => {
+      b.list.filter(a => inYear(a.date)).forEach(a => {
+        (a.action_items || []).forEach(it => {
+          allItems.push({
+            system: b.label,
+            title: it.title || it.name || it.action || '(unnamed)',
+            monthly: parseFloat(it.monthly_impact) || 0,
+            date: a.date || ''
+          });
+        });
+      });
+    });
+    allItems.sort((a, b) => b.monthly - a.monthly);
+    const topFive = allItems.slice(0, 5);
+    const totalAnnualOpp = allItems.reduce((s, i) => s + i.monthly, 0) * 12;
+
+    // Monthly trend table rows
+    const monthlyRows = Y.months.map((M, i) => {
+      const netRev = M.totalRev - (M.comps || 0);
+      const prime = M.totalCogs + M.totalLabor;
+      const primePct = M.totalRev ? (prime / M.totalRev) : null;
+      return '<tr>'
+        + '<td>' + this.MONTHS_SHORT[i] + '</td>'
+        + '<td class="right">' + fmt$(netRev) + '</td>'
+        + '<td class="right">' + fmt$(M.totalCogs) + '</td>'
+        + '<td class="right">' + fmt$(M.totalLabor) + '</td>'
+        + '<td class="right">' + fmt$(prime) + '</td>'
+        + '<td class="right">' + fmtPct(primePct) + '</td>'
+        + '</tr>';
+    }).join('');
+
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
+      + '<title>' + esc(barName) + ' Year-End Review, ' + year + '</title>'
+      + '<style>'
+      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
+      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
+      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
+      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
+      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
+      + 'td, th { padding: 4px 6px; border-bottom: 1px solid #eee; text-align: left; }'
+      + 'th { font-family: Arial, Helvetica, sans-serif; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #555; }'
+      + 'td.right, th.right { text-align: right; font-variant-numeric: tabular-nums; }'
+      + 'td.bold { font-weight: bold; }'
+      + 'td.muted { color: #666; font-size: 12px; }'
+      + '.delta-pos { color: #1a7a1a; }'
+      + '.delta-neg { color: #a01818; }'
+      + '.page-break { page-break-before: always; }'
+      + '.notes { background: #f7f4ea; border-left: 3px solid #8a6d00; padding: 12px 16px; font-size: 13px; line-height: 1.6; }'
+      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
+      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
+      + '</style></head><body>'
+
+      // ── Page 1: Headline numbers ──
+      + '<h1>' + esc(barName) + ' Year-End Review<span class="sub">' + year + (hasPrior ? ' (with ' + priorYear + ' comparison)' : '') + '</span></h1>'
+
+      + '<h2>The Year in Dollars</h2>'
+      + '<table>'
+      + '<tr><td>Total Revenue (net of comps)</td><td class="right bold">' + fmt$(Y.totalRev - (Y.comps || 0)) + fmtDeltaPct(Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0)) + '</td></tr>'
+      + '<tr><td class="muted">  Bar Revenue</td><td class="right muted">' + fmt$(Y.barRev) + '</td></tr>'
+      + '<tr><td class="muted">  Food Revenue</td><td class="right muted">' + fmt$(Y.foodRev) + '</td></tr>'
+      + '<tr><td class="muted">  Comps</td><td class="right muted">' + fmt$(Y.comps) + '</td></tr>'
+      + '<tr><td>Cost of Goods Sold</td><td class="right">' + fmt$(Y.totalCogs) + fmtDeltaPct(Y.totalCogs, P.totalCogs) + '</td></tr>'
+      + '<tr><td>Labor</td><td class="right">' + fmt$(Y.totalLabor) + fmtDeltaPct(Y.totalLabor, P.totalLabor) + '</td></tr>'
+      + '<tr><td>Prime Cost (COGS + Labor)</td><td class="right bold">' + fmt$(Y.totalCogs + Y.totalLabor) + fmtDeltaPct(Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor) + '</td></tr>'
+      + '<tr><td>Operating Margin</td><td class="right bold">' + fmt$((Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor)) + '</td></tr>'
+      + '</table>'
+
+      + '<h2>The Year in Percentages</h2>'
+      + '<table>'
+      + '<tr><td>Pour Cost</td><td class="right bold">' + fmtPct(pourCost) + fmtPtsDelta(pourCost, prevPour) + '</td></tr>'
+      + '<tr><td>Food Cost</td><td class="right bold">' + fmtPct(foodCost) + fmtPtsDelta(foodCost, prevFood) + '</td></tr>'
+      + '<tr><td>Labor %</td><td class="right bold">' + fmtPct(laborPct) + fmtPtsDelta(laborPct, prevLabor) + '</td></tr>'
+      + '<tr><td>Prime Cost %</td><td class="right bold">' + fmtPct(primeCost) + fmtPtsDelta(primeCost, prevPrime) + '</td></tr>'
+      + '</table>'
+
+      // ── Page 2: Monthly trend ──
+      + '<div class="page-break"></div>'
+      + '<h2>Month by Month</h2>'
+      + '<table>'
+      + '<thead><tr><th>Month</th><th class="right">Net Revenue</th><th class="right">COGS</th><th class="right">Labor</th><th class="right">Prime</th><th class="right">Prime %</th></tr></thead>'
+      + '<tbody>' + monthlyRows + '</tbody>'
+      + '</table>'
+
+      // ── Page 3: Operational events + top opportunities ──
+      + '<div class="page-break"></div>'
+      + '<h2>Operational Events</h2>'
+      + '<table>'
+      + '<tr><td>Voids logged</td><td class="right">' + voids.length + '</td></tr>'
+      + '<tr><td>Comps logged</td><td class="right">' + comps.length + ' (' + fmt$(comps.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)) + ')</td></tr>'
+      + '<tr><td>Walked Tabs</td><td class="right">' + walked.length + ' (' + fmt$(walked.reduce((s, w) => s + (parseFloat(w.amount) || 0), 0)) + ')</td></tr>'
+      + '<tr><td>Incidents logged</td><td class="right">' + incidents.length + '</td></tr>'
+      + '<tr><td>Cash variances logged</td><td class="right">' + variances.length + '</td></tr>'
+      + '<tr><td>Call-outs logged</td><td class="right">' + callouts.length + '</td></tr>'
+      + '<tr><td>Tips logged (total)</td><td class="right">' + fmt$(totalTips) + '</td></tr>'
+      + '</table>'
+
+      + '<h2>Top Opportunities Surfaced This Year</h2>'
+      + (topFive.length === 0
+          ? '<p style="color:#666;font-size:13px;">No open audit action items on file for ' + year + '. Run a Profit, Revenue, or Traffic audit to surface opportunities.</p>'
+          : '<p style="color:#444;font-size:13px;margin-bottom:6px;">Total annualized opportunity across every audit run this year: <strong>' + fmt$(totalAnnualOpp) + '</strong>.</p>'
+            + '<table>'
+            + '<thead><tr><th>System</th><th>Opportunity</th><th class="right">Monthly $</th><th class="right">Annual $</th></tr></thead>'
+            + '<tbody>'
+            + topFive.map(it => '<tr><td>' + esc(it.system) + '</td><td>' + esc(it.title) + '</td><td class="right">' + fmt$(it.monthly) + '</td><td class="right">' + fmt$(it.monthly * 12) + '</td></tr>').join('')
+            + '</tbody></table>')
+
+      // ── Page 4: Year-end notes ──
+      + '<div class="page-break"></div>'
+      + '<h2>The Year in a Few Lines</h2>'
+      + '<div class="notes">'
+      + '<p><strong>Strongest revenue month:</strong> '
+      + (strongIdx >= 0 ? (this.MONTHS_FULL[strongIdx] + ', net revenue ' + fmt$(strongVal)) : 'No data')
+      + '.</p>'
+      + '<p><strong>Weakest revenue month (with data):</strong> '
+      + (weakIdx >= 0 ? (this.MONTHS_FULL[weakIdx] + ', net revenue ' + fmt$(weakVal)) : 'No data')
+      + '.</p>'
+      + '<p><strong>Prime cost ran at:</strong> ' + fmtPct(primeCost) + ' for the year. The target for a healthy operation is 60% to 65%. Numbers above that are where money is leaking; numbers below are where the operation is making real margin.</p>'
+      + '<p><strong>Cash control:</strong> ' + variances.length + ' shifts had a cash variance logged. ' + (variances.length === 0 ? 'Either the year ran clean or the shifts did not get fully reconciled. Worth a look either way.' : 'See the Cash Control Summary sheet in the workbook for the worst-offender shifts.') + '</p>'
+      + (topFive.length > 0
+          ? '<p><strong>Biggest opportunity surfaced:</strong> ' + esc(topFive[0].system) + ' audit flagged "' + esc(topFive[0].title) + '" at ' + fmt$(topFive[0].monthly * 12) + ' annual. Worth running the corresponding Fix Process if it is still open.</p>'
+          : '')
+      + '</div>'
+
+      + '<div class="footer">'
+      + 'Generated from your input data on ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) + '. '
+      + 'Bar Cop is a software tool, not a tax preparer, CPA, financial advisor, or attorney. '
+      + 'Your accountant and any other relevant professional should review and verify this material before you act on it or share it with a third party.'
+      + '</div>'
+
+      + '<script>setTimeout(function(){window.print();}, 300);</script>'
+      + '</body></html>';
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      this._setStatus('Pop-up blocked. Allow pop-ups for Bar Cop and try again.', 'var(--red)');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  }
+};
