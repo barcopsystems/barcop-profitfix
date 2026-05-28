@@ -52,8 +52,8 @@ S.RevenueHelp = {
           a: 'One every 30 days from your last one. The 30-day pace gives you enough time to act on the prior report before scoring yourself again. Countdown on the screen shows days remaining.' },
         { q: 'How do I save the audit as a PDF?',
           a: 'Open any audit and use the Print / Save PDF button in the topbar. Save as PDF from your browser print dialog.' },
-        { q: 'What is Compare Other Audits?',
-          a: 'Side-by-side compare any two audits in your history. Section scores, deltas, resolved gaps, newly surfaced gaps, still-open list. Each still-open item deep-links to the matching Fix Process. Bar Cop Outlook at the top of the comparison generates a short operator-voice narrative on what changed between the two.' }
+        { q: 'What is Bar Cop Outlook?',
+          a: 'A short operator-voice read on this audit. Click the Bar Cop Outlook button on the audit detail page, next to the score. Two or three paragraphs in plain language about what the score says and what to do this month. Cached per audit so re-opening the same audit does not re-spend on the narrative.' }
       ]},
       { t: 'Revenue Fix', qa: [
         { q: 'What is Revenue Fix?',
