@@ -92,6 +92,27 @@ S.TheftRisk = {
     };
   },
 
+  // Unauthorized large comps. Reads sc_void_comps where auth_threshold_override
+  // is true — meaning the operator saved a Comp over the Hub Settings threshold
+  // without a manager in Authorized By and acknowledged the warning. This is
+  // one of the most common bar-theft patterns (bartender comping a round of
+  // drinks without manager involvement) and the auth override is the explicit
+  // signal that it happened. 90-day window.
+  unauthorizedLargeCompsSignal() {
+    const all = ((App.shiftData && App.shiftData.sc_void_comps) || []);
+    if (all.length === 0) return { score: null, count: 0, total: 0 };
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const flagged = all.filter(r =>
+      r.auth_threshold_override === true && (r.date || '') >= cutoffStr);
+    const total = flagged.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    return {
+      score: flagged.length > 0 ? Math.min(100, flagged.length * 20) : 0,
+      count: flagged.length,
+      total
+    };
+  },
+
   // Confirmed theft from the Inventory Adjustment log (reason='Theft'). These
   // are documented losses the operator has already attributed — strongest
   // signal of all four because there's no inference, just acknowledged events.
@@ -141,7 +162,8 @@ S.TheftRisk = {
   printBrief() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
     const confirmed = this.theftConfirmedSignal();
-    const autoScores = [pour.score, voids.score, cash.score, confirmed.score].filter(s => s != null);
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
     const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
     const manScore = this.manualScore(this._manual?.level);
     let overall;
@@ -197,6 +219,7 @@ S.TheftRisk = {
       + '<tr><td>Pour Variance (spot checks)</td><td class="right">' + (pour.score != null ? pour.score : '-') + (pour.flagged ? ' &nbsp;<span style="color:#666;">' + pour.flagged + ' of ' + pour.items + ' flagged</span>' : '') + '</td></tr>'
       + '<tr><td>Voids & Comps (loss-bearing only)</td><td class="right">' + (voids.score != null ? voids.score : '-') + (voids.count ? ' &nbsp;<span style="color:#666;">' + voids.count + ' loss records, ' + fmt$(voids.total) + '</span>' : '') + '</td></tr>'
       + '<tr><td>Cash Variance</td><td class="right">' + (cash.score != null ? cash.score : '-') + (cash.count ? ' &nbsp;<span style="color:#666;">' + cash.shorts + ' shorts of ' + cash.count + ' counts, ' + fmt$(Math.abs(cash.netShort)) + ' net short</span>' : '') + '</td></tr>'
+      + '<tr><td>Unauthorized Large Comps</td><td class="right">' + (unauthComps.score != null ? unauthComps.score : '-') + (unauthComps.count ? ' &nbsp;<span style="color:#666;">' + unauthComps.count + ' over threshold without auth, ' + fmt$(unauthComps.total) + '</span>' : '') + '</td></tr>'
       + '<tr><td>Confirmed Theft (adjustment log)</td><td class="right">' + (confirmed.score != null ? confirmed.score : '-') + (confirmed.count ? ' &nbsp;<span style="color:#666;">' + confirmed.count + ' events, ' + fmt$(confirmed.totalValue) + '</span>' : '') + '</td></tr>'
       + '</table>'
 
@@ -445,7 +468,8 @@ S.TheftRisk = {
   renderMain() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
     const confirmed = this.theftConfirmedSignal();
-    const autoScores = [pour.score, voids.score, cash.score, confirmed.score].filter(s => s != null);
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
     const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
     const manScore = this.manualScore(this._manual.level);
 
@@ -511,9 +535,21 @@ S.TheftRisk = {
           + (confirmed.count >= 3 ? 'Multiple confirmed events points to an ongoing problem, not a one-off.'
              : 'Documented but contained. Keep an eye on whether it repeats.');
 
+    const threshold = parseFloat((App.data?.settings || {}).comp_auth_threshold);
+    const thresholdLabel = (!isNaN(threshold) && threshold > 0) ? '$' + threshold : 'your threshold';
+    const unauthBody = unauthComps.score == null
+      ? 'No void/comp records logged yet. Setting a Comp Auth Threshold in Hub Settings enables this signal.'
+      : unauthComps.count === 0
+        ? 'No unauthorized large comps in the last 90 days. Every comp over ' + thresholdLabel + ' had a manager in the Authorized By field, which is what you want.'
+        : unauthComps.count + ' comp' + (unauthComps.count === 1 ? '' : 's')
+          + ' over ' + thresholdLabel + ' filed in the last 90 days without manager authorization, totaling ' + App.fmtCurrency(unauthComps.total) + '. '
+          + (unauthComps.count >= 3 ? 'A pattern of unauthorized large comps is one of the most common bar-theft vectors. Tighten the rule.'
+             : 'One instance can be a busy night. Repeats are a pattern.');
+
     const signals = signalCard('Pour Variance &middot; Spot Checks', pour, pourBody)
       + signalCard('Voids &amp; Comps', voids, voidBody)
       + signalCard('Cash Variance', cash, cashBody)
+      + signalCard('Unauthorized Large Comps', unauthComps, unauthBody)
       + signalCard('Confirmed Theft &middot; Adjustment Log', confirmed, confirmedBody);
 
     // ── Manual judgment ──
@@ -616,7 +652,8 @@ S.TheftRisk = {
   async save() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
     const confirmed = this.theftConfirmedSignal();
-    const autoScores = [pour.score, voids.score, cash.score, confirmed.score].filter(s => s != null);
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
     const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
     const manScore = this.manualScore(this._manual.level);
     let overall;
@@ -631,7 +668,7 @@ S.TheftRisk = {
       id: App.uid(),
       date: new Date().toISOString(),
       auto_score: autoScore,
-      signals: { pour: pour.score, voids: voids.score, cash: cash.score, confirmed: confirmed.score },
+      signals: { pour: pour.score, voids: voids.score, cash: cash.score, confirmed: confirmed.score, unauthComps: unauthComps.score },
       manual_level: this._manual.level,
       manual_score: manScore,
       notes: this._manual.notes,
