@@ -195,7 +195,7 @@ S.HubBooks = {
           : '<p style="color:#444;font-size:13px;margin-bottom:6px;">Total monthly opportunity across all systems: <strong>' + fmt$(totalMonthlyOpp) + '</strong>'
             + '. Annualized: <strong>' + fmt$(totalMonthlyOpp * 12) + '</strong>.</p>'
             + '<table>'
-            + topFive.map(it => '<tr><td>' + esc(it.system) + ' — ' + esc(it.title) + '</td><td class="right">' + fmt$(it.monthly) + '/mo</td></tr>').join('')
+            + topFive.map(it => '<tr><td>' + esc(it.system) + ': ' + esc(it.title) + '</td><td class="right">' + fmt$(it.monthly) + '/mo</td></tr>').join('')
             + '</table>')
 
       + '<div class="footer">'
