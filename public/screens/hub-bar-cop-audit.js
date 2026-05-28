@@ -909,6 +909,9 @@ S.HubBarCopAudit = {
 
     this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + historyCard + '</div>';
 
+    // Landing has no screen-specific topbar actions.
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+
     document.getElementById('bca-new-btn')?.addEventListener('click', () => this._generate());
     this.container.querySelectorAll('.bca-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx)));
@@ -1088,13 +1091,10 @@ S.HubBarCopAudit = {
       + 'Open each for fix detail.'
       + '</div>';
 
-    // Action bar — Back returns to the audit landing inside the same Hub
-    // page; Print opens the browser dialog.
+    // Detail page. No in-content action row: Back to Dashboard lives in the
+    // topbar (sidebar stays mounted so re-entering audit history is one
+    // click on the sidebar). Print / Save PDF lives in topbar-right.
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
-      +   '<button class="btn btn-ghost btn-sm" id="bca-back">Back to Audit History</button>'
-      +   '<button class="btn btn-ghost btn-sm" id="bca-print">Print / Save PDF</button>'
-      + '</div>'
 
       // Header card (mirrors recovery audit detail pattern, single-page layout)
       + '<div class="card" style="margin-bottom:16px;">'
@@ -1126,8 +1126,13 @@ S.HubBarCopAudit = {
 
       + '</div>';
 
-    document.getElementById('bca-back')?.addEventListener('click', () => this.renderMain());
-    document.getElementById('bca-print')?.addEventListener('click', () => window.print());
+    // Print button lives in the Hub topbar-right, mirroring how module
+    // audit screens put their Print action in topbar-right.
+    if (App.setHubTopbarActions) {
+      App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="bca-print-top">Print / Save PDF</button>');
+      document.getElementById('bca-print-top')?.addEventListener('click', () => window.print());
+    }
+
     this.container.querySelectorAll('.bca-nav').forEach(btn => {
       btn.addEventListener('click', () => this._navTo(btn.dataset.screen));
     });
