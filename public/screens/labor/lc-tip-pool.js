@@ -151,8 +151,10 @@ S.LaborTipPool = {
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       const hrow = ev.target.closest('.tp-hrow');
+      const hview = ev.target.closest('.tp-hview');
       const hdel = ev.target.closest('.tp-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
     };
     this.recalc();
@@ -309,6 +311,7 @@ S.LaborTipPool = {
       + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0) + '</td>'
       + '<td>' + ((p.participants || []).length) + '</td>'
       + '<td><div class="row-actions">'
+      + '<button class="btn btn-ghost btn-sm tp-hview" data-id="' + p.id + '">View</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
     return '<div class="card"><div class="card-title">Saved Tip Pools</div>'
