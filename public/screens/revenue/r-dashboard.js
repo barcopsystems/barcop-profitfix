@@ -94,70 +94,6 @@ S.RevenueDashboard = {
     FixPanel.wireFixAreas(container);
   },
 
-  showInsights() {
-    if (App.demoBlock('AI Trend Insights')) return;
-    const weeks = (App.data.revenue_weeks || [])
-      .filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0)
-      .slice(-8);
-    const showModal = (html) => {
-      const m = document.createElement('div');
-      m.className = 'ins-modal';
-      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-      const box = document.createElement('div');
-      box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
-      box.innerHTML = html;
-      m.appendChild(box);
-      document.body.appendChild(m);
-      m.onclick = ev => { if (ev.target === m) m.remove(); };
-      box.querySelector('.ins-close')?.addEventListener('click', () => m.remove());
-    };
-    if (weeks.length < 2) {
-      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of revenue data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-      return;
-    }
-    const btn = document.getElementById('r-insights-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
-    const t = (App.data.revenue_settings || {}).targets || {};
-    const caT    = t.check_avg ?? 35;
-    const laborT = ((t.bar_labor_pct ?? 28) + (t.kitchen_labor_pct ?? 30) + (t.floor_labor_pct ?? 32)) / 3;
-    const rplhT  = ((t.rplh_lunch ?? 50) + (t.rplh_dinner ?? 75) + (t.rplh_bar ?? 65)) / 3;
-    const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
-    const caS    = weeks.map(w => w.check_avg).filter(v => v != null);
-    const labS   = weeks.map(w => w.labor_pct_blended).filter(v => v != null);
-    const rplhS  = weeks.map(w => w.rplh_blended).filter(v => v != null);
-    const aCA    = avg(caS).toFixed(2);
-    const aLab   = avg(labS).toFixed(1);
-    const aRplh  = avg(rplhS).toFixed(0);
-    const trend  = caS.length >= 3
-      ? (caS[caS.length-1] - caS[0] > 1 ? 'trending higher (improving)'
-        : caS[0] - caS[caS.length-1] > 1 ? 'trending lower (worsening)'
-        : 'holding steady')
-      : 'early data';
-    const lines = [
-      'Check Average: ' + weeks.map(w => '$' + (w.check_avg||0).toFixed(2)).join(', ') + ' (target: $' + caT + ', avg: $' + aCA + ')',
-      'Labor Cost %: ' + weeks.map(w => (w.labor_pct_blended||0).toFixed(1) + '%').join(', ') + ' (target: ' + laborT.toFixed(1) + '%, avg: ' + aLab + '%)',
-      'RPLH: ' + weeks.map(w => '$' + (w.rplh_blended||0).toFixed(0)).join(', ') + ' (target: $' + rplhT.toFixed(0) + ', avg: $' + aRplh + ')',
-      'Covers: ' + weeks.map(w => Math.round(w.covers||0)).join(', '),
-      'Check average trend: ' + trend
-    ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with the biggest revenue lever (check average gap, labor productivity, or cover count), then the trend that matters, then the single action that will matter most this week.';
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Trend Insights'; }
-        if (data.error) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: ' + data.error.message + '</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
-        const text = data.content?.[0]?.text;
-        if (!text) { showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>'); return; }
-        const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last ' + weeks.length + ' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
-        const body = '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">') + '</div>';
-        showModal(header + body);
-      }).catch(err => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Trend Insights'; }
-        showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: ' + err.message + '. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-      });
-  },
-
   buildChart(weeks, t) {
     if (weeks.length < 2) return '<div class="chart-card" style="padding:24px 24px 20px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:32px;">8-Week Trend</div>'
@@ -208,7 +144,7 @@ S.RevenueDashboard = {
     const fixMarkers = (window.FixPanel && fixMarks.length)
       ? FixPanel.markerSvg(fixMarks, xs, PAD.t, PAD.t + ch) : '';
     const fixLegend = fixMarks.length
-      ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:#DBAB46;display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
+      ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:var(--gold);display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
       : '';
 
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
@@ -218,7 +154,7 @@ S.RevenueDashboard = {
       + '<button class="btn btn-ghost btn-sm" id="r-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
       + '</div>'
       + '<div style="display:flex;gap:20px;flex-wrap:wrap;">'
-      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Check Avg</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:var(--gold);display:inline-block;border-radius:1px;"></span>Check Avg</span>'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.4);display:inline-block;border-radius:1px;"></span>Labor %</span>'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.2);display:inline-block;border-radius:1px;"></span>RPLH</span>'
       + fixLegend
