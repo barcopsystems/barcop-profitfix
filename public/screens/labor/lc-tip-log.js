@@ -28,7 +28,7 @@ S.LaborTipLog = {
   hoursFor(staffId, date) {
     if (!staffId || !date) return null;
     const a = this.actuals().find(x => x.staff_id === staffId && x.date === date);
-    return a ? (a.hours_actual || a.hours_scheduled || null) : null;
+    return a ? (a.hours || null) : null;
   },
 
   // Shift dropdown options. Most-recent first. Includes Open shifts at the
@@ -81,8 +81,10 @@ S.LaborTipLog = {
   },
 
   renderList() {
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>';
+    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" id="tl-print-blank" style="margin-left:8px;">Print Tip Sheet</button>';
     document.getElementById('tl-export')?.addEventListener('click', () => window.print());
+    document.getElementById('tl-print-blank')?.addEventListener('click', () => this.printBlank());
     if (this.staff().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
         + '<div class="empty-title">Add staff first</div>'
@@ -325,17 +327,22 @@ S.LaborTipLog = {
     const shiftPick = document.getElementById('tl-shift')?.value || '';
     if (!shiftPick) { fail('Pick a shift or choose Manual entry.'); return; }
 
-    let date, shiftType, shiftId = '';
+    let date, shiftType, shiftId = '', managerId = '';
     if (shiftPick === '__manual') {
       date      = document.getElementById('tl-date')?.value;
       shiftType = document.getElementById('tl-shift-type')?.value || '';
       if (!date) { fail('Date is required for manual entry.'); return; }
+      // Manual entries still get a manager link when an active shift exists,
+      // so Form 8027 grouping has a chance at attribution. Falls back to empty
+      // when no shift is open.
+      managerId = App.activeManagerId ? App.activeManagerId() : '';
     } else {
       const s = this.shiftById(shiftPick);
       if (!s) { fail('Shift not found.'); return; }
       shiftId   = s.id;
       date      = s.date || new Date().toISOString().slice(0, 10);
       shiftType = s.shift_type || '';
+      managerId = s.manager_id || '';
     }
 
     const staff = this.staffById(document.getElementById('tl-staff')?.value);
@@ -347,6 +354,7 @@ S.LaborTipLog = {
     const rec = {
       id:          this.editId || App.uid(),
       shift_id:    shiftId,
+      manager_id:  managerId,
       date,
       staff_id:    staff.id,
       name:        staff.name,
@@ -386,5 +394,23 @@ S.LaborTipLog = {
     App.laborData.lc_tips = this.tips().filter(t => t.id !== id);
     await App.saveLabor();
     this.renderList();
+  },
+
+  // Paper-at-close workflow. Managers tally cash + card tips per server on a
+  // printed sheet during the shift, then enter into Bar Cop after close.
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Tip Sheet',
+      subtitle: 'Tally tips per server during the shift. Manager enters each row into Bar Cop after close.',
+      columns: [
+        { label: 'Server Name', width: '28%' },
+        { label: 'Cash Tips',   width: '14%' },
+        { label: 'Card Tips',   width: '14%' },
+        { label: 'Total',       width: '12%' },
+        { label: 'Hours',       width: '12%' },
+        { label: 'Notes',       width: '20%' }
+      ],
+      rows: 14
+    });
   }
 };
