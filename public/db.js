@@ -263,6 +263,8 @@ const DB = {
     'sc-86-list':'86-list',
     'sc-void-comp':'void-comp',
     'sc-maintenance':'maintenance',
+    'sc-walked-tabs':'cash-mgmt',
+    'sc-incident-log':'maintenance',
     'sc-reports-shift':'shift-reports','sc-reports-cash':'shift-reports','sc-reports-ops':'shift-reports',
     'sc-dashboard':'shift-dashboard','sc-help':'_always',
     // Profit Recovery (root + profit module screens)
