@@ -60,6 +60,7 @@ S.LaborScheduleHistory = {
           + (pct != null ? App.fmtPct(pct) : '-') + '</td>'
           + '<td>' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '-') + '</td>'
           + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm lh-view" data-id="' + s.id + '">View</button>'
           + '<button class="btn btn-ghost btn-sm lh-edit" data-id="' + s.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm lh-del" data-id="' + s.id + '">Delete</button>'
           + '</div></td></tr>';
@@ -81,11 +82,13 @@ S.LaborScheduleHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
       const row = ev.target.closest('.lh-row');
+      const view = ev.target.closest('.lh-view');
       const edit = ev.target.closest('.lh-edit');
       const del = ev.target.closest('.lh-del');
       const build = ev.target.closest('#lh-build');
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit)  { ev.stopPropagation(); this.editSchedule(edit.dataset.id); }
+      else if (view)  { ev.stopPropagation(); this.renderDetail(view.dataset.id); }
       else if (row)   this.renderDetail(row.dataset.id);
       else if (build) App.navigate('lc-build-schedule');
     };
