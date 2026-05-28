@@ -27,7 +27,7 @@ S.RevenueAudit = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div style="flex:1;min-width:200px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Revenue Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive revenue audit every 30 days. Upload your POS reports and labor data. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One revenue audit every 30 days. Upload your POS reports and labor data. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
       + '</div>'
       + (canRunAudit
           ? '<button class="btn btn-primary" id="ra-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>'
@@ -554,7 +554,21 @@ S.RevenueAudit = {
 
   showIntakeForm() {
     this._intakeStep = 1;
-    this._intakeDraft = { barRev: '', foodRev: '' };
+    // Pre-fill Annual Bar/Food Revenue. Priority: Hub Settings → 12-week
+    // revenue_weeks average × 52 → empty. Operator can override.
+    const s = App.data?.settings || {};
+    let barRev  = s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '';
+    let foodRev = s.annual_food_revenue != null ? String(s.annual_food_revenue) : '';
+    if (!barRev || !foodRev) {
+      const weeks = (App.data?.revenue_weeks || []).slice(-12);
+      if (weeks.length >= 1) {
+        const avgBar  = weeks.reduce((s, w) => s + (parseFloat(w.bar_revenue)   || 0), 0) / weeks.length;
+        const avgFood = weeks.reduce((s, w) => s + (parseFloat(w.floor_revenue) || 0), 0) / weeks.length;
+        if (!barRev  && avgBar  > 0) barRev  = String(Math.round(avgBar  * 52));
+        if (!foodRev && avgFood > 0) foodRev = String(Math.round(avgFood * 52));
+      }
+    }
+    this._intakeDraft = { barRev, foodRev };
     this.actions.innerHTML = '';
     this.renderIntakeStep();
   },
