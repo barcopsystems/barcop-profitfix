@@ -130,7 +130,7 @@ S.LaborOvertimeWatch = {
         const action = r.status === 'Over'
           ? '<span style="color:var(--red);font-weight:700;">Cut ' + r.cutHours.toFixed(1) + ' hr</span>'
           : r.status === 'Approaching'
-            ? '<span style="color:var(--gold);">Watch — ' + (this.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
+            ? '<span style="color:var(--gold);">Watch, ' + (this.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
             : '<span style="color:var(--t3);">-</span>';
         return '<tr>'
           + '<td><div class="val">' + esc(r.name) + '</div></td>'
