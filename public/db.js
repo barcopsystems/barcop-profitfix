@@ -292,7 +292,10 @@ const DB = {
     't-website':'traffic-recovery','t-gbp':'traffic-recovery',
     't-reviews':'traffic-recovery','t-search':'traffic-recovery',
     't-social':'traffic-recovery','t-delivery':'traffic-recovery',
-    't-email':'traffic-recovery','t-reports':'traffic-recovery','t-help':'_always'
+    't-email':'traffic-recovery',
+    't-regulars':'traffic-recovery','t-initiatives':'traffic-recovery',
+    't-holidays':'traffic-recovery','t-inquiries':'traffic-recovery',
+    't-reports':'traffic-recovery','t-help':'_always'
   },
 
   canAccessLevel(screen) {
