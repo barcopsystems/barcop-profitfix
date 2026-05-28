@@ -244,7 +244,7 @@ S.Hub = {
           + '</div>';
       } else {
         scoreBlock = '<div style="display:flex;align-items:baseline;gap:12px;">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--t4);line-height:1;">&#8212;</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--t4);line-height:1;">--</div>'
           + '<div style="flex:1;font-size:11px;color:var(--t3);">Run the first audit to score this module.</div>'
           + '</div>';
       }
@@ -397,7 +397,7 @@ S.Hub = {
       const lastVal  = [...series].reverse().find(v => v != null) ?? null;
       const status   = lastVal != null ? band(lastVal, target, dir) : 'none';
       const curColor = bandColor(status);
-      const curDisp  = lastVal != null ? valFmt(lastVal) : '—';
+      const curDisp  = lastVal != null ? valFmt(lastVal) : '--';
       const tgtDisp  = valFmt(target);
 
       const card = (inner) => '<div style="border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
@@ -588,7 +588,7 @@ S.Hub = {
     let readoutBody;
     if (!hasWeekData) {
       readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 16px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">&#8212; / wk</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">-- / wk</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:240px;">Enter this week\'s numbers in Profit and Revenue to see what is leaking and where.</div>'
         + '</div>';
     } else if (readout.items.length === 0) {
@@ -641,6 +641,7 @@ S.Hub = {
       settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       mail:    '<rect x="2.2" y="4" width="12.6" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 4.5l6.3 4.5 6.3-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      audit:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       signout: '<path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
     };
 
@@ -661,6 +662,12 @@ S.Hub = {
           ? ('<div class="nav-section">Locations</div>'
              + navItem('group-dashboard', 'Dashboard', 'allBars', []))
           : '')
+      // Analysis section — always visible. The Bar Cop Audit is the executive
+      // monthly read on the entire operation, distinct from the per-system
+      // recovery audits which live in their own sidebars. Single-location
+      // accounts see this section at the top of the Hub sidebar.
+      + '<div class="nav-section">Analysis</div>'
+      + navItem('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
       + '<div class="nav-section">Recovery</div>'
       + navItem('enter', 'Profit Recovery',  'profit',  [['data-mod','profit'],   ['data-screen','dashboard']])
       + navItem('enter', 'Revenue Recovery', 'revenue', [['data-mod','revenue'],  ['data-screen','r-dashboard']])
@@ -743,7 +750,6 @@ S.Hub = {
             </button>
           </div>
           <nav class="sidebar-nav">${sidebarNav}</nav>
-          <div class="sidebar-last-updated" style="font-size:10px;color:var(--t4);padding:8px 14px 10px;line-height:1.4;">${esc(lastUpdatedTxt)}</div>
           <div class="sidebar-footer">
             <button class="sidebar-btn" id="hub-signout">
               <svg class="nav-icon" viewBox="0 0 17 17" fill="none">${navIcons.signout}</svg>
@@ -798,6 +804,7 @@ S.Hub = {
       else if (action === 'settings')        S.HubSettings.open();
       else if (action === 'user-accounts')   S.HubUserAccounts.open();
       else if (action === 'group-dashboard') S.HubGroupDashboard.open();
+      else if (action === 'bar-cop-audit')   S.HubBarCopAudit?.open?.();
       else if (action === 'books')           S.HubBooks.open();
       else if (action === 'weekly-pnl')      S.Reports?._openQboModal?.();
       else if (action === 'year-end')        S.HubYearEnd.open();
