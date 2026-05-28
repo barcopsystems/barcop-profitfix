@@ -1,262 +1,163 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Bar Cop Recovery Systems</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=28"/>
-<style>
-@media print {
-  /* Flip the dark theme to a light, readable theme for print.
-     Almost everything reads these CSS variables, so overriding them
-     here recolors the whole audit automatically. */
-  :root {
-    --bg:#ffffff; --surface:#ffffff; --input:#ffffff;
-    --hover:transparent; --nav-act:#ffffff;
-    --gold:#8a6a16; --gold-h:#8a6a16; --gold-bg:#f3ecd6;
-    --red:#b3271a; --red-bg:#f7dfdc; --steel:#2f6a86;
-    --w:#000000; --t1:#1a1a1a; --t2:#333333; --t3:#555555; --t4:#777777;
-    --b1:#cccccc; --b2:#dddddd;
+'use strict';
+/* ── Hub Report Bug — single-form view to submit bug reports ──────────────────
+   A Hub-owned view, not a module screen. Opens from the Hub sidebar into the
+   Hub container. Form captures bug details plus auto-captured browser context
+   (user agent, viewport, the screen the operator came from) and submits to
+   the bug_reports Supabase table via DB.submitBugReport. Success state
+   replaces the form so the operator gets clear confirmation. */
+S.HubReportBug = {
+
+  _state: 'form',     // 'form' | 'success'
+  _submitting: false,
+
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "REPORT A BUG | Back to Dashboard".
+  open() {
+    this._state = 'form';
+    App.openHubFullPage('Report a Bug', (mount) => this.render(mount));
+  },
+
+  render(container) {
+    container.scrollTop = 0;
+    this._container = container;
+
+    const body = this._state === 'success' ? this._renderSuccess() : this._renderForm();
+
+    container.innerHTML = '<div class="screen">' + body + '</div>';
+
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+
+    if (this._state === 'form') {
+      document.getElementById('hrb-submit')?.addEventListener('click', () => this.submit());
+      document.getElementById('hrb-cancel')?.addEventListener('click', () => App.showHub());
+    } else {
+      document.getElementById('hrb-done')?.addEventListener('click', () => App.showHub());
+      document.getElementById('hrb-another')?.addEventListener('click', () => {
+        this._state = 'form';
+        this.render(container);
+      });
+    }
+  },
+
+  _renderForm() {
+    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--w);font-family:\'Barlow\',sans-serif;font-size:13px;padding:9px 11px;width:100%;outline:none;';
+    const taStyle    = inputStyle + 'resize:vertical;min-height:90px;line-height:1.6;';
+    const labelStyle = 'font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:7px;';
+    const reqStar    = '<span style="color:var(--red);margin-left:2px;">*</span>';
+
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">'
+      + 'Found a bug, a glitch, or something that just does not work the way it should? Tell the team what happened so we can find it and fix it fast. The more detail you give, the quicker we can get on it.'
+      + '</div>'
+      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+      +   '<div style="margin-bottom:18px;">'
+      +     '<label style="' + labelStyle + '">Short Title' + reqStar + '</label>'
+      +     '<input type="text" id="hrb-title" placeholder="One line summary of the problem" style="' + inputStyle + '"/>'
+      +   '</div>'
+      +   '<div style="margin-bottom:18px;">'
+      +     '<label style="' + labelStyle + '">Severity' + reqStar + '</label>'
+      +     '<select id="hrb-severity" style="' + inputStyle + 'cursor:pointer;">'
+      +       '<option value="minor">Minor (small glitch or visual issue)</option>'
+      +       '<option value="moderate" selected>Moderate (feature works but has bugs)</option>'
+      +       '<option value="major">Major (feature is broken)</option>'
+      +       '<option value="critical">Critical (Bar Cop unusable or data at risk)</option>'
+      +     '</select>'
+      +   '</div>'
+      +   '<div style="margin-bottom:18px;">'
+      +     '<label style="' + labelStyle + '">What Happened' + reqStar + '</label>'
+      +     '<textarea id="hrb-what" placeholder="Describe what you saw. Be specific about which page, which button, what data you were working with, and what went wrong." style="' + taStyle + '"></textarea>'
+      +   '</div>'
+      +   '<div style="margin-bottom:18px;">'
+      +     '<label style="' + labelStyle + '">Steps to Reproduce</label>'
+      +     '<textarea id="hrb-steps" placeholder="Number the steps to make the bug happen again. Example: 1. Open Profit Recovery. 2. Click This Week. 3. Enter $1,200. 4. The save button does not respond." style="' + taStyle + '"></textarea>'
+      +   '</div>'
+      +   '<div style="margin-bottom:18px;">'
+      +     '<label style="' + labelStyle + '">What Did You Expect to Happen</label>'
+      +     '<textarea id="hrb-expected" placeholder="Describe what should have happened instead. This helps us know if it is a bug or a misunderstanding of how the feature works." style="' + taStyle + '"></textarea>'
+      +   '</div>'
+      +   '<div id="hrb-status" style="font-size:11px;font-weight:700;letter-spacing:0.04em;margin-bottom:12px;display:none;"></div>'
+      +   '<div style="display:flex;gap:10px;align-items:center;">'
+      +     '<button class="btn btn-primary" id="hrb-submit">Submit Report</button>'
+      +     '<button class="btn btn-ghost" id="hrb-cancel">Cancel</button>'
+      +   '</div>'
+      + '</div>';
+  },
+
+  _renderSuccess() {
+    return '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:48px 24px;text-align:center;">'
+      + '<svg width="56" height="56" viewBox="0 0 26 26" fill="none" style="margin:0 auto;display:block;">'
+      +   '<circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/>'
+      +   '<path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '</svg>'
+      + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;margin-top:18px;text-transform:uppercase;">Report Submitted</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-top:14px;max-width:460px;margin-left:auto;margin-right:auto;">Got it. Your report is in the queue and the team is on it. A fix will land in the next update. Keep running your operation in the meantime.</div>'
+      + '<div style="margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'
+      +   '<button class="btn btn-primary" id="hrb-done">Back to Hub</button>'
+      +   '<button class="btn btn-ghost" id="hrb-another">Submit Another</button>'
+      + '</div>'
+      + '</div>';
+  },
+
+  async submit() {
+    if (this._submitting) return;
+
+    const $ = (id) => document.getElementById(id);
+    const title    = ($('hrb-title')?.value || '').trim();
+    const severity = $('hrb-severity')?.value || 'moderate';
+    const what     = ($('hrb-what')?.value || '').trim();
+    const steps    = ($('hrb-steps')?.value || '').trim();
+    const expected = ($('hrb-expected')?.value || '').trim();
+    const status   = $('hrb-status');
+
+    const showError = (msg) => {
+      if (!status) return;
+      status.style.color = 'var(--red)';
+      status.textContent = msg;
+      status.style.display = 'block';
+    };
+
+    if (!title) { showError('Please enter a short title for the bug.'); $('hrb-title')?.focus(); return; }
+    if (!what)  { showError('Please describe what happened.');          $('hrb-what')?.focus();  return; }
+
+    this._submitting = true;
+    const btn = $('hrb-submit');
+    if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+    if (status) { status.style.display = 'none'; }
+
+    const prevLoc = App._previousLocation;
+    const report = {
+      title:              title,
+      severity:           severity,
+      what_happened:      what,
+      steps_to_reproduce: steps,
+      expected_behavior:  expected,
+      previous_screen:    prevLoc ? (prevLoc.label + ' (' + (prevLoc.module || prevLoc.mode) + '/' + prevLoc.screen + ')') : 'Hub',
+      user_agent:         navigator.userAgent || '',
+      viewport:           window.innerWidth + 'x' + window.innerHeight
+    };
+
+    const result = await DB.submitBugReport(report);
+
+    if (!result.ok) {
+      this._submitting = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Submit Report'; }
+      showError('Could not submit your report right now. Check your internet connection and try again. If it keeps failing, the server may be temporarily down.');
+      return;
+    }
+
+    // DB record is saved — fire the notification email best-effort. We don't
+    // block the success state on this; if Resend is misconfigured or down,
+    // the bug is still in Supabase and the team will see it on next check.
+    try {
+      const payload = Object.assign({}, report, { user_email: (DB._user && DB._user.email) || '' });
+      await fetch('/api/report-bug-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) { /* notification failure is non-fatal */ }
+
+    this._submitting = false;
+    this._state = 'success';
+    this.render(this._container);
   }
-  .sidebar, .topbar { display: none !important; }
-  .btn, button { display: none !important; }
-  html, body { background:#fff !important; height:auto !important; overflow:visible !important; }
-  .app { display:block !important; height:auto !important; overflow:visible !important; }
-  .main { display:block !important; }
-  .content { padding:0 !important; overflow:visible !important; }
-  .screen { max-width:none !important; padding:0 !important; }
-  .card { box-shadow:none !important; break-inside:avoid; }
-  /* Any element still painted pure white from a literal hex */
-  [style*="color:#fff"], [style*="color: #fff"],
-  [style*="color:#ffffff"], [style*="color: #ffffff"] { color:#000 !important; }
-}
-</style>
-</head>
-<body>
-
-<!-- AUTH -->
-<div id="auth-screen" class="auth-screen" style="display:none;">
-  <div class="auth-panel">
-    <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
-    <div id="auth-login">
-      <div id="checkout-success-msg" style="background:rgba(219,171,70,0.1);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--gold);line-height:1.6;text-align:center;">
-        Your Bar Cop account is ready. Enter your email below and click Forgot Password to set your password and access your Recovery Hub.
-      </div>
-      <div class="auth-heading">Sign In</div>
-      <div class="auth-sub">Enter your email and password to access your account.</div>
-      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="login-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
-      <div class="f" style="margin-bottom:18px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/></div>
-      <button class="btn btn-primary" id="login-btn" style="width:100%;">Sign In</button>
-      <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-      <div style="text-align:center;margin-top:12px;"><button class="auth-link" id="show-reset" style="font-size:11px;">Forgot password?</button></div>
-    </div>
-    <div id="auth-reset" style="display:none;">
-      <div class="auth-heading">Reset Password</div>
-      <div class="auth-sub">Enter your email for a reset link.</div>
-      <div class="f" style="margin-bottom:18px;"><label>Email</label><input type="email" id="reset-email" placeholder="you@yourbar.com"/></div>
-      <button class="btn btn-primary" id="reset-btn" style="width:100%;">Send Reset Link</button>
-      <div id="reset-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-      <div style="text-align:center;margin-top:14px;"><button class="auth-link" id="show-login2">Back to sign in</button></div>
-    </div>
-    <div id="auth-set-password" style="display:none;">
-      <div class="auth-heading">Set Your Password</div>
-      <div class="auth-sub">Choose a password to access your Bar Cop account.</div>
-      <div class="f" style="margin-bottom:10px;"><label>New Password</label><input type="password" id="set-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
-      <div class="f" style="margin-bottom:18px;"><label>Confirm Password</label><input type="password" id="set-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
-      <button class="btn btn-primary" id="set-pw-btn" style="width:100%;">Set Password and Sign In</button>
-      <div id="set-pw-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ONBOARDING -->
-<div id="ob-overlay" class="ob-overlay hidden">
-  <div class="ob-panel">
-    <div class="ob-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:26px;"/></div>
-    <div id="ob-content"></div>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app" class="app hidden">
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
-      <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
-      <button class="sidebar-logo-toggle" id="sidebar-toggle" title="Toggle sidebar">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
-      </button>
-    </div>
-    <nav class="sidebar-nav" id="sidebar-nav">
-      <!-- Nav injected dynamically by App._renderNav() -->
-    </nav>
-    <div class="sidebar-footer">
-      <button class="sidebar-btn" id="signout-btn">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="sidebar-btn-label">Sign Out</span>
-      </button>
-    </div>
-  </aside>
-
-  <div class="main">
-    <header class="topbar">
-      <div class="topbar-left">
-        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
-        <span class="topbar-sub" id="topbar-sub"></span>
-      </div>
-      <div id="topbar-account-switcher" style="display:none;"></div>
-      <div class="topbar-right" id="topbar-actions"></div>
-    </header>
-    <main class="content" id="content-area"></main>
-  </div>
-</div>
-
-<!-- Tooltip box -->
-<div class="tt-box" id="tt-box">
-  <div class="tt-title" id="tt-title"></div>
-  <div class="tt-body" id="tt-body"></div>
-  <div class="tt-eg" id="tt-eg"></div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script>var S = {};</script>
-<script src="sample-profile.js?v=1"></script>
-<script src="nav.js?v=34"></script>
-<script src="screens/hub.js?v=85"></script>
-<script src="screens/hub-bar-cop-audit.js?v=7"></script>
-<script src="screens/dashboard.js?v=20"></script>
-<script src="screens/this-week.js?v=14"></script>
-<script src="screens/bar-products.js?v=5"></script>
-<script src="screens/kitchen-products.js?v=5"></script>
-<script src="screens/recipe-cost-analysis.js?v=4"></script>
-<script src="screens/vendor-watch.js?v=5"></script>
-<script src="screens/vendor-scorecard.js?v=2"></script>
-<script src="screens/vendor-discrepancy.js?v=8"></script>
-<script src="screens/theft-risk.js?v=9"></script>
-<script src="screens/pour-test.js?v=1"></script>
-<script src="screens/yield-test.js?v=1"></script>
-<script src="screens/cash-recon.js?v=4"></script>
-<script src="components/audit-outlook.js?v=2"></script>
-<script src="screens/audit-tracker.js?v=23"></script>
-<script src="screens/reports.js?v=10"></script>
-<script src="screens/settings.js?v=63"></script>
-<script src="screens/hub-getting-started.js?v=11"></script>
-<script src="screens/hub-help.js?v=8"></script>
-<script src="screens/hub-report-bug.js?v=6"></script>
-<script src="screens/hub-support.js?v=4"></script>
-<script src="screens/hub-user-accounts.js?v=11"></script>
-<script src="screens/hub-group-dashboard.js?v=2"></script>
-<script src="screens/hub-books.js?v=13"></script>
-<script src="screens/hub-year-end.js?v=4"></script>
-<script src="screens/help.js?v=15"></script>
-<script src="screens/profit-fix.js?v=2"></script>
-<script src="screens/revenue/r-audit.js?v=27"></script>
-<script src="screens/revenue/r-dashboard.js?v=22"></script>
-<script src="screens/revenue/r-forecast.js?v=2"></script>
-<script src="screens/revenue/r-this-week.js?v=15"></script>
-<script src="screens/revenue/r-server-check.js?v=11"></script>
-<script src="screens/revenue/r-menu-items.js?v=23"></script>
-<script src="screens/revenue/r-menu-engineering.js?v=14"></script>
-<script src="screens/revenue/r-pricing.js?v=4"></script>
-<script src="screens/revenue/r-dog-test.js?v=4"></script>
-<script src="screens/revenue/r-rplh.js?v=8"></script>
-<script src="screens/revenue/r-events.js?v=12"></script>
-<script src="screens/revenue/r-reports.js?v=6"></script>
-<script src="screens/revenue/r-help.js?v=10"></script>
-<script src="screens/revenue/r-fix.js?v=2"></script>
-<script src="screens/traffic/t-dashboard.js?v=23"></script>
-<script src="screens/traffic/t-audit.js?v=25"></script>
-<script src="screens/traffic/t-this-week.js?v=9"></script>
-<script src="screens/traffic/t-gbp.js?v=7"></script>
-<script src="screens/traffic/t-reviews.js?v=6"></script>
-<script src="screens/traffic/t-search.js?v=4"></script>
-<script src="screens/traffic/t-website.js?v=4"></script>
-<script src="screens/traffic/t-social.js?v=6"></script>
-<script src="screens/traffic/t-delivery.js?v=4"></script>
-<script src="screens/traffic/t-email.js?v=6"></script>
-<script src="screens/traffic/t-regulars.js?v=1"></script>
-<script src="screens/traffic/t-initiatives.js?v=1"></script>
-<script src="screens/traffic/t-holidays.js?v=1"></script>
-<script src="screens/traffic/t-inquiries.js?v=1"></script>
-<script src="screens/traffic/t-reports.js?v=6"></script>
-<script src="screens/traffic/t-help.js?v=9"></script>
-<script src="screens/traffic/t-fix.js?v=2"></script>
-<script src="components/bottle-slider.js?v=3"></script>
-<script src="components/csv-mapper.js?v=1"></script>
-<script src="components/drag-reorder.js?v=1"></script>
-<script src="recovery.js?v=9"></script>
-<script src="components/fix-panel.js?v=33"></script>
-<script src="fixlayer/fix-profit.js?v=24"></script>
-<script src="fixlayer/fix-revenue.js?v=28"></script>
-<script src="fixlayer/fix-traffic.js?v=25"></script>
-<script src="screens/inventory/ic-product-setup.js?v=15"></script>
-<script src="screens/inventory/ic-locations.js?v=9"></script>
-<script src="screens/inventory/ic-vendors.js?v=5"></script>
-<script src="screens/inventory/ic-prep-batches.js?v=4"></script>
-<script src="screens/inventory/ic-take-inventory.js?v=7"></script>
-<script src="screens/inventory/ic-count-history.js?v=3"></script>
-<script src="screens/inventory/ic-spot-check.js?v=8"></script>
-<script src="screens/inventory/ic-transfers.js?v=2"></script>
-<script src="screens/inventory/ic-empties.js?v=1"></script>
-<script src="screens/inventory/ic-adjustments.js?v=1"></script>
-<script src="screens/inventory/ic-par-suggestions.js?v=3"></script>
-<script src="screens/inventory/ic-order-sheet.js?v=8"></script>
-<script src="screens/inventory/ic-order-history.js?v=4"></script>
-<script src="screens/inventory/ic-receive-delivery.js?v=13"></script>
-<script src="screens/inventory/ic-delivery-history.js?v=3"></script>
-<script src="screens/inventory/ic-report-usage.js?v=4"></script>
-<script src="screens/inventory/ic-report-variance.js?v=7"></script>
-<script src="screens/inventory/ic-report-stock.js?v=3"></script>
-<script src="screens/inventory/ic-report-movers.js?v=4"></script>
-<script src="screens/inventory/ic-dashboard.js?v=4"></script>
-<script src="screens/inventory/ic-help.js?v=6"></script>
-<script src="screens/shift/sc-log-shift.js?v=9"></script>
-<script src="screens/shift/sc-shift-history.js?v=6"></script>
-<script src="screens/shift/sc-shift-handoff.js?v=4"></script>
-<script src="screens/shift/sc-drawers.js?v=1"></script>
-<script src="screens/shift/sc-cash-settings.js?v=2"></script>
-<script src="screens/shift/sc-comp-settings.js?v=1"></script>
-<script src="screens/shift/sc-cash-control.js?v=2"></script>
-<script src="screens/shift/sc-cash-drop.js?v=10"></script>
-<script src="screens/shift/sc-safe-log.js?v=7"></script>
-<script src="screens/shift/sc-variance-log.js?v=10"></script>
-<script src="screens/shift/sc-86-list.js?v=13"></script>
-<script src="screens/shift/sc-void-comp.js?v=12"></script>
-<script src="screens/shift/sc-walked-tabs.js?v=1"></script>
-<script src="screens/shift/sc-incident-log.js?v=1"></script>
-<script src="screens/shift/sc-waste.js?v=4"></script>
-<script src="screens/shift/sc-maintenance.js?v=8"></script>
-<script src="screens/shift/sc-opening-checklist.js?v=6"></script>
-<script src="screens/shift/sc-closing-checklist.js?v=6"></script>
-<script src="screens/shift/sc-checklist-templates.js?v=3"></script>
-<script src="screens/shift/sc-active-shift.js?v=14"></script>
-<script src="screens/shift/sc-reports-shift.js?v=2"></script>
-<script src="screens/shift/sc-reports-cash.js?v=1"></script>
-<script src="screens/shift/sc-reports-ops.js?v=2"></script>
-<script src="screens/shift/sc-dashboard.js?v=2"></script>
-<script src="screens/shift/sc-help.js?v=6"></script>
-<script src="screens/labor/lc-positions.js?v=3"></script>
-<script src="screens/labor/lc-wage-settings.js?v=1"></script>
-<script src="screens/labor/lc-staff-roster.js?v=9"></script>
-<script src="screens/labor/lc-build-schedule.js?v=6"></script>
-<script src="screens/labor/lc-schedule-history.js?v=4"></script>
-<script src="screens/labor/lc-schedule-templates.js?v=2"></script>
-<script src="screens/labor/lc-log-hours.js?v=7"></script>
-<script src="screens/labor/lc-daily-view.js?v=4"></script>
-<script src="screens/labor/lc-weekly-summary.js?v=4"></script>
-<script src="screens/labor/lc-pay-periods.js?v=3"></script>
-<script src="screens/labor/lc-tip-log.js?v=8"></script>
-<script src="screens/labor/lc-tip-pool.js?v=5"></script>
-<script src="screens/labor/lc-tip-history.js?v=3"></script>
-<script src="screens/labor/lc-overtime-watch.js?v=5"></script>
-<script src="screens/labor/lc-callout-log.js?v=7"></script>
-<script src="screens/labor/lc-reports.js?v=2"></script>
-<script src="screens/labor/lc-help.js?v=5"></script>
-<script src="screens/labor/lc-dashboard.js?v=3"></script>
-<script src="components/onboarding.js?v=14"></script>
-<script src="db.js?v=43"></script>
-<script src="app.js?v=138"></script>
-</body>
-</html>
+};
