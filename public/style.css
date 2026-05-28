@@ -20,14 +20,14 @@
   --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
   --blue-bg:   rgba(76,142,171,0.10);
   --amber:     #9A5D34;                /* Warn/watch state: muted burnt brown, between red (bad) and green (good) */
-  --amber-bg:  rgba(154,93,52,0.10);
+  --amber-bg:  rgba(154,93,52,0.12);
 
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.94);
   --t2:        rgba(200,216,232,0.66);
   --t3:        rgba(255,255,255,0.38);
   --t4:        rgba(255,255,255,0.22);
-  --b1:        rgba(255,255,255,0.12);
+  --b1:        rgba(255,255,255,0.10);
   --b2:        rgba(255,255,255,0.06);
   --b-edge:    #22282F;                /* Outer borders that touch the black page bg */
 
