@@ -7,10 +7,10 @@
    own Help screen. Renders into the Hub container, never the module app shell. */
 S.HubHelp = {
 
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "HELP AND FAQ | Back to Dashboard".
   open() {
-    // Open as a modal overlay on top of the Hub Dashboard so the operator
-    // never loses context. The dashboard renders behind (blurred).
-    App.openHubOverlay((panel) => this.render(panel));
+    App.openHubFullPage('Help and FAQ', (mount) => this.render(mount));
   },
 
   render(container) {
@@ -82,14 +82,10 @@ S.HubHelp = {
 
     container.scrollTop = 0;
     container.innerHTML =
-      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Help and FAQ</div>'
-      +   '<button id="hh-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>'
+      '<div class="screen">'
       + sectionsHtml
       + '</div>';
 
-    document.getElementById('hh-close')?.addEventListener('click', () => App.closeHubOverlay());
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
   }
 };
