@@ -113,7 +113,7 @@ S.ShiftLogShift = {
 
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Opening Bank</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ls-bank" value="' + v(s?.opening_bank) + '" step="0.01"/></div></div>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ls-bank" value="' + v(s?.opening_bank || (() => { const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false); return firstDrawer && firstDrawer.default_opening_bank != null ? firstDrawer.default_opening_bank : ''; })()) + '" step="0.01"/></div></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Staff on Floor</label>'
       + '<input type="number" id="ls-staff" value="' + v(s?.staff_on_floor) + '" min="0"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="ls-status">'
