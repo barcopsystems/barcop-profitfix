@@ -217,6 +217,23 @@ const Traffic = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3.5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 6.5l7 4.5 7-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Email and Loyalty</span>
       </div>
+      <div class="nav-section">Guests and Planning</div>
+      <div class="nav-item" data-screen="t-regulars" id="nav-t-regulars">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 14c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 5.5l1 1.2L15.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">VIP Regulars</span>
+      </div>
+      <div class="nav-item" data-screen="t-initiatives" id="nav-t-initiatives">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 13l3-4 3 2 5-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Slow-Night Initiatives</span>
+      </div>
+      <div class="nav-item" data-screen="t-holidays" id="nav-t-holidays">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="6" cy="11" r="0.7" fill="currentColor"/><circle cx="8.5" cy="11" r="0.7" fill="currentColor"/><circle cx="11" cy="11" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Holiday and Events</span>
+      </div>
+      <div class="nav-item" data-screen="t-inquiries" id="nav-t-inquiries">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 4h11v8H6l-3 3V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 7h5M6 9.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Group Inquiries</span>
+      </div>
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="t-reports" id="nav-t-reports">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
