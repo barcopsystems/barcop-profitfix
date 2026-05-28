@@ -44,8 +44,9 @@ S.TrafficThisWeek = {
       email_list_size:  lastIfSet('email_list_size'),
       emails_sent:      lastIfSet('emails_sent'),
       email_open_rate:  lastIfSet('email_open_rate'),
-      loyalty_active:   lastIfSet('loyalty_active'),
-      loyalty_members:  lastIfSet('loyalty_members'),
+      loyalty_active:      lastIfSet('loyalty_active'),
+      loyalty_members:     lastIfSet('loyalty_members'),
+      loyalty_redemptions: lastIfSet('loyalty_redemptions'),
       notes: ''
     };
   },
@@ -255,6 +256,7 @@ S.TrafficThisWeek = {
       + '<div class="f" style="width:160px;"><label>Email Open Rate ' + tt('t-email-open') + '</label><div class="fw"><input class="suf" type="number" id="ttw-eor" value="' + esc(this.draft.email_open_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcEmail()"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:140px;"><label>Loyalty Program ' + tt('t-loyalty-active') + '</label>' + this.yesNo('ttw-loya', this.draft.loyalty_active) + '</div>'
       + '<div class="f" style="width:160px;"><label>Loyalty Members ' + tt('t-loyalty-members') + '</label><div class="fw"><input class="suf" type="number" id="ttw-loym" value="' + esc(this.draft.loyalty_members) + '"/><span class="suf">members</span></div></div>'
+      + '<div class="f" style="width:170px;"><label>Loyalty Redemptions/Mo ' + tt('t-loyalty-redemptions') + '</label><div class="fw"><input class="suf" type="number" id="ttw-loyr" value="' + esc(this.draft.loyalty_redemptions) + '"/><span class="suf">/mo</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Open Rate</div><div id="ttw-eor-status">' + eorStatus + '</div></div>'
@@ -306,8 +308,9 @@ S.TrafficThisWeek = {
       + row('Email List Size',  d.email_list_size || '',                        '',           null)
       + row('Emails Sent/Mo',   d.emails_sent || '',                            '',           null)
       + row('Email Open Rate',  eor != null ? eor.toFixed(0) + '%' : '',         '20% or more', eor != null ? eor >= 20 : null)
-      + row('Loyalty Program',  yn(d.loyalty_active),                           '',           null)
-      + row('Loyalty Members',  d.loyalty_members || '',                        '',           null)
+      + row('Loyalty Program',     yn(d.loyalty_active),                        '',           null)
+      + row('Loyalty Members',     d.loyalty_members || '',                     '',           null)
+      + row('Loyalty Redemptions', d.loyalty_redemptions || '',                 '',           null)
       + '</tbody></table></div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label><textarea id="ttw-notes" rows="2">' + esc(d.notes || '') + '</textarea></div>'
       + this.nav(true, false, true)
@@ -352,6 +355,7 @@ S.TrafficThisWeek = {
       d.email_list_size = val('ttw-els'); d.emails_sent = val('ttw-esnt');
       d.email_open_rate = val('ttw-eor'); d.loyalty_active = val('ttw-loya');
       d.loyalty_members = val('ttw-loym');
+      d.loyalty_redemptions = val('ttw-loyr');
     }
     if (step === 7) { d.notes = val('ttw-notes'); }
   },
@@ -404,9 +408,10 @@ S.TrafficThisWeek = {
       email_list_size:  list,
       emails_sent:      numI(d.emails_sent),
       email_open_rate:  numF(d.email_open_rate),
-      loyalty_active:   d.loyalty_active || null,
-      loyalty_members:  numI(d.loyalty_members),
-      notes:            d.notes
+      loyalty_active:      d.loyalty_active || null,
+      loyalty_members:     numI(d.loyalty_members),
+      loyalty_redemptions: numI(d.loyalty_redemptions),
+      notes:               d.notes
     };
 
     App.data.traffic_weeks = App.data.traffic_weeks || [];
