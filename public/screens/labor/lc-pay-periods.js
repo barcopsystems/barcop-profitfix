@@ -183,7 +183,7 @@ S.LaborPayPeriods = {
     const saved = this.periods().find(p => p.week_start === weekStart);
     const isClosed = !!saved && saved.status === 'Closed';
 
-    const stateMin = parseFloat((App.data?.settings || {}).state_min_wage);
+    const stateMin = parseFloat((App.laborData?.settings || {}).state_min_wage);
     const stateMinValid = !isNaN(stateMin) && stateMin > 0;
     let belowMinCount = 0;
     const rows = agg.rows.sort((a, b) => b.gross - a.gross).map(r => {
@@ -350,7 +350,7 @@ S.LaborPayPeriods = {
       return;
     }
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
-    const stateMin = parseFloat((App.data?.settings || {}).state_min_wage);
+    const stateMin = parseFloat((App.laborData?.settings || {}).state_min_wage);
     const stateMinValid = !isNaN(stateMin) && stateMin > 0;
     const header = [
       'Staff Name', 'Position', 'Week Start', 'Week End',
