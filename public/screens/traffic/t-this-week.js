@@ -16,20 +16,36 @@ S.TrafficThisWeek = {
     } catch(e) {}
     const weeks = App.data.traffic_weeks || [];
     const lastWk = weeks.length ? Math.max(...weeks.map(w => w.week_num || 0)) : 0;
+    // Pre-fill from the latest weekly snapshot so Monday's wizard is
+    // confirm-and-update, not retype-from-blank. Operator only touches the
+    // numbers that actually moved. Active + rating per delivery platform
+    // intentionally not pre-filled here — those live on t-delivery now and
+    // get edited there. gbp_views + social_profile_visits killed per Decide
+    // #4: operators don't pull those weekly. Per Kyle's deep-dive triage.
+    const last = weeks.length ? weeks[weeks.length - 1] : null;
+    const lastIfSet = (key) => last && last[key] != null ? String(last[key]) : '';
     return {
       _step: 1,
       week_num: lastWk + 1,
-      period_end: App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0,10),
-      google_rating: '', google_total: '', new_reviews: '', response_rate: '',
-      gbp_views: '',
-      yelp_rating: '', yelp_total: '',
-      monthly_sessions: '', bounce_rate: '',
-      ig_followers: '', ig_posts_month: '', fb_followers: '',
-      social_profile_visits: '',
-      dd_active: '', dd_rating: '', ue_active: '', ue_rating: '', gh_active: '', gh_rating: '',
-      delivery_orders: '', delivery_avg_order_value: '',
-      email_list_size: '', emails_sent: '', email_open_rate: '',
-      loyalty_active: '', loyalty_members: '',
+      period_end: App.nextSunday(),
+      google_rating:    lastIfSet('google_rating'),
+      google_total:     lastIfSet('google_total'),
+      new_reviews:      lastIfSet('new_reviews'),
+      response_rate:    lastIfSet('response_rate'),
+      yelp_rating:      lastIfSet('yelp_rating'),
+      yelp_total:       lastIfSet('yelp_total'),
+      monthly_sessions: lastIfSet('monthly_sessions'),
+      bounce_rate:      lastIfSet('bounce_rate'),
+      ig_followers:     lastIfSet('ig_followers'),
+      ig_posts_month:   lastIfSet('ig_posts_month'),
+      fb_followers:     lastIfSet('fb_followers'),
+      delivery_orders:           lastIfSet('delivery_orders'),
+      delivery_avg_order_value:  lastIfSet('delivery_avg_order_value'),
+      email_list_size:  lastIfSet('email_list_size'),
+      emails_sent:      lastIfSet('emails_sent'),
+      email_open_rate:  lastIfSet('email_open_rate'),
+      loyalty_active:   lastIfSet('loyalty_active'),
+      loyalty_members:  lastIfSet('loyalty_members'),
       notes: ''
     };
   },
@@ -117,7 +133,6 @@ S.TrafficThisWeek = {
       + '<div class="f" style="width:130px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="ttw-rr" value="' + esc(this.draft.response_rate) + '" step="1" min="0" max="100" oninput="S.TrafficThisWeek.calcGBP()"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Yelp Rating ' + tt('t-yelp-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-yr" value="' + esc(this.draft.yelp_rating) + '" step="0.1" min="1" max="5"/><span class="suf">★</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Yelp Reviews ' + tt('t-yelp-total') + '</label><div class="fw"><input class="suf" type="number" id="ttw-yt" value="' + esc(this.draft.yelp_total) + '"/><span class="suf">total</span></div></div>'
-      + '<div class="f" style="width:160px;"><label>GBP Views/Mo ' + tt('t-gbp-views') + '</label><div class="fw"><input class="suf" type="number" id="ttw-gbpv" value="' + esc(this.draft.gbp_views) + '"/><span class="suf">/mo</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Rating vs Target</div><div id="ttw-gr-status">' + st(gr, gr>=tGR, gr!=null?(gr.toFixed(1)+'★ vs '+tGR+'★'):'') + '</div></div>'
@@ -182,7 +197,6 @@ S.TrafficThisWeek = {
       + '<div class="f" style="width:180px;"><label>Instagram Followers ' + tt('t-ig-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igf" value="' + esc(this.draft.ig_followers) + '"/><span class="suf">followers</span></div></div>'
       + '<div class="f" style="width:180px;"><label>IG Posts/Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="ttw-igp" value="' + esc(this.draft.ig_posts_month) + '" oninput="S.TrafficThisWeek.calcSocial()"/><span class="suf">posts</span></div></div>'
       + '<div class="f" style="width:180px;"><label>Facebook Followers ' + tt('t-fb-followers') + '</label><div class="fw"><input class="suf" type="number" id="ttw-fbf" value="' + esc(this.draft.fb_followers) + '"/><span class="suf">followers</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>Profile Visits/Mo ' + tt('t-social-profile-visits') + '</label><div class="fw"><input class="suf" type="number" id="ttw-spv" value="' + esc(this.draft.social_profile_visits) + '"/><span class="suf">/mo</span></div></div>'
       + '</div>'
       + '<div class="calc">'
       + '<div class="calc-item"><div class="calc-label">Posts vs Target</div><div id="ttw-sp-status">' + spStatus + '</div></div>'
@@ -199,31 +213,33 @@ S.TrafficThisWeek = {
   },
 
   step5() {
-    return '<div class="card"><div class="card-title">Delivery Platforms</div>'
+    // Active status + per-platform ratings live on t-delivery now (canonical
+    // store in traffic_settings.profile). The weekly wizard captures only
+    // rolled-up volume: total orders and avg order value across all platforms.
+    const ord = parseInt(this.draft.delivery_orders) || null;
+    const aov = parseFloat(this.draft.delivery_avg_order_value) || null;
+    const rev = (ord && aov) ? ord * aov : null;
+    const revStatus = rev != null
+      ? '<span class="calc-val good">' + App.fmtCurrency(rev, 0) + '/mo across all platforms</span>'
+      : '<span class="calc-val">Enter orders and avg order</span>';
+    return '<div class="card"><div class="card-title">Delivery Volume</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Per-platform rating and active status live on the Delivery Platforms screen. This step captures the rolled-up volume for the week.</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:130px;"><label>DoorDash Active ' + tt('t-delivery-active') + '</label>' + this.yesNo('ttw-dda', this.draft.dd_active) + '</div>'
-      + '<div class="f" style="width:130px;"><label>DoorDash Rating ' + tt('t-delivery-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-dd" value="' + esc(this.draft.dd_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Uber Eats Active ' + tt('t-delivery-active') + '</label>' + this.yesNo('ttw-uea', this.draft.ue_active) + '</div>'
-      + '<div class="f" style="width:130px;"><label>Uber Eats Rating ' + tt('t-delivery-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-ue" value="' + esc(this.draft.ue_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Grubhub Active ' + tt('t-delivery-active') + '</label>' + this.yesNo('ttw-gha', this.draft.gh_active) + '</div>'
-      + '<div class="f" style="width:130px;"><label>Grubhub Rating ' + tt('t-delivery-rating') + '</label><div class="fw"><input class="suf" type="number" id="ttw-gh" value="' + esc(this.draft.gh_rating) + '" step="0.1" min="1" max="5" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">★</span></div></div>'
-      + '<div class="f" style="width:160px;"><label>Total Orders/Mo ' + tt('t-delivery-orders') + '</label><div class="fw"><input class="suf" type="number" id="ttw-dlo" value="' + esc(this.draft.delivery_orders) + '"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:160px;"><label>Avg Order Value ' + tt('t-delivery-avg-order') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ttw-dlav" value="' + esc(this.draft.delivery_avg_order_value) + '" step="0.50"/></div></div>'
+      + '<div class="f" style="width:180px;"><label>Total Orders/Mo ' + tt('t-delivery-orders') + '</label><div class="fw"><input class="suf" type="number" id="ttw-dlo" value="' + esc(this.draft.delivery_orders) + '" oninput="S.TrafficThisWeek.calcDelivery()"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:180px;"><label>Avg Order Value ' + tt('t-delivery-avg-order') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ttw-dlav" value="' + esc(this.draft.delivery_avg_order_value) + '" step="0.50" oninput="S.TrafficThisWeek.calcDelivery()"/></div></div>'
       + '</div>'
       + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Delivery Rating Avg</div><div id="ttw-dl-status"><span class="calc-val">Enter ratings</span></div></div>'
+      + '<div class="calc-item"><div class="calc-label">Implied Delivery Revenue</div><div id="ttw-dl-status">' + revStatus + '</div></div>'
       + '</div>'
       + this.nav(true, true) + '</div>';
   },
 
   calcDelivery() {
-    const dd = parseFloat(document.getElementById('ttw-dd')?.value) || null;
-    const ue = parseFloat(document.getElementById('ttw-ue')?.value) || null;
-    const gh = parseFloat(document.getElementById('ttw-gh')?.value) || null;
-    const ratings = [dd, ue, gh].filter(v => v != null);
-    const avg = ratings.length ? ratings.reduce((a,b) => a+b, 0) / ratings.length : null;
+    const ord = parseInt(document.getElementById('ttw-dlo')?.value) || null;
+    const aov = parseFloat(document.getElementById('ttw-dlav')?.value) || null;
+    const rev = (ord && aov) ? ord * aov : null;
     const el = document.getElementById('ttw-dl-status');
-    if (el) el.innerHTML = avg != null ? '<span class="calc-val ' + (avg>=4.5?'good':'warn') + '">' + avg.toFixed(1) + '★ across ' + ratings.length + ' platform' + (ratings.length===1?'':'s') + '</span>' : '<span class="calc-val">Enter ratings</span>';
+    if (el) el.innerHTML = rev != null ? '<span class="calc-val good">' + App.fmtCurrency(rev, 0) + '/mo across all platforms</span>' : '<span class="calc-val">Enter orders and avg order</span>';
   },
 
   step6() {
@@ -278,7 +294,6 @@ S.TrafficThisWeek = {
       + row('Total Google Reviews', d.google_total || '',                       '',           null)
       + row('New Reviews/Mo',   rv != null ? rv + ' reviews' : '',              tRV + '/mo',  rv != null ? rv >= tRV : null)
       + row('Response Rate',    rr != null ? rr.toFixed(0) + '%' : '',          tRR + '%',    rr != null ? rr >= tRR : null)
-      + row('GBP Views/Mo',     d.gbp_views || '',                              '',           null)
       + row('Yelp Rating',      yr != null ? yr.toFixed(1) + '★' : '',          '4.0★',       yr != null ? yr >= 4.0 : null)
       + row('Total Yelp Reviews', d.yelp_total || '',                           '',           null)
       + row('Sessions/Mo',      ss != null ? ss.toLocaleString() : '',          tSS.toLocaleString() + '/mo', ss != null ? ss >= tSS : null)
@@ -286,10 +301,6 @@ S.TrafficThisWeek = {
       + row('IG Followers',     d.ig_followers || '',                           '',           null)
       + row('IG Posts/Mo',      igp != null ? igp + ' posts' : '',              tSP + '/mo',  igp != null ? igp >= tSP : null)
       + row('FB Followers',     d.fb_followers || '',                           '',           null)
-      + row('Profile Visits/Mo', d.social_profile_visits || '',                 '',           null)
-      + row('DoorDash',         yn(d.dd_active) + (d.dd_rating ? '  ' + d.dd_rating + '★' : ''),  '',  null)
-      + row('Uber Eats',        yn(d.ue_active) + (d.ue_rating ? '  ' + d.ue_rating + '★' : ''),  '',  null)
-      + row('Grubhub',          yn(d.gh_active) + (d.gh_rating ? '  ' + d.gh_rating + '★' : ''),  '',  null)
       + row('Delivery Orders/Mo', d.delivery_orders || '',                      '',           null)
       + row('Delivery Avg Order', d.delivery_avg_order_value ? '$' + d.delivery_avg_order_value : '', '', null)
       + row('Email List Size',  d.email_list_size || '',                        '',           null)
@@ -300,7 +311,6 @@ S.TrafficThisWeek = {
       + '</tbody></table></div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label><textarea id="ttw-notes" rows="2">' + esc(d.notes || '') + '</textarea></div>'
       + this.nav(true, false, true)
-      + '<div id="ttw-alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;"><div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;"><div id="ttw-alert-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;"></div><div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-primary" id="ttw-alert-ok">OK</button></div></div></div>'
       + '</div>';
   },
 
@@ -329,17 +339,13 @@ S.TrafficThisWeek = {
       d.google_rating = val('ttw-gr'); d.google_total = val('ttw-gt');
       d.new_reviews = val('ttw-nr'); d.response_rate = val('ttw-rr');
       d.yelp_rating = val('ttw-yr'); d.yelp_total = val('ttw-yt');
-      d.gbp_views = val('ttw-gbpv');
     }
     if (step === 3) { d.monthly_sessions = val('ttw-ss'); d.bounce_rate = val('ttw-br'); }
     if (step === 4) {
       d.ig_followers = val('ttw-igf'); d.ig_posts_month = val('ttw-igp');
-      d.fb_followers = val('ttw-fbf'); d.social_profile_visits = val('ttw-spv');
+      d.fb_followers = val('ttw-fbf');
     }
     if (step === 5) {
-      d.dd_active = val('ttw-dda'); d.dd_rating = val('ttw-dd');
-      d.ue_active = val('ttw-uea'); d.ue_rating = val('ttw-ue');
-      d.gh_active = val('ttw-gha'); d.gh_rating = val('ttw-gh');
       d.delivery_orders = val('ttw-dlo'); d.delivery_avg_order_value = val('ttw-dlav');
     }
     if (step === 6) {
@@ -357,15 +363,25 @@ S.TrafficThisWeek = {
     const numF = v => parseFloat(v) || null;
 
     const gr = numF(d.google_rating), rv = numI(d.new_reviews), ss = numI(d.monthly_sessions);
+    const rr = numF(d.response_rate);
+    const list = numI(d.email_list_size);
 
     if (!gr && !rv && !ss) {
-      const modal = document.getElementById('ttw-alert-modal');
-      const msg = document.getElementById('ttw-alert-msg');
-      if (msg) msg.textContent = 'Enter at least one metric before saving: Google rating, new reviews, or monthly sessions.';
-      if (modal) modal.style.display = 'flex';
-      document.getElementById('ttw-alert-ok')?.addEventListener('click', () => { if (modal) modal.style.display = 'none'; });
+      await App.confirm({
+        title: 'No metrics entered',
+        message: 'Enter at least one metric before saving: Google rating, new reviews, or monthly sessions.',
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        danger: false
+      });
       return;
     }
+
+    // Snapshot the prior week's threshold-relevant values so we know what
+    // just crossed when this week saves (fix_log auto-emit below).
+    const weeks = App.data.traffic_weeks || [];
+    const prev = weeks.length ? weeks[weeks.length - 1] : null;
+    const tRR = (App.data.traffic_settings?.targets?.response_rate) || 75;
 
     const entry = {
       id:               Date.now(),
@@ -375,8 +391,7 @@ S.TrafficThisWeek = {
       google_rating:    gr,
       google_total:     numI(d.google_total),
       new_reviews:      rv,
-      response_rate:    numF(d.response_rate),
-      gbp_views:        numI(d.gbp_views),
+      response_rate:    rr,
       yelp_rating:      numF(d.yelp_rating),
       yelp_total:       numI(d.yelp_total),
       monthly_sessions: ss,
@@ -384,16 +399,9 @@ S.TrafficThisWeek = {
       ig_followers:     numI(d.ig_followers),
       ig_posts_month:   numI(d.ig_posts_month),
       fb_followers:     numI(d.fb_followers),
-      social_profile_visits: numI(d.social_profile_visits),
-      dd_active:        d.dd_active || null,
-      dd_rating:        numF(d.dd_rating),
-      ue_active:        d.ue_active || null,
-      ue_rating:        numF(d.ue_rating),
-      gh_active:        d.gh_active || null,
-      gh_rating:        numF(d.gh_rating),
       delivery_orders:  numI(d.delivery_orders),
       delivery_avg_order_value: numF(d.delivery_avg_order_value),
-      email_list_size:  numI(d.email_list_size),
+      email_list_size:  list,
       emails_sent:      numI(d.emails_sent),
       email_open_rate:  numF(d.email_open_rate),
       loyalty_active:   d.loyalty_active || null,
@@ -404,6 +412,18 @@ S.TrafficThisWeek = {
     App.data.traffic_weeks = App.data.traffic_weeks || [];
     App.data.traffic_weeks.push(entry);
     const ok = await App.saveKey('traffic_weeks');
+
+    // Auto-emit fix_log on threshold crossings so the Recovery Scoreboard
+    // and the dashboard's 8-week chart "Fix Logged" markers credit the work.
+    // Each crossing is its own fix_log row, attributed to the right gap_id.
+    if (ok) {
+      if (rr != null && rr >= tRR && (prev?.response_rate == null || prev.response_rate < tRR)) {
+        await App.emitTrafficFix('reviews', 'Review response rate hit ' + Math.round(rr) + '% (target ' + tRR + '%)');
+      }
+      if (list != null && prev?.email_list_size != null && (list - prev.email_list_size) >= 10) {
+        await App.emitTrafficFix('email-loyalty', 'Email list grew by ' + (list - prev.email_list_size).toLocaleString() + ' contacts this week');
+      }
+    }
 
     if (ok) {
       this.clearDraft();
