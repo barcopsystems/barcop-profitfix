@@ -63,7 +63,9 @@ S.HubSettings = {
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
       + '<div class="f" style="width:145px;"><label>Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Revenue"/></div></div>'
       + '<div class="f" style="width:145px;"><label>Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Revenue"/></div></div>'
-      + '</div>';
+      + '<div class="f" style="width:145px;"><label>State Min Wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-min-wage" min="0" step="0.01" value="' + (s.state_min_wage != null ? s.state_min_wage : '') + '" placeholder="Per hour"/></div></div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.55;">Your state\'s minimum wage drives the tip credit check on the Payroll CSV. If a tipped employee\'s base wage plus their tip share falls below state minimum for the week, Bar Cop flags the row so you can make up the difference before payroll runs.</div>';
   },
 
   secProfit() {
@@ -181,6 +183,8 @@ S.HubSettings = {
       s.city_state          = city && state ? city + ', ' + state : city || state || '';
       s.annual_bar_revenue  = numOr('hs-abr', 0);
       s.annual_food_revenue = numOr('hs-afr', 0);
+      const minWageRaw      = document.getElementById('hs-min-wage')?.value;
+      s.state_min_wage      = minWageRaw === '' || minWageRaw == null ? null : (parseFloat(minWageRaw) || 0);
       keys.push('settings');
     } else if (which === 'profit') {
       const s = App.data.settings;
