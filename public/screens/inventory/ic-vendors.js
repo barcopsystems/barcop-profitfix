@@ -53,6 +53,7 @@ S.InventoryVendors = {
           + '<td>' + esc(v.payment_terms || '-') + '</td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm iv-view" data-id="' + v.id + '">View</button>'
           + '<button class="btn btn-ghost btn-sm iv-edit" data-id="' + v.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm iv-del" data-id="' + v.id + '">Delete</button>'
           + '</div></td></tr>';
@@ -73,10 +74,12 @@ S.InventoryVendors = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
       const open = ev.target.closest('.iv-open');
+      const view = ev.target.closest('.iv-view');
       const edit = ev.target.closest('.iv-edit');
       const del  = ev.target.closest('.iv-del');
       const addF = ev.target.closest('#iv-add-first');
       if (open)      this.showDetail(open.dataset.id);
+      else if (view) this.showDetail(view.dataset.id);
       else if (edit) this.showForm(edit.dataset.id);
       else if (del)  this.confirmDel(del.dataset.id);
       else if (addF) this.showForm();
