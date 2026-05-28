@@ -8,8 +8,6 @@
    deep-links here. */
 
 S.VendorDiscrepancy = {
-  TYPES: ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'],
-
   list() {
     if (!Array.isArray(App.data.vendor_discrepancies)) App.data.vendor_discrepancies = [];
     return App.data.vendor_discrepancies;
@@ -18,7 +16,33 @@ S.VendorDiscrepancy = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
+    // Print a blank delivery-inspection sheet that the receiver fills at the
+    // dock and the manager types in after close. Same paper-to-digital pattern
+    // as Transfer Log and Empties Log.
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-ghost btn-sm';
+    printBtn.textContent = 'Print Delivery Inspection Sheet';
+    printBtn.addEventListener('click', () => this.printBlank());
+    actions.appendChild(printBtn);
     this.draw();
+  },
+
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Delivery Inspection Sheet',
+      subtitle: 'Check every line at the dock. Anything off, write it down. Manager files each discrepancy in Bar Cop after close.',
+      columns: [
+        { label: 'Vendor',       width: '14%' },
+        { label: 'Product',      width: '20%' },
+        { label: 'Ordered Qty',  width: '10%' },
+        { label: 'Received Qty', width: '10%' },
+        { label: 'Agreed Price', width: '10%' },
+        { label: 'Invoiced Price', width: '10%' },
+        { label: 'Issue',        width: '16%' },
+        { label: 'Receiver',     width: '10%' }
+      ],
+      rows: 18
+    });
   },
 
   draw() {
@@ -37,7 +61,11 @@ S.VendorDiscrepancy = {
       .map(v => v && v.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
     const vendorList = '<option value="">Select vendor...</option>'
       + vendors.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
-    const typeOpts = this.TYPES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+    const typeOpts = App.VENDOR_DISCREPANCY_TYPES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+    // Product dropdown options are rebuilt on vendor change so the list stays
+    // filtered to the chosen vendor. Initial render is empty until vendor is
+    // picked; the wire() handler swaps the inner HTML in real time.
+    const productOptsInitial = '<option value="">Pick vendor first...</option>';
 
     // Manual filing form — hidden by default since most discrepancies now
     // get filed straight from Receive Delivery's flag-per-line flow. This
@@ -59,7 +87,7 @@ S.VendorDiscrepancy = {
       + '<div class="f" style="width:180px;"><label>Type</label><select id="vd-type">' + typeOpts + '</select></div>'
       + '</div>'
       + '<div class="form-row">'
-      + '<div class="f" style="width:200px;"><label>Product / SKU</label><input type="text" id="vd-sku" placeholder="Product name"/></div>'
+      + '<div class="f" style="width:220px;"><label>Product</label><select id="vd-product">' + productOptsInitial + '</select></div>'
       + '<div class="f" style="width:90px;"><label>Units</label><input type="number" id="vd-units" step="1" placeholder="0"/></div>'
       + '<div class="f" style="width:120px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vd-agreed" step="0.01"/></div></div>'
       + '<div class="f" style="width:120px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vd-invoiced" step="0.01"/></div></div>'
@@ -133,6 +161,21 @@ S.VendorDiscrepancy = {
     });
     document.getElementById('vd-overcharge')?.addEventListener('input', e => { e.target._touched = true; });
 
+    // When the vendor changes, rebuild the product dropdown to show only the
+    // products that vendor supplies. Captures product_id on save so Vendor
+    // Scorecard can attribute the discrepancy to a real SKU.
+    document.getElementById('vd-vendor')?.addEventListener('change', () => this.rebuildProductOptions());
+    // When the product changes, pre-fill the agreed price from the product
+    // master so the operator only types what's actually new (invoiced price).
+    document.getElementById('vd-product')?.addEventListener('change', e => {
+      const pid = e.target.value;
+      if (!pid) return;
+      const p = ((App.inventoryData && App.inventoryData.ic_products) || []).find(x => x.id === pid);
+      if (!p) return;
+      const ag = document.getElementById('vd-agreed');
+      if (ag && !ag.value) ag.value = (parseFloat(p.unit_cost) || 0).toFixed(2);
+    });
+
     document.getElementById('vd-file')?.addEventListener('click', () => this.file());
     document.getElementById('vd-show-form')?.addEventListener('click', () => this.toggleForm(true));
     document.getElementById('vd-form-cancel')?.addEventListener('click', () => this.toggleForm(false));
@@ -142,6 +185,25 @@ S.VendorDiscrepancy = {
       b.addEventListener('click', () => this.markResolved(b.dataset.id)));
     this.container.querySelectorAll('.vd-remove').forEach(b =>
       b.addEventListener('click', () => this.remove(b.dataset.id)));
+  },
+
+  rebuildProductOptions() {
+    const vendorName = document.getElementById('vd-vendor')?.value || '';
+    const sel = document.getElementById('vd-product');
+    if (!sel) return;
+    if (!vendorName) {
+      sel.innerHTML = '<option value="">Pick vendor first...</option>';
+      return;
+    }
+    const prods = ((App.inventoryData && App.inventoryData.ic_products) || [])
+      .filter(p => (p.vendor || '') === vendorName && p.active !== false)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (!prods.length) {
+      sel.innerHTML = '<option value="">No products on file for this vendor</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">Select product...</option>'
+      + prods.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('');
   },
 
   // ── Request Credit ───────────────────────────────────────────────────────
@@ -263,10 +325,11 @@ S.VendorDiscrepancy = {
       wrap.style.display = 'none';
       if (showBtn) showBtn.style.display = '';
       // Clear the form for next time.
-      ['vd-date','vd-vendor','vd-ref','vd-sku','vd-units','vd-agreed','vd-invoiced','vd-overcharge','vd-notes'].forEach(id => {
+      ['vd-date','vd-vendor','vd-ref','vd-product','vd-units','vd-agreed','vd-invoiced','vd-overcharge','vd-notes'].forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.value = ''; el._touched = false; }
       });
+      this.rebuildProductOptions();
       const err = document.getElementById('vd-err');
       if (err) { err.textContent = ''; err.style.display = 'none'; }
     }
@@ -283,10 +346,15 @@ S.VendorDiscrepancy = {
     if (!vendor) return fail('Enter the vendor.');
     if (overcharge == null) return fail('Enter the overcharge or loss amount.');
 
+    const productId = val('vd-product');
+    const product = productId
+      ? ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === productId)
+      : null;
     this.list().push({
       id: App.uid(), date: date, vendor: vendor,
       reference: val('vd-ref'), type: val('vd-type') || 'Other',
-      sku: val('vd-sku'), units: num('vd-units'),
+      product_id: productId, sku: (product?.name) || '',
+      units: num('vd-units'),
       agreed_price: num('vd-agreed'), invoiced_price: num('vd-invoiced'),
       overcharge: overcharge, notes: val('vd-notes'),
       status: 'Open', source: 'manual',
