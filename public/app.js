@@ -1264,6 +1264,42 @@ const App = {
   // separate cost line in Books and Year-End.
   VOID_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
 
+  // Menu category groupings used across Revenue Recovery (r-menu-items,
+  // r-menu-engineering, r-pricing, r-dog-test, recipe-cost-analysis).
+  // Promoted from per-file local arrays so the lists never drift.
+  MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
+  MENU_COCKTAIL_ING_CATS: ['Spirit', 'Liqueur', 'Mixer', 'Garnish', 'Other'],
+  MENU_PLATE_ING_CATS: ['Protein', 'Produce', 'Dairy', 'Dry Goods', 'Other'],
+  MENU_INVENTORY_GROUPS: ['Beer', 'Wine', 'NA Beverages'],
+  // Maps Inventory Control product category → Menu Items inventory group.
+  MENU_IC_TO_CAT: {
+    'Bottle Beer': 'Beer',
+    'Draft Beer': 'Beer',
+    'Wine': 'Wine',
+    'NA': 'NA Beverages',
+    'Non-Alcoholic': 'NA Beverages'
+  },
+
+  // Target cost % defaults per menu category. Plate dishes target 32%,
+  // single-drink cocktails target 22%, catering targets 28%. Operators
+  // override per item; this is the default applied when a new item is created.
+  MENU_TARGET_COST_PCT: { plate: 32, cocktail: 22, catering: 28 },
+
+  // Revenue Events canonical enums.
+  EVENT_TYPES: ['Private Dining', 'Buyout', 'Catering', 'Corporate', 'Social'],
+  EVENT_STATUSES: ['Inquiry', 'Proposal Sent', 'Confirmed', 'Completed', 'Lost'],
+  // Per-status color tokens. Confirmed = blue (committed), Proposal Sent =
+  // amber (pending, watch state), Completed = gold (won), Lost = red,
+  // Inquiry = neutral. All read from the CSS palette so the colors stay
+  // consistent with the rest of Bar Cop's status system.
+  EVENT_STATUS_COLOR: {
+    'Completed':      'var(--gold)',
+    'Confirmed':      'var(--blue)',
+    'Proposal Sent':  'var(--amber)',
+    'Inquiry':        'var(--t3)',
+    'Lost':           'var(--red)'
+  },
+
   // ── Menu Items ───────────────────────────────────────────────────────────
   // Single canonical store for every sellable thing on the menu. Each item
   // can OPTIONALLY have a recipe attached (ingredient breakdown). When a
