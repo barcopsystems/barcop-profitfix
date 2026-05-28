@@ -79,6 +79,20 @@ S.LaborStaffRoster = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    // Cross-system focus: when Server Scorecard fires "+ Coaching Note" on a
+    // row, it sets App._coachingFocus = { staff_id } and navigates here.
+    // Open the staff detail and pre-pop the Add Coaching Note form so the
+    // manager can write the note in one click instead of navigating to the
+    // staff member first.
+    if (App._coachingFocus && App._coachingFocus.staff_id) {
+      const sid = App._coachingFocus.staff_id;
+      App._coachingFocus = null;
+      this.detailId = sid;
+      this.renderUnified(sid, 'view');
+      this.noteEditId = null;
+      this.renderNoteForm(sid);
+      return;
+    }
     this.renderList();
   },
 
