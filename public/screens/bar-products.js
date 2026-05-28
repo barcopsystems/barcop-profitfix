@@ -6,11 +6,9 @@
    Draft Beer) in ic_products. */
 
 S.BarProducts = {
-  IC_BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
-
   icBarProducts() {
     return ((App.inventoryData && App.inventoryData.ic_products) || [])
-      .filter(p => this.IC_BAR_CATS.includes(p.category));
+      .filter(p => App.BAR_CATS.includes(p.category));
   },
 
   render(container, actions) {
@@ -36,12 +34,12 @@ S.BarProducts = {
         return '<tr>'
           + '<td><div class="val">' + esc(p.name) + '</div>'
           + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-          + '<td>' + esc(p.category || '—') + '</td>'
-          + '<td>' + (p.container_size_oz != null ? p.container_size_oz + ' oz' : '—') + '</td>'
-          + '<td>' + (p.pour_size_oz != null ? p.pour_size_oz + ' oz' : '—') + '</td>'
-          + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td>' + (p.cost_per_pour != null ? App.fmtCurrency(p.cost_per_pour) : '<span style="color:var(--t4);">—</span>') + '</td>'
-          + '<td class="' + pc + '">' + (p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">—</span>') + '</td>'
+          + '<td>' + esc(p.category || '-') + '</td>'
+          + '<td>' + (p.container_size_oz != null ? p.container_size_oz + ' oz' : '-') + '</td>'
+          + '<td>' + (p.pour_size_oz != null ? p.pour_size_oz + ' oz' : '-') + '</td>'
+          + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (p.cost_per_pour != null ? App.fmtCurrency(p.cost_per_pour) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td class="' + pc + '">' + (p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '</tr>';
       }).join('');
       body = '<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1px;margin-bottom:12px;">'
