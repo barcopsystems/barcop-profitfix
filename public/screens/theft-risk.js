@@ -535,7 +535,7 @@ S.TheftRisk = {
           + (confirmed.count >= 3 ? 'Multiple confirmed events points to an ongoing problem, not a one-off.'
              : 'Documented but contained. Keep an eye on whether it repeats.');
 
-    const threshold = parseFloat((App.data?.settings || {}).comp_auth_threshold);
+    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
     const thresholdLabel = (!isNaN(threshold) && threshold > 0) ? '$' + threshold : 'your threshold';
     const unauthBody = unauthComps.score == null
       ? 'No void/comp records logged yet. Setting a Comp Auth Threshold in Hub Settings enables this signal.'
