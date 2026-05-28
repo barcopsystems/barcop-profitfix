@@ -9,7 +9,8 @@ S.LaborBuildSchedule = {
   draft: null,
   editId: null,
   DRAFT_KEY: 'lc_sched_draft',
-  DAYS: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+
+  get DAYS() { return App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; },
 
   schedules() {
     if (!App.laborData) App.laborData = {};
@@ -139,7 +140,7 @@ S.LaborBuildSchedule = {
       + '<div class="card"><div class="card-title">Schedule Period</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
-      + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '" oninput="S.LaborBuildSchedule.onInput()"/></div>'
+      + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:220px;"><label>Revenue Forecast <span style="color:var(--t4);font-weight:400;">(from Revenue Recovery)</span></label>'
       + forecastBlock + '</div>'
       + '</div></div>'
@@ -157,13 +158,15 @@ S.LaborBuildSchedule = {
 
       + '<div class="card"><div class="card-title">Review</div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes</label>'
-      + '<textarea id="bs-notes" rows="2" placeholder="Optional" oninput="S.LaborBuildSchedule.onInput()">' + esc(d.notes || '') + '</textarea></div>'
+      + '<textarea id="bs-notes" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="bs-save">' + (this.editId ? 'Update Schedule' : 'Save Schedule') + '</button>'
       + (this.editId ? '<button class="btn btn-ghost" id="bs-cancel">Cancel Edit</button>' : '')
       + '<span id="bs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 
+    document.getElementById('bs-week')?.addEventListener('input', () => this.onInput());
+    document.getElementById('bs-notes')?.addEventListener('input', () => this.onInput());
     const rowsEl = document.getElementById('bs-rows');
     rowsEl.addEventListener('input', () => this.onInput());
     rowsEl.addEventListener('change', () => this.onInput());
