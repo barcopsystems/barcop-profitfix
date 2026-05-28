@@ -235,7 +235,7 @@ S.RevenueMenuItems = {
     const cardsBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">'
       + card('plate',     'Menu Plate Item',     'Appetizer, Entree, Dessert, Special')
       + card('cocktail',  'Menu Cocktail Item',  'Built drink with ingredients')
-      + card('inventory', 'Menu Inventory Item', 'Beer, Wine, NA — direct pour')
+      + card('inventory', 'Menu Inventory Item', 'Beer, Wine, NA, direct pour')
       + '</div>';
 
     // Tabs
@@ -500,7 +500,7 @@ S.RevenueMenuItems = {
       + '<div class="card">'
       + '<div class="sh">' + (item ? 'Edit Inventory Item' : 'Add Menu Inventory Item') + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.55;">'
-        + 'Direct-pour menu items: beer, wine, NA beverages. Pick the inventory product first — name and cost auto-fill, and cost stays in sync whenever you update the product in Inventory Control.'
+        + 'Direct-pour menu items: beer, wine, NA beverages. Pick the inventory product first; name and cost auto-fill, and cost stays in sync whenever you update the product in Inventory Control.'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
@@ -528,7 +528,7 @@ S.RevenueMenuItems = {
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
         + '<div class="fw"><input class="suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div>'
         + '<div class="f" style="flex:1;"><label>&nbsp;</label>'
-        + '<div style="font-size:11px;color:var(--t3);padding-bottom:8px;line-height:1.5;">Defaults to the linked product\'s pour size. Override for multi-size offerings — e.g., Pint (16 oz) and Pitcher (60 oz) drawing from the same keg.</div></div>'
+        + '<div style="font-size:11px;color:var(--t3);padding-bottom:8px;line-height:1.5;">Defaults to the linked product\'s pour size. Override for multi-size offerings, like Pint (16 oz) and Pitcher (60 oz) drawing from the same keg.</div></div>'
       + '</div>'
 
       // Notes sits at the bottom — last row before the save buttons
