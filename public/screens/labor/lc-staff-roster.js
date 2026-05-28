@@ -8,19 +8,68 @@
 
 S.LaborStaffRoster = {
   editId: null,
+  detailId: null,
+  certEditId: null,
+  noteEditId: null,
+  noteFilterCategory: '',
   _pendingDelId: null,
+
+  // Common bar/restaurant certifications. Custom escape hatch covers anything
+  // not on the standard list (state-specific permits, vendor trainings, etc).
+  CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
+    'ServSafe Manager', 'Allergen Awareness', 'CPR / First Aid', 'Food Handler Permit',
+    'ABC On-Premise', 'Health Card', 'Other'],
+  NOTE_CATEGORIES: ['Praise', 'Coaching', 'Concern', 'Warning'],
 
   staff() {
     if (!App.laborData) App.laborData = {};
     if (!Array.isArray(App.laborData.lc_staff)) App.laborData.lc_staff = [];
     return App.laborData.lc_staff;
   },
+  staffById(id) { return this.staff().find(s => s.id === id); },
   positions() {
     return ((App.laborData && App.laborData.lc_positions) || []);
   },
   positionById(id) {
     return this.positions().find(p => p.id === id);
   },
+
+  // ── Certifications data ──────────────────────────────────────────────
+  certs() {
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_certs)) App.laborData.lc_certs = [];
+    return App.laborData.lc_certs;
+  },
+  certsForStaff(staffId) {
+    return this.certs()
+      .filter(c => c.staff_id === staffId)
+      .slice()
+      .sort((a, b) => (a.expiration_date || '').localeCompare(b.expiration_date || ''));
+  },
+  // Returns 'expired' | 'expiring' (within 30 days) | 'ok'
+  certStatus(cert) {
+    if (!cert || !cert.expiration_date) return 'ok';
+    const today = new Date().toISOString().slice(0, 10);
+    if (cert.expiration_date < today) return 'expired';
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 30);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    if (cert.expiration_date <= cutoffStr) return 'expiring';
+    return 'ok';
+  },
+
+  // ── Coaching / staff notes data ──────────────────────────────────────
+  notes() {
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_staff_notes)) App.laborData.lc_staff_notes = [];
+    return App.laborData.lc_staff_notes;
+  },
+  notesForStaff(staffId) {
+    return this.notes()
+      .filter(n => n.staff_id === staffId)
+      .slice()
+      .sort((a, b) => (b.date || b.created_at || '').localeCompare(a.date || a.created_at || ''));
+  },
+
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -112,9 +161,297 @@ S.LaborStaffRoster = {
       const addF = ev.target.closest('#sr-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (row)  this.renderDetail(row.dataset.id);
       else if (addF) this.showForm();
     };
+  },
+
+  // ── Staff detail view — profile summary + Certifications + Coaching Log
+  renderDetail(staffId) {
+    const s = this.staffById(staffId);
+    if (!s) { this.renderList(); return; }
+    this.detailId = staffId;
+    this.actions.innerHTML = '';
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-ghost btn-sm';
+    exportBtn.textContent = 'Export PDF';
+    exportBtn.addEventListener('click', () => window.print());
+    this.actions.appendChild(exportBtn);
+
+    const pos = this.positionById(s.position_id);
+    const profileCard = '<div class="card">'
+      + '<div class="card-title">' + esc(s.name || '-') + '</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:var(--t2);">'
+      + this._kv('Position', pos ? pos.name : '-')
+      + this._kv('Department', pos ? (pos.department || '-') : '-')
+      + this._kv('Wage', s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '-')
+      + this._kv('Status', s.status || 'Active')
+      + this._kv('Hire Date', this.fmtDate(s.hire_date))
+      + this._kv('Phone', s.phone || '-')
+      + this._kv('Email', s.email || '-')
+      + '</div>'
+      + (s.notes ? '<div style="margin-top:12px;font-size:12px;color:var(--t3);line-height:1.6;"><strong style="color:var(--t2);">Notes:</strong> ' + esc(s.notes) + '</div>' : '')
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary btn-sm sr-edit-detail">Edit Profile</button>'
+        + '<button class="btn btn-ghost btn-sm sr-back">&laquo; Back to Roster</button>'
+      + '</div></div>';
+
+    const certsCard = this.renderCertsCard(staffId);
+    const notesCard = this.renderNotesCard(staffId);
+
+    this.container.innerHTML = '<div class="screen">' + profileCard + certsCard + notesCard + '</div>';
+    this.wireDetail(staffId);
+  },
+
+  _kv(label, val) {
+    return '<div style="min-width:160px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(label) + '</div>'
+      + '<div style="font-size:13px;color:var(--t1);">' + esc(val) + '</div>'
+      + '</div>';
+  },
+
+  wireDetail(staffId) {
+    this.container.onclick = null;
+    this.container.querySelector('.sr-back')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
+    this.container.querySelector('.sr-edit-detail')?.addEventListener('click', () => this.showForm(staffId));
+    // Certs
+    this.container.querySelector('#cert-add')?.addEventListener('click', () => { this.certEditId = null; this.renderCertForm(staffId); });
+    this.container.querySelectorAll('.cert-edit').forEach(b => b.addEventListener('click', () => { this.certEditId = b.dataset.id; this.renderCertForm(staffId); }));
+    this.container.querySelectorAll('.cert-del').forEach(b => b.addEventListener('click', () => this.confirmDelCert(b.dataset.id, staffId)));
+    // Notes
+    this.container.querySelector('#note-add')?.addEventListener('click', () => { this.noteEditId = null; this.renderNoteForm(staffId); });
+    this.container.querySelectorAll('.note-edit').forEach(b => b.addEventListener('click', () => { this.noteEditId = b.dataset.id; this.renderNoteForm(staffId); }));
+    this.container.querySelectorAll('.note-del').forEach(b => b.addEventListener('click', () => this.confirmDelNote(b.dataset.id, staffId)));
+    this.container.querySelector('#note-filter')?.addEventListener('change', e => {
+      this.noteFilterCategory = e.target.value || '';
+      this.renderDetail(staffId);
+    });
+  },
+
+  // ── Certifications card + form ───────────────────────────────────────
+  renderCertsCard(staffId) {
+    const list = this.certsForStaff(staffId);
+    let body;
+    if (list.length === 0) {
+      body = '<div style="font-size:12px;color:var(--t3);">No certifications on file yet. Add cert types, expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</div>';
+    } else {
+      const rows = list.map(c => {
+        const status = this.certStatus(c);
+        const badge = status === 'expired' ? '<span class="badge badge-warn">Expired</span>'
+                   : status === 'expiring' ? '<span class="badge badge-warn">Expiring Soon</span>'
+                   : '<span class="badge badge-ok">Active</span>';
+        return '<tr>'
+          + '<td><div class="val">' + esc(c.cert_type || '-') + '</div>'
+          + (c.cert_number ? '<div style="font-size:10px;color:var(--t3);">#' + esc(c.cert_number) + '</div>' : '') + '</td>'
+          + '<td>' + esc(c.issuer || '-') + '</td>'
+          + '<td>' + this.fmtDate(c.issue_date) + '</td>'
+          + '<td>' + this.fmtDate(c.expiration_date) + '</td>'
+          + '<td>' + badge + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm cert-edit" data-id="' + c.id + '">Edit</button>'
+          + '<button class="btn btn-danger btn-sm cert-del" data-id="' + c.id + '">Delete</button>'
+          + '</div></td></tr>';
+      }).join('');
+      body = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+    return '<div class="card"><div class="card-title">Certifications &amp; Licenses</div>'
+      + body
+      + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div>'
+      + '</div>';
+  },
+
+  renderCertForm(staffId) {
+    const c = this.certEditId ? this.certs().find(x => x.id === this.certEditId) : null;
+    const typeOpts = this.CERT_TYPES.map(t =>
+      '<option' + (c && c.cert_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+
+    this.container.innerHTML = '<div class="screen"><div class="card">'
+      + '<div class="card-title">' + (this.certEditId ? 'Edit Certification' : 'Add Certification') + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Certification Type</label>'
+          + '<select id="cert-type">' + typeOpts + '</select></div>'
+        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Cert Number <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<input type="text" id="cert-number" value="' + esc(c?.cert_number || '') + '" placeholder="Optional"/></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Issuer <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<input type="text" id="cert-issuer" value="' + esc(c?.issuer || '') + '" placeholder="State, school, etc."/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Issue Date</label>'
+          + '<input type="date" id="cert-issued" value="' + esc(c?.issue_date || '') + '"/></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Expiration Date</label>'
+          + '<input type="date" id="cert-expires" value="' + esc(c?.expiration_date || '') + '"/></div>'
+      + '</div>'
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
+        + '<textarea id="cert-notes" rows="2" placeholder="Optional context">' + esc(c?.notes || '') + '</textarea></div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="cert-save">' + (this.certEditId ? 'Update' : 'Save Certification') + '</button>'
+        + '<button class="btn btn-ghost" id="cert-cancel">Cancel</button>'
+        + '<span id="cert-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div></div>';
+
+    this.container.onclick = null;
+    document.getElementById('cert-cancel')?.addEventListener('click', () => this.renderDetail(staffId));
+    document.getElementById('cert-save')?.addEventListener('click', () => this.saveCert(staffId));
+  },
+
+  async saveCert(staffId) {
+    const err = document.getElementById('cert-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const cert_type = document.getElementById('cert-type')?.value;
+    if (!cert_type) { fail('Pick a certification type.'); return; }
+    const expiration_date = document.getElementById('cert-expires')?.value;
+    if (!expiration_date) { fail('Expiration date is required so Bar Cop can flag it before it lapses.'); return; }
+
+    const rec = {
+      id:              this.certEditId || App.uid(),
+      staff_id:        staffId,
+      cert_type,
+      cert_number:     document.getElementById('cert-number')?.value.trim() || '',
+      issuer:          document.getElementById('cert-issuer')?.value.trim() || '',
+      issue_date:      document.getElementById('cert-issued')?.value || '',
+      expiration_date,
+      notes:           document.getElementById('cert-notes')?.value.trim() || '',
+      updated_at:      new Date().toISOString()
+    };
+    if (!this.certEditId) rec.created_at = new Date().toISOString();
+
+    const list = this.certs();
+    if (this.certEditId) {
+      const i = list.findIndex(x => x.id === this.certEditId);
+      if (i > -1) list[i] = { ...list[i], ...rec };
+    } else {
+      list.push(rec);
+    }
+    const ok = await App.saveLabor();
+    this.certEditId = null;
+    if (ok) this.renderDetail(staffId);
+    else fail('Save failed. Try again.');
+  },
+
+  async confirmDelCert(id, staffId) {
+    const ok = await App.confirm({ title: 'Delete this certification?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
+    App.laborData.lc_certs = this.certs().filter(x => x.id !== id);
+    await App.saveLabor();
+    this.renderDetail(staffId);
+  },
+
+  // ── Coaching / notes card + form ─────────────────────────────────────
+  renderNotesCard(staffId) {
+    const all = this.notesForStaff(staffId);
+    const list = this.noteFilterCategory ? all.filter(n => n.category === this.noteFilterCategory) : all;
+    const filterOpts = '<option value="">All categories</option>'
+      + this.NOTE_CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (this.noteFilterCategory === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+
+    let body;
+    if (all.length === 0) {
+      body = '<div style="font-size:12px;color:var(--t3);">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div>';
+    } else if (list.length === 0) {
+      body = '<div style="font-size:12px;color:var(--t3);">No notes match this category. Clear the filter to see everything.</div>';
+    } else {
+      const rows = list.map(n => {
+        const catColor = n.category === 'Praise' ? 'var(--gold)'
+                       : n.category === 'Coaching' ? 'var(--blue)'
+                       : n.category === 'Concern' ? 'var(--gold)'
+                       : 'var(--red)';
+        return '<div style="padding:14px;border:1px solid var(--b2);border-radius:4px;margin-bottom:8px;">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px;">'
+            + '<div style="display:flex;align-items:center;gap:10px;">'
+              + '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + catColor + ';border:1px solid ' + catColor + ';border-radius:3px;padding:2px 6px;">' + esc(n.category || 'Note') + '</span>'
+              + '<span style="font-size:12px;color:var(--t2);">' + this.fmtDate(n.date) + '</span>'
+              + (n.manager_name ? '<span style="font-size:11px;color:var(--t3);">by ' + esc(n.manager_name) + '</span>' : '')
+            + '</div>'
+            + '<div class="row-actions">'
+              + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
+              + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
+            + '</div>'
+          + '</div>'
+          + '<div style="font-size:13px;color:var(--t1);line-height:1.6;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
+          + '</div>';
+      }).join('');
+      body = rows;
+    }
+
+    return '<div class="card"><div class="card-title">Coaching Log</div>'
+      + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:200px;flex-shrink:0;margin-bottom:0;"><label>Filter by Category</label>'
+          + '<select id="note-filter">' + filterOpts + '</select></div>'
+      + '</div>'
+      + body
+      + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div>'
+      + '</div>';
+  },
+
+  renderNoteForm(staffId) {
+    const n = this.noteEditId ? this.notes().find(x => x.id === this.noteEditId) : null;
+    const today = new Date().toISOString().slice(0, 10);
+    const catOpts = this.NOTE_CATEGORIES.map(c =>
+      '<option' + (n && n.category === c ? ' selected' : (!n && c === 'Coaching' ? ' selected' : '')) + '>' + esc(c) + '</option>').join('');
+
+    this.container.innerHTML = '<div class="screen"><div class="card">'
+      + '<div class="card-title">' + (this.noteEditId ? 'Edit Note' : 'Add Coaching Note') + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
+          + '<input type="date" id="note-date" value="' + esc(n?.date || today) + '"/></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label>'
+          + '<select id="note-cat">' + catOpts + '</select></div>'
+        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager</label>'
+          + '<select id="note-mgr">' + App.staffOptions(n?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...' }) + '</select></div>'
+      + '</div>'
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Note</label>'
+        + '<textarea id="note-text" rows="5" placeholder="What happened, when, who was around, what was said. Specifics matter if this becomes a personnel matter later.">' + esc(n?.text || '') + '</textarea></div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="note-save">' + (this.noteEditId ? 'Update Note' : 'Save Note') + '</button>'
+        + '<button class="btn btn-ghost" id="note-cancel">Cancel</button>'
+        + '<span id="note-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div></div>';
+
+    this.container.onclick = null;
+    document.getElementById('note-cancel')?.addEventListener('click', () => this.renderDetail(staffId));
+    document.getElementById('note-save')?.addEventListener('click', () => this.saveNote(staffId));
+  },
+
+  async saveNote(staffId) {
+    const err = document.getElementById('note-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const text = document.getElementById('note-text')?.value.trim();
+    if (!text) { fail('Write the note before saving.'); return; }
+    const managerId = document.getElementById('note-mgr')?.value || '';
+    const managerName = (this.staffById(managerId) || {}).name || '';
+
+    const rec = {
+      id:           this.noteEditId || App.uid(),
+      staff_id:     staffId,
+      date:         document.getElementById('note-date')?.value || new Date().toISOString().slice(0, 10),
+      category:     document.getElementById('note-cat')?.value || 'Coaching',
+      manager_id:   managerId,
+      manager_name: managerName,
+      text,
+      updated_at:   new Date().toISOString()
+    };
+    if (!this.noteEditId) rec.created_at = new Date().toISOString();
+
+    const list = this.notes();
+    if (this.noteEditId) {
+      const i = list.findIndex(x => x.id === this.noteEditId);
+      if (i > -1) list[i] = { ...list[i], ...rec };
+    } else {
+      list.push(rec);
+    }
+    const ok = await App.saveLabor();
+    this.noteEditId = null;
+    if (ok) this.renderDetail(staffId);
+    else fail('Save failed. Try again.');
+  },
+
+  async confirmDelNote(id, staffId) {
+    const ok = await App.confirm({ title: 'Delete this note?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
+    App.laborData.lc_staff_notes = this.notes().filter(x => x.id !== id);
+    await App.saveLabor();
+    this.renderDetail(staffId);
   },
 
   showForm(id) {
@@ -166,7 +503,10 @@ S.LaborStaffRoster = {
       const wEl = document.getElementById('sr-wage');
       if (p && wEl) wEl.value = p.default_wage != null ? p.default_wage : '';
     });
-    document.getElementById('sr-cancel')?.addEventListener('click', () => this.renderList());
+    document.getElementById('sr-cancel')?.addEventListener('click', () => {
+      if (this.detailId) this.renderDetail(this.detailId);
+      else this.renderList();
+    });
     document.getElementById('sr-save')?.addEventListener('click', () => this.save());
   },
 
@@ -222,10 +562,14 @@ S.LaborStaffRoster = {
     const btn = document.getElementById('sr-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveLabor();
+    const savedId = rec.id;
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_roster');
-      this.renderList();
+      // If the operator came from the detail view, return to it so they keep
+      // working with the staff member rather than getting kicked back to list.
+      if (this.detailId) this.renderDetail(savedId);
+      else this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Staff'; }
       fail('Save failed. Try again.');
