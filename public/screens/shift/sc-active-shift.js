@@ -195,6 +195,36 @@ S.ShiftActiveShift = {
         ? labor.hours.toFixed(1) + ' hrs scheduled'
         : 'No hours yet';
 
+    // Cover Goal vs Covers So Far. Goal comes from this week's Revenue Forecast
+    // covers_per_day for today's weekday. So-far covers come from the shift's
+    // running cover total (typed during shift close, or pulled from any
+    // matching server_check entries logged during shift so the floor manager
+    // sees a live read).
+    const goalForToday = (() => {
+      if (!s.date || !App.weekStartFor || !App.DAYS_MON_FIRST) return 0;
+      const ws = App.weekStartFor(s.date);
+      const f = App.forecastForWeek ? App.forecastForWeek(ws) : null;
+      if (!f || !f.covers_per_day) return 0;
+      const dt = new Date(s.date + 'T00:00:00');
+      if (isNaN(dt.getTime())) return 0;
+      const idx = (dt.getDay() + 6) % 7;
+      const key = App.DAYS_MON_FIRST[idx];
+      return parseFloat(f.covers_per_day[key]) || 0;
+    })();
+    const coversSoFar = (() => {
+      // Prefer the operator-typed running cover number on the shift record.
+      if (s.covers != null && s.covers > 0) return parseFloat(s.covers) || 0;
+      // Fall back to summing today's logged server_check entries for this
+      // shift_type (live read during service when servers are logging shift
+      // checks but cover total hasn't been typed on the shift yet).
+      const checks = (App.data.revenue_server_checks || [])
+        .filter(c => c.date === s.date && c.shift === s.shift_type);
+      return checks.reduce((sum, c) => sum + (parseFloat(c.covers) || 0), 0);
+    })();
+    const coverProgressLabel = goalForToday > 0
+      ? coversSoFar.toFixed(0) + ' of ' + goalForToday + (coversSoFar >= goalForToday ? ' (hit)' : ' (' + (goalForToday - coversSoFar).toFixed(0) + ' to goal)')
+      : (coversSoFar > 0 ? coversSoFar.toFixed(0) + ' so far' : 'No goal set');
+
     const stat = (label, val, sub) =>
       '<div style="flex:1;min-width:130px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:14px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
@@ -218,6 +248,7 @@ S.ShiftActiveShift = {
 
       + '<div class="card"><div class="card-title">This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverProgressLabel)
       + stat('Labor So Far', App.fmtCurrency(labor.cost), laborSub)
       + stat('Cash Drops', drops.length, App.fmtCurrency(dropTotal) + ' dropped')
       + stat('Voids &amp; Comps', vc.length, App.fmtCurrency(vcTotal) + ' total')
