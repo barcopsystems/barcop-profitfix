@@ -652,25 +652,37 @@ const App = {
   // ── Full-page Hub screen (sidebar stays mounted, content area swaps) ──
   // Hub-level screens render into the Hub content area, replacing the
   // dashboard tiles. The Hub sidebar stays mounted and interactive on the
-  // left so the operator can navigate to other Hub items. Use this for any
-  // Hub screen with enough content to deserve a real page (Bar Cop Audit,
-  // Books, Year-End, etc.). The legacy openHubOverlay modal pattern remains
-  // for screens not yet migrated.
+  // left so the operator can navigate to other Hub items. The Hub topbar
+  // gets rewritten to show "TITLE | Back to Dashboard" mirroring the module
+  // shell pattern (e.g., "PROFIT AUDIT | Back to Dashboard" inside the
+  // Profit Recovery system).
   //
-  // Each screen's header should include a "Back to Dashboard" control that
-  // calls App.showHub() to restore the dashboard tiles.
-  openHubFullPage(renderFn) {
+  // Call signature:
+  //   App.openHubFullPage('Bar Cop Audit', mount => renderFn(mount));
+  //
+  // Back to Dashboard re-renders the Hub via App.showHub(), restoring the
+  // default topbar (bar name + date).
+  openHubFullPage(title, renderFn) {
+    // Backward-compat: caller can pass just renderFn if title is unused.
+    if (typeof title === 'function') { renderFn = title; title = ''; }
     const wrap = document.getElementById('hub-wrapper');
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
-    // The Hub layout uses .hub-app .main .content as the dashboard content
-    // area. Replace its inner HTML with a fresh container the screen renders
-    // into. Sidebar (.hub-app .sidebar) stays untouched.
     const content = document.querySelector('.hub-app .content');
     if (!content) {
-      // Fall back to overlay if the dashboard layout is not present.
       this.openHubOverlay(renderFn);
       return;
+    }
+    // Rewrite the Hub topbar-left to match the module pattern: page title
+    // in uppercase weight 800, "Back to Dashboard" link to its right.
+    const topbarLeft = document.querySelector('.hub-app .topbar .topbar-left');
+    if (topbarLeft && title) {
+      topbarLeft.innerHTML = '<div style="display:flex;align-items:center;gap:14px;">'
+        +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">' + esc(title) + '</div>'
+        +   '<div style="font-size:11px;color:var(--t3);">|</div>'
+        +   '<button class="hub-fullpage-back" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer;padding:0;letter-spacing:0.3px;">Back to Dashboard</button>'
+        + '</div>';
+      topbarLeft.querySelector('.hub-fullpage-back')?.addEventListener('click', () => this.showHub());
     }
     content.innerHTML = '<div id="hub-fullpage-mount"></div>';
     const mount = document.getElementById('hub-fullpage-mount');
