@@ -1235,6 +1235,35 @@ const App = {
   // different files, which would silently desync the moment one changed.
   SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
 
+  // Canonical product category groups. Replaces the duplicated BAR_CATS /
+  // KITCHEN_CATS arrays in this-week.js, bar-products.js, kitchen-products.js,
+  // and the inline isBar() check below.
+  BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
+  KITCHEN_CATS: ['Food', 'Misc'],
+
+  // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
+  // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
+  VENDOR_DISCREPANCY_TYPES: ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'],
+
+  // Canonical Profit Audit section names. Used by audit-tracker.js in
+  // extractSections, viewAudit sections array, and renderNarrative sections
+  // array so the list never drifts across the three call sites.
+  AUDIT_PROFIT_SECTION_NAMES: [
+    'Bar Cost and Pour Control',
+    'Theft and Loss Prevention',
+    'Food Cost Control',
+    'Vendor Control',
+    'Prime Cost'
+  ],
+
+  // Categories on sc_void_comps records. A 30-year operator separates loss
+  // (a comp given for service recovery, a void rung in error) from policy
+  // expense (a staff meal eaten, a shift drink poured under house rules).
+  // Conflating them inflates the Theft Risk score and lies to the P&L.
+  // Loss categories feed Theft Risk; expense categories are tracked as a
+  // separate cost line in Books and Year-End.
+  VOID_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
+
   // ── Menu Items ───────────────────────────────────────────────────────────
   // Single canonical store for every sellable thing on the menu. Each item
   // can OPTIONALLY have a recipe attached (ingredient breakdown). When a
@@ -1298,7 +1327,7 @@ const App = {
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
-      const isBar = p => p && ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
+      const isBar = p => p && App.BAR_CATS.includes(p.category);
 
       const ingCost = ing => {
         const qty = parseFloat(ing.quantity) || 0;
