@@ -95,8 +95,8 @@ S.VendorWatch = {
         + (totalAnnual > 0 ? '+' : '') + App.fmtCurrency(totalAnnual) + '/yr</div></div>'
         + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-        + 'Captured automatically from deliveries received in Inventory Control. Annual impact uses each '
-        + 'product\'s usage rate from your latest inventory counts.</div>'
+        + 'Per-line price drift captured automatically from deliveries received in Inventory Control. Annual impact uses each '
+        + 'product\'s usage rate from your latest inventory counts. For the per-vendor rollup, see <a href="#" id="vw-to-scorecard" style="color:var(--gold);font-weight:700;">Vendor Scorecard</a>.</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Product</th><th>Previous Cost</th><th>New Cost</th>'
         + '<th>Change %</th><th>Annual Impact</th>'
@@ -106,6 +106,7 @@ S.VendorWatch = {
     this.container.innerHTML = '<div class="screen">' + body + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#vw-go')) { App.showApp('inventory'); App.navigate('ic-receive-delivery'); }
+      else if (ev.target.closest('#vw-to-scorecard')) { ev.preventDefault(); App.navigate('vendor-scorecard'); }
     };
   }
 };
