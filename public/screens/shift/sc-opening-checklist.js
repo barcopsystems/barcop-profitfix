@@ -129,6 +129,7 @@ S.ShiftOpeningChecklist = {
           + '<td>' + esc(r.completed_by || '-') + '</td>'
           + '<td>' + badge + '</td>'
           + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm oc-hview" data-id="' + r.id + '">View</button>'
           + '<button class="btn btn-danger btn-sm oc-hdel" data-id="' + r.id + '">Delete</button>'
           + '</div></td></tr>';
       }).join('');
@@ -153,8 +154,10 @@ S.ShiftOpeningChecklist = {
     // history clicks would fire N+1 times after N re-renders.
     this.container.onclick = ev => {
       const hrow = ev.target.closest('.oc-hrow');
+      const hview = ev.target.closest('.oc-hview');
       const hdel = ev.target.closest('.oc-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
     };
   },
