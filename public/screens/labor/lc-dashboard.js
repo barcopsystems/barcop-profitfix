@@ -12,11 +12,12 @@ S.LaborDashboard = {
   schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
   staff()     { return ((App.laborData && App.laborData.lc_staff) || []); },
   callouts()  { return ((App.laborData && App.laborData.lc_callouts) || []); },
+  certs()     { return ((App.laborData && App.laborData.lc_certs) || []); },
 
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   weekAgo() {
     const d = new Date(); d.setDate(d.getDate() - 7);
@@ -63,14 +64,21 @@ S.LaborDashboard = {
     const val = (txt, cls) => '<div class="metric-val ' + (cls || '') + '">' + txt + '</div>';
 
     const cards =
-        card('Labor Cost — Last 7 Days', val(App.fmtCurrency(wkCost)),
+        card('Labor Cost, Last 7 Days', val(App.fmtCurrency(wkCost)),
              wkActuals.length + ' hours entr' + (wkActuals.length === 1 ? 'y' : 'ies'))
-      + card('Labor Hours — Last 7 Days', val(wkHours.toFixed(1)),
+      + card('Labor Hours, Last 7 Days', val(wkHours.toFixed(1)),
              wkHours > 0 ? App.fmtCurrency(wkHours > 0 ? wkCost / wkHours : 0) + ' avg wage' : 'No hours logged')
       + card('Overtime Risk', val(String(over + approaching), (over + approaching) ? 'over-target' : 'on-target'),
              over + ' over · ' + approaching + ' approaching this week')
       + card('Active Staff', val(String(activeStaff)),
              this.staff().length + ' on the roster');
+
+    // Cert expiration sweep — anything expired or expiring within 30 days
+    const today = new Date().toISOString().slice(0, 10);
+    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
+    const activeStaffIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
+    const expiredCerts = this.certs().filter(c => activeStaffIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today);
+    const expiringCerts = this.certs().filter(c => activeStaffIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30);
 
     // ── Alerts ──
     const alerts = [];
@@ -79,11 +87,13 @@ S.LaborDashboard = {
     if (uncovered) alerts.push({ sev: 'red', text: uncovered + ' uncovered call-out' + (uncovered === 1 ? '' : 's') + ' in the last 7 days', go: 'lc-callout-log' });
     const hasWeekSchedule = this.schedules().some(s => s.week_start === wkStart);
     if (!hasWeekSchedule) alerts.push({ sev: 'amber', text: 'No schedule built for the current week', go: 'lc-build-schedule' });
+    if (expiredCerts.length) alerts.push({ sev: 'red', text: expiredCerts.length + ' certification' + (expiredCerts.length === 1 ? '' : 's') + ' expired on active staff. Fix before next shift to avoid a fine.', go: 'lc-staff-roster' });
+    if (expiringCerts.length) alerts.push({ sev: 'amber', text: expiringCerts.length + ' certification' + (expiringCerts.length === 1 ? '' : 's') + ' expiring within 30 days', go: 'lc-staff-roster' });
 
     let alertCard;
     if (alerts.length === 0) {
       alertCard = '<div class="card"><div class="card-title">Alerts</div>'
-        + '<div style="font-size:13px;color:var(--gold);">All clear — no labor issues flagged.</div></div>';
+        + '<div style="font-size:13px;color:var(--gold);">All clear. No labor issues flagged.</div></div>';
     } else {
       alertCard = '<div class="card"><div class="card-title">Alerts</div>'
         + alerts.map((a, i) => '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
@@ -102,8 +112,8 @@ S.LaborDashboard = {
     let recentCard = '';
     if (recent.length) {
       const rows = recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
-        + '<td>' + esc(a.name || '—') + '</td>'
-        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '—') + '</td>'
+        + '<td>' + esc(a.name || '-') + '</td>'
+        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td></tr>').join('');
       recentCard = '<div class="card"><div class="card-title">Recent Hours</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
