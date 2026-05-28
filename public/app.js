@@ -673,6 +673,11 @@ const App = {
       this.openHubOverlay(renderFn);
       return;
     }
+    // The Hub Dashboard overrides .content to padding:24px. Module screens
+    // render into a .content with no padding (.screen adds its own).
+    // Reset padding to 0 for full-page screens so the .screen wrapper inside
+    // them controls spacing the same way module screens do.
+    content.style.padding = '0';
     // Rewrite the Hub topbar-left to match the module pattern: page title
     // in uppercase weight 800, "Back to Dashboard" link to its right.
     const topbarLeft = document.querySelector('.hub-app .topbar .topbar-left');
@@ -684,9 +689,21 @@ const App = {
         + '</div>';
       topbarLeft.querySelector('.hub-fullpage-back')?.addEventListener('click', () => this.showHub());
     }
-    content.innerHTML = '<div id="hub-fullpage-mount"></div>';
-    const mount = document.getElementById('hub-fullpage-mount');
-    if (typeof renderFn === 'function') renderFn(mount);
+    // Clear topbar-right so prior screen actions don't bleed across.
+    const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
+    if (topbarRight) topbarRight.innerHTML = '';
+    // Hand the screen the content element directly so .screen wrapper
+    // padding behaves identically to module screens.
+    content.innerHTML = '';
+    if (typeof renderFn === 'function') renderFn(content);
+  },
+
+  // Inject screen-specific action buttons into the Hub topbar-right area
+  // (mirrors how module screens set this.actions.innerHTML during render).
+  // Pass HTML for the buttons; wire click handlers from the screen after.
+  setHubTopbarActions(actionsHtml) {
+    const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
+    if (topbarRight) topbarRight.innerHTML = actionsHtml || '';
   },
 
   // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
