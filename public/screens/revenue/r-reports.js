@@ -34,10 +34,10 @@ S.RevenueReports = {
         + '<td>' + App.fmtCurrency(w.bar_revenue||0) + '</td>'
         + '<td>' + App.fmtCurrency(w.floor_revenue||0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(totalRev) + '</td>'
-        + '<td>' + (w.covers||'&mdash;') + '</td>'
-        + '<td class="' + (caGap == null ? '' : caGap >= 0 ? 'pos' : 'neg') + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '&mdash;') + '</td>'
-        + '<td class="' + (labGap == null ? '' : labGap <= 0 ? 'pos' : 'neg') + '">' + (w.labor_pct_blended ? w.labor_pct_blended.toFixed(1)+'%' : '&mdash;') + '</td>'
-        + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '&mdash;') + '</td>'
+        + '<td>' + (w.covers||'-') + '</td>'
+        + '<td class="' + (caGap == null ? '' : caGap >= 0 ? 'pos' : 'neg') + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '-') + '</td>'
+        + '<td class="' + (labGap == null ? '' : labGap <= 0 ? 'pos' : 'neg') + '">' + (w.labor_pct_blended ? w.labor_pct_blended.toFixed(1)+'%' : '-') + '</td>'
+        + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '-') + '</td>'
         + '</tr>';
     }).join('');
 
@@ -112,7 +112,15 @@ S.RevenueReports = {
 </body></html>`;
 
     const win = window.open('', '_blank');
-    if (!win) { alert('Allow pop-ups to export the report.'); return; }
+    if (!win) {
+      App.confirm({
+        title: 'Pop-ups blocked',
+        message: 'Allow pop-ups for Bar Cop to export the report.',
+        confirmText: 'OK',
+        cancelText: ''
+      });
+      return;
+    }
     win.document.write(html);
     win.document.close();
     win.focus();
