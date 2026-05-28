@@ -53,10 +53,10 @@ S.Help = {
           a: 'One every 30 days from your last one. The 30-day pace gives you enough time to act on the prior report before scoring yourself again. Faster than that just produces reports that look the same.' },
         { q: 'How do I save the audit as a PDF?',
           a: 'Open the audit (View Full Audit on the latest card, or View on any row in Audit History). The Print / Save PDF button in the topbar opens your browser\'s print dialog. Save as PDF from there. Every historical audit is downloadable the same way.' },
-        { q: 'What is Compare Other Audits?',
-          a: 'A side-by-side view that lets you compare any two audits in your history (not just the latest two). Section scores, deltas, resolved gaps, newly surfaced gaps, and the still-open list. Each still-open item has a Fix This button that deep-links into Profit Fix. Bar Cop Outlook at the top of the comparison generates a short operator-voice narrative on what changed between the two audits. Cached per comparison so flipping back to a prior pair does not re-spend on the narrative.' },
-        { q: 'What is the Findings tab on the audit view?',
-          a: 'Written observations from the audit analysis. Bar Cop Outlook talks about the score and the trend; Findings drills into why each section scored where it did. Available on Tier 2 and Tier 3 audits (depends on how much data you fed in).' }
+        { q: 'Where do I read the written findings on an audit?',
+          a: 'Open the audit and scroll. The single-page layout shows every section with its score breakdown at the top and the written findings right below. No tabs, no separate Findings page, all on one scroll. Available on Tier 2 and Tier 3 audits depending on how much data you fed in.' },
+        { q: 'What is Bar Cop Outlook?',
+          a: 'A short operator-voice read on this audit. Click the Bar Cop Outlook button on the audit detail page, next to the score. Two or three paragraphs in plain language about what the score says and what to do this month. Cached per audit so re-opening the same audit does not re-spend on the narrative.' }
       ]},
       { t: 'Profit Fix', qa: [
         { q: 'What is Profit Fix?',
