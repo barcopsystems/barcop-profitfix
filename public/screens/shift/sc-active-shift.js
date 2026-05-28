@@ -410,7 +410,10 @@ S.ShiftActiveShift = {
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="aw-floor" min="0" step="0.01" inputmode="decimal" value="' + v(d.floor_revenue) + '" style="height:48px;font-size:16px;"/></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Covers</label>'
           + '<input type="number" id="aw-covers" min="0" inputmode="numeric" value="' + v(d.covers) + '" style="height:48px;font-size:16px;"/></div>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Walkouts</label>'
+          + '<input type="number" id="aw-walkouts" min="0" inputmode="numeric" value="' + v(d.walkouts) + '" placeholder="0" style="height:48px;font-size:16px;"/></div>'
       + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5;">Walkouts: parties that came in but left without ordering, usually because the wait was too long. Real lost-cover signal for capacity planning.</div>'
       + '<div class="calc" style="margin-top:6px;">'
         + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val good" id="aw-total">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="aw-check">-</div></div>'
@@ -789,6 +792,7 @@ S.ShiftActiveShift = {
       d.bar_revenue   = num('aw-bar');
       d.floor_revenue = num('aw-floor');
       d.covers        = num('aw-covers');
+      d.walkouts      = num('aw-walkouts');
     } else if (d.step === 'cash') {
       d.sales_cash    = num('aw-sales-cash');
       d.counted_cash  = num('aw-counted');
@@ -947,6 +951,7 @@ S.ShiftActiveShift = {
       floor_revenue: floor,
       total_revenue: bar + floor,
       covers:        d.covers,
+      walkouts:      d.walkouts,
       notes:         d.notes || '',
       handoff_notes: d.handoff_notes || '',
       cash_recon: {
