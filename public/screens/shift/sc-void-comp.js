@@ -10,8 +10,15 @@ S.ShiftVoidComp = {
   _pendingDelId: null,
   REASONS: {
     Void: ['Rung in error', 'Wrong item', 'Customer changed mind', 'Kitchen error', 'Sent back', 'Other'],
-    Comp: ['Service recovery', 'Manager comp', 'Regular / VIP', 'Marketing / promo', 'Staff meal', 'Other']
+    Comp: ['Service recovery', 'Manager comp', 'Regular / VIP', 'Marketing / promo', 'Other']
   },
+  // Categories on Comp records. A 30-year operator separates loss (a comp
+  // given to fix a guest issue) from policy expense (a staff meal eaten, a
+  // shift drink poured under house rules). Conflating them inflates the
+  // Theft Risk score and lies to the P&L. Default = Customer Comp.
+  // Loss categories feed Theft Risk; expense categories are tracked as
+  // separate cost lines in Books and Year-End.
+  CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
 
   records() {
     if (!App.shiftData) App.shiftData = {};
@@ -165,6 +172,14 @@ S.ShiftVoidComp = {
           '<option' + (r === selected ? ' selected' : '') + '>' + r + '</option>').join('');
   },
 
+  categoryOptions(selected) {
+    // Default to Customer Comp when no category is set (the common case for
+    // a comp filed without thought). Voids don't carry categories.
+    const sel = selected || 'Customer Comp';
+    return this.CATEGORIES.map(c =>
+      '<option' + (c === sel ? ' selected' : '') + '>' + c + '</option>').join('');
+  },
+
   showForm(id) {
     if (id && !App.canEdit('sc-void-comp')) return;
     this.editId = id || null;
@@ -224,6 +239,9 @@ S.ShiftVoidComp = {
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;" id="vc-cat-wrap"><label>Category</label>'
+      + '<select id="vc-cat" style="height:44px;">' + this.categoryOptions(r?.category) + '</select>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">Staff Meal and Shift Drink are policy expense, not theft signals. Customer Comp and Service Recovery feed Theft Risk.</div></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label>'
       + '<select id="vc-reason" style="height:44px;">' + this.reasonOptions(type, r?.reason) + '</select></div>'
       + '</div>'
@@ -241,7 +259,13 @@ S.ShiftVoidComp = {
     document.getElementById('vc-type')?.addEventListener('change', e => {
       const sel = document.getElementById('vc-reason');
       if (sel) sel.innerHTML = this.reasonOptions(e.target.value, '');
+      // Category only applies to Comp records — hide for Voids.
+      const catWrap = document.getElementById('vc-cat-wrap');
+      if (catWrap) catWrap.style.display = e.target.value === 'Void' ? 'none' : '';
     });
+    // Sync category visibility on initial render too.
+    const catWrap = document.getElementById('vc-cat-wrap');
+    if (catWrap) catWrap.style.display = type === 'Void' ? 'none' : '';
     document.getElementById('vc-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('vc-save')?.addEventListener('click', () => this.save());
   },
@@ -261,10 +285,18 @@ S.ShiftVoidComp = {
     const unitsRaw = parseFloat(document.getElementById('vc-units')?.value);
     const units = isNaN(unitsRaw) ? null : unitsRaw;
 
+    const type = document.getElementById('vc-type')?.value || 'Void';
+    // Category only applies to Comps. Voids stay un-categorized. Default to
+    // Customer Comp when category dropdown is empty (legacy records will read
+    // as Customer Comp via the same default downstream).
+    const category = type === 'Comp'
+      ? (document.getElementById('vc-cat')?.value || 'Customer Comp')
+      : '';
     const rec = {
       id:            this.editId || App.uid(),
       date,
-      type:          document.getElementById('vc-type')?.value || 'Void',
+      type,
+      category,
       shift_type:    document.getElementById('vc-shift')?.value || '',
       item,
       amount,
