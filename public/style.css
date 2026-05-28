@@ -20,7 +20,7 @@
   --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
   --blue-bg:   rgba(76,142,171,0.10);
   --amber:     #9A5D34;                /* Warn/watch state: muted burnt brown, between red (bad) and green (good) */
-  --amber-bg:  rgba(154,93,52,0.12);
+  --amber-bg:  rgba(154,93,52,0.10);
 
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.94);
