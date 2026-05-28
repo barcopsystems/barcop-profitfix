@@ -164,7 +164,7 @@ S.ShiftHandoff = {
     const exception86s = ex.eighty6.length === 0
       ? '<div class="empty-line">No 86\'d items. Floor is clean.</div>'
       : '<ul>' + ex.eighty6.map(i => '<li><strong>' + escH(i.item || '(unnamed)') + '</strong>'
-          + (i.reason ? ' &mdash; ' + escH(i.reason) : '')
+          + (i.reason ? ', ' + escH(i.reason) : '')
           + (i.date_86 ? ' <span class="muted">since ' + escH(i.date_86) + '</span>' : '')
           + '</li>').join('') + '</ul>';
     const exceptionMaint = ex.openMaint.length === 0
@@ -180,7 +180,7 @@ S.ShiftHandoff = {
       return '<h2>Notable Voids and Comps</h2>'
         + '<div class="meta">' + ex.vc.length + ' over $30 &middot; ' + fmt$(total) + ' total</div>'
         + '<ul>' + ex.vc.map(v => '<li><strong>' + escH(v.type || '') + ':</strong> ' + escH(v.item || '')
-          + ' &mdash; ' + fmt$(v.amount)
+          + ' &middot; ' + fmt$(v.amount)
           + (v.server ? ' <span class="muted">' + escH(v.server) + '</span>' : '')
           + (v.reason ? ' <span class="muted">(' + escH(v.reason) + ')</span>' : '')
           + '</li>').join('') + '</ul>';
