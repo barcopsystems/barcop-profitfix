@@ -672,6 +672,7 @@ S.Hub = {
       + '<div class="nav-section">Accounting</div>'
       + navItem('books',            'Month-End Books', 'books',    [])
       + navItem('weekly-pnl',       'Weekly P&L',      'report',   [])
+      + navItem('year-end',         'Year-End Review', 'books',    [])
       + '<div class="nav-section">Setup</div>'
       // Getting Started hides once every setup step is checked off so the
       // sidebar does not carry permanent clutter for operators past setup.
@@ -799,6 +800,7 @@ S.Hub = {
       else if (action === 'group-dashboard') S.HubGroupDashboard.open();
       else if (action === 'books')           S.HubBooks.open();
       else if (action === 'weekly-pnl')      S.Reports?._openQboModal?.();
+      else if (action === 'year-end')        S.HubYearEnd.open();
       else if (action === 'contact-support') S.HubSupport.open();
       else if (action === 'report-bug')      S.HubReportBug.open();
     });
