@@ -1,15 +1,10 @@
 'use strict';
 S.TrafficSearch = {
-  // Local SEO assessment — stored in traffic_settings.profile
-  TOGGLES: [
-    ['search_maps_pack', 'Confirmed in the Google Maps 3-pack'],
-    ['search_nap',       'Name, address, phone consistent everywhere'],
-    ['search_name',      'Business name correct on Google'],
-    ['search_address',   'Address correct on Google'],
-    ['search_phone',     'Phone number correct on Google'],
-    ['search_titles',    'Website page titles assessed for keywords']
-  ],
-  CITATION_BENCHMARK: 40,
+  // Toggle list drives off App.TRAFFIC_SEARCH_TOGGLES; citation benchmark
+  // pulls from App.TRAFFIC_BENCHMARKS.citations so a future tuning lands
+  // everywhere at once.
+  get TOGGLES() { return App.TRAFFIC_SEARCH_TOGGLES; },
+  get CITATION_BENCHMARK() { return App.TRAFFIC_BENCHMARKS.citations; },
 
   render(container, actions) {
     actions.innerHTML = '';
@@ -63,7 +58,7 @@ S.TrafficSearch = {
 
     // ── Action items ──
     const tips = [];
-    if (!prof.search_maps_pack) tips.push('Not confirmed in the Google Maps 3-pack. The 3-pack is where most local discovery happens — a complete, active Google Business Profile is how you get there.');
+    if (!prof.search_maps_pack) tips.push('Not confirmed in the Google Maps 3-pack. The 3-pack is where most local discovery happens. A complete, active Google Business Profile is how you get there.');
     if (!prof.search_nap) tips.push('NAP is inconsistent. Your business name, address, and phone must match exactly across Google, Yelp, Apple Maps, and every directory. Mismatches confuse search engines.');
     if (!prof.search_name) tips.push('Business name on Google needs correcting.');
     if (!prof.search_address) tips.push('Address on Google needs correcting.');
@@ -96,12 +91,29 @@ S.TrafficSearch = {
   async save() {
     const ts = App.data.traffic_settings || (App.data.traffic_settings = {});
     const prof = ts.profile || (ts.profile = {});
+    // Snapshot pre-save state for fix_log threshold checks.
+    const beforeChecked   = this.TOGGLES.filter(([k]) => prof[k]).length;
+    const beforeMapsPack  = !!prof.search_maps_pack;
+    const beforeCitations = prof.search_citations != null ? prof.search_citations : null;
     this.container.querySelectorAll('.srch-tog').forEach(cb => { prof[cb.dataset.key] = cb.checked; });
     prof.search_keyword = document.getElementById('srch-keyword')?.value || '';
     const cit = parseInt(document.getElementById('srch-citations')?.value);
     prof.search_citations = isNaN(cit) ? null : cit;
     prof.search_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
+    if (ok) {
+      const afterChecked = this.TOGGLES.filter(([k]) => prof[k]).length;
+      if (afterChecked === this.TOGGLES.length && beforeChecked < this.TOGGLES.length) {
+        await App.emitTrafficFix('search-seo', 'Local SEO checklist 100% complete');
+      }
+      if (prof.search_maps_pack && !beforeMapsPack) {
+        await App.emitTrafficFix('search-seo', 'Confirmed in the Google Maps 3-pack');
+      }
+      if (prof.search_citations != null && prof.search_citations >= this.CITATION_BENCHMARK
+          && (beforeCitations == null || beforeCitations < this.CITATION_BENCHMARK)) {
+        await App.emitTrafficFix('search-seo', 'Citation count hit ' + prof.search_citations + ' (benchmark ' + this.CITATION_BENCHMARK + ')');
+      }
+    }
     this.draw();
     const msg = document.getElementById('srch-msg');
     if (msg) {
