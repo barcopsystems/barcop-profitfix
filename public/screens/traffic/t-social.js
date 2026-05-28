@@ -1,7 +1,9 @@
 'use strict';
 S.TrafficSocial = {
-  CONTENT_MIX: ['Balanced', 'Mostly promotional', 'Mostly reposts', 'Too few food photos'],
-  ENGAGEMENT_BENCHMARK: 2,
+  // Drives off canonical App enums so content-mix options + engagement
+  // benchmark stay in sync across Traffic.
+  get CONTENT_MIX() { return App.TRAFFIC_SOCIAL_CONTENT_MIX; },
+  get ENGAGEMENT_BENCHMARK() { return App.TRAFFIC_BENCHMARKS.engagement_rate; },
 
   render(container, actions) {
     actions.innerHTML = '';
@@ -112,6 +114,9 @@ S.TrafficSocial = {
   async save() {
     const ts = App.data.traffic_settings || (App.data.traffic_settings = {});
     const prof = ts.profile || (ts.profile = {});
+    const beforeEng     = prof.social_ig_engagement != null ? prof.social_ig_engagement : null;
+    const beforeStories = !!prof.social_stories;
+    const beforeReels   = !!prof.social_reels;
     this.container.querySelectorAll('.soc-tog').forEach(cb => { prof[cb.dataset.key] = cb.checked; });
     const eng = parseFloat(document.getElementById('soc-eng')?.value);
     const fbp = parseInt(document.getElementById('soc-fbp')?.value);
@@ -120,6 +125,18 @@ S.TrafficSocial = {
     prof.social_content_mix = document.getElementById('soc-mix')?.value || '';
     prof.social_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
+    if (ok) {
+      if (prof.social_ig_engagement != null && prof.social_ig_engagement >= this.ENGAGEMENT_BENCHMARK
+          && (beforeEng == null || beforeEng < this.ENGAGEMENT_BENCHMARK)) {
+        await App.emitTrafficFix('social', 'Instagram engagement rate hit ' + prof.social_ig_engagement.toFixed(1) + '% (benchmark ' + this.ENGAGEMENT_BENCHMARK + '%)');
+      }
+      if (prof.social_stories && !beforeStories) {
+        await App.emitTrafficFix('social', 'Instagram Stories now in regular use');
+      }
+      if (prof.social_reels && !beforeReels) {
+        await App.emitTrafficFix('social', 'Instagram Reels posted this month');
+      }
+    }
     this.draw();
     const msg = document.getElementById('soc-msg');
     if (msg) {
