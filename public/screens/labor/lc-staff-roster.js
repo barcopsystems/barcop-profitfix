@@ -136,6 +136,7 @@ S.LaborStaffRoster = {
               ? '<span class="badge badge-dim">Inactive</span>'
               : '<span class="badge badge-ok">Active</span>') + '</td>'
           + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm sr-view" data-id="' + s.id + '">View</button>'
           + '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>'
           + '</div></td></tr>';
@@ -156,13 +157,15 @@ S.LaborStaffRoster = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
       const row = ev.target.closest('.sr-row');
+      const view = ev.target.closest('.sr-view');
       const edit = ev.target.closest('.sr-edit');
       const del = ev.target.closest('.sr-del');
       const addF = ev.target.closest('#sr-add-first');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.renderDetail(row.dataset.id);
-      else if (addF) this.showForm();
+      if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
+      else if (edit)  { ev.stopPropagation(); this.showForm(edit.dataset.id); }
+      else if (view)  { ev.stopPropagation(); this.renderDetail(view.dataset.id); }
+      else if (row)   this.renderDetail(row.dataset.id);
+      else if (addF)  this.showForm();
     };
   },
 
