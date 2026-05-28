@@ -1,350 +1,687 @@
 'use strict';
 
-/* ── Shift Control — Void and Comp Log (writes sc_void_comps) ─────────────────
-   Mobile-first. Logs voided and comped items during service. Voids and comps
-   are exception transactions — sc_void_comps feeds Profit Recovery's Theft Risk
-   and the Profit Audit's exception analysis. */
+/* ── Profit Recovery — Theft Risk (auto-scored) ───────────────────────────────
+   Restructured per the platform map: the Theft Risk score is computed from
+   operational data — Inventory Control spot checks (ic_spot_checks), Shift
+   Control voids/comps (sc_void_comps), and cash variances (sc_variances) — plus
+   a manual judgment the operator can add. No more 12-question manual scorecard.
+   Snapshots are saved to App.data.theft_scores. */
 
-S.ShiftVoidComp = {
-  editId: null,
-  _pendingDelId: null,
-  REASONS: {
-    Void: ['Rung in error', 'Wrong item', 'Customer changed mind', 'Kitchen error', 'Sent back', 'Other'],
-    Comp: ['Service recovery', 'Manager comp', 'Regular / VIP', 'Marketing / promo', 'Other']
-  },
-  // Categories on Comp records. A 30-year operator separates loss (a comp
-  // given to fix a guest issue) from policy expense (a staff meal eaten, a
-  // shift drink poured under house rules). Conflating them inflates the
-  // Theft Risk score and lies to the P&L. Default = Customer Comp.
-  // Loss categories feed Theft Risk; expense categories are tracked as
-  // separate cost lines in Books and Year-End.
-  CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
+S.TheftRisk = {
+  _manual: null,
+  MANUAL_LEVELS: [
+    { label: 'Strong controls',  score: 5 },
+    { label: 'Adequate controls', score: 30 },
+    { label: 'Some concern',     score: 60 },
+    { label: 'Serious concern',  score: 90 }
+  ],
+  // Comp categories that count as loss for theft scoring. Staff Meal and
+  // Shift Drink are policy expense — they should NOT inflate the void/comp
+  // signal. Voids always count (a voided drink could still have been poured).
+  LOSS_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery'],
 
-  records() {
-    if (!App.shiftData) App.shiftData = {};
-    if (!Array.isArray(App.shiftData.sc_void_comps)) App.shiftData.sc_void_comps = [];
-    return App.shiftData.sc_void_comps;
+  spotChecks() { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
+  // Only loss-bearing voids/comps. Filters out Staff Meal + Shift Drink
+  // policy expenses so the score reflects actual exposure.
+  voidComps() {
+    return ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => {
+      if (r.type === 'Void') return true;
+      // For comps, treat missing/legacy category as Customer Comp (loss).
+      const cat = r.category || 'Customer Comp';
+      return this.LOSS_COMP_CATEGORIES.includes(cat);
+    });
   },
+  variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
+  adjustments() { return ((App.inventoryData && App.inventoryData.ic_adjustments) || []); },
   products() {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
   },
   productById(id) {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
   },
-  productOptions(selectedId) {
-    const prods = this.products();
-    const cats = [...new Set(prods.map(p => p.category || 'Other'))]
-      .sort((a, b) => {
-        const order = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
-        const ia = order.indexOf(a), ib = order.indexOf(b);
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-      });
-    let h = '<option value="">Not linked to a tracked product</option>';
-    cats.forEach(cat => {
-      h += '<optgroup label="' + esc(cat) + '">';
-      prods.filter(p => (p.category || 'Other') === cat)
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        .forEach(p => {
-          h += '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>';
-        });
-      h += '</optgroup>';
+
+  manualScore(level) {
+    const m = this.MANUAL_LEVELS.find(x => x.label === level);
+    return m ? m.score : null;
+  },
+  scoreClass(score) {
+    if (score == null) return 'dim';
+    return score <= 30 ? 'good' : score <= 60 ? '' : 'warn';
+  },
+  ratingFor(score) {
+    if (score == null) return 'Not Enough Data';
+    return score <= 30 ? 'Low Risk: Strong Controls'
+         : score <= 60 ? 'Moderate Risk: Tighten Controls'
+         : 'High Risk: Immediate Action';
+  },
+
+  // ── Signals ─────────────────────────────────────────────────────────────────
+  pourSignal() {
+    const items = [];
+    this.spotChecks().forEach(c => (c.items || []).forEach(it => items.push(it)));
+    if (items.length === 0) return { score: null, checks: this.spotChecks().length, items: 0 };
+    const flagged = items.filter(i => i.flagged).length;
+    const rate = flagged / items.length;
+    const varDollar = items.reduce((t, i) => t + Math.max(0, i.variance_dollar || 0), 0);
+    return {
+      score: Math.min(100, Math.round(rate * 280)),
+      checks: this.spotChecks().length, items: items.length,
+      flagged, rate, varDollar
+    };
+  },
+  voidSignal() {
+    const vc = this.voidComps();
+    if (vc.length === 0) return { score: null, count: 0 };
+    const unauth = vc.filter(r => !r.authorized_by || !String(r.authorized_by).trim()).length;
+    const rate = unauth / vc.length;
+    const total = vc.reduce((t, r) => t + (r.amount || 0), 0);
+    return {
+      score: Math.min(100, Math.round(rate * 120)),
+      count: vc.length, unauth, rate, total
+    };
+  },
+  cashSignal() {
+    const vars = this.variances();
+    if (vars.length === 0) return { score: null, count: 0 };
+    const shorts = vars.filter(v => v.status === 'Short');
+    const rate = shorts.length / vars.length;
+    const netShort = vars.reduce((t, v) => t + Math.min(0, v.variance || 0), 0);
+    return {
+      score: Math.min(100, Math.round(rate * 150)),
+      count: vars.length, shorts: shorts.length, rate, netShort
+    };
+  },
+
+  // Unauthorized large comps. Reads sc_void_comps where auth_threshold_override
+  // is true — meaning the operator saved a Comp over the Hub Settings threshold
+  // without a manager in Authorized By and acknowledged the warning. This is
+  // one of the most common bar-theft patterns (bartender comping a round of
+  // drinks without manager involvement) and the auth override is the explicit
+  // signal that it happened. 90-day window.
+  unauthorizedLargeCompsSignal() {
+    const all = ((App.shiftData && App.shiftData.sc_void_comps) || []);
+    if (all.length === 0) return { score: null, count: 0, total: 0 };
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const flagged = all.filter(r =>
+      r.auth_threshold_override === true && (r.date || '') >= cutoffStr);
+    const total = flagged.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    return {
+      score: flagged.length > 0 ? Math.min(100, flagged.length * 20) : 0,
+      count: flagged.length,
+      total
+    };
+  },
+
+  // Confirmed theft from the Inventory Adjustment log (reason='Theft'). These
+  // are documented losses the operator has already attributed — strongest
+  // signal of all four because there's no inference, just acknowledged events.
+  // 90-day window so the score reflects what's recently happening, not
+  // permanent history from years ago.
+  theftConfirmedSignal() {
+    const all = this.adjustments();
+    if (all.length === 0) return { score: null, count: 0 };
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const recent = all.filter(a => {
+      if (a.reason !== 'Theft') return false;
+      const date = (a.date_time || '').slice(0, 10);
+      return date >= cutoffStr;
     });
-    return h;
-  },
-  shiftTypes() {
-    return App.SHIFT_TYPES;
-  },
-  fmtDate(str) {
-    if (!str) return '-';
-    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const totalValue = recent.reduce((t, a) => t + Math.abs(a.value || 0), 0);
+    // 25 points per confirmed event, capped at 100. Stack value as context.
+    return {
+      score: recent.length > 0 ? Math.min(100, recent.length * 25) : 0,
+      count: recent.length,
+      totalValue
+    };
   },
 
   render(container, actions) {
     this.container = container;
+    const saved = (App.data && App.data.theft_manual) || {};
+    this._manual = { level: saved.level || '', notes: saved.notes || '' };
+
     actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Log Void / Comp';
-    addBtn.addEventListener('click', () => this.showForm());
-    actions.appendChild(addBtn);
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'btn btn-ghost btn-sm';
-    exportBtn.textContent = 'Export PDF';
-    exportBtn.addEventListener('click', () => window.print());
-    actions.appendChild(exportBtn);
-    const printBlankBtn = document.createElement('button');
-    printBlankBtn.className = 'btn btn-ghost btn-sm';
-    printBlankBtn.textContent = 'Print Blank Sheet';
-    printBlankBtn.addEventListener('click', () => this.printBlank());
-    actions.appendChild(printBlankBtn);
-    this.renderList();
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.textContent = 'Save Scorecard';
+    btn.addEventListener('click', () => this.save());
+    actions.appendChild(btn);
+    // Quarterly Theft & Loss Brief PDF — single-page summary for owner /
+    // bookkeeper / insurance reviews. Opens a styled HTML page sized for
+    // print, auto-fires window.print() so it saves cleanly as a PDF.
+    const briefBtn = document.createElement('button');
+    briefBtn.className = 'btn btn-ghost btn-sm';
+    briefBtn.textContent = 'Print Theft & Loss Brief';
+    briefBtn.addEventListener('click', () => this.printBrief());
+    actions.appendChild(briefBtn);
+    this.renderMain();
   },
 
-  // Paper-at-bar workflow. Managers commonly clip a void/comp sheet to the
-  // POS, tally as the night runs, then enter into Bar Cop after close.
-  printBlank() {
-    App.printBlankSheet({
-      title: 'Void / Comp Sheet',
-      subtitle: 'Log every void and comp during the shift. Manager enters each row into Bar Cop after close.',
-      columns: [
-        { label: 'Time',         width: '8%'  },
-        { label: 'Type',         width: '10%' },
-        { label: 'Item',         width: '20%' },
-        { label: 'Amount',       width: '10%' },
-        { label: 'Server',       width: '13%' },
-        { label: 'Authorized By',width: '13%' },
-        { label: 'Reason',       width: '16%' },
-        { label: 'Notes',        width: '10%' }
-      ],
-      rows: 16
-    });
+  printBrief() {
+    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
+    const confirmed = this.theftConfirmedSignal();
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
+    const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
+    const manScore = this.manualScore(this._manual?.level);
+    let overall;
+    if (autoScore != null && manScore != null) overall = Math.round(autoScore * 0.65 + manScore * 0.35);
+    else if (autoScore != null) overall = autoScore;
+    else if (manScore != null) overall = manScore;
+    else overall = null;
+
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // 90-day window for the brief — same window the confirmed-theft signal uses.
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const inWindow = (d) => d && String(d).slice(0, 10) >= cutoffStr;
+
+    const recentVCs = this.voidComps().filter(r => inWindow(r.date));
+    const recentVars = this.variances().filter(v => inWindow(v.date));
+    const recentSpots = this.spotChecks().filter(c => inWindow(c.date));
+    const recentAdj = this.adjustments().filter(a => inWindow((a.date_time || '').slice(0, 10)));
+
+    const investigations = (App.data?.variance_investigations || []);
+    const openInv = investigations.filter(i => i.status !== 'resolved');
+    const resolvedInv = investigations.filter(i => i.status === 'resolved' && inWindow(i.resolved_date));
+
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
+      + '<title>' + esc(barName) + ' Theft & Loss Brief, ' + today + '</title>'
+      + '<style>'
+      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
+      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
+      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
+      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
+      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
+      + 'td { padding: 4px 6px; border-bottom: 1px solid #eee; }'
+      + 'td.right { text-align: right; font-variant-numeric: tabular-nums; }'
+      + 'td.bold { font-weight: bold; }'
+      + 'td.muted { color: #666; font-size: 12px; }'
+      + '.score { font-size: 56px; font-weight: 700; line-height: 1; }'
+      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
+      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
+      + '</style></head><body>'
+      + '<h1>' + esc(barName) + ' Theft & Loss Brief<span class="sub">90-day review, generated ' + esc(today) + '</span></h1>'
+      + '<h2>Overall Risk Score</h2>'
+      + '<table><tr><td><div class="score">' + (overall != null ? overall : '-') + '</div></td>'
+      + '<td class="right"><strong>' + esc(this.ratingFor(overall)) + '</strong>'
+      + (autoScore != null ? '<br><span style="color:#666;font-size:11px;">Auto-score ' + autoScore + ' from operational data</span>' : '')
+      + (manScore != null ? '<br><span style="color:#666;font-size:11px;">Manual judgment ' + manScore + '</span>' : '')
+      + '</td></tr></table>'
+
+      + '<h2>Signal Summary</h2>'
+      + '<table>'
+      + '<tr><td>Pour Variance (spot checks)</td><td class="right">' + (pour.score != null ? pour.score : '-') + (pour.flagged ? ' &nbsp;<span style="color:#666;">' + pour.flagged + ' of ' + pour.items + ' flagged</span>' : '') + '</td></tr>'
+      + '<tr><td>Voids & Comps (loss-bearing only)</td><td class="right">' + (voids.score != null ? voids.score : '-') + (voids.count ? ' &nbsp;<span style="color:#666;">' + voids.count + ' loss records, ' + fmt$(voids.total) + '</span>' : '') + '</td></tr>'
+      + '<tr><td>Cash Variance</td><td class="right">' + (cash.score != null ? cash.score : '-') + (cash.count ? ' &nbsp;<span style="color:#666;">' + cash.shorts + ' shorts of ' + cash.count + ' counts, ' + fmt$(Math.abs(cash.netShort)) + ' net short</span>' : '') + '</td></tr>'
+      + '<tr><td>Unauthorized Large Comps</td><td class="right">' + (unauthComps.score != null ? unauthComps.score : '-') + (unauthComps.count ? ' &nbsp;<span style="color:#666;">' + unauthComps.count + ' over threshold without auth, ' + fmt$(unauthComps.total) + '</span>' : '') + '</td></tr>'
+      + '<tr><td>Confirmed Theft (adjustment log)</td><td class="right">' + (confirmed.score != null ? confirmed.score : '-') + (confirmed.count ? ' &nbsp;<span style="color:#666;">' + confirmed.count + ' events, ' + fmt$(confirmed.totalValue) + '</span>' : '') + '</td></tr>'
+      + '</table>'
+
+      + '<h2>90-Day Event Counts</h2>'
+      + '<table>'
+      + '<tr><td>Spot checks run</td><td class="right">' + recentSpots.length + '</td></tr>'
+      + '<tr><td>Voids and comps logged (loss-bearing)</td><td class="right">' + recentVCs.length + '</td></tr>'
+      + '<tr><td>Cash variances logged</td><td class="right">' + recentVars.length + '</td></tr>'
+      + '<tr><td>Inventory adjustments logged</td><td class="right">' + recentAdj.length + '</td></tr>'
+      + '</table>'
+
+      + '<h2>Variance Investigations</h2>'
+      + '<table>'
+      + '<tr><td>Open investigations</td><td class="right">' + openInv.length + '</td></tr>'
+      + '<tr><td>Resolved in window</td><td class="right">' + resolvedInv.length + '</td></tr>'
+      + '</table>'
+      + (openInv.length > 0
+          ? '<p style="font-size:12px;color:#444;margin-top:6px;">Open: ' + openInv.map(i => esc(i.sku || '(unnamed)')).join(', ') + '</p>'
+          : '')
+
+      + '<div class="footer">Generated from your logged Bar Cop data on ' + esc(today) + '. '
+      + 'Bar Cop is a software tool, not a forensic auditor, attorney, or insurance adjuster. '
+      + 'Use this brief as a reference point for your own review; consult the relevant professional before acting on any conclusion.'
+      + '</div>'
+      + '<script>setTimeout(function(){window.print();}, 300);</script>'
+      + '</body></html>';
+
+    const w = window.open('', '_blank');
+    if (!w) { alert('Pop-up blocked. Allow pop-ups for Bar Cop and try again.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
   },
 
-  renderList() {
-    const recs = [...this.records()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+  /* Guided Variance Investigation (Section 10) — the Fix System's 6-step
+     variance process as a trackable workflow on a flagged product. */
+  VARIANCE_STEPS: [
+    { title: 'Verify the count',
+      detail: 'Pull the product count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error.' },
+    { title: 'Calculate theoretical usage',
+      detail: 'POS sales by drink type times recipe ounces, compared against the actual ounce movement from the count.' },
+    { title: 'Identify the shifts',
+      detail: 'Use the opening and closing counts to find which shifts the variance landed on.' },
+    { title: 'Talk to the bar manager',
+      detail: 'Ask what they noticed on those shifts: breakage, waste, comps, or unusual activity.' },
+    { title: 'Run a mid-shift count',
+      detail: 'Run an unannounced mid-shift count on the flagged product during a service period.' },
+    { title: 'Document the finding',
+      detail: 'Write down the finding and the resolution before closing, even when it is inconclusive.' }
+  ],
 
-    let html;
-    if (recs.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No voids or comps logged yet</div>'
-        + '<div class="empty-sub">Log every voided and comped item. These exception transactions feed '
-        + 'your Theft Risk score and exception analysis in Profit Recovery.</div>'
-        + '<button class="btn btn-primary" id="vc-add-first">Log Void / Comp</button></div>';
+  _inv(id) { return (App.data.variance_investigations || []).find(x => x.id === id); },
+
+  // Live data for a specific product, pulled from the same Control sources
+  // the Variance Report uses. Returns { step2, step3 } HTML strings, or empty
+  // strings when no product_id (legacy free-text investigations).
+  investigationLiveData(productId) {
+    if (!productId) {
+      return { step2: '<div style="font-size:11px;color:var(--t4);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">Open a new investigation from the dropdown above to wire live count + spot-check data into this step.</div>', step3: '' };
+    }
+    const p = this.productById(productId);
+    if (!p) return { step2: '', step3: '' };
+
+    // Step 2 — theoretical vs actual usage from the latest two ic_counts
+    // bracket + deliveries between them. Same math the Usage Report uses.
+    const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).slice()
+      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+    let step2Html = '';
+    if (counts.length >= 2) {
+      const start = counts[counts.length - 2], end = counts[counts.length - 1];
+      const si = (start.items || []).find(it => it.product_id === productId);
+      const ei = (end.items || []).find(it => it.product_id === productId);
+      if (si && ei) {
+        let purch = 0;
+        ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
+          .filter(d => d.date > start.date && d.date <= end.date)
+          .forEach(d => (d.line_items || []).forEach(li => {
+            if (li.product_id === productId) purch += (App.bottlesFromDeliveryLine ? App.bottlesFromDeliveryLine(li) : (li.qty || 0));
+          }));
+        const used = (si.total || 0) + purch - (ei.total || 0);
+        const pp = p.pours_per_container || (p.container_size_oz && p.pour_size_oz ? p.container_size_oz / p.pour_size_oz : 0);
+        const actualPours = used * pp;
+        const cost = (App.bottleCost ? App.bottleCost(p) : (p.unit_cost || 0)) || 0;
+        const actualDollars = used * cost;
+        step2Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
+          + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Live Data &middot; ' + esc(start.date) + ' to ' + esc(end.date) + '</div>'
+          + '<div>Used: <strong>' + used.toFixed(2) + ' containers</strong> (' + actualPours.toFixed(1) + ' pours, ' + App.fmtCurrency(actualDollars) + ')</div>'
+          + '<div style="color:var(--t3);margin-top:4px;">Starting count ' + (si.total || 0).toFixed(2) + ' + purchases ' + purch.toFixed(2) + ' - ending count ' + (ei.total || 0).toFixed(2) + '</div>'
+          + '<div style="color:var(--t3);margin-top:4px;">Compare against your POS pours sold for the same window. Variance Report in Inventory Control has the full POS-match math when you upload sales data.</div>'
+          + '</div>';
+      } else {
+        step2Html = '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">This product was not counted on both of the last two inventories. Run a count in Inventory Control to populate the math here.</div>';
+      }
     } else {
-      const voids = recs.filter(r => r.type === 'Void');
-      const comps = recs.filter(r => r.type === 'Comp');
-      const voidTot = voids.reduce((t, r) => t + (r.amount || 0), 0);
-      const compTot = comps.reduce((t, r) => t + (r.amount || 0), 0);
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Voids</div><div class="calc-val">' + voids.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Void Total</div><div class="calc-val warn">' + App.fmtCurrency(voidTot) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Comps</div><div class="calc-val">' + comps.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Comp Total</div><div class="calc-val warn">' + App.fmtCurrency(compTot) + '</div></div>'
-        + '</div>';
-      const rows = recs.map(r => {
-        const badge = r.type === 'Void'
-          ? '<span class="badge badge-warn">Void</span>'
-          : '<span class="badge badge-dim">Comp</span>';
-        return '<tr class="vc-row" data-id="' + r.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
-          + '<td>' + badge + '</td>'
-          + '<td>' + esc(r.item || '-') + '</td>'
-          + '<td class="val">' + App.fmtCurrency(r.amount || 0) + '</td>'
-          + '<td>' + esc(r.server || '-') + '</td>'
-          + '<td>' + esc(r.authorized_by || '-') + '</td>'
-          + '<td>' + esc(r.reason || '-') + '</td>'
-          + '<td><div class="row-actions">'
-          + (App.canEdit('sc-void-comp') ? '<button class="btn btn-ghost btn-sm vc-edit" data-id="' + r.id + '">Edit</button>' : '')
-          + (App.canEdit('sc-void-comp') ? '<button class="btn btn-danger btn-sm vc-del" data-id="' + r.id + '">Delete</button>' : '')
-          + '</div></td></tr>';
-      }).join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th>'
-        + '<th>Authorized By</th><th>Reason</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+      step2Html = '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">Need two inventory counts to compute usage. Run a count in Inventory Control.</div>';
     }
 
-    const modal = '<div id="vc-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this entry?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="vc-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="vc-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
-    this.container.onclick = ev => {
-      const row = ev.target.closest('.vc-row');
-      const edit = ev.target.closest('.vc-edit');
-      const del = ev.target.closest('.vc-del');
-      const addF = ev.target.closest('#vc-add-first');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row && App.canEdit('sc-void-comp')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
-    };
+    // Step 3 — recent spot checks where this product was flagged. Helps the
+    // operator narrow which shifts the variance landed on.
+    const recentSpots = this.spotChecks().slice()
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map(c => {
+        const item = (c.items || []).find(i => i.product_id === productId);
+        if (!item) return null;
+        return { date: c.date, shift: c.shift, checked_by: c.checked_by, item };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+    let step3Html = '';
+    if (recentSpots.length) {
+      const rows = recentSpots.map(s => {
+        const flag = s.item.flagged ? '<span style="color:var(--red);font-weight:700;">FLAGGED</span>' : '<span style="color:var(--t3);">ok</span>';
+        const vd = s.item.variance_dollar != null ? App.fmtCurrency(s.item.variance_dollar) : '-';
+        return '<div style="display:flex;gap:10px;padding:4px 0;font-size:11px;border-bottom:1px solid var(--b2);">'
+          + '<span style="color:var(--t2);width:100px;">' + esc(s.date) + '</span>'
+          + '<span style="color:var(--t3);width:90px;">' + esc(s.shift || '-') + '</span>'
+          + '<span style="color:var(--t3);flex:1;">' + esc(s.checked_by || '-') + '</span>'
+          + '<span style="width:80px;text-align:right;color:' + (s.item.flagged ? 'var(--red)' : 'var(--t2)') + ';">' + vd + '</span>'
+          + '<span style="width:80px;text-align:right;">' + flag + '</span>'
+          + '</div>';
+      }).join('');
+      step3Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
+        + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Recent Spot Checks for This Product</div>'
+        + rows
+        + '</div>';
+    }
+    return { step2: step2Html, step3: step3Html };
   },
 
-  reasonOptions(type, selected) {
-    return '<option value="">Select reason...</option>'
-      + (this.REASONS[type] || []).map(r =>
-          '<option' + (r === selected ? ' selected' : '') + '>' + r + '</option>').join('');
-  },
-
-  categoryOptions(selected) {
-    // Default to Customer Comp when no category is set (the common case for
-    // a comp filed without thought). Voids don't carry categories.
-    const sel = selected || 'Customer Comp';
-    return this.CATEGORIES.map(c =>
-      '<option' + (c === sel ? ' selected' : '') + '>' + c + '</option>').join('');
-  },
-
-  showForm(id) {
-    if (id && !App.canEdit('sc-void-comp')) return;
-    this.editId = id || null;
-    const r = id ? this.records().find(x => x.id === id) : null;
-    const type = (r && r.type) || 'Void';
-    const typeOpts = ['Void', 'Comp'].map(t =>
-      '<option' + (type === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const shiftOpts = this.shiftTypes().map(t =>
-      '<option' + (r && r.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const v = val => (val != null && val !== '') ? val : '';
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Log') + ' Void / Comp</div>'
-
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="vc-date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '" style="height:44px;"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Type</label>'
-      + '<select id="vc-type" style="height:44px;">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label>'
-      + '<select id="vc-shift" style="height:44px;">' + shiftOpts + '</select></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="flex:1;min-width:180px;"><label>Item</label>'
-      + '<input type="text" id="vc-item" list="vc-item-list" value="' + esc(r?.item || '') + '" placeholder="Pick a menu item or type the name" style="height:44px;"/>'
-      + '<datalist id="vc-item-list">'
-      + (((App.menuItems && App.menuItems()) || [])
-          .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map(m => '<option value="' + esc(m.name || '') + '"></option>').join(''))
-      + '</datalist>'
-      + '</div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Amount</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vc-amount" min="0" step="0.01" '
-      + 'inputmode="decimal" value="' + v(r?.amount) + '" style="height:44px;font-size:16px;"/></div></div>'
-      + '</div>'
-
-      // Linked product + units. Comps with a linked product subtract those
-      // units from the Inventory Variance Report "used" total so a known
-      // comp does not show up as a theft signal. Voids stay logged but do
-      // not subtract from variance (assumption: voided drinks were not
-      // poured). Linking a void is still useful for theft analytics.
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="flex:1;min-width:240px;"><label>Linked Product <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-      + '<select id="vc-product" style="height:44px;">' + this.productOptions(r?.product_id) + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Units</label>'
-      + '<input type="number" id="vc-units" min="0" step="0.01" inputmode="decimal" value="' + v(r?.units != null ? r.units : (r ? '' : 1)) + '" placeholder="1" style="height:44px;font-size:16px;"/></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label>'
-      + '<select id="vc-server" style="height:44px;">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Authorized By</label>'
-      + '<select id="vc-auth" style="height:44px;">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Check #</label>'
-      + '<input type="text" id="vc-check" value="' + esc(r?.check_number || '') + '" placeholder="Optional" style="height:44px;"/></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;" id="vc-cat-wrap"><label>Category</label>'
-      + '<select id="vc-cat" style="height:44px;">' + this.categoryOptions(r?.category) + '</select>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">Staff Meal and Shift Drink are policy expense, not theft signals. Customer Comp and Service Recovery feed Theft Risk.</div></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label>'
-      + '<select id="vc-reason" style="height:44px;">' + this.reasonOptions(type, r?.reason) + '</select></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="vc-notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>'
-
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="vc-save">' + (id ? 'Update' : 'Save') + '</button>'
-      + '<button class="btn btn-ghost" id="vc-cancel">Cancel</button>'
-      + '<span id="vc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    document.getElementById('vc-type')?.addEventListener('change', e => {
-      const sel = document.getElementById('vc-reason');
-      if (sel) sel.innerHTML = this.reasonOptions(e.target.value, '');
-      // Category only applies to Comp records — hide for Voids.
-      const catWrap = document.getElementById('vc-cat-wrap');
-      if (catWrap) catWrap.style.display = e.target.value === 'Void' ? 'none' : '';
+  // Paper worksheet operator can walk the back-bar with, then enter findings
+  // into Bar Cop after. Same paper-to-digital pattern as the Shift Control logs.
+  printBlankInvestigation() {
+    App.printBlankSheet({
+      title: 'Variance Investigation Worksheet',
+      subtitle: 'Work the six steps in order on a single flagged product. Manager enters findings into Bar Cop after.',
+      columns: [
+        { label: 'Step',         width: '8%'  },
+        { label: 'Task',         width: '32%' },
+        { label: 'What You Did', width: '30%' },
+        { label: 'Finding',      width: '30%' }
+      ],
+      rows: 6
     });
-    // Sync category visibility on initial render too.
-    const catWrap = document.getElementById('vc-cat-wrap');
-    if (catWrap) catWrap.style.display = type === 'Void' ? 'none' : '';
-    document.getElementById('vc-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('vc-save')?.addEventListener('click', () => this.save());
+  },
+
+  investigationsCard() {
+    const invs = App.data.variance_investigations || [];
+    const open = invs.filter(i => i.status !== 'resolved');
+    const resolved = invs.filter(i => i.status === 'resolved');
+    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;'
+      + 'color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
+
+    // Build the product dropdown grouped by category (Liquor, Wine, Beer first).
+    const prods = this.products();
+    const catOrder = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const cats = [...new Set(prods.map(p => p.category || 'Other'))]
+      .sort((a, b) => {
+        const ia = catOrder.indexOf(a), ib = catOrder.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+    let productOpts = '<option value="">Pick a product to investigate...</option>';
+    cats.forEach(cat => {
+      productOpts += '<optgroup label="' + esc(cat) + '">';
+      prods.filter(p => (p.category || 'Other') === cat)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .forEach(p => {
+          productOpts += '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
+        });
+      productOpts += '</optgroup>';
+    });
+
+    let html = '<div class="card"><div class="card-title">Variance Investigations</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
+      + 'When a product shows unexplained variance, open an investigation and work the six steps in order. '
+      + 'It keeps the process honest and leaves a record.</div>'
+      + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:14px;">'
+      + '<div class="f" style="width:280px;"><label>Flagged Product</label>'
+      + '<select class="vi-product-select" style="' + inputStyle + 'width:100%;height:38px;">' + productOpts + '</select></div>'
+      + '<button class="btn btn-primary vi-open-btn">Open Investigation</button>'
+      + '<button class="btn btn-ghost btn-sm vi-print-blank" style="margin-left:auto;">Print Blank Worksheet</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:18px;line-height:1.5;">'
+      + 'Tip: a flagged Spot Check in Inventory Control can open an investigation pre-filled for you. Look for the Investigate button on the spot check detail.'
+      + '</div>';
+
+    open.forEach(inv => {
+      const doneN = inv.steps.filter(s => s.done).length;
+      html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<span style="font-size:13px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(inv.sku) + '</span>'
+        + '<span style="font-size:11px;color:var(--t3);">opened ' + esc(inv.opened_date) + '</span>'
+        + '<span style="font-size:11px;font-weight:700;color:var(--gold);margin-left:auto;">' + doneN + ' of 6 steps</span>'
+        + '</div>';
+      // Live data block for Step 2 (theoretical vs actual) and Step 3 (recent
+      // spot checks) — only shows when the investigation is linked to a real
+      // product_id (which the spot-check entry path + the new dropdown both
+      // capture). Closes the orphan where Step 2 used to be "operator does
+      // the math by hand."
+      const liveData = this.investigationLiveData(inv.product_id);
+      inv.steps.forEach((s, idx) => {
+        const st = this.VARIANCE_STEPS[idx];
+        let extra = '';
+        if (idx === 1 && liveData.step2) extra = liveData.step2;  // theoretical vs actual
+        if (idx === 2 && liveData.step3) extra = liveData.step3;  // shift attribution
+        html += '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);">'
+          + '<input type="checkbox" class="vi-step-check" data-inv="' + inv.id + '" data-step="' + idx + '"'
+          + (s.done ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;width:15px;height:15px;accent-color:var(--gold);"/>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:12px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+          + (idx + 1) + '. ' + esc(st.title) + '</div>'
+          + '<div style="font-size:11px;color:var(--t3);line-height:1.55;margin:3px 0 6px;">' + esc(st.detail) + '</div>'
+          + extra
+          + '<input type="text" class="vi-finding" data-inv="' + inv.id + '" data-step="' + idx + '" '
+          + 'value="' + esc(s.finding) + '" placeholder="What you found" style="' + inputStyle + 'width:100%;"/>'
+          + '</div></div>';
+      });
+      html += '<div style="margin-top:12px;">'
+        + '<label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
+        + '<textarea class="vi-resolution" data-inv="' + inv.id + '" rows="2" '
+        + 'placeholder="The conclusion, even if inconclusive" style="' + inputStyle + 'width:100%;margin-top:5px;resize:vertical;">'
+        + esc(inv.resolution || '') + '</textarea>'
+        + '<div style="display:flex;gap:10px;margin-top:10px;">'
+        + '<button class="btn btn-primary btn-sm vi-resolve-btn" data-inv="' + inv.id + '">Resolve and Close</button>'
+        + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
+        + '</div></div></div>';
+    });
+    if (!open.length) {
+      html += '<div style="font-size:12px;color:var(--t4);">No open investigations.</div>';
+    }
+
+    if (resolved.length) {
+      html += '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 8px;">Resolved</div>'
+        + resolved.slice().reverse().map(inv =>
+          '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
+          + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-top:5px;"></span>'
+          + '<div style="flex:1;min-width:0;"><span style="font-weight:700;color:var(--t1);">' + esc(inv.sku) + '</span> '
+          + '<span style="color:var(--t3);">resolved ' + esc(inv.resolved_date || '') + '</span>'
+          + (inv.resolution ? '<div style="color:var(--t2);line-height:1.55;margin-top:2px;">' + esc(inv.resolution) + '</div>' : '')
+          + '</div>'
+          + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
+          + '</div>').join('');
+    }
+    return html + '</div>';
+  },
+
+  renderMain() {
+    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
+    const confirmed = this.theftConfirmedSignal();
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
+    const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
+    const manScore = this.manualScore(this._manual.level);
+
+    let overall;
+    if (autoScore != null && manScore != null) overall = Math.round(autoScore * 0.65 + manScore * 0.35);
+    else if (autoScore != null) overall = autoScore;
+    else if (manScore != null) overall = manScore;
+    else overall = null;
+
+    // ── Headline score ──
+    const sc = this.scoreClass(overall);
+    const scoreCard = '<div class="card"><div class="card-title">Theft Risk Score</div>'
+      + '<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;">'
+      + '<div style="font-family:\'Barlow Condensed\';font-size:52px;font-weight:600;line-height:1;color:'
+      + (sc === 'good' ? 'var(--gold)' : sc === 'warn' ? 'var(--red)' : 'var(--w)') + ';">'
+      + (overall != null ? overall : '-') + '</div>'
+      + '<div><div style="font-size:13px;font-weight:800;color:'
+      + (sc === 'good' ? 'var(--gold)' : sc === 'warn' ? 'var(--red)' : 'var(--t2)') + ';text-transform:uppercase;letter-spacing:1px;">'
+      + esc(this.ratingFor(overall)) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">0 = strong controls &middot; 100 = high risk'
+      + (autoScore != null ? ' &middot; auto-score ' + autoScore + ' from operational data' : '')
+      + (manScore != null ? ' &middot; manual judgment ' + manScore : '') + '</div></div>'
+      + '</div></div>';
+
+    // ── Signal cards ──
+    const signalCard = (title, sig, body) => {
+      const cls = this.scoreClass(sig.score);
+      const scoreTxt = sig.score != null ? sig.score : '-';
+      return '<div class="card"><div class="card-title">' + title + '</div>'
+        + '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">'
+        + '<div style="font-family:\'Barlow Condensed\';font-size:34px;font-weight:600;color:'
+        + (cls === 'good' ? 'var(--gold)' : cls === 'warn' ? 'var(--red)' : 'var(--t3)') + ';min-width:54px;">' + scoreTxt + '</div>'
+        + '<div style="flex:1;min-width:200px;font-size:12px;color:var(--t2);line-height:1.6;">' + body + '</div>'
+        + '</div></div>';
+    };
+
+    const pourBody = pour.score == null
+      ? 'No spot checks logged yet. Run spot checks in Inventory Control to score pour variance.'
+      : pour.flagged + ' of ' + pour.items + ' checked products flagged across ' + pour.checks
+        + ' spot check' + (pour.checks === 1 ? '' : 's') + '. '
+        + App.fmtCurrency(pour.varDollar) + ' of unexplained pour variance. '
+        + (pour.rate > 0.25 ? 'A high flag rate points to over-pouring or product walking out.'
+           : 'Flag rate is contained.');
+    const voidBody = voids.score == null
+      ? 'No voids or comps logged yet. Shift Control\'s Void and Comp Log feeds this signal.'
+      : voids.unauth + ' of ' + voids.count + ' voids/comps had no authorizing manager recorded. '
+        + App.fmtCurrency(voids.total) + ' in total voids and comps. '
+        + (voids.rate > 0.3 ? 'Unauthorized voids are the most common theft vector. Require manager sign-off.'
+           : 'Most voids and comps are authorized.');
+    const cashBody = cash.score == null
+      ? 'No cash variances logged yet. Shift Control\'s Variance Log feeds this signal.'
+      : cash.shorts + ' of ' + cash.count + ' drawer counts came up short. '
+        + App.fmtCurrency(Math.abs(cash.netShort)) + ' net shortage. '
+        + (cash.rate > 0.3 ? 'Repeated shortages from the same drawers or cashiers warrant a closer look.'
+           : 'Shortage rate is within a normal range.');
+
+    const confirmedBody = confirmed.score == null
+      ? 'No inventory adjustments logged yet. Documented theft events from the Adjustment Log feed this signal directly.'
+      : confirmed.count === 0
+        ? 'No theft events logged in the last 90 days. Adjustments with other reasons (damage, expiration, found) do not score here.'
+        : confirmed.count + ' confirmed theft event' + (confirmed.count === 1 ? '' : 's')
+          + ' logged in the last 90 days, totaling ' + App.fmtCurrency(confirmed.totalValue) + '. '
+          + (confirmed.count >= 3 ? 'Multiple confirmed events points to an ongoing problem, not a one-off.'
+             : 'Documented but contained. Keep an eye on whether it repeats.');
+
+    const threshold = parseFloat((App.data?.settings || {}).comp_auth_threshold);
+    const thresholdLabel = (!isNaN(threshold) && threshold > 0) ? '$' + threshold : 'your threshold';
+    const unauthBody = unauthComps.score == null
+      ? 'No void/comp records logged yet. Setting a Comp Auth Threshold in Hub Settings enables this signal.'
+      : unauthComps.count === 0
+        ? 'No unauthorized large comps in the last 90 days. Every comp over ' + thresholdLabel + ' had a manager in the Authorized By field, which is what you want.'
+        : unauthComps.count + ' comp' + (unauthComps.count === 1 ? '' : 's')
+          + ' over ' + thresholdLabel + ' filed in the last 90 days without manager authorization, totaling ' + App.fmtCurrency(unauthComps.total) + '. '
+          + (unauthComps.count >= 3 ? 'A pattern of unauthorized large comps is one of the most common bar-theft vectors. Tighten the rule.'
+             : 'One instance can be a busy night. Repeats are a pattern.');
+
+    const signals = signalCard('Pour Variance &middot; Spot Checks', pour, pourBody)
+      + signalCard('Voids &amp; Comps', voids, voidBody)
+      + signalCard('Cash Variance', cash, cashBody)
+      + signalCard('Unauthorized Large Comps', unauthComps, unauthBody)
+      + signalCard('Confirmed Theft &middot; Adjustment Log', confirmed, confirmedBody);
+
+    // ── Manual judgment ──
+    const levelOpts = '<option value="">No manual judgment</option>'
+      + this.MANUAL_LEVELS.map(m => '<option' + (this._manual.level === m.label ? ' selected' : '') + '>' + m.label + '</option>').join('');
+    const manualCard = '<div class="card"><div class="card-title">Manual Judgment</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
+      + 'Operational data does not see everything. Add your own read on cameras, policies, staffing, and '
+      + 'staff behavior. It is blended into the overall score.</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Your Assessment</label>'
+      + '<select id="tr-manual">' + levelOpts + '</select></div></div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="tr-notes" rows="2" placeholder="What concerns you, or what controls are working">'
+      + esc(this._manual.notes) + '</textarea></div></div>'
+      + '<div id="tr-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;">Scorecard saved.</div>'
+      + '</div>';
+
+    // ── History ──
+    const hist = (App.data.theft_scores || []).slice(-6).reverse();
+    let histCard = '';
+    if (hist.length) {
+      const rows = hist.map(s => {
+        const ov = s.overall != null ? s.overall : s.total;
+        const cls = this.scoreClass(ov);
+        return '<tr><td>' + (s.date ? String(s.date).slice(0, 10) : '-') + '</td>'
+          + '<td class="' + (cls === 'good' ? 'pos' : cls === 'warn' ? 'neg' : '') + ' val">' + (ov != null ? ov : '-') + '</td>'
+          + '<td>' + esc(s.rating || '-') + '</td></tr>';
+      }).join('');
+      histCard = '<div class="card"><div class="card-title">Recent Scorecards</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Score</th><th>Rating</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + scoreCard + signals + manualCard
+      + this.investigationsCard() + histCard + '</div>';
+
+    document.getElementById('tr-manual')?.addEventListener('change', e => {
+      this._manual.notes = document.getElementById('tr-notes')?.value || '';
+      this._manual.level = e.target.value;
+      this.renderMain();
+    });
+    document.getElementById('tr-notes')?.addEventListener('input', e => {
+      this._manual.notes = e.target.value;
+    });
+
+    // ── Variance investigation wiring ──
+    this.container.querySelectorAll('.vi-open-btn').forEach(b => b.addEventListener('click', () => {
+      const sel = this.container.querySelector('.vi-product-select');
+      const productId = sel && sel.value;
+      if (!productId) { if (sel) sel.style.borderColor = 'var(--red)'; return; }
+      const p = this.productById(productId);
+      const sku = (p && p.name) || productId;
+      App.data.variance_investigations = App.data.variance_investigations || [];
+      App.data.variance_investigations.push({
+        id: App.uid(),
+        product_id: productId,
+        sku,
+        opened_date: new Date().toISOString().slice(0, 10),
+        status: 'open',
+        steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })),
+        resolution: ''
+      });
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelector('.vi-print-blank')?.addEventListener('click', () => this.printBlankInvestigation());
+    this.container.querySelectorAll('.vi-step-check').forEach(c => c.addEventListener('change', () => {
+      const inv = this._inv(c.dataset.inv); if (!inv) return;
+      inv.steps[+c.dataset.step].done = c.checked;
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-finding').forEach(i => i.addEventListener('change', () => {
+      const inv = this._inv(i.dataset.inv); if (!inv) return;
+      inv.steps[+i.dataset.step].finding = i.value;
+      App.saveKey('variance_investigations');
+    }));
+    this.container.querySelectorAll('.vi-resolution').forEach(t => t.addEventListener('change', () => {
+      const inv = this._inv(t.dataset.inv); if (!inv) return;
+      inv.resolution = t.value;
+      App.saveKey('variance_investigations');
+    }));
+    this.container.querySelectorAll('.vi-resolve-btn').forEach(b => b.addEventListener('click', () => {
+      const inv = this._inv(b.dataset.inv); if (!inv) return;
+      const ta = this.container.querySelector('.vi-resolution[data-inv="' + inv.id + '"]');
+      if (ta) inv.resolution = ta.value;
+      inv.status = 'resolved';
+      inv.resolved_date = new Date().toISOString().slice(0, 10);
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-remove').forEach(b => b.addEventListener('click', () => {
+      App.data.variance_investigations = (App.data.variance_investigations || []).filter(x => x.id !== b.dataset.inv);
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
   },
 
   async save() {
-    const err = document.getElementById('vc-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('vc-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
-    const item = document.getElementById('vc-item')?.value.trim();
-    if (!item) { fail('Item is required.'); return; }
-    const amount = parseFloat(document.getElementById('vc-amount')?.value);
-    if (isNaN(amount) || amount < 0) { fail('Enter the amount.'); return; }
+    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
+    const confirmed = this.theftConfirmedSignal();
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
+    const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
+    const manScore = this.manualScore(this._manual.level);
+    let overall;
+    if (autoScore != null && manScore != null) overall = Math.round(autoScore * 0.65 + manScore * 0.35);
+    else if (autoScore != null) overall = autoScore;
+    else if (manScore != null) overall = manScore;
+    else overall = null;
 
-    const productId = document.getElementById('vc-product')?.value || '';
-    const product = productId ? this.productById(productId) : null;
-    const unitsRaw = parseFloat(document.getElementById('vc-units')?.value);
-    const units = isNaN(unitsRaw) ? null : unitsRaw;
+    App.data.theft_manual = { level: this._manual.level, notes: this._manual.notes };
+    if (!App.data.theft_scores) App.data.theft_scores = [];
+    App.data.theft_scores.push({
+      id: App.uid(),
+      date: new Date().toISOString(),
+      auto_score: autoScore,
+      signals: { pour: pour.score, voids: voids.score, cash: cash.score, confirmed: confirmed.score, unauthComps: unauthComps.score },
+      manual_level: this._manual.level,
+      manual_score: manScore,
+      notes: this._manual.notes,
+      overall,
+      rating: this.ratingFor(overall)
+    });
+    App.data.last_theft_score_date = new Date().toISOString();
 
-    const type = document.getElementById('vc-type')?.value || 'Void';
-    // Category only applies to Comps. Voids stay un-categorized. Default to
-    // Customer Comp when category dropdown is empty (legacy records will read
-    // as Customer Comp via the same default downstream).
-    const category = type === 'Comp'
-      ? (document.getElementById('vc-cat')?.value || 'Customer Comp')
-      : '';
-    const rec = {
-      id:            this.editId || App.uid(),
-      date,
-      type,
-      category,
-      shift_type:    document.getElementById('vc-shift')?.value || '',
-      item,
-      amount,
-      product_id:    productId,
-      product_name:  product?.name || '',
-      units,
-      staff_id:         document.getElementById('vc-server')?.value || '',
-      server:           (App.staffById(document.getElementById('vc-server')?.value) || {}).name || '',
-      authorized_by_id: document.getElementById('vc-auth')?.value || '',
-      authorized_by:    (App.staffById(document.getElementById('vc-auth')?.value) || {}).name || '',
-      check_number:  document.getElementById('vc-check')?.value.trim() || '',
-      reason:        document.getElementById('vc-reason')?.value || '',
-      notes:         document.getElementById('vc-notes')?.value.trim() || ''
-    };
-    if (!this.editId) rec.created_at = new Date().toISOString();
-
-    const list = this.records();
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
-    }
-
-    const btn = document.getElementById('vc-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
-    this.editId = null;
-    if (ok) {
-      this.renderList();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-      fail('Save failed. Try again.');
-    }
-  },
-
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('vc-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('vc-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('vc-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      App.shiftData.sc_void_comps = this.records().filter(x => x.id !== delId);
-      await App.saveShift();
-      this.renderList();
-    };
+    await App.saveKey('theft_manual');
+    await App.saveKey('theft_scores');
+    await App.saveKey('last_theft_score_date');
+    const m = document.getElementById('tr-msg');
+    if (m) { m.style.display = 'block'; setTimeout(() => { if (m) m.style.display = 'none'; }, 2500); }
+    this.renderMain();
   }
 };
