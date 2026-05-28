@@ -174,8 +174,10 @@ S.Shift86List = {
   // ── Entry ──────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button>';
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" id="el-print-blank" style="margin-left:8px;">Print Blank Sheet</button>';
     document.getElementById('el-export')?.addEventListener('click', () => window.print());
+    document.getElementById('el-print-blank')?.addEventListener('click', () => this.printBlank());
     this.editId = null;
     this.customMode = false;
     this.alsoIds = {};
@@ -624,5 +626,23 @@ S.Shift86List = {
       await App.saveShift();
       this.renderMain();
     };
+  },
+
+  // Paper-at-bar workflow. Bartenders + managers commonly mark 86s on a
+  // whiteboard or clipboard mid-service, then enter into Bar Cop after close.
+  printBlank() {
+    App.printBlankSheet({
+      title: '86 List',
+      subtitle: 'Mark every item 86\'d during the shift. Manager enters each row into Bar Cop after close.',
+      columns: [
+        { label: 'Time',         width: '10%' },
+        { label: 'Item',         width: '26%' },
+        { label: 'Category',     width: '14%' },
+        { label: 'Reason',       width: '24%' },
+        { label: 'Reported By',  width: '14%' },
+        { label: 'Notes',        width: '12%' }
+      ],
+      rows: 14
+    });
   }
 };
