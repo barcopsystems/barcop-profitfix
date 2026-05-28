@@ -177,26 +177,30 @@ S.HubYearEnd = {
   _aggregateYear(year) {
     const months = [];
     let agg = {
-      barRev: 0, foodRev: 0, totalRev: 0,
-      barCogs: 0, foodCogs: 0, totalCogs: 0,
-      barLabor: 0, foodLabor: 0, totalLabor: 0,
-      comps: 0, maintenance: 0
+      barRev: 0, foodRev: 0, cateringRev: 0, totalRev: 0,
+      barCogs: 0, foodCogs: 0, cateringCogs: 0, totalCogs: 0,
+      barLabor: 0, foodLabor: 0, cateringLabor: 0, totalLabor: 0,
+      comps: 0, maintenance: 0, platformFees: 0
     };
     for (let m = 1; m <= 12; m++) {
       const monthKey = year + '-' + String(m).padStart(2, '0');
       const M = S.HubBooks._aggregateMonth(monthKey);
       months.push({ key: monthKey, monthNum: m, ...M });
-      agg.barRev     += M.barRev;
-      agg.foodRev    += M.foodRev;
-      agg.totalRev   += M.totalRev;
-      agg.barCogs    += M.barCogs;
-      agg.foodCogs   += M.foodCogs;
-      agg.totalCogs  += M.totalCogs;
-      agg.barLabor   += M.barLabor;
-      agg.foodLabor  += M.foodLabor;
-      agg.totalLabor += M.totalLabor;
-      agg.comps      += M.comps || 0;
-      agg.maintenance+= M.maintenance || 0;
+      agg.barRev        += M.barRev;
+      agg.foodRev       += M.foodRev;
+      agg.cateringRev   += M.cateringRev   || 0;
+      agg.totalRev      += M.totalRev;
+      agg.barCogs       += M.barCogs;
+      agg.foodCogs      += M.foodCogs;
+      agg.cateringCogs  += M.cateringCogs  || 0;
+      agg.totalCogs     += M.totalCogs;
+      agg.barLabor      += M.barLabor;
+      agg.foodLabor     += M.foodLabor;
+      agg.cateringLabor += M.cateringLabor || 0;
+      agg.totalLabor    += M.totalLabor;
+      agg.comps         += M.comps         || 0;
+      agg.maintenance   += M.maintenance   || 0;
+      agg.platformFees  += M.platformFees  || 0;
     }
     return { months, ...agg };
   },
@@ -248,15 +252,17 @@ S.HubYearEnd = {
     const row = (label, cur, prev) => rows.push([label, cur, hasPrior ? prev : '', deltaCell(cur, prev)]);
 
     rows.push(['Revenue', '', '', '']);
-    row('  Bar Revenue',  Y.barRev,  P.barRev);
-    row('  Food Revenue', Y.foodRev, P.foodRev);
+    row('  Bar Revenue',      Y.barRev,      P.barRev);
+    row('  Food Revenue',     Y.foodRev,     P.foodRev);
+    row('  Catering Revenue', Y.cateringRev, P.cateringRev);
     row('  Less: Comps',  Y.comps != null ? -Math.abs(Y.comps) : null, P.comps != null ? -Math.abs(P.comps) : null);
     row('Total Revenue (net of comps)', Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0));
     rows.push(blank());
 
     rows.push(['Cost of Goods Sold', '', '', '']);
-    row('  Bar COGS',  Y.barCogs,  P.barCogs);
-    row('  Food COGS', Y.foodCogs, P.foodCogs);
+    row('  Bar COGS',      Y.barCogs,      P.barCogs);
+    row('  Food COGS',     Y.foodCogs,     P.foodCogs);
+    row('  Catering COGS', Y.cateringCogs, P.cateringCogs);
     row('Total COGS', Y.totalCogs, P.totalCogs);
     rows.push(blank());
 
@@ -264,13 +270,22 @@ S.HubYearEnd = {
     rows.push(blank());
 
     rows.push(['Labor', '', '', '']);
-    row('  Bar Labor',  Y.barLabor,  P.barLabor);
-    row('  Food Labor', Y.foodLabor, P.foodLabor);
+    row('  Bar Labor',      Y.barLabor,      P.barLabor);
+    row('  Food Labor',     Y.foodLabor,     P.foodLabor);
+    row('  Catering Labor', Y.cateringLabor, P.cateringLabor);
     row('Total Labor', Y.totalLabor, P.totalLabor);
     rows.push(blank());
 
     row('Prime Cost (COGS + Labor)', Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor);
-    row('Operating Margin (Net Revenue - Prime)', (Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor), (P.totalRev - (P.comps || 0)) - (P.totalCogs + P.totalLabor));
+    rows.push(blank());
+
+    rows.push(['Other Operating Costs', '', '', '']);
+    row('  3rd-Party Platform Fees', Y.platformFees, P.platformFees);
+    rows.push(blank());
+
+    row('Operating Margin (Net Revenue - Prime - Platform Fees)',
+        (Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor) - (Y.platformFees || 0),
+        (P.totalRev - (P.comps || 0)) - (P.totalCogs + P.totalLabor) - (P.platformFees || 0));
     rows.push(blank());
 
     // Percentages
@@ -351,15 +366,17 @@ S.HubYearEnd = {
     };
 
     rows.push(['Revenue', ...Array(13).fill('')]);
-    seriesRow('  Bar Revenue',  M => M.barRev);
-    seriesRow('  Food Revenue', M => M.foodRev);
-    seriesRow('  Comps',        M => -Math.abs(M.comps || 0));
+    seriesRow('  Bar Revenue',      M => M.barRev);
+    seriesRow('  Food Revenue',     M => M.foodRev);
+    seriesRow('  Catering Revenue', M => M.cateringRev || 0);
+    seriesRow('  Comps',            M => -Math.abs(M.comps || 0));
     seriesRow('Total Revenue (net)', M => M.totalRev - (M.comps || 0));
     rows.push(blank());
 
     rows.push(['COGS', ...Array(13).fill('')]);
-    seriesRow('  Bar COGS',  M => M.barCogs);
-    seriesRow('  Food COGS', M => M.foodCogs);
+    seriesRow('  Bar COGS',      M => M.barCogs);
+    seriesRow('  Food COGS',     M => M.foodCogs);
+    seriesRow('  Catering COGS', M => M.cateringCogs || 0);
     seriesRow('Total COGS', M => M.totalCogs);
     rows.push(blank());
 
@@ -367,12 +384,17 @@ S.HubYearEnd = {
     rows.push(blank());
 
     rows.push(['Labor', ...Array(13).fill('')]);
-    seriesRow('  Bar Labor',  M => M.barLabor);
-    seriesRow('  Food Labor', M => M.foodLabor);
+    seriesRow('  Bar Labor',      M => M.barLabor);
+    seriesRow('  Food Labor',     M => M.foodLabor);
+    seriesRow('  Catering Labor', M => M.cateringLabor || 0);
     seriesRow('Total Labor', M => M.totalLabor);
     rows.push(blank());
 
     seriesRow('Prime Cost (COGS + Labor)', M => M.totalCogs + M.totalLabor);
+    rows.push(blank());
+
+    rows.push(['Other Operating Costs', ...Array(13).fill('')]);
+    seriesRow('  3rd-Party Platform Fees', M => M.platformFees || 0);
     rows.push(blank());
 
     rows.push(['Key Cost Ratios', ...Array(13).fill('')]);
@@ -808,6 +830,13 @@ S.HubYearEnd = {
     const voidComps = (App.shiftData?.sc_void_comps || []).filter(v => inYear(v.date));
     const voids = voidComps.filter(v => v.type === 'void' || v.type === 'Void');
     const comps = voidComps.filter(v => v.type === 'comp' || v.type === 'Comp');
+    // Split comps by category. Legacy/missing category defaults to Customer
+    // Comp (loss). Staff Meal and Shift Drink are policy expense, not loss.
+    const categoryOf = c => c.category || 'Customer Comp';
+    const customerComps = comps.filter(c => categoryOf(c) === 'Customer Comp');
+    const serviceRec   = comps.filter(c => categoryOf(c) === 'Service Recovery');
+    const staffMeals   = comps.filter(c => categoryOf(c) === 'Staff Meal');
+    const shiftDrinks  = comps.filter(c => categoryOf(c) === 'Shift Drink');
     const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
     const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
     const incidents = (App.shiftData?.sc_incidents || []).filter(i => inYear(i.date));
@@ -817,12 +846,15 @@ S.HubYearEnd = {
 
     rows.push(['Counts and Totals for ' + year, '', '', '']);
     rows.push(['Event', 'Count', 'Total $', 'Notes']);
-    rows.push(['Voids',          voids.length, sum(voids, 'amount'), 'Reversed sales']);
-    rows.push(['Comps',          comps.length, sum(comps, 'amount'), 'Contra-revenue or operating expense']);
-    rows.push(['Walked Tabs',    walked.length, sum(walked, 'amount'), 'Unpaid checks, mis-bills, lost tickets']);
-    rows.push(['Incidents',      incidents.length, '', 'Slip-and-fall, altercation, employee injury, regulatory visit']);
-    rows.push(['Call-Outs',      callouts.length, '', 'Staff call-outs and no-shows']);
-    rows.push(['Certs Lapsed',   certs.length, '', 'Certifications with expiration date in ' + year]);
+    rows.push(['Voids',                voids.length, sum(voids, 'amount'),         'Reversed sales']);
+    rows.push(['Customer Comps',       customerComps.length, sum(customerComps, 'amount'), 'Loss-bearing comps given to guests']);
+    rows.push(['Service Recovery',     serviceRec.length, sum(serviceRec, 'amount'),       'Loss-bearing comps to fix a service problem']);
+    rows.push(['Staff Meals',          staffMeals.length, sum(staffMeals, 'amount'),       'Policy expense, not loss']);
+    rows.push(['Shift Drinks',         shiftDrinks.length, sum(shiftDrinks, 'amount'),     'Policy expense, not loss']);
+    rows.push(['Walked Tabs',          walked.length, sum(walked, 'amount'),         'Unpaid checks, mis-bills, lost tickets']);
+    rows.push(['Incidents',            incidents.length, '',                         'Slip-and-fall, altercation, employee injury, regulatory visit']);
+    rows.push(['Call-Outs',            callouts.length, '',                          'Staff call-outs and no-shows']);
+    rows.push(['Certs Lapsed',         certs.length, '',                             'Certifications with expiration date in ' + year]);
     rows.push(blank());
 
     // Incident breakdown by type
