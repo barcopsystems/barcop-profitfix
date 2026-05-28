@@ -289,10 +289,15 @@ const App = {
           });
           inviteSetupArmed = false;  // consume the one invite SIGNED_IN event
         } else if (event === 'SIGNED_IN' && session) {
+          // Same visibility-change guard as the main handler below: Supabase v2
+          // re-fires SIGNED_IN on tab focus, don't re-boot if already booted.
+          if (this._bootedUserId === session.user?.id) return;
+          this._bootedUserId = session.user?.id || null;
           await this.loadAllData();
           this.subscription = await DB.getSubscription();
           this.boot();
         } else if (event === 'SIGNED_OUT') {
+          this._bootedUserId = null;
           this.data = null;
           this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
           this.showAuth();
@@ -302,6 +307,7 @@ const App = {
     }
     const session = await DB.getSession();
     if (session) {
+      this._bootedUserId = session.user?.id || null;
       await this.loadAllData();
       this.subscription = await DB.getSubscription();
       this.boot();
@@ -322,10 +328,17 @@ const App = {
           if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
         });
       } else if (event === 'SIGNED_IN' && session) {
+        // Supabase v2 re-emits SIGNED_IN whenever the tab regains visibility
+        // (e.g., closing a print pop-up). Without this guard, the handler
+        // re-runs boot() and bounces the operator back to Hub Dashboard,
+        // losing whatever module/screen they were on.
+        if (this._bootedUserId === session.user?.id) return;
+        this._bootedUserId = session.user?.id || null;
         await this.loadAllData();
         this.subscription = await DB.getSubscription();
         this.boot();
       } else if (event === 'SIGNED_OUT') {
+        this._bootedUserId = null;
         this.data = null;
         this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
         this.showAuth();
