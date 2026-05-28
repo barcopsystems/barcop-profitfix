@@ -1309,6 +1309,117 @@ const App = {
     'Lost':           'var(--red)'
   },
 
+  // ── Traffic Recovery canonical enums ────────────────────────────────────
+  // Single source for every list shared across Traffic screens (t-dashboard,
+  // t-this-week, t-gbp, t-reviews, t-search, t-website, t-social, t-delivery,
+  // t-email, t-reports, t-audit), Hub Settings → Operation Links, and the
+  // Recovery Scoreboard. Promoted from per-file local arrays so the lists
+  // never drift. Mirrors the MENU_* / EVENT_* migration pattern from Revenue.
+  //
+  // Public digital platforms the operator owns or maintains a listing on.
+  // urlKey: name of the field under traffic_settings.urls (set in Hub
+  //         Settings → Operation Links).
+  TRAFFIC_PLATFORMS: [
+    { key: 'website',        label: 'Website',         urlKey: 'website',        placeholder: 'https://yourbar.com' },
+    { key: 'gbp',            label: 'Google',          urlKey: 'gbp',            placeholder: 'https://maps.google.com/?cid=...' },
+    { key: 'yelp',           label: 'Yelp',            urlKey: 'yelp',           placeholder: 'https://yelp.com/biz/your-bar' },
+    { key: 'instagram',      label: 'Instagram',       urlKey: 'instagram',      placeholder: 'https://instagram.com/yourbar' },
+    { key: 'facebook',       label: 'Facebook',        urlKey: 'facebook',       placeholder: 'https://facebook.com/yourbar' },
+    { key: 'doordash',       label: 'DoorDash',        urlKey: 'doordash',       placeholder: 'https://doordash.com/store/...' },
+    { key: 'ubereats',       label: 'Uber Eats',       urlKey: 'ubereats',       placeholder: 'https://ubereats.com/store/...' },
+    { key: 'grubhub',        label: 'Grubhub',         urlKey: 'grubhub',        placeholder: 'https://grubhub.com/restaurant/...' },
+    { key: 'ezcater',        label: 'ezCater',         urlKey: 'ezcater',        placeholder: 'https://ezcater.com/catering/...' },
+    { key: 'email_platform', label: 'Email Platform',  urlKey: 'email_platform', placeholder: 'https://mailchimp.com or your tool' }
+  ],
+
+  // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
+  // and the average-rating math in t-reports + t-dashboard. Key prefix maps to
+  // the per-platform fields in traffic_weeks (dd_active, dd_rating, etc.) and
+  // traffic_settings.profile (dd_photos, dd_menu, dd_promo, dd_menu_synced_at).
+  // Independent operators in catering-heavy markets need ezCater; held the rest
+  // of the long tail out per [[value-bar]] — every added platform multiplies
+  // the operator's weekly typing burden.
+  TRAFFIC_DELIVERY_PLATFORMS: [
+    { key: 'dd', name: 'DoorDash' },
+    { key: 'ue', name: 'Uber Eats' },
+    { key: 'gh', name: 'Grubhub' },
+    { key: 'ez', name: 'ezCater' }
+  ],
+
+  // Benchmarks read by tip-generators, action-item math, and trend chart
+  // targets. Operator-tunable targets that move per operation (rating,
+  // review velocity, response rate, monthly sessions, social posts/mo) live
+  // under traffic_settings.targets and are set in Hub Settings → Traffic
+  // Targets. The values here are fixed industry benchmarks that don't vary.
+  TRAFFIC_BENCHMARKS: {
+    yelp_rating:       4.0,
+    delivery_rating:   4.5,
+    open_rate:         20,
+    list_size:         500,
+    citations:         40,
+    engagement_rate:   2,
+    gbp_photos:        100
+  },
+
+  // Profile-completeness checklist on t-gbp. Each entry is [key, label].
+  // The key is stored as a boolean on traffic_settings.profile.
+  TRAFFIC_GBP_TOGGLES: [
+    ['gbp_claimed',    'Listing claimed'],
+    ['gbp_hours',      'Hours complete'],
+    ['gbp_phone',      'Phone number present'],
+    ['gbp_website',    'Website linked'],
+    ['gbp_menu',       'Menu link active'],
+    ['gbp_category',   'Primary category set'],
+    ['gbp_attributes', 'Attributes complete'],
+    ['gbp_qa',         'Q and A populated']
+  ],
+
+  // Local SEO assessment on t-search.
+  TRAFFIC_SEARCH_TOGGLES: [
+    ['search_maps_pack', 'Confirmed in the Google Maps 3-pack'],
+    ['search_nap',       'Name, address, phone consistent everywhere'],
+    ['search_name',      'Business name correct on Google'],
+    ['search_address',   'Address correct on Google'],
+    ['search_phone',     'Phone number correct on Google'],
+    ['search_titles',    'Website page titles assessed for keywords']
+  ],
+
+  // Website setup checklist on t-website.
+  TRAFFIC_WEB_TOGGLES: [
+    ['web_exists',       'Website is live'],
+    ['web_mobile',       'Mobile optimized'],
+    ['web_menu',         'Menu linked from the homepage'],
+    ['web_online_order', 'Online ordering available'],
+    ['web_reservations', 'Reservation system in place']
+  ],
+
+  // Email program enums on t-email.
+  TRAFFIC_EMAIL_FREQUENCY:      ['Weekly', 'Every two weeks', 'Monthly', 'Rarely', 'Never'],
+  TRAFFIC_EMAIL_GROWTH_SOURCES: ['Website signup form', 'In-store signup', 'WiFi login capture', 'Online order checkout', 'No active mechanism'],
+
+  // Social content mix on t-social.
+  TRAFFIC_SOCIAL_CONTENT_MIX: ['Balanced', 'Mostly promotional', 'Mostly reposts', 'Too few food photos'],
+
+  // ── Traffic fix_log auto-emit helper (Recovery Scoreboard wiring) ───────
+  // Every operator action that closes a Traffic gap writes a fix_log row so
+  // the Recovery Scoreboard, the 8-week dashboard chart's "Fix Logged"
+  // markers, and the Fix Areas card progress tally all credit the work.
+  // Mirrors the auto-emit pattern in r-menu-items.js for menu price changes.
+  // gap_id matches the FIX.traffic entry id (gbp, website, reviews, search-seo,
+  // social, delivery, email-loyalty).
+  emitTrafficFix(gap_id, note) {
+    if (!Array.isArray(this.data.fix_log)) this.data.fix_log = [];
+    this.data.fix_log.push({
+      id: this.uid(),
+      module: 'traffic',
+      gap_id: gap_id,
+      note: note || '',
+      source: 'traffic-auto',
+      saved_at: new Date().toISOString()
+    });
+    return this.saveKey('fix_log');
+  },
+
   // ── Menu Items ───────────────────────────────────────────────────────────
   // Single canonical store for every sellable thing on the menu. Each item
   // can OPTIONALLY have a recipe attached (ingredient breakdown). When a
