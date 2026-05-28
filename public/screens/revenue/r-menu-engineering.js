@@ -55,7 +55,7 @@ S.RevenueMenuEngineering = {
       'PUZZLE':    'High margin, low volume. Needs promotion and server attention.',
       'DOG':       'Low margin and low volume. Candidate for removal or full rework.',
     };
-    const colorMap = { 'STAR':'var(--gold)', 'PLOWHORSE':'#4888A8', 'PUZZLE':'#D08008', 'DOG':'var(--red)' };
+    const colorMap = { 'STAR':'var(--gold)', 'PLOWHORSE':'var(--blue)', 'PUZZLE':'var(--amber)', 'DOG':'var(--red)' };
 
     const classified = items.map(item => ({
       ...item, quad:classify(item), cm:item.price-item.cost,
@@ -247,8 +247,23 @@ S.RevenueMenuEngineering = {
       const allItems = App.data.menu_items||[];
       const ri = allItems.findIndex(i=>i.id===item.id);
       if(ri>=0) allItems[ri].price=newPrice;
+      // Auto-emit a Recovery Scoreboard fix_log entry tied to the Pricing gap
+      // area. Recovery.js watches check_avg + revenue for the 8 weeks after a
+      // fix_date and surfaces the recovered dollars. No more manual "mark
+      // implemented" step for a price change that already got logged here.
+      if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
+      App.data.fix_log.push({
+        id:        App.uid(),
+        module:    'revenue',
+        gap_id:    'pricing',
+        fix_date:  new Date().toISOString().slice(0, 10),
+        source:    'price-change',
+        source_id: entry.id,
+        note:      'Price change logged: ' + (item.name || '') + ' ' + App.fmtCurrency(item.price) + ' to ' + App.fmtCurrency(newPrice)
+      });
       await App.saveKey('revenue_price_log');
       await App.saveKey('menu_items');
+      await App.saveKey('fix_log');
       // Refresh log table inline
       const tbody = document.getElementById('rps-log-table');
       if (tbody) {
