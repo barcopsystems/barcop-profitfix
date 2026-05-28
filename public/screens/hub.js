@@ -670,9 +670,9 @@ S.Hub = {
       + navItem('enter', 'Labor Control',    'labor',   [['data-mod','labor'],    ['data-screen','lc-dashboard']])
       + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
       + '<div class="nav-section">Accounting</div>'
-      + navItem('books',            'Month-End Books', 'books',    [])
-      + navItem('weekly-pnl',       'Weekly P&L',      'report',   [])
-      + navItem('year-end',         'Year-End Review', 'books',    [])
+      + navItem('weekly-pnl',       'Weekly P&L Brief', 'report',   [])
+      + navItem('books',            'Month-End Books',  'books',    [])
+      + navItem('year-end',         'Year-End Review',  'books',    [])
       + '<div class="nav-section">Setup</div>'
       // Getting Started hides once every setup step is checked off so the
       // sidebar does not carry permanent clutter for operators past setup.
