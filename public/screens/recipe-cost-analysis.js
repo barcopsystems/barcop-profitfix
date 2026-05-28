@@ -38,7 +38,7 @@ S.RecipeCostAnalysis = {
     // Rank items WITH recipes by recipe cost % vs target (over-target first).
     const ranked = withRecipe.map(i => {
       const cost = App.menuItemCost(i) || 0;
-      const tgt  = i.target_cost_pct || (i.recipe.mode === 'food' ? 32 : 22);
+      const tgt  = i.target_cost_pct || (i.recipe.mode === 'food' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail);
       const pct  = i.price > 0 ? (cost / i.price * 100) : null;
       const over = pct != null && pct > tgt;
       const gap  = (pct != null && over) ? (pct - tgt) : 0;
