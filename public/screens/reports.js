@@ -193,12 +193,17 @@ S.Reports={
     toInp.addEventListener('change',updatePreview);
     updatePreview();
 
-    dlBtn.addEventListener('click',()=>{
+    dlBtn.addEventListener('click', async () => {
       const range=rangeSel.value;
       const filtered=this._filterWeeksByRange(weeks,range,fromInp.value,toInp.value);
       if(filtered.length===0) return;
       if(typeof XLSX==='undefined'){
-        alert('The file builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.');
+        await App.confirm({
+          title: 'File builder not loaded',
+          message: 'The Excel builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.',
+          confirmText: 'OK',
+          cancelText: ''
+        });
         return;
       }
       const today=new Date().toISOString().slice(0,10);
