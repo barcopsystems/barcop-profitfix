@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap');
 
 :root {
-  --bg:        #000000;
+  --bg:        #070E15;
   --surface:   #070E15;
   --input:     #06111c;
   --panel:     #08111A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
