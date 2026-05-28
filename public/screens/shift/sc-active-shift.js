@@ -515,7 +515,7 @@ S.ShiftActiveShift = {
       const hrs = (t.hours != null && t.hours > 0)
         ? t.hours
         : (actuals.find(a => a.staff_id === t.staff_id) || {});
-      const hoursVal = (typeof hrs === 'number') ? hrs : (hrs.hours_actual || hrs.hours_scheduled || 0);
+      const hoursVal = (typeof hrs === 'number') ? hrs : (hrs.hours || 0);
       if (!staffMap.has(t.staff_id)) staffMap.set(t.staff_id, { staff_id: t.staff_id, name: t.name, hours: hoursVal || 0, share: 0 });
     });
     // If no tip entries at all, fall back to staff who clocked in
@@ -523,7 +523,7 @@ S.ShiftActiveShift = {
       actuals.forEach(a => {
         if (!a.staff_id) return;
         const staff = (App.laborData?.lc_staff || []).find(x => x.id === a.staff_id);
-        staffMap.set(a.staff_id, { staff_id: a.staff_id, name: staff?.name || '', hours: a.hours_actual || a.hours_scheduled || 0, share: 0 });
+        staffMap.set(a.staff_id, { staff_id: a.staff_id, name: staff?.name || '', hours: a.hours || 0, share: 0 });
       });
     }
 
