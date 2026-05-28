@@ -24,7 +24,7 @@ S.AuditTracker = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div style="flex:1;min-width:200px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Profit Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One comprehensive profit audit every 30 days. Upload your POS reports and data files. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One profit audit every 30 days. Upload your POS reports and data files. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
       + '</div>'
       + (canRunAudit
           ? '<button class="btn btn-primary" id="at-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>'
@@ -384,8 +384,9 @@ S.AuditTracker = {
       {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL},
     ].filter(s => s.label);
 
+    const NAMES = App.AUDIT_PROFIT_SECTION_NAMES;
     const sections = [
-      sectionBlock(1, 'Bar Cost and Pour Control', d.S1_SCORE, [
+      sectionBlock(1, NAMES[0], d.S1_SCORE, [
         ['Bar Pour Cost %',         pct(d.S1_BAR_COST_PCT, d.S1_TARGET_PCT), d.S1_BAR_COST_PCT > d.S1_TARGET_PCT ? 'warn' : 'good'],
         ['Monthly Bar Revenue',     cur(d.S1_BAR_REV_MONTHLY)],
         ['Bev COGS Period',         cur(d.S1_BEV_COGS_PERIOD)],
@@ -396,7 +397,7 @@ S.AuditTracker = {
         ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S1_ANNUAL_GAP), d.S1_ANNUAL_GAP > 0 ? 'warn' : ''],
       ]),
-      sectionBlock(2, 'Theft and Loss Prevention', d.S2_SCORE, [
+      sectionBlock(2, NAMES[1], d.S2_SCORE, [
         ['Void/Comp %',             pct(d.S2_VOID_COMP_PCT), d.S2_VOID_COMP_PCT > 2 ? 'warn' : ''],
         ['Void/Comp Amount',        cur(d.S2_VOID_COMP_AMT), d.S2_VOID_COMP_AMT > 0 ? 'warn' : ''],
         ['Unauthorized Voids %',    pct(d.S2_VOIDS_NO_APPROVAL_PCT), d.S2_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
@@ -406,7 +407,7 @@ S.AuditTracker = {
         ['Spillage Log',            d.S2_SPILLAGE_LOG],
         ['Monthly Gap',             cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
       ]),
-      sectionBlock(3, 'Food Cost Control', d.S3_SCORE, [
+      sectionBlock(3, NAMES[2], d.S3_SCORE, [
         ['Food Cost %',             pct(d.S3_FOOD_COST_PCT, d.S3_TARGET_PCT), d.S3_FOOD_COST_PCT > d.S3_TARGET_PCT ? 'warn' : 'good'],
         ['Monthly Food Revenue',    cur(d.S3_FOOD_REV_MONTHLY)],
         ['Food Variance %',         pct(d.S3_FOOD_VAR_PCT), d.S3_FOOD_VAR_PCT > 3 ? 'warn' : ''],
@@ -417,7 +418,7 @@ S.AuditTracker = {
         ['Monthly Gap vs Target',   cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S3_ANNUAL_GAP), d.S3_ANNUAL_GAP > 0 ? 'warn' : ''],
       ]),
-      sectionBlock(4, 'Vendor Control', d.S4_SCORE, [
+      sectionBlock(4, NAMES[3], d.S4_SCORE, [
         ['Bev Invoice Count',       num(d.S4_BEV_INVOICE_COUNT)],
         ['Food Invoice Count',      num(d.S4_FOOD_INVOICE_COUNT)],
         ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
@@ -428,7 +429,7 @@ S.AuditTracker = {
         ['Monthly Exposure',        cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
         ['Annual Exposure',         cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
       ]),
-      sectionBlock(5, 'Prime Cost', d.S5_SCORE, [
+      sectionBlock(5, NAMES[4], d.S5_SCORE, [
         ['Total Revenue Period',    cur(d.S5_TOTAL_REV_PERIOD)],
         ['Total COGS Period',       cur(d.S5_TOTAL_COGS_PERIOD)],
         ['Labor Period',            cur(d.S5_LABOR_PERIOD)],
@@ -540,12 +541,13 @@ S.AuditTracker = {
 
   renderNarrative(d) {
     // Collect evidence/gap/tool fields across all sections
+    const NAMES = App.AUDIT_PROFIT_SECTION_NAMES;
     const sections = [
-      { num:1, name:'Bar Cost and Pour Control',  fields: ['S1_EVIDENCE','S1_GAP','S1_TOOL','S1_NARRATIVE','S1_FINDING'] },
-      { num:2, name:'Theft and Loss Prevention',  fields: ['S2_EVIDENCE','S2_GAP','S2_TOOL','S2_NARRATIVE','S2_FINDING'] },
-      { num:3, name:'Food Cost Control',          fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
-      { num:4, name:'Vendor Control',             fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
-      { num:5, name:'Prime Cost',                 fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
+      { num:1, name:NAMES[0], fields: ['S1_EVIDENCE','S1_GAP','S1_TOOL','S1_NARRATIVE','S1_FINDING'] },
+      { num:2, name:NAMES[1], fields: ['S2_EVIDENCE','S2_GAP','S2_TOOL','S2_NARRATIVE','S2_FINDING'] },
+      { num:3, name:NAMES[2], fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
+      { num:4, name:NAMES[3], fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
+      { num:5, name:NAMES[4], fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
       { num:6, name:'Operational Risk Signals',   fields: ['S6_SIG1_EVIDENCE','S6_SIG1_GAP','S6_SIG1_TOOL','S6_SIG2_EVIDENCE','S6_SIG2_GAP','S6_SIG2_TOOL','S6_SIG3_EVIDENCE','S6_SIG3_GAP','S6_SIG3_TOOL'] },
     ];
     const cards = sections.map(s => {
@@ -574,7 +576,14 @@ S.AuditTracker = {
 
   showIntakeForm() {
     this._intakeStep = 1;
-    this._intakeDraft = { barRev: '', foodRev: '' };
+    // Pre-fill from Hub Settings if available so the operator only types
+    // these numbers once across the whole platform (per the "Bar Cop knows
+    // this already" rule). They can still override before running the audit.
+    const s = App.data?.settings || {};
+    this._intakeDraft = {
+      barRev:  s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '',
+      foodRev: s.annual_food_revenue != null ? String(s.annual_food_revenue) : ''
+    };
     this.actions.innerHTML = '';
     this.renderIntakeStep();
   },
@@ -598,11 +607,37 @@ S.AuditTracker = {
     const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Audit</div>';
 
     const cd = this.buildControlData();
+    // Per-section grid showing the operator exactly what Control is feeding
+    // (so they know what they don't need to upload before scrolling six file
+    // inputs). Each row reads green check + source label, or grey dash + "upload
+    // needed" hint when that section's Control data isn't on file yet.
+    const controlChecks = [
+      { label: 'Bar Pour Cost',  ok: cd && cd.bar_cost_pct  != null, hint: 'Comes from Inventory Control counts + Shift Control revenue' },
+      { label: 'Food Cost',      ok: cd && cd.food_cost_pct != null, hint: 'Comes from Inventory Control counts + Shift Control revenue' },
+      { label: 'Prime Cost',     ok: cd && cd.prime_cost_pct != null, hint: 'Comes from Inventory Control + Labor Control + Shift Control' },
+      { label: 'Inventory Variance', ok: cd && cd.spot_checks > 0, hint: 'Comes from Inventory Control spot checks' },
+      { label: 'Vendor Drift',   ok: cd && cd.deliveries_logged > 0, hint: 'Comes from Inventory Control deliveries' },
+      { label: 'Cash Variance',  ok: cd && cd.cash_reconciliations > 0, hint: 'Comes from Shift Control drawer reconciliation' },
+      { label: 'Voids and Comps', ok: cd && cd.void_comp_count > 0, hint: 'Comes from Shift Control void and comp log' },
+      { label: 'Payroll / RPLH', ok: cd && cd.labor_hours > 0, hint: 'Comes from Labor Control actuals' }
+    ];
+    const okRows = controlChecks.filter(c => c.ok);
+    const missingRows = controlChecks.filter(c => !c.ok);
+    const gridRow = (c) => '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'
+      + (c.ok
+          ? '<span style="color:var(--gold);font-weight:800;font-size:12px;line-height:1;">&#10003;</span>'
+          : '<span style="color:var(--t4);font-weight:800;font-size:12px;line-height:1;">&middot;</span>')
+      + '<span style="font-size:11px;color:' + (c.ok ? 'var(--t1)' : 'var(--t3)') + ';font-weight:' + (c.ok ? '700' : '400') + ';">' + esc(c.label) + '</span>'
+      + '<span style="font-size:11px;color:var(--t3);">' + (c.ok ? 'covered by Control' : 'upload needed below') + '</span>'
+      + '</div>';
     const controlBanner = (cd && cd.sources && cd.sources.length)
-      ? '<div style="background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
-        + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:5px;">Control Data Is Feeding This Audit</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Verified figures from ' + esc(cd.sources.join(', '))
-        + ' go in automatically as ground truth. The uploads below only need to cover what your Control modules do not.</div>'
+      ? '<div style="background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:14px 18px;margin-bottom:16px;">'
+        + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Control Data Is Feeding This Audit</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 18px;">'
+        + okRows.map(gridRow).join('')
+        + missingRows.map(gridRow).join('')
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;padding-top:8px;border-top:1px solid rgba(219,171,70,0.2);line-height:1.5;">Verified figures go in automatically as ground truth. The uploads below only need to cover what your Control systems do not.</div>'
         + '</div>'
       : '';
     const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
@@ -818,11 +853,11 @@ S.AuditTracker = {
 
   extractSections(d) {
     const s = {};
-    if (d.S1_SCORE != null) s['Bar Cost and Pour Control'] = d.S1_SCORE;
-    if (d.S2_SCORE != null) s['Theft and Loss Prevention']  = d.S2_SCORE;
-    if (d.S3_SCORE != null) s['Food Cost Control']          = d.S3_SCORE;
-    if (d.S4_SCORE != null) s['Vendor Control']             = d.S4_SCORE;
-    if (d.S5_SCORE != null) s['Prime Cost']                 = d.S5_SCORE;
+    const names = App.AUDIT_PROFIT_SECTION_NAMES;
+    [1, 2, 3, 4, 5].forEach(n => {
+      const v = d['S' + n + '_SCORE'];
+      if (v != null) s[names[n - 1]] = v;
+    });
     return s;
   },
 
