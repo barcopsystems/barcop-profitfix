@@ -98,8 +98,15 @@ S.ShiftCashDrop = {
     if (id && !App.canEdit('sc-cash-drop')) return;
     this.editId = id || null;
     const d = id ? this.drops().find(x => x.id === id) : null;
+    // Pre-fill drawer + shift_type + performed_by from the active shift when
+    // we're adding a new drop (not when editing an existing one). The drop is
+    // being logged DURING the running shift in the operator's typical flow.
+    const active = (App.activeShift && App.activeShift()) || null;
+    const defaultDrawerId = d ? (d.drawer_id || d.drawer) : (active ? active.drawer_id || '' : '');
+    const defaultShiftType = d ? d.shift_type : (active ? active.shift_type || '' : '');
+    const defaultPerformedBy = d ? (d.performed_by_id || d.performed_by) : (active ? active.manager_id || '' : '');
     const typeOpts = this.shiftTypes().map(t =>
-      '<option' + (d && d.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
+      '<option' + (defaultShiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const v = val => (val != null && val !== '') ? val : '';
     const den = d && d.denominations ? d.denominations : {};
 
@@ -123,14 +130,14 @@ S.ShiftCashDrop = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label>'
       + '<select id="cd-type" style="height:44px;">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Time</label>'
-      + '<input type="time" id="cd-time" value="' + esc(d?.drop_time || '') + '" style="height:44px;"/></div>'
+      + '<input type="time" id="cd-time" value="' + esc(d?.drop_time || (() => { const n = new Date(); return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); })()) + '" style="height:44px;"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Drawer / Register</label>'
-      + '<select id="cd-drawer" style="height:44px;">' + App.drawerOptions(d?.drawer_id || d?.drawer, { placeholder: 'Select drawer...' }) + '</select></div>'
+      + '<select id="cd-drawer" style="height:44px;">' + App.drawerOptions(defaultDrawerId, { placeholder: 'Select drawer...' }) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Performed By</label>'
-      + '<select id="cd-by" style="height:44px;">' + App.staffOptions(d?.performed_by_id || d?.performed_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<select id="cd-by" style="height:44px;">' + App.staffOptions(defaultPerformedBy, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witness</label>'
       + '<select id="cd-witness" style="height:44px;">' + App.staffOptions(d?.witness_id || d?.witness, { placeholder: '(optional)' }) + '</select></div>'
       + '</div></div>'
