@@ -62,7 +62,7 @@ S.HubGettingStarted = {
 
     // ── Phase 4: Weekly Work — the operational rhythm from week one onward
     { group:'weekly', id:'gs_p_week', screen:'this-week',
-      label:'Confirm your first week in Profit This Week. Most figures auto-fill from your Control modules.' },
+      label:'Confirm your first week in Profit This Week. Most figures auto-fill from your Control systems.' },
     { group:'weekly', id:'gs_p_recipes', screen:'r-menu-items',
       label:'Cost your top menu items with ingredient recipes in Menu Items.' },
     { group:'weekly', id:'gs_p_fix', screen:'profit-fix',
