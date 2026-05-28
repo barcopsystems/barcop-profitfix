@@ -20,8 +20,6 @@ S.LaborPayPeriods = {
   OT_THRESHOLD: 40,
   detailWeekStart: null,
 
-  pdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-
   actuals()  { return ((App.laborData && App.laborData.lc_actuals)     || []); },
   periods()  {
     if (!App.laborData) App.laborData = {};
@@ -63,16 +61,23 @@ S.LaborPayPeriods = {
     const byStaff = {};
     range.forEach(a => {
       const key = a.staff_id || a.name || '?';
-      if (!byStaff[key]) byStaff[key] = {
-        staff_id: a.staff_id || '',
-        name: a.name || '(unknown)',
-        position_id: a.position_id || '',
-        hours: 0, cost: 0, wage: a.wage || 0
-      };
+      if (!byStaff[key]) {
+        // Resolve the wage in effect on the week's start date — wage_history
+        // is the canonical source per Phase 5. Falling back to a.wage if no
+        // wage_history is on file. Avoids the "last record wins" drift the
+        // previous logic had when a wage change landed mid-week.
+        const wageAtStart = (a.staff_id && App.wageForStaffOn)
+          ? App.wageForStaffOn(a.staff_id, weekStart)
+          : (a.wage || 0);
+        byStaff[key] = {
+          staff_id: a.staff_id || '',
+          name: a.name || '(unknown)',
+          position_id: a.position_id || '',
+          hours: 0, cost: 0, wage: wageAtStart || a.wage || 0
+        };
+      }
       byStaff[key].hours += a.hours || 0;
       byStaff[key].cost  += a.cost  || 0;
-      // Keep most recent wage seen for the staff (used to compute OT premium)
-      if (a.wage) byStaff[key].wage = a.wage;
     });
     const rows = Object.values(byStaff).map(r => {
       const regularHours = Math.min(r.hours, this.OT_THRESHOLD);
@@ -83,13 +88,15 @@ S.LaborPayPeriods = {
       return { ...r, regular_hours: regularHours, ot_hours: otHours, regular_cost: regularCost, ot_cost: otCost, gross: regularCost + otCost };
     });
     const totals = rows.reduce((t, r) => {
-      t.hours    += r.hours;
-      t.cost     += r.cost;
-      t.ot_hours += r.ot_hours;
-      t.ot_cost  += r.ot_cost;
-      t.gross    += r.gross;
+      t.hours         += r.hours;
+      t.regular_hours += r.regular_hours;
+      t.ot_hours      += r.ot_hours;
+      t.cost          += r.cost;
+      t.regular_cost  += r.regular_cost;
+      t.ot_cost       += r.ot_cost;
+      t.gross         += r.gross;
       return t;
-    }, { hours: 0, cost: 0, ot_hours: 0, ot_cost: 0, gross: 0 });
+    }, { hours: 0, regular_hours: 0, ot_hours: 0, cost: 0, regular_cost: 0, ot_cost: 0, gross: 0 });
     return { weekStart, weekEnd, rows, totals, lockedCount: range.filter(a => a.locked).length, totalCount: range.length };
   },
 
@@ -176,8 +183,23 @@ S.LaborPayPeriods = {
     const saved = this.periods().find(p => p.week_start === weekStart);
     const isClosed = !!saved && saved.status === 'Closed';
 
+    const stateMin = parseFloat((App.data?.settings || {}).state_min_wage);
+    const stateMinValid = !isNaN(stateMin) && stateMin > 0;
+    let belowMinCount = 0;
     const rows = agg.rows.sort((a, b) => b.gross - a.gross).map(r => {
       const pos = this.positionById(r.position_id);
+      const isTipped = !!(pos && pos.tipped);
+      const tipShare = isTipped ? this.tipShareForStaffInWeek(r.staff_id, agg.weekStart, agg.weekEnd) : 0;
+      const effectiveHourly = r.hours > 0 ? (r.gross + tipShare) / r.hours : 0;
+      const below = isTipped && stateMinValid && r.hours > 0 && effectiveHourly < stateMin;
+      if (below) belowMinCount++;
+      const tipCell = isTipped
+        ? (stateMinValid
+            ? (below
+                ? '<span class="badge badge-warn" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
+                : '<span class="badge badge-ok">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>')
+            : '<span class="badge badge-dim">Set State Min Wage</span>')
+        : '<span style="color:var(--t4);font-size:11px;">Non-Tipped</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + '</div>'
         + (pos ? '<div style="font-size:10px;color:var(--t3);">' + esc(pos.name) + '</div>' : '') + '</td>'
@@ -187,8 +209,9 @@ S.LaborPayPeriods = {
         + '<td>' + App.fmtCurrency(r.regular_cost) + '</td>'
         + '<td>' + (r.ot_cost > 0 ? App.fmtCurrency(r.ot_cost) : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(r.gross) + '</td>'
+        + '<td>' + tipCell + '</td>'
         + '</tr>';
-    }).join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No hours logged this period.</td></tr>';
+    }).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No hours logged this period.</td></tr>';
 
     const statusInfo = isClosed
       ? '<div style="font-size:11px;color:var(--gold);margin-bottom:10px;">Closed ' + (saved.closed_at ? this.fmtDate(saved.closed_at.slice(0, 10)) : '') + '. ' + agg.lockedCount + ' record' + (agg.lockedCount === 1 ? '' : 's') + ' locked.</div>'
@@ -205,8 +228,11 @@ S.LaborPayPeriods = {
         + '<div class="calc-item"><div class="calc-label">OT Premium</div><div class="calc-val ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Gross</div><div class="calc-val good">' + App.fmtCurrency(agg.totals.gross) + '</div></div>'
       + '</div>'
+      + (belowMinCount > 0
+          ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:10px;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. Make up the difference before payroll runs.</div>'
+          : '')
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Premium</th><th>Gross</th>'
+        + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Premium</th><th>Gross</th><th>Tip Credit</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Export Payroll CSV</button>'
@@ -297,6 +323,25 @@ S.LaborPayPeriods = {
     else this.renderList();
   },
 
+  // Sum tip-pool shares for a staff member in a given week. Reads
+  // lc_tip_pools where shift_id is set to a shift in the range; falls back
+  // to date-keyed pools for off-shift entries. Used by the tip credit
+  // compliance check.
+  tipShareForStaffInWeek(staffId, weekStart, weekEnd) {
+    const pools = ((App.laborData && App.laborData.lc_tip_pools) || []);
+    const shifts = ((App.shiftData && App.shiftData.sc_shifts) || []);
+    let total = 0;
+    pools.forEach(p => {
+      const inRange = (p.date && p.date >= weekStart && p.date <= weekEnd)
+        || (p.shift_id && shifts.find(s => s.id === p.shift_id && s.date >= weekStart && s.date <= weekEnd));
+      if (!inRange) return;
+      (p.participants || []).forEach(part => {
+        if (part.staff_id === staffId) total += parseFloat(part.share) || 0;
+      });
+    });
+    return total;
+  },
+
   // ── Payroll CSV export ──────────────────────────────────────────────
   exportCSV(weekStart) {
     const agg = this.aggregateWeek(weekStart);
@@ -305,13 +350,24 @@ S.LaborPayPeriods = {
       return;
     }
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    const stateMin = parseFloat((App.data?.settings || {}).state_min_wage);
+    const stateMinValid = !isNaN(stateMin) && stateMin > 0;
     const header = [
       'Staff Name', 'Position', 'Week Start', 'Week End',
       'Regular Hours', 'OT Hours', 'Total Hours',
-      'Wage Rate', 'Regular Cost', 'OT Premium', 'Gross Pay'
+      'Wage Rate', 'Regular Cost', 'OT Premium', 'Gross Pay',
+      'Tipped Position', 'Tip Share', 'Effective Hourly', 'Tip Credit Status'
     ];
     const rows = agg.rows.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(r => {
       const pos = this.positionById(r.position_id);
+      const isTipped = !!(pos && pos.tipped);
+      const tipShare = isTipped ? this.tipShareForStaffInWeek(r.staff_id, agg.weekStart, agg.weekEnd) : 0;
+      const effectiveHourly = r.hours > 0 ? (r.gross + tipShare) / r.hours : 0;
+      let status = '';
+      if (!isTipped) status = '';
+      else if (!stateMinValid) status = 'No State Min Wage set';
+      else if (effectiveHourly < stateMin) status = 'BELOW: $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed';
+      else status = 'OK';
       return [
         r.name,
         pos ? pos.name : '',
@@ -323,13 +379,18 @@ S.LaborPayPeriods = {
         r.wage.toFixed(2),
         r.regular_cost.toFixed(2),
         r.ot_cost.toFixed(2),
-        r.gross.toFixed(2)
+        r.gross.toFixed(2),
+        isTipped ? 'Yes' : 'No',
+        isTipped ? tipShare.toFixed(2) : '',
+        isTipped && r.hours > 0 ? effectiveHourly.toFixed(2) : '',
+        status
       ];
     });
     rows.push([
       'TOTAL', '', '', '',
-      agg.totals.hours.toFixed(2), agg.totals.ot_hours.toFixed(2), agg.totals.hours.toFixed(2),
-      '', agg.totals.cost.toFixed(2), agg.totals.ot_cost.toFixed(2), agg.totals.gross.toFixed(2)
+      agg.totals.regular_hours.toFixed(2), agg.totals.ot_hours.toFixed(2), agg.totals.hours.toFixed(2),
+      '', agg.totals.regular_cost.toFixed(2), agg.totals.ot_cost.toFixed(2), agg.totals.gross.toFixed(2),
+      '', '', '', ''
     ]);
     const escapeCell = (v) => {
       const s = String(v == null ? '' : v);
