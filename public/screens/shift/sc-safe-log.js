@@ -143,7 +143,7 @@ S.ShiftSafeLog = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="sl-date" value="' + esc(e?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label>'
-      + '<input type="time" id="sl-time" value="' + esc(e?.time || '') + '"/></div>'
+      + '<input type="time" id="sl-time" value="' + esc(e?.time || (() => { const n = new Date(); return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); })()) + '"/></div>'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Type</label>'
       + '<select id="sl-type">' + typeOpts + '</select></div>'
       + '</div>'
