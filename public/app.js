@@ -1406,15 +1406,28 @@ const App = {
   // Every operator action that closes a Traffic gap writes a fix_log row so
   // the Recovery Scoreboard, the 8-week dashboard chart's "Fix Logged"
   // markers, and the Fix Areas card progress tally all credit the work.
-  // Mirrors the auto-emit pattern in r-menu-items.js for menu price changes.
-  // gap_id matches the FIX.traffic entry id (gbp, website, reviews, search-seo,
-  // social, delivery, email-loyalty).
+  // gap_id matches the FIX.traffic entry id (gbp, website, reviews,
+  // search-seo, social, delivery, email-loyalty). Writes `date` (the field
+  // recovery.js + fix-panel.js both read for cutoff + chart markers) along
+  // with the human-readable `gap_name` so chart tooltips render cleanly.
+  TRAFFIC_GAP_NAMES: {
+    'gbp':            'Google Business Profile',
+    'website':        'Website',
+    'reviews':        'Reviews',
+    'search-seo':     'Search and SEO',
+    'social':         'Social Media',
+    'delivery':       'Delivery Platforms',
+    'email-loyalty':  'Email and Loyalty'
+  },
   emitTrafficFix(gap_id, note) {
     if (!Array.isArray(this.data.fix_log)) this.data.fix_log = [];
+    const today = new Date().toISOString().slice(0, 10);
     this.data.fix_log.push({
       id: this.uid(),
       module: 'traffic',
       gap_id: gap_id,
+      gap_name: this.TRAFFIC_GAP_NAMES[gap_id] || gap_id,
+      date: today,
       note: note || '',
       source: 'traffic-auto',
       saved_at: new Date().toISOString()
@@ -2185,7 +2198,8 @@ const App = {
       + 'h1 { font-size:18px; margin:0 0 4px 0; letter-spacing:0.5px; }'
       + '.sub { font-size:11px; color:#444; margin-bottom:12px; }'
       + '.meta { display:flex; gap:24px; font-size:11px; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid #888; }'
-      + 'table { width:100%; border-collapse:collapse; }'
+      + 'table { width:100%; border-collapse:collapse; border:1px solid #888; table-layout:fixed; }'
+      + 'th, td { box-sizing:border-box; }'
       + '.footer { margin-top:14px; font-size:10px; color:#666; }'
       + '@media print { .noprint { display:none; } }'
       + '</style></head><body>'
