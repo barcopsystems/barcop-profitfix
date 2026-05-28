@@ -49,6 +49,12 @@ S.ShiftActiveShift = {
   // ── Start a shift ───────────────────────────────────────────────────────────
   renderStart() {
     const typeOpts = this.shiftTypes().map(t => '<option>' + t + '</option>').join('');
+    const drawerOpts = (App.drawerOptions ? App.drawerOptions('', { placeholder: 'Select drawer...' }) : '<option value="">No drawers set up</option>');
+    // Pick a sensible default drawer: the first active drawer, if any. Its
+    // default_opening_bank pre-fills the Opening Bank field.
+    const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false);
+    const defaultBank = firstDrawer && firstDrawer.default_opening_bank != null ? firstDrawer.default_opening_bank : '';
+
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">Start a Shift</div>'
       + '<div style="font-size:13px;color:var(--t3);margin-bottom:16px;">No shift is running. Start one to '
@@ -62,9 +68,11 @@ S.ShiftActiveShift = {
       + '<select id="as-mgr" style="height:48px;">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Drawer / Register</label>'
+      + '<select id="as-drawer" style="height:48px;">' + drawerOpts + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Opening Bank</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="as-bank" min="0" step="0.01" '
-      + 'inputmode="decimal" style="height:48px;font-size:16px;"/></div></div>'
+      + 'inputmode="decimal" value="' + esc(String(defaultBank)) + '" style="height:48px;font-size:16px;"/></div></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Staff on Floor</label>'
       + '<input type="number" id="as-staff" min="0" inputmode="numeric" style="height:48px;font-size:16px;"/></div>'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Cash Tolerance <span style="color:var(--t4);font-weight:400;">(this shift)</span></label>'
@@ -83,6 +91,13 @@ S.ShiftActiveShift = {
       const tolEl = document.getElementById('as-tol');
       if (tolEl) tolEl.value = this._defaultToleranceFor(e.target.value);
     });
+    // When operator changes the drawer, pre-fill Opening Bank with that
+    // drawer's default. Operator can still override the bank for tonight.
+    document.getElementById('as-drawer')?.addEventListener('change', e => {
+      const drawer = App.drawerById ? App.drawerById(e.target.value) : null;
+      const bankEl = document.getElementById('as-bank');
+      if (drawer && drawer.default_opening_bank != null && bankEl) bankEl.value = drawer.default_opening_bank;
+    });
     document.getElementById('as-start')?.addEventListener('click', () => this.startShift());
   },
 
@@ -99,12 +114,16 @@ S.ShiftActiveShift = {
     if (!date) { fail('Date is required.'); return; }
     const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
 
+    const drawerId = document.getElementById('as-drawer')?.value || '';
+    const drawer = drawerId && App.drawerById ? App.drawerById(drawerId) : null;
     const rec = {
       id:             App.uid(),
       date,
       shift_type:     document.getElementById('as-type')?.value || '',
       manager_id:     document.getElementById('as-mgr')?.value || '',
       manager:        (App.staffById(document.getElementById('as-mgr')?.value) || {}).name || '',
+      drawer_id:      drawerId,
+      drawer:         drawer ? drawer.name : '',
       opening_bank:   num('as-bank'),
       staff_on_floor: num('as-staff'),
       cash_tolerance: num('as-tol'),
@@ -114,6 +133,7 @@ S.ShiftActiveShift = {
       covers:         null,
       status:         'Open',
       notes:          '',
+      shift_notes:    [],
       started_at:     new Date().toISOString(),
       created_at:     new Date().toISOString()
     };
@@ -215,6 +235,8 @@ S.ShiftActiveShift = {
       + action('sc-maintenance', 'Maintenance')
       + '</div></div>'
 
+      + this.renderShiftNotesCard(s)
+
       + '<div class="card"><div class="card-title">End of Shift</div>'
       + '<div style="font-size:13px;color:var(--t3);margin-bottom:14px;">Closing the shift records its revenue '
       + 'and covers. That revenue is what feeds your weekly Profit and Revenue numbers.</div>'
@@ -225,7 +247,71 @@ S.ShiftActiveShift = {
       const go = ev.target.closest('.as-go');
       if (go) App.navigate(go.dataset.go);
       else if (ev.target.closest('#as-end')) this.renderEnd(s);
+      else if (ev.target.closest('#sn-add')) this.addShiftNote(s);
+      else if (ev.target.closest('.sn-del')) this.removeShiftNote(s, ev.target.closest('.sn-del').dataset.id);
     };
+  },
+
+  // ── Mid-shift Notes ────────────────────────────────────────────────────────
+  // Operator-pain fix: the handoff_notes field only captures things at close.
+  // This adds a running timestamped notebook the manager can drop notes into
+  // throughout the shift. Notes flow into the Shift Handoff Report at close.
+  renderShiftNotesCard(s) {
+    const notes = Array.isArray(s.shift_notes) ? s.shift_notes : [];
+    const fmtTime = iso => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    };
+    const list = notes.length === 0
+      ? '<div style="font-size:12px;color:var(--t3);">No notes yet. Drop in anything the closer or the next manager should know. Delivery short, VIP at nine, server X went home sick, weather slowing us down.</div>'
+      : '<div style="display:flex;flex-direction:column;gap:8px;">'
+        + notes.slice().reverse().map(n => '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:var(--input);border-radius:4px;">'
+          + '<div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;min-width:55px;padding-top:1px;">' + esc(fmtTime(n.at)) + '</div>'
+          + '<div style="flex:1;font-size:13px;color:var(--t1);line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
+          + '<button class="btn btn-ghost btn-sm sn-del" data-id="' + esc(n.id) + '" style="font-size:10px;padding:2px 8px;color:var(--red);">Delete</button>'
+          + '</div>').join('')
+      + '</div>';
+    return '<div class="card"><div class="card-title">Shift Notes</div>'
+      + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:10px;">'
+        + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add a Note</label>'
+          + '<textarea id="sn-text" rows="2" placeholder="VIP at 9pm, delivery short on bourbon, weather slowing us down..."></textarea></div>'
+        + '<div style="flex-shrink:0;"><button class="btn btn-primary" id="sn-add" style="height:48px;">Add Note</button></div>'
+      + '</div>'
+      + list
+      + '</div>';
+  },
+
+  async addShiftNote(s) {
+    const textEl = document.getElementById('sn-text');
+    const text = textEl?.value.trim();
+    if (!text) return;
+    const list = this.shifts();
+    const i = list.findIndex(x => x.id === s.id);
+    if (i < 0) return;
+    if (!Array.isArray(list[i].shift_notes)) list[i].shift_notes = [];
+    list[i].shift_notes.push({
+      id: App.uid(),
+      at: new Date().toISOString(),
+      text,
+      manager_id: s.manager_id || ''
+    });
+    const ok = await App.saveShift();
+    if (ok) {
+      if (textEl) textEl.value = '';
+      this.renderActive(list[i]);
+    }
+  },
+
+  async removeShiftNote(s, noteId) {
+    const ok = await App.confirm({ title: 'Delete this shift note?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
+    const list = this.shifts();
+    const i = list.findIndex(x => x.id === s.id);
+    if (i < 0) return;
+    list[i].shift_notes = (list[i].shift_notes || []).filter(n => n.id !== noteId);
+    const saved = await App.saveShift();
+    if (saved) this.renderActive(list[i]);
   },
 
   // ── Shift Close Wizard ─────────────────────────────────────────────────────
@@ -355,7 +441,7 @@ S.ShiftActiveShift = {
         + '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="aw-variance">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="aw-vstatus">-</div></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tolerance ' + App.fmtCurrency(tolerance) + ' from Hub Settings. A variance outside tolerance auto-logs to the Variance Log when you close the shift.</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tolerance ' + App.fmtCurrency(tolerance) + ' from Shift Control Cash Settings. A variance outside tolerance auto-logs to the Variance Log when you close the shift.</div>'
       + '<div style="margin-top:14px;">'
         + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
           + '<input type="checkbox" id="aw-cash-skip" ' + (d.cash_skipped ? 'checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>'
@@ -897,7 +983,9 @@ S.ShiftActiveShift = {
         id:            App.uid(),
         date:          s.date,
         shift_type:    s.shift_type || 'Close',
-        drawer:        'Main',
+        drawer_id:     s.drawer_id || '',
+        drawer:        s.drawer || ((App.drawerById && s.drawer_id) ? (App.drawerById(s.drawer_id) || {}).name || '' : ''),
+        cashier_id:    s.manager_id || '',
         cashier:       s.manager || '',
         expected_cash: expected,
         counted_cash:  d.counted_cash || 0,
