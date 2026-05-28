@@ -109,6 +109,8 @@ S.ShiftLogShift = {
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ls-floor" value="' + v(s?.floor_revenue) + '" step="0.01" oninput="S.ShiftLogShift.calc()"/></div></div>'
       + '<div class="f" style="width:110px;flex-shrink:0;"><label>Covers</label>'
       + '<input type="number" id="ls-covers" value="' + v(s?.covers) + '" min="0" oninput="S.ShiftLogShift.calc()"/></div>'
+      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Walkouts</label>'
+      + '<input type="number" id="ls-walkouts" value="' + v(s?.walkouts) + '" min="0" placeholder="0"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
@@ -169,6 +171,7 @@ S.ShiftLogShift = {
       floor_revenue:  floor,
       total_revenue:  bar + floor,
       covers:         num('ls-covers'),
+      walkouts:       num('ls-walkouts'),
       opening_bank:   num('ls-bank'),
       staff_on_floor: num('ls-staff'),
       status:         document.getElementById('ls-status')?.value || 'Closed',
