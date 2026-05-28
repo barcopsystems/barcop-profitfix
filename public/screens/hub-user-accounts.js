@@ -47,12 +47,13 @@ S.HubUserAccounts = {
     { module: 'Recovery',          key: 'traffic-recovery', label: 'Traffic Recovery (all)' }
   ],
 
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "USER ACCOUNTS | Back to Dashboard".
   async open() {
-    // Ensure role/permissions are resolved before render checks isAdmin
     if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
-    App.openHubOverlay((panel) => {
-      this.container = panel;
-      this.render(panel);
+    App.openHubFullPage('User Accounts', (mount) => {
+      this.container = mount;
+      this.render(mount);
     });
   },
 
@@ -114,16 +115,12 @@ S.HubUserAccounts = {
       + '</div>' : '';
 
     container.innerHTML =
-      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">User Accounts</div>'
-      +   '<button id="ua-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>'
+      '<div class="screen">'
       + accountCard
       + teamCard
       + '</div>';
 
-    document.getElementById('ua-close')?.addEventListener('click', () => App.closeHubOverlay());
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire();
     this.renderSubscription();
     this._teamRoleChange();  // initialize perms grid visibility
