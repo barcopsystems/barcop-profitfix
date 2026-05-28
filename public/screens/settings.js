@@ -63,24 +63,18 @@ S.HubSettings = {
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
       + '<div class="f" style="width:145px;"><label>Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Revenue"/></div></div>'
       + '<div class="f" style="width:145px;"><label>Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Revenue"/></div></div>'
-      + '<div class="f" style="width:145px;"><label>State Min Wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-min-wage" min="0" step="0.01" value="' + (s.state_min_wage != null ? s.state_min_wage : '') + '" placeholder="Per hour"/></div></div>'
-      + '</div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.55;">Your state\'s minimum wage drives the tip credit check on the Payroll CSV. If a tipped employee\'s base wage plus their tip share falls below state minimum for the week, Bar Cop flags the row so you can make up the difference before payroll runs.</div>';
+      + '</div>';
   },
 
   secProfit() {
-    const s = App.data.settings || {};
-    const t = s.targets || {};
-    const compThreshold = s.comp_auth_threshold != null ? s.comp_auth_threshold : 25;
+    const t = (App.data.settings||{}).targets || {};
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
       + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:160px;"><label>Comp Auth Threshold</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-comp-thresh" value="' + compThreshold + '" min="0" step="1"/></div></div>'
-      + '</div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.55;">Comps above this dollar amount require a manager in the Authorized By field on the Void / Comp Log. Saving a comp over the threshold without a manager pops a soft warning the operator can override. Tracked as an "unauthorized large comp" signal in Theft Risk.</div>';
+      + '</div>';
   },
 
   secRevenue() {
@@ -187,8 +181,6 @@ S.HubSettings = {
       s.city_state          = city && state ? city + ', ' + state : city || state || '';
       s.annual_bar_revenue  = numOr('hs-abr', 0);
       s.annual_food_revenue = numOr('hs-afr', 0);
-      const minWageRaw      = document.getElementById('hs-min-wage')?.value;
-      s.state_min_wage      = minWageRaw === '' || minWageRaw == null ? null : (parseFloat(minWageRaw) || 0);
       keys.push('settings');
     } else if (which === 'profit') {
       const s = App.data.settings;
@@ -199,7 +191,6 @@ S.HubSettings = {
         food_labor_cost_pct:numOr('hs-fl', 30),
         prime_cost_pct:     numOr('hs-pc', 60)
       });
-      s.comp_auth_threshold = numOr('hs-comp-thresh', 25);
       s._targets_saved = true;
       keys.push('settings');
     } else if (which === 'revenue') {
