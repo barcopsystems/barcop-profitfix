@@ -383,6 +383,12 @@ S.InventorySpotCheck = {
 
     const rows = (c.items || []).map(it => {
       const vd = it.variance_dollar;
+      // Flagged rows get an Investigate action that pre-fills a Variance
+      // Investigation in Theft Risk. Closes the orphan where the operator
+      // had to retype the product name after seeing the flag.
+      const action = (it.flagged && it.product_id)
+        ? '<button class="btn btn-ghost btn-sm sp-investigate" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '">Investigate</button>'
+        : '';
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
         + '<td>' + (it.pre != null ? it.pre.toFixed(1) : '-') + '</td>'
@@ -392,7 +398,8 @@ S.InventorySpotCheck = {
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
         + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
-        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-') + '</td></tr>';
+        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-') + '</td>'
+        + '<td>' + action + '</td></tr>';
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
@@ -407,9 +414,45 @@ S.InventorySpotCheck = {
       + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
-      + '<th>Variance</th><th>Variance $</th>'
+      + '<th>Variance</th><th>Variance $</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
-    this.container.onclick = ev => { if (ev.target.closest('#sp-back')) this.render(this.container, this.actions); };
+    this.container.onclick = ev => {
+      if (ev.target.closest('#sp-back')) this.render(this.container, this.actions);
+      const inv = ev.target.closest('.sp-investigate');
+      if (inv) {
+        ev.stopPropagation();
+        this.openInvestigation(inv.dataset.pid, inv.dataset.name);
+      }
+    };
+  },
+
+  // Spin up a Variance Investigation in theft-risk pre-filled with this
+  // product, then navigate the operator to it. Same shape as the dropdown
+  // path on theft-risk's investigationsCard, but the trigger is the
+  // flagged spot-check row instead of the manual dropdown.
+  openInvestigation(productId, productName) {
+    App.data.variance_investigations = App.data.variance_investigations || [];
+    // De-dupe — if an open investigation already exists for this product,
+    // jump to theft-risk instead of opening a second one.
+    const existing = App.data.variance_investigations.find(i =>
+      i.product_id === productId && i.status !== 'resolved');
+    if (!existing) {
+      const steps = (S.TheftRisk && S.TheftRisk.VARIANCE_STEPS)
+        ? S.TheftRisk.VARIANCE_STEPS.map(() => ({ done: false, finding: '' }))
+        : [];
+      App.data.variance_investigations.push({
+        id: App.uid(),
+        product_id: productId,
+        sku: productName,
+        opened_date: new Date().toISOString().slice(0, 10),
+        status: 'open',
+        steps,
+        resolution: ''
+      });
+      App.saveKey('variance_investigations');
+    }
+    App.showApp('profit');
+    App.navigate('theft-risk');
   },
 
   delModal() {
