@@ -236,7 +236,7 @@ S.ShiftClosingChecklist = {
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="cl-back">&#8592; Back to Closing Checklist</button></div>'
+      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="cl-back">&laquo; Back to Closing Checklist</button></div>'
       + '<div class="card"><div class="card-title">' + esc(r.template_name || 'Closing Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
@@ -244,8 +244,13 @@ S.ShiftClosingChecklist = {
       + '</div>'
       + itemRows
       + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
-      + '</div></div>';
-    this.container.onclick = ev => { if (ev.target.closest('#cl-back')) this.renderMain(); };
+      + '<div class="card-actions">'
+        + '<button class="btn btn-ghost btn-sm" id="cl-print">Print This Checklist</button>'
+      + '</div></div></div>';
+    this.container.onclick = ev => {
+      if (ev.target.closest('#cl-back')) this.renderMain();
+      else if (ev.target.closest('#cl-print')) window.print();
+    };
   },
 
   confirmDel(id) {
