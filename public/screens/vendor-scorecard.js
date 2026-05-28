@@ -162,7 +162,7 @@ S.VendorScorecard = {
     }).join('');
 
     const tableHint = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-      + 'Vendors ranked by total impact (open overcharge plus net price drift plus a small weight on total spend). Take this read into your quarterly vendor review and ask for a price match or an explanation on every line that drifted up.'
+      + 'Per-vendor rollup. Vendors ranked by total impact (open overcharge plus net price drift plus a small weight on total spend). Take this read into your quarterly vendor review and ask for a price match or an explanation on every line that drifted up. For the line-by-line price-change log, see <a href="#" id="vs-to-watch" style="color:var(--gold);font-weight:700;">Vendor Watch</a>.'
     + '</div>';
 
     const tbl = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -173,5 +173,6 @@ S.VendorScorecard = {
 
     this.container.innerHTML = '<div class="screen">' + controls + tiles + tableHint + tbl + '</div>';
     document.getElementById('vs-range')?.addEventListener('change', e => { this.range = e.target.value; this.draw(); });
+    document.getElementById('vs-to-watch')?.addEventListener('click', ev => { ev.preventDefault(); App.navigate('vendor-watch'); });
   }
 };
