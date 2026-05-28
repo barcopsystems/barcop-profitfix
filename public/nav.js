@@ -58,6 +58,14 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Theft Risk</span>
       </div>
+      <div class="nav-item" data-screen="pour-test" id="nav-pour-test">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6l-0.5 4H6l-0.5-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 6.5l-1.5 7a1 1 0 0 0 1 1.2h6a1 1 0 0 0 1-1.2L11 6.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 10.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Pour Test</span>
+      </div>
+      <div class="nav-item" data-screen="yield-test" id="nav-yield-test">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="9" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M3 9h11" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Yield Test</span>
+      </div>
       <div class="nav-item" data-screen="cash-recon" id="nav-cash-recon">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Cash Reconciliation</span>
