@@ -115,20 +115,13 @@ S.HubSettings = {
     const field = (id, label, val, ph) =>
       '<div class="f" style="width:300px;"><label>' + label + '</label>'
       + '<input type="url" id="' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(ph) + '"/></div>';
+    const rows = App.TRAFFIC_PLATFORMS.map(p =>
+      field('hs-url-' + p.urlKey, p.label, u[p.urlKey], p.placeholder)
+    ).join('');
     return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
       + 'Paste the public URL for each platform. Bar Cop uses these for one-click access to your live listings and pulls public data from them into the Traffic Audit.'
       + '</div>'
-      + '<div class="form-row" style="gap:14px 20px;flex-wrap:wrap;">'
-      + field('hs-url-website',   'Website',                 u.website,        'https://yourbar.com')
-      + field('hs-url-gbp',       'Google Business Profile', u.gbp,            'https://maps.google.com/?cid=...')
-      + field('hs-url-yelp',      'Yelp Listing',            u.yelp,           'https://yelp.com/biz/your-bar')
-      + field('hs-url-instagram', 'Instagram',               u.instagram,      'https://instagram.com/yourbar')
-      + field('hs-url-facebook',  'Facebook Page',           u.facebook,       'https://facebook.com/yourbar')
-      + field('hs-url-doordash',  'DoorDash',                u.doordash,       'https://doordash.com/store/...')
-      + field('hs-url-ubereats',  'Uber Eats',               u.ubereats,       'https://ubereats.com/store/...')
-      + field('hs-url-grubhub',   'Grubhub',                 u.grubhub,        'https://grubhub.com/restaurant/...')
-      + field('hs-url-email',     'Email Platform Login',    u.email_platform, 'https://mailchimp.com or your tool')
-      + '</div>';
+      + '<div class="form-row" style="gap:14px 20px;flex-wrap:wrap;">' + rows + '</div>';
   },
 
   // Traffic Recovery Scoreboard conversion rates. Each rate maps a Traffic
@@ -221,17 +214,9 @@ S.HubSettings = {
     } else if (which === 'links') {
       const ts = App.data.traffic_settings = App.data.traffic_settings || {};
       const strOr = (id) => (document.getElementById(id)?.value || '').trim();
-      ts.urls = Object.assign({}, ts.urls, {
-        website:        strOr('hs-url-website'),
-        gbp:            strOr('hs-url-gbp'),
-        yelp:           strOr('hs-url-yelp'),
-        instagram:      strOr('hs-url-instagram'),
-        facebook:       strOr('hs-url-facebook'),
-        doordash:       strOr('hs-url-doordash'),
-        ubereats:       strOr('hs-url-ubereats'),
-        grubhub:        strOr('hs-url-grubhub'),
-        email_platform: strOr('hs-url-email')
-      });
+      const next = Object.assign({}, ts.urls);
+      App.TRAFFIC_PLATFORMS.forEach(p => { next[p.urlKey] = strOr('hs-url-' + p.urlKey); });
+      ts.urls = next;
       keys.push('traffic_settings');
     } else if (which === 'tconv') {
       const ts = App.data.traffic_settings = App.data.traffic_settings || {};
