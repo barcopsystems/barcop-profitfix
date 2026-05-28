@@ -124,7 +124,7 @@ S.RecipeCostAnalysis = {
       }).join('');
       linkedSection = '<div class="sh" style="margin-top:24px;">Linked Inventory Items</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-          + 'Direct-pour items (Beer / Wine / NA Beverages). Cost flows from the linked inventory product — no recipe needed. When the product price changes in Inventory Control, these menu items auto-update.'
+          + 'Direct-pour items (Beer / Wine / NA Beverages). Cost flows from the linked inventory product, no recipe needed. When the product price changes in Inventory Control, these menu items auto-update.'
         + '</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
           + '<th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost %</th><th></th>'
