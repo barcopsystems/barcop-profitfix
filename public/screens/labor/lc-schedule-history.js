@@ -6,7 +6,7 @@
 
 S.LaborScheduleHistory = {
   _pendingDelId: null,
-  DAYS: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  get DAYS() { return App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; },
 
   schedules() {
     if (!App.laborData) App.laborData = {};
@@ -18,7 +18,7 @@ S.LaborScheduleHistory = {
       new Date((b.week_start || b.created_at || 0)).getTime() - new Date((a.week_start || a.created_at || 0)).getTime());
   },
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
@@ -54,11 +54,11 @@ S.LaborScheduleHistory = {
         return '<tr class="lh-row" data-id="' + s.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(s.week_start) + '</div></td>'
           + '<td>' + ((s.shifts || []).length) + '</td>'
-          + '<td>' + (s.total_hours != null ? s.total_hours.toFixed(1) : '—') + '</td>'
+          + '<td>' + (s.total_hours != null ? s.total_hours.toFixed(1) : '-') + '</td>'
           + '<td class="val">' + App.fmtCurrency(s.total_cost || 0) + '</td>'
           + '<td class="' + (pct != null ? (pct > target ? 'neg' : 'pos') : '') + '">'
-          + (pct != null ? App.fmtPct(pct) : '—') + '</td>'
-          + '<td>' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '—') + '</td>'
+          + (pct != null ? App.fmtPct(pct) : '-') + '</td>'
+          + '<td>' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '-') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm lh-edit" data-id="' + s.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm lh-del" data-id="' + s.id + '">Delete</button>'
@@ -109,12 +109,12 @@ S.LaborScheduleHistory = {
       return (a.start || '').localeCompare(b.start || '');
     });
     const rows = shifts.map(sh => '<tr>'
-      + '<td><div class="val">' + esc(sh.name || '—') + '</div></td>'
-      + '<td>' + esc(sh.day || '—') + '</td>'
-      + '<td>' + esc(sh.start || '—') + '</td>'
-      + '<td>' + esc(sh.end || '—') + '</td>'
-      + '<td>' + (sh.hours != null ? sh.hours.toFixed(1) : '—') + '</td>'
-      + '<td>' + (sh.wage != null ? App.fmtCurrency(sh.wage) + '/hr' : '—') + '</td>'
+      + '<td><div class="val">' + esc(sh.name || '-') + '</div></td>'
+      + '<td>' + esc(sh.day || '-') + '</td>'
+      + '<td>' + esc(sh.start || '-') + '</td>'
+      + '<td>' + esc(sh.end || '-') + '</td>'
+      + '<td>' + (sh.hours != null ? sh.hours.toFixed(1) : '-') + '</td>'
+      + '<td>' + (sh.wage != null ? App.fmtCurrency(sh.wage) + '/hr' : '-') + '</td>'
       + '<td class="val">' + App.fmtCurrency(sh.cost || 0) + '</td>'
       + '</tr>').join('');
 
@@ -126,11 +126,11 @@ S.LaborScheduleHistory = {
       + '<div class="card"><div class="card-title">Schedule &middot; Week of ' + this.fmtDate(s.week_start) + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val">' + App.fmtCurrency(s.revenue_forecast || 0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val">' + (s.total_hours != null ? s.total_hours.toFixed(1) : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val">' + (s.total_hours != null ? s.total_hours.toFixed(1) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val">' + App.fmtCurrency(s.total_cost || 0) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val ' + (pct != null ? (pct > target ? 'warn' : 'good') : '') + '">'
-      + (pct != null ? App.fmtPct(pct) : '—') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '—') + '</div></div>'
+      + (pct != null ? App.fmtPct(pct) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '-') + '</div></div>'
       + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Day</th><th>Start</th><th>End</th><th>Hours</th><th>Wage</th><th>Cost</th>'
@@ -138,12 +138,39 @@ S.LaborScheduleHistory = {
       + (s.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(s.notes) + '</div>' : '')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lh-edit-detail">Edit in Build Schedule</button>'
+      + '<button class="btn btn-ghost" id="lh-copy">Copy to New Week</button>'
       + '</div></div></div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#lh-back')) this.renderList();
       else if (ev.target.closest('#lh-edit-detail')) this.editSchedule(id);
+      else if (ev.target.closest('#lh-copy')) this.copyToNewWeek(s);
     };
+  },
+
+  // Hydrate a fresh Build Schedule draft from an existing schedule's shifts,
+  // shifted forward by 7 days. Saves the operator from rebuilding a typical
+  // week shift-by-shift when this week looks like last week.
+  copyToNewWeek(src) {
+    if (!src) return;
+    const start = new Date((src.week_start || '') + 'T00:00:00');
+    if (!isNaN(start.getTime())) start.setDate(start.getDate() + 7);
+    const nextWeek = isNaN(start.getTime()) ? '' : start.toISOString().slice(0, 10);
+    const draft = {
+      week_start: nextWeek,
+      shifts: (src.shifts || []).map(sh => ({
+        staff_id: sh.staff_id || '',
+        day: sh.day || 'Mon',
+        start: sh.start || '',
+        end: sh.end || ''
+      })),
+      notes: ''
+    };
+    // Push into Build Schedule's draft localStorage so a fresh entry hydrates
+    // from the copy. editId stays null because this is a new schedule.
+    try { localStorage.setItem(S.LaborBuildSchedule.DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
+    if (S.LaborBuildSchedule) S.LaborBuildSchedule.editId = null;
+    App.navigate('lc-build-schedule');
   },
 
   confirmDel(id) {
