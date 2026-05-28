@@ -62,7 +62,7 @@ S.TrafficDashboard = {
           + '</div>';
         }).join('')
       : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">'
-        + 'Run a Traffic Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
+        + 'Run a Traffic Audit and your biggest-dollar opportunities will be ranked here.</div>';
     const actionHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
       + FixPanel.sectionHeader('Priority Action Items')
       + actionRows
@@ -161,20 +161,12 @@ S.TrafficDashboard = {
   /* Live Links card — one-click jumps to the operator's saved public platforms.
      Only renders entries for URLs that are actually set in traffic_settings.urls
      (Operation Links in Hub Settings). If none are set, returns empty so the
-     card stays hidden. */
+     card stays hidden. Platform list drives off App.TRAFFIC_PLATFORMS. */
   buildLiveLinks() {
     const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || {};
-    const items = [
-      { key: 'website',        label: 'Website',         u: urls.website        },
-      { key: 'gbp',            label: 'Google',          u: urls.gbp            },
-      { key: 'yelp',           label: 'Yelp',            u: urls.yelp           },
-      { key: 'instagram',      label: 'Instagram',       u: urls.instagram      },
-      { key: 'facebook',       label: 'Facebook',        u: urls.facebook       },
-      { key: 'doordash',       label: 'DoorDash',        u: urls.doordash       },
-      { key: 'ubereats',       label: 'Uber Eats',       u: urls.ubereats       },
-      { key: 'grubhub',        label: 'Grubhub',         u: urls.grubhub        },
-      { key: 'email_platform', label: 'Email Platform',  u: urls.email_platform }
-    ].filter(x => x.u && x.u.trim());
+    const items = App.TRAFFIC_PLATFORMS
+      .map(p => ({ key: p.key, label: p.label, u: urls[p.urlKey] }))
+      .filter(x => x.u && x.u.trim());
 
     if (!items.length) return '';
 
@@ -246,7 +238,7 @@ S.TrafficDashboard = {
     const fixMarkers = (window.FixPanel && fixMarks.length)
       ? FixPanel.markerSvg(fixMarks, xs, PAD.t, PAD.t + ch) : '';
     const fixLegend = fixMarks.length
-      ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:#DBAB46;display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
+      ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:var(--gold);display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
       : '';
 
     return '<div class="chart-card" style="padding:20px 24px 16px;">'
@@ -256,7 +248,7 @@ S.TrafficDashboard = {
       + '<button class="btn btn-ghost btn-sm" id="t-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>'
       + '</div>'
       + '<div style="display:flex;gap:20px;flex-wrap:wrap;">'
-      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Google Rating</span>'
+      + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:var(--gold);display:inline-block;border-radius:1px;"></span>Google Rating</span>'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:rgba(255,255,255,0.55);display:inline-block;border-radius:1px;"></span>Reviews/mo (÷10)</span>'
       + '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:20px;height:2px;background:var(--blue);display:inline-block;border-radius:1px;"></span>Response % (÷10)</span>'
       + fixLegend
