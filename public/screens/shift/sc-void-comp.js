@@ -66,7 +66,32 @@ S.ShiftVoidComp = {
     exportBtn.textContent = 'Export PDF';
     exportBtn.addEventListener('click', () => window.print());
     actions.appendChild(exportBtn);
+    const printBlankBtn = document.createElement('button');
+    printBlankBtn.className = 'btn btn-ghost btn-sm';
+    printBlankBtn.textContent = 'Print Blank Sheet';
+    printBlankBtn.addEventListener('click', () => this.printBlank());
+    actions.appendChild(printBlankBtn);
     this.renderList();
+  },
+
+  // Paper-at-bar workflow. Managers commonly clip a void/comp sheet to the
+  // POS, tally as the night runs, then enter into Bar Cop after close.
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Void / Comp Sheet',
+      subtitle: 'Log every void and comp during the shift. Manager enters each row into Bar Cop after close.',
+      columns: [
+        { label: 'Time',         width: '8%'  },
+        { label: 'Type',         width: '10%' },
+        { label: 'Item',         width: '20%' },
+        { label: 'Amount',       width: '10%' },
+        { label: 'Server',       width: '13%' },
+        { label: 'Authorized By',width: '13%' },
+        { label: 'Reason',       width: '16%' },
+        { label: 'Notes',        width: '10%' }
+      ],
+      rows: 16
+    });
   },
 
   renderList() {
@@ -165,7 +190,13 @@ S.ShiftVoidComp = {
 
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="flex:1;min-width:180px;"><label>Item</label>'
-      + '<input type="text" id="vc-item" value="' + esc(r?.item || '') + '" placeholder="What was voided / comped?" style="height:44px;"/></div>'
+      + '<input type="text" id="vc-item" list="vc-item-list" value="' + esc(r?.item || '') + '" placeholder="Pick a menu item or type the name" style="height:44px;"/>'
+      + '<datalist id="vc-item-list">'
+      + (((App.menuItems && App.menuItems()) || [])
+          .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+          .map(m => '<option value="' + esc(m.name || '') + '"></option>').join(''))
+      + '</datalist>'
+      + '</div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Amount</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vc-amount" min="0" step="0.01" '
       + 'inputmode="decimal" value="' + v(r?.amount) + '" style="height:44px;font-size:16px;"/></div></div>'
