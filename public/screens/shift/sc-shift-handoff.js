@@ -123,6 +123,17 @@ S.ShiftHandoff = {
       lines.push('CLOSING CHECKLIST: ' + (ex.closingCheck.completion_pct || 0) + '% complete');
       lines.push('');
     }
+    const sNotes = Array.isArray(shift.shift_notes) ? shift.shift_notes : [];
+    if (sNotes.length) {
+      lines.push('SHIFT NOTES');
+      lines.push('');
+      sNotes.forEach(n => {
+        const t = n.at ? new Date(n.at) : null;
+        const time = t && !isNaN(t.getTime()) ? t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+        lines.push('  ' + (time ? time + ' ' : '') + (n.text || ''));
+      });
+      lines.push('');
+    }
     if (shift.handoff_notes) {
       lines.push('NOTES FROM THE CLOSING MANAGER');
       lines.push('');
@@ -217,6 +228,22 @@ S.ShiftHandoff = {
         ? '<h2>Cash Reconciliation ' + cashStatusBadge + '</h2><div class="empty-line">Drawer was not counted this shift.</div>'
         : '';
 
+    // Mid-shift notes that were captured live on Active Shift roll into the
+    // handoff in chronological order. The opener sees what happened during
+    // service alongside the closing manager's intentional notes.
+    const fmtTime = iso => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    };
+    const shiftNotesList = Array.isArray(shift.shift_notes) ? shift.shift_notes : [];
+    const shiftNotesSection = shiftNotesList.length
+      ? '<h2>Shift Notes</h2>'
+        + '<ul>' + shiftNotesList.map(n =>
+            '<li><span class="muted">' + escH(fmtTime(n.at)) + '</span> ' + escH(n.text || '').replace(/\n/g, '<br/>') + '</li>'
+          ).join('') + '</ul>'
+      : '';
+
     const handoffNotesSection = shift.handoff_notes
       ? '<h2>Notes for the Opener</h2>'
         + '<div class="notes">' + escH(shift.handoff_notes).replace(/\n/g, '<br/>') + '</div>'
@@ -292,6 +319,7 @@ S.ShiftHandoff = {
 
       + vcSection
       + checklistSection
+      + shiftNotesSection
       + handoffNotesSection
 
       + '<div class="footer">'
