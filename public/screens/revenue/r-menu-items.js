@@ -867,7 +867,8 @@ S.RevenueMenuItems = {
         id: App.uid(),
         module: 'revenue',
         gap_id: 'pricing',
-        fix_date: new Date().toISOString().slice(0, 10),
+        gap_name: 'Pricing',
+        date: new Date().toISOString().slice(0, 10),
         source: 'price-change',
         note: 'Price change on ' + entry.name + ': ' + App.fmtCurrency(existing.price) + ' to ' + App.fmtCurrency(price)
       });
