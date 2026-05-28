@@ -36,22 +36,24 @@ S.HubYearEnd = {
   MONTHS_SHORT: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
 
   // ── Entry point ────────────────────────────────────────────────────────────
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "YEAR-END REVIEW | Back to Dashboard". Action buttons live next to
+  // the Year dropdown inside the picker card.
   open() {
-    App.openHubOverlay((panel) => this._render(panel));
+    App.openHubFullPage('Year-End Review', (mount) => this._render(mount));
   },
 
   // ── Render the picker screen ───────────────────────────────────────────────
-  _render(panel) {
+  _render(mount) {
     const years = this._availableYears();
     const defaultYear = years[0] || String(new Date().getFullYear() - 1);
     const yearOpts = years.map(y =>
       '<option value="' + y + '"' + (y === defaultYear ? ' selected' : '') + '>' + y + '</option>'
     ).join('') || '<option value="' + defaultYear + '" selected>' + defaultYear + '</option>';
 
-    panel.innerHTML =
-      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + this._header()
-      + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
+    mount.innerHTML =
+      '<div class="screen">'
+      + '<div class="card" style="margin-bottom:18px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Year-End Operations Review</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a year. Bar Cop rolls 12 months of operations into one file your accountant, your CPA, your lender, or your business partner can read. P&L by month, inventory valuation, labor trend, tip allocation, cash control, audit history, and operational events. Run it alongside your December close, or pull any prior year for review.</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
@@ -67,16 +69,10 @@ S.HubYearEnd = {
       + this._whatsInsideCard()
       + '</div>';
 
-    document.getElementById('hy-close')?.addEventListener('click', () => App.closeHubOverlay());
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+
     document.getElementById('hy-generate')?.addEventListener('click', () => this._generate());
     document.getElementById('hy-pdf')?.addEventListener('click', () => this._openPdfSummary());
-  },
-
-  _header() {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Year-End Review</div>'
-      +   '<button id="hy-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>';
   },
 
   _whatsInsideCard() {
@@ -94,7 +90,7 @@ S.HubYearEnd = {
       '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
       + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
     ).join('');
-    return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+    return '<div class="card">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
       + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
       + '</div>';
