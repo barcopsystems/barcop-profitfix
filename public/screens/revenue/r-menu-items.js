@@ -839,10 +839,48 @@ S.RevenueMenuItems = {
       updated_at:         new Date().toISOString()
     };
 
+    // If this is an edit and the price changed, auto-write a revenue_price_log
+    // entry + a fix_log entry so Menu Engineering's Pricing Review Log and the
+    // Recovery Scoreboard both pick it up. Closes the orphan where direct
+    // menu-items price edits used to bypass the log.
+    const priceChanged = existing && existing.price != null && existing.price !== price;
+    if (priceChanged) {
+      if (!Array.isArray(App.data.revenue_price_log)) App.data.revenue_price_log = [];
+      App.data.revenue_price_log.push({
+        id: App.uid(),
+        date: new Date().toISOString().slice(0, 10),
+        item_id: entry.id,
+        item_name: entry.name,
+        old_price: existing.price,
+        new_price: price,
+        cost: computedCost,
+        reason: 'Direct edit on Menu Items',
+        margin_impact: price - existing.price,
+        covers_at_change: existing.weekly_covers || 0,
+        predicted_vol_pct: null,
+        predicted_weekly_impact: null,
+        source: 'menu-items-edit',
+        saved_at: new Date().toISOString()
+      });
+      if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
+      App.data.fix_log.push({
+        id: App.uid(),
+        module: 'revenue',
+        gap_id: 'pricing',
+        fix_date: new Date().toISOString().slice(0, 10),
+        source: 'price-change',
+        note: 'Price change on ' + entry.name + ': ' + App.fmtCurrency(existing.price) + ' to ' + App.fmtCurrency(price)
+      });
+    }
+
     if (this.editIdx !== null) this.items()[this.editIdx] = entry;
     else this.items().push(entry);
 
     await App.saveKey('menu_items');
+    if (priceChanged) {
+      await App.saveKey('revenue_price_log');
+      await App.saveKey('fix_log');
+    }
     App.markSetupDone('gs_r_menu');
     if (recipe) App.markSetupDone('gs_p_recipes');
     this.editIdx = null;
