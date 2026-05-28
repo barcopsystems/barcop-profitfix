@@ -184,13 +184,13 @@ FIX.traffic = [
           detail: 'Every Monday, in This Week, log profile visits and link clicks. Track visits and clicks, not likes. Profile visits and link-in-bio clicks measure new-guest consideration. Follower count and likes only measure the audience you already have.' },
         { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
           title: 'Watch the trend',
-          detail: 'The Traffic dashboard rolls your social numbers into the digital presence score and the 90-day trend. Read it weekly. Social content compounds over months, so 90 days of consistent posting gets fundamentally different distribution than the first 30.' }
+          detail: 'The Traffic dashboard rolls your social numbers into the digital presence score and the 90-day trend. Read it weekly. Social content stacks up over months, so 90 days of consistent posting gets fundamentally different distribution than the first 30.' }
       ]
     },
 
     commonMistakes: [
       'Posting promotional graphics as the dominant content type. Promo content gets saves from existing followers and almost no new reach. Experience content drives new-guest decisions.',
-      'Abandoning a platform after 30 days. Social content compounds over months. Ninety days of consistent posting gets fundamentally different distribution than the first 30.',
+      'Abandoning a platform after 30 days. Social content stacks up over months. Ninety days of consistent posting gets fundamentally different distribution than the first 30.',
       'Using the same post on every platform without format adjustment. A square photo pushed to three platforms at once ignores the format and audience differences.',
       'Never showing the inside of the bar in video. Food and cocktail photos show what guests can order, not what it feels like to be there. The feel is the decision driver.',
       'Tracking follower count and likes instead of profile visits and link clicks. The first pair measures your existing audience, the second measures new-guest consideration.',
@@ -223,7 +223,7 @@ FIX.traffic = [
           detail: 'Every Monday, in This Week, log each platform\'s rating and order volume. Answer every new platform review with the same standard you use for Google, and never blame the platform or the driver. Check the dashboards for any item the platform auto-flagged or removed.' },
         { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
           title: 'Watch the trend',
-          detail: 'The Traffic dashboard rolls your delivery numbers into the digital presence score and the 90-day trend. Read it weekly. Ten minutes a week catches a rating slide before it compounds.' }
+          detail: 'The Traffic dashboard rolls your delivery numbers into the digital presence score and the 90-day trend. Read it weekly. Ten minutes a week catches a rating slide before it stacks up.' }
       ]
     },
 
@@ -232,7 +232,7 @@ FIX.traffic = [
       'Not updating platform hours when kitchen hours change. Wrong hours produce wrong-time orders that arrive cold or get cancelled.',
       'Listing every in-house item on delivery. Items that travel poorly or lose margin at commission should not be on a tight delivery menu.',
       'Ignoring delivery platform reviews. They affect platform ranking the way Google reviews affect your profile. The same response standard applies.',
-      'Never logging into the platform dashboards. Ratings and order volume change weekly, and an operator who checks monthly misses problems that compound for weeks.',
+      'Never logging into the platform dashboards. Ratings and order volume change weekly, and an operator who checks monthly misses problems that stack up for weeks.',
       'Adding a third platform before optimizing the first two. A poor listing on two platforms is not fixed by adding a third.'
     ]
   },
