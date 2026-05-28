@@ -2,12 +2,14 @@
 
 /* ── Bar Cop Outlook — shared audit narrative helper ─────────────────────────
    One home for the operator-voice paragraph that goes on every audit detail
-   page. Renders a button in the audit detail header card (next to the score),
-   on click fetches /api/claude with a prompt tuned to the audit type, caches
-   the result per audit id for the session so re-opening the same audit does
-   not re-spend tokens. Sanitizes the model output for emdashes and double-
-   dash punctuation before render (the prompt forbids them, but the model
-   sometimes ignores).
+   page. The button mounts inside the audit detail header card next to the
+   score. On click the API call fires, the button shows "Analyzing...", and
+   the paragraphs render in a popup modal layered over the audit (mirroring
+   the Trend Insights pattern on the Traffic Dashboard so the audit detail
+   page itself does not overflow with text).
+
+   Caches the rendered HTML per audit id for the session. Re-clicks open the
+   cached modal instantly without re-spending API tokens.
 
    Replaces the equivalent Outlook plumbing that used to live inside the
    killed audit-diff.js Compare Other Audits modal. All four audits (Profit,
@@ -37,8 +39,9 @@ window.AuditOutlook = {
       .replace(/--/g, '-');       // remaining "--" to single hyphen
   },
 
-  /* Mount the Outlook button + body wrapper into the given container element.
-     Wires the click handler and restores any cached paragraph for this audit.
+  /* Mount the Outlook button into the given container element. Wires the
+     click handler. Button-only, no inline text body — the paragraph renders
+     in a popup modal on click so the audit header card never overflows.
 
      containerEl  — DOM node where the button should render
      audit        — the audit record (uses audit_id, date, overall_score,
@@ -49,49 +52,36 @@ window.AuditOutlook = {
   attach(containerEl, audit, auditType, opts) {
     if (!containerEl || !audit) return;
     opts = opts || {};
-    const btnId  = 'ao-btn-' + auditType;
-    const bodyId = 'ao-body-' + auditType;
+    const btnId = 'ao-btn-' + auditType;
     const btnStyle = opts.compact
       ? 'font-size:10px;padding:5px 12px;letter-spacing:1px;'
       : 'font-size:11px;padding:6px 14px;letter-spacing:1px;';
-    const html = '<div class="ao-wrap">'
-      + '<button class="btn btn-ghost btn-sm" id="' + btnId + '" style="' + btnStyle + '">Bar Cop Outlook</button>'
-      + '<div id="' + bodyId + '" class="ao-body" style="display:none;font-size:13px;color:var(--t2);line-height:1.7;margin-top:14px;padding:14px;background:rgba(219,171,70,0.04);border:1px solid rgba(219,171,70,0.15);border-radius:6px;"></div>'
-      + '</div>';
-    containerEl.insertAdjacentHTML('beforeend', html);
-
+    containerEl.insertAdjacentHTML('beforeend',
+      '<button class="btn btn-ghost btn-sm" id="' + btnId + '" style="' + btnStyle + '">Bar Cop Outlook</button>'
+    );
     const btn = document.getElementById(btnId);
-    const body = document.getElementById(bodyId);
-    if (!btn || !body) return;
+    if (!btn) return;
+    btn.addEventListener('click', () => this._handleClick(auditType, audit, btn));
+  },
 
-    btn.addEventListener('click', () => this._generate(auditType, audit, btn, body));
-
-    // Restore cached paragraph if this audit was generated already this session.
-    const cached = this._cache[this._cacheKey(auditType, audit)];
+  _handleClick(auditType, audit, btn) {
+    const key = this._cacheKey(auditType, audit);
+    const cached = this._cache[key];
     if (cached) {
-      body.style.display = 'block';
-      body.innerHTML = cached;
-      this._lockButton(btn, 'Outlook Generated');
+      this._showModal(auditType, audit, cached);
+      return;
     }
+    this._generate(auditType, audit, btn);
   },
 
-  _lockButton(btn, label) {
+  async _generate(auditType, audit, btn) {
+    const originalLabel = btn.textContent;
     btn.disabled = true;
     btn.style.opacity = '0.65';
     btn.style.cursor = 'not-allowed';
-    btn.textContent = label;
-  },
-
-  async _generate(auditType, audit, btn, body) {
-    btn.disabled = true;
-    btn.style.opacity = '0.65';
-    btn.style.cursor = 'not-allowed';
-    btn.textContent = 'Generating...';
-    body.style.display = 'block';
-    body.innerHTML = '<div style="color:var(--t3);">Reading the audit and writing the outlook...</div>';
+    btn.textContent = 'Analyzing...';
 
     const prompt = this._buildPrompt(auditType, audit);
-    let succeeded = false;
     try {
       const r = await fetch('/api/claude', {
         method: 'POST',
@@ -105,33 +95,74 @@ window.AuditOutlook = {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
       if (data.error) {
-        body.innerHTML = '<div style="color:var(--red);">API error: ' + esc(data.error.message || 'unknown') + '</div>';
-      } else {
-        const raw = data.content?.[0]?.text || '';
-        const sanitized = this._sanitize(raw);
-        if (!sanitized.trim()) {
-          body.innerHTML = '<div style="color:var(--red);">Empty response. Try again.</div>';
-        } else {
-          const paragraphs = sanitized.split(/\n\n+/).map(p =>
-            '<div style="margin-bottom:12px;">' + esc(p).replace(/\n/g, '<br>') + '</div>'
-          ).join('');
-          body.innerHTML = paragraphs;
-          succeeded = true;
-        }
-      }
-    } catch (e) {
-      body.innerHTML = '<div style="color:var(--red);">Could not generate outlook: ' + esc(e.message || 'unknown error') + '</div>';
-    } finally {
-      if (succeeded) {
-        this._cache[this._cacheKey(auditType, audit)] = body.innerHTML;
-        this._lockButton(btn, 'Outlook Generated');
-      } else {
+        this._showError('API error: ' + esc(data.error.message || 'unknown'));
+        btn.textContent = 'Try Again';
         btn.disabled = false;
         btn.style.opacity = '';
         btn.style.cursor = '';
-        btn.textContent = 'Try Again';
+        return;
       }
+      const raw = data.content?.[0]?.text || '';
+      const sanitized = this._sanitize(raw);
+      if (!sanitized.trim()) {
+        this._showError('Empty response. Try again.');
+        btn.textContent = 'Try Again';
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        return;
+      }
+      const paragraphs = sanitized.split(/\n\n+/).map(p =>
+        '<div style="margin-bottom:14px;">' + esc(p).replace(/\n/g, '<br>') + '</div>'
+      ).join('');
+      this._cache[this._cacheKey(auditType, audit)] = paragraphs;
+      this._showModal(auditType, audit, paragraphs);
+      btn.textContent = originalLabel;
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+    } catch (e) {
+      this._showError('Could not generate outlook: ' + esc(e.message || 'unknown error'));
+      btn.textContent = 'Try Again';
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
     }
+  },
+
+  _showModal(auditType, audit, bodyHtml) {
+    const typeLabel = this._typeLabel(auditType);
+    const period = (audit.date || '').slice(0, 10);
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
+    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Outlook: ' + esc(typeLabel) + (period ? ' · ' + esc(period) : '') + '</div>'
+      +   '<button class="btn btn-ghost btn-sm ao-close">Close</button>'
+      + '</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    box.querySelector('.ao-close')?.addEventListener('click', close);
+    const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
+    document.addEventListener('keydown', onKey);
+  },
+
+  _showError(message) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;';
+    box.innerHTML = '<div style="font-size:13px;color:var(--red);line-height:1.6;margin-bottom:18px;">' + message + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-ghost btn-sm ao-close">OK</button></div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    box.querySelector('.ao-close')?.addEventListener('click', close);
   },
 
   _typeLabel(auditType) {
