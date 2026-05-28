@@ -25,38 +25,43 @@
 S.HubBooks = {
 
   // ── Entry point — called from the Hub sidebar ──────────────────────────────
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "BOOKS | Back to Dashboard". Action buttons live in topbar-right.
   open() {
-    App.openHubOverlay((panel) => this._render(panel));
+    App.openHubFullPage('Books', (mount) => this._render(mount));
   },
 
   // ── Render the picker screen ───────────────────────────────────────────────
-  _render(panel) {
+  _render(mount) {
     const months = this._availableMonths();
     const defaultMonth = months[0] || this._currentMonthKey();
     const monthOpts = months.map(m =>
       '<option value="' + m + '"' + (m === defaultMonth ? ' selected' : '') + '>' + this._monthLabel(m) + '</option>'
     ).join('');
 
-    panel.innerHTML =
-      '<div style="max-width:880px;margin:0 auto;padding:0 24px 64px;">'
-      + this._header()
+    mount.innerHTML =
+      '<div class="screen">'
+      + '<div style="max-width:880px;margin:0 auto;">'
       + '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:18px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Month-End Books</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a month. Bar Cop pulls every number together into one file your accountant or bookkeeper can work from. Income statement, inventory value, cash variance, voids and comps, tip allocation worksheet for IRS Form 8027, shrinkage, and labor cost. All built from what you log in Bar Cop. Nothing to re-enter.</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
           + '<div class="f" style="width:240px;"><label>Close Month</label><select id="hb-month">' + monthOpts + '</select></div>'
-          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
-            + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
-            + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
-          + '</div>'
         + '</div>'
         + '<div id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
         + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before filing anything or closing the books.</div>'
       + '</div>'
       + this._whatsInsideCard()
+      + '</div>'
       + '</div>';
 
-    document.getElementById('hb-close')?.addEventListener('click', () => App.closeHubOverlay());
+    if (App.setHubTopbarActions) {
+      App.setHubTopbarActions(
+        '<button class="btn btn-ghost btn-sm" id="hb-pdf">Owner Summary (PDF)</button>'
+        + '<button class="btn btn-primary btn-sm" id="hb-generate" style="margin-left:8px;">Generate File</button>'
+      );
+    }
+
     document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
     document.getElementById('hb-pdf')?.addEventListener('click', () => this._openPdfSummary());
   },
@@ -232,13 +237,6 @@ S.HubBooks = {
     if (pm < 1) { pm = 12; py = y - 1; }
     if (py < 1900) return null;
     return py + '-' + String(pm).padStart(2, '0');
-  },
-
-  _header() {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Books</div>'
-      +   '<button id="hb-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>';
   },
 
   _whatsInsideCard() {
