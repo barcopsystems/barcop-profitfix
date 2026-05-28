@@ -1,9 +1,11 @@
 'use strict';
 S.TrafficEmail = {
-  FREQUENCY: ['Weekly', 'Every two weeks', 'Monthly', 'Rarely', 'Never'],
-  GROWTH: ['Website signup form', 'In-store signup', 'WiFi login capture', 'Online order checkout', 'No active mechanism'],
-  OPEN_RATE_BENCHMARK: 20,
-  LIST_BENCHMARK: 500,
+  // Drives off canonical App enums + benchmarks so frequency, growth options,
+  // and the two performance benchmarks stay in sync.
+  get FREQUENCY()           { return App.TRAFFIC_EMAIL_FREQUENCY; },
+  get GROWTH()              { return App.TRAFFIC_EMAIL_GROWTH_SOURCES; },
+  get OPEN_RATE_BENCHMARK() { return App.TRAFFIC_BENCHMARKS.open_rate; },
+  get LIST_BENCHMARK()      { return App.TRAFFIC_BENCHMARKS.list_size; },
 
   render(container, actions) {
     actions.innerHTML = '';
@@ -109,11 +111,23 @@ S.TrafficEmail = {
   async save() {
     const ts = App.data.traffic_settings || (App.data.traffic_settings = {});
     const prof = ts.profile || (ts.profile = {});
+    const beforeFreq   = prof.email_frequency || '';
+    const beforeGrowth = prof.email_growth || '';
     prof.email_last_send = document.getElementById('em-last')?.value || '';
     prof.email_frequency = document.getElementById('em-freq')?.value || '';
     prof.email_growth    = document.getElementById('em-growth')?.value || '';
     prof.email_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
+    if (ok) {
+      const inactiveFreq = ['', 'Rarely', 'Never'];
+      const inactiveGrowth = ['', 'No active mechanism'];
+      if (!inactiveFreq.includes(prof.email_frequency) && inactiveFreq.includes(beforeFreq)) {
+        await App.emitTrafficFix('email-loyalty', 'Email send cadence moved to ' + prof.email_frequency);
+      }
+      if (!inactiveGrowth.includes(prof.email_growth) && inactiveGrowth.includes(beforeGrowth)) {
+        await App.emitTrafficFix('email-loyalty', 'List growth mechanism active: ' + prof.email_growth);
+      }
+    }
     this.draw();
     const msg = document.getElementById('em-msg');
     if (msg) {
