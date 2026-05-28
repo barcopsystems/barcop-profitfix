@@ -1267,17 +1267,26 @@ const App = {
   // Menu category groupings used across Revenue Recovery (r-menu-items,
   // r-menu-engineering, r-pricing, r-dog-test, recipe-cost-analysis).
   // Promoted from per-file local arrays so the lists never drift.
+  // Plate-side menu categories — what the operator picks on the Plate form.
   MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
-  MENU_COCKTAIL_ING_CATS: ['Spirit', 'Liqueur', 'Mixer', 'Garnish', 'Other'],
-  MENU_PLATE_ING_CATS: ['Protein', 'Produce', 'Dairy', 'Dry Goods', 'Other'],
-  MENU_INVENTORY_GROUPS: ['Beer', 'Wine', 'NA Beverages'],
-  // Maps Inventory Control product category → Menu Items inventory group.
+  // Inventory Control product categories shown as available recipe ingredients.
+  // Cocktail recipes draw from spirits, wine, beer, and the catch-all Misc bin.
+  MENU_COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
+  // Plate recipes draw from the Food category and Misc.
+  MENU_PLATE_ING_CATS: ['Food', 'Misc'],
+  // Direct-pour mapping: what IC categories show on the Inventory form,
+  // grouped by their MENU category for the picker.
+  MENU_INVENTORY_GROUPS: [
+    { menuCat: 'Beer',         icCats: ['Bottle Beer', 'Draft Beer'] },
+    { menuCat: 'Wine',         icCats: ['Wine'] },
+    { menuCat: 'NA Beverages', icCats: ['Misc'] }
+  ],
+  // Reverse map: IC product category → menu category (auto-derived on save).
   MENU_IC_TO_CAT: {
     'Bottle Beer': 'Beer',
-    'Draft Beer': 'Beer',
-    'Wine': 'Wine',
-    'NA': 'NA Beverages',
-    'Non-Alcoholic': 'NA Beverages'
+    'Draft Beer':  'Beer',
+    'Wine':        'Wine',
+    'Misc':        'NA Beverages'
   },
 
   // Target cost % defaults per menu category. Plate dishes target 32%,
