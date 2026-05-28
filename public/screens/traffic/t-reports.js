@@ -281,10 +281,7 @@ S.TrafficReports = {
       + '<div class="section-h">Fixes Closed This Month</div>'
       + '<table class="fixes"><tbody>' + fixRows + '</tbody></table>'
 
-      + '<div class="footer">'
-      +   '<div>Bar Cop Traffic Recovery &nbsp;|&nbsp; Brief for the operation\'s owner or marketing consultant.</div>'
-      +   '<div class="disclaimer">This brief summarizes data the operator entered in Bar Cop for the month shown. It is not a substitute for professional marketing, SEO, or business advice. Numbers reflect what was logged; actions taken outside Bar Cop are not captured.</div>'
-      + '</div>'
+      + App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Traffic Recovery. Brief for the operator and their consultant.' })
       + '</body></html>';
 
     const win = window.open('', '_blank');
@@ -328,7 +325,8 @@ S.TrafficReports = {
       + '<div class="sub">Generated ' + today + ' &nbsp;|&nbsp; ' + weeks.length + ' weeks shown &nbsp;|&nbsp; Targets: ' + (ts.google_rating||4.3) + '★ rating, ' + (ts.review_velocity||8) + ' reviews/mo</div>'
       + '<table><thead><tr><th>Week</th><th>Period End</th><th>Google</th><th>Yelp</th><th>New Reviews</th><th>Response</th><th>Sessions</th><th>IG Followers</th><th>Delivery Avg</th><th>Email Open</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table>'
-      + '<div class="footer">Bar Cop Traffic Recovery</div></body></html>';
+      + App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Traffic Recovery. Weekly history for the operator and their consultant.' })
+      + '</body></html>';
 
     const win = window.open('', '_blank');
     if (!win) { alert('Allow pop-ups to export the report.'); return; }
