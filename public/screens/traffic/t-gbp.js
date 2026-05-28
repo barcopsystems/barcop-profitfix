@@ -1,16 +1,8 @@
 'use strict';
 S.TrafficGBP = {
-  // Profile completeness checklist — stored once in traffic_settings.profile
-  TOGGLES: [
-    ['gbp_claimed',    'Listing claimed'],
-    ['gbp_hours',      'Hours complete'],
-    ['gbp_phone',      'Phone number present'],
-    ['gbp_website',    'Website linked'],
-    ['gbp_menu',       'Menu link active'],
-    ['gbp_category',   'Primary category set'],
-    ['gbp_attributes', 'Attributes complete'],
-    ['gbp_qa',         'Q and A populated']
-  ],
+  // Toggle list drives off App.TRAFFIC_GBP_TOGGLES so the checklist stays in
+  // sync with t-audit and any future screen that needs to read it.
+  get TOGGLES() { return App.TRAFFIC_GBP_TOGGLES; },
 
   render(container, actions) {
     actions.innerHTML = '';
@@ -102,6 +94,11 @@ S.TrafficGBP = {
   async save() {
     const ts = App.data.traffic_settings || (App.data.traffic_settings = {});
     const prof = ts.profile || (ts.profile = {});
+    // Snapshot pre-save threshold-relevant state so a just-closed gap
+    // (completeness now 100%, or posts/mo target just crossed) can credit
+    // the Recovery Scoreboard.
+    const beforeChecked = this.TOGGLES.filter(([k]) => prof[k]).length;
+    const beforePosts   = prof.gbp_posts != null ? prof.gbp_posts : null;
     this.container.querySelectorAll('.gbp-tog').forEach(cb => { prof[cb.dataset.key] = cb.checked; });
     const photos = parseInt(document.getElementById('gbp-photos')?.value);
     const posts  = parseInt(document.getElementById('gbp-posts')?.value);
@@ -109,7 +106,16 @@ S.TrafficGBP = {
     prof.gbp_posts  = isNaN(posts)  ? null : posts;
     prof.gbp_reviewed_at = new Date().toISOString();
     const ok = await App.saveKey('traffic_settings');
-    if (ok) App.markSetupDone('gs_t_gbp');
+    if (ok) {
+      App.markSetupDone('gs_t_gbp');
+      const afterChecked = this.TOGGLES.filter(([k]) => prof[k]).length;
+      if (afterChecked === this.TOGGLES.length && beforeChecked < this.TOGGLES.length) {
+        await App.emitTrafficFix('gbp', 'Google Business Profile checklist 100% complete');
+      }
+      if (prof.gbp_posts != null && prof.gbp_posts >= 8 && (beforePosts == null || beforePosts < 8)) {
+        await App.emitTrafficFix('gbp', 'GBP posts hit ' + prof.gbp_posts + '/mo (benchmark 8/mo)');
+      }
+    }
     this.draw();
     const msg = document.getElementById('gbp-msg');
     if (msg) {
