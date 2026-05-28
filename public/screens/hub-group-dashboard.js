@@ -8,31 +8,26 @@
 
 S.HubGroupDashboard = {
 
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
+  // shows "GROUP DASHBOARD | Back to Dashboard".
   async open() {
-    App.openHubOverlay((panel) => {
-      panel.innerHTML = this.renderLoading();
-      this._renderAsync(panel);
+    App.openHubFullPage('Group Dashboard', (mount) => {
+      mount.innerHTML = this.renderLoading();
+      if (App.setHubTopbarActions) App.setHubTopbarActions('');
+      this._renderAsync(mount);
     });
   },
 
   renderLoading() {
-    return '<div style="max-width:1100px;margin:0 auto;padding:0 24px 64px;">'
-      + this._header()
+    return '<div class="screen">'
       + '<div style="font-size:13px;color:var(--t3);padding:24px 0;">Loading bars...</div>'
       + '</div>';
   },
 
-  _header() {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Group Dashboard</div>'
-      +   '<button id="gd-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
-      + '</div>';
-  },
-
-  async _renderAsync(panel) {
+  async _renderAsync(mount) {
     const accounts = await DB.listMyAccounts();
     const dataByAccount = await this._fetchAccountData(accounts);
-    this._render(panel, accounts, dataByAccount);
+    this._render(mount, accounts, dataByAccount);
   },
 
   async _fetchAccountData(accounts) {
@@ -109,24 +104,20 @@ S.HubGroupDashboard = {
   _fmtCur(v) { return v == null ? '—' : App.fmtCurrency(v); },
   _fmtRating(v) { return v == null ? '—' : v.toFixed(1) + ' ★'; },
 
-  _render(panel, accounts, dataByAccount) {
+  _render(mount, accounts, dataByAccount) {
     if (!accounts || accounts.length === 0) {
-      panel.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:0 24px 64px;">'
-        + this._header()
+      mount.innerHTML = '<div class="screen">'
         + '<div style="font-size:13px;color:var(--t3);padding:24px 0;">No bars found on your account.</div>'
         + '</div>';
-      document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
       return;
     }
     if (accounts.length === 1) {
-      panel.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:0 24px 64px;">'
-        + this._header()
-        + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;font-size:13px;color:var(--t2);line-height:1.7;">'
+      mount.innerHTML = '<div class="screen">'
+        + '<div class="card">'
         +   '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">One bar on this account</div>'
-        +   'The Group Dashboard rolls up headline numbers across multiple bars. You currently have one. Add a second bar from User Accounts to start using this view.'
+        +   '<div style="font-size:13px;color:var(--t2);line-height:1.7;">The Group Dashboard rolls up headline numbers across multiple bars. You currently have one. Add a second bar from User Accounts to start using this view.</div>'
         + '</div>'
         + '</div>';
-      document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
       return;
     }
 
@@ -162,8 +153,7 @@ S.HubGroupDashboard = {
         + '</tr>';
     }).join('');
 
-    panel.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:0 24px 64px;">'
-      + this._header()
+    mount.innerHTML = '<div class="screen">'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">'
       +   'Headline numbers across every bar on your account. Click a row to switch to that bar and open its Hub Dashboard.'
       + '</div>'
@@ -175,8 +165,7 @@ S.HubGroupDashboard = {
       + '</div>'
       + '</div>';
 
-    document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
-    panel.querySelectorAll('.gd-row').forEach(row => {
+    mount.querySelectorAll('.gd-row').forEach(row => {
       row.addEventListener('mouseenter', () => { row.style.background = 'rgba(255,255,255,0.03)'; });
       row.addEventListener('mouseleave', () => { row.style.background = ''; });
       row.addEventListener('click', () => {
