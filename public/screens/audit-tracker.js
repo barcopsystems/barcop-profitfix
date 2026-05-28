@@ -147,7 +147,6 @@ S.AuditTracker = {
     this.container.querySelectorAll('.at-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
-    this.container.querySelector('.at-compare-btn')?.addEventListener('click', () => S.AuditDiff.open('profit'));
   },
 
   renderScoreChart(audits, prefix) {
@@ -230,10 +229,7 @@ S.AuditTracker = {
     }).join('');
     const overallDiff = (curr.overall_score||0) - (prev.overall_score||0);
     return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit Comparison</div>'
-      +   '<button class="btn btn-ghost btn-sm at-compare-btn" style="font-size:10px;padding:4px 10px;">Compare Other Audits</button>'
-      + '</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
       + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
       + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(prev.overall_score||0) + ';">' + (prev.overall_score||0) + '</div></div>'
@@ -324,6 +320,22 @@ S.AuditTracker = {
     const d = audit.raw || audit;
     const scoreColor = App.scoreColor(audit.overall_score||0);
 
+    // Findings text for a section. S1-S5 store evidence + gap + tool +
+    // narrative + finding in flat fields per the audit data shape; S6 stores
+    // the equivalent inside each signal object so its findings render via
+    // sigRows already. This helper pulls the S1-S5 findings text inline so
+    // operators see scores and findings on the same page (no Findings tab).
+    const findingsBlock = (num) => {
+      if (num === 6) return '';
+      const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
+      const texts = fields.map(f => d[f]).filter(v => v && String(v).trim());
+      if (!texts.length) return '';
+      return '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Findings</div>'
+        + texts.map(t => '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
+        + '</div>';
+    };
+
     const sectionBlock = (num, name, score, items, signals) => {
       const bar   = Math.min(100, Math.max(0, score||0));
       const color = App.scoreColor(score);
@@ -363,6 +375,7 @@ S.AuditTracker = {
         + scoreBlock + '</div>'
         + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
         + sigRows
+        + findingsBlock(num)
         + '</div>';
     };
 
@@ -482,9 +495,12 @@ S.AuditTracker = {
       + '<div style="font-size:11px;color:var(--t3);">Industry Avg: ' + (d.INDUSTRY_AVG||63) + '  |  Target: ' + (d.TARGET_SCORE||65) + '</div>'
       + '</div>'
       + '</div>'
-      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);">'
-      +   '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
-      +   App.scoreBar(audit.overall_score||0)
+      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
+      +   '<div style="flex:1;min-width:240px;">'
+      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
+      +     App.scoreBar(audit.overall_score||0)
+      +   '</div>'
+      +   '<div id="at-outlook-mount" style="flex-shrink:0;"></div>'
       + '</div>'
       + (totalMonthly > 0 ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:20px;flex-wrap:wrap;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Total Recoverable Per Month</div>'
@@ -496,79 +512,33 @@ S.AuditTracker = {
         + '</div>' : '')
       + '</div>'
 
-      // Tabs
-      + '<div style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:16px;">'
-      + '<button id="at-tab-scores" style="background:none;border:none;border-bottom:2px solid var(--gold);color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Scores</button>'
-      + '<button id="at-tab-narrative" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--t3);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Findings</button>'
-      + '</div>'
-
-      + '<div id="at-tab-scores-content">'
+      // Single-page layout: action items + sections inline, findings rendered
+      // under each section via findingsBlock. No Scores/Findings tab split.
       + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items, Ranked by Impact</div>'
         + actionItems + '</div>' : '')
       + sections
-      + '</div>'
-
-      + '<div id="at-tab-narrative-content" style="display:none;">'
-      + this.renderNarrative(d)
-      + '</div>'
 
       + '</div>';
 
-    document.getElementById('at-tab-scores')?.addEventListener('click', () => {
-      document.getElementById('at-tab-scores-content').style.display = '';
-      document.getElementById('at-tab-narrative-content').style.display = 'none';
-      document.getElementById('at-tab-scores').style.borderBottomColor = 'var(--gold)';
-      document.getElementById('at-tab-scores').style.color = 'var(--t1)';
-      document.getElementById('at-tab-narrative').style.borderBottomColor = 'transparent';
-      document.getElementById('at-tab-narrative').style.color = 'var(--t3)';
-    });
+    // Bar Cop Outlook mounts into the audit detail header next to the score.
+    // Shared helper handles click + cache + render across all 4 audits.
+    const outlookMount = document.getElementById('at-outlook-mount');
+    if (outlookMount && window.AuditOutlook) {
+      AuditOutlook.attach(outlookMount, audit, 'profit', { compact: true });
+    }
+
     this.container.querySelectorAll('.at-fix-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         App._fixFocus = btn.dataset.gap;
         App.navigate('profit-fix');
       });
     });
-    document.getElementById('at-tab-narrative')?.addEventListener('click', () => {
-      document.getElementById('at-tab-scores-content').style.display = 'none';
-      document.getElementById('at-tab-narrative-content').style.display = '';
-      document.getElementById('at-tab-narrative').style.borderBottomColor = 'var(--gold)';
-      document.getElementById('at-tab-narrative').style.color = 'var(--t1)';
-      document.getElementById('at-tab-scores').style.borderBottomColor = 'transparent';
-      document.getElementById('at-tab-scores').style.color = 'var(--t3)';
-    });
   },
 
-  renderNarrative(d) {
-    // Collect evidence/gap/tool fields across all sections
-    const NAMES = App.AUDIT_PROFIT_SECTION_NAMES;
-    const sections = [
-      { num:1, name:NAMES[0], fields: ['S1_EVIDENCE','S1_GAP','S1_TOOL','S1_NARRATIVE','S1_FINDING'] },
-      { num:2, name:NAMES[1], fields: ['S2_EVIDENCE','S2_GAP','S2_TOOL','S2_NARRATIVE','S2_FINDING'] },
-      { num:3, name:NAMES[2], fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
-      { num:4, name:NAMES[3], fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
-      { num:5, name:NAMES[4], fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
-      { num:6, name:'Operational Risk Signals',   fields: ['S6_SIG1_EVIDENCE','S6_SIG1_GAP','S6_SIG1_TOOL','S6_SIG2_EVIDENCE','S6_SIG2_GAP','S6_SIG2_TOOL','S6_SIG3_EVIDENCE','S6_SIG3_GAP','S6_SIG3_TOOL'] },
-    ];
-    const cards = sections.map(s => {
-      const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
-      if (!texts.length) return '';
-      const score = d['S'+s.num+'_SCORE'];
-      const col = score!=null ? App.scoreColor(score) : 'var(--t3)';
-      return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--b2);">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Section ' + s.num + '</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + s.name + '</div></div>'
-        + (score!=null ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + col + ';">' + score + '</div>' : '')
-        + '</div>'
-        + texts.map(t => '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
-        + '</div>';
-    }).filter(Boolean).join('');
-    if (!cards) {
-      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. With your POS exception report and inventory sheets attached, the audit produces section narratives.</div>';
-    }
-    return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
-  },
+  // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
+  // Findings text now renders inline under each section via findingsBlock()
+  // inside the sectionBlock helper in viewAudit().
 
   // ── Stepped intake wizard ─────────────────────────────────────────────────
   _intakeStep: 1,
