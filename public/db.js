@@ -773,6 +773,12 @@ const DB = {
       traffic_holidays:    [],
       traffic_inquiries:   [],
       getting_started_traffic: {},
+      // Hub — Bar Cop Audit history (executive monthly audits at Hub level)
+      bar_cop_audits: [],
+      // Hub — Operating Expenses Log (per-entry expense capture, feeds Books)
+      operating_expenses: [],
+      // Hub — Permits and Compliance Log (liquor license, tax filings, etc)
+      permits_compliance: [],
       // Hub — unified setup checklist progress (Section 1, Section 9)
       hub_setup_progress: {},
       // Fix layer — implemented-fix events feeding the Recovery Scoreboard
