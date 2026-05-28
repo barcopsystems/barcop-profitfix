@@ -146,7 +146,6 @@ S.RevenueAudit = {
     this.container.querySelectorAll('.ra-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
-    this.container.querySelector('.ra-compare-btn')?.addEventListener('click', () => S.AuditDiff.open('revenue'));
   },
 
   renderScoreChart(audits, prefix) {
@@ -228,7 +227,6 @@ S.RevenueAudit = {
     return '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit Comparison</div>'
-      +   '<button class="btn btn-ghost btn-sm ra-compare-btn" style="font-size:10px;padding:4px 10px;">Compare Other Audits</button>'
       + '</div>'
       + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
       + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
@@ -318,6 +316,20 @@ S.RevenueAudit = {
     const d = audit.raw || audit;
     const scoreColor = App.scoreColor(audit.overall_score||0);
 
+    // Findings text for sections 1-5 (S6 has signal-embedded findings).
+    // Inlined under each section card via findingsBlock so the operator
+    // sees scores and findings on the same page (no Findings tab).
+    const findingsBlock = (num) => {
+      if (num === 6) return '';
+      const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
+      const texts = fields.map(f => d[f]).filter(v => v && String(v).trim());
+      if (!texts.length) return '';
+      return '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Findings</div>'
+        + texts.map(t => '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
+        + '</div>';
+    };
+
     const sectionBlock = (num, name, score, items, signals) => {
       const bar   = Math.min(100, Math.max(0, score||0));
       const color = App.scoreColor(score);
@@ -357,6 +369,7 @@ S.RevenueAudit = {
         + scoreBlock + '</div>'
         + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
         + sigRows
+        + findingsBlock(num)
         + '</div>';
     };
 
@@ -461,9 +474,12 @@ S.RevenueAudit = {
       + '<div style="font-size:11px;color:var(--t3);">Industry Avg: ' + (d.INDUSTRY_AVG||61) + '  |  Target: ' + (d.TARGET_SCORE||65) + '</div>'
       + '</div>'
       + '</div>'
-      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);">'
-      +   '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Revenue Score</div>'
-      +   App.scoreBar(audit.overall_score||0)
+      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
+      +   '<div style="flex:1;min-width:240px;">'
+      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Revenue Score</div>'
+      +     App.scoreBar(audit.overall_score||0)
+      +   '</div>'
+      +   '<div id="ra-outlook-mount" style="flex-shrink:0;"></div>'
       + '</div>'
       + (totalMonthly > 0 ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:20px;flex-wrap:wrap;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Total Recoverable Per Month</div>'
@@ -473,40 +489,20 @@ S.RevenueAudit = {
         + '</div>' : '')
       + '</div>'
 
-      + '<div style="display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:16px;">'
-      + '<button id="ra-tab-scores" style="background:none;border:none;border-bottom:2px solid var(--gold);color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Scores</button>'
-      + '<button id="ra-tab-narrative" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--t3);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;letter-spacing:0.5px;">Findings</button>'
-      + '</div>'
-
-      + '<div id="ra-tab-scores-content">'
+      // Single-page layout: action items + sections inline, findings under
+      // each section via findingsBlock. No tab split.
       + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items, Ranked by Impact</div>'
         + actionItems + '</div>' : '')
       + sections
-      + '</div>'
-
-      + '<div id="ra-tab-narrative-content" style="display:none;">'
-      + this.renderNarrative(d)
-      + '</div>'
 
       + '</div>';
 
-    document.getElementById('ra-tab-scores')?.addEventListener('click', () => {
-      document.getElementById('ra-tab-scores-content').style.display = '';
-      document.getElementById('ra-tab-narrative-content').style.display = 'none';
-      document.getElementById('ra-tab-scores').style.borderBottomColor = 'var(--gold)';
-      document.getElementById('ra-tab-scores').style.color = 'var(--t1)';
-      document.getElementById('ra-tab-narrative').style.borderBottomColor = 'transparent';
-      document.getElementById('ra-tab-narrative').style.color = 'var(--t3)';
-    });
-    document.getElementById('ra-tab-narrative')?.addEventListener('click', () => {
-      document.getElementById('ra-tab-scores-content').style.display = 'none';
-      document.getElementById('ra-tab-narrative-content').style.display = '';
-      document.getElementById('ra-tab-narrative').style.borderBottomColor = 'var(--gold)';
-      document.getElementById('ra-tab-narrative').style.color = 'var(--t1)';
-      document.getElementById('ra-tab-scores').style.borderBottomColor = 'transparent';
-      document.getElementById('ra-tab-scores').style.color = 'var(--t3)';
-    });
+    const outlookMount = document.getElementById('ra-outlook-mount');
+    if (outlookMount && window.AuditOutlook) {
+      AuditOutlook.attach(outlookMount, audit, 'revenue', { compact: true });
+    }
+
     this.container.querySelectorAll('.ra-fix-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         App._fixFocus = btn.dataset.gap;
@@ -515,34 +511,8 @@ S.RevenueAudit = {
     });
   },
 
-  renderNarrative(d) {
-    const sections = [
-      { num:1, name:'Check Average and Revenue',  fields: ['S1_EVIDENCE','S1_GAP','S1_TOOL','S1_NARRATIVE','S1_FINDING'] },
-      { num:2, name:'Labor Efficiency',            fields: ['S2_EVIDENCE','S2_GAP','S2_TOOL','S2_NARRATIVE','S2_FINDING'] },
-      { num:3, name:'Menu Performance',            fields: ['S3_EVIDENCE','S3_GAP','S3_TOOL','S3_NARRATIVE','S3_FINDING'] },
-      { num:4, name:'Server Performance',          fields: ['S4_EVIDENCE','S4_GAP','S4_TOOL','S4_NARRATIVE','S4_FINDING'] },
-      { num:5, name:'Events and Private Dining',   fields: ['S5_EVIDENCE','S5_GAP','S5_TOOL','S5_NARRATIVE','S5_FINDING'] },
-      { num:6, name:'Operational Risk Signals',     fields: ['S6_SIG1_EVIDENCE','S6_SIG1_GAP','S6_SIG1_TOOL','S6_SIG2_EVIDENCE','S6_SIG2_GAP','S6_SIG2_TOOL','S6_SIG3_EVIDENCE','S6_SIG3_GAP','S6_SIG3_TOOL','S6_SIG4_EVIDENCE','S6_SIG4_GAP','S6_SIG4_TOOL'] },
-    ];
-    const cards = sections.map(s => {
-      const texts = s.fields.map(f => d[f]).filter(v => v && String(v).trim());
-      if (!texts.length) return '';
-      const score = d['S'+s.num+'_SCORE'];
-      const col = score!=null ? App.scoreColor(score) : 'var(--t3)';
-      return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--b2);">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Section ' + s.num + '</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + s.name + '</div></div>'
-        + (score!=null ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + col + ';">' + score + '</div>' : '')
-        + '</div>'
-        + texts.map(t => '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
-        + '</div>';
-    }).filter(Boolean).join('');
-    if (!cards) {
-      return '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">Written findings are available on Tier 2 and Tier 3 audits. With your server sales report and labor schedule attached, the audit produces section narratives.</div>';
-    }
-    return '<div style="margin-bottom:8px;font-size:11px;color:var(--t3);line-height:1.6;">Written findings from the audit analysis. These are the observations behind each section score.</div>' + cards;
-  },
+  // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
+  // Findings render inline under each section via findingsBlock() in viewAudit().
 
   // ── Stepped intake wizard ─────────────────────────────────────────────────
   _intakeStep: 1,
