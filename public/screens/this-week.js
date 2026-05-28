@@ -9,8 +9,11 @@
 S.ThisWeek = {
   draft: null,
   DRAFT_KEY: 'pf_draft',
-  BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
-  KITCHEN_CATS: ['Food', 'Misc'],
+  // Bar / Kitchen category lists read from App canonical (see app.js BAR_CATS
+  // / KITCHEN_CATS) so the lists never drift across the three Profit Recovery
+  // screens that read them.
+  get BAR_CATS()     { return App.BAR_CATS; },
+  get KITCHEN_CATS() { return App.KITCHEN_CATS; },
 
   // ── Inventory Control COGS feed ───────────────────────────────────────────
   hasIC() {
@@ -100,6 +103,14 @@ S.ThisWeek = {
       period_end: periodEnd,
       bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
       food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
+      // Catering: optional third revenue stream for operators who do
+      // off-premise events. Operators who don't cater leave it blank — it
+      // adds zero to totals so it's invisible if unused.
+      catering: { revenue: '', cogs: '', labor: '' },
+      // 3rd-party platform fees (DoorDash, UberEats, Toast Tabs, etc).
+      // Operating cost, NOT part of prime cost or COGS. Sits as its own line
+      // on Books and Year-End. Operators who don't do delivery leave blank.
+      platform_fees: '',
       notes: ''
     };
   },
@@ -139,6 +150,28 @@ S.ThisWeek = {
       + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">' + this.feedNote(kind) + '</div></div>';
   },
 
+  // Catering: optional third revenue line. Renders the same shape as the Bar
+  // / Food cards but with no Pull Latest links (no Control source feeds
+  // catering numbers — the operator types them) and no target % comparison
+  // (catering margin varies too widely by event type to anchor a single target).
+  cateringCard(data) {
+    const inputRow = (id, label, value) =>
+      '<div class="f w-md"><label>' + label + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">Operator entry. Leave blank if you do not cater.</div></div>';
+    return '<div class="card"><div class="card-title">Catering / Events (optional)</div>'
+      + '<div class="form-row">'
+      + inputRow('tw-cr', 'Catering Revenue', data.revenue)
+      + inputRow('tw-cl', 'Catering Labor',   data.labor)
+      + inputRow('tw-cc', 'Catering COGS',    data.cogs)
+      + '</div>'
+      + '<div class="calc">'
+      + '<div class="calc-item"><div class="calc-label">Catering Cost %</div><div class="calc-val" id="tw-cpct">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Catering Labor %</div><div class="calc-val" id="tw-clpct">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Gross Contribution</div><div class="calc-val" id="tw-ccontrib">-</div></div>'
+      + '</div></div>';
+  },
+
   sectionCard(title, prefix, data) {
     return '<div class="card"><div class="card-title">' + title + '</div>'
       + '<div class="form-row">'
@@ -164,6 +197,13 @@ S.ThisWeek = {
       + '</div></div>'
       + this.sectionCard('Bar', 'b', d.bar)
       + this.sectionCard('Food', 'f', d.food)
+      + this.cateringCard(d.catering || { revenue: '', cogs: '', labor: '' })
+      + '<div class="card"><div class="card-title">Other Operating Costs</div>'
+      + '<div class="form-row">'
+      + '<div class="f w-md"><label>3rd-Party Platform Fees</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">DoorDash, UberEats, Toast Tabs, or any platform fee for the week. Sits as its own operating expense line on Books and Year-End.</div>'
+      + '</div></div></div>'
       + '<div class="card"><div class="card-title">Review</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="tw-totrev">-</div></div>'
@@ -194,33 +234,77 @@ S.ThisWeek = {
     d.week_num = v('tw-wk'); d.period_end = v('tw-end');
     d.bar.revenue = v('tw-br'); d.bar.cogs = v('tw-bc'); d.bar.labor = v('tw-bl');
     d.food.revenue = v('tw-fr'); d.food.cogs = v('tw-fc'); d.food.labor = v('tw-fl');
+    if (!d.catering) d.catering = { revenue: '', cogs: '', labor: '' };
+    d.catering.revenue = v('tw-cr'); d.catering.cogs = v('tw-cc'); d.catering.labor = v('tw-cl');
+    d.platform_fees = v('tw-pf');
     d.notes = v('tw-notes');
   },
 
-  pullCOGS() {
+  // True when the operator has typed a value that meaningfully differs from
+  // what Control wants to pull in. 50-cent tolerance avoids false alarms on
+  // floating-point noise.
+  _isOverride(id, incoming) {
+    const cur = parseFloat(document.getElementById(id)?.value);
+    if (isNaN(cur) || cur === 0) return false;
+    const inc = parseFloat(incoming);
+    if (isNaN(inc)) return false;
+    return Math.abs(cur - inc) > 0.5;
+  },
+  async _confirmOverride(title, message) {
+    return App.confirm({ title, message, confirmText: 'Overwrite', cancelText: 'Keep Mine' });
+  },
+
+  async pullCOGS() {
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
+    const incoming = {};
+    if (bc != null) incoming['tw-bc'] = bc;
+    if (fc != null) incoming['tw-fc'] = fc;
+    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    if (conflicted) {
+      const ok = await this._confirmOverride(
+        'Overwrite your COGS numbers?',
+        'Your typed Bar or Food COGS don\'t match what Inventory Control just computed. Pulling latest will replace them.'
+      );
+      if (!ok) return;
+    }
     if (bc != null) { const el = document.getElementById('tw-bc'); if (el) el.value = bc.toFixed(2); }
     if (fc != null) { const el = document.getElementById('tw-fc'); if (el) el.value = fc.toFixed(2); }
     this.onInput();
   },
 
-  pullRevenue() {
+  async pullRevenue() {
     const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
     const sr = this.shiftRevenue(pe);
-    if (sr) {
-      const br = document.getElementById('tw-br'); if (br) br.value = sr.bar.toFixed(2);
-      const fr = document.getElementById('tw-fr'); if (fr) fr.value = sr.food.toFixed(2);
+    if (!sr) return;
+    const incoming = { 'tw-br': sr.bar, 'tw-fr': sr.food };
+    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    if (conflicted) {
+      const ok = await this._confirmOverride(
+        'Overwrite your revenue numbers?',
+        'Your typed Bar or Food revenue don\'t match Shift Control. Pulling latest will replace them.'
+      );
+      if (!ok) return;
     }
+    const br = document.getElementById('tw-br'); if (br) br.value = sr.bar.toFixed(2);
+    const fr = document.getElementById('tw-fr'); if (fr) fr.value = sr.food.toFixed(2);
     this.onInput();
   },
 
-  pullLabor() {
+  async pullLabor() {
     const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
     const lc = this.laborCost(pe);
-    if (lc) {
-      const bl = document.getElementById('tw-bl'); if (bl) bl.value = lc.bar.toFixed(2);
-      const fl = document.getElementById('tw-fl'); if (fl) fl.value = lc.food.toFixed(2);
+    if (!lc) return;
+    const incoming = { 'tw-bl': lc.bar, 'tw-fl': lc.food };
+    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    if (conflicted) {
+      const ok = await this._confirmOverride(
+        'Overwrite your labor numbers?',
+        'Your typed Bar or Food labor don\'t match Labor Control. Pulling latest will replace them.'
+      );
+      if (!ok) return;
     }
+    const bl = document.getElementById('tw-bl'); if (bl) bl.value = lc.bar.toFixed(2);
+    const fl = document.getElementById('tw-fl'); if (fl) fl.value = lc.food.toFixed(2);
     this.onInput();
   },
 
@@ -243,8 +327,22 @@ S.ThisWeek = {
     section('b', t.bar_pour_cost_pct ?? 22);
     section('f', t.food_cost_pct ?? 32);
 
-    const tRev = num('tw-br') + num('tw-fr');
-    const tCost = num('tw-bc') + num('tw-fc') + num('tw-bl') + num('tw-fl');
+    // Catering tile math: read-only display, doesn't anchor a target since
+    // catering margin varies too widely by event type.
+    const cr = num('tw-cr'), cc = num('tw-cc'), cl = num('tw-cl');
+    const cpct = cr > 0 ? cc / cr * 100 : null;
+    const clpct = cr > 0 ? cl / cr * 100 : null;
+    const ccontrib = cr - cc - cl;
+    set('tw-cpct',    cpct  != null ? App.fmtPct(cpct)  : '-');
+    set('tw-clpct',   clpct != null ? App.fmtPct(clpct) : '-');
+    set('tw-ccontrib', cr > 0 ? App.fmtCurrency(ccontrib) : '-', cr > 0 ? (ccontrib >= 0 ? 'good' : 'warn') : '');
+
+    // Catering revenue rolls into Total Revenue; catering COGS + labor roll
+    // into prime cost since they're real product + payroll cost. Platform
+    // fees do NOT roll into prime — they're shown as a separate operating
+    // expense line on Books and Year-End.
+    const tRev = num('tw-br') + num('tw-fr') + cr;
+    const tCost = num('tw-bc') + num('tw-fc') + num('tw-bl') + num('tw-fl') + cc + cl;
     const prime = tRev > 0 ? tCost / tRev * 100 : null;
     const pTarget = t.prime_cost_pct ?? 60;
     set('tw-totrev', tRev > 0 ? App.fmtCurrency(tRev) : '-');
@@ -265,13 +363,16 @@ S.ThisWeek = {
     const numF = v => parseFloat(v) || 0;
     const bRev = numF(d.bar.revenue), bCogs = numF(d.bar.cogs), bLab = numF(d.bar.labor);
     const fRev = numF(d.food.revenue), fCogs = numF(d.food.cogs), fLab = numF(d.food.labor);
-    if (bRev + fRev === 0) {
+    const cRev = numF(d.catering?.revenue), cCogs = numF(d.catering?.cogs), cLab = numF(d.catering?.labor);
+    const pFees = numF(d.platform_fees);
+    if (bRev + fRev + cRev === 0) {
       if (err) { err.textContent = 'Enter at least one revenue figure before saving.'; err.style.display = 'inline'; }
       return;
     }
     const t = App.data.settings.targets || {};
     const bTarget = t.bar_pour_cost_pct ?? 22, fTarget = t.food_cost_pct ?? 32;
-    const tRev = bRev + fRev, tCost = bCogs + fCogs + bLab + fLab;
+    const tRev = bRev + fRev + cRev;
+    const tCost = bCogs + fCogs + bLab + fLab + cCogs + cLab;
     const bPct = bRev > 0 ? bCogs / bRev * 100 : 0;
     const fPct = fRev > 0 ? fCogs / fRev * 100 : 0;
 
@@ -290,6 +391,12 @@ S.ThisWeek = {
         labor_pct: fRev > 0 ? fLab / fRev * 100 : 0,
         vs_target_pct: fPct - fTarget, vs_target_dollar: ((fPct - fTarget) / 100) * fRev
       },
+      catering: {
+        revenue: cRev, cogs: cCogs, labor: cLab,
+        cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0,
+        labor_pct: cRev > 0 ? cLab / cRev * 100 : 0
+      },
+      platform_fees: pFees,
       prime_cost_pct: tRev > 0 ? tCost / tRev * 100 : 0,
       notes: d.notes || ''
     };
