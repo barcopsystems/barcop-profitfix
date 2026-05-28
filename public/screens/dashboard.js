@@ -274,7 +274,8 @@ S.Dashboard = {
       const text=data.content?.[0]?.text;
       if(!text){showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');return;}
       const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
-      const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
+      const clean=text.replace(/—/g,', ').replace(/–/g,'-').replace(/ -- /g,', ').replace(/--/g,'-');
+      const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+clean.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
       showModal(header+body);
     }).catch(err=>{
       if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
