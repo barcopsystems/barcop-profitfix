@@ -1329,6 +1329,8 @@ const App = {
     { key: 'ubereats',       label: 'Uber Eats',       urlKey: 'ubereats',       placeholder: 'https://ubereats.com/store/...' },
     { key: 'grubhub',        label: 'Grubhub',         urlKey: 'grubhub',        placeholder: 'https://grubhub.com/restaurant/...' },
     { key: 'ezcater',        label: 'ezCater',         urlKey: 'ezcater',        placeholder: 'https://ezcater.com/catering/...' },
+    { key: 'opentable',      label: 'OpenTable',       urlKey: 'opentable',      placeholder: 'https://opentable.com/...' },
+    { key: 'resy',           label: 'Resy',            urlKey: 'resy',           placeholder: 'https://resy.com/cities/...' },
     { key: 'email_platform', label: 'Email Platform',  urlKey: 'email_platform', placeholder: 'https://mailchimp.com or your tool' }
   ],
 
