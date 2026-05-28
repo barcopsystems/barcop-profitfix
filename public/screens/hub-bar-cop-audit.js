@@ -850,10 +850,9 @@ S.HubBarCopAudit = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div style="max-width:1100px;margin:0 auto;">'
+    this.container.innerHTML = ''
       + this._header('Bar Cop Audit')
-      + '<div class="screen" style="padding:0;">' + intro + history + '</div>'
-      + '</div>';
+      + '<div class="screen" style="padding:0;">' + intro + history + '</div>';
     document.getElementById('bca-back-dash')?.addEventListener('click', () => App.showHub());
     document.getElementById('bca-generate')?.addEventListener('click', () => this._generate());
     this.container.querySelectorAll('.bca-row, .bca-view').forEach(el => {
@@ -976,7 +975,7 @@ S.HubBarCopAudit = {
 
     // Action bar — sits below the page header. Back returns to the audit
     // landing view; Print opens the browser dialog.
-    this.container.innerHTML = '<div style="max-width:1100px;margin:0 auto;">'
+    this.container.innerHTML = ''
       + this._header('Bar Cop Audit')
       + '<div class="screen" style="padding:0;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
