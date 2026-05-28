@@ -2259,6 +2259,53 @@ const App = {
     });
   },
 
+  // ── Deliverable footer + disclaimer (legal protection helper) ───────────
+  // Single source for the disclaimer text + workbook Subject metadata + PDF
+  // footer HTML used across every Bar Cop deliverable: Books, Year-End,
+  // Weekly P&L Brief, Traffic Month End Brief, Bar Cop Audit PDF, and any
+  // future operator-facing export. Centralizing means the legal language
+  // stays in lockstep when it gets edited.
+  //
+  // Usage:
+  //   For XLSX consumers (Books, Year-End, Weekly P&L):
+  //     const f = App.deliverableFooter();
+  //     f.disclaimerLines  // array of 3 short strings, one per sheet footer row
+  //     f.workbookSubject  // single-line string for wb.Props.Subject
+  //
+  //   For PDF/HTML consumers (Traffic Month End Brief, Bar Cop Audit PDF):
+  //     html += App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Audit' });
+  //     returns a styled <div class="footer">...</div> block.
+  //
+  // opts.barName        — defaults to App.data.settings.bar_name or 'Bar Cop'
+  // opts.tagline        — short tagline shown above the disclaimer in PDFs
+  // opts.sourceText     — optional source note rendered above the disclaimer
+  // opts.generatedDate  — Date object, defaults to now
+  deliverableFooter(opts) {
+    opts = opts || {};
+    const dateStr = (opts.generatedDate || new Date()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const tagline = opts.tagline || 'Bar Cop';
+
+    const disclaimerLines = [
+      'Generated from data you entered in Bar Cop on ' + dateStr + '.',
+      'Bar Cop is a software tool, not a CPA, accountant, marketing consultant, or other professional advisor.',
+      'Review and verify before filing, presenting, or making material decisions.'
+    ];
+    const workbookSubject = disclaimerLines.join(' ');
+
+    if (opts.kind === 'pdf-html') {
+      const sourceLine = opts.sourceText
+        ? '<div>' + esc(opts.sourceText) + '</div>'
+        : '';
+      return '<div class="footer" style="margin-top:24px;font-size:9px;color:#999;line-height:1.5;font-family:Helvetica,Arial,sans-serif;border-top:1px solid #ddd;padding-top:10px;">'
+        + '<div>' + esc(tagline) + '</div>'
+        + sourceLine
+        + '<div style="font-style:italic;margin-top:6px;">' + esc(workbookSubject) + '</div>'
+        + '</div>';
+    }
+
+    return { disclaimerLines: disclaimerLines, workbookSubject: workbookSubject };
+  },
+
   fmtPct(n, d=1) {
     if (isNaN(n) || n == null) return ' ';
     return Number(n).toFixed(d) + '%';
