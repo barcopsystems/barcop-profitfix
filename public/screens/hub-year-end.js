@@ -178,10 +178,28 @@ S.HubYearEnd = {
       barLabor: 0, foodLabor: 0, cateringLabor: 0, totalLabor: 0,
       comps: 0, maintenance: 0, platformFees: 0
     };
+    // Annual OpEx by category. Operating Expenses log (App.data.operating_expenses)
+    // is the canonical store; Books and Year-End both read from it via the
+    // shared _opExSums helper. Repairs/Maintenance + Platform Fees come from
+    // sc_maintenance + weekly platform_fees instead to avoid double-counting.
+    const opexCategories = [
+      'Occupancy (Rent, Property Tax)',
+      'Utilities',
+      'Insurance',
+      'Marketing and Advertising',
+      'Professional Fees',
+      'Bank and Credit Card Fees',
+      'Licenses and Permits',
+      'Software and Subscriptions',
+      'Other'
+    ];
+    const opex = {};
+    opexCategories.forEach(c => { opex[c] = 0; });
     for (let m = 1; m <= 12; m++) {
       const monthKey = year + '-' + String(m).padStart(2, '0');
       const M = S.HubBooks._aggregateMonth(monthKey);
-      months.push({ key: monthKey, monthNum: m, ...M });
+      const monthOpex = S.HubBooks._opExSums(monthKey, false);
+      months.push({ key: monthKey, monthNum: m, ...M, opex: monthOpex });
       agg.barRev        += M.barRev;
       agg.foodRev       += M.foodRev;
       agg.cateringRev   += M.cateringRev   || 0;
@@ -197,8 +215,9 @@ S.HubYearEnd = {
       agg.comps         += M.comps         || 0;
       agg.maintenance   += M.maintenance   || 0;
       agg.platformFees  += M.platformFees  || 0;
+      opexCategories.forEach(c => { opex[c] += monthOpex[c] || 0; });
     }
-    return { months, ...agg };
+    return { months, ...agg, opex };
   },
 
   // ── Shared sheet helpers (borrow from HubBooks for styling cohesion) ───────
@@ -275,13 +294,31 @@ S.HubYearEnd = {
     row('Prime Cost (COGS + Labor)', Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor);
     rows.push(blank());
 
-    rows.push(['Other Operating Costs', '', '', '']);
-    row('  3rd-Party Platform Fees', Y.platformFees, P.platformFees);
+    // Operating Expenses — from the Operating Expenses log + Shift Control
+    // maintenance + weekly platform fees. Books and Year-End share the same
+    // category enum so the numbers tie back across both deliverables.
+    const totalOpExY = Object.values(Y.opex || {}).reduce((s, v) => s + (v || 0), 0)
+                      + (Y.maintenance || 0) + (Y.platformFees || 0);
+    const totalOpExP = Object.values(P.opex || {}).reduce((s, v) => s + (v || 0), 0)
+                      + (P.maintenance || 0) + (P.platformFees || 0);
+    rows.push(['Operating Expenses', '', '', '']);
+    row('  Occupancy (rent, property tax)',           (Y.opex?.['Occupancy (Rent, Property Tax)'] || 0), (P.opex?.['Occupancy (Rent, Property Tax)'] || 0));
+    row('  Utilities',                                (Y.opex?.['Utilities']                      || 0), (P.opex?.['Utilities']                      || 0));
+    row('  Insurance',                                (Y.opex?.['Insurance']                      || 0), (P.opex?.['Insurance']                      || 0));
+    row('  Marketing and advertising',                (Y.opex?.['Marketing and Advertising']      || 0), (P.opex?.['Marketing and Advertising']      || 0));
+    row('  Repairs and maintenance',                  Y.maintenance,                                    P.maintenance);
+    row('  3rd-party platform fees',                  Y.platformFees,                                   P.platformFees);
+    row('  Professional fees',                        (Y.opex?.['Professional Fees']              || 0), (P.opex?.['Professional Fees']              || 0));
+    row('  Bank and credit card fees',                (Y.opex?.['Bank and Credit Card Fees']      || 0), (P.opex?.['Bank and Credit Card Fees']      || 0));
+    row('  Licenses and permits',                     (Y.opex?.['Licenses and Permits']           || 0), (P.opex?.['Licenses and Permits']           || 0));
+    row('  Software and subscriptions',               (Y.opex?.['Software and Subscriptions']     || 0), (P.opex?.['Software and Subscriptions']     || 0));
+    row('  Other operating expenses',                 (Y.opex?.['Other']                          || 0), (P.opex?.['Other']                          || 0));
+    row('Total Operating Expenses', totalOpExY, totalOpExP);
     rows.push(blank());
 
-    row('Operating Margin (Net Revenue - Prime - Platform Fees)',
-        (Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor) - (Y.platformFees || 0),
-        (P.totalRev - (P.comps || 0)) - (P.totalCogs + P.totalLabor) - (P.platformFees || 0));
+    row('Operating Income (Net Revenue - COGS - Labor - OpEx)',
+        (Y.totalRev - (Y.comps || 0)) - Y.totalCogs - Y.totalLabor - totalOpExY,
+        (P.totalRev - (P.comps || 0)) - P.totalCogs - P.totalLabor - totalOpExP);
     rows.push(blank());
 
     // Percentages
@@ -389,8 +426,29 @@ S.HubYearEnd = {
     seriesRow('Prime Cost (COGS + Labor)', M => M.totalCogs + M.totalLabor);
     rows.push(blank());
 
-    rows.push(['Other Operating Costs', ...Array(13).fill('')]);
-    seriesRow('  3rd-Party Platform Fees', M => M.platformFees || 0);
+    rows.push(['Operating Expenses', ...Array(13).fill('')]);
+    seriesRow('  Occupancy (rent, property tax)',   M => M.opex?.['Occupancy (Rent, Property Tax)'] || 0);
+    seriesRow('  Utilities',                        M => M.opex?.['Utilities']                      || 0);
+    seriesRow('  Insurance',                        M => M.opex?.['Insurance']                      || 0);
+    seriesRow('  Marketing and advertising',        M => M.opex?.['Marketing and Advertising']      || 0);
+    seriesRow('  Repairs and maintenance',          M => M.maintenance || 0);
+    seriesRow('  3rd-party platform fees',          M => M.platformFees || 0);
+    seriesRow('  Professional fees',                M => M.opex?.['Professional Fees']              || 0);
+    seriesRow('  Bank and credit card fees',        M => M.opex?.['Bank and Credit Card Fees']      || 0);
+    seriesRow('  Licenses and permits',             M => M.opex?.['Licenses and Permits']           || 0);
+    seriesRow('  Software and subscriptions',       M => M.opex?.['Software and Subscriptions']     || 0);
+    seriesRow('  Other operating expenses',         M => M.opex?.['Other']                          || 0);
+    seriesRow('Total Operating Expenses', M => {
+      const opexSum = Object.values(M.opex || {}).reduce((s, v) => s + (v || 0), 0);
+      return opexSum + (M.maintenance || 0) + (M.platformFees || 0);
+    });
+    rows.push(blank());
+
+    seriesRow('Operating Income', M => {
+      const opexSum = Object.values(M.opex || {}).reduce((s, v) => s + (v || 0), 0);
+      const totalOpEx = opexSum + (M.maintenance || 0) + (M.platformFees || 0);
+      return (M.totalRev - (M.comps || 0)) - M.totalCogs - M.totalLabor - totalOpEx;
+    });
     rows.push(blank());
 
     rows.push(['Key Cost Ratios', ...Array(13).fill('')]);
