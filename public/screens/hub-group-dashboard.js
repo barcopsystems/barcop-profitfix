@@ -4,30 +4,46 @@
    Roll-up view across every bar the operator belongs to. One row per bar,
    headline metrics in columns, color-coded against target the same way the
    single-bar Hub Dashboard tiles are. Click a row to switch active account
-   and enter that bar's Hub. Phase 2 Item 27b. */
+   and enter that bar's Hub.
+
+   Modal overlay (not full-page). Group Dashboard is a quick cross-context
+   comparison tool, not a workspace, so it pops over the current screen and
+   closes cleanly back to wherever the operator was. Triggered from the
+   "Group Dashboard" topbar button that mounts next to the location switcher
+   (multi-location operators only). See [[hub-fullpage-pattern]] for why
+   this is the exception to the full-page Hub-screen pattern. */
 
 S.HubGroupDashboard = {
 
-  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "GROUP DASHBOARD | Back to Dashboard".
   async open() {
-    App.openHubFullPage('Group Dashboard', (mount) => {
-      mount.innerHTML = this.renderLoading();
-      if (App.setHubTopbarActions) App.setHubTopbarActions('');
-      this._renderAsync(mount);
+    App.openHubOverlay((panel) => {
+      // Widen the modal panel beyond its default 920px so the 7-column
+      // comparison table reads cleanly without horizontal scroll.
+      panel.style.maxWidth = '1100px';
+      panel.innerHTML = this.renderLoading();
+      document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
+      this._renderAsync(panel);
     });
   },
 
+  _header() {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--b2);margin-bottom:18px;">'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">Group Dashboard</div>'
+      +   '<button id="gd-close" type="button" aria-label="Close" style="background:none;border:none;color:var(--t2);font-size:26px;line-height:1;cursor:pointer;padding:0 4px;font-weight:300;">&times;</button>'
+      + '</div>';
+  },
+
   renderLoading() {
-    return '<div class="screen">'
+    return '<div style="padding:0 24px 32px;">'
+      + this._header()
       + '<div style="font-size:13px;color:var(--t3);padding:24px 0;">Loading bars...</div>'
       + '</div>';
   },
 
-  async _renderAsync(mount) {
+  async _renderAsync(panel) {
     const accounts = await DB.listMyAccounts();
     const dataByAccount = await this._fetchAccountData(accounts);
-    this._render(mount, accounts, dataByAccount);
+    this._render(panel, accounts, dataByAccount);
   },
 
   async _fetchAccountData(accounts) {
@@ -49,7 +65,7 @@ S.HubGroupDashboard = {
   },
 
   // Extract the headline numbers from one account's user_data blob.
-  // All values may be null if the bar hasn't logged a week yet.
+  // All values may be null if the bar has not logged a week yet.
   _metrics(accountData) {
     const d = accountData || {};
     const s = d.settings || {};
@@ -100,24 +116,28 @@ S.HubGroupDashboard = {
       : 'var(--t3)';
   },
 
-  _fmtPct(v) { return v == null ? '—' : v.toFixed(1) + '%'; },
-  _fmtCur(v) { return v == null ? '—' : App.fmtCurrency(v); },
-  _fmtRating(v) { return v == null ? '—' : v.toFixed(1) + ' ★'; },
+  _fmtPct(v) { return v == null ? '--' : v.toFixed(1) + '%'; },
+  _fmtCur(v) { return v == null ? '--' : App.fmtCurrency(v); },
+  _fmtRating(v) { return v == null ? '--' : v.toFixed(1) + ' ★'; },
 
-  _render(mount, accounts, dataByAccount) {
+  _render(panel, accounts, dataByAccount) {
     if (!accounts || accounts.length === 0) {
-      mount.innerHTML = '<div class="screen">'
+      panel.innerHTML = '<div style="padding:0 24px 32px;">'
+        + this._header()
         + '<div style="font-size:13px;color:var(--t3);padding:24px 0;">No bars found on your account.</div>'
         + '</div>';
+      document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
       return;
     }
     if (accounts.length === 1) {
-      mount.innerHTML = '<div class="screen">'
-        + '<div class="card">'
+      panel.innerHTML = '<div style="padding:0 24px 32px;">'
+        + this._header()
+        + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;font-size:13px;color:var(--t2);line-height:1.7;">'
         +   '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">One bar on this account</div>'
-        +   '<div style="font-size:13px;color:var(--t2);line-height:1.7;">The Group Dashboard rolls up headline numbers across multiple bars. You currently have one. Add a second bar from User Accounts to start using this view.</div>'
+        +   'The Group Dashboard rolls up headline numbers across multiple bars. You currently have one. Add a second bar from User Accounts to start using this view.'
         + '</div>'
         + '</div>';
+      document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
       return;
     }
 
@@ -153,7 +173,8 @@ S.HubGroupDashboard = {
         + '</tr>';
     }).join('');
 
-    mount.innerHTML = '<div class="screen">'
+    panel.innerHTML = '<div style="padding:0 24px 32px;">'
+      + this._header()
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">'
       +   'Headline numbers across every bar on your account. Click a row to switch to that bar and open its Hub Dashboard.'
       + '</div>'
@@ -165,13 +186,14 @@ S.HubGroupDashboard = {
       + '</div>'
       + '</div>';
 
-    mount.querySelectorAll('.gd-row').forEach(row => {
+    document.getElementById('gd-close')?.addEventListener('click', () => App.closeHubOverlay());
+    panel.querySelectorAll('.gd-row').forEach(row => {
       row.addEventListener('mouseenter', () => { row.style.background = 'rgba(255,255,255,0.03)'; });
       row.addEventListener('mouseleave', () => { row.style.background = ''; });
       row.addEventListener('click', () => {
         const aid = row.dataset.account;
         if (!aid) return;
-        // Switch active account → page reloads → lands on that bar's Hub
+        // Switch active account, page reloads, operator lands on that bar's Hub.
         DB.setActiveAccount(aid);
       });
     });
