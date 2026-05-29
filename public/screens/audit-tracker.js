@@ -1,1473 +1,1077 @@
 'use strict';
-const express  = require('express');
-const path     = require('path');
-const https    = require('https');
-const http     = require('http');
-const fs       = require('fs');
-const { execSync } = require('child_process');
-const multiparty = require('multiparty');
-let XLSX;
-try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
-const { computeProfitAudit } = require('./audit-compute');
+S.AuditTracker = {
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+  render(container, actions) {
+    this.container = container;
+    this.actions   = actions;
+    actions.innerHTML = '';
+    this.renderMain();
+  },
 
-// Skip JSON parsing for the Stripe webhook route — it needs the raw body for signature verification
-app.use((req, res, next) => {
-  if (req.path === '/api/stripe-webhook') return next();
-  express.json({ limit: '50mb' })(req, res, next);
-});
+  renderMain() {
+    this.actions.innerHTML = '';
+    const audits       = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    const latest       = audits[0] || null;
+    // 30-day rolling: next audit is available 30 days after the last one
+    // ran, independent of the calendar month. First audit is always available.
+    const daysSince    = latest && latest.date
+      ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000)
+      : Infinity;
+    const canRunAudit  = daysSince >= 30;
+    const daysLeft     = canRunAudit ? 0 : 30 - daysSince;
 
-// No-cache headers for JS/CSS
-app.use((req, res, next) => {
-  if (req.url.match(/\.(js|css)(\?.*)?$/)) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
-  next();
-});
+    const requestCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div style="flex:1;min-width:200px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Profit Audit</div>'
+      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One profit audit every 30 days. Upload your POS reports and data files. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
+      + '</div>'
+      + (canRunAudit
+          ? '<button class="btn btn-primary" id="at-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>'
+          : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' day' + (daysLeft===1?'':'s') + '</div>'
+            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit</div></div>')
+      + '</div></div>';
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+    let latestCard = '';
+    if (latest) {
+      const prev = audits[1] || null;
+      const scoreColor = App.scoreColor(latest.overall_score);
+      const scoreLabel = App.scoreLabel(latest.overall_score);
 
-// ── Claude API proxy ──────────────────────────────────────────────────────────
-app.post('/api/claude', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const body = JSON.stringify(req.body);
-  const options = {
-    hostname: 'api.anthropic.com',
-    path:     '/v1/messages',
-    method:   'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Length':    Buffer.byteLength(body)
-    }
-  };
-
-  const proxyReq = https.request(options, proxyRes => {
-    res.status(proxyRes.statusCode);
-    proxyRes.pipe(res);
-  });
-  proxyReq.on('error', err => {
-    console.error('Claude proxy error:', err);
-    res.status(502).json({ error: 'Proxy request failed' });
-  });
-  proxyReq.write(body);
-  proxyReq.end();
-});
-
-// ── Profit audit — JSON only, no PDF ──────────────────────────────────────────
-app.post('/api/generate-profit-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const appDataStr = fields.appData?.[0] || '{}';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-    let practices = {};
-    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
+      let progressBanner = '';
+      if (prev) {
+        const diff = (latest.overall_score||0) - (prev.overall_score||0);
+        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</div>'
+          + '<div style="font-size:12px;color:var(--t2);">' + prev.overall_score + ' to ' + latest.overall_score + '</div>'
+          + '</div>';
       }
+
+      const sections = latest.sections || {};
+      const sectionRows = Object.entries(sections).map(([name, score]) => {
+        const ps   = prev?.sections?.[name];
+        const diff = ps != null ? score - ps : null;
+        const bar  = Math.min(100, Math.max(0, score));
+        return '<tr>'
+          + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
+          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+bar+'%;background:'+App.scoreColor(score)+';border-radius:3px;"></div></div></td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:'+App.scoreColor(score)+';padding:8px 12px;">' + score + '</td>'
+          + (diff != null ? '<td style="font-size:12px;color:'+(diff>=0?'var(--gold)':'var(--red)')+';padding:8px 12px;">'+(diff>=0?'+':'')+diff+'</td>' : '<td></td>')
+          + '</tr>';
+      }).join('');
+
+      // Top Action Items by Impact lives on the full audit view (where the
+      // Fix This buttons route into the Fix Process). Keeping it off the
+      // preview card makes the preview a faster score-only scan and gives the
+      // operator a reason to click through.
+      latestCard = '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
+        + '<div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Profit Audit</div>'
+        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
+        + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
+        + '</div>'
+        + '</div>'
+        + progressBanner
+        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
+          + '<thead><tr>'
+          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
+          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
+          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
+          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
+          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
+        + '</div>';
     }
 
-    let controlData = null;
-    try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
-
-    try {
-      const auditData = await generateProfitAudit(apiKey, uploadedFiles, appData, practices, controlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Profit audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
-    }
-  });
-});
-
-/* ── Profit audit — honest pipeline (2026-05-29 rebuild) ───────────────────────
-   1. EXTRACTION (only if files uploaded): the model reads uploads and returns a
-      small JSON of raw observed input metrics — no scores, no gaps, no prose.
-   2. COMPUTE: code (computeProfitAudit) calculates every score and dollar figure
-      from intake + Control data + extracted inputs. This is the source of truth.
-   3. NARRATIVE: the model is GIVEN the computed numbers and writes only the
-      operator-voice prose, echoing the numbers, never recomputing.
-   4. MERGE: computed numbers overwrite anything the model returned, so code's
-      figures are always authoritative. See memory: audit-honesty-rebuild. */
-async function generateProfitAudit(apiKey, files, appData, practices, controlData) {
-  const extracted = await extractProfitInputs(apiKey, files);
-  // Operator-stated practices are authoritative over anything the model read
-  // from a file — the operator knows whether they jigger or count inventory.
-  Object.assign(extracted, practices || {});
-  const numbers = computeProfitAudit(appData, controlData, extracted);
-  // Stamp identifiers code owns (not the model).
-  numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateProfitNarrative(apiKey, numbers);
-  // Computed numbers win over anything the model echoed back.
-  return Object.assign({}, prose, numbers);
-}
-
-/* Extraction pass — returns observed input metrics from uploaded files only.
-   Returns {} when no files (the common case: data already in app/Control). */
-async function extractProfitInputs(apiKey, files) {
-  const fileContent = buildFileContent(files);
-  if (fileContent.length === 0) return {};
-  const instruction = `You are reading uploaded operator documents (a P&L or sales summary, a voids/comps/cash report, invoices, a recipe costing sheet, inventory counts) for a bar and restaurant profit audit. Extract ONLY the raw values you can actually see in the documents. Report dollar amounts as plain numbers and percentages as plain numbers (e.g. 27.4 not "27.4%"). Do NOT calculate ratios or scores yourself — if a report shows revenue and COGS dollars but not a cost %, return the dollars and leave the % null; the system computes the ratio. Respond with a single JSON object, no other text. Use null for anything not present. Fields:
-{"audit_period":[the month or date range the data covers, e.g. "April 2026", or null],"bar_revenue_monthly":[total bar/beverage revenue for the period or null],"food_revenue_monthly":[total food revenue for the period or null],"bar_cogs_monthly":[bar/beverage cost of goods in dollars or null],"food_cogs_monthly":[food cost of goods in dollars or null],"bar_cost_pct":[only if the report states it directly, else null],"food_cost_pct":[only if stated directly, else null],"labor_cost_monthly":[total labor cost for the period or null],"pour_method":["Free pour" / "Jiggered" / "Measured" or null],"inv_variance_pct":[number or null],"void_comp_pct":[voids+comps as % of sales if stated, else null],"voids_total":[voids+comps dollars if shown, else null],"voids_no_approval_pct":[number or null],"void_approval":[true if a manager-approval policy is evidenced, else null],"cash_recon_count":[number of drawer reconciliations shown or null],"cash_short_count":[number of shifts that came up short or null],"food_var_pct":[number or null],"inv_freq":["Weekly" / "Monthly" / "Never" or null],"waste_log":["Yes" or null],"bev_invoice_count":[integer or null],"food_invoice_count":[integer or null],"invoice_vs_po":["Matched every delivery" / "Spot checked" / "Never matched" or null],"backup_vendors":[text or null],"recipe_count":[number of costed recipes shown or null],"rplh_tracked":["Yes" or null]}`;
-  const content = fileContent.concat([{ type: 'text', text: instruction }]);
-  try {
-    return await callClaudeForJSON(apiKey, content, 1500);
-  } catch (e) {
-    console.warn('[audit] profit extraction failed, proceeding with app/Control data only:', e.message);
-    return {};
-  }
-}
-
-/* Narrative pass — the model writes prose around the code-computed numbers. */
-async function generateProfitNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a profit audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Write in plain operator voice. No emdashes (use a period or comma). Avoid the words "leverage", "compounds", "robust", "seamless". Respond with a single JSON object, no other text, with exactly these prose fields (reference the given numbers verbatim where relevant):
-{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
-
-COMPUTED NUMBERS (final):
-${JSON.stringify(d, null, 1)}`;
-  try {
-    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
-  } catch (e) {
-    console.warn('[audit] profit narrative failed, returning numbers without prose:', e.message);
-    return {};
-  }
-}
-
-/* Build Claude content blocks from uploaded files (PDF/image inline, sheets as text). */
-function buildFileContent(files) {
-  const content = [];
-  const sheetTexts = [];
-  for (const f of (files || [])) {
-    const ext = path.extname(f.name).toLowerCase();
-    if (ext === '.pdf') {
-      content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fs.readFileSync(f.path).toString('base64') } });
-    } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
-      const mt = ext === '.png' ? 'image/png' : 'image/jpeg';
-      content.push({ type: 'image', source: { type: 'base64', media_type: mt, data: fs.readFileSync(f.path).toString('base64') } });
-    } else if (['.xlsx', '.xls', '.csv', '.doc', '.docx'].includes(ext)) {
-      const text = parseSpreadsheetToText(f.path, f.name);
-      if (text) sheetTexts.push(text);
-    }
-  }
-  if (sheetTexts.length) content.unshift({ type: 'text', text: 'SUBMITTED DATA FILES:\n\n' + sheetTexts.join('\n\n---\n\n') });
-  return content;
-}
-
-/* Call Claude with content blocks, parse a single JSON object from the reply. */
-async function callClaudeForJSON(apiKey, content, maxTokens) {
-  const body = JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens || 4000, messages: [{ role: 'user', content }] });
-  const responseData = await callClaude(apiKey, body);
-  const rawText = responseData.content?.[0]?.text || '';
-  const first = rawText.indexOf('{'), last = rawText.lastIndexOf('}');
-  if (first === -1 || last === -1) throw new Error('No JSON object in response: ' + rawText.slice(0, 200));
-  return JSON.parse(rawText.slice(first, last + 1));
-}
-
-// ── Traffic audit — JSON only, no PDF ─────────────────────────────────────────
-app.post('/api/generate-traffic-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const appDataStr = fields.appData?.[0] || '{}';
-    const notes      = fields.notes?.[0]   || '';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-
-    // Operator's saved URLs from traffic_settings.urls. Server fetches public
-    // data from these (PageSpeed Insights for website, HTML for GBP) so the
-    // audit does not require screenshots for sections we can read live.
-    let urls = null;
-    try { urls = JSON.parse(fields.urls?.[0] || 'null'); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-      }
+    let historyCard = '';
+    if (audits.length > 1) {
+      const rows = audits.map((a,i) => {
+        const p    = audits[i+1];
+        const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
+        const tier = a.grade || '';
+        const tierBadge = tier
+          ? '<span style="background:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'var(--gold)':tier.includes('2')||tier.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;">' + esc(tier) + '</span>'
+          : '';
+        return '<tr>'
+          + '<td>' + (a.date||'').slice(0,10) + '</td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score||0) + ';">' + (a.overall_score||0) + '</td>'
+          + (diff != null ? '<td style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</td>' : '<td></td>')
+          + '<td>' + tierBadge + '</td>'
+          + '<td><button class="btn btn-ghost btn-sm at-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
+          + '</tr>';
+      }).join('');
+      historyCard = '<div class="card">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
+        + '</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>'
+        + '</div>';
     }
 
-    try {
-      const urlData = await fetchTrafficUrlData(urls);
-      const auditData = await extractAuditData(apiKey, 'traffic', uploadedFiles, appData, notes, null, urlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Traffic audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
-    }
-  });
-});
+    const emptyState = !latest
+      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
+        + '<div class="empty-sub">Generate your first Profit Audit above. Upload your POS reports and the scored audit appears once the analysis finishes.</div></div>'
+      : '';
 
-// ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
-app.post('/api/generate-revenue-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
 
-    const appDataStr = fields.appData?.[0] || '{}';
-    const notes      = fields.notes?.[0]   || '';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-      }
+    // Score History Chart (2+ audits)
+    let scoreChart = '';
+    if (audits.length >= 2) {
+      scoreChart = this.renderScoreChart(audits, 'at');
     }
 
-    let controlData = null;
-    try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
-
-    try {
-      const auditData = await extractAuditData(apiKey, 'revenue', uploadedFiles, appData, notes, controlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Revenue audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
+    // Score Comparison (2 audits)
+    let comparison = '';
+    if (audits.length >= 2) {
+      comparison = this.renderComparison(audits[0], audits[1]);
     }
-  });
-});
 
-// ── Fetch public URL data for the Traffic Audit ───────────────────────────────
-// Pulls live data from the operator's saved URLs in traffic_settings.urls so
-// the audit can score what is publicly visible without requiring a screenshot.
-//
-// Two sources currently:
-//   1) Website  — calls Google PageSpeed Insights API (free, sanctioned). Returns
-//                 performance, accessibility, SEO, and best-practices scores.
-//                 Requires PAGESPEED_API_KEY env var to be set. If missing or the
-//                 call fails, returns null and the audit falls back to operator
-//                 screenshot uploads.
-//   2) GBP      — plain HTML fetch of the operator's Google Business Profile URL.
-//                 Returns the rendered listing HTML which Claude can read for
-//                 rating, review count, photo count, hours, categories, recent
-//                 reviews. No API key needed. Best-effort — some GBP URLs may be
-//                 blocked or rate-limited.
-//
-// Both fetches have short timeouts and fail-safe: any error returns null and
-// the rest of the audit continues normally.
-async function fetchTrafficUrlData(urls) {
-  if (!urls || typeof urls !== 'object') return null;
-  const out = { website: null, gbp: null };
-
-  // PageSpeed Insights for the operator's website (mobile strategy)
-  const psKey = process.env.PAGESPEED_API_KEY;
-  if (urls.website && psKey) {
-    try {
-      const target = encodeURIComponent(urls.website);
-      const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed'
-        + '?url=' + target
-        + '&strategy=mobile'
-        + '&category=performance&category=accessibility&category=seo&category=best-practices'
-        + '&key=' + psKey;
-      const ctrl = new AbortController();
-      const tmo = setTimeout(() => ctrl.abort(), 30000);
-      const r = await fetch(apiUrl, { signal: ctrl.signal });
-      clearTimeout(tmo);
-      if (r.ok) {
-        const data = await r.json();
-        const lh = data.lighthouseResult || {};
-        const cats = lh.categories || {};
-        const audits = lh.audits || {};
-        const pct = (id) => cats[id] && typeof cats[id].score === 'number' ? Math.round(cats[id].score * 100) : null;
-        const ms  = (id) => audits[id] && audits[id].numericValue != null ? Math.round(audits[id].numericValue) : null;
-        out.website = {
-          url: urls.website,
-          performance:    pct('performance'),
-          accessibility:  pct('accessibility'),
-          seo:            pct('seo'),
-          bestPractices:  pct('best-practices'),
-          firstContentfulPaintMs: ms('first-contentful-paint'),
-          largestContentfulPaintMs: ms('largest-contentful-paint'),
-          totalBlockingTimeMs: ms('total-blocking-time'),
-          cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue ?? null,
-          speedIndexMs:  ms('speed-index'),
-          fetchedAt: new Date().toISOString()
-        };
-      }
-    } catch (e) {
-      console.warn('[audit] PageSpeed Insights fetch failed:', e.message);
+    // Section Trend sparklines (3+ audits)
+    let sparklines = '';
+    if (audits.length >= 3) {
+      sparklines = this.renderSparklines(audits);
     }
-  }
 
-  // Public Google Business Profile HTML fetch
-  if (urls.gbp) {
-    try {
-      const ctrl = new AbortController();
-      const tmo = setTimeout(() => ctrl.abort(), 20000);
-      const r = await fetch(urls.gbp, {
-        signal: ctrl.signal,
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
-      clearTimeout(tmo);
-      if (r.ok) {
-        const html = await r.text();
-        // Cap to 80KB to keep prompt cost sane. Most GBP HTML well under this.
-        out.gbp = { url: urls.gbp, html: html.slice(0, 80000), fetchedAt: new Date().toISOString() };
-      }
-    } catch (e) {
-      console.warn('[audit] GBP HTML fetch failed:', e.message);
-    }
-  }
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + historyCard + '</div>';
 
-  return (out.website || out.gbp) ? out : null;
-}
-
-function formatTrafficUrlDataForPrompt(urlData) {
-  if (!urlData) return '';
-  const lines = ['FETCHED LIVE URL DATA — Use this as primary input for the sections it covers:'];
-  if (urlData.website) {
-    const w = urlData.website;
-    lines.push('');
-    lines.push('WEBSITE (Google PageSpeed Insights, mobile): ' + w.url);
-    lines.push('  Performance score: '   + (w.performance   != null ? w.performance + '/100'   : 'unavailable'));
-    lines.push('  Accessibility:     '   + (w.accessibility != null ? w.accessibility + '/100' : 'unavailable'));
-    lines.push('  SEO:               '   + (w.seo           != null ? w.seo + '/100'           : 'unavailable'));
-    lines.push('  Best Practices:    '   + (w.bestPractices != null ? w.bestPractices + '/100' : 'unavailable'));
-    if (w.firstContentfulPaintMs   != null) lines.push('  First Contentful Paint: '   + w.firstContentfulPaintMs   + ' ms');
-    if (w.largestContentfulPaintMs != null) lines.push('  Largest Contentful Paint: ' + w.largestContentfulPaintMs + ' ms');
-    if (w.totalBlockingTimeMs      != null) lines.push('  Total Blocking Time: '      + w.totalBlockingTimeMs      + ' ms');
-    if (w.cumulativeLayoutShift    != null) lines.push('  Cumulative Layout Shift: '  + w.cumulativeLayoutShift.toFixed(3));
-    if (w.speedIndexMs             != null) lines.push('  Speed Index: '              + w.speedIndexMs             + ' ms');
-  }
-  if (urlData.gbp) {
-    lines.push('');
-    lines.push('GOOGLE BUSINESS PROFILE (public page HTML): ' + urlData.gbp.url);
-    lines.push('--- BEGIN GBP HTML ---');
-    lines.push(urlData.gbp.html);
-    lines.push('--- END GBP HTML ---');
-  }
-  return lines.join('\n');
-}
-
-// ── Parse spreadsheet/CSV file into readable text for Claude ──────────────────
-function parseSpreadsheetToText(filePath, fileName) {
-  const ext = path.extname(fileName).toLowerCase();
-  try {
-    if (ext === '.csv') {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const lines = raw.trim().split('\n').slice(0, 200);
-      return `FILE: ${fileName}\n${lines.join('\n')}`;
-    }
-    if (['.xlsx', '.xls'].includes(ext)) {
-      if (!XLSX) return `FILE: ${fileName}\n[Excel parser not available — install xlsx package]`;
-      const wb    = XLSX.readFile(filePath);
-      const parts = [];
-      for (const sheetName of wb.SheetNames.slice(0, 5)) {
-        const ws   = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
-        const lines = rows.trim().split('\n').slice(0, 200);
-        if (lines.length > 1) {
-          parts.push(`FILE: ${fileName} | SHEET: ${sheetName}\n${lines.join('\n')}`);
-        }
-      }
-      return parts.join('\n\n') || `FILE: ${fileName}\n[Empty spreadsheet]`;
-    }
-    if (ext === '.docx' || ext === '.doc') {
-      return `FILE: ${fileName}\n[Word document submitted — operator should convert to PDF for best results]`;
-    }
-  } catch(e) {
-    return `FILE: ${fileName}\n[Parse error: ${e.message}]`;
-  }
-  return null;
-}
-
-// ── Extract audit data from uploaded files ────────────────────────────────────
-async function extractAuditData(apiKey, auditType, files, appData, notes='', controlData=null, urlData=null) {
-  const prompts = {
-    profit:  getExtractionPrompt_Profit(appData, controlData),
-    revenue: getExtractionPrompt_Revenue(appData, controlData),
-    traffic: getExtractionPrompt_Traffic(appData, urlData),
-  };
-
-  const prompt = prompts[auditType] || prompts.profit;
-
-  const content = [];
-  const spreadsheetTexts = [];
-
-  for (const f of files) {
-    const ext = path.extname(f.name).toLowerCase();
-
-    if (ext === '.pdf') {
-      const b64 = fs.readFileSync(f.path).toString('base64');
-      content.push({
-        type: 'document',
-        source: { type: 'base64', media_type: 'application/pdf', data: b64 }
-      });
-    } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
-      const mt  = ext === '.png' ? 'image/png' : 'image/jpeg';
-      const b64 = fs.readFileSync(f.path).toString('base64');
-      content.push({
-        type: 'image',
-        source: { type: 'base64', media_type: mt, data: b64 }
-      });
-    } else if (['.xlsx', '.xls', '.csv', '.doc', '.docx'].includes(ext)) {
-      const text = parseSpreadsheetToText(f.path, f.name);
-      if (text) spreadsheetTexts.push(text);
-    }
-  }
-
-  if (spreadsheetTexts.length > 0) {
-    content.push({
-      type: 'text',
-      text: 'SUBMITTED DATA FILES — Read all data carefully and use it to score each section:\n\n'
-        + spreadsheetTexts.join('\n\n---\n\n')
+    document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
+    this.container.querySelectorAll('.at-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
-  }
+  },
 
-  const fullPrompt = notes
-    ? prompt + '\n\nOPERATOR NOTES (read carefully — these may affect how you interpret the data):\n' + notes
-    : prompt;
-  content.push({ type: 'text', text: fullPrompt });
+  renderScoreChart(audits, prefix) {
+    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
+    const W=700, H=180, PAD={t:24,r:20,b:36,l:40};
+    const cw = W-PAD.l-PAD.r, ch = H-PAD.t-PAD.b;
+    const scores = sorted.map(a => a.overall_score||0);
+    const minY = Math.max(0, Math.min(...scores) - 10);
+    const maxY = Math.min(100, Math.max(...scores) + 10);
+    const xs = i => PAD.l + (sorted.length > 1 ? (i/(sorted.length-1))*cw : cw/2);
+    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
 
-  const body = JSON.stringify({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
-    messages: [{ role: 'user', content }]
-  });
+    const smoothPath = pts => {
+      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
+      if (valid.length < 2) return valid.length===1 ? `M${valid[0].x},${valid[0].y}` : '';
+      let d = `M${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
+      for (let i=1; i<valid.length; i++) {
+        const cp = (valid[i].x - valid[i-1].x) * 0.35;
+        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
+      }
+      return d;
+    };
+    const areaPath = pts => {
+      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
+      if (valid.length < 2) return '';
+      let d = `M${valid[0].x.toFixed(1)},${ys(minY).toFixed(1)} L${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
+      for (let i=1; i<valid.length; i++) {
+        const cp = (valid[i].x - valid[i-1].x) * 0.35;
+        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
+      }
+      d += ` L${valid[valid.length-1].x.toFixed(1)},${ys(minY).toFixed(1)} Z`;
+      return d;
+    };
 
-  const responseData = await callClaude(apiKey, body);
-  const rawText = responseData.content?.[0]?.text || '';
+    const ticks = [minY, Math.round((minY+maxY)/2), maxY].filter((v,i,a) => a.indexOf(v)===i);
+    const uid = prefix + 'sc' + Math.random().toString(36).slice(2,6);
+    const linePath  = smoothPath(scores);
+    const fillPath  = areaPath(scores);
+    const xLabels   = sorted.map((a,i) =>
+      `<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${(a.date||'').slice(0,7)}</text>`
+    ).join('');
+    const dots = sorted.map((a,i) => {
+      const v = a.overall_score||0;
+      const col = App.scoreHex(v);
+      return `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="5" fill="#0A1520" stroke="${col}" stroke-width="2.5"/>
+        <text x="${xs(i).toFixed(1)}" y="${(ys(v)-10).toFixed(1)}" text-anchor="middle" fill="${col}" font-family="'Barlow Condensed',sans-serif" font-size="13" font-weight="700">${v}</text>`;
+    }).join('');
 
-  console.log('[audit] raw length:', rawText.length, '| first 300:', rawText.slice(0, 300));
+    return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Profit Score History</div>'
+      + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">`
+      + `<defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>`
+      + ticks.map(v => `<line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${PAD.l-6}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${Math.round(v)}</text>`).join('')
+      + (fillPath ? `<path d="${fillPath}" fill="url(#${uid})"/>` : '')
+      + (linePath ? `<path d="${linePath}" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')
+      + dots + xLabels
+      + '</svg></div>';
+  },
 
-  // Extract JSON robustly — find first { and last }
-  const firstBrace = rawText.indexOf('{');
-  const lastBrace  = rawText.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1) {
-    console.error('[audit] no JSON braces found. raw:', rawText.slice(0, 500));
-    throw new Error('Audit response contained no JSON object. Response: ' + rawText.slice(0, 300));
-  }
-  const clean = rawText.slice(firstBrace, lastBrace + 1);
+  renderComparison(curr, prev) {
+    const cs = curr.sections || {};
+    const ps = prev.sections || {};
+    const allNames = [...new Set([...Object.keys(cs), ...Object.keys(ps)])];
+    const rows = allNames.map(name => {
+      const cv = cs[name] ?? null;
+      const pv = ps[name] ?? null;
+      const diff = (cv != null && pv != null) ? cv - pv : null;
+      const arrow = diff == null ? '' : diff > 0
+        ? '<span style="color:var(--gold);font-weight:700;">&#9650; +' + diff + '</span>'
+        : diff < 0
+        ? '<span style="color:var(--red);font-weight:700;">&#9660; ' + diff + '</span>'
+        : '<span style="color:var(--t3);">&#8212;</span>';
+      const col = (v) => v==null?'':App.scoreColor(v);
+      return '<tr>'
+        + '<td style="padding:9px 12px;font-size:12px;color:var(--t2);">' + esc(name) + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(pv) + ';">' + (pv??'--') + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(cv) + ';">' + (cv??'--') + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-size:13px;">' + arrow + '</td>'
+        + '</tr>';
+    }).join('');
+    const overallDiff = (curr.overall_score||0) - (prev.overall_score||0);
+    return '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
+      + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
+      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(prev.overall_score||0) + ';">' + (prev.overall_score||0) + '</div></div>'
+      + '<div style="display:flex;align-items:center;padding:0 8px;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + (overallDiff>=0?'var(--gold)':'var(--red)') + ';">' + (overallDiff>=0?'+':'') + overallDiff + ' pts</div></div>'
+      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((curr.date||'').slice(0,7)) + (curr.grade?' &nbsp;&middot;&nbsp;' + esc(curr.grade):'') + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(curr.overall_score||0) + ';">' + (curr.overall_score||0) + '</div></div>'
+      + '</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th style="text-align:left;">Section</th><th style="text-align:center;">' + esc((prev.date||'').slice(0,7)) + '</th><th style="text-align:center;">' + esc((curr.date||'').slice(0,7)) + '</th><th style="text-align:center;">Change</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '</div>';
+  },
 
-  try {
-    return JSON.parse(clean);
-  } catch(e) {
-    console.error('[audit] parse error:', e.message, '| tail:', rawText.slice(-300));
-    throw new Error('Audit JSON parse failed: ' + e.message + ' | Response start: ' + rawText.slice(0, 300));
-  }
-}
+  renderSparklines(audits) {
+    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-6);
+    const latest = sorted[sorted.length-1];
+    const allNames = Object.keys(latest.sections||{});
+    if (!allNames.length) return '';
+    const W=120, H=40, PAD=4;
 
-// ── Claude HTTP helper — streaming to survive DO 60s timeout ──────────────────
-function callClaude(apiKey, bodyObj) {
-  const parsed = typeof bodyObj === 'string' ? JSON.parse(bodyObj) : bodyObj;
-  const streamBody = JSON.stringify({ ...parsed, stream: true });
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.anthropic.com',
-      path:     '/v1/messages',
-      method:   'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Length':    Buffer.byteLength(streamBody)
+    const spark = (values) => {
+      const valid = values.filter(v => v != null);
+      if (valid.length < 2) return '';
+      const minV = Math.min(...valid), maxV = Math.max(...valid);
+      const range = maxV - minV || 1;
+      const pts = values.map((v,i) => {
+        if (v == null) return null;
+        const x = PAD + (i/(values.length-1))*(W-PAD*2);
+        const y = H - PAD - ((v-minV)/range)*(H-PAD*2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).filter(Boolean);
+      return pts.length >= 2 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+    };
+
+    const tiles = allNames.map(name => {
+      const values = sorted.map(a => (a.sections||{})[name] ?? null);
+      const curr   = values[values.length-1] ?? 0;
+      const prev   = values.slice(0,-1).reverse().find(v => v != null) ?? null;
+      const diff   = prev != null ? curr - prev : null;
+      const col    = App.scoreColor(curr);
+      return '<div style="flex:1;min-width:140px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:10px 12px;">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:4px;letter-spacing:0.5px;">' + esc(name) + '</div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + col + ';line-height:1;">' + curr + '</div>'
+        + (diff != null ? '<div style="font-size:11px;font-weight:700;color:' + (diff>0?'var(--gold)':diff<0?'var(--red)':'var(--t3)') + ';">' + (diff>0?'+':'') + diff + '</div>' : '')
+        + '</div>'
+        + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">`
+        + `<line x1="4" y1="${(H/2).toFixed(1)}" x2="${W-4}" y2="${(H/2).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`
+        + spark(values)
+        + (values[values.length-1] != null ? (() => {
+            const valid = values.filter(v=>v!=null);
+            const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
+            const lx = PAD + ((values.length-1)/(values.length-1))*(W-PAD*2);
+            const ly = H - PAD - ((values[values.length-1]-minV)/range)*(H-PAD*2);
+            return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>`;
+          })() : '')
+        + '</svg>'
+        + '</div>';
+    }).join('');
+
+    return '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Section Trends  <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;color:var(--t3);">Last ' + sorted.length + ' audits</span></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:10px;">' + tiles + '</div>'
+      + '</div>';
+  },
+
+  viewAudit(idx) {
+    const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    const audit  = audits[idx];
+    if (!audit) return;
+
+    this.actions.innerHTML = '';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn-ghost btn-sm';
+    backBtn.textContent = '← Back';
+    backBtn.style.marginRight = '8px';
+    backBtn.onclick = () => this.renderMain();
+    this.actions.appendChild(backBtn);
+
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-ghost btn-sm';
+    printBtn.textContent = 'Print / Save PDF';
+    printBtn.onclick = () => window.print();
+    this.actions.appendChild(printBtn);
+
+
+    const d = audit.raw || audit;
+    const scoreColor = App.scoreColor(audit.overall_score||0);
+
+    // Findings text for a section. S1-S5 store evidence + gap + tool +
+    // narrative + finding in flat fields per the audit data shape; S6 stores
+    // the equivalent inside each signal object so its findings render via
+    // sigRows already. This helper pulls the S1-S5 findings text inline so
+    // operators see scores and findings on the same page (no Findings tab).
+    const findingsBlock = (num) => {
+      if (num === 6) return '';
+      const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
+      const texts = fields.map(f => d[f]).filter(v => v && String(v).trim());
+      if (!texts.length) return '';
+      return '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Findings</div>'
+        + texts.map(t => '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
+        + '</div>';
+    };
+
+    const sectionBlock = (num, name, score, items, signals) => {
+      const bar   = Math.min(100, Math.max(0, score||0));
+      const color = App.scoreColor(score);
+      const rows  = items.filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
+        '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<td style="padding:7px 0;font-size:11px;color:var(--t3);width:55%;">' + label + '</td>'
+        + '<td style="padding:7px 0;font-size:11px;color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';font-weight:600;">' + val + '</td>'
+        + '</tr>'
+      ).join('');
+      const sigRows = (signals||[]).map(sig => {
+        const sc = (sig.score||'').toUpperCase();
+        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'rgba(255,200,0,0.7)':'var(--gold)';
+        return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px;margin-top:10px;">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+          + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></div>'
+          + '<div style="font-size:11px;font-weight:700;color:var(--t1);">' + esc(sig.label||'') + '</div>'
+          + '<div style="margin-left:auto;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + dot + ';">' + esc(sig.score||'') + '</div>'
+          + '</div>'
+          + (sig.evidence ? '<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">' + esc(sig.evidence) + '</div>' : '')
+          + (sig.gap      ? '<div style="font-size:11px;color:var(--t2);margin-bottom:4px;">' + esc(sig.gap) + '</div>' : '')
+          + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
+          + '</div>';
+      }).join('');
+      // score === null means the section is intentionally unscored (Risk
+      // Signals). Skip the big number + scale bar so we don't paint a
+      // red "0" that reads like a failing score.
+      const scoreBlock = score == null
+        ? ''
+        : '<div style="text-align:right;">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
+          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
+          + '</div>';
+      return '<div class="card" style="margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
+        + scoreBlock + '</div>'
+        + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
+        + sigRows
+        + findingsBlock(num)
+        + '</div>';
+    };
+
+    const pct = (v,t) => v ? v+'%' + (t?' (Target: '+t+'%)':'') : '';
+    const cur = v => v ? App.fmtCurrency(v) : '';
+    const num = v => v != null && v !== 0 ? String(v) : '';
+    const yN  = v => v===true?'Yes':v===false?'No':'';
+
+    const gap = (v) => v > 0 ? [cur(v), 'warn'] : v < 0 ? [cur(Math.abs(v)) + ' under target', 'good'] : [''];
+    const [s1gap]  = gap(d.S1_MONTHLY_GAP);
+    const [s2gap]  = gap(d.S2_MONTHLY_GAP);
+    const [s3gap]  = gap(d.S3_MONTHLY_GAP);
+    const [s5gap]  = gap(d.S5_PRIME_COST_PCT - (d.S5_TARGET_PCT||60) > 0 ? d.S5_COMBINED_COGS_GAP : 0);
+
+    const signals6 = [
+      {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
+      {score:d.S6_SIG2_SCORE, label:d.S6_SIG2_LABEL, evidence:d.S6_SIG2_EVIDENCE, gap:d.S6_SIG2_GAP, tool:d.S6_SIG2_TOOL},
+      {score:d.S6_SIG3_SCORE, label:d.S6_SIG3_LABEL, evidence:d.S6_SIG3_EVIDENCE, gap:d.S6_SIG3_GAP, tool:d.S6_SIG3_TOOL},
+      {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL},
+    ].filter(s => s.label);
+
+    const NAMES = App.AUDIT_PROFIT_SECTION_NAMES;
+    const sections = [
+      sectionBlock(1, NAMES[0], d.S1_SCORE, [
+        ['Bar Pour Cost %',         pct(d.S1_BAR_COST_PCT, d.S1_TARGET_PCT), d.S1_BAR_COST_PCT > d.S1_TARGET_PCT ? 'warn' : 'good'],
+        ['Monthly Bar Revenue',     cur(d.S1_BAR_REV_MONTHLY)],
+        ['Bev COGS Period',         cur(d.S1_BEV_COGS_PERIOD)],
+        ['Inventory Variance %',    pct(d.S1_INV_VARIANCE_PCT), d.S1_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
+        ['Inventory Variance $',    cur(d.S1_INV_VARIANCE_AMT), d.S1_INV_VARIANCE_AMT > 500 ? 'warn' : ''],
+        ['Pour Method',             d.S1_POUR_METHOD],
+        ['Recipe Coverage',         d.S1_RECIPE_COVERAGE],
+        ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
+        ['Annual Gap',              cur(d.S1_ANNUAL_GAP), d.S1_ANNUAL_GAP > 0 ? 'warn' : ''],
+      ]),
+      sectionBlock(2, NAMES[1], d.S2_SCORE, [
+        ['Void/Comp %',             pct(d.S2_VOID_COMP_PCT), d.S2_VOID_COMP_PCT > 2 ? 'warn' : ''],
+        ['Void/Comp Amount',        cur(d.S2_VOID_COMP_AMT), d.S2_VOID_COMP_AMT > 0 ? 'warn' : ''],
+        ['Unauthorized Voids %',    pct(d.S2_VOIDS_NO_APPROVAL_PCT), d.S2_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
+        ['Drawer Reconciliation',   d.S2_DRAWER_RECON],
+        ['Cash Policy Documented',  d.S2_CASH_POLICY],
+        ['Void Approval Required',  d.S2_VOID_APPROVAL],
+        ['Spillage Log',            d.S2_SPILLAGE_LOG],
+        ['Monthly Gap',             cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
+      ]),
+      sectionBlock(3, NAMES[2], d.S3_SCORE, [
+        ['Food Cost %',             pct(d.S3_FOOD_COST_PCT, d.S3_TARGET_PCT), d.S3_FOOD_COST_PCT > d.S3_TARGET_PCT ? 'warn' : 'good'],
+        ['Monthly Food Revenue',    cur(d.S3_FOOD_REV_MONTHLY)],
+        ['Food Variance %',         pct(d.S3_FOOD_VAR_PCT), d.S3_FOOD_VAR_PCT > 3 ? 'warn' : ''],
+        ['Food Variance $',         cur(d.S3_FOOD_VAR_AMT)],
+        ['Recipe Coverage',         d.S3_RECIPE_COVERAGE],
+        ['Inventory Frequency',     d.S3_INV_FREQ],
+        ['Waste Log',               d.S3_WASTE_LOG],
+        ['Monthly Gap vs Target',   cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
+        ['Annual Gap',              cur(d.S3_ANNUAL_GAP), d.S3_ANNUAL_GAP > 0 ? 'warn' : ''],
+      ]),
+      sectionBlock(4, NAMES[3], d.S4_SCORE, [
+        ['Bev Invoice Count',       num(d.S4_BEV_INVOICE_COUNT)],
+        ['Food Invoice Count',      num(d.S4_FOOD_INVOICE_COUNT)],
+        ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
+        ['Invoice vs PO Matching',  d.S4_INVOICE_VS_PO],
+        ['Price Verification',      d.S4_PRICE_VERIFY],
+        ['Annual Bid Process',      d.S4_ANNUAL_BIDS],
+        ['Backup Vendors',          d.S4_BACKUP_VENDORS],
+        ['Monthly Exposure',        cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
+        ['Annual Exposure',         cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
+      ]),
+      sectionBlock(5, NAMES[4], d.S5_SCORE, [
+        ['Total Revenue Period',    cur(d.S5_TOTAL_REV_PERIOD)],
+        ['Total COGS Period',       cur(d.S5_TOTAL_COGS_PERIOD)],
+        ['Labor Period',            cur(d.S5_LABOR_PERIOD)],
+        ['Labor %',                 pct(d.S5_LABOR_PCT), d.S5_LABOR_PCT > 35 ? 'warn' : ''],
+        ['Bar Pour Cost %',         pct(d.S5_BAR_COST_PCT)],
+        ['Food Cost %',             pct(d.S5_FOOD_COST_PCT)],
+        ['Prime Cost %',            pct(d.S5_PRIME_COST_PCT, d.S5_TARGET_PCT), d.S5_PRIME_COST_PCT > (d.S5_TARGET_PCT||60) ? 'warn' : 'good'],
+        ['Prime Cost Amount',       cur(d.S5_PRIME_COST_AMT)],
+        ['RPLH Tracked',            d.S5_RPLH_TRACKED],
+        ['Labor by Department',     d.S5_LABOR_BY_DEPT],
+        ['Monthly COGS Gap',        cur(d.S5_COMBINED_COGS_GAP), d.S5_COMBINED_COGS_GAP > 0 ? 'warn' : ''],
+      ]),
+      ...(signals6.length ? [sectionBlock(6, 'Operational Risk Signals', null, [], signals6)] : []),
+    ].join('');
+
+    const actionItems = (audit.action_items || []).map((a,i) => {
+      const txt = a.action || a || '';
+      const gid = a.gap_id || (window.FixPanel ? FixPanel.inferGapId(txt, 'profit') : null);
+      const btn = gid
+        ? '<button class="at-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This &#9656;</button>'
+        : '';
+      return '<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
+        + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(txt) + '</div>'
+        + (a.monthly_impact ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:4px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
+        + '</div>'
+        + btn
+        + '</div>';
+    }).join('');
+
+    // Total recoverable
+    const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
+
+    this.container.innerHTML = '<div class="screen">'
+      + '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Recovery Audit</div>'
+      + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">'
+        + (audit.date||'').slice(0,10)
+        + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '')
+        + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '')
+        + '</div>'
+      + (audit.grade ? '<div style="margin-top:8px;"><span style="background:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'var(--gold)':audit.grade.includes('2')||audit.grade.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:2px;">' + esc(audit.grade) + '</span></div>' : '')
+      + '</div>'
+      + '<div style="text-align:right;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Score</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);">Industry Avg: ' + (d.INDUSTRY_AVG||63) + '  |  Target: ' + (d.TARGET_SCORE||65) + '</div>'
+      + '</div>'
+      + '</div>'
+      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
+      +   '<div style="flex:1;min-width:240px;">'
+      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
+      +     App.scoreBar(audit.overall_score||0)
+      +   '</div>'
+      +   '<div id="at-outlook-mount" style="flex-shrink:0;"></div>'
+      + '</div>'
+      + (totalMonthly > 0 ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:20px;flex-wrap:wrap;">'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Total Recoverable Per Month</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + App.fmtCurrency(totalMonthly) + '</div></div>'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Annualized</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + App.fmtCurrency(totalMonthly*12) + '</div></div>'
+        + (d.WEEKLY_GAP_AMT ? '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Weekly Gap</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + esc(String(d.WEEKLY_GAP_AMT)) + '</div></div>' : '')
+        + '</div>' : '')
+      + '</div>'
+
+      // Single-page layout: action items + sections inline, findings rendered
+      // under each section via findingsBlock. No Scores/Findings tab split.
+      + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items, Ranked by Impact</div>'
+        + actionItems + '</div>' : '')
+      + sections
+
+      + '</div>';
+
+    // Bar Cop Outlook mounts into the audit detail header next to the score.
+    // Shared helper handles click + cache + render across all 4 audits.
+    const outlookMount = document.getElementById('at-outlook-mount');
+    if (outlookMount && window.AuditOutlook) {
+      AuditOutlook.attach(outlookMount, audit, 'profit', { compact: true });
+    }
+
+    this.container.querySelectorAll('.at-fix-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        App._fixFocus = btn.dataset.gap;
+        App.navigate('profit-fix');
+      });
+    });
+  },
+
+  // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
+  // Findings text now renders inline under each section via findingsBlock()
+  // inside the sectionBlock helper in viewAudit().
+
+  // ── Stepped intake wizard ─────────────────────────────────────────────────
+  _intakeStep: 1,
+  _intakeDraft: null,
+
+  showIntakeForm() {
+    this._intakeStep = 1;
+    // Pre-fill from Hub Settings if available so the operator only types
+    // these numbers once across the whole platform (per the "Bar Cop knows
+    // this already" rule). They can still override before running the audit.
+    const s = App.data?.settings || {};
+    // Operating practices persist across audits. They pre-fill from last time
+    // so the operator just updates what changed (e.g. Free pour -> Jiggered)
+    // and watches the score move. Defaults describe an uncontrolled operation.
+    const p = s.profit_practices || {};
+    this._intakeDraft = {
+      barRev:  s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '',
+      foodRev: s.annual_food_revenue != null ? String(s.annual_food_revenue) : '',
+      practices: {
+        pour_method:   p.pour_method   || 'Free pour',
+        recipes_costed:p.recipes_costed|| 'none',
+        inv_freq:      p.inv_freq      || 'Never',
+        void_approval: p.void_approval === true,
+        drawer_recon:  p.drawer_recon  === true,
+        invoice_vs_po: p.invoice_vs_po || 'Never matched',
+        backup_vendors:p.backup_vendors|| 'No'
       }
     };
-    let partial = '';
-    let fullText = '';
-    const req = https.request(options, res => {
-      res.on('data', chunk => {
-        partial += chunk.toString();
-        const lines = partial.split('\n');
-        partial = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(data);
-            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-              fullText += evt.delta.text || '';
-            }
-          } catch(e) { /* skip malformed SSE lines */ }
-        }
-      });
-      res.on('end', () => {
-        if (fullText) {
-          resolve({ content: [{ type: 'text', text: fullText }] });
-        } else {
-          try { resolve(JSON.parse(partial)); }
-          catch(e) { reject(new Error('Claude response parse error: ' + partial.slice(0, 200))); }
-        }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(180000, () => { req.destroy(new Error('Claude request timed out after 3 minutes')); });
-    req.write(streamBody);
-    req.end();
-  });
-}
+    this.actions.innerHTML = '';
+    this.renderIntake();
+  },
 
-// ── Extraction Prompts ─────────────────────────────────────────────────────────
-function getExtractionPrompt_Profit(appData, controlData) {
-  const settings = appData.settings || {};
-  const weeks    = appData.weeks    || [];
-  const shifts   = appData.shifts   || [];
-  const recons   = appData.reconciliations || [];
-  const vendor   = appData.vendor_log || [];
-  const theft    = appData.theft_scores || [];
-  const products = appData.bar_products || [];
-  const kitchen  = appData.kitchen_products || [];
-  const recipes  = appData.recipes || [];
+  // Single-page Profit intake. Revenue is the only required input; every upload
+  // is optional because an operator running Control already has the data, and
+  // the slots map 1:1 to the sections computeProfitAudit scores.
+  renderIntake() {
+    const s = App.data.settings || {};
+    const d = this._intakeDraft || {};
+    document.getElementById('topbar-sub').textContent = '';
 
-  const recentWeeks = weeks.slice(-4);
-  const avgBarCost  = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.bar?.cost_pct||0),0)/recentWeeks.length : null;
-  const avgFoodCost = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.food?.cost_pct||0),0)/recentWeeks.length : null;
-  const avgBarRev   = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.bar?.revenue||0),0)/recentWeeks.length : null;
-  const avgFoodRev  = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.food?.revenue||0),0)/recentWeeks.length : null;
-
-  // Build weekly data summary for prompt
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = [`Week ${i+1}`];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.bar && w.bar.revenue) parts.push('Bar rev $'+w.bar.revenue);
-        if (w.bar && w.bar.cost_pct) parts.push('Bar cost '+w.bar.cost_pct+'%');
-        if (w.food && w.food.revenue) parts.push('Food rev $'+w.food.revenue);
-        if (w.food && w.food.cost_pct) parts.push('Food cost '+w.food.cost_pct+'%');
-        if (w.labor_pct) parts.push('Labor '+w.labor_pct+'%');
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly data entered yet';
-
-  const barProductsSummary = products.length
-    ? products.slice(0,15).map(p => '  ' + (p.name||'Product') + ' | Cost: $' + (p.cost||0) + ' | Category: ' + (p.category||'')).join('\n')
-    : '  No bar products entered';
-
-  const reconSummary = recons.length
-    ? recons.slice(-4).map(r => '  ' + (r.date||'') + ' | Expected: $' + (r.expected||0) + ' | Actual: $' + (r.actual||0) + ' | Variance: $' + ((r.actual||0)-(r.expected||0)).toFixed(2)).join('\n')
-    : '  No cash reconciliation entries';
-
-  // Verified Control-module data — real logged operational data the audit
-  // treats as ground truth for the sections it covers (map Section 8).
-  let controlBlock = '';
-  if (controlData && typeof controlData === 'object') {
-    const c = controlData, cl = [];
-    if (c.bar_cost_pct != null)    cl.push('verified_bar_pour_cost_pct=' + c.bar_cost_pct + ' — S1 ground truth');
-    if (c.food_cost_pct != null)   cl.push('verified_food_cost_pct=' + c.food_cost_pct + ' — S3 ground truth');
-    if (c.prime_cost_pct != null)  cl.push('verified_prime_cost_pct=' + c.prime_cost_pct + ' — S5 ground truth');
-    if (c.inventory_counts)        cl.push('inventory_counts_on_file=' + c.inventory_counts);
-    if (c.spot_checks)             cl.push('spot_checks=' + c.spot_checks + ' flagged_items=' + (c.spot_check_flagged||0) + ' pour_variance_$=' + (c.spot_check_variance_dollar||0) + ' — S2 theft ground truth');
-    if (c.void_comp_count != null) cl.push('void_comp_events=' + c.void_comp_count + ' total_$=' + c.void_comp_total + ' unauthorized=' + c.void_comp_unauthorized + ' — S2 ground truth');
-    if (c.cash_reconciliations)    cl.push('drawer_reconciliations=' + c.cash_reconciliations + ' total_variance_$=' + c.cash_variance_total + ' short_count=' + c.cash_short_count + ' — S2 cash ground truth');
-    if (c.cash_drops)              cl.push('cash_drops_logged=' + c.cash_drops);
-    if (c.deliveries_logged)       cl.push('deliveries_logged=' + c.deliveries_logged + ' vendor_price_changes=' + c.vendor_price_changes + ' — S4 vendor ground truth');
-    if (c.labor_hours != null)     cl.push('labor_hours=' + c.labor_hours + ' labor_cost_$=' + c.labor_cost + ' — S5 prime cost labor ground truth');
-    if (cl.length) {
-      controlBlock = '\nVERIFIED CONTROL DATA — this operator runs Bar Cop\'s Inventory, Shift and Labor Control modules. The figures below are real logged operational data, not estimates. Treat them as ground truth: score the sections they cover from these values, do not estimate those numbers or depend on uploaded files for them, and reflect this verified coverage in DATA_TIER_LABEL. Sections not covered here still rely on the uploads.\n'
-        + cl.map(l => '  ' + l).join('\n') + '\n';
-    }
-  }
-
-  return `PROFIT AUDIT — respond with a single JSON object, no other text. Use the app data below to populate every field. Never output 0 for a score.
-
-SCORING (out of 100 each):
-S1 Bar Cost: gap vs target — within 1pt=85, within 3=65, within 5=45, >5 over=25. +10 if recipes>0, +5 pour method known.
-S2 Theft: base 50. +15 cash recon present, +10 shift checks present, +15 void/comp data from file, +10 approval policy documented.
-S3 Food Cost: same scale as S1. +10 if kitchen products>0, +5 inventory freq known.
-S4 Vendor: base 40. +15 vendor log entries>0, +10 recipes>5, +10 bar products>10, +15 invoices uploaded.
-S5 Prime Cost: prime% vs target — within 2=80, within 5=60, within 8=40, >8 over=20. +${weeks.length>4?15:weeks.length>0?8:0} weekly tracking.
-S6: 4 specific risk signals with HIGH/MEDIUM/LOW ratings.
-OVERALL: weighted avg S1-S5.
-
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''} | annual_bar_rev=$${settings.annual_bar_revenue||0} | annual_food_rev=$${settings.annual_food_revenue||0}
-bar_cost_target=${(settings.targets&&settings.targets.bar_pour_cost_pct)||22}% | food_cost_target=${(settings.targets&&settings.targets.food_cost_pct)||32}% | prime_target=${(settings.targets&&settings.targets.prime_cost_pct)||60}%
-avg_bar_cost_pct=${avgBarCost?avgBarCost.toFixed(1):'unknown'} | avg_food_cost_pct=${avgFoodCost?avgFoodCost.toFixed(1):'unknown'}
-avg_weekly_bar_rev=$${avgBarRev?Math.round(avgBarRev):0} | avg_weekly_food_rev=$${avgFoodRev?Math.round(avgFoodRev):0}
-monthly_bar_rev_est=$${avgBarRev?Math.round(avgBarRev*4.33):0} | monthly_food_rev_est=$${avgFoodRev?Math.round(avgFoodRev*4.33):0}
-bar_products=${products.length} | kitchen_products=${kitchen.length} | recipes=${recipes.length} | weeks_data=${weeks.length}
-shift_checks=${shifts.length} | cash_recons=${recons.length} | vendor_log_entries=${vendor.length}
-theft_score=${theft.length?(theft[theft.length-1]&&theft[theft.length-1].total)||'unscored':'unscored'}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
-${reconSummary?'RECONS:\n'+reconSummary:''}
-${controlBlock}
-Return this exact JSON structure with all values calculated (not 0):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"PFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":63,"TARGET_SCORE":65,
-"OVERALL_SCORE":[calculated],
-"S1_SCORE":[calc],"S1_BAR_COST_PCT":[from app:${avgBarCost?avgBarCost.toFixed(1):0}],"S1_BAR_REV_MONTHLY":[calc],"S1_BEV_COGS_PERIOD":[calc],"S1_BAR_REV_PERIOD":[calc],"S1_INV_VARIANCE_PCT":[from file or 0],"S1_INV_VARIANCE_AMT":[calc],"S1_POUR_METHOD":[from file],"S1_RECIPE_COVERAGE":"${recipes.length} recipes","S1_VARIANCE_FREQ":[obs],"S1_VARIANCE_SKU":[obs],"S1_TARGET_PCT":${(settings.targets&&settings.targets.bar_pour_cost_pct)||22},"S1_GAP_PTS":[calc],"S1_MONTHLY_GAP":[calc],"S1_ANNUAL_GAP":[calc],"S1_PTS_BAR_COST":[pts],"S1_PTS_RECIPE":[pts],"S1_PTS_POUR":[pts],"S1_PTS_VAR_FREQ":[pts],"S1_PTS_VAR_SKU":[pts],
-"S2_SCORE":[calc],"S2_BEV_REV_MONTHLY":[calc],"S2_VOIDS_AMT":[file or 0],"S2_COMPS_AMT":[file or 0],"S2_VOID_COMP_PCT":[file or 1.5],"S2_VOID_COMP_AMT":[calc],"S2_VOIDS_NO_APPROVAL_PCT":[file or 0],"S2_VOIDS_NO_APPROVAL_AMT":[calc],"S2_CASH_POLICY":"${recons.length>0?'Reconciliation performed':'Not documented'}","S2_VOID_APPROVAL":[obs],"S2_DRAWER_RECON":"${recons.length>0?'Yes — '+recons.length+' entries':'No'}","S2_OVERSHORT_POLICY":[obs],"S2_BOTTLE_SECURITY":[obs],"S2_NOSALE_POLICY":[obs],"S2_SPILLAGE_LOG":"${shifts.length>0?'Yes — '+shifts.length+' shift checks':'Not documented'}","S2_BENCHMARK_PCT":2.0,"S2_GAP_PCT":[calc],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],"S2_PTS_VOID_COMP":[pts],"S2_PTS_VOID_APPROVAL":[pts],"S2_PTS_DRAWER":${recons.length>0?15:0},"S2_PTS_CASH_POLICY":[pts],"S2_PTS_BOTTLE":[pts],"S2_PTS_SPILLAGE":${shifts.length>0?10:0},
-"S3_SCORE":[calc],"S3_FOOD_COST_PCT":[from app:${avgFoodCost?avgFoodCost.toFixed(1):0}],"S3_FOOD_REV_MONTHLY":[calc],"S3_FOOD_COGS_PERIOD":[calc],"S3_FOOD_VAR_PCT":[file or 0],"S3_FOOD_VAR_AMT":[calc],"S3_RECIPE_COVERAGE":"${kitchen.length} kitchen products","S3_PORTION_STANDARDS":[obs],"S3_INV_FREQ":[obs],"S3_THEO_ACTUAL":[obs],"S3_WASTE_LOG":[obs],"S3_TARGET_PCT":${(settings.targets&&settings.targets.food_cost_pct)||32},"S3_GAP_PTS":[calc],"S3_MONTHLY_GAP":[calc],"S3_ANNUAL_GAP":[calc],"S3_PTS_FOOD_COST":[pts],"S3_PTS_RECIPE":[pts],"S3_PTS_PORTION":[pts],"S3_PTS_INV":[pts],"S3_PTS_WASTE":[pts],
-"S4_SCORE":[calc],"S4_BEV_INVOICE_COUNT":[file or ${vendor.length}],"S4_FOOD_INVOICE_COUNT":[file or 0],"S4_AUDIT_PERIOD_DESC":"4 weeks","S4_VENDOR_SPEND_MONTHLY":[calc],"S4_BEV_INVOICE_SPEND":[file or calc],"S4_FOOD_INVOICE_SPEND":[file or calc],"S4_INVOICE_VS_PO":[obs],"S4_PRICE_VERIFY":"${vendor.length>0?'Active — '+vendor.length+' changes logged':'Not documented'}","S4_DELIVERY_COUNT":[obs],"S4_CREDIT_MEMOS":[obs],"S4_ANNUAL_BIDS":[obs],"S4_BACKUP_VENDORS":[obs],"S4_PAYMENT_POLICY":[obs],"S4_EXPOSURE_PCT":3.0,"S4_EXPOSURE_MONTHLY":[calc 3% of COGS],"S4_EXPOSURE_ANNUAL":[calc],"S4_PTS_INVOICE_PO":[pts],"S4_PTS_PRICE_VERIFY":${vendor.length>0?15:0},"S4_PTS_DELIVERY":[pts],"S4_PTS_CREDIT":[pts],"S4_PTS_BIDS":[pts],"S4_PTS_PAYMENT":[pts],
-"S5_SCORE":[calc],"S5_BEV_REV_PERIOD":[calc],"S5_FOOD_REV_PERIOD":[calc],"S5_TOTAL_REV_PERIOD":[calc],"S5_BEV_COGS_PERIOD":[calc],"S5_FOOD_COGS_PERIOD":[calc],"S5_TOTAL_COGS_PERIOD":[calc],"S5_LABOR_PERIOD":[file or est 28% rev],"S5_LABOR_PCT":[file or 28],"S5_LABOR_SOURCE":"${weeks.length>0?'App data':'Estimated 28%'}","S5_PRIME_COST_AMT":[calc],"S5_PRIME_COST_PCT":[calc],"S5_TARGET_PCT":${(settings.targets&&settings.targets.prime_cost_pct)||60},"S5_BAR_COST_PCT":[from app],"S5_FOOD_COST_PCT":[from app],"S5_BLENDED_COGS_PCT":[calc],"S5_PRIME_WEEKLY":"${weeks.length>0?weeks.length+' weeks tracked':'Not tracked'}","S5_LABOR_BY_DEPT":[obs],"S5_SCHEDULE_FORECAST":[obs],"S5_RPLH_TRACKED":[obs],"S5_BAR_COST_GAP_MONTHLY":[calc],"S5_FOOD_COST_GAP_MONTHLY":[calc],"S5_COMBINED_COGS_GAP":[calc],"S5_TOTAL_REV_MONTHLY":[calc],"S5_LABOR_MONTHLY":[calc],"S5_PTS_PRIME_PCT":[pts],"S5_PTS_PRIME_WEEKLY":${weeks.length>4?15:weeks.length>0?8:0},"S5_PTS_LABOR_DEPT":[pts],"S5_PTS_SCHEDULE":[pts],"S5_PTS_RPLH":[pts],
-"S6_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG1_LABEL":[specific title],"S6_SIG1_EVIDENCE":[specific with numbers],"S6_SIG1_GAP":[specific gap],"S6_SIG1_TOOL":[action],
-"S6_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG2_LABEL":[specific],"S6_SIG2_EVIDENCE":[specific],"S6_SIG2_GAP":[specific],"S6_SIG2_TOOL":[action],
-"S6_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG3_LABEL":[specific],"S6_SIG3_EVIDENCE":[specific],"S6_SIG3_GAP":[specific],"S6_SIG3_TOOL":[action],
-"S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
-}
-
-function getExtractionPrompt_Revenue(appData, controlData) {
-  const settings     = appData.settings || {};
-  const targets      = settings.targets || {};
-  const weeks        = appData.revenue_weeks || [];
-  const servers      = appData.revenue_servers || [];
-  const menuItems    = appData.revenue_menu_items || [];
-
-  const recentWeeks  = weeks.slice(-4);
-  const avgCheckAvg  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.check_avg||0),0)/recentWeeks.length : null;
-  const avgLaborPct  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.labor_pct_blended||0),0)/recentWeeks.length : null;
-  const avgRPLH      = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.rplh_blended||0),0)/recentWeeks.length : null;
-  const avgCovers    = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.covers||0),0)/recentWeeks.length : null;
-  const avgBarRev    = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.bar_revenue||0),0)/recentWeeks.length : null;
-  const avgFloorRev  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.floor_revenue||0),0)/recentWeeks.length : null;
-  const totalAnnual  = (settings.annual_bar_revenue||0) + (settings.annual_food_revenue||0);
-
-  // Build a compact server roster string for the prompt
-  const serverRoster = servers.length
-    ? servers.slice(0,20).map((sv,i) => `  ${i+1}. ${sv.name||('Server '+(i+1))}${sv.role?' ('+sv.role+')':''}${sv.wage?' $'+sv.wage+'/hr':''}`).join('\n')
-    : '  None on roster';
-
-  // Build recent weekly data summary
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = [`Week ${i+1}`];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.total_revenue) parts.push('Rev $'+w.total_revenue);
-        if (w.check_avg) parts.push('Check avg $'+w.check_avg);
-        if (w.covers) parts.push('Covers '+w.covers);
-        if (w.labor_pct_blended) parts.push('Labor '+w.labor_pct_blended+'%');
-        if (w.rplh_blended) parts.push('RPLH $'+w.rplh_blended);
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly data entered yet';
-
-  // Build menu items summary
-  const menuSummary = menuItems.length
-    ? menuItems.slice(0,30).map(m => `  ${m.name||'Item'} | ${m.category||''} | Price: $${m.price||0} | Cost: $${m.cost||0}`).join('\n')
-    : '  No menu items entered yet';
-
-  // Verified Control-module data — real logged Labor Control data the audit
-  // treats as ground truth for the sections it covers (map Section 8).
-  let controlBlock = '';
-  if (controlData && typeof controlData === 'object') {
-    const c = controlData, cl = [];
-    if (c.check_average != null)     cl.push('verified_check_average=$' + c.check_average + ' — S1 ground truth');
-    if (c.labor_pct_blended != null) cl.push('verified_labor_pct=' + c.labor_pct_blended + ' — S2 ground truth');
-    if (c.rplh_blended != null)      cl.push('verified_rplh=$' + c.rplh_blended + ' — S2 ground truth');
-    if (c.labor_hours != null)       cl.push('labor_hours_logged=' + c.labor_hours + ' labor_cost_$=' + c.labor_cost + ' — S2 ground truth');
-    if (c.roster_count)              cl.push('staff_on_roster=' + c.roster_count + ' — S4 server count ground truth');
-    if (cl.length) {
-      controlBlock = '\nVERIFIED CONTROL DATA — this operator runs Bar Cop\'s Labor Control module, and the weekly revenue and labor figures are confirmed records fed from Control. The figures below are real logged operational data, not estimates. Treat them as ground truth: score the sections they cover from these values, do not estimate those numbers or depend on uploaded files for them, and reflect this verified coverage in DATA_TIER_LABEL. Sections not covered here still rely on the uploads.\n'
-        + cl.map(l => '  ' + l).join('\n') + '\n';
-    }
-  }
-
-  return `REVENUE AUDIT — respond with a single JSON object, no other text. Use app data below. Never output 0 for a score.
-
-SCORING (out of 100 each):
-S1 Check Avg: within $1 of target=85, within $3=70, within $5=55, >$5 below=35.
-S2 Labor: labor% vs target — within 1pt=85, within 3=65, >5 over=35. RPLH tracked adds 15.
-S3 Menu: items in system >20=60 base, 10-20=50, <10=40. POS mix data +30, pricing data +10.
-S4 Server: no report=45 base. With report: score spread. Servers on roster >0 adds 5.
-S5 Events: no data=50. Score if data present.
-S6: 4 specific revenue-side risk signals with HIGH/MEDIUM/LOW ratings (server-level patterns, daypart staffing anomalies, menu-item complaint concentration, missing pre-shift, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
-OVERALL: weighted avg S1-S5.
-
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''}
-annual_bar_rev=$${settings.annual_bar_revenue||0} | annual_food_rev=$${settings.annual_food_revenue||0}
-check_avg_target=$${targets.check_avg||35} | labor_target=${targets.floor_labor_pct||32}%
-rplh_targets: lunch=$${targets.rplh_lunch||50} dinner=$${targets.rplh_dinner||75} bar=$${targets.rplh_bar||65}
-servers_on_roster=${servers.length} | menu_items=${menuItems.length} | weeks_data=${weeks.length}
-avg_check_avg=$${avgCheckAvg?avgCheckAvg.toFixed(2):0} | avg_labor_pct=${avgLaborPct?avgLaborPct.toFixed(1):0}%
-avg_rplh=$${avgRPLH?avgRPLH.toFixed(2):0} | avg_covers_week=${avgCovers?Math.round(avgCovers):0}
-avg_bar_rev_week=$${avgBarRev?Math.round(avgBarRev):0} | avg_floor_rev_week=$${avgFloorRev?Math.round(avgFloorRev):0}
-monthly_covers_est=${avgCovers?Math.round(avgCovers*4.33):0} | monthly_rev_est=$${avgBarRev&&avgFloorRev?Math.round((avgBarRev+avgFloorRev)*4.33):0}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
-${serverRoster?'SERVERS:\n'+serverRoster:''}
-${controlBlock}
-Return this exact JSON (all values calculated):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"RFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":61,"TARGET_SCORE":65,
-"OVERALL_SCORE":[calc weighted avg],
-"S1_SCORE":[calc],"S1_CHECK_AVG":[from app:${avgCheckAvg?avgCheckAvg.toFixed(2):0}],"S1_CHECK_AVG_TARGET":${targets.check_avg||35},"S1_BAR_CHECK_AVG":[from report or est],"S1_FOOD_CHECK_AVG":[from report or est],"S1_COVER_COUNT":${avgCovers?Math.round(avgCovers*4.33):0},"S1_MONTHLY_REVENUE":${avgBarRev&&avgFloorRev?Math.round((avgBarRev+avgFloorRev)*4.33):0},"S1_MONTHLY_GAP":[calc: (target-actual)*covers],"S1_ANNUAL_GAP":[calc],
-"S2_SCORE":[calc],"S2_LABOR_PCT":[from app:${avgLaborPct?avgLaborPct.toFixed(1):30}],"S2_LABOR_TARGET_PCT":${targets.floor_labor_pct||32},"S2_RPLH":[from app:${avgRPLH?avgRPLH.toFixed(2):0}],"S2_RPLH_TARGET":${targets.rplh_dinner||75},"S2_LABOR_PERIOD":[calc],"S2_SCHED_VS_ACTUAL":[obs],"S2_OVERTIME_HRS":[file or null],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],
-"S3_SCORE":[calc],"S3_STARS_COUNT":[file or 0],"S3_PLOWHORSES_COUNT":[file or 0],"S3_DOGS_COUNT":[file or 0],"S3_PUZZLES_COUNT":[file or 0],"S3_TOP_CATEGORY":[file or est],"S3_MONTHLY_GAP":[calc or 0],"S3_PRICING_OPPORTUNITY":[calc or 0],
-"S4_SCORE":[calc],"S4_SERVER_COUNT":${servers.length||0},"S4_TOP_CHECK_AVG":[file or 0],"S4_BOTTOM_CHECK_AVG":[file or 0],"S4_PERFORMANCE_SPREAD":[calc],"S4_APP_ATTACH_RATE":[file or null],"S4_DESSERT_ATTACH_RATE":[file or null],"S4_PRESHIFT_BRIEFING":[obs],"S4_MONTHLY_GAP":[calc or 0],"S4_ANNUAL_GAP":[calc],
-"S5_SCORE":50,"S5_EVENT_REV_PERIOD":[file or null],"S5_EVENTS_PER_MONTH":[file or null],"S5_AVG_EVENT_REVENUE":[file or null],"S5_MINIMUM_MET":[file or null],"S5_CATERING_REV_PERIOD":[file or null],"S5_ANNUAL_EVENT_GAP":[file or null],"S5_MONTHLY_GAP":[file or null],
-"S6_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG1_LABEL":[specific title],"S6_SIG1_EVIDENCE":[specific with numbers],"S6_SIG1_GAP":[specific gap],"S6_SIG1_TOOL":[action],
-"S6_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG2_LABEL":[specific],"S6_SIG2_EVIDENCE":[specific],"S6_SIG2_GAP":[specific],"S6_SIG2_TOOL":[action],
-"S6_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG3_LABEL":[specific],"S6_SIG3_EVIDENCE":[specific],"S6_SIG3_GAP":[specific],"S6_SIG3_TOOL":[action],
-"S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
-}
-
-function getExtractionPrompt_Traffic(appData, urlData=null) {
-  const settings      = appData.settings || {};
-  const targets       = (appData.traffic_settings && appData.traffic_settings.targets) || {};
-  const weeks         = appData.traffic_weeks || [];
-  const recentWeeks   = weeks.slice(-4);
-  const avg = (fn) => { const v = recentWeeks.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
-  const avgGR  = avg(w=>w.google_rating);
-  const urlBlock = formatTrafficUrlDataForPrompt(urlData);
-  const avgRV  = avg(w=>w.new_reviews);
-  const avgRR  = avg(w=>w.response_rate);
-  const avgSS  = avg(w=>w.monthly_sessions);
-  const avgBR  = avg(w=>w.bounce_rate);
-  const avgIGF = avg(w=>w.ig_followers);
-  const avgIGP = avg(w=>w.ig_posts_month);
-
-  // Build weekly data summary
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = ['Week ' + (i+1)];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.google_rating) parts.push('Google ' + w.google_rating + 'star');
-        if (w.new_reviews) parts.push('New reviews: ' + w.new_reviews);
-        if (w.response_rate) parts.push('Response rate: ' + w.response_rate + '%');
-        if (w.monthly_sessions) parts.push('Sessions: ' + w.monthly_sessions);
-        if (w.ig_followers) parts.push('IG followers: ' + w.ig_followers);
-        if (w.ig_posts_month) parts.push('IG posts: ' + w.ig_posts_month);
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly traffic data entered yet';
-
-  return `TRAFFIC AUDIT — respond with a single JSON object, no other text. Use app data, fetched live URL data when present, and any uploaded screenshots. Never output 0 for a score.
-
-${urlBlock}
-
-
-SCORING (out of 100 each):
-S1 GBP: claimed+verified=20, hours+phone+website=15, menu linked=10, photos>50=15, posts>4/mo=15, response>75%=15, Q&A=10.
-S2 Website: exists+mobile=25, sessions vs 2000/mo benchmark scored, bounce<60%=15, menu in top3=15, online ordering=20.
-S3 Reviews: rating≥4.5=30, 4.3-4.5=20, 4.0-4.3=10, <4.0=0. Response rate scored. Review velocity scored. Recency scored.
-S4 Search: maps pack=40, NAP consistent=30, primary keyword=20, citations=10.
-S5 Social: IG profile=20, followers scored, post freq vs 12/mo scored, engagement if available.
-S6 Delivery: active platforms 20pts each (max 3), ratings scored, photos>10=15, menu complete=15, promo=10.
-S7 Email: list exists=20, size vs 500 benchmark, frequency scored, open rate if available, loyalty=15.
-S8: 4 specific traffic-side risk signals with HIGH/MEDIUM/LOW ratings (review velocity drops, unanswered review backlog, GBP staleness, platform-specific issues, posting schedule gaps, email channel dormancy, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
-OVERALL: weighted avg S1-S7.
-
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''}
-google_rating_target=${targets.google_rating||4.3} | review_velocity_target=${targets.review_velocity||8}/mo
-response_rate_target=${targets.response_rate||75}% | sessions_target=${targets.monthly_sessions||2000}/mo
-social_posts_target=${targets.social_posts_month||12}/mo | weeks_tracked=${weeks.length}
-avg_google_rating=${avgGR?avgGR.toFixed(2):'not tracked'} | avg_new_reviews_mo=${avgRV?avgRV.toFixed(1):'not tracked'}
-avg_response_rate=${avgRR?avgRR.toFixed(1)+'%':'not tracked'} | avg_monthly_sessions=${avgSS?Math.round(avgSS):'not tracked'}
-avg_bounce_rate=${avgBR?avgBR.toFixed(1)+'%':'not tracked'} | avg_ig_followers=${avgIGF?Math.round(avgIGF):'not tracked'}
-avg_ig_posts_mo=${avgIGP?avgIGP.toFixed(1):'not tracked'}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
-
-Return this exact JSON (all values calculated):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"TFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":58,"TARGET_SCORE":65,
-"OVERALL_SCORE":[calc],
-"S1_SCORE":[calc],"S1_LISTING_CLAIMED":[screenshot],"S1_LISTING_VERIFIED":[screenshot],"S1_HOURS_COMPLETE":[screenshot],"S1_PHONE_PRESENT":[screenshot],"S1_WEBSITE_LINKED":[screenshot],"S1_MENU_LINK_ACTIVE":[screenshot],"S1_CATEGORY_SET":[screenshot],"S1_ATTRIBUTES_COMPLETE":[screenshot],"S1_PHOTO_COUNT":[screenshot or 0],"S1_PHOTO_BENCHMARK":100,"S1_POSTS_LAST_30_DAYS":[screenshot or 0],"S1_POSTS_BENCHMARK":8,"S1_REVIEW_COUNT_GOOGLE":[screenshot],"S1_RATING_GOOGLE":[app:${avgGR?avgGR.toFixed(2):0}],"S1_REVIEW_RESPONSE_RATE":[app:${avgRR?Math.round(avgRR):0}],"S1_RESPONSE_BENCHMARK":75,"S1_QA_POPULATED":[screenshot],"S1_PROFILE_COMPLETENESS_PCT":[calc],"S1_MONTHLY_GAP":[est],"S1_ANNUAL_GAP":[calc],
-"S2_SCORE":[calc],"S2_WEBSITE_EXISTS":[screenshot],"S2_MOBILE_OPTIMIZED":[screenshot],"S2_MONTHLY_SESSIONS":[app:${avgSS?Math.round(avgSS):0}],"S2_SESSIONS_BENCHMARK":2000,"S2_BOUNCE_RATE":[app:${avgBR?avgBR.toFixed(1):0}],"S2_BOUNCE_BENCHMARK":60,"S2_MENU_PAGE_IN_TOP_3":[analytics],"S2_MENU_PAGE_SESSIONS":[analytics or 0],"S2_TOP_PAGES":[],"S2_ONLINE_ORDERING_PRESENT":[screenshot],"S2_RESERVATION_SYSTEM":[screenshot],"S2_AVG_SESSION_DURATION_SEC":[analytics or 0],"S2_PAGE_LOAD_SCORE":null,"S2_SOURCE_BREAKDOWN":null,"S2_MONTHLY_GAP":[est],"S2_ANNUAL_GAP":[calc],
-"S3_SCORE":[calc],"S3_GOOGLE_RATING":[app:${avgGR?avgGR.toFixed(2):0}],"S3_GOOGLE_RATING_BENCHMARK":4.3,"S3_GOOGLE_REVIEW_COUNT":[screenshot],"S3_GOOGLE_COUNT_BENCHMARK":200,"S3_RESPONSE_RATE":[app:${avgRR?Math.round(avgRR):0}],"S3_RESPONSE_BENCHMARK":75,"S3_YELP_RATING":[screenshot or 0],"S3_YELP_RATING_BENCHMARK":4.0,"S3_YELP_REVIEW_COUNT":[screenshot or 0],"S3_TRIPADVISOR_PRESENT":false,"S3_MOST_RECENT_REVIEW_DAYS":[screenshot],"S3_RECENCY_BENCHMARK":7,"S3_NEGATIVE_PATTERN":[obs],"S3_MONTHLY_GAP":[est],"S3_ANNUAL_GAP":[calc],"S3_UNANSWERED":[screenshot or 0],
-"S4_SCORE":[calc],"S4_MAPS_PACK_CONFIRMED":[screenshot],"S4_RANKING_REPORT_SUBMITTED":false,"S4_NAP_CONSISTENT":[screenshots],"S4_NAP_BUSINESS_NAME":"${settings.bar_name||''}","S4_NAP_ADDRESS":[screenshot],"S4_NAP_PHONE":[screenshot],"S4_WEBSITE_TITLES_ASSESSED":false,"S4_CITATION_COUNT":null,"S4_PRIMARY_KEYWORD":"${settings.bar_name?(settings.bar_name.split(' ')[0]||'').toLowerCase()+' bar':'bar [city]'}","S4_SECONDARY_KEYWORDS":[],"S4_MONTHLY_GAP":null,
-"S5_SCORE":[calc],"S5_IG_PROFILE_SUBMITTED":[true if uploaded],"S5_IG_FOLLOWERS":[app:${avgIGF?Math.round(avgIGF):0}],"S5_IG_POSTS_LAST_30":[app:${avgIGP?Math.round(avgIGP):0}],"S5_IG_POSTS_BENCHMARK":12,"S5_IG_ENGAGEMENT_RATE":[analytics or null],"S5_FB_FOLLOWERS":[screenshot or 0],"S5_FB_POSTS_LAST_30":[screenshot or 0],"S5_CONTENT_TYPE":[screenshot obs],"S5_FOOD_PHOTO_RATIO":[screenshot or 0],"S5_MONTHLY_GAP":[est],"S5_ANNUAL_GAP":[calc],
-"S6_SCORE":[calc],"S6_DOORDASH_ACTIVE":[screenshot],"S6_UBEREATS_ACTIVE":[screenshot],"S6_GRUBHUB_ACTIVE":[screenshot],"S6_PLATFORM_COUNT":[count],"S6_DOORDASH_RATING":[screenshot or null],"S6_UBEREATS_RATING":[screenshot or null],"S6_PHOTO_COUNT_DELIVERY":[screenshot or 0],"S6_MENU_COMPLETE":[screenshot],"S6_PROMO_ACTIVE":[screenshot],"S6_MONTHLY_GAP":[est],"S6_ANNUAL_GAP":[calc],
-"S7_SCORE":[calc],"S7_EMAIL_LIST_EXISTS":[screenshot],"S7_LIST_SIZE":[screenshot or 0],"S7_LIST_BENCHMARK":500,"S7_LAST_SEND_DAYS_AGO":[screenshot or null],"S7_SEND_FREQUENCY":[screenshot],"S7_OPEN_RATE":[analytics or null],"S7_OPEN_BENCHMARK":35,"S7_GROWTH_MECHANISM":[obs],"S7_LOYALTY_PROGRAM":[screenshot],"S7_MONTHLY_GAP":[est],"S7_ANNUAL_GAP":[calc],
-"S8_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG1_LABEL":[specific title],"S8_SIG1_EVIDENCE":[specific with numbers],"S8_SIG1_GAP":[specific gap],"S8_SIG1_TOOL":[action],
-"S8_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG2_LABEL":[specific],"S8_SIG2_EVIDENCE":[specific],"S8_SIG2_GAP":[specific],"S8_SIG2_TOOL":[action],
-"S8_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG3_LABEL":[specific],"S8_SIG3_EVIDENCE":[specific],"S8_SIG3_GAP":[specific],"S8_SIG3_TOOL":[action],
-"S8_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG4_LABEL":[specific],"S8_SIG4_EVIDENCE":[specific],"S8_SIG4_GAP":[specific],"S8_SIG4_TOOL":[action]`
-}
-
-// ── Stripe checkout session ───────────────────────────────────────────────────
-const BARCOP_PRICE_ID = 'price_1TZA54Gow04S066UjWZIRAlL';
-const ALL_MODULES     = ['profit', 'revenue', 'traffic'];
-
-app.post('/api/create-checkout-session', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-  try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: BARCOP_PRICE_ID, quantity: 1 }],
-      success_url: 'https://app.barcop.com/?checkout=success',
-      cancel_url:  'https://app.barcop.com/?checkout=cancelled',
-      metadata: { user_id: userId }
-    });
-    res.json({ url: session.url });
-  } catch (e) {
-    console.error('Checkout session error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Stripe billing portal ─────────────────────────────────────────────────────
-app.post('/api/billing-portal', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-  try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const { createClient: mkClient } = require('@supabase/supabase-js');
-    const adminDb = mkClient(
-      'https://plpikfpintruksclkwyb.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    const { data, error } = await adminDb
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !data?.stripe_customer_id) {
-      return res.status(404).json({ error: 'No Stripe customer found for this account.' });
-    }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: data.stripe_customer_id,
-      return_url: 'https://app.barcop.com/'
-    });
-
-    res.json({ url: session.url });
-  } catch (e) {
-    console.error('Billing portal error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Stripe webhook ────────────────────────────────────────────────────────────
-const { createClient } = require('@supabase/supabase-js');
-const ws = require('ws');
-
-const supabaseAdmin = createClient(
-  'https://plpikfpintruksclkwyb.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { realtime: { transport: ws } }
-);
-
-app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-  const sig    = req.headers['stripe-signature'];
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, secret);
-  } catch (err) {
-    console.error('Webhook signature failed:', err.message);
-    return res.status(400).send('Webhook Error: ' + err.message);
-  }
-
-  try {
-    if (event.type === 'checkout.session.completed') {
-      const session    = event.data.object;
-      const customerId = session.customer;
-      const email      = session.customer_details?.email || session.customer_email;
-
-      let userId = session.metadata?.user_id || null;
-
-      if (!userId && email) {
-        const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
-        const found = existing?.users?.find(u => u.email === email);
-        if (found) {
-          userId = found.id;
-        } else {
-          const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: { created_via: 'stripe_checkout' },
-          });
-          if (createErr) {
-            console.error('Failed to create Supabase user:', createErr.message);
-          } else {
-            userId = created.user.id;
-            console.log('Account created for new subscriber:', email);
-          }
-        }
-      }
-
-      if (userId) {
-        await supabaseAdmin.from('subscriptions').upsert({
-          user_id:             userId,
-          stripe_customer_id:  customerId,
-          subscription_status: 'active',
-          subscription_plan:   'full_access',
-          active_modules:      ALL_MODULES,
-          current_period_end:  null,
-          updated_at:          new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-      }
-    }
-
-    if (event.type === 'customer.subscription.updated') {
-      const sub        = event.data.object;
-      const customerId = sub.customer;
-      const status     = sub.status;
-      const periodEnd  = new Date(sub.current_period_end * 1000).toISOString();
-
-      await supabaseAdmin.from('subscriptions')
-        .update({
-          subscription_status: status,
-          current_period_end:  periodEnd,
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('stripe_customer_id', customerId);
-    }
-
-    if (event.type === 'customer.subscription.deleted') {
-      const sub        = event.data.object;
-      const customerId = sub.customer;
-
-      await supabaseAdmin.from('subscriptions')
-        .update({
-          subscription_status: 'canceled',
-          active_modules:      [],
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('stripe_customer_id', customerId);
-    }
-
-    res.json({ received: true });
-  } catch (err) {
-    console.error('Webhook handler error:', err);
-    res.status(500).json({ error: 'Webhook handler failed' });
-  }
-});
-
-// ── Bug report notification ──────────────────────────────────────────────────
-// Fires after the client successfully writes a bug report row to Supabase.
-// The DB record is the source of truth; this endpoint just sends a courtesy
-// email so the team gets pinged without polling the table. If Resend fails
-// or the env vars are missing, we still return ok=true — the report itself
-// is safely persisted, the email is best-effort.
-app.post('/api/report-bug-notify', async (req, res) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to     = process.env.BUG_REPORT_NOTIFY_EMAIL;
-  const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
-  if (!apiKey || !to) {
-    console.warn('report-bug-notify: RESEND_API_KEY or BUG_REPORT_NOTIFY_EMAIL not configured; skipping email');
-    return res.json({ ok: true, emailed: false, reason: 'not_configured' });
-  }
-  try {
-    const r = req.body || {};
-    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    const sevLabel = { minor:'Minor', moderate:'Moderate', major:'Major', critical:'Critical' }[r.severity] || 'Moderate';
-    const sevColor = { minor:'#888', moderate:'#9A5D34', major:'#C03828', critical:'#C03828' }[r.severity] || '#9A5D34';
-    const subject  = 'Bar Cop Bug: ' + (r.title || 'Untitled report');
-    const row = (label, value) => value
-      ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
-        + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
-      : '';
-    const html =
-        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#111;">'
-      +   '<div style="border-bottom:3px solid ' + sevColor + ';padding-bottom:14px;margin-bottom:18px;">'
-      +     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999;">Bar Cop Bug Report</div>'
-      +     '<div style="font-size:18px;font-weight:700;color:#111;margin-top:4px;">' + esc(r.title || 'Untitled report') + '</div>'
-      +     '<div style="font-size:12px;color:' + sevColor + ';font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;">' + sevLabel + ' severity</div>'
-      +   '</div>'
-      +   '<table style="width:100%;border-collapse:collapse;">'
-      +     row('What Happened',      r.what_happened)
-      +     row('Steps to Reproduce', r.steps_to_reproduce)
-      +     row('Expected Behavior',  r.expected_behavior)
-      +     row('Reporter Email',     r.user_email)
-      +     row('From Screen',        r.previous_screen)
-      +     row('Browser',            r.user_agent)
-      +     row('Viewport',           r.viewport)
-      +     row('Submitted',          new Date().toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }))
-      +   '</table>'
-      +   '<div style="margin-top:18px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px;">Full report is also in your Supabase bug_reports table.</div>'
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Audit</div>';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name || 'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
       + '</div>';
 
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html, reply_to: r.user_email || undefined })
-    });
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error('Resend send failed:', resp.status, txt);
-      return res.json({ ok: true, emailed: false, reason: 'send_failed' });
-    }
-    res.json({ ok: true, emailed: true });
-  } catch (e) {
-    console.error('report-bug-notify exception:', e);
-    res.json({ ok: true, emailed: false, reason: 'exception' });
-  }
-});
+    // What Bar Cop already has from the last 30 days of Control data.
+    const cd = this.buildControlData();
+    const checks = [
+      { label: 'Bar Pour Cost',   ok: cd && cd.bar_cost_pct != null },
+      { label: 'Food Cost',       ok: cd && cd.food_cost_pct != null },
+      { label: 'Prime Cost',      ok: cd && cd.prime_cost_pct != null },
+      { label: 'Voids and Comps', ok: cd && cd.void_comp_count > 0 },
+      { label: 'Cash Variance',   ok: cd && cd.cash_reconciliations > 0 },
+      { label: 'Vendor Drift',    ok: cd && cd.deliveries_logged > 0 },
+      { label: 'Payroll / Labor', ok: cd && cd.labor_hours > 0 }
+    ];
+    const chip = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;margin:0 6px 6px 0;'
+      + (c.ok ? 'background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);color:var(--t1);font-weight:700;' : 'background:var(--input);border:1px solid var(--b2);color:var(--t3);') + '">'
+      + (c.ok ? '<span style="color:var(--gold);font-weight:800;">&#10003;</span>' : '<span style="color:var(--t4);font-weight:800;">&middot;</span>')
+      + esc(c.label) + '</span>';
+    const haveControl = cd && cd.sources && cd.sources.length;
+    const controlCard = haveControl
+      ? '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">What Bar Cop already has</div>'
+        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">These come straight from your last 30 days of Control data as verified ground truth. You do not need to upload anything for the items checked below. Uploads only fill what is not checked, or add deeper per-item detail.</div>'
+        + '<div>' + checks.map(chip).join('') + '</div></div>'
+      : '<div class="card" style="margin-bottom:16px;"><div style="font-size:12px;color:var(--t2);line-height:1.6;">Bar Cop has no Control data yet for this bar, so this first audit reads from the reports you upload below. Once you run the Inventory, Shift and Labor Control systems for 30 days, those numbers flow in automatically and the uploads become optional.</div></div>';
 
-// ── Support message notification ─────────────────────────────────────────────
-// Email-only contact form from the Hub "Contact Support" screen. No DB row
-// is kept — the support inbox is the record. The user's email is set as
-// reply_to so the team can hit Reply and write back directly.
-app.post('/api/support-message-notify', async (req, res) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to     = process.env.SUPPORT_NOTIFY_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL;
-  const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
-  if (!apiKey || !to) {
-    console.warn('support-message-notify: RESEND_API_KEY or notify email not configured');
-    return res.json({ ok: false, emailed: false, reason: 'not_configured' });
-  }
-  try {
-    const r = req.body || {};
-    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    const subject = 'Bar Cop Support: ' + (r.subject || '(no subject)');
-    const row = (label, value) => value
-      ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
-        + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
-      : '';
-    const html =
-        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#111;">'
-      +   '<div style="border-bottom:3px solid #4C8EAB;padding-bottom:14px;margin-bottom:18px;">'
-      +     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999;">Bar Cop Support Message</div>'
-      +     '<div style="font-size:18px;font-weight:700;color:#111;margin-top:4px;">' + esc(r.subject || '(no subject)') + '</div>'
-      +     '<div style="font-size:12px;color:#4C8EAB;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;">' + esc(r.topic || 'Other') + '</div>'
-      +   '</div>'
-      +   '<table style="width:100%;border-collapse:collapse;">'
-      +     row('Message',         r.message)
-      +     row('Reporter Email',  r.user_email)
-      +     row('From Screen',     r.previous_screen)
-      +     row('Submitted',       new Date().toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }))
-      +   '</table>'
-      +   '<div style="margin-top:18px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px;">Reply directly to this email to respond to the user.</div>'
+    const revLabel = (txt) => '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">' + txt + '</label>';
+    const revInput = (id, ph, val) => '<div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div>';
+
+    const revCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual revenue. This sets the dollar baselines for every gap in the audit. Enter at least one figure. Run a bar with no kitchen? Leave Food Revenue blank and the food sections are simply left out.</div>'
+      + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Bar Revenue') + revInput('at-iz-bar-rev', '618000', d.barRev) + '</div>'
+      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Food Revenue (leave blank if none)') + revInput('at-iz-food-rev', '372000', d.foodRev) + '</div>'
+      + '</div></div>';
+
+    const uploadCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Add any reports to cover what the checklist above does not, or to add deeper per-item detail. Accepts PDF, Excel, CSV, or images.</div>'
+      + this.renderFileSection('optional',  'Profit and Loss or Monthly Sales Summary', 'at-f-pl',     'at-pl',     'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report)')
+      + this.renderFileSection('optional',  'Voids, Comps and Cash Report',             'at-f-loss',   'at-loss',   'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance)')
+      + this.renderFileSection('optional',  'Invoices and Vendor Pricing',              'at-f-vendor', 'at-vendor', 'Scores Vendor Control (invoice matching, price drift)')
+      + this.renderFileSection('highlight', 'Recipe Costing Sheet',                     'at-f-recipe', 'at-recipe', 'Adds repricing opportunities ranked by dollar impact, and recipe coverage')
+      + this.renderFileSection('optional',  'Inventory Count Sheets (Bar and Kitchen)', 'at-f-inv',    'at-inv',    'Adds per-product pour and food cost variance')
       + '</div>';
 
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html, reply_to: r.user_email || undefined })
+    // Operating-practice questions. These move scores but are not in financial
+    // reports, so we ask directly rather than hope they land in a notes box.
+    // Answers persist and pre-fill next audit so the operator updates what
+    // changed and watches the score move. Fed straight to the engine.
+    const pr = d.practices || {};
+    const qRow = (label, id, options) => {
+      const opts = options.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id]) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
+      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
+        + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(label) + '</div>'
+        + '<select id="at-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:170px;">' + opts + '</select>'
+        + '</div>';
+    };
+    const questionsCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Few Quick Questions</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These shape your scores and usually are not in your reports. They carry over to your next audit, so update what changed and watch the numbers move.</div>'
+      + qRow('How do you pour spirits?',            'pour_method',   [['Free pour','Free pour'],['Jiggered/measured','Jiggered or measured']])
+      + qRow('Are your recipes costed?',            'recipes_costed',[['none','None'],['some','Some'],['all','All']])
+      + qRow('How often do you count inventory?',   'inv_freq',      [['Never','Never'],['Monthly','Monthly'],['Weekly','Weekly']])
+      + qRow('Manager approval required on voids and comps?', 'void_approval', [['false','No'],['true','Yes']])
+      + qRow('Drawer reconciled every shift?',      'drawer_recon',  [['false','No'],['true','Yes']])
+      + qRow('Are invoices matched to orders?',     'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']])
+      + qRow('Backup vendors identified?',          'backup_vendors',[['No','No'],['Yes','Yes']])
+      + '</div>';
+
+    const submitCard = '<div class="card">'
+      + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>'
+      + '<div id="at-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
+      + '<div style="flex:1;"></div>'
+      + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Analysis takes 60 to 90 seconds.</div></div>';
+
+    this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
+
+    document.getElementById('at-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
+    document.getElementById('at-iz-submit')?.addEventListener('click', () => {
+      const barRev = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
+      const foodRev = parseFloat(document.getElementById('at-iz-food-rev')?.value) || 0;
+      if (barRev === 0 && foodRev === 0) {
+        const st = document.getElementById('at-iz-status');
+        if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'Enter at least one revenue figure to run the audit.'; }
+        return;
+      }
+      this._intakeDraft.barRev = document.getElementById('at-iz-bar-rev')?.value || '';
+      this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
+      const val = id => (document.getElementById('at-q-' + id) || {}).value;
+      this._intakeDraft.practices = {
+        pour_method:    val('pour_method'),
+        recipes_costed: val('recipes_costed'),
+        inv_freq:       val('inv_freq'),
+        void_approval:  val('void_approval') === 'true',
+        drawer_recon:   val('drawer_recon') === 'true',
+        invoice_vs_po:  val('invoice_vs_po'),
+        backup_vendors: val('backup_vendors')
+      };
+      this.generateAudit();
     });
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error('Resend send failed:', resp.status, txt);
-      return res.json({ ok: false, emailed: false, reason: 'send_failed' });
+  },
+
+  intakeStepsHtml(total) {
+    let h = '<div class="steps">';
+    for (let i = 1; i <= total; i++) {
+      const cls = i < this._intakeStep ? 'done' : i === this._intakeStep ? 'active' : '';
+      h += (i > 1 ? '<div class="step-line' + (i-1 < this._intakeStep ? ' done' : '') + '"></div>' : '')
+        + '<div class="step-dot ' + cls + '">' + (i < this._intakeStep ? '&#10003;' : i) + '</div>';
     }
-    res.json({ ok: true, emailed: true });
-  } catch (e) {
-    console.error('support-message-notify exception:', e);
-    res.json({ ok: false, emailed: false, reason: 'exception' });
-  }
-});
+    return h + '</div>';
+  },
 
-// ── Invite user to an account (Phase 2 multi-user) ────────────────────────────
-// Admin sends an invite from App Settings → Team. Recipient gets a Supabase
-// magic-link email. When they sign up, the 24a trigger reads the metadata
-// (invited_to_account_id + invited_role) and links them to this account
-// instead of creating a new one for them.
-app.post('/api/invite-user', async (req, res) => {
-  try {
-    const { email, accountId, role, permissions } = req.body || {};
-    if (!email || !accountId) {
-      return res.status(400).json({ error: 'email and accountId required' });
+  renderIntakeStep() {
+    const s    = App.data.settings;
+    const step = this._intakeStep;
+    const total = 5;
+    document.getElementById('topbar-sub').textContent = 'Step ' + step + ' of ' + total;
+
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Audit</div>';
+
+    const cd = this.buildControlData();
+    // Per-section grid showing the operator exactly what Control is feeding
+    // (so they know what they don't need to upload before scrolling six file
+    // inputs). Each row reads green check + source label, or grey dash + "upload
+    // needed" hint when that section's Control data isn't on file yet.
+    const controlChecks = [
+      { label: 'Bar Pour Cost',  ok: cd && cd.bar_cost_pct  != null, hint: 'Comes from Inventory Control counts + Shift Control revenue' },
+      { label: 'Food Cost',      ok: cd && cd.food_cost_pct != null, hint: 'Comes from Inventory Control counts + Shift Control revenue' },
+      { label: 'Prime Cost',     ok: cd && cd.prime_cost_pct != null, hint: 'Comes from Inventory Control + Labor Control + Shift Control' },
+      { label: 'Inventory Variance', ok: cd && cd.spot_checks > 0, hint: 'Comes from Inventory Control spot checks' },
+      { label: 'Vendor Drift',   ok: cd && cd.deliveries_logged > 0, hint: 'Comes from Inventory Control deliveries' },
+      { label: 'Cash Variance',  ok: cd && cd.cash_reconciliations > 0, hint: 'Comes from Shift Control drawer reconciliation' },
+      { label: 'Voids and Comps', ok: cd && cd.void_comp_count > 0, hint: 'Comes from Shift Control void and comp log' },
+      { label: 'Payroll / RPLH', ok: cd && cd.labor_hours > 0, hint: 'Comes from Labor Control actuals' }
+    ];
+    const okRows = controlChecks.filter(c => c.ok);
+    const missingRows = controlChecks.filter(c => !c.ok);
+    const gridRow = (c) => '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'
+      + (c.ok
+          ? '<span style="color:var(--gold);font-weight:800;font-size:12px;line-height:1;">&#10003;</span>'
+          : '<span style="color:var(--t4);font-weight:800;font-size:12px;line-height:1;">&middot;</span>')
+      + '<span style="font-size:11px;color:' + (c.ok ? 'var(--t1)' : 'var(--t3)') + ';font-weight:' + (c.ok ? '700' : '400') + ';">' + esc(c.label) + '</span>'
+      + '<span style="font-size:11px;color:var(--t3);">' + (c.ok ? 'covered by Control' : 'upload needed below') + '</span>'
+      + '</div>';
+    const controlBanner = (cd && cd.sources && cd.sources.length)
+      ? '<div style="background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:14px 18px;margin-bottom:16px;">'
+        + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Control Data Is Feeding This Audit</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 18px;">'
+        + okRows.map(gridRow).join('')
+        + missingRows.map(gridRow).join('')
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;padding-top:8px;border-top:1px solid rgba(219,171,70,0.2);line-height:1.5;">Verified figures go in automatically as ground truth. The uploads below only need to cover what your Control systems do not.</div>'
+        + '</div>'
+      : '';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name||'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
+      + '</div>';
+
+    const nav = (showPrev, showNext, isSubmit) =>
+      '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
+      + (showPrev ? '<button class="btn btn-ghost" id="at-iz-prev">&#8592; Back</button>' : '')
+      + (showNext ? '<button class="btn btn-primary" id="at-iz-next">Next &#8594;</button>' : '')
+      + (isSubmit ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>' : '')
+      + '<div id="at-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
+      + '<div style="flex:1;"></div>'
+      + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button>'
+      + '</div>';
+
+    let stepHtml = '';
+    if (step === 1) {
+      stepHtml = '<div class="card">' + header + barInfo
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;">Enter your annual bar and food revenue. This sets the dollar baselines for every gap calculation in the audit. Your Bar Cop data from the last 30 days is included automatically.</div>'
+        + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>Annual Bar Revenue</label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-iz-bar-rev" placeholder="480000" value="' + esc(this._intakeDraft.barRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
+        + '<div style="flex:1;min-width:200px;"><label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>Annual Food Revenue</label><div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="at-iz-food-rev" placeholder="320000" value="' + esc(this._intakeDraft.foodRev) + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div></div>'
+        + '</div>'
+        + nav(false, true, false) + '</div>';
+    } else if (step === 2) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Bar Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">The POS Beverages report is required. Every additional file unlocks more scored sections.</div>'
+        + this.renderFileSection('required', 'POS Sales Report: Beverages',           'at-f-pos-bev',   'at-pos-bev',   'Adds: Revenue baseline, category split, estimated gap calculations')
+        + this.renderFileSection('optional', 'Bar Inventory Count Sheets',             'at-f-bar-inv',   'at-bar-inv',   'Adds: Actual pour cost %, theoretical vs. actual variance by product')
+        + this.renderFileSection('optional', 'POS Exception Report: Voids and Comps', 'at-f-exception', 'at-exception', 'Adds: Void and comp rate, behavioral risk indicators, theft vs. training diagnosis')
+        + this.renderFileSection('optional', 'Cash Drawer Reconciliation Records',     'at-f-cash',      'at-cash',      'Adds: Cash handling gap analysis by shift')
+        + this.renderFileSection('optional', 'Beverage Invoices and Delivery Receipts','at-f-bev-inv',   'at-bev-inv',   'Adds: Delivery accuracy rate, vendor short analysis')
+        + this.renderFileSection('optional', 'Vendor Price List or Recent Invoices',   'at-f-vendor',    'at-vendor',    'Adds: Price drift analysis, distributor negotiation data')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 3) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Kitchen Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Upload whatever you have. Each file unlocks additional food cost scoring.</div>'
+        + this.renderFileSection('optional',   'POS Sales Report: Food',               'at-f-pos-food',  'at-pos-food',  'Adds: Food cost benchmarking, category-level analysis')
+        + this.renderFileSection('optional',   'Kitchen Inventory Count Sheets',       'at-f-kit-inv',   'at-kit-inv',   'Adds: Actual food cost %, kitchen variance, spoilage rate')
+        + this.renderFileSection('optional',   'Food Invoices and Delivery Receipts',  'at-f-food-inv',  'at-food-inv',  'Adds: Food delivery accuracy, produce par analysis')
+        + this.renderFileSection('highlight',  'Recipe Costing Sheet',                 'at-f-recipe',    'at-recipe',    'Adds: Yield-corrected cost per dish, every repricing opportunity ranked by annual dollar impact')
+        + this.renderFileSection('optional',   'Daily Prep Sheets or Production Logs', 'at-f-prep',      'at-prep',      'Adds: Production loss analysis, prep yield by station')
+        + this.renderFileSection('optional',   'Daily Waste Logs',                     'at-f-waste',     'at-waste',     'Adds: Weekly spoilage cost, waste pattern diagnosis')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 4) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Labor Data</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Payroll or time clock data is required to calculate verified prime cost and RPLH.</div>'
+        + this.renderFileSection('optional', 'Payroll or Time Clock Data', 'at-f-payroll', 'at-payroll', 'Adds: Required for prime cost calculation, labor by department, RPLH calculation')
+        + nav(true, true, false) + '</div>';
+    } else if (step === 5) {
+      stepHtml = '<div class="card">' + header
+        + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Notes and Submit</div>'
+        + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Add any context that might affect how the numbers look, then generate your audit. Analysis takes 60 to 90 seconds.</div>'
+        + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+        + '<textarea id="at-iz-notes" rows="4" placeholder="Recent changes, seasonal factors, staffing changes, anything that might affect how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;">' + esc(this._intakeDraft.notes||'') + '</textarea>'
+        + nav(true, false, true) + '</div>';
     }
-    // Permissions: optional JSON object { groupKey: 'add' | 'edit' } for staff role.
-    // Sanitized so only known levels are stored.
-    const cleanPerms = (permissions && typeof permissions === 'object')
-      ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'add' || v === 'edit')
-        )
-      : {};
 
-    // Verify the requester via their JWT (don't trust client-supplied user IDs)
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+    this.container.innerHTML = '<div class="screen">' + this.intakeStepsHtml(total) + controlBanner + stepHtml + '</div>';
 
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const inviterUserId = userData.user.id;
-
-    // Inviter must be an admin of the target account
-    const { data: membership, error: memberError } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', inviterUserId)
-      .single();
-
-    if (memberError || !membership || membership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can send invites' });
-    }
-
-    const validRoles = ['admin', 'staff', 'viewer'];
-    const inviteRole = validRoles.includes(role) ? role : 'staff';
-    const cleanEmail = String(email).toLowerCase().trim();
-
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      cleanEmail,
-      {
-        data: {
-          invited_to_account_id: accountId,
-          invited_role: inviteRole,
-          invited_permissions: cleanPerms
-        },
-        redirectTo: 'https://app.barcop.com/'
-      }
-    );
-
-    if (inviteError) {
-      // Common case: this person was previously invited/removed. Their auth
-      // row still exists, so Supabase refuses a new invite. Look up the
-      // existing user by email and add a membership row directly.
-      const errMsg = (inviteError.message || '').toLowerCase();
-      const isAlreadyRegistered = errMsg.includes('already') &&
-        (errMsg.includes('registered') || errMsg.includes('exists'));
-
-      if (isAlreadyRegistered) {
-        let existingUserId = null;
-        try {
-          const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-          const found = (usersData?.users || []).find(u => u.email && u.email.toLowerCase() === cleanEmail);
-          if (found) existingUserId = found.id;
-        } catch (e) {
-          console.error('listUsers fallback failed:', e);
+    document.getElementById('at-iz-cancel')?.addEventListener('click', () => {
+      document.getElementById('topbar-sub').textContent = '';
+      this.renderMain();
+    });
+    document.getElementById('at-iz-prev')?.addEventListener('click', () => {
+      this._saveIntakeStep();
+      this._intakeStep--;
+      this.renderIntakeStep();
+    });
+    document.getElementById('at-iz-next')?.addEventListener('click', () => {
+      if (step === 1) {
+        const barRev  = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
+        const foodRev = parseFloat(document.getElementById('at-iz-food-rev')?.value) || 0;
+        if (barRev === 0 && foodRev === 0) {
+          const st = document.getElementById('at-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='Enter at least one revenue figure to continue.'; }
+          return;
         }
-
-        if (!existingUserId) {
-          return res.status(500).json({ error: 'Email is already registered but the user record could not be located.' });
-        }
-
-        const { data: alreadyMember } = await supabaseAdmin
-          .from('memberships')
-          .select('id')
-          .eq('account_id', accountId)
-          .eq('user_id', existingUserId)
-          .maybeSingle();
-
-        if (alreadyMember) {
-          return res.status(400).json({ error: 'This person is already a member of this account.' });
-        }
-
-        const { error: insertError } = await supabaseAdmin
-          .from('memberships')
-          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: cleanPerms });
-
-        if (insertError) {
-          return res.status(500).json({ error: insertError.message });
-        }
-
-        // Also send a password recovery email so they can set (or reset) their
-        // password and sign in. Triggers the recovery flow in app.js which
-        // shows the set-password panel. Non-fatal if email send fails.
-        let emailSent = false;
-        try {
-          const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail, {
-            redirectTo: 'https://app.barcop.com/'
-          });
-          emailSent = !resetErr;
-          if (resetErr) console.error('Password reset email failed:', resetErr);
-        } catch (e) {
-          console.error('Password reset email exception:', e);
-        }
-
-        return res.json({ ok: true, email: cleanEmail, role: inviteRole, addedDirectly: true, emailSent });
+        this._intakeDraft.barRev  = document.getElementById('at-iz-bar-rev')?.value || '';
+        this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
       }
-
-      console.error('Invite error:', inviteError);
-      return res.status(500).json({ error: inviteError.message || 'Invite failed' });
-    }
-
-    res.json({ ok: true, email: cleanEmail, role: inviteRole });
-  } catch (e) {
-    console.error('Invite exception:', e);
-    res.status(500).json({ error: e.message || 'Invite failed' });
-  }
-});
-
-// ── List members of an account (Phase 2 multi-user) ───────────────────────────
-// Returns every member of the account along with their email and role. Caller
-// must be a member of the account (any role) to see the list.
-app.post('/api/list-members', async (req, res) => {
-  try {
-    const { accountId } = req.body || {};
-    if (!accountId) return res.status(400).json({ error: 'accountId required' });
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership) {
-      return res.status(403).json({ error: 'Not a member of this account' });
-    }
-
-    const { data: memberships, error: listError } = await supabaseAdmin
-      .from('memberships')
-      .select('id, user_id, role, permissions, created_at')
-      .eq('account_id', accountId)
-      .order('created_at', { ascending: true });
-
-    if (listError) {
-      return res.status(500).json({ error: listError.message });
-    }
-
-    // Resolve emails via admin API
-    const members = [];
-    for (const m of memberships || []) {
-      try {
-        const { data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
-        members.push({
-          id: m.id,
-          user_id: m.user_id,
-          email: u?.user?.email || '(unknown)',
-          role: m.role,
-          permissions: m.permissions || {},
-          confirmed: !!u?.user?.confirmed_at,
-          created_at: m.created_at,
-          is_self: m.user_id === requesterUserId
-        });
-      } catch (e) {
-        members.push({
-          id: m.id,
-          user_id: m.user_id,
-          email: '(unknown)',
-          role: m.role,
-          permissions: m.permissions || {},
-          confirmed: false,
-          created_at: m.created_at,
-          is_self: m.user_id === requesterUserId
-        });
+      if (step === 2) {
+        const posFiles = document.getElementById('at-f-pos-bev')?.files;
+        if (!posFiles || posFiles.length === 0) {
+          const st = document.getElementById('at-iz-status');
+          if (st) { st.style.display='block'; st.style.color='var(--red)'; st.textContent='POS Beverages report is required.'; }
+          return;
+        }
       }
+      this._saveIntakeStep();
+      this._intakeStep++;
+      this.renderIntakeStep();
+    });
+    document.getElementById('at-iz-submit')?.addEventListener('click', () => {
+      this._intakeDraft.notes = document.getElementById('at-iz-notes')?.value || '';
+      this.generateAudit();
+    });
+  },
+
+  _saveIntakeStep() {
+    // File inputs can't be persisted but text values can
+    if (document.getElementById('at-iz-bar-rev'))  this._intakeDraft.barRev  = document.getElementById('at-iz-bar-rev').value;
+    if (document.getElementById('at-iz-food-rev')) this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev').value;
+    if (document.getElementById('at-iz-notes'))    this._intakeDraft.notes   = document.getElementById('at-iz-notes').value;
+  },
+
+
+  renderFileSection(type, title, inputId, ttId, unlocks) {
+    const badge = type === 'required'
+      ? '<span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>'
+      : type === 'highlight'
+      ? '<span style="background:var(--gold);color:#000;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Highest Value</span>'
+      : '<span style="background:var(--b1);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Optional</span>';
+    return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px 14px;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' + badge
+      + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
+      + (ttId ? tt(ttId) : '')
+      + '</div>'
+      + (unlocks ? '<div style="font-size:10px;color:var(--gold);margin-bottom:8px;line-height:1.4;">' + esc(unlocks) + '</div>' : '<div style="margin-bottom:8px;"></div>')
+      + '<input type="file" id="' + inputId + '" multiple accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg" '
+      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;"/>'
+      + '</div>';
+  },
+
+  async generateAudit() {
+    if (App.demoBlock('Running an audit')) return;
+    // Show generating state in the current container
+    const submitBtn = document.getElementById('at-iz-submit');
+    const statusEl  = document.getElementById('at-iz-status');
+    const setStatus = (msg, color='var(--t2)') => {
+      if (statusEl) { statusEl.style.display='block'; statusEl.style.color=color; statusEl.textContent=msg; }
+    };
+    if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
+
+    const fileInputIds = ['at-f-pl','at-f-loss','at-f-vendor','at-f-recipe','at-f-inv'];
+    const allFiles = [];
+    for (const id of fileInputIds) {
+      const inp = document.getElementById(id);
+      if (inp?.files) for (const f of inp.files) allFiles.push({file:f, field:id});
     }
 
-    res.json({ ok: true, members, requesterRole: requesterMembership.role });
-  } catch (e) {
-    console.error('list-members exception:', e);
-    res.status(500).json({ error: e.message || 'List members failed' });
+    const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
+    const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
+
+    // Validation — do not run an audit with nothing to analyze
+    const hasRealData = allFiles.length > 0 || (App.data.weeks && App.data.weeks.length > 0) || barRev > 0 || foodRev > 0;
+    if (!hasRealData) {
+      setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your POS reports.', 'var(--red)');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
+      return;
+    }
+
+    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
+
+    try {
+      const practices = this._intakeDraft?.practices || {};
+      // Remember revenue + operating practices so the next audit pre-fills them
+      // and the operator only changes what improved.
+      App.data.settings.annual_bar_revenue  = barRev;
+      App.data.settings.annual_food_revenue = foodRev;
+      App.data.settings.profit_practices    = practices;
+      await App.saveKey('settings');
+
+      const auditAppData = JSON.parse(JSON.stringify(App.data));
+
+      const form = new FormData();
+      form.append('appData', JSON.stringify(auditAppData));
+      form.append('practices', JSON.stringify(practices));
+      const controlData = this.buildControlData();
+      if (controlData) form.append('controlData', JSON.stringify(controlData));
+      for (const {file, field} of allFiles) form.append(field, file, file.name);
+
+      setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
+
+      const res  = await fetch('/api/generate-profit-audit', { method:'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Generation failed');
+
+      setStatus('Saving audit...', 'var(--gold)');
+      const d = data.auditData || {};
+
+      const auditRecord = {
+        id:            App.uid(),
+        date:          new Date().toISOString().slice(0,10),
+        bar_name:      d.BAR_NAME || App.data.settings.bar_name,
+        overall_score: d.OVERALL_SCORE || 0,
+        grade:         d.DATA_TIER_LABEL || '',
+        audit_period:  d.AUDIT_PERIOD || '',
+        audit_id:      d.AUDIT_ID || '',
+        sections:      this.extractSections(d),
+        action_items:  this.extractActionItems(d),
+        raw:           d,
+        generated_at:  new Date().toISOString()
+      };
+
+      if (!App.data.audits) App.data.audits = [];
+      App.data.audits.push(auditRecord);
+      if (App.data.audits.length > 12) App.data.audits = App.data.audits.slice(-12);
+      await App.saveKey('audits');
+      App.markSetupDone('gs_p_audit');
+
+      document.getElementById('topbar-sub').textContent = '';
+      this.renderMain();
+      setTimeout(() => this.viewAudit(0), 100);
+
+    } catch(e) {
+      setStatus('Error: ' + (e.message||'Generation failed. Please try again.'), 'var(--red)');
+      if (submitBtn) { submitBtn.disabled=false; submitBtn.textContent='Generate Audit'; }
+    }
+  },
+
+  extractSections(d) {
+    const s = {};
+    const names = App.AUDIT_PROFIT_SECTION_NAMES;
+    [1, 2, 3, 4, 5].forEach(n => {
+      const v = d['S' + n + '_SCORE'];
+      if (v != null) s[names[n - 1]] = v;
+    });
+    return s;
+  },
+
+  extractActionItems(d) {
+    const items = [];
+    if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Reduce bar pour cost. $' + Math.round(d.S1_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S1_MONTHLY_GAP, gap_id: 'pour-cost' });
+    if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S3_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'food-cost' });
+    if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S2_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'theft-loss' });
+    if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY, gap_id: 'vendor-control' });
+    // Prime cost (S5_COMBINED_COGS_GAP) is the bar + food COGS overage, i.e. it
+    // already equals S1 + S3. It is shown as context on the Prime Cost section,
+    // never added here as a recoverable item, or the Total Recoverable would
+    // double-count the same dollars. (Decision: audit-honesty-rebuild.)
+    return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
+  },
+
+  /* Verified Control-module data sent with the audit as ground truth (map
+     Section 8). Each slice is real logged operational data; a section only
+     appears when its Control data exists, so the server never gets a
+     fabricated figure. Returns null when no Control module has data. */
+  buildControlData() {
+    const inv = App.inventoryData || {};
+    const sh  = App.shiftData || {};
+    const lab = App.laborData || {};
+    const r1  = n => (n == null || isNaN(n)) ? null : Math.round(n * 10) / 10;
+    const cd  = { sources: [] };
+
+    // Bar / food / prime cost — the weeks already derive from Control feeds
+    const weeks = (App.data.weeks || []).filter(w => w.period_end).slice(-4);
+    if (weeks.length) {
+      const avg = fn => { const v = weeks.map(fn).filter(x => x != null && !isNaN(x));
+        return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+      cd.bar_cost_pct   = r1(avg(w => w.bar && w.bar.cost_pct));
+      cd.food_cost_pct  = r1(avg(w => w.food && w.food.cost_pct));
+      cd.prime_cost_pct = r1(avg(w => w.prime_cost_pct));
+    }
+
+    // Period window — the audit covers the same trailing 4 weeks the cost
+    // percentages use. Scope every summed Control figure to that window so a
+    // bar with months of logged records does not overstate a one-period rate.
+    let windowStart = null;
+    if (weeks.length) {
+      const ends = weeks.map(w => w.period_end).sort();
+      const d = new Date(ends[0] + 'T00:00:00');
+      d.setDate(d.getDate() - 6);          // include the full first week of the window
+      windowStart = isNaN(d) ? null : d;
+    }
+    const inWindow = (rec) => {
+      if (!windowStart) return true;       // no weekly data — do not filter
+      const ds = rec && (rec.date || rec.created_at);
+      if (!ds) return true;                // undated — include rather than silently drop
+      const rd = new Date(('' + ds).slice(0, 10) + 'T00:00:00');
+      return isNaN(rd) ? true : rd >= windowStart;
+    };
+
+    // Inventory Control — counts
+    const counts = (inv.ic_counts || []).filter(inWindow);
+    if (counts.length) { cd.inventory_counts = counts.length; cd.sources.push('Inventory Control counts'); }
+
+    // Inventory Control — deliveries and vendor price drift
+    const dels = (inv.ic_deliveries || []).filter(inWindow);
+    if (dels.length) {
+      let changes = 0;
+      dels.forEach(d => (d.line_items || []).forEach(li => {
+        if (li.price_changed && li.prev_price != null && li.price_per_unit != null) changes++;
+      }));
+      cd.deliveries_logged = dels.length;
+      cd.vendor_price_changes = changes;
+      cd.sources.push('Inventory Control deliveries');
+    }
+
+    // Inventory Control — spot checks (theft pour-variance signal)
+    const spots = (inv.ic_spot_checks || []).filter(inWindow);
+    if (spots.length) {
+      cd.spot_checks = spots.length;
+      cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
+      cd.spot_check_variance_dollar = r1(spots.reduce((s,c) => s + (c.total_variance_dollar || 0), 0));
+      cd.sources.push('Inventory Control spot checks');
+    }
+
+    // Shift Control — voids and comps
+    const vc = (sh.sc_void_comps || []).filter(inWindow);
+    if (vc.length) {
+      cd.void_comp_count = vc.length;
+      cd.void_comp_total = r1(vc.reduce((s,v) => s + (v.amount || 0), 0));
+      cd.void_comp_unauthorized = vc.filter(v => !v.authorized_by).length;
+      cd.sources.push('Shift Control void and comp log');
+    }
+
+    // Shift Control — drawer reconciliations and cash drops
+    const variances = (sh.sc_variances || []).filter(inWindow);
+    if (variances.length) {
+      cd.cash_reconciliations = variances.length;
+      cd.cash_variance_total = r1(variances.reduce((s,v) => s + (v.variance || 0), 0));
+      cd.cash_short_count = variances.filter(v => v.status === 'Short').length;
+      cd.sources.push('Shift Control drawer reconciliation');
+    }
+    const drops = (sh.sc_cash_drops || []).filter(inWindow);
+    if (drops.length) cd.cash_drops = drops.length;
+
+    // Labor Control — actual hours and cost (prime cost labor)
+    const actuals = (lab.lc_actuals || []).filter(inWindow);
+    if (actuals.length) {
+      cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
+      cd.labor_cost  = Math.round(actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0));
+      cd.sources.push('Labor Control actuals');
+    }
+
+    return cd.sources.length ? cd : null;
   }
-});
-
-// ── Update a member's role (Phase 2 multi-user) ───────────────────────────────
-// Only admins can call. Cannot demote the last admin. Cannot change your own role.
-app.post('/api/update-member-role', async (req, res) => {
-  try {
-    const { accountId, membershipId, newRole } = req.body || {};
-    if (!accountId || !membershipId || !newRole) {
-      return res.status(400).json({ error: 'accountId, membershipId, newRole required' });
-    }
-    const validRoles = ['admin', 'staff', 'viewer'];
-    if (!validRoles.includes(newRole)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can change roles' });
-    }
-
-    const { data: target } = await supabaseAdmin
-      .from('memberships')
-      .select('id, user_id, role')
-      .eq('id', membershipId)
-      .eq('account_id', accountId)
-      .single();
-
-    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
-    if (target.user_id === requesterUserId) {
-      return res.status(400).json({ error: 'You cannot change your own role' });
-    }
-
-    // Last-admin protection: if demoting an admin, ensure another admin exists
-    if (target.role === 'admin' && newRole !== 'admin') {
-      const { count } = await supabaseAdmin
-        .from('memberships')
-        .select('id', { count: 'exact', head: true })
-        .eq('account_id', accountId)
-        .eq('role', 'admin');
-      if ((count || 0) <= 1) {
-        return res.status(400).json({ error: 'Cannot remove the last admin from this account' });
-      }
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('memberships')
-      .update({ role: newRole })
-      .eq('id', membershipId);
-
-    if (updateError) return res.status(500).json({ error: updateError.message });
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('update-member-role exception:', e);
-    res.status(500).json({ error: e.message || 'Update role failed' });
-  }
-});
-
-// ── Update a member's permissions (Phase 2 Item 25b) ──────────────────────────
-// Only admins can call. Permissions is a JSON object { groupKey: 'add' | 'edit' }.
-// Missing keys mean no access to that group.
-app.post('/api/update-member-permissions', async (req, res) => {
-  try {
-    const { accountId, membershipId, permissions } = req.body || {};
-    if (!accountId || !membershipId) {
-      return res.status(400).json({ error: 'accountId and membershipId required' });
-    }
-    const cleanPerms = (permissions && typeof permissions === 'object')
-      ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'add' || v === 'edit')
-        )
-      : {};
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can change permissions' });
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('memberships')
-      .update({ permissions: cleanPerms })
-      .eq('id', membershipId)
-      .eq('account_id', accountId);
-
-    if (updateError) return res.status(500).json({ error: updateError.message });
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('update-member-permissions exception:', e);
-    res.status(500).json({ error: e.message || 'Update permissions failed' });
-  }
-});
-
-// ── Remove a member from an account (Phase 2 multi-user) ──────────────────────
-// Only admins can call. Cannot remove the last admin. Cannot remove yourself.
-app.post('/api/remove-member', async (req, res) => {
-  try {
-    const { accountId, membershipId } = req.body || {};
-    if (!accountId || !membershipId) {
-      return res.status(400).json({ error: 'accountId and membershipId required' });
-    }
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can remove members' });
-    }
-
-    const { data: target } = await supabaseAdmin
-      .from('memberships')
-      .select('id, user_id, role')
-      .eq('id', membershipId)
-      .eq('account_id', accountId)
-      .single();
-
-    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
-    if (target.user_id === requesterUserId) {
-      return res.status(400).json({ error: 'You cannot remove yourself' });
-    }
-
-    if (target.role === 'admin') {
-      const { count } = await supabaseAdmin
-        .from('memberships')
-        .select('id', { count: 'exact', head: true })
-        .eq('account_id', accountId)
-        .eq('role', 'admin');
-      if ((count || 0) <= 1) {
-        return res.status(400).json({ error: 'Cannot remove the last admin from this account' });
-      }
-    }
-
-    const { error: deleteError } = await supabaseAdmin
-      .from('memberships')
-      .delete()
-      .eq('id', membershipId);
-
-    if (deleteError) return res.status(500).json({ error: deleteError.message });
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('remove-member exception:', e);
-    res.status(500).json({ error: e.message || 'Remove member failed' });
-  }
-});
-
-// ── SPA fallback ──────────────────────────────────────────────────────────────
-app.get('*', (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-
-const server = app.listen(PORT, () => {
-  console.log('\n  Bar Cop Recovery\n  http://localhost:' + PORT + '\n');
-});
-server.timeout = 300000;
-server.headersTimeout = 310000;
+};
