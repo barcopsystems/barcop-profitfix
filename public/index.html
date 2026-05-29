@@ -1,793 +1,265 @@
-'use strict';
-
-const DB = {
-  _sb: null,
-  _user: null,
-  _accountId: null,  // resolved lazily on first read/write after signin (Phase 2)
-  _role: null,       // 'admin' | 'staff' | 'viewer' — resolved alongside _accountId
-  _permissions: null, // { groupKey: 'view' | 'add' | 'edit' } — staff granular permissions
-  _accountsCache: null,  // last-known accounts list for the current user (Phase 2)
-  _demo: false,   // demo mode — all writes are no-ops so the demo never persists
-
-  // ── Init ─────────────────────────────────────────────────────────────────
-  async init() {
-    const url = 'https://plpikfpintruksclkwyb.supabase.co';
-    const key = 'sb_publishable_2tv02ZIL_HKQitRV1ST-rQ_9a8Gjw_u';
-
-    if (window.supabase) {
-      this._sb = window.supabase.createClient(url, key);
-      window.SUPABASE_URL = url;
-    } else {
-      console.warn('Supabase not loaded — using localStorage');
-    }
-  },
-
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  async getSession() {
-    if (!this._sb) return null;
-    const { data } = await this._sb.auth.getSession();
-    this._user = data?.session?.user || null;
-    this._accountId = null;
-    this._role = null;
-    this._permissions = null;
-    this._accountsCache = null;  // force re-resolve on next read/write
-    return data?.session || null;
-  },
-
-  onAuthChange(cb) {
-    if (!this._sb) return;
-    this._sb.auth.onAuthStateChange((event, session) => {
-      const prevUserId = this._user?.id;
-      this._user = session?.user || null;
-      const newUserId = this._user?.id;
-      // Only clear cached account/role/permissions if the user actually
-      // changed. TOKEN_REFRESHED events keep the same user — wiping the cache
-      // there was hiding the Team card after periodic token refresh.
-      if (prevUserId !== newUserId) {
-        this._accountId = null;
-        this._role = null;
-        this._permissions = null;
-        this._accountsCache = null;
-      }
-      cb(event, session);
-    });
-  },
-
-  async signIn(email, password) {
-    if (!this._sb) return { error: { message: 'Not connected' } };
-    const { data, error } = await this._sb.auth.signInWithPassword({ email, password });
-    if (data?.user) this._user = data.user;
-    this._accountId = null;
-    this._role = null;
-    this._permissions = null;
-    this._accountsCache = null;
-    return { data, error };
-  },
-
-  async signUp(email, password) {
-    if (!this._sb) return { error: { message: 'Not connected' } };
-    return await this._sb.auth.signUp({ email, password });
-  },
-
-  async signOut() {
-    if (!this._sb) return;
-    await this._sb.auth.signOut();
-    this._user = null;
-    this._accountId = null;
-    this._role = null;
-    this._permissions = null;
-    this._accountsCache = null;
-  },
-
-  async resetPassword(email) {
-    if (!this._sb) return { error: { message: 'Not connected' } };
-    return await this._sb.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://app.barcop.com/'
-    });
-  },
-
-  // ── Subscription ─────────────────────────────────────────────────────────
-  async getSubscription() {
-    if (!this._sb || !this._user) {
-      return { status: 'inactive', plan: null, active_modules: [], period_end: null };
-    }
-    try {
-      const { data, error } = await this._sb
-        .from('subscriptions')
-        .select('subscription_status, subscription_plan, active_modules, current_period_end')
-        .eq('user_id', this._user.id)
-        .single();
-
-      if (error || !data) {
-        return { status: 'inactive', plan: null, active_modules: [], period_end: null };
-      }
-      return {
-        status:         data.subscription_status,
-        plan:           data.subscription_plan,
-        active_modules: data.active_modules || [],
-        period_end:     data.current_period_end
-      };
-    } catch (e) {
-      console.error('getSubscription error:', e);
-      return { status: 'inactive', plan: null, active_modules: [], period_end: null };
-    }
-  },
-
-  hasModule(moduleName) {
-    return App.subscription?.active_modules?.includes(moduleName) || false;
-  },
-
-  // ── Account resolution (Phase 2) ──────────────────────────────────────────
-  // Looks up the current user's account_id from the memberships table and
-  // caches it. Lazy: resolves on first read/write after signin. Cleared in
-  // every auth handler so a fresh signin always re-resolves.
-  // Active account ID is stored in localStorage so it persists across reloads.
-  // Multi-account users (owners of 2+ bars) pick which bar to view via the
-  // topbar account switcher; that selection becomes the active account.
-  _ACTIVE_ACCOUNT_KEY: 'pf_active_account_id',
-  _getStoredActiveAccountId() {
-    try { return localStorage.getItem(this._ACTIVE_ACCOUNT_KEY) || null; }
-    catch (e) { return null; }
-  },
-  _setStoredActiveAccountId(id) {
-    try {
-      if (id) localStorage.setItem(this._ACTIVE_ACCOUNT_KEY, id);
-      else localStorage.removeItem(this._ACTIVE_ACCOUNT_KEY);
-    } catch (e) {}
-  },
-
-  async _ensureAccountId() {
-    if (this._accountId) return this._accountId;
-    if (!this._sb || !this._user) return null;
-    try {
-      // Multi-account: if the user previously selected an active account,
-      // resolve that one first. Falls back to first membership otherwise.
-      const stored = this._getStoredActiveAccountId();
-      if (stored) {
-        const { data: m, error: e1 } = await this._sb
-          .from('memberships')
-          .select('account_id, role, permissions')
-          .eq('user_id', this._user.id)
-          .eq('account_id', stored)
-          .maybeSingle();
-        if (!e1 && m) {
-          this._accountId = m.account_id;
-          this._role = m.role || 'admin';
-          this._permissions = m.permissions || {};
-          return this._accountId;
-        }
-        // Stale stored ID (user lost access to that account). Clear it.
-        this._setStoredActiveAccountId(null);
-      }
-      const { data, error } = await this._sb
-        .from('memberships')
-        .select('account_id, role, permissions')
-        .eq('user_id', this._user.id)
-        .limit(1)
-        .single();
-      if (error || !data) return null;
-      this._accountId = data.account_id;
-      this._role = data.role || 'admin';
-      this._permissions = data.permissions || {};
-      return this._accountId;
-    } catch (e) {
-      return null;
-    }
-  },
-
-  // Returns every account the current user is a member of, with name + role.
-  // Used by the topbar account switcher and the Hub sidebar Locations gate.
-  // Caches the result in _accountsCache so synchronous callers (sidebar render)
-  // can read the list without awaiting a network round-trip. Cache clears on
-  // signIn / signOut / user change.
-  async listMyAccounts() {
-    if (!this._sb || !this._user) { this._accountsCache = []; return []; }
-    try {
-      const { data, error } = await this._sb
-        .from('memberships')
-        .select('account_id, role, accounts(id, name)')
-        .eq('user_id', this._user.id);
-      if (error || !data) { this._accountsCache = []; return []; }
-      const list = data
-        .filter(m => m.accounts)
-        .map(m => ({ id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role }));
-      this._accountsCache = list;
-      return list;
-    } catch (e) {
-      this._accountsCache = [];
-      return [];
-    }
-  },
-
-  // Sync accessor for callers that need the accounts list during render and
-  // cannot await. Returns whatever the last listMyAccounts() populated, or
-  // an empty array if nothing has been resolved yet. Pre-fetched by
-  // App.loadAllData() so by the time the Hub renders, the cache is populated.
-  cachedAccounts() {
-    return this._accountsCache || [];
-  },
-
-  // Switch which account is active. Stores in localStorage and reloads so
-  // every cached data structure starts fresh under the new account context.
-  setActiveAccount(accountId) {
-    this._setStoredActiveAccountId(accountId);
-    window.location.reload();
-  },
-
-  // Current user's role in their active account. 'admin' | 'staff' | 'viewer' |
-  // null if not yet resolved. Resolved lazily as a side effect of any read/write.
-  role() { return this._role; },
-  permissions() { return this._permissions || {}; },
-  isAdmin()  { return this._role === 'admin'; },
-  isStaff()  { return this._role === 'staff'; },
-  isViewer() { return this._role === 'viewer'; },
-  canWrite() { return this._role !== 'viewer'; },
-
-  // ── Granular permission system (Phase 2 Item 25b) ───────────────────────────
-  // Each screen maps to a permission group. The user's permissions object
-  // stores per-group access levels: 'add' (view + create new) or 'edit'
-  // (view + create + edit + delete). Missing key = no access.
-  //
-  // Admin: implicit 'edit' on all groups (bypasses the map).
-  // Viewer: implicit 'view' on all groups (read-only, blocked at write).
-  // Staff: looks up the screen's group in their permissions object.
-  // Help screens (mapped to '_always'): accessible to anyone signed in.
-  SCREEN_GROUPS: {
-    // Inventory Control
-    'ic-take-inventory':'take-inventory','ic-count-history':'take-inventory',
-    'ic-receive-delivery':'receive-delivery','ic-delivery-history':'receive-delivery',
-    'ic-order-sheet':'place-orders','ic-order-history':'place-orders',
-    'ic-spot-check':'spot-check',
-    'ic-transfers':'inventory-counts',
-    'ic-empties':'inventory-counts',
-    'ic-adjustments':'inventory-counts',
-    'ic-par-suggestions':'inventory-reports',
-    'ic-product-setup':'manage-products','ic-locations':'manage-products','ic-vendors':'manage-products',
-    'ic-report-stock':'inventory-reports','ic-report-movers':'inventory-reports',
-    'ic-report-usage':'inventory-reports','ic-report-variance':'inventory-reports',
-    'ic-dashboard':'inventory-dashboard','ic-help':'_always',
-    // Labor Control
-    'lc-log-hours':'log-hours','lc-daily-view':'log-hours',
-    'lc-tip-log':'log-tips','lc-tip-history':'log-tips','lc-tip-pool':'log-tips',
-    'lc-schedule-history':'view-schedule',
-    'lc-build-schedule':'manage-schedule','lc-schedule-templates':'manage-schedule',
-    'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
-    'lc-wage-settings':'manage-staff',
-    'lc-callout-log':'call-out-log',
-    'lc-reports':'labor-reports','lc-weekly-summary':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports',
-    'lc-dashboard':'labor-dashboard','lc-help':'_always',
-    // Shift Control
-    'sc-log-shift':'log-shift','sc-shift-history':'log-shift',
-    'sc-active-shift':'active-shift',
-    'sc-cash-drop':'cash-mgmt','sc-safe-log':'cash-mgmt','sc-variance-log':'cash-mgmt',
-    'sc-opening-checklist':'checklists','sc-closing-checklist':'checklists','sc-checklist-templates':'checklists',
-    'sc-86-list':'86-list',
-    'sc-void-comp':'void-comp',
-    'sc-comp-settings':'void-comp',
-    'sc-maintenance':'maintenance',
-    'sc-walked-tabs':'cash-mgmt',
-    'sc-incident-log':'maintenance',
-    'sc-reports-shift':'shift-reports','sc-reports-cash':'shift-reports','sc-reports-ops':'shift-reports',
-    'sc-dashboard':'shift-dashboard','sc-help':'_always',
-    // Profit Recovery (root + profit module screens)
-    'dashboard':'profit-recovery','this-week':'profit-recovery',
-    'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
-    'cash-recon':'profit-recovery','theft-risk':'profit-recovery',
-    'pour-test':'profit-recovery','yield-test':'profit-recovery',
-    'recipe-cost-analysis':'profit-recovery','vendor-watch':'profit-recovery',
-    'vendor-scorecard':'profit-recovery','vendor-discrepancy':'profit-recovery',
-    'bar-products':'profit-recovery','kitchen-products':'profit-recovery',
-    'reports':'profit-recovery','help':'_always',
-    // Revenue Recovery
-    'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery','r-forecast':'revenue-recovery',
-    'r-audit':'revenue-recovery','r-fix':'revenue-recovery',
-    'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
-    'r-menu-engineering':'revenue-recovery','r-pricing':'revenue-recovery',
-    'r-rplh':'revenue-recovery','r-dog-test':'revenue-recovery',
-    'r-events':'revenue-recovery',
-    'r-reports':'revenue-recovery','r-help':'_always',
-    // Traffic Recovery
-    't-dashboard':'traffic-recovery','t-this-week':'traffic-recovery',
-    't-audit':'traffic-recovery','t-fix':'traffic-recovery',
-    't-website':'traffic-recovery','t-gbp':'traffic-recovery',
-    't-reviews':'traffic-recovery','t-search':'traffic-recovery',
-    't-social':'traffic-recovery','t-delivery':'traffic-recovery',
-    't-email':'traffic-recovery',
-    't-regulars':'traffic-recovery','t-initiatives':'traffic-recovery',
-    't-holidays':'traffic-recovery','t-inquiries':'traffic-recovery',
-    't-reports':'traffic-recovery','t-help':'_always'
-  },
-
-  canAccessLevel(screen) {
-    if (!this._role) return 'edit';  // not yet resolved (e.g., demo mode) — open
-    if (this._role === 'admin') return 'edit';
-    const group = this.SCREEN_GROUPS[screen];
-    if (group === '_always') return 'view';  // help screens always accessible
-    if (this._role === 'viewer') return 'view';
-    if (!group) return null;
-    const perms = this._permissions || {};
-    return perms[group] || null;
-  },
-
-  screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
-  screenCanAdd(screen)  { const l = this.canAccessLevel(screen); return l === 'add' || l === 'edit'; },
-  screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },
-
-  // ── Data ──────────────────────────────────────────────────────────────────
-  async readData() {
-    // Supabase mode
-    if (this._sb && this._user) {
-      // Unsynced local changes from an offline session are newer than the
-      // server copy — load them so no offline work is lost.
-      if (this._pendingList().includes('pf_data')) {
-        return this._mergeDefaults(this._localRead());
-      }
-      const accountId = await this._ensureAccountId();
-      if (!accountId) {
-        // No membership found — should not happen after Phase 19 backfill +
-        // 22a signup trigger, but fall back to local so the operator is never
-        // locked out of their own data.
-        return this._mergeDefaults(this._localRead());
-      }
-      try {
-        const { data, error } = await this._sb
-          .from('user_data')
-          .select('data')
-          .eq('account_id', accountId)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('readData error:', error);
-          return this._mergeDefaults(this._localRead());
-        }
-        if (!data) {
-          // First login — create row with defaults
-          const defaults = this._defaultData();
-          await this._sb.from('user_data').insert({
-            account_id: accountId,
-            user_id: this._user.id,
-            data: defaults,
-            updated_at: new Date().toISOString()
-          });
-          return defaults;
-        }
-        return this._mergeDefaults(data.data);
-      } catch (e) {
-        console.error('readData exception:', e);
-        return this._mergeDefaults(this._localRead());
-      }
-    }
-    // localStorage fallback
-    return this._mergeDefaults(this._localRead());
-  },
-
-  async writeData(appData) {
-    if (this._demo) return { ok: true };
-    if (this._sb && this._user) {
-      // Fix D: short-circuit the network call when the browser knows it is offline.
-      // No round-trip, no console error, faster save. The local copy is canonical.
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        this._localWrite(appData);
-        this._markPending('pf_data');
-        return { ok: false, offline: true };
-      }
-      const accountId = await this._ensureAccountId();
-      if (!accountId) {
-        this._localWrite(appData);
-        this._markPending('pf_data');
-        return { ok: false, error: 'no account membership found' };
-      }
-      // Viewer role: read-only. Silently swallow writes so the UI doesn't
-      // pretend a save succeeded. Server-side RLS is the real enforcement;
-      // this is the friendly client-side rejection.
-      if (this._role === 'viewer') {
-        return { ok: false, error: 'Viewer access is read-only.' };
-      }
-      try {
-        const { error } = await this._sb
-          .from('user_data')
-          .upsert({
-            account_id: accountId,
-            user_id: this._user.id,
-            data: appData,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'account_id' });
-
-        if (error) {
-          console.error('writeData error:', error);
-          this._localWrite(appData);
-          this._markPending('pf_data');
-          return { ok: false, error };
-        }
-        this._localWrite(appData); // keep local copy in sync
-        this._clearPending('pf_data');
-        return { ok: true };
-      } catch (e) {
-        console.error('writeData exception:', e);
-        this._localWrite(appData);
-        this._markPending('pf_data');
-        return { ok: false, error: e };
-      }
-    }
-    this._localWrite(appData);
-    return { ok: true };
-  },
-
-  async writeKey(key, value) {
-    if (!App.data) return { ok: false };
-    App.data[key] = value;
-    return await this.writeData(App.data);
-  },
-
-  // ── Offline sync (Section 14) ─────────────────────────────────────────────
-  // When a write to Supabase fails (offline or server unreachable), the local
-  // copy is kept and the store is marked pending. On the next load the local
-  // copy is loaded (it is newer than the server), and App prompts to sync.
-  _PENDING_KEY: 'pf_pending_sync',
-
-  _pendingList() {
-    try { const r = localStorage.getItem(this._PENDING_KEY); return r ? JSON.parse(r) : []; }
-    catch (e) { return []; }
-  },
-  _setPendingList(list) {
-    try {
-      if (list && list.length) localStorage.setItem(this._PENDING_KEY, JSON.stringify(list));
-      else localStorage.removeItem(this._PENDING_KEY);
-    } catch (e) { /* storage full or unavailable */ }
-  },
-  _markPending(lsKey) {
-    const list = this._pendingList();
-    if (!list.includes(lsKey)) {
-      list.push(lsKey);
-      this._setPendingList(list);
-      // Fix C: tell the app that something just landed in the pending queue, so it
-      // can surface the sync banner immediately instead of waiting for next reload.
-      try { window.dispatchEvent(new CustomEvent('bcop:pending-write', { detail: { key: lsKey } })); }
-      catch (e) { /* CustomEvent unavailable */ }
-    }
-  },
-  _clearPending(lsKey) {
-    this._setPendingList(this._pendingList().filter(k => k !== lsKey));
-  },
-  // True only in Supabase mode with a signed-in user and unsynced local data.
-  hasPendingSync() {
-    return !!(this._sb && this._user && this._pendingList().length > 0);
-  },
-
-  // Re-push every pending store's local copy to Supabase. Each store clears
-  // from the pending list only on its own successful write.
-  async syncPending() {
-    if (!this._sb || !this._user) return { ok: false, synced: 0, failed: 0, error: 'Not connected' };
-    const tableOf = { pf_data: 'user_data', pf_ic_data: 'ic_data', pf_lc_data: 'lc_data', pf_sc_data: 'sc_data' };
-    let synced = 0, failed = 0;
-    for (const lsKey of this._pendingList()) {
-      const table = tableOf[lsKey];
-      if (!table) { this._clearPending(lsKey); continue; }
-      const data = lsKey === 'pf_data' ? this._localRead() : this._localReadControl(lsKey);
-      try {
-        const { error } = await this._sb.from(table).upsert({
-          user_id: this._user.id, data: data, updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-        if (error) { failed++; }
-        else { this._clearPending(lsKey); synced++; }
-      } catch (e) { failed++; }
-    }
-    return { ok: failed === 0, synced: synced, failed: failed };
-  },
-
-  // ── Local storage fallback ────────────────────────────────────────────────
-  _localRead() {
-    try {
-      const r = localStorage.getItem('pf_data');
-      return r ? JSON.parse(r) : this._defaultData();
-    } catch (e) {
-      return this._defaultData();
-    }
-  },
-
-  _localWrite(data) {
-    try {
-      localStorage.setItem('pf_data', JSON.stringify(data));
-    } catch (e) {
-      console.warn('localStorage write failed:', e);
-    }
-  },
-
-  // ── Control module data (separate Supabase tables — see Rule 21) ──────────
-  // Inventory / Labor / Shift data lives in its own table (ic_data / lc_data /
-  // sc_data), NOT in the user_data JSON blob. Same read/write pattern as
-  // readData()/writeData(); default for a fresh row is an empty object.
-  async _readControl(table, lsKey) {
-    if (this._sb && this._user) {
-      // Unsynced offline changes are newer than the server copy.
-      if (this._pendingList().includes(lsKey)) {
-        return this._localReadControl(lsKey);
-      }
-      const accountId = await this._ensureAccountId();
-      if (!accountId) {
-        return this._localReadControl(lsKey);
-      }
-      try {
-        const { data, error } = await this._sb
-          .from(table)
-          .select('data')
-          .eq('account_id', accountId)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('read ' + table + ' error:', error);
-          return this._localReadControl(lsKey);
-        }
-        if (!data) {
-          // First access — create the row with an empty object
-          await this._sb.from(table).insert({
-            account_id: accountId,
-            user_id: this._user.id,
-            data: {},
-            updated_at: new Date().toISOString()
-          });
-          return {};
-        }
-        return data.data || {};
-      } catch (e) {
-        console.error('read ' + table + ' exception:', e);
-        return this._localReadControl(lsKey);
-      }
-    }
-    return this._localReadControl(lsKey);
-  },
-
-  async _writeControl(table, lsKey, data) {
-    if (this._demo) return { ok: true };
-    if (this._sb && this._user) {
-      // Fix D: short-circuit the network call when the browser knows it is offline.
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        this._localWriteControl(lsKey, data);
-        this._markPending(lsKey);
-        return { ok: false, offline: true };
-      }
-      const accountId = await this._ensureAccountId();
-      if (!accountId) {
-        this._localWriteControl(lsKey, data);
-        this._markPending(lsKey);
-        return { ok: false, error: 'no account membership found' };
-      }
-      if (this._role === 'viewer') {
-        return { ok: false, error: 'Viewer access is read-only.' };
-      }
-      try {
-        const { error } = await this._sb
-          .from(table)
-          .upsert({
-            account_id: accountId,
-            user_id: this._user.id,
-            data: data,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'account_id' });
-
-        if (error) {
-          console.error('write ' + table + ' error:', error);
-          this._localWriteControl(lsKey, data);
-          this._markPending(lsKey);
-          return { ok: false, error };
-        }
-        this._localWriteControl(lsKey, data); // keep local copy in sync
-        this._clearPending(lsKey);
-        return { ok: true };
-      } catch (e) {
-        console.error('write ' + table + ' exception:', e);
-        this._localWriteControl(lsKey, data);
-        this._markPending(lsKey);
-        return { ok: false, error: e };
-      }
-    }
-    this._localWriteControl(lsKey, data);
-    return { ok: true };
-  },
-
-  _localReadControl(lsKey) {
-    try {
-      const r = localStorage.getItem(lsKey);
-      return r ? JSON.parse(r) : {};
-    } catch (e) {
-      return {};
-    }
-  },
-
-  _localWriteControl(lsKey, data) {
-    try {
-      localStorage.setItem(lsKey, JSON.stringify(data));
-    } catch (e) {
-      console.warn('localStorage write failed:', e);
-    }
-  },
-
-  // ── Bug reports ──────────────────────────────────────────────────────────
-  // Operator-submitted bug reports land in the bug_reports Supabase table for
-  // the team to triage. In demo mode it's a no-op success — demo users should
-  // not be filing real bug reports. On any failure the operator sees an
-  // inline error and can retry.
-  async submitBugReport(report) {
-    if (this._demo) return { ok: true };
-    if (!this._sb || !this._user) return { ok: false, error: 'Not connected. Sign in and try again.' };
-    try {
-      const { error } = await this._sb.from('bug_reports').insert({
-        user_id:            this._user.id,
-        user_email:         this._user.email || '',
-        title:              report.title || '',
-        severity:           report.severity || 'moderate',
-        what_happened:      report.what_happened || '',
-        steps_to_reproduce: report.steps_to_reproduce || '',
-        expected_behavior:  report.expected_behavior || '',
-        previous_screen:    report.previous_screen || '',
-        user_agent:         report.user_agent || '',
-        viewport:           report.viewport || '',
-        status:             'open'
-      });
-      if (error) {
-        console.error('submitBugReport error:', error);
-        return { ok: false, error };
-      }
-      return { ok: true };
-    } catch (e) {
-      console.error('submitBugReport exception:', e);
-      return { ok: false, error: e };
-    }
-  },
-
-  async readInventoryData()      { return await this._readControl('ic_data', 'pf_ic_data'); },
-  async writeInventoryData(data) { return await this._writeControl('ic_data', 'pf_ic_data', data); },
-  async readLaborData()          { return await this._readControl('lc_data', 'pf_lc_data'); },
-  async writeLaborData(data)     { return await this._writeControl('lc_data', 'pf_lc_data', data); },
-  async readShiftData()          { return await this._readControl('sc_data', 'pf_sc_data'); },
-  async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
-
-  // ── Merge defaults (ensures all keys exist after updates) ─────────────────
-  _mergeDefaults(data) {
-    const d = this._defaultData();
-    Object.keys(d).forEach(k => { if (!(k in data)) data[k] = d[k]; });
-    if (data.settings) {
-      Object.keys(d.settings).forEach(k => {
-        if (!(k in data.settings)) data.settings[k] = d.settings[k];
-      });
-      if (data.settings.targets) {
-        Object.keys(d.settings.targets).forEach(k => {
-          if (!(k in data.settings.targets)) data.settings.targets[k] = d.settings.targets[k];
-        });
-      } else {
-        data.settings.targets = d.settings.targets;
-      }
-    }
-    if (data.revenue_settings) {
-      Object.keys(d.revenue_settings).forEach(k => {
-        if (!(k in data.revenue_settings)) data.revenue_settings[k] = d.revenue_settings[k];
-      });
-    }
-    if (data.traffic_settings) {
-      Object.keys(d.traffic_settings).forEach(k => {
-        if (!(k in data.traffic_settings)) data.traffic_settings[k] = d.traffic_settings[k];
-      });
-    }
-    return data;
-  },
-
-  // ── Default data structure ────────────────────────────────────────────────
-  _defaultData() {
-    return {
-      settings: {
-        bar_name: '', city_state: '',
-        annual_bar_revenue: 0, annual_food_revenue: 0,
-        targets: {
-          bar_pour_cost_pct: 22, food_cost_pct: 32,
-          bar_labor_cost_pct: 28, food_labor_cost_pct: 30, prime_cost_pct: 60
-        },
-        // Cash tolerance moved to App.shiftData.settings — Shift Control owns
-        // it now. See sc-cash-settings.js + App.cashToleranceForShift().
-        onboarding_complete: false
-      },
-      bar_products: [], kitchen_products: [],
-      // Menu items: the unified store for everything sellable on the menu.
-      // Recipes live embedded as the optional `recipe` field on each item.
-      // Edited from r-menu-items (Revenue Recovery) — the single edit
-      // surface. Profit Recovery's Recipe Cost Analysis is read-only.
-      menu_items: [],
-      weeks: [], shifts: [], reconciliations: [],
-      theft_scores: [], vendor_log: [], last_theft_score_date: null,
-      vendor_discrepancies: [],
-      variance_investigations: [],
-      audits: [],
-      getting_started_profit: {},
-      // Revenue Recovery data
-      revenue_settings: {
-        targets: {
-          check_avg: 35,
-          bar_labor_pct: 28,
-          kitchen_labor_pct: 30,
-          floor_labor_pct: 32,
-          rplh_lunch: 50,
-          rplh_dinner: 75,
-          rplh_bar: 65,
-          event_close_rate: 40
-        },
-        servers: []
-      },
-      revenue_weeks: [],
-      revenue_audits: [],
-      revenue_server_checks: [],
-      menu_dog_tests: [],
-      revenue_price_log: [],
-      revenue_events: [],
-      revenue_rate_cards: [],
-      getting_started_revenue: {},
-      // Traffic Recovery data
-      traffic_settings: {
-        targets: {
-          google_rating:      4.3,
-          review_velocity:    8,
-          response_rate:      75,
-          monthly_sessions:   2000,
-          social_posts_month: 12
-        },
-        // Static digital-presence profile state — set once on the scorecard
-        // screens, not repeated on every weekly record.
-        profile: {},
-        // Operation links — the operator's public URLs for each platform.
-        // The audit fetches public data from these; Recovery screens use them
-        // for "Open Live" click-throughs. Empty until the operator enters them.
-        urls: {
-          website:         '',
-          gbp:             '',
-          yelp:            '',
-          instagram:       '',
-          facebook:        '',
-          doordash:        '',
-          ubereats:        '',
-          grubhub:         '',
-          email_platform:  ''
-        },
-        // Traffic Recovery Scoreboard conversion rates. These map a Traffic
-        // metric improvement to a dollar figure using check_avg from Revenue
-        // Recovery as the per-visit value. Defaults are industry benchmarks
-        // for restaurant digital channels; operator can override per channel.
-        conversion_rates: {
-          web_session_to_visit:    3,
-          gbp_view_to_visit:       2,
-          social_profile_to_visit: 1,
-          email_open_to_visit:     1
-        }
-      },
-      traffic_weeks:   [],
-      traffic_audits:  [],
-      // Traffic Recovery logs added in the Traffic deep dive — each holds the
-      // operator-typed history that feeds the matching screen card and the
-      // fix_log auto-emit thresholds.
-      traffic_review_replies:  [],
-      traffic_gbp_posts:       [],
-      traffic_social_posts:    [],
-      traffic_email_campaigns: [],
-      // Guests and Planning section tools.
-      traffic_regulars:    [],
-      traffic_initiatives: [],
-      traffic_holidays:    [],
-      traffic_inquiries:   [],
-      getting_started_traffic: {},
-      // Hub — Bar Cop Audit history (executive monthly audits at Hub level)
-      bar_cop_audits: [],
-      // Hub — Operating Expenses Log (per-entry expense capture, feeds Books)
-      operating_expenses: [],
-      // Hub — Permits and Compliance Log (liquor license, tax filings, etc)
-      permits_compliance: [],
-      // Hub — unified setup checklist progress (Section 1, Section 9)
-      hub_setup_progress: {},
-      // Fix layer — implemented-fix events feeding the Recovery Scoreboard
-      fix_log: [],
-      // Fix layer — per-gap step checklist progress, shape: { gap_id: [step_index,...] }
-      fix_progress: {},
-      // Fix layer — chronological step-check feed for the Recent Activity card.
-      // Shape: [{ id, module, gap_id, gap_name, step_index, step_title, step_kind, ts }]
-      fix_activity: []
-    };
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bar Cop Recovery Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css?v=28"/>
+<style>
+@media print {
+  /* Flip the dark theme to a light, readable theme for print.
+     Almost everything reads these CSS variables, so overriding them
+     here recolors the whole audit automatically. */
+  :root {
+    --bg:#ffffff; --surface:#ffffff; --input:#ffffff;
+    --hover:transparent; --nav-act:#ffffff;
+    --gold:#8a6a16; --gold-h:#8a6a16; --gold-bg:#f3ecd6;
+    --red:#b3271a; --red-bg:#f7dfdc; --steel:#2f6a86;
+    --w:#000000; --t1:#1a1a1a; --t2:#333333; --t3:#555555; --t4:#777777;
+    --b1:#cccccc; --b2:#dddddd;
   }
-};
+  .sidebar, .topbar { display: none !important; }
+  .btn, button { display: none !important; }
+  html, body { background:#fff !important; height:auto !important; overflow:visible !important; }
+  .app { display:block !important; height:auto !important; overflow:visible !important; }
+  .main { display:block !important; }
+  .content { padding:0 !important; overflow:visible !important; }
+  .screen { max-width:none !important; padding:0 !important; }
+  .card { box-shadow:none !important; break-inside:avoid; }
+  /* Any element still painted pure white from a literal hex */
+  [style*="color:#fff"], [style*="color: #fff"],
+  [style*="color:#ffffff"], [style*="color: #ffffff"] { color:#000 !important; }
+}
+</style>
+</head>
+<body>
 
-window.DB = DB;
+<!-- AUTH -->
+<div id="auth-screen" class="auth-screen" style="display:none;">
+  <div class="auth-panel">
+    <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+    <div id="auth-login">
+      <div id="checkout-success-msg" style="background:rgba(219,171,70,0.1);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--gold);line-height:1.6;text-align:center;">
+        Your Bar Cop account is ready. Enter your email below and click Forgot Password to set your password and access your Recovery Hub.
+      </div>
+      <div class="auth-heading">Sign In</div>
+      <div class="auth-sub">Enter your email and password to access your account.</div>
+      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="login-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
+      <div class="f" style="margin-bottom:18px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/></div>
+      <button class="btn btn-primary" id="login-btn" style="width:100%;">Sign In</button>
+      <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:12px;"><button class="auth-link" id="show-reset" style="font-size:11px;">Forgot password?</button></div>
+    </div>
+    <div id="auth-reset" style="display:none;">
+      <div class="auth-heading">Reset Password</div>
+      <div class="auth-sub">Enter your email for a reset link.</div>
+      <div class="f" style="margin-bottom:18px;"><label>Email</label><input type="email" id="reset-email" placeholder="you@yourbar.com"/></div>
+      <button class="btn btn-primary" id="reset-btn" style="width:100%;">Send Reset Link</button>
+      <div id="reset-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      <div style="text-align:center;margin-top:14px;"><button class="auth-link" id="show-login2">Back to sign in</button></div>
+    </div>
+    <div id="auth-set-password" style="display:none;">
+      <div class="auth-heading">Set Your Password</div>
+      <div class="auth-sub">Choose a password to access your Bar Cop account.</div>
+      <div class="f" style="margin-bottom:10px;"><label>New Password</label><input type="password" id="set-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
+      <div class="f" style="margin-bottom:18px;"><label>Confirm Password</label><input type="password" id="set-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
+      <button class="btn btn-primary" id="set-pw-btn" style="width:100%;">Set Password and Sign In</button>
+      <div id="set-pw-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="ob-overlay" class="ob-overlay hidden">
+  <div class="ob-panel">
+    <div class="ob-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:26px;"/></div>
+    <div id="ob-content"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
+      <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="sidebar-logo-icon"/>
+      <button class="sidebar-logo-toggle" id="sidebar-toggle" title="Toggle sidebar">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <!-- Nav injected dynamically by App._renderNav() -->
+    </nav>
+    <div class="sidebar-footer">
+      <button class="sidebar-btn" id="signout-btn">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="sidebar-btn-label">Sign Out</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+        <span class="topbar-sub" id="topbar-sub"></span>
+      </div>
+      <div id="topbar-account-switcher" style="display:none;"></div>
+      <div id="topbar-group-dashboard" style="display:none;"></div>
+      <div class="topbar-right" id="topbar-actions"></div>
+    </header>
+    <main class="content" id="content-area"></main>
+  </div>
+</div>
+
+<!-- Tooltip box -->
+<div class="tt-box" id="tt-box">
+  <div class="tt-title" id="tt-title"></div>
+  <div class="tt-body" id="tt-body"></div>
+  <div class="tt-eg" id="tt-eg"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>var S = {};</script>
+<script src="sample-profile.js?v=1"></script>
+<script src="nav.js?v=34"></script>
+<script src="screens/hub.js?v=88"></script>
+<script src="screens/hub-bar-cop-audit.js?v=8"></script>
+<script src="screens/dashboard.js?v=20"></script>
+<script src="screens/this-week.js?v=14"></script>
+<script src="screens/bar-products.js?v=5"></script>
+<script src="screens/kitchen-products.js?v=5"></script>
+<script src="screens/recipe-cost-analysis.js?v=4"></script>
+<script src="screens/vendor-watch.js?v=5"></script>
+<script src="screens/vendor-scorecard.js?v=2"></script>
+<script src="screens/vendor-discrepancy.js?v=8"></script>
+<script src="screens/theft-risk.js?v=9"></script>
+<script src="screens/pour-test.js?v=1"></script>
+<script src="screens/yield-test.js?v=1"></script>
+<script src="screens/cash-recon.js?v=4"></script>
+<script src="components/audit-outlook.js?v=2"></script>
+<script src="screens/audit-tracker.js?v=23"></script>
+<script src="screens/reports.js?v=12"></script>
+<script src="screens/settings.js?v=65"></script>
+<script src="screens/hub-getting-started.js?v=12"></script>
+<script src="screens/hub-help.js?v=9"></script>
+<script src="screens/hub-report-bug.js?v=7"></script>
+<script src="screens/hub-support.js?v=6"></script>
+<script src="screens/hub-user-accounts.js?v=13"></script>
+<script src="screens/hub-group-dashboard.js?v=3"></script>
+<script src="screens/hub-books.js?v=15"></script>
+<script src="screens/hub-year-end.js?v=6"></script>
+<script src="screens/hub-operating-expenses.js?v=2"></script>
+<script src="screens/hub-permits.js?v=2"></script>
+<script src="screens/help.js?v=15"></script>
+<script src="screens/profit-fix.js?v=2"></script>
+<script src="screens/revenue/r-audit.js?v=27"></script>
+<script src="screens/revenue/r-dashboard.js?v=22"></script>
+<script src="screens/revenue/r-forecast.js?v=2"></script>
+<script src="screens/revenue/r-this-week.js?v=15"></script>
+<script src="screens/revenue/r-server-check.js?v=11"></script>
+<script src="screens/revenue/r-menu-items.js?v=23"></script>
+<script src="screens/revenue/r-menu-engineering.js?v=14"></script>
+<script src="screens/revenue/r-pricing.js?v=4"></script>
+<script src="screens/revenue/r-dog-test.js?v=4"></script>
+<script src="screens/revenue/r-rplh.js?v=8"></script>
+<script src="screens/revenue/r-events.js?v=12"></script>
+<script src="screens/revenue/r-reports.js?v=6"></script>
+<script src="screens/revenue/r-help.js?v=10"></script>
+<script src="screens/revenue/r-fix.js?v=2"></script>
+<script src="screens/traffic/t-dashboard.js?v=23"></script>
+<script src="screens/traffic/t-audit.js?v=25"></script>
+<script src="screens/traffic/t-this-week.js?v=9"></script>
+<script src="screens/traffic/t-gbp.js?v=7"></script>
+<script src="screens/traffic/t-reviews.js?v=6"></script>
+<script src="screens/traffic/t-search.js?v=4"></script>
+<script src="screens/traffic/t-website.js?v=4"></script>
+<script src="screens/traffic/t-social.js?v=6"></script>
+<script src="screens/traffic/t-delivery.js?v=4"></script>
+<script src="screens/traffic/t-email.js?v=6"></script>
+<script src="screens/traffic/t-regulars.js?v=1"></script>
+<script src="screens/traffic/t-initiatives.js?v=1"></script>
+<script src="screens/traffic/t-holidays.js?v=1"></script>
+<script src="screens/traffic/t-inquiries.js?v=1"></script>
+<script src="screens/traffic/t-reports.js?v=6"></script>
+<script src="screens/traffic/t-help.js?v=9"></script>
+<script src="screens/traffic/t-fix.js?v=2"></script>
+<script src="components/bottle-slider.js?v=3"></script>
+<script src="components/csv-mapper.js?v=1"></script>
+<script src="components/drag-reorder.js?v=1"></script>
+<script src="recovery.js?v=9"></script>
+<script src="components/fix-panel.js?v=33"></script>
+<script src="fixlayer/fix-profit.js?v=25"></script>
+<script src="fixlayer/fix-revenue.js?v=29"></script>
+<script src="fixlayer/fix-traffic.js?v=26"></script>
+<script src="screens/inventory/ic-product-setup.js?v=15"></script>
+<script src="screens/inventory/ic-locations.js?v=9"></script>
+<script src="screens/inventory/ic-vendors.js?v=5"></script>
+<script src="screens/inventory/ic-prep-batches.js?v=4"></script>
+<script src="screens/inventory/ic-take-inventory.js?v=7"></script>
+<script src="screens/inventory/ic-count-history.js?v=3"></script>
+<script src="screens/inventory/ic-spot-check.js?v=8"></script>
+<script src="screens/inventory/ic-transfers.js?v=2"></script>
+<script src="screens/inventory/ic-empties.js?v=1"></script>
+<script src="screens/inventory/ic-adjustments.js?v=1"></script>
+<script src="screens/inventory/ic-par-suggestions.js?v=3"></script>
+<script src="screens/inventory/ic-order-sheet.js?v=8"></script>
+<script src="screens/inventory/ic-order-history.js?v=4"></script>
+<script src="screens/inventory/ic-receive-delivery.js?v=13"></script>
+<script src="screens/inventory/ic-delivery-history.js?v=3"></script>
+<script src="screens/inventory/ic-report-usage.js?v=4"></script>
+<script src="screens/inventory/ic-report-variance.js?v=7"></script>
+<script src="screens/inventory/ic-report-stock.js?v=3"></script>
+<script src="screens/inventory/ic-report-movers.js?v=4"></script>
+<script src="screens/inventory/ic-dashboard.js?v=4"></script>
+<script src="screens/inventory/ic-help.js?v=6"></script>
+<script src="screens/shift/sc-log-shift.js?v=9"></script>
+<script src="screens/shift/sc-shift-history.js?v=6"></script>
+<script src="screens/shift/sc-shift-handoff.js?v=4"></script>
+<script src="screens/shift/sc-drawers.js?v=1"></script>
+<script src="screens/shift/sc-cash-settings.js?v=2"></script>
+<script src="screens/shift/sc-comp-settings.js?v=1"></script>
+<script src="screens/shift/sc-cash-control.js?v=2"></script>
+<script src="screens/shift/sc-cash-drop.js?v=10"></script>
+<script src="screens/shift/sc-safe-log.js?v=7"></script>
+<script src="screens/shift/sc-variance-log.js?v=10"></script>
+<script src="screens/shift/sc-86-list.js?v=13"></script>
+<script src="screens/shift/sc-void-comp.js?v=12"></script>
+<script src="screens/shift/sc-walked-tabs.js?v=1"></script>
+<script src="screens/shift/sc-incident-log.js?v=1"></script>
+<script src="screens/shift/sc-waste.js?v=4"></script>
+<script src="screens/shift/sc-maintenance.js?v=8"></script>
+<script src="screens/shift/sc-opening-checklist.js?v=6"></script>
+<script src="screens/shift/sc-closing-checklist.js?v=6"></script>
+<script src="screens/shift/sc-checklist-templates.js?v=3"></script>
+<script src="screens/shift/sc-active-shift.js?v=14"></script>
+<script src="screens/shift/sc-reports-shift.js?v=2"></script>
+<script src="screens/shift/sc-reports-cash.js?v=1"></script>
+<script src="screens/shift/sc-reports-ops.js?v=2"></script>
+<script src="screens/shift/sc-dashboard.js?v=2"></script>
+<script src="screens/shift/sc-help.js?v=6"></script>
+<script src="screens/labor/lc-positions.js?v=3"></script>
+<script src="screens/labor/lc-wage-settings.js?v=1"></script>
+<script src="screens/labor/lc-staff-roster.js?v=9"></script>
+<script src="screens/labor/lc-build-schedule.js?v=6"></script>
+<script src="screens/labor/lc-schedule-history.js?v=4"></script>
+<script src="screens/labor/lc-schedule-templates.js?v=2"></script>
+<script src="screens/labor/lc-log-hours.js?v=7"></script>
+<script src="screens/labor/lc-daily-view.js?v=4"></script>
+<script src="screens/labor/lc-weekly-summary.js?v=4"></script>
+<script src="screens/labor/lc-pay-periods.js?v=3"></script>
+<script src="screens/labor/lc-tip-log.js?v=8"></script>
+<script src="screens/labor/lc-tip-pool.js?v=5"></script>
+<script src="screens/labor/lc-tip-history.js?v=3"></script>
+<script src="screens/labor/lc-overtime-watch.js?v=5"></script>
+<script src="screens/labor/lc-callout-log.js?v=7"></script>
+<script src="screens/labor/lc-reports.js?v=2"></script>
+<script src="screens/labor/lc-help.js?v=5"></script>
+<script src="screens/labor/lc-dashboard.js?v=3"></script>
+<script src="components/onboarding.js?v=17"></script>
+<script src="db.js?v=44"></script>
+<script src="app.js?v=139"></script>
+</body>
+</html>
