@@ -51,7 +51,18 @@ S.TrafficAudit = {
           + '</div>';
       }
       const sections = latest.sections || {};
-      const sectionRows = Object.entries(sections).map(([name, score]) => {
+      // List all seven sections; an unscored one shows N/A (Not enough data).
+      const TRAF_SECTION_NAMES = ['Google Business Profile', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email and Loyalty'];
+      const sectionRows = TRAF_SECTION_NAMES.map(name => {
+        const score = sections[name];
+        if (score == null) {
+          return '<tr>'
+            + '<td style="color:var(--t2);padding:8px 12px;">' + esc(name) + '</td>'
+            + '<td style="padding:8px 12px;width:140px;"></td>'
+            + '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);padding:8px 12px;">N/A</td>'
+            + '<td style="font-size:11px;color:var(--t4);padding:8px 12px;">Not enough data</td>'
+            + '</tr>';
+        }
         const ps   = audits[1]?.sections?.[name];
         const diff = ps != null ? score - ps : null;
         const bar  = Math.min(100, Math.max(0, score));
@@ -346,15 +357,18 @@ S.TrafficAudit = {
           + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
           + '</div>';
       }).join('');
-      // score === null means the section is intentionally unscored (Risk
-      // Signals). Skip the big number + scale bar so we don't paint a
-      // red "0" that reads like a failing score.
-      const scoreBlock = score == null
-        ? ''
-        : '<div style="text-align:right;">'
+      // score === null on a DATA section means N/A (not enough data) — show a
+      // clear N/A badge. The Risk Signals section also passes null but supplies
+      // a signals array, so it shows no badge.
+      const isSignals = signals && signals.length;
+      const scoreBlock = score != null
+        ? '<div style="text-align:right;">'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
           + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
-          + '</div>';
+          + '</div>'
+        : isSignals
+          ? ''
+          : '<div style="text-align:right;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
@@ -516,9 +530,111 @@ S.TrafficAudit = {
 
   showIntakeForm() {
     this._intakeStep = 1;
-    this._intakeDraft = {};
+    const s = App.data?.settings || {};
+    const p = s.traffic_practices || {};
+    const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
+    this._intakeDraft = {
+      practices: { growth_mechanism: boolStr(p.growth_mechanism), loyalty: boolStr(p.loyalty) }
+    };
     this.actions.innerHTML = '';
-    this.renderIntakeStep();
+    this.renderIntake();
+  },
+
+  // Single-page Traffic intake. Links are entered inline (no bouncing to
+  // Settings), saved back to Operation Links, and read live (PageSpeed, Google
+  // Places, Yelp). Screenshots are optional fallback. No revenue, no notes.
+  renderIntake() {
+    const s = App.data.settings || {};
+    const d = this._intakeDraft || {};
+    document.getElementById('topbar-sub').textContent = '';
+    const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || {};
+
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Traffic Audit</div>';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name || 'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
+      + '</div>';
+
+    // What Bar Cop already has from weekly traffic metrics.
+    const tw = (App.data.traffic_weeks || []).slice(-4);
+    const has = (fn) => tw.some(w => w[fn] != null);
+    const checks = [
+      { label: 'Google Rating',  ok: has('google_rating') },
+      { label: 'Review Response',ok: has('response_rate') },
+      { label: 'Website Sessions',ok: has('monthly_sessions') },
+      { label: 'Social Posts',   ok: has('social_posts_month') },
+      { label: 'Email',          ok: has('email_list_size') || has('email_open_rate') }
+    ];
+    const chip = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;margin:0 6px 6px 0;'
+      + (c.ok ? 'background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);color:var(--t1);font-weight:700;' : 'background:var(--input);border:1px solid var(--b2);color:var(--t3);') + '">'
+      + (c.ok ? '<span style="color:var(--gold);font-weight:800;">&#10003;</span>' : '<span style="color:var(--t4);font-weight:800;">&middot;</span>') + esc(c.label) + '</span>';
+    const controlCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">What Bar Cop already has</div>'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">From your weekly traffic numbers. Your links below add live data; screenshots fill anything links cannot reach.</div>'
+      + '<div>' + checks.map(chip).join('') + '</div></div>';
+
+    // Inline link fields — pre-filled from Operation Links, saved on Generate.
+    const linkRow = (key, label, ph) => '<div style="margin-bottom:10px;">'
+      + '<label style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--t3);display:block;margin-bottom:4px;">' + esc(label) + '</label>'
+      + '<input type="url" id="ta-link-' + key + '" value="' + esc(urls[key] || '') + '" placeholder="' + ph + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:8px 10px;width:100%;outline:none;"/></div>';
+    const linksCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Links</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Paste the links Bar Cop should read. They save to your Operation Links so you only enter them once. Google rating, reviews, and website speed are read live from these.</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 24px;">'
+      + linkRow('gbp', 'Google Business Profile', 'https://g.page/...')
+      + linkRow('website', 'Website', 'https://...')
+      + linkRow('yelp', 'Yelp', 'https://yelp.com/biz/...')
+      + linkRow('instagram', 'Instagram', 'https://instagram.com/...')
+      + linkRow('facebook', 'Facebook', 'https://facebook.com/...')
+      + linkRow('delivery', 'Delivery (DoorDash / UberEats)', 'https://...')
+      + linkRow('email', 'Email platform', 'https://...')
+      + '</div></div>';
+
+    const screenshotsCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Screenshots</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Add these for what your links cannot reach (data behind a login) or as a fallback. Accepts images, PDF, or exports.</div>'
+      + this.renderFileSection('highlight', 'Website Analytics (sessions, bounce rate)', 'ta-f-analytics',      'ta-analytics',      'Sessions and bounce live behind your analytics login, not in the public page.')
+      + this.renderFileSection('optional',  'Google Review Page (fallback)',             'ta-f-google-reviews', 'ta-google-reviews', 'Backup if the live Google read is unavailable.')
+      + this.renderFileSection('optional',  'GBP Insights (impressions, calls)',         'ta-f-gbp-insights',   'ta-gbp-insights',   'Adds the impression-to-action funnel.')
+      + this.renderFileSection('optional',  'Search Results (maps pack)',                'ta-f-search',         'ta-search',         'Confirms maps-pack presence and search visibility.')
+      + this.renderFileSection('optional',  'Instagram Profile',                         'ta-f-instagram',      'ta-instagram',      'Follower count, post frequency, content.')
+      + this.renderFileSection('optional',  'Delivery Platform Dashboard',               'ta-f-delivery',       'ta-delivery',       'Rating, photos, menu completeness, promos.')
+      + this.renderFileSection('optional',  'Email Platform',                            'ta-f-email',          'ta-email',          'List size, send frequency, open rate.')
+      + '</div>';
+
+    const pr = d.practices || {};
+    const qRow = (label, id, options) => {
+      const all = [['', 'Select Answer']].concat(options);
+      const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id] || '') === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
+      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
+        + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(label) + '</div>'
+        + '<select id="ta-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:120px;">' + opts + '</select></div>';
+    };
+    const questionsCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Couple Quick Questions</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These are not in your reports. Select Answer = no effect on the score.</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 28px;">'
+      + qRow('Email signup or list-growth mechanism in place?', 'growth_mechanism', [['false', 'No'], ['true', 'Yes']])
+      + qRow('Loyalty or rewards program?', 'loyalty', [['false', 'No'], ['true', 'Yes']])
+      + '</div></div>';
+
+    const submitCard = '<div class="card">'
+      + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="ta-iz-submit">Generate Audit</button>'
+      + '<div id="ta-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
+      + '<div style="flex:1;"></div>'
+      + '<button class="btn btn-ghost" id="ta-iz-cancel">Cancel</button></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Analysis takes 60 to 90 seconds.</div></div>';
+
+    this.container.innerHTML = '<div class="screen">' + linksCard + controlCard + screenshotsCard + questionsCard + submitCard + '</div>';
+
+    document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
+    document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
+      const val = id => (document.getElementById('ta-q-' + id) || {}).value || '';
+      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty') };
+      this.generateAudit();
+    });
   },
 
   intakeStepsHtml(total) {
@@ -708,29 +824,43 @@ S.TrafficAudit = {
     };
     if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
+    const draftP = this._intakeDraft?.practices || {};
+    // Collect the inline links and save them back to Operation Links so the
+    // operator enters them once and the audit can read them live next time.
+    const linkKeys = ['gbp', 'website', 'yelp', 'instagram', 'facebook', 'delivery', 'email'];
+    const savedUrls = Object.assign({}, (App.data.traffic_settings && App.data.traffic_settings.urls) || {});
+    linkKeys.forEach(k => { const el = document.getElementById('ta-link-' + k); if (el) savedUrls[k] = (el.value || '').trim(); });
+    if (!App.data.traffic_settings) App.data.traffic_settings = {};
+    App.data.traffic_settings.urls = savedUrls;
+    App.data.settings.traffic_practices = draftP;
+    await App.saveKey('traffic_settings');
+    await App.saveKey('settings');
+
     const form = new FormData();
     form.append('appData', JSON.stringify(App.data));
-    form.append('notes', this._intakeDraft?.notes || '');
-    // Saved URLs from Operation Links. Server fetches public data from these
-    // (PageSpeed Insights for website, HTML for GBP) instead of relying on
-    // operator screenshots for sections we can read live.
-    const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || null;
-    if (urls) form.append('urls', JSON.stringify(urls));
+    // Links + a place query (name + city) so the server can read Google Places
+    // and Yelp live where keys are configured.
+    const urlsPayload = Object.assign({}, savedUrls, {
+      place_query: [App.data.settings?.bar_name, App.data.settings?.city_state].filter(Boolean).join(' '),
+      city_state: App.data.settings?.city_state || ''
+    });
+    form.append('urls', JSON.stringify(urlsPayload));
+    // Practices — unanswered ('') omitted so it has no score effect.
+    const practices = {};
+    if (draftP.growth_mechanism === 'true' || draftP.growth_mechanism === 'false') practices.growth_mechanism = draftP.growth_mechanism === 'true';
+    if (draftP.loyalty === 'true' || draftP.loyalty === 'false') practices.loyalty = draftP.loyalty === 'true';
+    form.append('practices', JSON.stringify(practices));
 
-    const fileInputIds = [
-      'ta-f-gbp-profile','ta-f-gbp-insights','ta-f-analytics','ta-f-mobile-site',
-      'ta-f-google-reviews','ta-f-yelp','ta-f-search',
-      'ta-f-instagram','ta-f-facebook','ta-f-ig-analytics',
-      'ta-f-delivery','ta-f-email','ta-f-email-analytics'
-    ];
+    const fileInputIds = ['ta-f-analytics', 'ta-f-google-reviews', 'ta-f-gbp-insights', 'ta-f-search', 'ta-f-instagram', 'ta-f-delivery', 'ta-f-email'];
     let taFileCount = 0;
     fileInputIds.forEach(id => {
       const inp = document.getElementById(id);
       if (inp?.files) { for (const f of inp.files) { form.append('file', f); taFileCount++; } }
     });
 
-    // Validation — do not run an audit with nothing to analyze
-    const hasRealData = taFileCount > 0 || (App.data.traffic_weeks && App.data.traffic_weeks.length > 0);
+    // Validation — links, screenshots, or weekly data all count as real input.
+    const hasRealData = taFileCount > 0 || (App.data.traffic_weeks && App.data.traffic_weeks.length > 0)
+      || savedUrls.gbp || savedUrls.website || savedUrls.yelp;
     if (!hasRealData) {
       setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your screenshots.', 'var(--red)');
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
@@ -753,15 +883,12 @@ S.TrafficAudit = {
         audit_id:      d.AUDIT_ID      || '',
         audit_period:  d.AUDIT_PERIOD  || '',
         grade:         d.DATA_TIER_LABEL || '',
-        sections: {
-          'Google Business Profile': d.S1_SCORE || 0,
-          'Website':                 d.S2_SCORE || 0,
-          'Reviews':                 d.S3_SCORE || 0,
-          'Search and SEO':          d.S4_SCORE || 0,
-          'Social Media':            d.S5_SCORE || 0,
-          'Delivery Platforms':      d.S6_SCORE || 0,
-          'Email and Loyalty':       d.S7_SCORE || 0,
-        },
+        sections: (() => {
+          // Preserve N/A: only include a section when it actually scored, so
+          // the landing list can show "N/A" for the ones with no data.
+          const map = { 'Google Business Profile': d.S1_SCORE, 'Website': d.S2_SCORE, 'Reviews': d.S3_SCORE, 'Search and SEO': d.S4_SCORE, 'Social Media': d.S5_SCORE, 'Delivery Platforms': d.S6_SCORE, 'Email and Loyalty': d.S7_SCORE };
+          const out = {}; Object.keys(map).forEach(k => { if (map[k] != null) out[k] = map[k]; }); return out;
+        })(),
         action_items: (Array.isArray(d.action_items) ? d.action_items : []).map(a => {
           const obj = typeof a === 'string' ? { action: a, monthly_impact: 0 } : a;
           if (!obj.gap_id && window.FixPanel) obj.gap_id = FixPanel.inferGapId(obj.action, 'traffic');
