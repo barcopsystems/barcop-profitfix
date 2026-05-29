@@ -417,6 +417,18 @@ const App = {
     if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
+    // Mobile sidebar: hamburger button in the topbar opens the off-canvas
+    // sidebar below the 768px breakpoint. Backdrop click closes it. Module
+    // nav clicks also close it (wired in _renderNav). No-op on desktop where
+    // the sidebar-open class is never set.
+    const hbBtn = document.getElementById('topbar-hamburger');
+    if (hbBtn) hbBtn.onclick = () => {
+      document.getElementById('app').classList.toggle('sidebar-open');
+    };
+    const bdrop = document.getElementById('sidebar-backdrop');
+    if (bdrop) bdrop.onclick = () => {
+      document.getElementById('app').classList.remove('sidebar-open');
+    };
     // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
     // (a simplified tile view of their accessible tasks across all modules).
     // Admin and viewer get the normal flow.
@@ -971,7 +983,13 @@ const App = {
       if (!App.canAccess(el.dataset.screen)) {
         el.style.display = 'none';
       } else {
-        el.addEventListener('click', () => App.navigate(el.dataset.screen));
+        el.addEventListener('click', () => {
+          // Close the mobile sidebar after the click so the navigated screen
+          // gets full width on phones. No-op on desktop where the class is
+          // never set.
+          document.getElementById('app')?.classList.remove('sidebar-open');
+          App.navigate(el.dataset.screen);
+        });
       }
     });
     nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
