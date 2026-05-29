@@ -143,6 +143,7 @@ S.Reports={
           +'<div class="f" style="flex:1;max-width:200px;"><label>To</label><input type="date" id="qbo-to"/></div>'
         +'</div>'
         +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;line-height:1.5;"></div>'
+        +'<div id="qbo-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
       +'</div>'
     +'</div>';
 
@@ -346,7 +347,7 @@ S.Reports={
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Weekly P&L');
     wb.Props = {
-      Title:       barName + ' Weekly P&L Brief',
+      Title:       barName + ' - Weekly P&L Brief, ' + firstWeek + ' through ' + lastWeek,
       Subject:     App.deliverableFooter().workbookSubject,
       Author:      barName,
       Company:     'Bar Cop',
@@ -355,6 +356,12 @@ S.Reports={
 
     const filename = barName + ' - Weekly P&L Brief - ' + today + '.xlsx';
     XLSX.writeFile(wb, filename);
+    const statusEl = document.getElementById('qbo-status');
+    if (statusEl) {
+      statusEl.textContent = 'Downloaded ' + filename;
+      statusEl.style.color = 'var(--gold)';
+      statusEl.style.display = 'block';
+    }
   },
 
   viewWeek(id){
