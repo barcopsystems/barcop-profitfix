@@ -13,7 +13,7 @@ S.HubSupport = {
   // shows "CONTACT BAR COP | Back to Dashboard".
   open() {
     this._state = 'form';
-    App.openHubFullPage('Contact Bar Cop', (mount) => this.render(mount));
+    App.openHubFullPage('Contact Bar Cop', (mount) => this.render(mount), 'contact-support');
   },
 
   render(container) {
