@@ -588,13 +588,7 @@ S.TrafficAudit = {
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Links</div>'
       + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Paste the links Bar Cop should read. They save to your Operation Links so you only enter them once. Google rating, reviews, and website speed are read live from these.</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 24px;">'
-      + linkRow('gbp', 'Google Business Profile', 'https://g.page/...')
-      + linkRow('website', 'Website', 'https://...')
-      + linkRow('yelp', 'Yelp', 'https://yelp.com/biz/...')
-      + linkRow('instagram', 'Instagram', 'https://instagram.com/...')
-      + linkRow('facebook', 'Facebook', 'https://facebook.com/...')
-      + linkRow('delivery', 'Delivery (DoorDash / UberEats)', 'https://...')
-      + linkRow('email', 'Email platform', 'https://...')
+      + (App.TRAFFIC_PLATFORMS || []).map(p => linkRow(p.urlKey, p.label, p.placeholder || '')).join('')
       + '</div></div>';
 
     const screenshotsCard = '<div class="card" style="margin-bottom:16px;">'
@@ -833,7 +827,7 @@ S.TrafficAudit = {
     const draftP = this._intakeDraft?.practices || {};
     // Collect the inline links and save them back to Operation Links so the
     // operator enters them once and the audit can read them live next time.
-    const linkKeys = ['gbp', 'website', 'yelp', 'instagram', 'facebook', 'delivery', 'email'];
+    const linkKeys = (App.TRAFFIC_PLATFORMS || []).map(p => p.urlKey);
     const savedUrls = Object.assign({}, (App.data.traffic_settings && App.data.traffic_settings.urls) || {});
     linkKeys.forEach(k => { const el = document.getElementById('ta-link-' + k); if (el) savedUrls[k] = (el.value || '').trim(); });
     if (!App.data.traffic_settings) App.data.traffic_settings = {};
