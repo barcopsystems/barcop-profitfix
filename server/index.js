@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
-const { computeProfitAudit, computeRevenueAudit } = require('./audit-compute');
+const { computeProfitAudit, computeRevenueAudit, computeTrafficAudit } = require('./audit-compute');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -192,13 +192,13 @@ app.post('/api/generate-traffic-audit', (req, res) => {
     if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
 
     const appDataStr = fields.appData?.[0] || '{}';
-    const notes      = fields.notes?.[0]   || '';
     let appData = {};
     try { appData = JSON.parse(appDataStr); } catch(e) {}
-
-    // Operator's saved URLs from traffic_settings.urls. Server fetches public
-    // data from these (PageSpeed Insights for website, HTML for GBP) so the
-    // audit does not require screenshots for sections we can read live.
+    let practices = {};
+    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
+    // Operator's saved links. Server reads public data from these (PageSpeed for
+    // website, Google Places for rating/reviews, Yelp Fusion) so the audit reads
+    // live where possible and only needs screenshots for what links cannot cover.
     let urls = null;
     try { urls = JSON.parse(fields.urls?.[0] || 'null'); } catch(e) {}
 
@@ -211,7 +211,7 @@ app.post('/api/generate-traffic-audit', (req, res) => {
 
     try {
       const urlData = await fetchTrafficUrlData(urls);
-      const auditData = await extractAuditData(apiKey, 'traffic', uploadedFiles, appData, notes, null, urlData);
+      const auditData = await generateTrafficAudit(apiKey, uploadedFiles, appData, practices, urlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Traffic audit error:', e);
@@ -221,6 +221,47 @@ app.post('/api/generate-traffic-audit', (req, res) => {
     }
   });
 });
+
+/* ── Traffic audit — honest pipeline, NO dollar figures ───────────────────────
+   urlData (live link reads) + screenshot extraction -> computeTrafficAudit ->
+   narrative (deficits, never dollars) -> merge with computed numbers winning. */
+async function generateTrafficAudit(apiKey, files, appData, practices, urlData) {
+  const extracted = await extractTrafficInputs(apiKey, files);
+  Object.assign(extracted, practices || {});
+  const numbers = computeTrafficAudit(appData, null, extracted, urlData);
+  numbers.AUDIT_ID = 'TFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
+  const prose = await generateTrafficNarrative(apiKey, numbers);
+  return Object.assign({}, prose, numbers);
+}
+
+async function extractTrafficInputs(apiKey, files) {
+  const fileContent = buildFileContent(files);
+  if (fileContent.length === 0) return {};
+  const instruction = `You are reading uploaded screenshots and exports for a bar and restaurant digital-presence (TRAFFIC) audit: Google Business Profile, website analytics, Google/Yelp review pages, search results, Instagram/Facebook, delivery dashboards, email platform. Extract ONLY what you can see. Booleans as true/false, numbers as plain numbers, percentages as plain numbers. NO dollar figures, NO scores. Use null for anything not present. Respond with a single JSON object, no other text:
+{"listing_claimed":[true/false/null],"hours_complete":[t/f/null],"website_linked":[t/f/null],"menu_link_active":[t/f/null],"photo_count":[int/null],"posts_last_30":[int/null],"profile_completeness":[percent/null],"mobile_optimized":[t/f/null],"monthly_sessions":[int/null],"bounce_rate":[percent/null],"menu_page_top3":[t/f/null],"online_ordering":[t/f/null],"google_rating":[number/null],"google_review_count":[int/null],"response_rate":[percent/null],"most_recent_review_days":[int/null],"unanswered":[int/null],"negative_pattern":[short text/null],"yelp_rating":[number/null],"maps_pack":[t/f/null],"nap_consistent":[t/f/null],"primary_keyword":[text/null],"ig_followers":[int/null],"ig_posts_last_30":[int/null],"fb_followers":[int/null],"content_type":[text/null],"doordash_active":[t/f/null],"ubereats_active":[t/f/null],"grubhub_active":[t/f/null],"doordash_rating":[number/null],"ubereats_rating":[number/null],"photo_count_delivery":[int/null],"menu_complete":[t/f/null],"promo_active":[t/f/null],"email_list_exists":[t/f/null],"list_size":[int/null],"open_rate":[percent/null],"send_frequency":[text/null],"last_send_days":[int/null],"growth_mechanism":[t/f/null],"loyalty":[t/f/null]}`;
+  const content = fileContent.concat([{ type: 'text', text: instruction }]);
+  try {
+    return await callClaudeForJSON(apiKey, content, 1500);
+  } catch (e) {
+    console.warn('[audit] traffic extraction failed, proceeding with link/weekly data only:', e.message);
+    return {};
+  }
+}
+
+async function generateTrafficNarrative(apiKey, d) {
+  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a digital-presence (TRAFFIC) audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Plain operator voice. No emdashes (use a period or comma). Avoid "leverage", "compounds", "robust", "seamless". CRITICAL: this audit has NO dollar figures. Express every gap as a real deficit, e.g. "response rate 45% versus a 75% benchmark" or "6 posts in 30 days versus 12". Never invent or imply a dollar amount. Respond with a single JSON object, no other text, with exactly these prose fields:
+{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_NARRATIVE":"","S6_FINDING":"","S6_TOOL":"","S7_NARRATIVE":"","S7_FINDING":"","S7_TOOL":"","S8_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG1_LABEL":"","S8_SIG1_EVIDENCE":"","S8_SIG1_GAP":"","S8_SIG1_TOOL":"","S8_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG2_LABEL":"","S8_SIG2_EVIDENCE":"","S8_SIG2_GAP":"","S8_SIG2_TOOL":"","S8_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG3_LABEL":"","S8_SIG3_EVIDENCE":"","S8_SIG3_GAP":"","S8_SIG3_TOOL":"","S8_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG4_LABEL":"","S8_SIG4_EVIDENCE":"","S8_SIG4_GAP":"","S8_SIG4_TOOL":""}
+
+COMPUTED NUMBERS (final):
+${JSON.stringify(d, null, 1)}`;
+  try {
+    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
+  } catch (e) {
+    console.warn('[audit] traffic narrative failed, returning numbers without prose:', e.message);
+    return {};
+  }
+}
 
 // ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-revenue-audit', (req, res) => {
@@ -362,32 +403,67 @@ async function fetchTrafficUrlData(urls) {
     }
   }
 
-  // Public Google Business Profile HTML fetch
-  if (urls.gbp) {
-    try {
-      const ctrl = new AbortController();
-      const tmo = setTimeout(() => ctrl.abort(), 20000);
-      const r = await fetch(urls.gbp, {
-        signal: ctrl.signal,
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
-      clearTimeout(tmo);
-      if (r.ok) {
-        const html = await r.text();
-        // Cap to 80KB to keep prompt cost sane. Most GBP HTML well under this.
-        out.gbp = { url: urls.gbp, html: html.slice(0, 80000), fetchedAt: new Date().toISOString() };
-      }
-    } catch (e) {
-      console.warn('[audit] GBP HTML fetch failed:', e.message);
-    }
+  // Google rating + review count via Google Places API (accurate, sanctioned).
+  // Needs GOOGLE_PLACES_API_KEY and a place query (bar name + city). Gracefully
+  // absent until the key is set — then S3 Reviews falls back to a screenshot.
+  const placeQuery = urls.place_query || urls.gbp_query;
+  if (placeQuery) {
+    const g = await fetchGooglePlaces(placeQuery);
+    if (g) out.gbp = g;
   }
 
-  return (out.website || out.gbp) ? out : null;
+  // Yelp rating + count via Yelp Fusion (free tier). Needs YELP_API_KEY.
+  if (placeQuery) {
+    const y = await fetchYelp(placeQuery, urls.city_state);
+    if (y) out.yelp = y;
+  }
+
+  return (out.website || out.gbp || out.yelp) ? out : null;
+}
+
+/* Google Places — text search -> rating + review count. Returns null if no key
+   or no match, so the audit simply scores Reviews from a screenshot instead. */
+async function fetchGooglePlaces(query) {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!key || !query) return null;
+  try {
+    const url = 'https://maps.googleapis.com/maps/api/place/textsearch/json?query='
+      + encodeURIComponent(query) + '&key=' + key;
+    const ctrl = new AbortController();
+    const tmo = setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tmo);
+    if (!r.ok) return null;
+    const data = await r.json();
+    const hit = (data.results || [])[0];
+    if (!hit || hit.rating == null) return null;
+    return { rating: hit.rating, review_count: hit.user_ratings_total ?? null, name: hit.name, fetchedAt: new Date().toISOString() };
+  } catch (e) {
+    console.warn('[audit] Google Places fetch failed:', e.message);
+    return null;
+  }
+}
+
+/* Yelp Fusion — business search -> rating + review count. Null without a key. */
+async function fetchYelp(term, location) {
+  const key = process.env.YELP_API_KEY;
+  if (!key || !term) return null;
+  try {
+    const url = 'https://api.yelp.com/v3/businesses/search?term='
+      + encodeURIComponent(term) + '&location=' + encodeURIComponent(location || term) + '&limit=1';
+    const ctrl = new AbortController();
+    const tmo = setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch(url, { signal: ctrl.signal, headers: { Authorization: 'Bearer ' + key } });
+    clearTimeout(tmo);
+    if (!r.ok) return null;
+    const data = await r.json();
+    const biz = (data.businesses || [])[0];
+    if (!biz || biz.rating == null) return null;
+    return { rating: biz.rating, count: biz.review_count ?? null, name: biz.name, fetchedAt: new Date().toISOString() };
+  } catch (e) {
+    console.warn('[audit] Yelp fetch failed:', e.message);
+    return null;
+  }
 }
 
 function formatTrafficUrlDataForPrompt(urlData) {
