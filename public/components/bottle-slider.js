@@ -61,9 +61,8 @@ const BottleSlider = {
       + '<div style="text-align:center;">'
       +   '<input class="bs-val" type="number" step="0.01" min="0" max="1" inputmode="decimal" '
       +     'aria-label="Open bottle level (0 to 1)" value="' + value.toFixed(2) + '" '
-      +     'style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';line-height:1;'
-      +     'width:74px;text-align:center;background:transparent;border:1px solid transparent;border-radius:4px;outline:none;padding:2px 4px;"/>'
-      +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:2px;">Open Bottle</div>'
+      +     'style="color:' + col + ';"/>'
+      +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">Open Bottle</div>'
       + '</div>'
 
       + '<div style="font-size:11px;font-weight:700;color:var(--t2);">Total on hand: '
@@ -87,7 +86,12 @@ const BottleSlider = {
       _writing: false
     };
 
-    const apply = () => {
+    // skipInputWrite=true means: update the slider visual + fulls/total
+    // displays, but leave whatever the operator is currently typing in the
+    // input alone. Used by the input handler so we do not stomp on a
+    // partial entry like "." or "0.2" while the operator is still typing
+    // the rest of the number.
+    const apply = (skipInputWrite) => {
       const fill = root.querySelector('.bs-fill');
       const handle = root.querySelector('.bs-handle');
       const valEl = root.querySelector('.bs-val');
@@ -95,7 +99,7 @@ const BottleSlider = {
       const totalEl = root.querySelector('.bs-total');
       if (fill)   { fill.setAttribute('y', this._fillY(inst.value)); fill.setAttribute('height', this._fillH(inst.value)); }
       if (handle) { handle.setAttribute('y1', this._fillY(inst.value)); handle.setAttribute('y2', this._fillY(inst.value)); }
-      if (valEl)  { inst._writing = true; valEl.value = inst.value.toFixed(2); inst._writing = false; }
+      if (valEl && !skipInputWrite) { inst._writing = true; valEl.value = inst.value.toFixed(2); inst._writing = false; }
       if (fullsEl) fullsEl.textContent = inst.fulls;
       if (totalEl) totalEl.textContent = this._fmt(inst.fulls + inst.value);
       inst.onChange({ value: inst.value, fulls: inst.fulls, total: inst.fulls + inst.value });
@@ -146,23 +150,30 @@ const BottleSlider = {
     root.querySelector('.bs-plus').addEventListener('click',  () => { inst.fulls = inst.fulls + 1; apply(); });
 
     // Bidirectional sync between the slider visual and the numeric input.
-    // Typing in the input updates the slider; dragging the slider writes
-    // back into the input (handled in apply()). The _writing flag stops
-    // the change handler from firing on programmatic writes.
+    // While typing: parse the raw text, clamp to 0-1, sync the slider
+    // visual, but DO NOT write back to the input (would stomp the operator's
+    // half-typed number like "." or "0.2" and force the cursor to the end).
+    // On blur: snap to 2 decimals and write the canonical formatted value.
     if (valInput) {
       valInput.addEventListener('input', () => {
         if (inst._writing) return;
         const raw = parseFloat(valInput.value);
-        if (isNaN(raw)) return;
-        inst.value = this._snap(raw);
-        apply();
+        if (isNaN(raw)) {
+          // Empty or just "." -- keep the slider where it is and let the
+          // operator keep typing. They will commit a valid number on blur.
+          return;
+        }
+        // Clamp to 0-1 but do NOT round to 2 decimals here -- rounding mid-
+        // type is what stole keystrokes on the previous build.
+        inst.value = Math.max(0, Math.min(1, raw));
+        apply(true);
       });
       valInput.addEventListener('blur', () => {
-        // On blur, snap the displayed value to whatever inst.value resolved
-        // to (covers empty input, NaN, out-of-range typed values).
-        inst._writing = true;
-        valInput.value = inst.value.toFixed(2);
-        inst._writing = false;
+        // Snap to 2 decimals and write the canonical formatted value back.
+        // If the operator left the field empty or with garbage, fall back to
+        // whatever inst.value last resolved to (zero on a fresh slider).
+        inst.value = this._snap(inst.value);
+        apply();
       });
       valInput.addEventListener('focus', () => { valInput.select(); });
     }
