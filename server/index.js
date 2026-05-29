@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
-const { computeProfitAudit } = require('./audit-compute');
+const { computeProfitAudit, computeRevenueAudit } = require('./audit-compute');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -232,9 +232,10 @@ app.post('/api/generate-revenue-audit', (req, res) => {
     if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
 
     const appDataStr = fields.appData?.[0] || '{}';
-    const notes      = fields.notes?.[0]   || '';
     let appData = {};
     try { appData = JSON.parse(appDataStr); } catch(e) {}
+    let practices = {};
+    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
 
     const uploadedFiles = [];
     for (const [key, fileArr] of Object.entries(files)) {
@@ -247,7 +248,7 @@ app.post('/api/generate-revenue-audit', (req, res) => {
     try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
 
     try {
-      const auditData = await extractAuditData(apiKey, 'revenue', uploadedFiles, appData, notes, controlData);
+      const auditData = await generateRevenueAudit(apiKey, uploadedFiles, appData, practices, controlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Revenue audit error:', e);
@@ -257,6 +258,47 @@ app.post('/api/generate-revenue-audit', (req, res) => {
     }
   });
 });
+
+/* ── Revenue audit — same honest pipeline as Profit ───────────────────────────
+   EXTRACT (files -> raw input numbers) -> COMPUTE (code) -> NARRATE (prose) ->
+   MERGE with computed numbers authoritative. */
+async function generateRevenueAudit(apiKey, files, appData, practices, controlData) {
+  const extracted = await extractRevenueInputs(apiKey, files);
+  Object.assign(extracted, practices || {});   // operator answers win over file reads
+  const numbers = computeRevenueAudit(appData, controlData, extracted);
+  numbers.AUDIT_ID = 'RFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
+  const prose = await generateRevenueNarrative(apiKey, numbers);
+  return Object.assign({}, prose, numbers);
+}
+
+async function extractRevenueInputs(apiKey, files) {
+  const fileContent = buildFileContent(files);
+  if (fileContent.length === 0) return {};
+  const instruction = `You are reading uploaded operator documents (a POS sales summary, server sales report, menu sales mix, menu price list, labor schedule/payroll, event records) for a bar and restaurant REVENUE audit. Extract ONLY the raw values you can see. Numbers as plain numbers, percentages as plain numbers. Do NOT calculate ratios or scores — the system does that. Use null for anything not present. Respond with a single JSON object, no other text:
+{"audit_period":[month or range or null],"monthly_revenue":[total monthly revenue or null],"monthly_covers":[total monthly guests/covers or null],"check_avg":[average check if stated, else null],"labor_pct":[labor as % of revenue if stated, else null],"rplh":[revenue per labor hour if stated, else null],"overtime_hrs":[number or null],"sched_vs_actual":[text like "214 scheduled / 247 actual" or null],"stars_count":[menu items, integer or null],"plowhorses_count":[integer or null],"puzzles_count":[integer or null],"dogs_count":[integer or null],"top_category":[best-selling category name or null],"server_count":[number of servers on the report or null],"top_check_avg":[highest server check average or null],"bottom_check_avg":[lowest server check average or null],"app_attach_rate":[appetizer attach % or null],"dessert_attach_rate":[dessert attach % or null],"catering_rev":[catering revenue for the period or null]}`;
+  const content = fileContent.concat([{ type: 'text', text: instruction }]);
+  try {
+    return await callClaudeForJSON(apiKey, content, 1500);
+  } catch (e) {
+    console.warn('[audit] revenue extraction failed, proceeding with app/Control data only:', e.message);
+    return {};
+  }
+}
+
+async function generateRevenueNarrative(apiKey, d) {
+  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a REVENUE audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Plain operator voice. No emdashes (use a period or comma). Avoid "leverage", "compounds", "robust", "seamless". Treat check-average, menu, server, and event figures as REVENUE OPPORTUNITY (potential growth), and labor as cost. Do not call opportunity "recovered" money. Respond with a single JSON object, no other text, with exactly these prose fields:
+{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
+
+COMPUTED NUMBERS (final):
+${JSON.stringify(d, null, 1)}`;
+  try {
+    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
+  } catch (e) {
+    console.warn('[audit] revenue narrative failed, returning numbers without prose:', e.message);
+    return {};
+  }
+}
 
 // ── Fetch public URL data for the Traffic Audit ───────────────────────────────
 // Pulls live data from the operator's saved URLs in traffic_settings.urls so
