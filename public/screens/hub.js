@@ -734,6 +734,9 @@ S.Hub = {
         <div class="main">
           <header class="topbar">
             <div class="topbar-left">
+              <button class="topbar-hamburger" id="hub-topbar-hamburger" aria-label="Open sidebar" type="button">
+                <svg viewBox="0 0 17 17" fill="none"><rect x="2" y="4" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="8" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="12" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
+              </button>
               <h1 class="topbar-title">${esc(barName)}</h1>
               <span class="topbar-sub">${todayStr}</span>
             </div>
@@ -743,13 +746,14 @@ S.Hub = {
           </header>
           <main class="content">
             ${catchupBanner}
-            <div style="display:grid;grid-template-rows:auto 470px 510px;gap:18px;padding-bottom:18px;">
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
-              <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${actionPanel}</div>
+            <div class="hub-grid" style="display:grid;grid-template-rows:auto 470px 510px;gap:18px;padding-bottom:18px;">
+              <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${actionPanel}</div>
             </div>
           </main>
         </div>
+        <div class="sidebar-backdrop" id="hub-sidebar-backdrop"></div>
       </div>
     `;
 
@@ -771,11 +775,25 @@ S.Hub = {
       container.querySelector('.hub-app')?.classList.toggle('sidebar-collapsed');
     });
 
+    // Mobile sidebar toggle: hamburger opens the off-canvas sidebar, backdrop
+    // click closes it. Tapping any nav item also closes the sidebar so the
+    // operator does not have to reach back for the close button after
+    // navigating. Only relevant below the 768px breakpoint.
+    const hubApp = container.querySelector('.hub-app');
+    const closeHubMobileSidebar = () => hubApp?.classList.remove('sidebar-open');
+    document.getElementById('hub-topbar-hamburger')?.addEventListener('click', () => {
+      hubApp?.classList.toggle('sidebar-open');
+    });
+    document.getElementById('hub-sidebar-backdrop')?.addEventListener('click', closeHubMobileSidebar);
+
     const navEl = container.querySelector('.sidebar-nav');
     if (navEl) navEl.addEventListener('click', (ev) => {
       const item = ev.target.closest('.nav-item');
       if (!item || item.classList.contains('nav-disabled')) return;
       const action = item.dataset.hubAction;
+      // Close the mobile sidebar after the click so the navigated screen has
+      // full width to render. No-op on desktop where the class is never set.
+      closeHubMobileSidebar();
       if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
       else if (action === 'hub-home')           App.showHub();
       else if (action === 'getting-started')    S.HubGettingStarted.open();
