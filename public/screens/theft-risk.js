@@ -56,38 +56,48 @@ S.TheftRisk = {
   },
 
   // ── Signals ─────────────────────────────────────────────────────────────────
+  // Minimum samples before a signal scores. Below these, a single flag would
+  // swing the score wildly, so the signal returns null (Not Enough Data) and is
+  // excluded from the blended score rather than reported as confident risk.
+  MIN_POUR_ITEMS: 8,
+  MIN_VOIDS: 10,
+  MIN_VARIANCES: 5,
+
   pourSignal() {
     const items = [];
     this.spotChecks().forEach(c => (c.items || []).forEach(it => items.push(it)));
-    if (items.length === 0) return { score: null, checks: this.spotChecks().length, items: 0 };
+    if (items.length < this.MIN_POUR_ITEMS) return { score: null, checks: this.spotChecks().length, items: items.length, insufficient: true };
     const flagged = items.filter(i => i.flagged).length;
     const rate = flagged / items.length;
     const varDollar = items.reduce((t, i) => t + Math.max(0, i.variance_dollar || 0), 0);
+    // Transparent: the risk score IS the flagged-pour rate as a percent.
     return {
-      score: Math.min(100, Math.round(rate * 280)),
+      score: Math.min(100, Math.round(rate * 100)),
       checks: this.spotChecks().length, items: items.length,
       flagged, rate, varDollar
     };
   },
   voidSignal() {
     const vc = this.voidComps();
-    if (vc.length === 0) return { score: null, count: 0 };
+    if (vc.length < this.MIN_VOIDS) return { score: null, count: vc.length, insufficient: true };
     const unauth = vc.filter(r => !r.authorized_by || !String(r.authorized_by).trim()).length;
     const rate = unauth / vc.length;
     const total = vc.reduce((t, r) => t + (r.amount || 0), 0);
+    // Risk score = share of voids/comps rung without manager authorization.
     return {
-      score: Math.min(100, Math.round(rate * 120)),
+      score: Math.min(100, Math.round(rate * 100)),
       count: vc.length, unauth, rate, total
     };
   },
   cashSignal() {
     const vars = this.variances();
-    if (vars.length === 0) return { score: null, count: 0 };
+    if (vars.length < this.MIN_VARIANCES) return { score: null, count: vars.length, insufficient: true };
     const shorts = vars.filter(v => v.status === 'Short');
     const rate = shorts.length / vars.length;
     const netShort = vars.reduce((t, v) => t + Math.min(0, v.variance || 0), 0);
+    // Risk score = share of drawer reconciliations that came up short.
     return {
-      score: Math.min(100, Math.round(rate * 150)),
+      score: Math.min(100, Math.round(rate * 100)),
       count: vars.length, shorts: shorts.length, rate, netShort
     };
   },
