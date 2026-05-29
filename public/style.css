@@ -496,6 +496,20 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .topbar-hamburger:hover{border-color:rgba(255,255,255,0.25);color:var(--w);}
 .topbar-hamburger svg{width:16px;height:16px;}
 
+/* Mobile-only close button inside the sidebar's logo bar. Hidden on desktop
+   (where the sidebar always stays mounted and there is nothing to close).
+   Below 768px the sidebar slides in over the topbar, so the topbar hamburger
+   is hidden behind it -- this button gives the operator an explicit way out. */
+.sidebar-mobile-close{
+  display:none;
+  width:30px;height:30px;flex-shrink:0;
+  align-items:center;justify-content:center;
+  background:transparent;border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--t2);cursor:pointer;font-size:22px;line-height:1;font-weight:300;
+  transition:border-color 0.1s,color 0.1s;
+}
+.sidebar-mobile-close:hover{border-color:rgba(255,255,255,0.25);color:var(--w);}
+
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
    wire a click handler to close. Created on demand by the hamburger handler. */
 .sidebar-backdrop{
@@ -528,6 +542,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 
   /* Hamburger button shows on mobile. */
   .topbar-hamburger{display:flex;}
+
+  /* Close X inside the sidebar shows on mobile so the operator has an
+     explicit out once the sidebar has slid over the topbar. */
+  .sidebar-mobile-close{display:flex;}
 
   /* Topbar density: tighter padding, smaller title. */
   .topbar{padding:0 12px;}
