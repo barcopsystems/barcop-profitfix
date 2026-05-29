@@ -658,11 +658,13 @@ const App = {
   // Profit Recovery system).
   //
   // Call signature:
-  //   App.openHubFullPage('Bar Cop Audit', mount => renderFn(mount));
+  //   App.openHubFullPage('Bar Cop Audit', mount => renderFn(mount), 'bar-cop-audit');
   //
-  // Back to Dashboard re-renders the Hub via App.showHub(), restoring the
-  // default topbar (bar name + date).
-  openHubFullPage(title, renderFn) {
+  // The third arg is the sidebar action key (data-hub-action) so we can
+  // light up the matching nav item. Back to Dashboard re-renders the Hub
+  // via App.showHub(), restoring the default topbar (bar name + date) and
+  // putting the active state back on "The Hub".
+  openHubFullPage(title, renderFn, activeAction) {
     // Backward-compat: caller can pass just renderFn if title is unused.
     if (typeof title === 'function') { renderFn = title; title = ''; }
     const wrap = document.getElementById('hub-wrapper');
@@ -692,6 +694,9 @@ const App = {
     // Clear topbar-right so prior screen actions don't bleed across.
     const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
     if (topbarRight) topbarRight.innerHTML = '';
+    // Light up the matching sidebar entry so the operator can see at a
+    // glance which Hub section they are in.
+    if (activeAction) this.setActiveHubNav(activeAction);
     // Hand the screen the content element directly so .screen wrapper
     // padding behaves identically to module screens.
     content.innerHTML = '';
@@ -706,6 +711,16 @@ const App = {
     if (topbarRight) topbarRight.innerHTML = actionsHtml || '';
   },
 
+  // Toggle the .active class on the Hub sidebar nav item whose data-hub-action
+  // matches the given key. Pass null to clear all. CSS at .nav-item.active
+  // paints the gold icon and white label that signals "you are here."
+  setActiveHubNav(action) {
+    document.querySelectorAll('.hub-app .nav-item').forEach(el => el.classList.remove('active'));
+    if (!action) return;
+    const el = document.querySelector('.hub-app .nav-item[data-hub-action="' + action + '"]');
+    if (el) el.classList.add('active');
+  },
+
   // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
   // Renders a dropdown in the topbar showing all bars the user belongs to.
   // Hidden when the user has only one account. Switching reloads the page so
@@ -715,11 +730,12 @@ const App = {
     if (!window.DB || !DB.listMyAccounts) return;
     const accounts = await DB.listMyAccounts();
     const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
-    // Both topbars (module + hub) have their own switcher slot — populate both
+    const isMulti  = !!(accounts && accounts.length > 1);
+    // Both topbars (module + hub) have their own switcher slot -- populate both
     ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
       const slot = document.getElementById(slotId);
       if (!slot) return;
-      if (!accounts || accounts.length <= 1) {
+      if (!isMulti) {
         slot.style.display = 'none';
         slot.innerHTML = '';
         return;
@@ -737,6 +753,23 @@ const App = {
       sel.addEventListener('change', (ev) => {
         const newId = ev.target.value;
         if (newId && newId !== active.id) DB.setActiveAccount(newId);
+      });
+    });
+    // Group Dashboard button -- multi-loc only. Mounts in both topbars so the
+    // operator can pop the cross-bar comparison from any screen without losing
+    // their current context. Opens as a modal overlay, not a full-page route.
+    ['topbar-group-dashboard', 'hub-topbar-group-dashboard'].forEach(slotId => {
+      const slot = document.getElementById(slotId);
+      if (!slot) return;
+      if (!isMulti) {
+        slot.style.display = 'none';
+        slot.innerHTML = '';
+        return;
+      }
+      slot.style.cssText = 'display:flex;align-items:center;margin-right:14px;';
+      slot.innerHTML = '<button class="btn btn-ghost btn-sm" id="' + slotId + '-btn" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Group Dashboard</button>';
+      slot.querySelector('button')?.addEventListener('click', () => {
+        if (window.S && S.HubGroupDashboard) S.HubGroupDashboard.open();
       });
     });
   },
