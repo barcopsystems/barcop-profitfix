@@ -85,10 +85,17 @@ function computeProfitAudit(appData, controlData, extracted) {
   const wkBarCost = avg(weeks.map(w => w.bar && w.bar.cost_pct));
   const wkFoodCost = avg(weeks.map(w => w.food && w.food.cost_pct));
   const wkPrime = avg(weeks.map(w => w.prime_cost_pct));
+  // Cost % from an uploaded P&L: prefer a stated %, else derive it in code from
+  // the raw COGS and revenue dollars (we never ask the model to do the ratio).
+  const pct = (cogs, rev) => (num(cogs) != null && num(rev) > 0) ? (cogs / rev) * 100 : null;
+  const exBarCostPct = num(extracted.bar_cost_pct) != null ? num(extracted.bar_cost_pct)
+    : pct(extracted.bar_cogs_monthly, extracted.bar_revenue_monthly);
+  const exFoodCostPct = num(extracted.food_cost_pct) != null ? num(extracted.food_cost_pct)
+    : pct(extracted.food_cogs_monthly, extracted.food_revenue_monthly);
   const barCostPct = round1(num(cd.bar_cost_pct) != null ? cd.bar_cost_pct
-    : (wkBarCost != null ? wkBarCost : num(extracted.bar_cost_pct)));
+    : (wkBarCost != null ? wkBarCost : exBarCostPct));
   const foodCostPct = round1(num(cd.food_cost_pct) != null ? cd.food_cost_pct
-    : (wkFoodCost != null ? wkFoodCost : num(extracted.food_cost_pct)));
+    : (wkFoodCost != null ? wkFoodCost : exFoodCostPct));
 
   // ── Revenue and labor — weeks first, then uploaded monthly figures, then
   // the operator's annual revenue from settings (÷12). ──
@@ -112,8 +119,9 @@ function computeProfitAudit(appData, controlData, extracted) {
 
   // ── S1 — Bar Cost and Pour Control ──
   const havePourMethod = !!extracted.pour_method;
+  const recipeCount = recipes.length || (num(extracted.recipe_count) || 0);
   let s1 = scoreCostVsTarget(barCostPct, barTarget, [85, 65, 45, 25]) || 25;
-  if (recipes.length > 0) s1 += 10;
+  if (recipeCount > 0) s1 += 10;
   if (havePourMethod) s1 += 5;
   s1 = clampScore(s1);
   const s1Diff = (barCostPct != null && barTarget != null) ? barCostPct - barTarget : 0;
@@ -134,6 +142,9 @@ function computeProfitAudit(appData, controlData, extracted) {
   if (num(cd.void_comp_total) != null && periodTotalRev > 0) {
     voidCompAmt = round0(cd.void_comp_total);
     voidCompPct = round1((cd.void_comp_total / periodTotalRev) * 100);
+  } else if (num(extracted.voids_total) != null && periodTotalRev > 0) {
+    voidCompAmt = round0(extracted.voids_total);
+    voidCompPct = round1((extracted.voids_total / periodTotalRev) * 100);
   } else if (extracted.void_comp_pct != null) {
     voidCompPct = round1(num(extracted.void_comp_pct));
     voidCompAmt = (periodTotalRev > 0) ? round0((voidCompPct / 100) * periodTotalRev) : null;
@@ -159,8 +170,11 @@ function computeProfitAudit(appData, controlData, extracted) {
     else if (voidsNoApprovalPct > 10) s2 -= 8;
   }
   // Cash short rate (shorts as a share of reconciliations) — behavior signal.
-  if (num(cd.cash_short_count) != null && num(cd.cash_reconciliations) > 0) {
-    const shortRate = cd.cash_short_count / cd.cash_reconciliations;
+  // Control data first, then an uploaded cash report.
+  const shortCount = num(cd.cash_short_count) != null ? cd.cash_short_count : num(extracted.cash_short_count);
+  const reconCount = num(cd.cash_reconciliations) > 0 ? cd.cash_reconciliations : num(extracted.cash_recon_count);
+  if (shortCount != null && reconCount > 0) {
+    const shortRate = shortCount / reconCount;
     if (shortRate > 0.30) s2 -= 10;
     else if (shortRate > 0.15) s2 -= 5;
   }
@@ -253,7 +267,7 @@ function computeProfitAudit(appData, controlData, extracted) {
     S1_INV_VARIANCE_PCT: invVarPct != null ? invVarPct : 0,
     S1_INV_VARIANCE_AMT: invVarAmt != null ? invVarAmt : 0,
     S1_POUR_METHOD: extracted.pour_method || 'Not documented',
-    S1_RECIPE_COVERAGE: `${recipes.length} recipes`,
+    S1_RECIPE_COVERAGE: `${recipeCount} recipes`,
     S1_MONTHLY_GAP: s1MonthlyGap,
     S1_ANNUAL_GAP: round0(s1MonthlyGap * 12),
 
@@ -377,19 +391,24 @@ if (require.main === module) {
     { settings: { bar_name: 'The Anchor Bar & Kitchen', city_state: 'Austin, TX', targets: {} } },
     null,
     {
+      // Mirrors the test CSVs: raw COGS dollars (code derives the cost %),
+      // voids_total + cash counts (code derives the rate), never matched.
       audit_period: 'April 2026',
-      bar_revenue_monthly: 43450, food_revenue_monthly: 26070,
-      bar_cost_pct: 27.0, food_cost_pct: 36.0, labor_cost_monthly: 22000,
-      pour_method: 'Free pour', void_comp_pct: 4.1, voids_no_approval_pct: 30,
-      food_var_pct: 6.0, invoice_vs_po: 'Never matched'
+      bar_revenue_monthly: 51500, bar_cogs_monthly: 14111,
+      food_revenue_monthly: 31000, food_cogs_monthly: 11098,
+      labor_cost_monthly: 24000, pour_method: 'Free pour',
+      voids_total: 3465, voids_no_approval_pct: 30,
+      cash_recon_count: 26, cash_short_count: 9, invoice_vs_po: 'Never matched'
     }
   );
-  const ftBarGap = Math.round(((27 - 22) / 100) * 43450);  // 2173
-  const ftFoodGap = Math.round(((36 - 32) / 100) * 26070); // 1043
+  const ftBarGap = Math.round(((27.4 - 22) / 100) * 51500);  // cost% derived from COGS
+  const ftFoodGap = Math.round(((35.8 - 32) / 100) * 31000);
   const ftChecks = [
+    ['upload bar cost % derived from COGS dollars', firstTime.S1_BAR_COST_PCT, 27.4],
+    ['upload food cost % derived from COGS dollars', firstTime.S3_FOOD_COST_PCT, 35.8],
     ['upload S1_MONTHLY_GAP from file revenue', firstTime.S1_MONTHLY_GAP, ftBarGap],
     ['upload S3_MONTHLY_GAP from file revenue', firstTime.S3_MONTHLY_GAP, ftFoodGap],
-    ['upload S2 scores the void rate (4.1%) low', firstTime.S2_SCORE < 50, true],
+    ['upload S2 scores the void rate (4.2%) low', firstTime.S2_SCORE < 50, true],
     ['upload S2_MONTHLY_GAP computed', firstTime.S2_MONTHLY_GAP > 0, true],
     ['upload AUDIT_PERIOD from file', firstTime.AUDIT_PERIOD, 'April 2026'],
     ['S4 "Never matched" scores 40, not 80 (substring bug regression)', firstTime.S4_SCORE, 40],
