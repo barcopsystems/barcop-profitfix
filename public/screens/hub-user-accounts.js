@@ -54,7 +54,7 @@ S.HubUserAccounts = {
     App.openHubFullPage('User Accounts', (mount) => {
       this.container = mount;
       this.render(mount);
-    });
+    }, 'user-accounts');
   },
 
   render(container) {
