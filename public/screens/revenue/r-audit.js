@@ -607,7 +607,10 @@ S.RevenueAudit = {
     const revLabel = (txt) => '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">' + txt + '</label>';
     const revInput = (id, ph, val) => '<div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div>';
     const revCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">'
+      +   '<div style="font-size:16px;font-weight:800;color:var(--t1);">Annual Revenue</div>'
+      +   '<button class="btn btn-ghost btn-sm" id="ra-how-btn">How this works</button>'
+      + '</div>'
       + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual revenue. This sets the dollar baselines for every gap. Enter at least one figure. A bar with no kitchen can leave Food Revenue blank.</div>'
       + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
       + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Bar Revenue') + revInput('ra-iz-bar-rev', '618000', d.barRev) + '</div>'
@@ -616,7 +619,7 @@ S.RevenueAudit = {
 
     const uploadCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Add any reports to cover what the checklist above does not, or for deeper detail. Accepts PDF, Excel, CSV, or images.</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Add a report here to score a section Bar Cop cannot see yet, or for deeper detail. Accepts PDF, Excel, CSV, or images.</div>'
       + this.renderFileSection('optional',  'POS Sales Summary',            'ra-f-pos',    'ra-pos',    'Scores Check Average (revenue, covers, blended check average)')
       + this.renderFileSection('highlight', 'Server Sales Report',          'ra-f-server', 'ra-server', 'Scores Server Performance (check average by server, spread, top and bottom)')
       + this.renderFileSection('optional',  'Menu Sales Mix and Pricing',   'ra-f-menu',   'ra-menu',   'Scores Menu Performance (Stars, Plowhorses, Dogs, pricing)')
@@ -653,6 +656,12 @@ S.RevenueAudit = {
 
     this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
 
+    document.getElementById('ra-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Revenue Audit Works', [
+      { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
+      { h: 'What Bar Cop already has', p: ['If you log weekly numbers, schedules, menu items, and servers in Bar Cop, those feed the audit automatically. A new operation reads from what you enter and upload here instead.'] },
+      { h: 'The steps', p: ['1. Enter your annual revenue (the dollar baseline).', '2. Upload any reports for a section Bar Cop cannot see yet (a POS sales summary covers Check Average, a server sales report covers Server Performance, and so on).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in over time.'] },
+      { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
+    ]));
     document.getElementById('ra-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ra-iz-submit')?.addEventListener('click', () => {
       const barRev = parseFloat(document.getElementById('ra-iz-bar-rev')?.value) || 0;
