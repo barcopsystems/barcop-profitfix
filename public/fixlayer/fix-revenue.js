@@ -118,7 +118,7 @@ FIX.revenue = [
       'Building the schedule before checking the revenue forecast. The schedule should be built from a revenue number, not from who worked last week.',
       'Calculating labor percentage on wages only. Total labor cost runs 10 to 15% higher than wages, so a wages-only number understates the problem.',
       'Treating overtime as a staffing cost instead of a scheduling error. Almost all overtime is hours concentrated on too few people.',
-      'Overstaffing slow shifts because it feels safer. An idle server on a slow Tuesday is a labor percentage problem that compounds across the year.',
+      'Overstaffing slow shifts because it feels safer. An idle server on a slow Tuesday is a labor percentage problem that costs you all year.',
       'Building a schedule with no revenue reference at all. A schedule without a forecast is a guess.'
     ]
   },
