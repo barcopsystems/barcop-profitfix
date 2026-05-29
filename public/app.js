@@ -696,11 +696,40 @@ const App = {
     // Reset padding to 0 for full-page screens so the .screen wrapper inside
     // them controls spacing the same way module screens do.
     content.style.padding = '0';
-    // Rewrite the Hub topbar-left to the page title. The sidebar's The Hub
-    // entry handles the return-to-dashboard path; no inline back link.
+    // Update the Hub topbar to show the page title. We preserve the existing
+    // hamburger button that hub.js rendered into topbar-left (so the operator
+    // can open the sidebar from any Hub-level screen on mobile) and only swap
+    // the title text + clear the date subtitle. If the hamburger is missing
+    // for any reason, we inject one and wire its click handler.
     const topbarLeft = document.querySelector('.hub-app .topbar .topbar-left');
     if (topbarLeft && title) {
-      topbarLeft.innerHTML = '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">' + esc(title) + '</div>';
+      let hamburger = topbarLeft.querySelector('.topbar-hamburger');
+      if (!hamburger) {
+        hamburger = document.createElement('button');
+        hamburger.className = 'topbar-hamburger';
+        hamburger.id = 'hub-topbar-hamburger';
+        hamburger.setAttribute('aria-label', 'Open sidebar');
+        hamburger.type = 'button';
+        hamburger.innerHTML = '<svg viewBox="0 0 17 17" fill="none"><rect x="2" y="4" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="8" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="12" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>';
+        hamburger.addEventListener('click', () => {
+          document.querySelector('.hub-app')?.classList.toggle('sidebar-open');
+        });
+        topbarLeft.insertBefore(hamburger, topbarLeft.firstChild);
+      }
+      // Update the title element (the <h1 class="topbar-title"> rendered by
+      // hub.js) and clear the date subtitle so it does not flash old content
+      // while the operator is on a Hub-level page.
+      let titleEl = topbarLeft.querySelector('.topbar-title');
+      if (titleEl) {
+        titleEl.textContent = title;
+      } else {
+        titleEl = document.createElement('div');
+        titleEl.className = 'topbar-title';
+        titleEl.textContent = title;
+        topbarLeft.appendChild(titleEl);
+      }
+      const subEl = topbarLeft.querySelector('.topbar-sub');
+      if (subEl) subEl.textContent = '';
     }
     // Clear topbar-right so prior screen actions don't bleed across.
     const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
