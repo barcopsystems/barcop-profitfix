@@ -418,21 +418,35 @@ S.HubBooks = {
     rows.push(r('Prime Cost (COGS + Labor)', M.totalCogs + M.totalLabor, YTD.totalCogs + YTD.totalLabor));
     rows.push(blank());
 
-    // Operating Expenses
-    rows.push(['Operating Expenses (your accountant fills in)', '', '']);
-    rows.push(r('  Occupancy (rent, property tax)', null, null));
-    rows.push(r('  Utilities', null, null));
-    rows.push(r('  Insurance', null, null));
-    rows.push(r('  Marketing and advertising', null, null));
-    rows.push(r('  Repairs and maintenance', M.maintenance, YTD.maintenance));
-    rows.push(r('  3rd-party platform fees (DoorDash, UberEats, etc.)', M.platformFees, YTD.platformFees));
-    rows.push(r('  Professional fees', null, null));
-    rows.push(r('  Bank and credit card fees', null, null));
-    rows.push(r('  Other operating expenses', null, null));
-    rows.push(r('Total Operating Expenses', null, null));
+    // Operating Expenses (from the Operating Expenses log + sc_maintenance +
+    // weekly platform fees). Operator logs each bill in Operating Expenses;
+    // Books rolls it up by category. Maintenance and platform fees come from
+    // their own canonical stores to avoid double-counting.
+    const opexM = this._opExSums(monthKey, false);
+    const opexY = this._opExSums(monthKey, true);
+    const totalOpExM = Object.values(opexM).reduce((s, v) => s + (v || 0), 0)
+                      + (M.maintenance || 0) + (M.platformFees || 0);
+    const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
+                      + (YTD.maintenance || 0) + (YTD.platformFees || 0);
+    const operatingIncomeM = (M.totalRev - (M.comps || 0)) - M.totalCogs - M.totalLabor - totalOpExM;
+    const operatingIncomeY = (YTD.totalRev - (YTD.comps || 0)) - YTD.totalCogs - YTD.totalLabor - totalOpExY;
+
+    rows.push(['Operating Expenses', '', '']);
+    rows.push(r('  Occupancy (rent, property tax)',                 opexM['Occupancy (Rent, Property Tax)']    || 0, opexY['Occupancy (Rent, Property Tax)']    || 0));
+    rows.push(r('  Utilities',                                      opexM['Utilities']                         || 0, opexY['Utilities']                         || 0));
+    rows.push(r('  Insurance',                                      opexM['Insurance']                         || 0, opexY['Insurance']                         || 0));
+    rows.push(r('  Marketing and advertising',                      opexM['Marketing and Advertising']         || 0, opexY['Marketing and Advertising']         || 0));
+    rows.push(r('  Repairs and maintenance',                        M.maintenance,                                  YTD.maintenance));
+    rows.push(r('  3rd-party platform fees (DoorDash, UberEats, etc.)', M.platformFees,                              YTD.platformFees));
+    rows.push(r('  Professional fees',                              opexM['Professional Fees']                 || 0, opexY['Professional Fees']                 || 0));
+    rows.push(r('  Bank and credit card fees',                      opexM['Bank and Credit Card Fees']         || 0, opexY['Bank and Credit Card Fees']         || 0));
+    rows.push(r('  Licenses and permits',                           opexM['Licenses and Permits']              || 0, opexY['Licenses and Permits']              || 0));
+    rows.push(r('  Software and subscriptions',                     opexM['Software and Subscriptions']        || 0, opexY['Software and Subscriptions']        || 0));
+    rows.push(r('  Other operating expenses',                       opexM['Other']                             || 0, opexY['Other']                             || 0));
+    rows.push(r('Total Operating Expenses', totalOpExM, totalOpExY));
     rows.push(blank());
 
-    rows.push(r('Operating Income (before taxes)', null, null));
+    rows.push(r('Operating Income (before taxes)', operatingIncomeM, operatingIncomeY));
     rows.push(blank());
 
     // Key Ratios
@@ -446,7 +460,7 @@ S.HubBooks = {
     rows.push(blank());
     rows.push(this._lineRow('Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
-    rows.push(this._lineRow('Comps from Shift Control void and comp log. Maintenance from Shift Control maintenance log.', COL_COUNT));
+    rows.push(this._lineRow('Comps from Shift Control void and comp log. Maintenance from Shift Control maintenance log. Other operating expenses from your Operating Expenses log.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
 
     // Footer + disclaimer
@@ -1457,5 +1471,41 @@ S.HubBooks = {
     const inMonth = (dateStr) => dateStr && String(dateStr).slice(0, 7) === monthKey;
     const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inMonth(m.date));
     return mnts.reduce((s, m) => s + (parseFloat(m.cost || m.amount) || 0), 0);
+  },
+
+  // Operating Expenses by category. Reads App.data.operating_expenses (entered
+  // by the operator in the Operating Expenses log under Accounting). When
+  // ytd is true, sums the calendar year through monthKey; otherwise sums
+  // just monthKey. Returns an object keyed by category name (matches the
+  // locked enum in S.HubOperatingExpenses.CATEGORIES). Unknown / legacy
+  // categories fold into 'Other' so nothing gets dropped from the rollup.
+  _opExSums(monthKey, ytd) {
+    const out = {};
+    const known = [
+      'Occupancy (Rent, Property Tax)',
+      'Utilities',
+      'Insurance',
+      'Marketing and Advertising',
+      'Professional Fees',
+      'Bank and Credit Card Fees',
+      'Licenses and Permits',
+      'Software and Subscriptions',
+      'Other'
+    ];
+    known.forEach(k => { out[k] = 0; });
+    const records = App.data?.operating_expenses || [];
+    const year = monthKey.slice(0, 4);
+    records.forEach(r => {
+      const mk = String(r.date || '').slice(0, 7);
+      if (!mk) return;
+      if (ytd) {
+        if (mk.slice(0, 4) !== year || mk > monthKey) return;
+      } else {
+        if (mk !== monthKey) return;
+      }
+      const cat = known.includes(r.category) ? r.category : 'Other';
+      out[cat] = (out[cat] || 0) + (parseFloat(r.amount) || 0);
+    });
+    return out;
   }
 };
