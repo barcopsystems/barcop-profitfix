@@ -69,30 +69,45 @@ function computeProfitAudit(appData, controlData, extracted) {
   const recons = appData.reconciliations || [];
 
   const cd = controlData || {};
-  const periodWeeks = weeks.length || PERIOD_WEEKS;
+  // In-app audits span the actual number of weeks (up to 4). An upload-only
+  // audit spans the one month its figures represent (~4.345 weeks), so monthly
+  // COGS is not mis-scaled into a 4-week period.
+  const periodWeeks = weeks.length || WEEKS_PER_MONTH;
 
   // Targets (operator-set, with documented industry defaults)
   const barTarget = num(targets.bar_pour_cost_pct) != null ? num(targets.bar_pour_cost_pct) : 22;
   const foodTarget = num(targets.food_cost_pct) != null ? num(targets.food_cost_pct) : 32;
   const primeTarget = num(targets.prime_cost_pct) != null ? num(targets.prime_cost_pct) : 60;
 
-  // ── Source-of-truth percentages: Control data first, then weekly averages ──
+  // ── Source-of-truth percentages: Control data > in-app weeks > uploaded
+  // file values (a first-time audit has no weeks; its numbers come from the
+  // uploaded POS/financial reports the model extracted). ──
   const wkBarCost = avg(weeks.map(w => w.bar && w.bar.cost_pct));
   const wkFoodCost = avg(weeks.map(w => w.food && w.food.cost_pct));
   const wkPrime = avg(weeks.map(w => w.prime_cost_pct));
-  const barCostPct = round1(num(cd.bar_cost_pct) != null ? cd.bar_cost_pct : wkBarCost);
-  const foodCostPct = round1(num(cd.food_cost_pct) != null ? cd.food_cost_pct : wkFoodCost);
+  const barCostPct = round1(num(cd.bar_cost_pct) != null ? cd.bar_cost_pct
+    : (wkBarCost != null ? wkBarCost : num(extracted.bar_cost_pct)));
+  const foodCostPct = round1(num(cd.food_cost_pct) != null ? cd.food_cost_pct
+    : (wkFoodCost != null ? wkFoodCost : num(extracted.food_cost_pct)));
 
-  // ── Revenue (weekly avg -> period and monthly) ──
+  // ── Revenue and labor — weeks first, then uploaded monthly figures, then
+  // the operator's annual revenue from settings (÷12). ──
   const wkBarRev = avg(weeks.map(w => w.bar && w.bar.revenue));
   const wkFoodRev = avg(weeks.map(w => w.food && w.food.revenue));
   const wkBarLabor = avg(weeks.map(w => w.bar && w.bar.labor));
   const wkFoodLabor = avg(weeks.map(w => w.food && w.food.labor));
+  const fromUpload = weeks.length === 0;
 
-  const monthlyBarRev = wkBarRev != null ? wkBarRev * WEEKS_PER_MONTH : null;
-  const monthlyFoodRev = wkFoodRev != null ? wkFoodRev * WEEKS_PER_MONTH : null;
-  const periodBarRev = wkBarRev != null ? wkBarRev * periodWeeks : null;
-  const periodFoodRev = wkFoodRev != null ? wkFoodRev * periodWeeks : null;
+  const monthlyBarRev = wkBarRev != null ? wkBarRev * WEEKS_PER_MONTH
+    : (num(extracted.bar_revenue_monthly) != null ? num(extracted.bar_revenue_monthly)
+      : (num(settings.annual_bar_revenue) ? settings.annual_bar_revenue / 12 : null));
+  const monthlyFoodRev = wkFoodRev != null ? wkFoodRev * WEEKS_PER_MONTH
+    : (num(extracted.food_revenue_monthly) != null ? num(extracted.food_revenue_monthly)
+      : (num(settings.annual_food_revenue) ? settings.annual_food_revenue / 12 : null));
+  // Period basis: in-app audits use a 4-week window; an upload-only audit uses
+  // the one month the uploaded figures represent.
+  const periodBarRev = wkBarRev != null ? wkBarRev * periodWeeks : monthlyBarRev;
+  const periodFoodRev = wkFoodRev != null ? wkFoodRev * periodWeeks : monthlyFoodRev;
   const periodTotalRev = (periodBarRev || 0) + (periodFoodRev || 0);
 
   // ── S1 — Bar Cost and Pour Control ──
@@ -171,9 +186,15 @@ function computeProfitAudit(appData, controlData, extracted) {
   // active price verification, not whether the system is set up) ──
   const matchState = (extracted.invoice_vs_po || '').toLowerCase();
   let s4;
-  if (matchState.includes('every') || matchState.includes('matched')) s4 = 80;
-  else if (matchState.includes('spot')) s4 = 60;
-  else s4 = 40;   // never matched / unknown — exposure goes unchecked
+  if (!matchState || matchState.includes('never') || matchState.includes('not ') || matchState.includes('no ')) {
+    s4 = 40;        // never matched / unknown — exposure goes unchecked
+  } else if (matchState.includes('spot')) {
+    s4 = 60;        // partial discipline
+  } else if (matchState.includes('match') || matchState.includes('every') || matchState.includes('all')) {
+    s4 = 80;        // matches invoices to orders
+  } else {
+    s4 = 40;
+  }
   if (vendorLog.length > 0) s4 += 10;   // actively logging/verifying price drift
   if (extracted.backup_vendors) s4 += 5; // negotiating leverage in place
   s4 = clampScore(s4);
@@ -185,7 +206,9 @@ function computeProfitAudit(appData, controlData, extracted) {
   // ── S5 — Prime Cost (CONTEXT ONLY — never summed into recoverable total) ──
   const periodLabor = num(cd.labor_cost) != null
     ? cd.labor_cost
-    : ((wkBarLabor != null || wkFoodLabor != null) ? round0(((wkBarLabor || 0) + (wkFoodLabor || 0)) * periodWeeks) : null);
+    : ((wkBarLabor != null || wkFoodLabor != null)
+      ? round0(((wkBarLabor || 0) + (wkFoodLabor || 0)) * periodWeeks)
+      : (num(extracted.labor_cost_monthly) != null ? num(extracted.labor_cost_monthly) : null));
   const totalCogsPeriod = (bevCogsPeriod || 0) + (foodCogsPeriod || 0);
   const primeAmtPeriod = (periodLabor != null) ? round0(totalCogsPeriod + periodLabor) : null;
   const primePct = round1(num(cd.prime_cost_pct) != null
@@ -205,7 +228,9 @@ function computeProfitAudit(appData, controlData, extracted) {
 
   // ── Period label ──
   const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
-  const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : `${PERIOD_WEEKS} weeks`;
+  const auditPeriod = latestEnd
+    ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`)
+    : (extracted.audit_period || 'Most recent month (uploaded data)');
   const dataTier = (controlData && (cd.sources || []).length)
     ? 'Verified — Control module data'
     : (weeks.length ? 'Standard — weekly data entered' : 'Baseline — uploaded data');
@@ -344,6 +369,39 @@ if (require.main === module) {
     console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
   console.log(`\n${pass}/${checks.length} checks passed`);
-  console.log('\nFull computed object:');
-  console.log(JSON.stringify(d, null, 2));
+
+  // ── Upload-only first-time audit: no weeks, no Control data; financials come
+  // from the model's extraction of uploaded files. Proves the gaps still compute.
+  console.log('\n--- Upload-only (first-time audit) path ---');
+  const firstTime = computeProfitAudit(
+    { settings: { bar_name: 'The Anchor Bar & Kitchen', city_state: 'Austin, TX', targets: {} } },
+    null,
+    {
+      audit_period: 'April 2026',
+      bar_revenue_monthly: 43450, food_revenue_monthly: 26070,
+      bar_cost_pct: 27.0, food_cost_pct: 36.0, labor_cost_monthly: 22000,
+      pour_method: 'Free pour', void_comp_pct: 4.1, voids_no_approval_pct: 30,
+      food_var_pct: 6.0, invoice_vs_po: 'Never matched'
+    }
+  );
+  const ftBarGap = Math.round(((27 - 22) / 100) * 43450);  // 2173
+  const ftFoodGap = Math.round(((36 - 32) / 100) * 26070); // 1043
+  const ftChecks = [
+    ['upload S1_MONTHLY_GAP from file revenue', firstTime.S1_MONTHLY_GAP, ftBarGap],
+    ['upload S3_MONTHLY_GAP from file revenue', firstTime.S3_MONTHLY_GAP, ftFoodGap],
+    ['upload S2 scores the void rate (4.1%) low', firstTime.S2_SCORE < 50, true],
+    ['upload S2_MONTHLY_GAP computed', firstTime.S2_MONTHLY_GAP > 0, true],
+    ['upload AUDIT_PERIOD from file', firstTime.AUDIT_PERIOD, 'April 2026'],
+    ['S4 "Never matched" scores 40, not 80 (substring bug regression)', firstTime.S4_SCORE, 40],
+    ['upload OVERALL is 1-100', firstTime.OVERALL_SCORE >= 1 && firstTime.OVERALL_SCORE <= 100, true]
+  ];
+  // Sanity: a bar that matches every invoice should score 80 on S4.
+  const matched = computeProfitAudit({ settings: { targets: {} } }, null, { bar_revenue_monthly: 50000, invoice_vs_po: 'Matched every delivery' });
+  ftChecks.push(['S4 "Matched every delivery" scores 80', matched.S4_SCORE, 80]);
+  let ftPass = 0;
+  for (const [label, got, exp] of ftChecks) {
+    const ok = got === exp; if (ok) ftPass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
+  }
+  console.log(`\n${ftPass}/${ftChecks.length} upload-path checks passed`);
 }
