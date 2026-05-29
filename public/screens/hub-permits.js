@@ -53,7 +53,7 @@ S.HubPermits = {
     App.openHubFullPage('Permits and Compliance', (mount) => {
       this.container = mount;
       this.renderMain();
-    });
+    }, 'permits');
   },
 
   // ── Status helpers ─────────────────────────────────────────────────────
