@@ -106,7 +106,7 @@ S.HubSettings = {
   secLinks() {
     const u = ((App.data.traffic_settings || {}).urls) || {};
     const field = (id, label, val, ph) =>
-      '<div class="f" style="width:300px;"><label>' + label + '</label>'
+      '<div class="f" style="width:100%;"><label>' + label + '</label>'
       + '<input type="url" id="' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(ph) + '"/></div>';
     const rows = App.TRAFFIC_PLATFORMS.map(p =>
       field('hs-url-' + p.urlKey, p.label, u[p.urlKey], p.placeholder)
@@ -114,7 +114,7 @@ S.HubSettings = {
     return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
       + 'Paste the public URL for each platform. Bar Cop uses these for one-click access to your live listings and pulls public data from them into the Traffic Audit.'
       + '</div>'
-      + '<div class="form-row" style="gap:14px 20px;flex-wrap:wrap;">' + rows + '</div>';
+      + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;">' + rows + '</div>';
   },
 
   // Traffic Recovery Scoreboard conversion rates. Each rate maps a Traffic
