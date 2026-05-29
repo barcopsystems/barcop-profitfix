@@ -170,22 +170,34 @@ window.Recovery = {
 
     const improvement = m.lowerBetter ? (bAvg - aAvg) : (aAvg - bAvg);
     const baseAvg = this._avg(afterW.map(m.base));
-    let dollars = null;
+    // `dollars` is REALIZED-to-date: the weekly improvement times the number of
+    // weeks since the fix landed. `dollarsAnnual` is the forward run-rate (x52),
+    // for a clearly-labeled "on pace for" figure only — never as banked cash.
+    let dollars = null, dollarsAnnual = null;
     if (baseAvg != null) {
-      dollars = (m.baseKind === 'pts')
-        ? (improvement / 100) * baseAvg * 52
-        : improvement * baseAvg * 52;
+      const perWeek = (m.baseKind === 'pts') ? (improvement / 100) * baseAvg : improvement * baseAvg;
+      dollars = perWeek * aN;
+      dollarsAnnual = perWeek * 52;
     }
     return {
       status: 'ok',
       label: m.label,
       before: bAvg, after: aAvg, improvement,
       fmt: m.fmt,
-      dollars,
+      dollars,            // realized to date
+      dollarsAnnual,      // forward run-rate, labeled as such
       weeksAfter: aN,
       mature: aN >= this.WINDOW
     };
   },
+
+  // Gap categorization for honest totals. Cost recovery (real leaks plugged)
+  // is kept separate from revenue growth (projected). Prime cost is the
+  // composite of pour + food, so it is EXCLUDED from totals to avoid counting
+  // the same dollars twice.
+  COST_GAPS:      ['pour-cost', 'food-cost', 'labor-scheduling'],
+  REVENUE_GAPS:   ['pricing', 'check-average', 'rplh', 'website', 'email-loyalty', 'delivery'],
+  COMPOSITE_GAPS: ['prime-cost'],
 
   /* Roll a module's logged fixes into a slice for its dashboard. Returns
      { logged, recovered, withFigure, measuring }: total logged fixes, the
@@ -194,25 +206,32 @@ window.Recovery = {
   moduleSummary(moduleKey) {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.module === moduleKey);
-    let recovered = 0, withFigure = 0, measuring = 0;
+    let recovered = 0, annual = 0, withFigure = 0, measuring = 0;
     mine.forEach(e => {
+      if (this.COMPOSITE_GAPS.indexOf(e.gap_id) !== -1) return;   // skip composite (double-count)
       const r = this.compute(e);
-      if (r.status === 'ok' && r.dollars != null && r.dollars > 0) { recovered += r.dollars; withFigure++; }
+      if (r.status === 'ok' && r.dollars != null && r.dollars > 0) { recovered += r.dollars; annual += (r.dollarsAnnual || 0); withFigure++; }
       else if (r.status === 'pending') measuring++;
     });
-    return { logged: mine.length, recovered: recovered, withFigure: withFigure, measuring: measuring };
+    return { logged: mine.length, recovered: recovered, annualRunRate: Math.round(annual), withFigure: withFigure, measuring: measuring };
   },
 
-  /* Cross-module recovery total for the Hub Scoreboard. Sums the annualized
-     recovered dollars across every logged fix that has produced a figure. */
+  /* Cross-module recovery total for the Hub Scoreboard. Sums REALIZED-to-date
+     dollars across logged fixes, excluding the prime-cost composite, and keeps
+     cost recovery separate from revenue growth. `annualRunRate` is the forward
+     pace, for an "on pace for" line only. */
   total() {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    let dollars = 0, fixes = 0;
+    let dollars = 0, annual = 0, cost = 0, revenue = 0, fixes = 0;
     log.forEach(e => {
+      if (this.COMPOSITE_GAPS.indexOf(e.gap_id) !== -1) return;
       const r = this.compute(e);
-      if (r.status === 'ok' && r.dollars > 0) { dollars += r.dollars; fixes++; }
+      if (r.status === 'ok' && r.dollars > 0) {
+        dollars += r.dollars; annual += (r.dollarsAnnual || 0); fixes++;
+        if (this.REVENUE_GAPS.indexOf(e.gap_id) !== -1) revenue += r.dollars; else cost += r.dollars;
+      }
     });
-    return { dollars: dollars, fixes: fixes };
+    return { dollars: Math.round(dollars), annualRunRate: Math.round(annual), cost: Math.round(cost), revenue: Math.round(revenue), fixes: fixes };
   },
 
   /* Fix-event markers for an annotated trend chart. Given the charted weeks
