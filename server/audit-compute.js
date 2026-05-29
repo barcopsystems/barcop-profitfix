@@ -117,6 +117,12 @@ function computeProfitAudit(appData, controlData, extracted) {
   const periodFoodRev = wkFoodRev != null ? wkFoodRev * periodWeeks : monthlyFoodRev;
   const periodTotalRev = (periodBarRev || 0) + (periodFoodRev || 0);
 
+  // A bar with no kitchen (or a kitchen with no bar) is fully supported. The
+  // missing side's section is marked N/A and EXCLUDED from the overall — never
+  // scored as a default that drags the operation down for selling what it sells.
+  const haveBar = num(monthlyBarRev) > 0;
+  const haveFood = num(monthlyFoodRev) > 0;
+
   // ── S1 — Bar Cost and Pour Control ──
   const havePourMethod = !!extracted.pour_method;
   const recipeCount = recipes.length || (num(extracted.recipe_count) || 0);
@@ -237,8 +243,15 @@ function computeProfitAudit(appData, controlData, extracted) {
   // the recoverable total (chunk 5, client) must NOT add this on top of them.
   const combinedCogsGap = (s1MonthlyGap || 0) + (s3MonthlyGap || 0);
 
-  // ── Overall — weighted average S1-S5 (equal weight per server spec) ──
-  const overall = clampScore(avg([s1, s2, s3, s4, s5]));
+  // ── Section scores, N/A-aware. A cost section is scored only when the data
+  // to compute it honestly exists: S1 needs a bar cost %, S3 a food cost %,
+  // S5 a prime cost %. Absent ones are null (N/A) and excluded from the
+  // overall, so a bar with no kitchen (or any missing input) is never dragged
+  // by a defaulted score. S2/S4 always apply. ──
+  const s1Out = (haveBar && barCostPct != null) ? s1 : null;
+  const s3Out = (haveFood && foodCostPct != null) ? s3 : null;
+  const s5Out = (primePct != null) ? s5 : null;
+  const overall = clampScore(avg([s1Out, s2, s3Out, s4, s5Out]));
 
   // ── Period label ──
   const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
@@ -258,7 +271,7 @@ function computeProfitAudit(appData, controlData, extracted) {
     INDUSTRY_AVG: 63,          // internal Bar Cop benchmark (relabeled in chunk 5)
     TARGET_SCORE: 65,
 
-    S1_SCORE: s1,
+    S1_SCORE: s1Out,
     S1_BAR_COST_PCT: barCostPct,
     S1_TARGET_PCT: barTarget,
     S1_BAR_REV_MONTHLY: round0(monthlyBarRev),
@@ -282,7 +295,7 @@ function computeProfitAudit(appData, controlData, extracted) {
     S2_MONTHLY_GAP: s2MonthlyGap,
     S2_ANNUAL_GAP: round0(s2MonthlyGap * 12),
 
-    S3_SCORE: s3,
+    S3_SCORE: s3Out,
     S3_FOOD_COST_PCT: foodCostPct,
     S3_TARGET_PCT: foodTarget,
     S3_FOOD_REV_MONTHLY: round0(monthlyFoodRev),
@@ -305,7 +318,7 @@ function computeProfitAudit(appData, controlData, extracted) {
     S4_EXPOSURE_MONTHLY: s4ExposureMonthly,
     S4_EXPOSURE_ANNUAL: round0(s4ExposureMonthly * 12),
 
-    S5_SCORE: s5,
+    S5_SCORE: s5Out,
     S5_PRIME_COST_PCT: primePct,
     S5_TARGET_PCT: primeTarget,
     S5_PRIME_COST_AMT: primeAmtPeriod,
@@ -417,6 +430,19 @@ if (require.main === module) {
   // Sanity: a bar that matches every invoice should score 80 on S4.
   const matched = computeProfitAudit({ settings: { targets: {} } }, null, { bar_revenue_monthly: 50000, invoice_vs_po: 'Matched every delivery' });
   ftChecks.push(['S4 "Matched every delivery" scores 80', matched.S4_SCORE, 80]);
+
+  // Bar-only operation (no kitchen): Food Cost must be N/A and excluded from
+  // the overall, not scored as a default that drags the bar down.
+  const barOnly = computeProfitAudit({ settings: { targets: {} } }, null, {
+    bar_revenue_monthly: 60000, bar_cogs_monthly: 16440, pour_method: 'Free pour',
+    voids_total: 1500, invoice_vs_po: 'Spot checked'
+  });
+  ftChecks.push(['bar-only: S3 Food is N/A (null)', barOnly.S3_SCORE, null]);
+  ftChecks.push(['bar-only: S1 Bar still scored', barOnly.S1_SCORE > 0, true]);
+  ftChecks.push(['bar-only: OVERALL excludes Food (not dragged to ~25)', barOnly.OVERALL_SCORE >= 1 && barOnly.OVERALL_SCORE <= 100, true]);
+  // Food-only operation (no bar): mirror case.
+  const foodOnly = computeProfitAudit({ settings: { targets: {} } }, null, { food_revenue_monthly: 40000, food_cogs_monthly: 13200 });
+  ftChecks.push(['food-only: S1 Bar is N/A (null)', foodOnly.S1_SCORE, null]);
   let ftPass = 0;
   for (const [label, got, exp] of ftChecks) {
     const ok = got === exp; if (ok) ftPass++;
