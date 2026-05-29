@@ -812,11 +812,11 @@ const App = {
         if (window.S && S.HubGroupDashboard) S.HubGroupDashboard.open();
       });
     });
-    // Sidebar multi-loc slots (mobile-only via CSS). Same switcher + Group
-    // Dashboard button, packaged for the sidebar layout. Both slots
-    // (#sidebar-multi-loc in the module shell, #hub-sidebar-multi-loc in the
-    // Hub shell) get populated with the same markup so the operator finds
-    // them in the same place no matter which shell they are in.
+    // Sidebar multi-loc slots (mobile-only via CSS). Location switcher only
+    // -- Group Dashboard is intentionally not exposed on mobile because the
+    // 8-column comparison table does not fit on a phone screen. Multi-loc
+    // operators on a phone can still switch bars from here; comparison view
+    // stays a desktop tool.
     ['sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
       const slot = document.getElementById(slotId);
       if (!slot) return;
@@ -827,15 +827,11 @@ const App = {
         return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
       }).join('');
       slot.innerHTML = '<div class="sidebar-multi-loc-label">Viewing</div>'
-        + '<select class="smm-switcher">' + options + '</select>'
-        + '<button type="button" class="smm-group-btn">Group Dashboard</button>';
+        + '<select class="smm-switcher">' + options + '</select>';
       const sel = slot.querySelector('.smm-switcher');
       sel?.addEventListener('change', (ev) => {
         const newId = ev.target.value;
         if (newId && newId !== active.id) DB.setActiveAccount(newId);
-      });
-      slot.querySelector('.smm-group-btn')?.addEventListener('click', () => {
-        if (window.S && S.HubGroupDashboard) S.HubGroupDashboard.open();
       });
     });
   },
