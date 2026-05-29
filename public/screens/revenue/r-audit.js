@@ -52,7 +52,19 @@ S.RevenueAudit = {
       }
 
       const sections = latest.sections || {};
-      const sectionRows = Object.entries(sections).map(([name, score]) => {
+      // List ALL five sections; an unscored one shows N/A (Not enough data)
+      // instead of disappearing.
+      const REV_SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
+      const sectionRows = REV_SECTION_NAMES.map(name => {
+        const score = sections[name];
+        if (score == null) {
+          return '<tr>'
+            + '<td style="color:var(--t2);padding:8px 12px;">' + esc(name) + '</td>'
+            + '<td style="padding:8px 12px;width:140px;"></td>'
+            + '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);padding:8px 12px;">N/A</td>'
+            + '<td style="font-size:11px;color:var(--t4);padding:8px 12px;">Not enough data</td>'
+            + '</tr>';
+        }
         const ps   = prev?.sections?.[name];
         const diff = ps != null ? score - ps : null;
         const bar  = Math.min(100, Math.max(0, score));
@@ -353,15 +365,18 @@ S.RevenueAudit = {
           + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
           + '</div>';
       }).join('');
-      // score === null means the section is intentionally unscored (Risk
-      // Signals). Skip the big number + scale bar so we don't paint a
-      // red "0" that reads like a failing score.
-      const scoreBlock = score == null
-        ? ''
-        : '<div style="text-align:right;">'
+      // score === null on a DATA section means N/A (not enough data) — show a
+      // clear N/A badge, never a red "0". The Risk Signals section also passes
+      // null but supplies a signals array, so it shows no badge at all.
+      const isSignals = signals && signals.length;
+      const scoreBlock = score != null
+        ? '<div style="text-align:right;">'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
           + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
-          + '</div>';
+          + '</div>'
+        : isSignals
+          ? ''
+          : '<div style="text-align:right;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
