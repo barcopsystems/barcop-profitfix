@@ -33,18 +33,17 @@ const BottleSlider = {
     const fulls = Math.max(0, parseInt(opts.fulls) || 0);
     const col = this.colorFor(opts.category || 'Liquor');
     const clip = 'bsclip-' + id;
-    const btn = 'width:44px;height:44px;border-radius:6px;border:1px solid var(--b1);background:var(--input);color:var(--t1);font-size:22px;font-weight:700;cursor:pointer;';
 
     return '<div class="bs" data-bs="' + esc(String(id)) + '" tabindex="0" '
       + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;">'
 
-      + '<div style="display:flex;align-items:center;gap:10px;">'
-      +   '<button type="button" class="bs-minus" style="' + btn + '">&#8722;</button>'
+      + '<div class="bs-fulls-row" style="display:flex;align-items:center;gap:10px;">'
+      +   '<button type="button" class="bs-minus" aria-label="One less full bottle">&#8722;</button>'
       +   '<div style="text-align:center;min-width:62px;">'
       +     '<div class="bs-fulls" style="font-family:\'Barlow Condensed\',sans-serif;font-size:26px;font-weight:700;color:var(--t1);line-height:1;">' + fulls + '</div>'
       +     '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:2px;">Full Bottles</div>'
       +   '</div>'
-      +   '<button type="button" class="bs-plus" style="' + btn + '">+</button>'
+      +   '<button type="button" class="bs-plus" aria-label="One more full bottle">+</button>'
       + '</div>'
 
       + '<svg class="bs-svg" viewBox="0 0 90 230" width="92" height="210" style="touch-action:none;cursor:pointer;display:block;">'
@@ -60,7 +59,10 @@ const BottleSlider = {
       + '</svg>'
 
       + '<div style="text-align:center;">'
-      +   '<div class="bs-val" style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';line-height:1;cursor:pointer;">' + value.toFixed(2) + '</div>'
+      +   '<input class="bs-val" type="number" step="0.01" min="0" max="1" inputmode="decimal" '
+      +     'aria-label="Open bottle level (0 to 1)" value="' + value.toFixed(2) + '" '
+      +     'style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';line-height:1;'
+      +     'width:74px;text-align:center;background:transparent;border:1px solid transparent;border-radius:4px;outline:none;padding:2px 4px;"/>'
       +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:2px;">Open Bottle</div>'
       + '</div>'
 
@@ -74,10 +76,15 @@ const BottleSlider = {
     const root = document.querySelector('.bs[data-bs="' + (window.CSS && CSS.escape ? CSS.escape(String(id)) : String(id)) + '"]');
     if (!root) return;
     const svg = root.querySelector('.bs-svg');
+    const valInput = root.querySelector('.bs-val');
     const inst = this._inst[id] = {
-      value: this._snap(parseFloat(root.querySelector('.bs-val').textContent)),
+      value: this._snap(parseFloat(valInput && valInput.value) || 0),
       fulls: parseInt(root.querySelector('.bs-fulls').textContent) || 0,
-      onChange: onChange || function(){}
+      onChange: onChange || function(){},
+      // Suppresses the input change handler during programmatic value writes
+      // (drag, arrow keys, +/-) so we do not feed our own writes back through
+      // the snap/apply cycle as if the operator typed them.
+      _writing: false
     };
 
     const apply = () => {
@@ -88,7 +95,7 @@ const BottleSlider = {
       const totalEl = root.querySelector('.bs-total');
       if (fill)   { fill.setAttribute('y', this._fillY(inst.value)); fill.setAttribute('height', this._fillH(inst.value)); }
       if (handle) { handle.setAttribute('y1', this._fillY(inst.value)); handle.setAttribute('y2', this._fillY(inst.value)); }
-      if (valEl)  valEl.textContent = inst.value.toFixed(2);
+      if (valEl)  { inst._writing = true; valEl.value = inst.value.toFixed(2); inst._writing = false; }
       if (fullsEl) fullsEl.textContent = inst.fulls;
       if (totalEl) totalEl.textContent = this._fmt(inst.fulls + inst.value);
       inst.onChange({ value: inst.value, fulls: inst.fulls, total: inst.fulls + inst.value });
@@ -138,24 +145,27 @@ const BottleSlider = {
     root.querySelector('.bs-minus').addEventListener('click', () => { inst.fulls = Math.max(0, inst.fulls - 1); apply(); });
     root.querySelector('.bs-plus').addEventListener('click',  () => { inst.fulls = inst.fulls + 1; apply(); });
 
-    const valEl = root.querySelector('.bs-val');
-    valEl.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'number'; input.step = '0.01'; input.min = '0'; input.max = '1';
-      input.value = inst.value.toFixed(2);
-      input.style.cssText = 'width:64px;text-align:center;font-size:18px;';
-      valEl.replaceWith(input);
-      input.focus(); input.select();
-      let done = false;
-      const commit = () => {
-        if (done) return; done = true;
-        inst.value = this._snap(parseFloat(input.value));
-        input.replaceWith(valEl);
+    // Bidirectional sync between the slider visual and the numeric input.
+    // Typing in the input updates the slider; dragging the slider writes
+    // back into the input (handled in apply()). The _writing flag stops
+    // the change handler from firing on programmatic writes.
+    if (valInput) {
+      valInput.addEventListener('input', () => {
+        if (inst._writing) return;
+        const raw = parseFloat(valInput.value);
+        if (isNaN(raw)) return;
+        inst.value = this._snap(raw);
         apply();
-      };
-      input.addEventListener('blur', commit);
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
-    });
+      });
+      valInput.addEventListener('blur', () => {
+        // On blur, snap the displayed value to whatever inst.value resolved
+        // to (covers empty input, NaN, out-of-range typed values).
+        inst._writing = true;
+        valInput.value = inst.value.toFixed(2);
+        inst._writing = false;
+      });
+      valInput.addEventListener('focus', () => { valInput.select(); });
+    }
   },
 
   get(id) {
