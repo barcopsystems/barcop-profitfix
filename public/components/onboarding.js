@@ -6,29 +6,11 @@
    and hands off to the unified Hub Getting Started for the six-module setup.
    The setup checklist is the wizard; onboarding is just the front door. */
 const Onboarding = {
-  SIZES: [
-    {g:'Spirits',l:'50ml (1.7 oz)',oz:1.7},{g:'Spirits',l:'200ml (6.8 oz)',oz:6.8},
-    {g:'Spirits',l:'375ml (12.7 oz)',oz:12.7},{g:'Spirits',l:'750ml (25.4 oz)',oz:25.4},
-    {g:'Spirits',l:'1L (33.8 oz)',oz:33.8},{g:'Spirits',l:'1.75L (59.2 oz)',oz:59.2},
-    {g:'Wine',l:'187ml (6.3 oz)',oz:6.3},{g:'Wine',l:'375ml (12.7 oz)',oz:12.7},
-    {g:'Wine',l:'750ml (25.4 oz)',oz:25.4},{g:'Wine',l:'1.5L (50.7 oz)',oz:50.7},
-    {g:'Beer',l:'12 oz',oz:12},{g:'Beer',l:'16 oz',oz:16},{g:'Beer',l:'22 oz bomber',oz:22},
-    {g:'Beer',l:'32 oz crowler',oz:32},{g:'Beer',l:'40 oz',oz:40},
-    {g:'Draft Keg',l:'1/6 keg (661 oz)',oz:661},{g:'Draft Keg',l:'1/4 keg (992 oz)',oz:992},
-    {g:'Draft Keg',l:'1/2 keg (1984 oz)',oz:1984},{g:'Other',l:'Custom (enter oz)',oz:null}
-  ],
-  sizeOpts() {
-    let g = '', h = '<option value="">Select size...</option>';
-    this.SIZES.forEach(s => {
-      if (s.g !== g) { if (g) h += '</optgroup>'; h += '<optgroup label="' + s.g + '">'; g = s.g; }
-      const v = s.oz !== null ? s.oz : 'custom';
-      h += '<option value="' + v + '">' + s.l + '</option>';
-    });
-    if (g) h += '</optgroup>';
-    return h;
-  },
-
   _step: 1,
+
+  // Shared recessed box style for the explanatory text on every step. Same
+  // visual treatment across all three steps for cohesion.
+  _boxStyle: 'background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;text-align:left;',
 
   start() {
     this._step = 1;
@@ -54,8 +36,11 @@ const Onboarding = {
     const parts = (s.city_state || '').split(',').map(p => p.trim());
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">Bar Cop captures the operation, identifies where profit leaks, and shows you exactly what to fix.</div>'
       + this._stepDots(1)
+      + '<div style="' + this._boxStyle + '">'
+      +   'Bar Cop captures your daily operation, identifies where profit and revenue are leaking, and shows you exactly what to fix. '
+      +   'Start with your bar or restaurant name and where you operate, and the rest of the setup follows from there.'
+      + '</div>'
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
       + '<div class="f" style="flex:2;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
       + '<div class="f" style="flex:1.2;"><label>City</label><input type="text" id="ob-city" value="' + esc(parts[0] || '') + '" placeholder="Austin"/></div>'
@@ -89,8 +74,11 @@ const Onboarding = {
     const s = App.data.settings;
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">Your Operation</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">These numbers set the dollar baselines for every calculation and audit. You can change them any time in Settings.</div>'
       + this._stepDots(2)
+      + '<div style="' + this._boxStyle + '">'
+      +   'A best estimate is fine here, not exact figures. These annual revenue numbers set the dollar baselines for the Profit Audit, the Recovery Scoreboard, and every dashboard percentage, so a rough number now lets every calculation start working today. '
+      +   'If you do not run food sales, enter zero for food. You can adjust either number any time from App Settings under Profile as the year goes on.'
+      + '</div>'
       + '<div style="display:flex;gap:14px;margin-bottom:14px;">'
       + '<div class="f" style="flex:1;"><label>Annual Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + (s.annual_bar_revenue || '') + '"/></div></div>'
       + '<div class="f" style="flex:1;"><label>Annual Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + (s.annual_food_revenue || '') + '"/></div></div>'
@@ -113,11 +101,10 @@ const Onboarding = {
   renderOrientation() {
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">How Bar Cop Works</div>'
-      + '<div class="ob-sub" style="text-align:center;margin-bottom:8px;line-height:1.6;">A quick lay of the land before you dig in.</div>'
       + this._stepDots(3)
-      + '<div style="background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:16px 18px;margin-bottom:18px;font-size:12px;color:var(--t2);line-height:1.7;">'
-      + 'Three <strong style="color:var(--t1);">Control</strong> systems run the day: Inventory, Labor, Shift. Three <strong style="color:var(--t1);">Recovery</strong> systems run the diagnosis: Profit, Revenue, Traffic. Each Recovery system gives you a scored monthly <strong style="color:var(--t1);">Audit</strong>, a <strong style="color:var(--t1);">Fix Process</strong> that walks you through closing every gap step by step, and a <strong style="color:var(--t1);">Recovery Scoreboard</strong> that tallies every dollar you put back into the business.'
-      + '<div style="margin-top:10px;">Next up: complete the short setup list. Once your numbers are in, the systems start tracking, scoring, and measuring recovery automatically.</div>'
+      + '<div style="' + this._boxStyle + '">'
+      +   'Three <strong style="color:var(--t1);">Control</strong> systems run the day: Inventory, Labor, Shift. Three <strong style="color:var(--t1);">Recovery</strong> systems run the diagnosis: Profit, Revenue, Traffic. Each Recovery system gives you a scored monthly <strong style="color:var(--t1);">Audit</strong>, a <strong style="color:var(--t1);">Fix Process</strong> that walks you through closing every gap step by step, and a <strong style="color:var(--t1);">Recovery Scoreboard</strong> that tallies every dollar you put back into the business. The <strong style="color:var(--t1);">Bar Cop Audit</strong> sits above all six and gives you the executive monthly read on the whole operation.'
+      +   '<div style="margin-top:10px;">Next, complete the short setup list. Once your numbers are in, the systems start tracking, scoring, and measuring recovery automatically.</div>'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
       + '<button class="btn btn-ghost btn-lg" id="ob-back">Back</button>'
@@ -128,9 +115,10 @@ const Onboarding = {
 
     document.getElementById('ob-finish')?.addEventListener('click', async () => {
       App.data.settings.onboarding_complete = true;
-      // The operator just filled in bar name, location, type, and annual
-      // revenue — the gs_profile task is done by definition. Auto-complete
-      // it so Getting Started reflects that on first open.
+      // The operator just filled in bar name, location, and annual revenue
+      // across steps 1 and 2 -- the gs_profile setup task is done by
+      // definition. Auto-complete it so Getting Started reflects that on
+      // first open (gs_profile shows checked off and lined through).
       App.data.hub_setup_progress = App.data.hub_setup_progress || {};
       App.data.hub_setup_progress.gs_profile = new Date().toISOString();
       await App.saveKey('settings');
