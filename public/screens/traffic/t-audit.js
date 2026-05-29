@@ -587,7 +587,7 @@ S.TrafficAudit = {
     const linksCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Links</div>'
       + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Paste the links Bar Cop should read. They save to your Operation Links so you only enter them once. Google rating, reviews, and website speed are read live from these.</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 24px;">'
+      + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px;">'
       + (App.TRAFFIC_PLATFORMS || []).map(p => linkRow(p.urlKey, p.label, p.placeholder || '')).join('')
       + '</div></div>';
 
