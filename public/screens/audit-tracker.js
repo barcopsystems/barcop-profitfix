@@ -554,17 +554,22 @@ S.AuditTracker = {
     // so the operator just updates what changed (e.g. Free pour -> Jiggered)
     // and watches the score move. Defaults describe an uncontrolled operation.
     const p = s.profit_practices || {};
+    // Stored as dropdown strings. Unanswered = '' so a brand-new audit starts
+    // every question on "Select Answer" and an unanswered question has zero
+    // effect on the score. Returning audits pre-fill the operator's last
+    // answers so they only change what improved.
+    const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
     this._intakeDraft = {
       barRev:  s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '',
       foodRev: s.annual_food_revenue != null ? String(s.annual_food_revenue) : '',
       practices: {
-        pour_method:   p.pour_method   || 'Free pour',
-        recipes_costed:p.recipes_costed|| 'none',
-        inv_freq:      p.inv_freq      || 'Never',
-        void_approval: p.void_approval === true,
-        drawer_recon:  p.drawer_recon  === true,
-        invoice_vs_po: p.invoice_vs_po || 'Never matched',
-        backup_vendors:p.backup_vendors|| 'No'
+        pour_method:    p.pour_method    || '',
+        recipes_costed: p.recipes_costed || '',
+        inv_freq:       p.inv_freq       || '',
+        void_approval:  boolStr(p.void_approval),
+        drawer_recon:   boolStr(p.drawer_recon),
+        invoice_vs_po:  p.invoice_vs_po  || '',
+        backup_vendors: p.backup_vendors || ''
       }
     };
     this.actions.innerHTML = '';
@@ -636,23 +641,25 @@ S.AuditTracker = {
     // changed and watches the score move. Fed straight to the engine.
     const pr = d.practices || {};
     const qRow = (label, id, options) => {
-      const opts = options.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id]) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
+      const all = [['', 'Select Answer']].concat(options);
+      const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id] || '') === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
       return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
         + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(label) + '</div>'
-        + '<select id="at-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:170px;">' + opts + '</select>'
+        + '<select id="at-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:150px;">' + opts + '</select>'
         + '</div>';
     };
     const questionsCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Few Quick Questions</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These shape your scores and usually are not in your reports. They carry over to your next audit, so update what changed and watch the numbers move.</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These shape your scores and usually are not in your reports. Answer the ones that apply. Anything left on Select Answer has no effect on your score. They carry over to your next audit, so update what changed and watch the numbers move.</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0 28px;">'
       + qRow('How do you pour spirits?',            'pour_method',   [['Free pour','Free pour'],['Jiggered/measured','Jiggered or measured']])
       + qRow('Are your recipes costed?',            'recipes_costed',[['none','None'],['some','Some'],['all','All']])
       + qRow('How often do you count inventory?',   'inv_freq',      [['Never','Never'],['Monthly','Monthly'],['Weekly','Weekly']])
-      + qRow('Manager approval required on voids and comps?', 'void_approval', [['false','No'],['true','Yes']])
+      + qRow('Manager approval on voids and comps?','void_approval', [['false','No'],['true','Yes']])
       + qRow('Drawer reconciled every shift?',      'drawer_recon',  [['false','No'],['true','Yes']])
-      + qRow('Are invoices matched to orders?',     'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']])
+      + qRow('Invoices matched to orders?',         'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']])
       + qRow('Backup vendors identified?',          'backup_vendors',[['No','No'],['Yes','Yes']])
-      + '</div>';
+      + '</div></div>';
 
     const submitCard = '<div class="card">'
       + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
@@ -675,13 +682,13 @@ S.AuditTracker = {
       }
       this._intakeDraft.barRev = document.getElementById('at-iz-bar-rev')?.value || '';
       this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
-      const val = id => (document.getElementById('at-q-' + id) || {}).value;
+      const val = id => (document.getElementById('at-q-' + id) || {}).value || '';
       this._intakeDraft.practices = {
         pour_method:    val('pour_method'),
         recipes_costed: val('recipes_costed'),
         inv_freq:       val('inv_freq'),
-        void_approval:  val('void_approval') === 'true',
-        drawer_recon:   val('drawer_recon') === 'true',
+        void_approval:  val('void_approval'),   // '' / 'true' / 'false'
+        drawer_recon:   val('drawer_recon'),
         invoice_vs_po:  val('invoice_vs_po'),
         backup_vendors: val('backup_vendors')
       };
@@ -901,13 +908,24 @@ S.AuditTracker = {
     setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
-      const practices = this._intakeDraft?.practices || {};
-      // Remember revenue + operating practices so the next audit pre-fills them
-      // and the operator only changes what improved.
+      const draftP = this._intakeDraft?.practices || {};
+      // Remember revenue + operating practices (as dropdown strings) so the
+      // next audit pre-fills them and the operator only changes what improved.
       App.data.settings.annual_bar_revenue  = barRev;
       App.data.settings.annual_food_revenue = foodRev;
-      App.data.settings.profit_practices    = practices;
+      App.data.settings.profit_practices    = draftP;
       await App.saveKey('settings');
+
+      // Convert to the engine's shape. An unanswered question ('') is omitted
+      // so it has no effect on the score.
+      const practices = {};
+      if (draftP.pour_method)    practices.pour_method    = draftP.pour_method;
+      if (draftP.recipes_costed) practices.recipes_costed = draftP.recipes_costed;
+      if (draftP.inv_freq)       practices.inv_freq       = draftP.inv_freq;
+      if (draftP.invoice_vs_po)  practices.invoice_vs_po  = draftP.invoice_vs_po;
+      if (draftP.backup_vendors) practices.backup_vendors = draftP.backup_vendors;
+      if (draftP.void_approval === 'true' || draftP.void_approval === 'false') practices.void_approval = draftP.void_approval === 'true';
+      if (draftP.drawer_recon === 'true' || draftP.drawer_recon === 'false')   practices.drawer_recon  = draftP.drawer_recon === 'true';
 
       const auditAppData = JSON.parse(JSON.stringify(App.data));
 
