@@ -211,27 +211,32 @@ function computeProfitAudit(appData, controlData, extracted) {
   const foodVarAmt = (foodVarPct != null && foodCogsPeriod != null) ? round0((foodVarPct / 100) * foodCogsPeriod) : null;
 
   // ── S4 — Vendor Control (RESULTS-based: invoice-matching behavior +
-  // active price verification, not whether the system is set up) ──
+  // active price verification). N/A when there is nothing to assess — no
+  // invoice-matching answer and no logged vendor activity. An unanswered
+  // question never manufactures a score. ──
   const matchState = (extracted.invoice_vs_po || '').toLowerCase();
-  let s4;
-  if (!matchState || matchState.includes('never') || matchState.includes('not ') || matchState.includes('no ')) {
-    s4 = 40;        // never matched / unknown — exposure goes unchecked
-  } else if (matchState.includes('spot')) {
-    s4 = 60;        // partial discipline
-  } else if (matchState.includes('match') || matchState.includes('every') || matchState.includes('all')) {
-    s4 = 80;        // matches invoices to orders
-  } else {
-    s4 = 40;
+  const haveVendorActivity = vendorLog.length > 0 || num(cd.deliveries_logged) > 0;
+  let s4 = null;
+  if (matchState) {
+    if (matchState.includes('never') || matchState.includes('not ') || matchState.includes('no ')) s4 = 40;
+    else if (matchState.includes('spot')) s4 = 60;
+    else if (matchState.includes('match') || matchState.includes('every') || matchState.includes('all')) s4 = 80;
+    else s4 = 40;
+  } else if (haveVendorActivity) {
+    s4 = 50;   // vendor activity on file but matching discipline not stated
   }
-  if (vendorLog.length > 0) s4 += 10;   // actively logging/verifying price drift
-  // Results-based: credit only real backup vendors. "None" earns nothing.
-  const backupStr = (extracted.backup_vendors || '').toLowerCase();
-  if (backupStr !== '' && !backupStr.includes('none') && backupStr !== 'no' && !backupStr.startsWith('no ')) s4 += 5;
-  s4 = clampScore(s4);
+  if (s4 != null) {
+    if (vendorLog.length > 0) s4 += 10;   // actively logging/verifying price drift
+    // Results-based: credit only real backup vendors. "None"/"No" earns nothing.
+    const backupStr = (extracted.backup_vendors || '').toLowerCase();
+    if (backupStr !== '' && !backupStr.includes('none') && backupStr !== 'no' && !backupStr.startsWith('no ')) s4 += 5;
+    s4 = clampScore(s4);
+  }
   const vendorSpendMonthly = round0((bevCogsPeriod != null || foodCogsPeriod != null)
     ? (((bevCogsPeriod || 0) + (foodCogsPeriod || 0)) / periodWeeks) * WEEKS_PER_MONTH
     : null);
-  const s4ExposureMonthly = vendorSpendMonthly != null ? round0((VENDOR_EXPOSURE_PCT / 100) * vendorSpendMonthly) : 0;
+  // No exposure figure when the vendor section itself is N/A.
+  const s4ExposureMonthly = (s4 != null && vendorSpendMonthly != null) ? round0((VENDOR_EXPOSURE_PCT / 100) * vendorSpendMonthly) : 0;
 
   // ── S5 — Prime Cost (CONTEXT ONLY — never summed into recoverable total) ──
   const periodLabor = num(cd.labor_cost) != null
@@ -396,8 +401,8 @@ if (require.main === module) {
     // Results-based: 4.1% void (2.1 over) = 25, -15 unauth (30%), +5 approval +5 recon = 20.
     ['S2_SCORE results-based (bad rate scores LOW, not 100)', d.S2_SCORE, 20],
     ['S2 score below benchmark-pass even with controls logged', d.S2_SCORE < 50, true],
-    // Invoice matching unknown (40) + vendor log present (+10) = 50.
-    ['S4_SCORE results-based (unknown matching = mediocre)', d.S4_SCORE, 50],
+    // No invoice answer but vendor activity logged (50) + vendor log present (+10) = 60.
+    ['S4_SCORE results-based (vendor activity, matching unstated)', d.S4_SCORE, 60],
     ['S5_COMBINED_COGS_GAP == S1+S3 gap (no double count beyond)', d.S5_COMBINED_COGS_GAP, expS1Gap + expS3Gap],
     ['S5 prime % from control', d.S5_PRIME_COST_PCT, 63.0],
     ['OVERALL is 1-100', d.OVERALL_SCORE >= 1 && d.OVERALL_SCORE <= 100, true]
@@ -468,6 +473,10 @@ if (require.main === module) {
   ftChecks.push(['practices: measured pour + costed recipes raise S1', improved.S1_SCORE > firstTime.S1_SCORE, true]);
   ftChecks.push(['practices: costed recipes + counts raise S3', improved.S3_SCORE > firstTime.S3_SCORE, true]);
   ftChecks.push(['practices: matched invoices + backups raise S4', improved.S4_SCORE > firstTime.S4_SCORE, true]);
+
+  // Unanswered vendor question + no vendor data -> S4 is N/A, never a manufactured score.
+  const noVendor = computeProfitAudit({ settings: { targets: {} } }, null, { bar_revenue_monthly: 50000, bar_cogs_monthly: 13700 });
+  ftChecks.push(['unanswered vendor + no data: S4 is N/A (null)', noVendor.S4_SCORE, null]);
   let ftPass = 0;
   for (const [label, got, exp] of ftChecks) {
     const ok = got === exp; if (ok) ftPass++;
