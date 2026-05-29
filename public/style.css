@@ -580,8 +580,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .topbar-title{font-size:11px;letter-spacing:1.4px;}
   .topbar-sub{font-size:10px;margin-left:6px;}
 
-  /* Screen container padding tightens on narrow viewports. */
-  .screen{padding:16px 14px 40px;}
+  /* Screen container padding tightens on narrow viewports. Bottom padding
+     stays generous so the last card/button on a screen never butts up
+     against the viewport edge (especially with iOS/Android browser chrome
+     that can collapse and re-show as the operator scrolls). */
+  .screen{padding:16px 14px 72px;}
+  /* Module shell content area gets the same bottom breathing room as the
+     Hub Dashboard content (below). */
+  .app .content{padding-bottom:72px;}
 
   /* openHubOverlay modal panel goes near-full-screen instead of centered card. */
   #hub-modal{padding:0 !important;align-items:stretch !important;}
@@ -600,7 +606,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .hub-grid{grid-template-rows:auto !important;}
   .hub-grid-tiles{grid-template-columns:1fr 1fr !important;}
   .hub-grid-row{grid-template-columns:1fr !important;}
-  .hub-app .content{padding:14px !important;}
+  .hub-app .content{padding:14px 14px 72px !important;}
 
   /* Form rows stack vertically on narrow widths so fields get full width
      instead of squeezing into truncated columns. */
