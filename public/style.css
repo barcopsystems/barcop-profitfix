@@ -667,4 +667,18 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   /* Card padding tightens on mobile so per-product cards fit more content
      on a phone screen without horizontal scroll or cramped margins. */
   .card { padding:14px !important; }
+
+  /* Any inline-styled grid with repeat(4,1fr) -- the standard 4-stat-tile
+     row pattern used across the app -- collapses to 2 columns on mobile so
+     the tiles do not run off-screen. Catches every existing 4-up tile row
+     without needing to add a class to every screen. Same treatment for
+     3-column grids (collapse to single column on phones). */
+  [style*="grid-template-columns:repeat(4"],
+  [style*="grid-template-columns: repeat(4"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  [style*="grid-template-columns:repeat(3"],
+  [style*="grid-template-columns: repeat(3"] {
+    grid-template-columns: 1fr !important;
+  }
 }
