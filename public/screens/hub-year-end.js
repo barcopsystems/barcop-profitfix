@@ -40,7 +40,7 @@ S.HubYearEnd = {
   // shows "YEAR-END REVIEW | Back to Dashboard". Action buttons live next to
   // the Year dropdown inside the picker card.
   open() {
-    App.openHubFullPage('Year-End Review', (mount) => this._render(mount));
+    App.openHubFullPage('Year-End Review', (mount) => this._render(mount), 'year-end');
   },
 
   // ── Render the picker screen ───────────────────────────────────────────────
