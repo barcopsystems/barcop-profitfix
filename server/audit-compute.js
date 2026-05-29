@@ -124,11 +124,14 @@ function computeProfitAudit(appData, controlData, extracted) {
   const haveFood = num(monthlyFoodRev) > 0;
 
   // ── S1 — Bar Cost and Pour Control ──
-  const havePourMethod = !!extracted.pour_method;
   const recipeCount = recipes.length || (num(extracted.recipe_count) || 0);
+  // Results-based bonus: only a measured/jiggered pour earns credit. Free pour
+  // is the bad behavior, not a control — it earns nothing.
+  const pourStr = (extracted.pour_method || '').toLowerCase();
+  const measuredPour = pourStr.includes('jigger') || pourStr.includes('measur');
   let s1 = scoreCostVsTarget(barCostPct, barTarget, [85, 65, 45, 25]) || 25;
   if (recipeCount > 0) s1 += 10;
-  if (havePourMethod) s1 += 5;
+  if (measuredPour) s1 += 5;
   s1 = clampScore(s1);
   const s1Diff = (barCostPct != null && barTarget != null) ? barCostPct - barTarget : 0;
   const s1MonthlyGap = (s1Diff > 0 && monthlyBarRev != null) ? round0((s1Diff / 100) * monthlyBarRev) : 0;
@@ -191,7 +194,10 @@ function computeProfitAudit(appData, controlData, extracted) {
   s2 = clampScore(s2);
 
   // ── S3 — Food Cost Control ──
-  const haveInvFreq = !!extracted.inv_freq || num(cd.inventory_counts) > 0;
+  // Results-based: credit only when counts actually happen. "Never" earns nothing.
+  const invFreqStr = (extracted.inv_freq || '').toLowerCase();
+  const haveInvFreq = num(cd.inventory_counts) > 0
+    || (invFreqStr !== '' && !invFreqStr.includes('never') && !invFreqStr.includes('none') && !invFreqStr.includes('not'));
   let s3 = scoreCostVsTarget(foodCostPct, foodTarget, [85, 65, 45, 25]) || 25;
   if (kitchenProducts.length > 0) s3 += 10;
   if (haveInvFreq) s3 += 5;
@@ -216,7 +222,9 @@ function computeProfitAudit(appData, controlData, extracted) {
     s4 = 40;
   }
   if (vendorLog.length > 0) s4 += 10;   // actively logging/verifying price drift
-  if (extracted.backup_vendors) s4 += 5; // negotiating leverage in place
+  // Results-based: credit only real backup vendors. "None" earns nothing.
+  const backupStr = (extracted.backup_vendors || '').toLowerCase();
+  if (backupStr !== '' && !backupStr.includes('none') && backupStr !== 'no' && !backupStr.startsWith('no ')) s4 += 5;
   s4 = clampScore(s4);
   const vendorSpendMonthly = round0((bevCogsPeriod != null || foodCogsPeriod != null)
     ? (((bevCogsPeriod || 0) + (foodCogsPeriod || 0)) / periodWeeks) * WEEKS_PER_MONTH
@@ -375,7 +383,7 @@ if (require.main === module) {
   const expS2Gap = Math.round(((expVoidPct - 2.0) / 100) * (monthlyBarRev + monthlyFoodRev));
 
   const checks = [
-    ['S1_SCORE (diff 5 = within-5 band 45, +10 recipes, +5 pour = 60)', d.S1_SCORE, 60],
+    ['S1_SCORE (diff 5 = band 45, +10 recipes, free pour earns no bonus = 55)', d.S1_SCORE, 55],
     ['S1_MONTHLY_GAP', d.S1_MONTHLY_GAP, expS1Gap],
     ['S3_MONTHLY_GAP', d.S3_MONTHLY_GAP, expS3Gap],
     ['S2_VOID_COMP_PCT', d.S2_VOID_COMP_PCT, expVoidPct],
