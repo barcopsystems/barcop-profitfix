@@ -10,7 +10,7 @@ S.HubHelp = {
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows "HELP AND FAQ | Back to Dashboard".
   open() {
-    App.openHubFullPage('Help and FAQ', (mount) => this.render(mount));
+    App.openHubFullPage('Help and FAQ', (mount) => this.render(mount), 'help');
   },
 
   render(container) {
