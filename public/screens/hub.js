@@ -607,6 +607,7 @@ S.Hub = {
       getStart:'<path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       allBars: '<rect x="2" y="6" width="3" height="8" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="3" width="3" height="11" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="12" y="8" width="3" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3"/>',
       books:   '<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      calendar:'<rect x="2" y="3.5" width="13" height="11.5" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 7h13" stroke="currentColor" stroke-width="1.3"/><path d="M5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="4" y="9" width="2" height="2" stroke="currentColor" stroke-width="1.1" fill="none"/><rect x="7.5" y="9" width="2" height="2" stroke="currentColor" stroke-width="1.1" fill="none"/><rect x="11" y="9" width="2" height="2" fill="currentColor"/>',
       user:    '<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       report:  '<rect x="3.5" y="2" width="10" height="13" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 5.5h5M6 8h5M6 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M9 12.5l1.2 1.2 2.2-2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
@@ -651,7 +652,7 @@ S.Hub = {
       + navItem('weekly-pnl',         'Weekly P&L Brief',    'report',   [])
       + navItem('operating-expenses', 'Operating Expenses',  'expense',  [])
       + navItem('books',              'Month-End Books',     'books',    [])
-      + navItem('year-end',           'Year-End Review',     'books',    [])
+      + navItem('year-end',           'Year-End Review',     'calendar', [])
       + '<div class="nav-section">Compliance</div>'
       + navItem('permits',            'Permits and Licenses','shield',   [])
       + '<div class="nav-section">Setup</div>'
