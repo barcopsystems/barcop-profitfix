@@ -29,7 +29,7 @@ S.HubBooks = {
   // shows "MONTH-END BOOKS | Back to Dashboard". Action buttons live next to
   // the Close Month dropdown inside the picker card.
   open() {
-    App.openHubFullPage('Month-End Books', (mount) => this._render(mount));
+    App.openHubFullPage('Month-End Books', (mount) => this._render(mount), 'books');
   },
 
   // ── Render the picker screen ───────────────────────────────────────────────
