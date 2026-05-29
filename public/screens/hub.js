@@ -643,6 +643,7 @@ S.Hub = {
       mail:    '<rect x="2.2" y="4" width="12.6" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 4.5l6.3 4.5 6.3-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       audit:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       expense: '<path d="M3.5 2v13l1.5-1 1.5 1 1.5-1 1.5 1 1.5-1 1.5 1V2H3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 5.5v5M10 6.5H7.5a1 1 0 0 0 0 2H9.5a1 1 0 0 1 0 2H7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
+      shield:  '<path d="M8.5 2L3 4v5c0 3 2.5 5 5.5 6 3-1 5.5-3 5.5-6V4l-5.5-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M6.5 8.5l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
       signout: '<path d="M6.5 3h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M11 5.5l3 3-3 3M14 8.5H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
     };
 
@@ -682,6 +683,8 @@ S.Hub = {
       + navItem('operating-expenses', 'Operating Expenses',  'expense',  [])
       + navItem('books',              'Month-End Books',     'books',    [])
       + navItem('year-end',           'Year-End Review',     'books',    [])
+      + '<div class="nav-section">Compliance</div>'
+      + navItem('permits',            'Permits and Licenses','shield',   [])
       + '<div class="nav-section">Setup</div>'
       // Getting Started hides once every setup step is checked off so the
       // sidebar does not carry permanent clutter for operators past setup.
@@ -811,6 +814,7 @@ S.Hub = {
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();
       else if (action === 'operating-expenses') S.HubOperatingExpenses?.open?.();
+      else if (action === 'permits')            S.HubPermits?.open?.();
       else if (action === 'contact-support') S.HubSupport.open();
       else if (action === 'report-bug')      S.HubReportBug.open();
     });
