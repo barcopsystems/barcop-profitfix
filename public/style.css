@@ -476,6 +476,26 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 *::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.11);}
 
 /* ══════════════════════════════════════════════════════════════════════════
+   BOTTLE SLIDER -- base styles for the +/- buttons and the level input.
+   Pulled out of inline so the mobile media query below can override.
+   ══════════════════════════════════════════════════════════════════════════ */
+.bs-minus, .bs-plus {
+  width:44px;height:44px;border-radius:6px;
+  border:1px solid var(--b1);background:var(--input);color:var(--t1);
+  font-size:22px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color 0.1s,color 0.1s;
+}
+.bs-minus:hover, .bs-plus:hover { border-color:var(--gold); color:var(--gold); }
+
+/* The level input looks like a static display on desktop (no border, no
+   spinner) but is always editable on click. On mobile a visible border + bg
+   appears so the keyboard-entry path is obvious without a hidden gesture. */
+.bs-val { -moz-appearance:textfield; }
+.bs-val::-webkit-inner-spin-button, .bs-val::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.bs-val:focus { border-color:var(--gold) !important; background:var(--input); }
+
+/* ══════════════════════════════════════════════════════════════════════════
    MOBILE SHELL (Layer 1 of the mobile-first pass)
    ──────────────────────────────────────────────────────────────────────────
    Breakpoint: 768px. Below this, the sidebar hides off-canvas and slides in
@@ -577,4 +597,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   /* Form rows stack vertically on narrow widths so fields get full width
      instead of squeezing into truncated columns. */
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+
+  /* Bottle slider mobile pass: bigger SVG so a thumb can drive it, thicker
+     drag handle so it is visible + grab-able, larger +/- buttons hitting
+     the 48px touch target, always-visible numeric input border so the
+     keyboard-entry path is obvious without a hidden tap-on-value gesture. */
+  .bs-svg { width:140px !important; height:240px !important; }
+  .bs-handle { stroke-width:4 !important; }
+  .bs-minus, .bs-plus { width:48px !important; height:48px !important; font-size:24px !important; }
+  .bs-val {
+    border:1px solid var(--b1) !important;
+    background:var(--input) !important;
+    width:90px !important;
+    padding:6px 8px !important;
+  }
+
+  /* Card padding tightens on mobile so per-product cards fit more content
+     on a phone screen without horizontal scroll or cramped margins. */
+  .card { padding:14px !important; }
 }
