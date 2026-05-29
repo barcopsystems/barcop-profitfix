@@ -8,6 +8,7 @@ const { execSync } = require('child_process');
 const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
+const { computeProfitAudit } = require('./audit-compute');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -85,7 +86,7 @@ app.post('/api/generate-profit-audit', (req, res) => {
     try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
 
     try {
-      const auditData = await extractAuditData(apiKey, 'profit', uploadedFiles, appData, notes, controlData);
+      const auditData = await generateProfitAudit(apiKey, uploadedFiles, appData, notes, controlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Profit audit error:', e);
@@ -95,6 +96,87 @@ app.post('/api/generate-profit-audit', (req, res) => {
     }
   });
 });
+
+/* ── Profit audit — honest pipeline (2026-05-29 rebuild) ───────────────────────
+   1. EXTRACTION (only if files uploaded): the model reads uploads and returns a
+      small JSON of raw observed input metrics — no scores, no gaps, no prose.
+   2. COMPUTE: code (computeProfitAudit) calculates every score and dollar figure
+      from intake + Control data + extracted inputs. This is the source of truth.
+   3. NARRATIVE: the model is GIVEN the computed numbers and writes only the
+      operator-voice prose, echoing the numbers, never recomputing.
+   4. MERGE: computed numbers overwrite anything the model returned, so code's
+      figures are always authoritative. See memory: audit-honesty-rebuild. */
+async function generateProfitAudit(apiKey, files, appData, notes, controlData) {
+  const extracted = await extractProfitInputs(apiKey, files, notes);
+  const numbers = computeProfitAudit(appData, controlData, extracted);
+  // Stamp identifiers code owns (not the model).
+  numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
+  const prose = await generateProfitNarrative(apiKey, numbers, notes);
+  // Computed numbers win over anything the model echoed back.
+  return Object.assign({}, prose, numbers);
+}
+
+/* Extraction pass — returns observed input metrics from uploaded files only.
+   Returns {} when no files (the common case: data already in app/Control). */
+async function extractProfitInputs(apiKey, files, notes) {
+  const fileContent = buildFileContent(files);
+  if (fileContent.length === 0) return {};
+  const instruction = `You are reading uploaded operator documents (POS reports, invoices, spreadsheets) for a bar and restaurant profit audit. Extract ONLY the raw values you can actually see. Respond with a single JSON object, no other text, no calculations, no scores. Use null for anything not present. Fields:
+{"pour_method":[e.g. "Free pour" / "Jiggered" or null],"inv_variance_pct":[number or null],"void_comp_pct":[number or null],"voids_no_approval_pct":[number or null],"void_approval":[true if a manager-approval policy is evidenced, else null],"food_var_pct":[number or null],"inv_freq":[e.g. "Weekly" or null],"waste_log":[e.g. "Yes" or null],"bev_invoice_count":[integer or null],"food_invoice_count":[integer or null],"invoice_vs_po":[e.g. "Matched every delivery" / "Spot checked" / "Never matched" or null],"backup_vendors":[text or null],"rplh_tracked":[e.g. "Yes" or null]}`;
+  const content = fileContent.concat([{ type: 'text', text: (notes ? 'OPERATOR NOTES:\n' + notes + '\n\n' : '') + instruction }]);
+  try {
+    return await callClaudeForJSON(apiKey, content, 1500);
+  } catch (e) {
+    console.warn('[audit] profit extraction failed, proceeding with app/Control data only:', e.message);
+    return {};
+  }
+}
+
+/* Narrative pass — the model writes prose around the code-computed numbers. */
+async function generateProfitNarrative(apiKey, d, notes) {
+  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a profit audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Write in plain operator voice. No emdashes (use a period or comma). Avoid the words "leverage", "compounds", "robust", "seamless". Respond with a single JSON object, no other text, with exactly these prose fields (reference the given numbers verbatim where relevant):
+{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
+
+COMPUTED NUMBERS (final):
+${JSON.stringify(d, null, 1)}${notes ? '\n\nOPERATOR NOTES (for context):\n' + notes : ''}`;
+  try {
+    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
+  } catch (e) {
+    console.warn('[audit] profit narrative failed, returning numbers without prose:', e.message);
+    return {};
+  }
+}
+
+/* Build Claude content blocks from uploaded files (PDF/image inline, sheets as text). */
+function buildFileContent(files) {
+  const content = [];
+  const sheetTexts = [];
+  for (const f of (files || [])) {
+    const ext = path.extname(f.name).toLowerCase();
+    if (ext === '.pdf') {
+      content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fs.readFileSync(f.path).toString('base64') } });
+    } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
+      const mt = ext === '.png' ? 'image/png' : 'image/jpeg';
+      content.push({ type: 'image', source: { type: 'base64', media_type: mt, data: fs.readFileSync(f.path).toString('base64') } });
+    } else if (['.xlsx', '.xls', '.csv', '.doc', '.docx'].includes(ext)) {
+      const text = parseSpreadsheetToText(f.path, f.name);
+      if (text) sheetTexts.push(text);
+    }
+  }
+  if (sheetTexts.length) content.unshift({ type: 'text', text: 'SUBMITTED DATA FILES:\n\n' + sheetTexts.join('\n\n---\n\n') });
+  return content;
+}
+
+/* Call Claude with content blocks, parse a single JSON object from the reply. */
+async function callClaudeForJSON(apiKey, content, maxTokens) {
+  const body = JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens || 4000, messages: [{ role: 'user', content }] });
+  const responseData = await callClaude(apiKey, body);
+  const rawText = responseData.content?.[0]?.text || '';
+  const first = rawText.indexOf('{'), last = rawText.lastIndexOf('}');
+  if (first === -1 || last === -1) throw new Error('No JSON object in response: ' + rawText.slice(0, 200));
+  return JSON.parse(rawText.slice(first, last + 1));
+}
 
 // ── Traffic audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-traffic-audit', (req, res) => {
