@@ -474,3 +474,89 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 *::-webkit-scrollbar-track{background:transparent;}
 *::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:3px;}
 *::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.11);}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE SHELL (Layer 1 of the mobile-first pass)
+   ──────────────────────────────────────────────────────────────────────────
+   Breakpoint: 768px. Below this, the sidebar hides off-canvas and slides in
+   over the content when the topbar hamburger is tapped. Backdrop dims the
+   content behind. Modal overlays (openHubOverlay) go near-full-screen.
+   Per-screen layout (form stacking, bottle slider redesign) lives in Layer 2.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Hamburger button (lives in topbar-left). Hidden on desktop, shown below
+   768px so the operator can pop the sidebar from any screen. */
+.topbar-hamburger{
+  display:none;
+  width:32px;height:32px;flex-shrink:0;margin-right:10px;
+  align-items:center;justify-content:center;
+  background:transparent;border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--t2);cursor:pointer;transition:border-color 0.1s,color 0.1s;
+}
+.topbar-hamburger:hover{border-color:rgba(255,255,255,0.25);color:var(--w);}
+.topbar-hamburger svg{width:16px;height:16px;}
+
+/* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
+   wire a click handler to close. Created on demand by the hamburger handler. */
+.sidebar-backdrop{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.55);z-index:250;
+  cursor:pointer;
+}
+
+@media (max-width: 768px) {
+  /* Sidebar goes off-canvas. .sidebar-open class on the app shell slides it
+     into view. Higher z-index than the backdrop so it sits on top. */
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;
+    width:260px;min-width:260px;
+    transform:translateX(-100%);
+    transition:transform 0.22s ease;
+    z-index:300;
+    box-shadow:0 0 24px rgba(0,0,0,0.55);
+  }
+  .app.sidebar-open .sidebar,
+  .hub-app.sidebar-open .sidebar{
+    transform:translateX(0);
+  }
+  .app.sidebar-open .sidebar-backdrop,
+  .hub-app.sidebar-open .sidebar-backdrop{display:block;}
+
+  /* Sidebar-collapse desktop affordance hides on mobile. The hamburger does
+     the toggling instead. */
+  .sidebar-logo-toggle{display:none !important;}
+
+  /* Hamburger button shows on mobile. */
+  .topbar-hamburger{display:flex;}
+
+  /* Topbar density: tighter padding, smaller title. */
+  .topbar{padding:0 12px;}
+  .topbar-title{font-size:11px;letter-spacing:1.4px;}
+  .topbar-sub{font-size:10px;margin-left:6px;}
+
+  /* Screen container padding tightens on narrow viewports. */
+  .screen{padding:16px 14px 40px;}
+
+  /* openHubOverlay modal panel goes near-full-screen instead of centered card. */
+  #hub-modal{padding:0 !important;align-items:stretch !important;}
+  #hub-modal .hub-modal-panel{
+    max-width:100% !important;
+    width:100% !important;
+    max-height:100vh !important;
+    border-radius:0 !important;
+    border:none !important;
+    border-left:none !important;border-right:none !important;
+  }
+
+  /* Hub Dashboard grid -- on desktop a 4-col tile row plus two 3-col content
+     rows; on mobile everything stacks vertically. Fixed row heights drop so
+     content sizes to its own intrinsic height instead of being clipped. */
+  .hub-grid{grid-template-rows:auto !important;}
+  .hub-grid-tiles{grid-template-columns:1fr 1fr !important;}
+  .hub-grid-row{grid-template-columns:1fr !important;}
+  .hub-app .content{padding:14px !important;}
+
+  /* Form rows stack vertically on narrow widths so fields get full width
+     instead of squeezing into truncated columns. */
+  .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+}
