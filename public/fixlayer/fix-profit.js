@@ -136,7 +136,7 @@ FIX.profit = [
       'Treating portion audit findings as a disciplinary issue. Over-portioning is almost always a standards gap, not a character gap.',
       'Logging waste without reason codes. A count of what was thrown away tells you nothing about why it happened or what to change.',
       'Raising prices across the board when food cost spikes. A surgical increase on the specific items above target is less visible and more effective.',
-      'Building recipe cards once and never updating them. A card built at January prices is wrong by March, and the error compounds with every price move since.',
+      'Building recipe cards once and never updating them. A card built at January prices is wrong by March, and the gap widens with every price move since.',
       'Having no written portion standards posted at stations. A verbal instruction given on day one is a memory that fades and drifts.',
       'Costing proteins at purchase price without a yield adjustment. Every protein on the menu is understated until you cost on true cost per usable pound.'
     ]
@@ -214,7 +214,7 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Reading prime cost monthly instead of weekly. A 30-day lag means 30 days of compounding loss before you see it, and 30 more before you know the fix worked.',
+      'Reading prime cost monthly instead of weekly. A 30-day lag means 30 days of loss before you see it, and 30 more before you know the fix worked.',
       'Treating prime cost as a finance metric. It belongs in the weekly management meeting, not the monthly P&L review.',
       'Acting on a single week\'s spike before checking the data. A miscoded payroll run or a one-time bulk purchase produces a false spike.',
       'Excluding payroll taxes and benefits from labor. Real labor cost runs 10 to 15% above wages alone, and a wages-only number understates the problem every week.'
