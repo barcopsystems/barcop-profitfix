@@ -1,1591 +1,990 @@
 'use strict';
-const express  = require('express');
-const path     = require('path');
-const https    = require('https');
-const http     = require('http');
-const fs       = require('fs');
-const { execSync } = require('child_process');
-const multiparty = require('multiparty');
-let XLSX;
-try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
-const { computeProfitAudit, computeRevenueAudit, computeTrafficAudit } = require('./audit-compute');
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+/* ── Audit Compute — deterministic audit math (honesty rebuild, 2026-05-29) ────
+   Every audit SCORE and DOLLAR figure is computed here in code, from the real
+   data Bar Cop holds. The Claude API never does arithmetic — it only reads
+   uploaded files (extraction) and writes the operator-voice prose around the
+   numbers this module locks. See memory: audit-honesty-rebuild, output-honesty.
 
-// Skip JSON parsing for the Stripe webhook route — it needs the raw body for signature verification
-app.use((req, res, next) => {
-  if (req.path === '/api/stripe-webhook') return next();
-  express.json({ limit: '50mb' })(req, res, next);
-});
+   Honesty contract for every number this file returns:
+     1. computed from held data (intake fields + parsed uploads + Control data)
+     2. correct for the period it claims (a 4-week audit period, never x52 cash)
+     3. no double-counting a composite and its parts (prime cost is CONTEXT,
+        never summed into the recoverable total with pour + food)
+     4. cost recovery is kept separate from revenue growth
+     5. anything we cannot compute honestly is returned null / "Not documented",
+        never a fabricated placeholder.
 
-// No-cache headers for JS/CSS
-app.use((req, res, next) => {
-  if (req.url.match(/\.(js|css)(\?.*)?$/)) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
-  next();
-});
+   Period basis: the audit covers the trailing 4 weeks of `weeks` data. Control
+   percentages and Control sums passed in are expected to be scoped to that same
+   window (see audit-tracker.js buildControlData period scoping). Monthly =
+   weekly average x 4.345. */
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+const WEEKS_PER_MONTH = 4.345;
+const PERIOD_WEEKS = 4;
+const VOID_COMP_BENCHMARK_PCT = 2.0;   // S2 benchmark (server prompt S2_BENCHMARK_PCT)
+const VENDOR_EXPOSURE_PCT = 3.0;       // S4 exposure assumption (server prompt S4_EXPOSURE_PCT)
 
-// ── Claude API proxy ──────────────────────────────────────────────────────────
-app.post('/api/claude', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const body = JSON.stringify(req.body);
-  const options = {
-    hostname: 'api.anthropic.com',
-    path:     '/v1/messages',
-    method:   'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Length':    Buffer.byteLength(body)
-    }
-  };
-
-  const proxyReq = https.request(options, proxyRes => {
-    res.status(proxyRes.statusCode);
-    proxyRes.pipe(res);
-  });
-  proxyReq.on('error', err => {
-    console.error('Claude proxy error:', err);
-    res.status(502).json({ error: 'Proxy request failed' });
-  });
-  proxyReq.write(body);
-  proxyReq.end();
-});
-
-// ── Profit audit — JSON only, no PDF ──────────────────────────────────────────
-app.post('/api/generate-profit-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const appDataStr = fields.appData?.[0] || '{}';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-    let practices = {};
-    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-      }
-    }
-
-    let controlData = null;
-    try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
-
-    try {
-      const auditData = await generateProfitAudit(apiKey, uploadedFiles, appData, practices, controlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Profit audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
-    }
-  });
-});
-
-/* ── Profit audit — honest pipeline (2026-05-29 rebuild) ───────────────────────
-   1. EXTRACTION (only if files uploaded): the model reads uploads and returns a
-      small JSON of raw observed input metrics — no scores, no gaps, no prose.
-   2. COMPUTE: code (computeProfitAudit) calculates every score and dollar figure
-      from intake + Control data + extracted inputs. This is the source of truth.
-   3. NARRATIVE: the model is GIVEN the computed numbers and writes only the
-      operator-voice prose, echoing the numbers, never recomputing.
-   4. MERGE: computed numbers overwrite anything the model returned, so code's
-      figures are always authoritative. See memory: audit-honesty-rebuild. */
-async function generateProfitAudit(apiKey, files, appData, practices, controlData) {
-  const extracted = await extractProfitInputs(apiKey, files);
-  // Operator-stated practices are authoritative over anything the model read
-  // from a file — the operator knows whether they jigger or count inventory.
-  Object.assign(extracted, practices || {});
-  const numbers = computeProfitAudit(appData, controlData, extracted);
-  // Stamp identifiers code owns (not the model).
-  numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateProfitNarrative(apiKey, numbers);
-  // Computed numbers win over anything the model echoed back.
-  return Object.assign({}, prose, numbers);
+function num(v) { return (v == null || isNaN(v)) ? null : Number(v); }
+function round1(v) { return v == null ? null : Math.round(v * 10) / 10; }
+function round0(v) { return v == null ? null : Math.round(v); }
+function round2(v) { return v == null ? null : Math.round(v * 100) / 100; }
+function clampScore(v) { return Math.max(1, Math.min(100, Math.round(v))); } // never 0 per spec
+function avg(arr) {
+  const v = arr.filter(x => x != null && !isNaN(x));
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
-/* Extraction pass — returns observed input metrics from uploaded files only.
-   Returns {} when no files (the common case: data already in app/Control). */
-async function extractProfitInputs(apiKey, files) {
-  const fileContent = buildFileContent(files);
-  if (fileContent.length === 0) return {};
-  const instruction = `You are reading uploaded operator documents (a P&L or sales summary, a voids/comps/cash report, invoices, a recipe costing sheet, inventory counts) for a bar and restaurant profit audit. Extract ONLY the raw values you can actually see in the documents. Report dollar amounts as plain numbers and percentages as plain numbers (e.g. 27.4 not "27.4%"). Do NOT calculate ratios or scores yourself — if a report shows revenue and COGS dollars but not a cost %, return the dollars and leave the % null; the system computes the ratio. Respond with a single JSON object, no other text. Use null for anything not present. Fields:
-{"audit_period":[the month or date range the data covers, e.g. "April 2026", or null],"bar_revenue_monthly":[total bar/beverage revenue for the period or null],"food_revenue_monthly":[total food revenue for the period or null],"bar_cogs_monthly":[bar/beverage cost of goods in dollars or null],"food_cogs_monthly":[food cost of goods in dollars or null],"bar_cost_pct":[only if the report states it directly, else null],"food_cost_pct":[only if stated directly, else null],"labor_cost_monthly":[total labor cost for the period or null],"pour_method":["Free pour" / "Jiggered" / "Measured" or null],"inv_variance_pct":[number or null],"void_comp_pct":[voids+comps as % of sales if stated, else null],"voids_total":[voids+comps dollars if shown, else null],"voids_no_approval_pct":[number or null],"void_approval":[true if a manager-approval policy is evidenced, else null],"cash_recon_count":[number of drawer reconciliations shown or null],"cash_short_count":[number of shifts that came up short or null],"food_var_pct":[number or null],"inv_freq":["Weekly" / "Monthly" / "Never" or null],"waste_log":["Yes" or null],"bev_invoice_count":[integer or null],"food_invoice_count":[integer or null],"invoice_vs_po":["Matched every delivery" / "Spot checked" / "Never matched" or null],"backup_vendors":[text or null],"recipe_count":[number of costed recipes shown or null],"rplh_tracked":["Yes" or null]}`;
-  const content = fileContent.concat([{ type: 'text', text: instruction }]);
-  try {
-    return await callClaudeForJSON(apiKey, content, 1500);
-  } catch (e) {
-    console.warn('[audit] profit extraction failed, proceeding with app/Control data only:', e.message);
-    return {};
-  }
+// Score for a cost % vs target: at/under target is strong, degrading as it
+// runs over. diff = actual - target (positive = over target = worse).
+function scoreCostVsTarget(actualPct, targetPct, withinBands) {
+  if (actualPct == null || targetPct == null) return null;
+  const diff = actualPct - targetPct;
+  const b = withinBands;
+  if (diff <= 1) return b[0];
+  if (diff <= 3) return b[1];
+  if (diff <= 5) return b[2];
+  return b[3];
 }
 
-/* Narrative pass — the model writes prose around the code-computed numbers. */
-async function generateProfitNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a profit audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Write in plain operator voice. No emdashes (use a period or comma). Avoid the words "leverage", "compounds", "robust", "seamless". Respond with a single JSON object, no other text, with exactly these prose fields (reference the given numbers verbatim where relevant):
-{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
+/* computeProfitAudit(appData, controlData, extracted)
+   - appData:    the operator's in-app data (settings, weeks, products, etc.)
+   - controlData: verified Control-module figures, period-scoped (or null)
+   - extracted:  numbers the model read off uploaded files (or {})
+   Returns the numeric/derived fields of the audit `d` object. Prose fields
+   (S#_NARRATIVE / FINDING / TOOL, S6 signal text) are added by the narrative
+   pass; this function leaves them undefined. */
+function computeProfitAudit(appData, controlData, extracted) {
+  appData = appData || {};
+  controlData = controlData || null;
+  extracted = extracted || {};
 
-COMPUTED NUMBERS (final):
-${JSON.stringify(d, null, 1)}`;
-  try {
-    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
-  } catch (e) {
-    console.warn('[audit] profit narrative failed, returning numbers without prose:', e.message);
-    return {};
-  }
-}
-
-/* Build Claude content blocks from uploaded files (PDF/image inline, sheets as text). */
-function buildFileContent(files) {
-  const content = [];
-  const sheetTexts = [];
-  for (const f of (files || [])) {
-    const ext = path.extname(f.name).toLowerCase();
-    if (ext === '.pdf') {
-      content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fs.readFileSync(f.path).toString('base64') } });
-    } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
-      const mt = ext === '.png' ? 'image/png' : 'image/jpeg';
-      content.push({ type: 'image', source: { type: 'base64', media_type: mt, data: fs.readFileSync(f.path).toString('base64') } });
-    } else if (['.xlsx', '.xls', '.csv', '.doc', '.docx'].includes(ext)) {
-      const text = parseSpreadsheetToText(f.path, f.name);
-      if (text) sheetTexts.push(text);
-    }
-  }
-  if (sheetTexts.length) content.unshift({ type: 'text', text: 'SUBMITTED DATA FILES:\n\n' + sheetTexts.join('\n\n---\n\n') });
-  return content;
-}
-
-/* Call Claude with content blocks, parse a single JSON object from the reply. */
-async function callClaudeForJSON(apiKey, content, maxTokens) {
-  const body = JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens || 4000, messages: [{ role: 'user', content }] });
-  const responseData = await callClaude(apiKey, body);
-  const rawText = responseData.content?.[0]?.text || '';
-  const first = rawText.indexOf('{'), last = rawText.lastIndexOf('}');
-  if (first === -1 || last === -1) throw new Error('No JSON object in response: ' + rawText.slice(0, 200));
-  return JSON.parse(rawText.slice(first, last + 1));
-}
-
-// ── Traffic audit — JSON only, no PDF ─────────────────────────────────────────
-app.post('/api/generate-traffic-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const appDataStr = fields.appData?.[0] || '{}';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-    let practices = {};
-    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
-    // Operator's saved links. Server reads public data from these (PageSpeed for
-    // website, Google Places for rating/reviews, Yelp Fusion) so the audit reads
-    // live where possible and only needs screenshots for what links cannot cover.
-    let urls = null;
-    try { urls = JSON.parse(fields.urls?.[0] || 'null'); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-      }
-    }
-
-    try {
-      const urlData = await fetchTrafficUrlData(urls);
-      const auditData = await generateTrafficAudit(apiKey, uploadedFiles, appData, practices, urlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Traffic audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
-    }
-  });
-});
-
-/* ── Traffic audit — honest pipeline, NO dollar figures ───────────────────────
-   urlData (live link reads) + screenshot extraction -> computeTrafficAudit ->
-   narrative (deficits, never dollars) -> merge with computed numbers winning. */
-async function generateTrafficAudit(apiKey, files, appData, practices, urlData) {
-  const extracted = await extractTrafficInputs(apiKey, files);
-  Object.assign(extracted, practices || {});
-  const numbers = computeTrafficAudit(appData, null, extracted, urlData);
-  numbers.AUDIT_ID = 'TFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateTrafficNarrative(apiKey, numbers);
-  return Object.assign({}, prose, numbers);
-}
-
-async function extractTrafficInputs(apiKey, files) {
-  const fileContent = buildFileContent(files);
-  if (fileContent.length === 0) return {};
-  const instruction = `You are reading uploaded screenshots and exports for a bar and restaurant digital-presence (TRAFFIC) audit: Google Business Profile, website analytics, Google/Yelp review pages, search results, Instagram/Facebook, delivery dashboards, email platform. Extract ONLY what you can see. Booleans as true/false, numbers as plain numbers, percentages as plain numbers. NO dollar figures, NO scores. Use null for anything not present. Respond with a single JSON object, no other text:
-{"listing_claimed":[true/false/null],"hours_complete":[t/f/null],"website_linked":[t/f/null],"menu_link_active":[t/f/null],"photo_count":[int/null],"posts_last_30":[int/null],"profile_completeness":[percent/null],"mobile_optimized":[t/f/null],"monthly_sessions":[int/null],"bounce_rate":[percent/null],"menu_page_top3":[t/f/null],"online_ordering":[t/f/null],"google_rating":[number/null],"google_review_count":[int/null],"response_rate":[percent/null],"most_recent_review_days":[int/null],"unanswered":[int/null],"negative_pattern":[short text/null],"yelp_rating":[number/null],"maps_pack":[t/f/null],"nap_consistent":[t/f/null],"primary_keyword":[text/null],"ig_followers":[int/null],"ig_posts_last_30":[int/null],"fb_followers":[int/null],"content_type":[text/null],"doordash_active":[t/f/null],"ubereats_active":[t/f/null],"grubhub_active":[t/f/null],"doordash_rating":[number/null],"ubereats_rating":[number/null],"photo_count_delivery":[int/null],"menu_complete":[t/f/null],"promo_active":[t/f/null],"email_list_exists":[t/f/null],"list_size":[int/null],"open_rate":[percent/null],"send_frequency":[text/null],"last_send_days":[int/null],"growth_mechanism":[t/f/null],"loyalty":[t/f/null]}`;
-  const content = fileContent.concat([{ type: 'text', text: instruction }]);
-  try {
-    return await callClaudeForJSON(apiKey, content, 1500);
-  } catch (e) {
-    console.warn('[audit] traffic extraction failed, proceeding with link/weekly data only:', e.message);
-    return {};
-  }
-}
-
-async function generateTrafficNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a digital-presence (TRAFFIC) audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Plain operator voice. No emdashes (use a period or comma). Avoid "leverage", "compounds", "robust", "seamless". CRITICAL: this audit has NO dollar figures. Express every gap as a real deficit, e.g. "response rate 45% versus a 75% benchmark" or "6 posts in 30 days versus 12". Never invent or imply a dollar amount. Respond with a single JSON object, no other text, with exactly these prose fields:
-{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_NARRATIVE":"","S6_FINDING":"","S6_TOOL":"","S7_NARRATIVE":"","S7_FINDING":"","S7_TOOL":"","S8_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG1_LABEL":"","S8_SIG1_EVIDENCE":"","S8_SIG1_GAP":"","S8_SIG1_TOOL":"","S8_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG2_LABEL":"","S8_SIG2_EVIDENCE":"","S8_SIG2_GAP":"","S8_SIG2_TOOL":"","S8_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG3_LABEL":"","S8_SIG3_EVIDENCE":"","S8_SIG3_GAP":"","S8_SIG3_TOOL":"","S8_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG4_LABEL":"","S8_SIG4_EVIDENCE":"","S8_SIG4_GAP":"","S8_SIG4_TOOL":""}
-
-COMPUTED NUMBERS (final):
-${JSON.stringify(d, null, 1)}`;
-  try {
-    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
-  } catch (e) {
-    console.warn('[audit] traffic narrative failed, returning numbers without prose:', e.message);
-    return {};
-  }
-}
-
-// ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
-app.post('/api/generate-revenue-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const appDataStr = fields.appData?.[0] || '{}';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-    let practices = {};
-    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-      }
-    }
-
-    let controlData = null;
-    try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
-
-    try {
-      const auditData = await generateRevenueAudit(apiKey, uploadedFiles, appData, practices, controlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Revenue audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
-    }
-  });
-});
-
-/* ── Revenue audit — same honest pipeline as Profit ───────────────────────────
-   EXTRACT (files -> raw input numbers) -> COMPUTE (code) -> NARRATE (prose) ->
-   MERGE with computed numbers authoritative. */
-async function generateRevenueAudit(apiKey, files, appData, practices, controlData) {
-  const extracted = await extractRevenueInputs(apiKey, files);
-  Object.assign(extracted, practices || {});   // operator answers win over file reads
-  const numbers = computeRevenueAudit(appData, controlData, extracted);
-  numbers.AUDIT_ID = 'RFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateRevenueNarrative(apiKey, numbers);
-  return Object.assign({}, prose, numbers);
-}
-
-async function extractRevenueInputs(apiKey, files) {
-  const fileContent = buildFileContent(files);
-  if (fileContent.length === 0) return {};
-  const instruction = `You are reading uploaded operator documents (a POS sales summary, server sales report, menu sales mix, menu price list, labor schedule/payroll, event records) for a bar and restaurant REVENUE audit. Extract ONLY the raw values you can see. Numbers as plain numbers, percentages as plain numbers. Do NOT calculate ratios or scores — the system does that. Use null for anything not present. Respond with a single JSON object, no other text:
-{"audit_period":[month or range or null],"monthly_revenue":[total monthly revenue or null],"monthly_covers":[total monthly guests/covers or null],"check_avg":[average check if stated, else null],"labor_pct":[labor as % of revenue if stated, else null],"rplh":[revenue per labor hour if stated, else null],"overtime_hrs":[number or null],"sched_vs_actual":[text like "214 scheduled / 247 actual" or null],"stars_count":[menu items, integer or null],"plowhorses_count":[integer or null],"puzzles_count":[integer or null],"dogs_count":[integer or null],"top_category":[best-selling category name or null],"server_count":[number of servers on the report or null],"top_check_avg":[highest server check average or null],"bottom_check_avg":[lowest server check average or null],"app_attach_rate":[appetizer attach % or null],"dessert_attach_rate":[dessert attach % or null],"catering_rev":[catering revenue for the period or null]}`;
-  const content = fileContent.concat([{ type: 'text', text: instruction }]);
-  try {
-    return await callClaudeForJSON(apiKey, content, 1500);
-  } catch (e) {
-    console.warn('[audit] revenue extraction failed, proceeding with app/Control data only:', e.message);
-    return {};
-  }
-}
-
-async function generateRevenueNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a REVENUE audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Plain operator voice. No emdashes (use a period or comma). Avoid "leverage", "compounds", "robust", "seamless". Treat check-average, menu, server, and event figures as REVENUE OPPORTUNITY (potential growth), and labor as cost. Do not call opportunity "recovered" money. Respond with a single JSON object, no other text, with exactly these prose fields:
-{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
-
-COMPUTED NUMBERS (final):
-${JSON.stringify(d, null, 1)}`;
-  try {
-    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
-  } catch (e) {
-    console.warn('[audit] revenue narrative failed, returning numbers without prose:', e.message);
-    return {};
-  }
-}
-
-// ── Fetch public URL data for the Traffic Audit ───────────────────────────────
-// Pulls live data from the operator's saved URLs in traffic_settings.urls so
-// the audit can score what is publicly visible without requiring a screenshot.
-//
-// Two sources currently:
-//   1) Website  — calls Google PageSpeed Insights API (free, sanctioned). Returns
-//                 performance, accessibility, SEO, and best-practices scores.
-//                 Requires PAGESPEED_API_KEY env var to be set. If missing or the
-//                 call fails, returns null and the audit falls back to operator
-//                 screenshot uploads.
-//   2) GBP      — plain HTML fetch of the operator's Google Business Profile URL.
-//                 Returns the rendered listing HTML which Claude can read for
-//                 rating, review count, photo count, hours, categories, recent
-//                 reviews. No API key needed. Best-effort — some GBP URLs may be
-//                 blocked or rate-limited.
-//
-// Both fetches have short timeouts and fail-safe: any error returns null and
-// the rest of the audit continues normally.
-async function fetchTrafficUrlData(urls) {
-  if (!urls || typeof urls !== 'object') return null;
-  const out = { website: null, gbp: null };
-
-  // PageSpeed Insights for the operator's website (mobile strategy)
-  const psKey = process.env.PAGESPEED_API_KEY;
-  if (urls.website && psKey) {
-    try {
-      const target = encodeURIComponent(urls.website);
-      const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed'
-        + '?url=' + target
-        + '&strategy=mobile'
-        + '&category=performance&category=accessibility&category=seo&category=best-practices'
-        + '&key=' + psKey;
-      const ctrl = new AbortController();
-      const tmo = setTimeout(() => ctrl.abort(), 30000);
-      const r = await fetch(apiUrl, { signal: ctrl.signal });
-      clearTimeout(tmo);
-      if (r.ok) {
-        const data = await r.json();
-        const lh = data.lighthouseResult || {};
-        const cats = lh.categories || {};
-        const audits = lh.audits || {};
-        const pct = (id) => cats[id] && typeof cats[id].score === 'number' ? Math.round(cats[id].score * 100) : null;
-        const ms  = (id) => audits[id] && audits[id].numericValue != null ? Math.round(audits[id].numericValue) : null;
-        out.website = {
-          url: urls.website,
-          performance:    pct('performance'),
-          accessibility:  pct('accessibility'),
-          seo:            pct('seo'),
-          bestPractices:  pct('best-practices'),
-          firstContentfulPaintMs: ms('first-contentful-paint'),
-          largestContentfulPaintMs: ms('largest-contentful-paint'),
-          totalBlockingTimeMs: ms('total-blocking-time'),
-          cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue ?? null,
-          speedIndexMs:  ms('speed-index'),
-          fetchedAt: new Date().toISOString()
-        };
-      }
-    } catch (e) {
-      console.warn('[audit] PageSpeed Insights fetch failed:', e.message);
-    }
-  }
-
-  // Google rating + review count via Google Places API (accurate, sanctioned).
-  // Needs GOOGLE_PLACES_API_KEY and a place query (bar name + city). Gracefully
-  // absent until the key is set — then S3 Reviews falls back to a screenshot.
-  const placeQuery = urls.place_query || urls.gbp_query;
-  if (placeQuery) {
-    const g = await fetchGooglePlaces(placeQuery);
-    if (g) out.gbp = g;
-  }
-
-  // Yelp rating + count via Yelp Fusion (free tier). Needs YELP_API_KEY.
-  if (placeQuery) {
-    const y = await fetchYelp(placeQuery, urls.city_state);
-    if (y) out.yelp = y;
-  }
-
-  return (out.website || out.gbp || out.yelp) ? out : null;
-}
-
-/* Google Places — text search -> rating + review count. Returns null if no key
-   or no match, so the audit simply scores Reviews from a screenshot instead. */
-async function fetchGooglePlaces(query) {
-  const key = process.env.GOOGLE_PLACES_API_KEY;
-  if (!key || !query) return null;
-  try {
-    const url = 'https://maps.googleapis.com/maps/api/place/textsearch/json?query='
-      + encodeURIComponent(query) + '&key=' + key;
-    const ctrl = new AbortController();
-    const tmo = setTimeout(() => ctrl.abort(), 15000);
-    const r = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(tmo);
-    if (!r.ok) return null;
-    const data = await r.json();
-    const hit = (data.results || [])[0];
-    if (!hit || hit.rating == null) return null;
-    return { rating: hit.rating, review_count: hit.user_ratings_total ?? null, name: hit.name, fetchedAt: new Date().toISOString() };
-  } catch (e) {
-    console.warn('[audit] Google Places fetch failed:', e.message);
-    return null;
-  }
-}
-
-/* Yelp Fusion — business search -> rating + review count. Null without a key. */
-async function fetchYelp(term, location) {
-  const key = process.env.YELP_API_KEY;
-  if (!key || !term) return null;
-  try {
-    const url = 'https://api.yelp.com/v3/businesses/search?term='
-      + encodeURIComponent(term) + '&location=' + encodeURIComponent(location || term) + '&limit=1';
-    const ctrl = new AbortController();
-    const tmo = setTimeout(() => ctrl.abort(), 15000);
-    const r = await fetch(url, { signal: ctrl.signal, headers: { Authorization: 'Bearer ' + key } });
-    clearTimeout(tmo);
-    if (!r.ok) return null;
-    const data = await r.json();
-    const biz = (data.businesses || [])[0];
-    if (!biz || biz.rating == null) return null;
-    return { rating: biz.rating, count: biz.review_count ?? null, name: biz.name, fetchedAt: new Date().toISOString() };
-  } catch (e) {
-    console.warn('[audit] Yelp fetch failed:', e.message);
-    return null;
-  }
-}
-
-function formatTrafficUrlDataForPrompt(urlData) {
-  if (!urlData) return '';
-  const lines = ['FETCHED LIVE URL DATA — Use this as primary input for the sections it covers:'];
-  if (urlData.website) {
-    const w = urlData.website;
-    lines.push('');
-    lines.push('WEBSITE (Google PageSpeed Insights, mobile): ' + w.url);
-    lines.push('  Performance score: '   + (w.performance   != null ? w.performance + '/100'   : 'unavailable'));
-    lines.push('  Accessibility:     '   + (w.accessibility != null ? w.accessibility + '/100' : 'unavailable'));
-    lines.push('  SEO:               '   + (w.seo           != null ? w.seo + '/100'           : 'unavailable'));
-    lines.push('  Best Practices:    '   + (w.bestPractices != null ? w.bestPractices + '/100' : 'unavailable'));
-    if (w.firstContentfulPaintMs   != null) lines.push('  First Contentful Paint: '   + w.firstContentfulPaintMs   + ' ms');
-    if (w.largestContentfulPaintMs != null) lines.push('  Largest Contentful Paint: ' + w.largestContentfulPaintMs + ' ms');
-    if (w.totalBlockingTimeMs      != null) lines.push('  Total Blocking Time: '      + w.totalBlockingTimeMs      + ' ms');
-    if (w.cumulativeLayoutShift    != null) lines.push('  Cumulative Layout Shift: '  + w.cumulativeLayoutShift.toFixed(3));
-    if (w.speedIndexMs             != null) lines.push('  Speed Index: '              + w.speedIndexMs             + ' ms');
-  }
-  if (urlData.gbp) {
-    lines.push('');
-    lines.push('GOOGLE BUSINESS PROFILE (public page HTML): ' + urlData.gbp.url);
-    lines.push('--- BEGIN GBP HTML ---');
-    lines.push(urlData.gbp.html);
-    lines.push('--- END GBP HTML ---');
-  }
-  return lines.join('\n');
-}
-
-// ── Parse spreadsheet/CSV file into readable text for Claude ──────────────────
-function parseSpreadsheetToText(filePath, fileName) {
-  const ext = path.extname(fileName).toLowerCase();
-  try {
-    if (ext === '.csv') {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const lines = raw.trim().split('\n').slice(0, 200);
-      return `FILE: ${fileName}\n${lines.join('\n')}`;
-    }
-    if (['.xlsx', '.xls'].includes(ext)) {
-      if (!XLSX) return `FILE: ${fileName}\n[Excel parser not available — install xlsx package]`;
-      const wb    = XLSX.readFile(filePath);
-      const parts = [];
-      for (const sheetName of wb.SheetNames.slice(0, 5)) {
-        const ws   = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
-        const lines = rows.trim().split('\n').slice(0, 200);
-        if (lines.length > 1) {
-          parts.push(`FILE: ${fileName} | SHEET: ${sheetName}\n${lines.join('\n')}`);
-        }
-      }
-      return parts.join('\n\n') || `FILE: ${fileName}\n[Empty spreadsheet]`;
-    }
-    if (ext === '.docx' || ext === '.doc') {
-      return `FILE: ${fileName}\n[Word document submitted — operator should convert to PDF for best results]`;
-    }
-  } catch(e) {
-    return `FILE: ${fileName}\n[Parse error: ${e.message}]`;
-  }
-  return null;
-}
-
-// ── Extract audit data from uploaded files ────────────────────────────────────
-async function extractAuditData(apiKey, auditType, files, appData, notes='', controlData=null, urlData=null) {
-  const prompts = {
-    profit:  getExtractionPrompt_Profit(appData, controlData),
-    revenue: getExtractionPrompt_Revenue(appData, controlData),
-    traffic: getExtractionPrompt_Traffic(appData, urlData),
-  };
-
-  const prompt = prompts[auditType] || prompts.profit;
-
-  const content = [];
-  const spreadsheetTexts = [];
-
-  for (const f of files) {
-    const ext = path.extname(f.name).toLowerCase();
-
-    if (ext === '.pdf') {
-      const b64 = fs.readFileSync(f.path).toString('base64');
-      content.push({
-        type: 'document',
-        source: { type: 'base64', media_type: 'application/pdf', data: b64 }
-      });
-    } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
-      const mt  = ext === '.png' ? 'image/png' : 'image/jpeg';
-      const b64 = fs.readFileSync(f.path).toString('base64');
-      content.push({
-        type: 'image',
-        source: { type: 'base64', media_type: mt, data: b64 }
-      });
-    } else if (['.xlsx', '.xls', '.csv', '.doc', '.docx'].includes(ext)) {
-      const text = parseSpreadsheetToText(f.path, f.name);
-      if (text) spreadsheetTexts.push(text);
-    }
-  }
-
-  if (spreadsheetTexts.length > 0) {
-    content.push({
-      type: 'text',
-      text: 'SUBMITTED DATA FILES — Read all data carefully and use it to score each section:\n\n'
-        + spreadsheetTexts.join('\n\n---\n\n')
-    });
-  }
-
-  const fullPrompt = notes
-    ? prompt + '\n\nOPERATOR NOTES (read carefully — these may affect how you interpret the data):\n' + notes
-    : prompt;
-  content.push({ type: 'text', text: fullPrompt });
-
-  const body = JSON.stringify({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
-    messages: [{ role: 'user', content }]
-  });
-
-  const responseData = await callClaude(apiKey, body);
-  const rawText = responseData.content?.[0]?.text || '';
-
-  console.log('[audit] raw length:', rawText.length, '| first 300:', rawText.slice(0, 300));
-
-  // Extract JSON robustly — find first { and last }
-  const firstBrace = rawText.indexOf('{');
-  const lastBrace  = rawText.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1) {
-    console.error('[audit] no JSON braces found. raw:', rawText.slice(0, 500));
-    throw new Error('Audit response contained no JSON object. Response: ' + rawText.slice(0, 300));
-  }
-  const clean = rawText.slice(firstBrace, lastBrace + 1);
-
-  try {
-    return JSON.parse(clean);
-  } catch(e) {
-    console.error('[audit] parse error:', e.message, '| tail:', rawText.slice(-300));
-    throw new Error('Audit JSON parse failed: ' + e.message + ' | Response start: ' + rawText.slice(0, 300));
-  }
-}
-
-// ── Claude HTTP helper — streaming to survive DO 60s timeout ──────────────────
-function callClaude(apiKey, bodyObj) {
-  const parsed = typeof bodyObj === 'string' ? JSON.parse(bodyObj) : bodyObj;
-  const streamBody = JSON.stringify({ ...parsed, stream: true });
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.anthropic.com',
-      path:     '/v1/messages',
-      method:   'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Length':    Buffer.byteLength(streamBody)
-      }
-    };
-    let partial = '';
-    let fullText = '';
-    const req = https.request(options, res => {
-      res.on('data', chunk => {
-        partial += chunk.toString();
-        const lines = partial.split('\n');
-        partial = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(data);
-            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-              fullText += evt.delta.text || '';
-            }
-          } catch(e) { /* skip malformed SSE lines */ }
-        }
-      });
-      res.on('end', () => {
-        if (fullText) {
-          resolve({ content: [{ type: 'text', text: fullText }] });
-        } else {
-          try { resolve(JSON.parse(partial)); }
-          catch(e) { reject(new Error('Claude response parse error: ' + partial.slice(0, 200))); }
-        }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(180000, () => { req.destroy(new Error('Claude request timed out after 3 minutes')); });
-    req.write(streamBody);
-    req.end();
-  });
-}
-
-// ── Extraction Prompts ─────────────────────────────────────────────────────────
-function getExtractionPrompt_Profit(appData, controlData) {
   const settings = appData.settings || {};
-  const weeks    = appData.weeks    || [];
-  const shifts   = appData.shifts   || [];
-  const recons   = appData.reconciliations || [];
-  const vendor   = appData.vendor_log || [];
-  const theft    = appData.theft_scores || [];
-  const products = appData.bar_products || [];
-  const kitchen  = appData.kitchen_products || [];
-  const recipes  = appData.recipes || [];
+  const targets = settings.targets || {};
+  const weeks = (appData.weeks || []).filter(w => w && (w.period_end || w.week_end)).slice(-PERIOD_WEEKS);
+  const recipes = appData.recipes || [];
+  const barProducts = appData.bar_products || [];
+  const kitchenProducts = appData.kitchen_products || [];
+  const vendorLog = appData.vendor_log || [];
+  const shifts = appData.shifts || [];
+  const recons = appData.reconciliations || [];
 
-  const recentWeeks = weeks.slice(-4);
-  const avgBarCost  = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.bar?.cost_pct||0),0)/recentWeeks.length : null;
-  const avgFoodCost = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.food?.cost_pct||0),0)/recentWeeks.length : null;
-  const avgBarRev   = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.bar?.revenue||0),0)/recentWeeks.length : null;
-  const avgFoodRev  = recentWeeks.length ? recentWeeks.reduce((s,w) => s+(w.food?.revenue||0),0)/recentWeeks.length : null;
+  const cd = controlData || {};
+  // In-app audits span the actual number of weeks (up to 4). An upload-only
+  // audit spans the one month its figures represent (~4.345 weeks), so monthly
+  // COGS is not mis-scaled into a 4-week period.
+  const periodWeeks = weeks.length || WEEKS_PER_MONTH;
 
-  // Build weekly data summary for prompt
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = [`Week ${i+1}`];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.bar && w.bar.revenue) parts.push('Bar rev $'+w.bar.revenue);
-        if (w.bar && w.bar.cost_pct) parts.push('Bar cost '+w.bar.cost_pct+'%');
-        if (w.food && w.food.revenue) parts.push('Food rev $'+w.food.revenue);
-        if (w.food && w.food.cost_pct) parts.push('Food cost '+w.food.cost_pct+'%');
-        if (w.labor_pct) parts.push('Labor '+w.labor_pct+'%');
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly data entered yet';
+  // Targets (operator-set, with documented industry defaults)
+  const barTarget = num(targets.bar_pour_cost_pct) != null ? num(targets.bar_pour_cost_pct) : 22;
+  const foodTarget = num(targets.food_cost_pct) != null ? num(targets.food_cost_pct) : 32;
+  const primeTarget = num(targets.prime_cost_pct) != null ? num(targets.prime_cost_pct) : 60;
 
-  const barProductsSummary = products.length
-    ? products.slice(0,15).map(p => '  ' + (p.name||'Product') + ' | Cost: $' + (p.cost||0) + ' | Category: ' + (p.category||'')).join('\n')
-    : '  No bar products entered';
+  // ── Source-of-truth percentages: Control data > in-app weeks > uploaded
+  // file values (a first-time audit has no weeks; its numbers come from the
+  // uploaded POS/financial reports the model extracted). ──
+  const wkBarCost = avg(weeks.map(w => w.bar && w.bar.cost_pct));
+  const wkFoodCost = avg(weeks.map(w => w.food && w.food.cost_pct));
+  const wkPrime = avg(weeks.map(w => w.prime_cost_pct));
+  // Cost % from an uploaded P&L: prefer a stated %, else derive it in code from
+  // the raw COGS and revenue dollars (we never ask the model to do the ratio).
+  const pct = (cogs, rev) => (num(cogs) != null && num(rev) > 0) ? (cogs / rev) * 100 : null;
+  const exBarCostPct = num(extracted.bar_cost_pct) != null ? num(extracted.bar_cost_pct)
+    : pct(extracted.bar_cogs_monthly, extracted.bar_revenue_monthly);
+  const exFoodCostPct = num(extracted.food_cost_pct) != null ? num(extracted.food_cost_pct)
+    : pct(extracted.food_cogs_monthly, extracted.food_revenue_monthly);
+  const barCostPct = round1(num(cd.bar_cost_pct) != null ? cd.bar_cost_pct
+    : (wkBarCost != null ? wkBarCost : exBarCostPct));
+  const foodCostPct = round1(num(cd.food_cost_pct) != null ? cd.food_cost_pct
+    : (wkFoodCost != null ? wkFoodCost : exFoodCostPct));
 
-  const reconSummary = recons.length
-    ? recons.slice(-4).map(r => '  ' + (r.date||'') + ' | Expected: $' + (r.expected||0) + ' | Actual: $' + (r.actual||0) + ' | Variance: $' + ((r.actual||0)-(r.expected||0)).toFixed(2)).join('\n')
-    : '  No cash reconciliation entries';
+  // ── Revenue and labor — weeks first, then uploaded monthly figures, then
+  // the operator's annual revenue from settings (÷12). ──
+  const wkBarRev = avg(weeks.map(w => w.bar && w.bar.revenue));
+  const wkFoodRev = avg(weeks.map(w => w.food && w.food.revenue));
+  const wkBarLabor = avg(weeks.map(w => w.bar && w.bar.labor));
+  const wkFoodLabor = avg(weeks.map(w => w.food && w.food.labor));
+  const fromUpload = weeks.length === 0;
 
-  // Verified Control-module data — real logged operational data the audit
-  // treats as ground truth for the sections it covers (map Section 8).
-  let controlBlock = '';
-  if (controlData && typeof controlData === 'object') {
-    const c = controlData, cl = [];
-    if (c.bar_cost_pct != null)    cl.push('verified_bar_pour_cost_pct=' + c.bar_cost_pct + ' — S1 ground truth');
-    if (c.food_cost_pct != null)   cl.push('verified_food_cost_pct=' + c.food_cost_pct + ' — S3 ground truth');
-    if (c.prime_cost_pct != null)  cl.push('verified_prime_cost_pct=' + c.prime_cost_pct + ' — S5 ground truth');
-    if (c.inventory_counts)        cl.push('inventory_counts_on_file=' + c.inventory_counts);
-    if (c.spot_checks)             cl.push('spot_checks=' + c.spot_checks + ' flagged_items=' + (c.spot_check_flagged||0) + ' pour_variance_$=' + (c.spot_check_variance_dollar||0) + ' — S2 theft ground truth');
-    if (c.void_comp_count != null) cl.push('void_comp_events=' + c.void_comp_count + ' total_$=' + c.void_comp_total + ' unauthorized=' + c.void_comp_unauthorized + ' — S2 ground truth');
-    if (c.cash_reconciliations)    cl.push('drawer_reconciliations=' + c.cash_reconciliations + ' total_variance_$=' + c.cash_variance_total + ' short_count=' + c.cash_short_count + ' — S2 cash ground truth');
-    if (c.cash_drops)              cl.push('cash_drops_logged=' + c.cash_drops);
-    if (c.deliveries_logged)       cl.push('deliveries_logged=' + c.deliveries_logged + ' vendor_price_changes=' + c.vendor_price_changes + ' — S4 vendor ground truth');
-    if (c.labor_hours != null)     cl.push('labor_hours=' + c.labor_hours + ' labor_cost_$=' + c.labor_cost + ' — S5 prime cost labor ground truth');
-    if (cl.length) {
-      controlBlock = '\nVERIFIED CONTROL DATA — this operator runs Bar Cop\'s Inventory, Shift and Labor Control modules. The figures below are real logged operational data, not estimates. Treat them as ground truth: score the sections they cover from these values, do not estimate those numbers or depend on uploaded files for them, and reflect this verified coverage in DATA_TIER_LABEL. Sections not covered here still rely on the uploads.\n'
-        + cl.map(l => '  ' + l).join('\n') + '\n';
-    }
+  const monthlyBarRev = wkBarRev != null ? wkBarRev * WEEKS_PER_MONTH
+    : (num(extracted.bar_revenue_monthly) != null ? num(extracted.bar_revenue_monthly)
+      : (num(settings.annual_bar_revenue) ? settings.annual_bar_revenue / 12 : null));
+  const monthlyFoodRev = wkFoodRev != null ? wkFoodRev * WEEKS_PER_MONTH
+    : (num(extracted.food_revenue_monthly) != null ? num(extracted.food_revenue_monthly)
+      : (num(settings.annual_food_revenue) ? settings.annual_food_revenue / 12 : null));
+  // Period basis: in-app audits use a 4-week window; an upload-only audit uses
+  // the one month the uploaded figures represent.
+  const periodBarRev = wkBarRev != null ? wkBarRev * periodWeeks : monthlyBarRev;
+  const periodFoodRev = wkFoodRev != null ? wkFoodRev * periodWeeks : monthlyFoodRev;
+  const periodTotalRev = (periodBarRev || 0) + (periodFoodRev || 0);
+
+  // A bar with no kitchen (or a kitchen with no bar) is fully supported. The
+  // missing side's section is marked N/A and EXCLUDED from the overall — never
+  // scored as a default that drags the operation down for selling what it sells.
+  const haveBar = num(monthlyBarRev) > 0;
+  const haveFood = num(monthlyFoodRev) > 0;
+
+  // ── S1 — Bar Cost and Pour Control ──
+  const recipeCount = recipes.length || (num(extracted.recipe_count) || 0);
+  const recipesCosted = (extracted.recipes_costed || '').toLowerCase();
+  const haveCostedRecipes = recipeCount > 0 || recipesCosted === 'some' || recipesCosted === 'all';
+  // Results-based bonus: only a measured/jiggered pour earns credit. Free pour
+  // is the bad behavior, not a control — it earns nothing.
+  const pourStr = (extracted.pour_method || '').toLowerCase();
+  const measuredPour = pourStr.includes('jigger') || pourStr.includes('measur');
+  let s1 = scoreCostVsTarget(barCostPct, barTarget, [85, 65, 45, 25]) || 25;
+  if (haveCostedRecipes) s1 += 10;
+  if (measuredPour) s1 += 5;
+  s1 = clampScore(s1);
+  const s1Diff = (barCostPct != null && barTarget != null) ? barCostPct - barTarget : 0;
+  const s1MonthlyGap = (s1Diff > 0 && monthlyBarRev != null) ? round0((s1Diff / 100) * monthlyBarRev) : 0;
+  const bevCogsPeriod = (barCostPct != null && periodBarRev != null) ? round0((barCostPct / 100) * periodBarRev) : null;
+  const invVarPct = round1(num(extracted.inv_variance_pct));
+  const invVarAmt = (invVarPct != null && bevCogsPeriod != null) ? round0((invVarPct / 100) * bevCogsPeriod) : null;
+
+  // ── S2 — Theft and Loss Prevention (RESULTS-based, not presence-based) ──
+  // Scored on actual loss behavior: void/comp rate vs benchmark, unauthorized
+  // void rate, and cash short rate. Documented controls give modest capped
+  // credit that cannot rescue a bad rate. (Decision 8, audit-honesty-rebuild.)
+  const haveCashRecon = (num(cd.cash_reconciliations) > 0) || recons.length > 0 || extracted.drawer_recon === true;
+  const haveShiftChecks = shifts.length > 0 || num(cd.spot_checks) > 0;
+  const haveApprovalPolicy = !!extracted.void_approval || num(cd.void_comp_unauthorized) != null;
+  // Void/comp rate from period-scoped Control sum vs period total revenue.
+  let voidCompPct = null, voidCompAmt = null;
+  if (num(cd.void_comp_total) != null && periodTotalRev > 0) {
+    voidCompAmt = round0(cd.void_comp_total);
+    voidCompPct = round1((cd.void_comp_total / periodTotalRev) * 100);
+  } else if (num(extracted.voids_total) != null && periodTotalRev > 0) {
+    voidCompAmt = round0(extracted.voids_total);
+    voidCompPct = round1((extracted.voids_total / periodTotalRev) * 100);
+  } else if (extracted.void_comp_pct != null) {
+    voidCompPct = round1(num(extracted.void_comp_pct));
+    voidCompAmt = (periodTotalRev > 0) ? round0((voidCompPct / 100) * periodTotalRev) : null;
   }
+  const voidsNoApprovalPct = (num(cd.void_comp_count) > 0 && num(cd.void_comp_unauthorized) != null)
+    ? round0((cd.void_comp_unauthorized / cd.void_comp_count) * 100)
+    : (extracted.voids_no_approval_pct != null ? round0(extracted.voids_no_approval_pct) : null);
+  // Excess void/comp over benchmark, as a monthly dollar leak.
+  const s2MonthlyGap = (voidCompPct != null && voidCompPct > VOID_COMP_BENCHMARK_PCT && monthlyBarRev != null && monthlyFoodRev != null)
+    ? round0(((voidCompPct - VOID_COMP_BENCHMARK_PCT) / 100) * (monthlyBarRev + monthlyFoodRev))
+    : 0;
+  // Score off the actual void/comp rate vs benchmark.
+  let s2;
+  if (voidCompPct != null) {
+    const over = voidCompPct - VOID_COMP_BENCHMARK_PCT;
+    s2 = over <= 0 ? 85 : over <= 1 ? 65 : over <= 2 ? 45 : 25;
+  } else {
+    s2 = 50;   // no void/comp data — insufficient to grade behavior
+  }
+  // Unauthorized voids are a behavior signal — they drag the score down.
+  if (voidsNoApprovalPct != null) {
+    if (voidsNoApprovalPct > 25) s2 -= 15;
+    else if (voidsNoApprovalPct > 10) s2 -= 8;
+  }
+  // Cash short rate (shorts as a share of reconciliations) — behavior signal.
+  // Control data first, then an uploaded cash report.
+  const shortCount = num(cd.cash_short_count) != null ? cd.cash_short_count : num(extracted.cash_short_count);
+  const reconCount = num(cd.cash_reconciliations) > 0 ? cd.cash_reconciliations : num(extracted.cash_recon_count);
+  if (shortCount != null && reconCount > 0) {
+    const shortRate = shortCount / reconCount;
+    if (shortRate > 0.30) s2 -= 10;
+    else if (shortRate > 0.15) s2 -= 5;
+  }
+  // Modest, capped credit for controls that genuinely reduce risk — never
+  // enough to rescue a bad rate.
+  if (haveApprovalPolicy) s2 += 5;
+  if (haveCashRecon) s2 += 5;
+  s2 = clampScore(s2);
 
-  return `PROFIT AUDIT — respond with a single JSON object, no other text. Use the app data below to populate every field. Never output 0 for a score.
+  // ── S3 — Food Cost Control ──
+  // Results-based: credit only when counts actually happen. "Never" earns nothing.
+  const invFreqStr = (extracted.inv_freq || '').toLowerCase();
+  const haveInvFreq = num(cd.inventory_counts) > 0
+    || (invFreqStr !== '' && !invFreqStr.includes('never') && !invFreqStr.includes('none') && !invFreqStr.includes('not'));
+  let s3 = scoreCostVsTarget(foodCostPct, foodTarget, [85, 65, 45, 25]) || 25;
+  if (haveCostedRecipes) s3 += 10;   // costed recipes control food cost (behavior, not setup)
+  if (haveInvFreq) s3 += 5;
+  s3 = clampScore(s3);
+  const s3Diff = (foodCostPct != null && foodTarget != null) ? foodCostPct - foodTarget : 0;
+  const s3MonthlyGap = (s3Diff > 0 && monthlyFoodRev != null) ? round0((s3Diff / 100) * monthlyFoodRev) : 0;
+  const foodVarPct = round1(num(extracted.food_var_pct));
+  const foodCogsPeriod = (foodCostPct != null && periodFoodRev != null) ? round0((foodCostPct / 100) * periodFoodRev) : null;
+  const foodVarAmt = (foodVarPct != null && foodCogsPeriod != null) ? round0((foodVarPct / 100) * foodCogsPeriod) : null;
 
-SCORING (out of 100 each):
-S1 Bar Cost: gap vs target — within 1pt=85, within 3=65, within 5=45, >5 over=25. +10 if recipes>0, +5 pour method known.
-S2 Theft: base 50. +15 cash recon present, +10 shift checks present, +15 void/comp data from file, +10 approval policy documented.
-S3 Food Cost: same scale as S1. +10 if kitchen products>0, +5 inventory freq known.
-S4 Vendor: base 40. +15 vendor log entries>0, +10 recipes>5, +10 bar products>10, +15 invoices uploaded.
-S5 Prime Cost: prime% vs target — within 2=80, within 5=60, within 8=40, >8 over=20. +${weeks.length>4?15:weeks.length>0?8:0} weekly tracking.
-S6: 4 specific risk signals with HIGH/MEDIUM/LOW ratings.
-OVERALL: weighted avg S1-S5.
+  // ── S4 — Vendor Control (RESULTS-based: invoice-matching behavior +
+  // active price verification). N/A when there is nothing to assess — no
+  // invoice-matching answer and no logged vendor activity. An unanswered
+  // question never manufactures a score. ──
+  const matchState = (extracted.invoice_vs_po || '').toLowerCase();
+  const haveVendorActivity = vendorLog.length > 0 || num(cd.deliveries_logged) > 0;
+  let s4 = null;
+  if (matchState) {
+    if (matchState.includes('never') || matchState.includes('not ') || matchState.includes('no ')) s4 = 40;
+    else if (matchState.includes('spot')) s4 = 60;
+    else if (matchState.includes('match') || matchState.includes('every') || matchState.includes('all')) s4 = 80;
+    else s4 = 40;
+  } else if (haveVendorActivity) {
+    s4 = 50;   // vendor activity on file but matching discipline not stated
+  }
+  if (s4 != null) {
+    if (vendorLog.length > 0) s4 += 10;   // actively logging/verifying price drift
+    // Results-based: credit only real backup vendors. "None"/"No" earns nothing.
+    const backupStr = (extracted.backup_vendors || '').toLowerCase();
+    if (backupStr !== '' && !backupStr.includes('none') && backupStr !== 'no' && !backupStr.startsWith('no ')) s4 += 5;
+    s4 = clampScore(s4);
+  }
+  const vendorSpendMonthly = round0((bevCogsPeriod != null || foodCogsPeriod != null)
+    ? (((bevCogsPeriod || 0) + (foodCogsPeriod || 0)) / periodWeeks) * WEEKS_PER_MONTH
+    : null);
+  // No exposure figure when the vendor section itself is N/A.
+  const s4ExposureMonthly = (s4 != null && vendorSpendMonthly != null) ? round0((VENDOR_EXPOSURE_PCT / 100) * vendorSpendMonthly) : 0;
 
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''} | annual_bar_rev=$${settings.annual_bar_revenue||0} | annual_food_rev=$${settings.annual_food_revenue||0}
-bar_cost_target=${(settings.targets&&settings.targets.bar_pour_cost_pct)||22}% | food_cost_target=${(settings.targets&&settings.targets.food_cost_pct)||32}% | prime_target=${(settings.targets&&settings.targets.prime_cost_pct)||60}%
-avg_bar_cost_pct=${avgBarCost?avgBarCost.toFixed(1):'unknown'} | avg_food_cost_pct=${avgFoodCost?avgFoodCost.toFixed(1):'unknown'}
-avg_weekly_bar_rev=$${avgBarRev?Math.round(avgBarRev):0} | avg_weekly_food_rev=$${avgFoodRev?Math.round(avgFoodRev):0}
-monthly_bar_rev_est=$${avgBarRev?Math.round(avgBarRev*4.33):0} | monthly_food_rev_est=$${avgFoodRev?Math.round(avgFoodRev*4.33):0}
-bar_products=${products.length} | kitchen_products=${kitchen.length} | recipes=${recipes.length} | weeks_data=${weeks.length}
-shift_checks=${shifts.length} | cash_recons=${recons.length} | vendor_log_entries=${vendor.length}
-theft_score=${theft.length?(theft[theft.length-1]&&theft[theft.length-1].total)||'unscored':'unscored'}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
-${reconSummary?'RECONS:\n'+reconSummary:''}
-${controlBlock}
-Return this exact JSON structure with all values calculated (not 0):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"PFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":63,"TARGET_SCORE":65,
-"OVERALL_SCORE":[calculated],
-"S1_SCORE":[calc],"S1_BAR_COST_PCT":[from app:${avgBarCost?avgBarCost.toFixed(1):0}],"S1_BAR_REV_MONTHLY":[calc],"S1_BEV_COGS_PERIOD":[calc],"S1_BAR_REV_PERIOD":[calc],"S1_INV_VARIANCE_PCT":[from file or 0],"S1_INV_VARIANCE_AMT":[calc],"S1_POUR_METHOD":[from file],"S1_RECIPE_COVERAGE":"${recipes.length} recipes","S1_VARIANCE_FREQ":[obs],"S1_VARIANCE_SKU":[obs],"S1_TARGET_PCT":${(settings.targets&&settings.targets.bar_pour_cost_pct)||22},"S1_GAP_PTS":[calc],"S1_MONTHLY_GAP":[calc],"S1_ANNUAL_GAP":[calc],"S1_PTS_BAR_COST":[pts],"S1_PTS_RECIPE":[pts],"S1_PTS_POUR":[pts],"S1_PTS_VAR_FREQ":[pts],"S1_PTS_VAR_SKU":[pts],
-"S2_SCORE":[calc],"S2_BEV_REV_MONTHLY":[calc],"S2_VOIDS_AMT":[file or 0],"S2_COMPS_AMT":[file or 0],"S2_VOID_COMP_PCT":[file or 1.5],"S2_VOID_COMP_AMT":[calc],"S2_VOIDS_NO_APPROVAL_PCT":[file or 0],"S2_VOIDS_NO_APPROVAL_AMT":[calc],"S2_CASH_POLICY":"${recons.length>0?'Reconciliation performed':'Not documented'}","S2_VOID_APPROVAL":[obs],"S2_DRAWER_RECON":"${recons.length>0?'Yes — '+recons.length+' entries':'No'}","S2_OVERSHORT_POLICY":[obs],"S2_BOTTLE_SECURITY":[obs],"S2_NOSALE_POLICY":[obs],"S2_SPILLAGE_LOG":"${shifts.length>0?'Yes — '+shifts.length+' shift checks':'Not documented'}","S2_BENCHMARK_PCT":2.0,"S2_GAP_PCT":[calc],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],"S2_PTS_VOID_COMP":[pts],"S2_PTS_VOID_APPROVAL":[pts],"S2_PTS_DRAWER":${recons.length>0?15:0},"S2_PTS_CASH_POLICY":[pts],"S2_PTS_BOTTLE":[pts],"S2_PTS_SPILLAGE":${shifts.length>0?10:0},
-"S3_SCORE":[calc],"S3_FOOD_COST_PCT":[from app:${avgFoodCost?avgFoodCost.toFixed(1):0}],"S3_FOOD_REV_MONTHLY":[calc],"S3_FOOD_COGS_PERIOD":[calc],"S3_FOOD_VAR_PCT":[file or 0],"S3_FOOD_VAR_AMT":[calc],"S3_RECIPE_COVERAGE":"${kitchen.length} kitchen products","S3_PORTION_STANDARDS":[obs],"S3_INV_FREQ":[obs],"S3_THEO_ACTUAL":[obs],"S3_WASTE_LOG":[obs],"S3_TARGET_PCT":${(settings.targets&&settings.targets.food_cost_pct)||32},"S3_GAP_PTS":[calc],"S3_MONTHLY_GAP":[calc],"S3_ANNUAL_GAP":[calc],"S3_PTS_FOOD_COST":[pts],"S3_PTS_RECIPE":[pts],"S3_PTS_PORTION":[pts],"S3_PTS_INV":[pts],"S3_PTS_WASTE":[pts],
-"S4_SCORE":[calc],"S4_BEV_INVOICE_COUNT":[file or ${vendor.length}],"S4_FOOD_INVOICE_COUNT":[file or 0],"S4_AUDIT_PERIOD_DESC":"4 weeks","S4_VENDOR_SPEND_MONTHLY":[calc],"S4_BEV_INVOICE_SPEND":[file or calc],"S4_FOOD_INVOICE_SPEND":[file or calc],"S4_INVOICE_VS_PO":[obs],"S4_PRICE_VERIFY":"${vendor.length>0?'Active — '+vendor.length+' changes logged':'Not documented'}","S4_DELIVERY_COUNT":[obs],"S4_CREDIT_MEMOS":[obs],"S4_ANNUAL_BIDS":[obs],"S4_BACKUP_VENDORS":[obs],"S4_PAYMENT_POLICY":[obs],"S4_EXPOSURE_PCT":3.0,"S4_EXPOSURE_MONTHLY":[calc 3% of COGS],"S4_EXPOSURE_ANNUAL":[calc],"S4_PTS_INVOICE_PO":[pts],"S4_PTS_PRICE_VERIFY":${vendor.length>0?15:0},"S4_PTS_DELIVERY":[pts],"S4_PTS_CREDIT":[pts],"S4_PTS_BIDS":[pts],"S4_PTS_PAYMENT":[pts],
-"S5_SCORE":[calc],"S5_BEV_REV_PERIOD":[calc],"S5_FOOD_REV_PERIOD":[calc],"S5_TOTAL_REV_PERIOD":[calc],"S5_BEV_COGS_PERIOD":[calc],"S5_FOOD_COGS_PERIOD":[calc],"S5_TOTAL_COGS_PERIOD":[calc],"S5_LABOR_PERIOD":[file or est 28% rev],"S5_LABOR_PCT":[file or 28],"S5_LABOR_SOURCE":"${weeks.length>0?'App data':'Estimated 28%'}","S5_PRIME_COST_AMT":[calc],"S5_PRIME_COST_PCT":[calc],"S5_TARGET_PCT":${(settings.targets&&settings.targets.prime_cost_pct)||60},"S5_BAR_COST_PCT":[from app],"S5_FOOD_COST_PCT":[from app],"S5_BLENDED_COGS_PCT":[calc],"S5_PRIME_WEEKLY":"${weeks.length>0?weeks.length+' weeks tracked':'Not tracked'}","S5_LABOR_BY_DEPT":[obs],"S5_SCHEDULE_FORECAST":[obs],"S5_RPLH_TRACKED":[obs],"S5_BAR_COST_GAP_MONTHLY":[calc],"S5_FOOD_COST_GAP_MONTHLY":[calc],"S5_COMBINED_COGS_GAP":[calc],"S5_TOTAL_REV_MONTHLY":[calc],"S5_LABOR_MONTHLY":[calc],"S5_PTS_PRIME_PCT":[pts],"S5_PTS_PRIME_WEEKLY":${weeks.length>4?15:weeks.length>0?8:0},"S5_PTS_LABOR_DEPT":[pts],"S5_PTS_SCHEDULE":[pts],"S5_PTS_RPLH":[pts],
-"S6_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG1_LABEL":[specific title],"S6_SIG1_EVIDENCE":[specific with numbers],"S6_SIG1_GAP":[specific gap],"S6_SIG1_TOOL":[action],
-"S6_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG2_LABEL":[specific],"S6_SIG2_EVIDENCE":[specific],"S6_SIG2_GAP":[specific],"S6_SIG2_TOOL":[action],
-"S6_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG3_LABEL":[specific],"S6_SIG3_EVIDENCE":[specific],"S6_SIG3_GAP":[specific],"S6_SIG3_TOOL":[action],
-"S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
+  // ── S5 — Prime Cost (CONTEXT ONLY — never summed into recoverable total) ──
+  const periodLabor = num(cd.labor_cost) != null
+    ? cd.labor_cost
+    : ((wkBarLabor != null || wkFoodLabor != null)
+      ? round0(((wkBarLabor || 0) + (wkFoodLabor || 0)) * periodWeeks)
+      : (num(extracted.labor_cost_monthly) != null ? num(extracted.labor_cost_monthly) : null));
+  const totalCogsPeriod = (bevCogsPeriod || 0) + (foodCogsPeriod || 0);
+  const primeAmtPeriod = (periodLabor != null) ? round0(totalCogsPeriod + periodLabor) : null;
+  const primePct = round1(num(cd.prime_cost_pct) != null
+    ? cd.prime_cost_pct
+    : (wkPrime != null ? wkPrime : (periodTotalRev > 0 && primeAmtPeriod != null ? (primeAmtPeriod / periodTotalRev) * 100 : null)));
+  const laborPct = round1(periodLabor != null && periodTotalRev > 0 ? (periodLabor / periodTotalRev) * 100 : null);
+  let s5 = scoreCostVsTarget(primePct, primeTarget, [80, 60, 40, 20]) || 20;
+  s5 += (weeks.length > 4 ? 15 : weeks.length > 0 ? 8 : 0);
+  s5 = clampScore(s5);
+  // Combined COGS gap is the bar + food monthly overage — shown as the prime
+  // cost view ONLY. It equals S1_MONTHLY_GAP + S3_MONTHLY_GAP by definition, so
+  // the recoverable total (chunk 5, client) must NOT add this on top of them.
+  const combinedCogsGap = (s1MonthlyGap || 0) + (s3MonthlyGap || 0);
+
+  // ── Section scores, N/A-aware. A cost section is scored only when the data
+  // to compute it honestly exists: S1 needs a bar cost %, S3 a food cost %,
+  // S5 a prime cost %. Absent ones are null (N/A) and excluded from the
+  // overall, so a bar with no kitchen (or any missing input) is never dragged
+  // by a defaulted score. S2/S4 always apply. ──
+  const s1Out = (haveBar && barCostPct != null) ? s1 : null;
+  const s3Out = (haveFood && foodCostPct != null) ? s3 : null;
+  const s5Out = (primePct != null) ? s5 : null;
+  const overall = clampScore(avg([s1Out, s2, s3Out, s4, s5Out]));
+
+  // ── Period label ──
+  const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
+  const auditPeriod = latestEnd
+    ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`)
+    : (extracted.audit_period || 'Most recent month (uploaded data)');
+  const dataTier = (controlData && (cd.sources || []).length)
+    ? 'Verified — Control module data'
+    : (weeks.length ? 'Standard — weekly data entered' : 'Baseline — uploaded data');
+
+  return {
+    BAR_NAME: settings.bar_name || '',
+    BAR_CITY_STATE: settings.city_state || '',
+    AUDIT_PERIOD: auditPeriod,
+    DATA_TIER_LABEL: dataTier,
+    OVERALL_SCORE: overall,
+    INDUSTRY_AVG: 63,          // internal Bar Cop benchmark (relabeled in chunk 5)
+    TARGET_SCORE: 65,
+
+    S1_SCORE: s1Out,
+    S1_BAR_COST_PCT: barCostPct,
+    S1_TARGET_PCT: barTarget,
+    S1_BAR_REV_MONTHLY: round0(monthlyBarRev),
+    S1_BAR_REV_PERIOD: round0(periodBarRev),
+    S1_BEV_COGS_PERIOD: bevCogsPeriod,
+    S1_INV_VARIANCE_PCT: invVarPct != null ? invVarPct : 0,
+    S1_INV_VARIANCE_AMT: invVarAmt != null ? invVarAmt : 0,
+    S1_POUR_METHOD: extracted.pour_method || 'Not documented',
+    S1_RECIPE_COVERAGE: recipesCosted === 'all' ? 'All recipes costed'
+      : recipesCosted === 'some' ? 'Some recipes costed'
+      : recipesCosted === 'none' ? 'No costed recipes'
+      : `${recipeCount} recipes`,
+    S1_MONTHLY_GAP: s1MonthlyGap,
+    S1_ANNUAL_GAP: round0(s1MonthlyGap * 12),
+
+    S2_SCORE: s2,
+    S2_VOID_COMP_PCT: voidCompPct,
+    S2_VOID_COMP_AMT: voidCompAmt,
+    S2_VOIDS_NO_APPROVAL_PCT: voidsNoApprovalPct,
+    S2_CASH_POLICY: haveCashRecon ? 'Reconciliation performed' : 'Not documented',
+    S2_VOID_APPROVAL: haveApprovalPolicy ? 'Manager approval tracked' : 'Not documented',
+    S2_DRAWER_RECON: num(cd.cash_reconciliations) > 0 ? `Yes — ${cd.cash_reconciliations} entries` : (recons.length ? `Yes — ${recons.length} entries` : 'No'),
+    S2_SPILLAGE_LOG: haveShiftChecks ? 'Yes' : 'Not documented',
+    S2_MONTHLY_GAP: s2MonthlyGap,
+    S2_ANNUAL_GAP: round0(s2MonthlyGap * 12),
+
+    S3_SCORE: s3Out,
+    S3_FOOD_COST_PCT: foodCostPct,
+    S3_TARGET_PCT: foodTarget,
+    S3_FOOD_REV_MONTHLY: round0(monthlyFoodRev),
+    S3_FOOD_VAR_PCT: foodVarPct != null ? foodVarPct : 0,
+    S3_FOOD_VAR_AMT: foodVarAmt != null ? foodVarAmt : 0,
+    S3_RECIPE_COVERAGE: `${kitchenProducts.length} kitchen products`,
+    S3_INV_FREQ: extracted.inv_freq || (num(cd.inventory_counts) > 0 ? `${cd.inventory_counts} counts on file` : 'Not documented'),
+    S3_WASTE_LOG: extracted.waste_log || 'Not documented',
+    S3_MONTHLY_GAP: s3MonthlyGap,
+    S3_ANNUAL_GAP: round0(s3MonthlyGap * 12),
+
+    S4_SCORE: s4,
+    S4_BEV_INVOICE_COUNT: num(extracted.bev_invoice_count) != null ? num(extracted.bev_invoice_count) : vendorLog.length,
+    S4_FOOD_INVOICE_COUNT: num(extracted.food_invoice_count) != null ? num(extracted.food_invoice_count) : 0,
+    S4_VENDOR_SPEND_MONTHLY: vendorSpendMonthly,
+    S4_INVOICE_VS_PO: extracted.invoice_vs_po || 'Not documented',
+    S4_PRICE_VERIFY: vendorLog.length > 0 ? `Active — ${vendorLog.length} changes logged` : 'Not documented',
+    S4_ANNUAL_BIDS: extracted.annual_bids || 'Not documented',
+    S4_BACKUP_VENDORS: extracted.backup_vendors || 'Not documented',
+    S4_EXPOSURE_MONTHLY: s4ExposureMonthly,
+    S4_EXPOSURE_ANNUAL: round0(s4ExposureMonthly * 12),
+
+    S5_SCORE: s5Out,
+    S5_PRIME_COST_PCT: primePct,
+    S5_TARGET_PCT: primeTarget,
+    S5_PRIME_COST_AMT: primeAmtPeriod,
+    S5_TOTAL_REV_PERIOD: round0(periodTotalRev),
+    S5_TOTAL_COGS_PERIOD: round0(totalCogsPeriod),
+    S5_LABOR_PERIOD: periodLabor,
+    S5_LABOR_PCT: laborPct,
+    S5_BAR_COST_PCT: barCostPct,
+    S5_FOOD_COST_PCT: foodCostPct,
+    S5_LABOR_BY_DEPT: (wkBarLabor != null && wkFoodLabor != null) ? 'Yes' : 'Not documented',
+    S5_RPLH_TRACKED: extracted.rplh_tracked || 'Not documented',
+    S5_COMBINED_COGS_GAP: combinedCogsGap,  // CONTEXT only — see note above
+
+    // WEEKLY_GAP_AMT reconciles to the recoverable total (S1+S2+S3+S4, NOT S5).
+    WEEKLY_GAP_AMT: '$' + Math.round(((s1MonthlyGap + s2MonthlyGap + s3MonthlyGap + s4ExposureMonthly)) / WEEKS_PER_MONTH).toLocaleString('en-US')
+  };
 }
 
-function getExtractionPrompt_Revenue(appData, controlData) {
-  const settings     = appData.settings || {};
-  const targets      = settings.targets || {};
-  const weeks        = appData.revenue_weeks || [];
-  const servers      = appData.revenue_servers || [];
-  const menuItems    = appData.revenue_menu_items || [];
+/* computeRevenueAudit(appData, controlData, extracted)
+   Same honesty contract as Profit. Five sections:
+     S1 Check Average and Revenue  — dollar opportunity (revenue growth)
+     S2 Labor Efficiency           — dollar gap (cost recovery)
+     S3 Menu Performance           — scored on Dog ratio; NO fabricated dollar
+     S4 Server Performance         — grounded spread opportunity (revenue growth)
+     S5 Events and Private Dining  — scored; NO fabricated target dollar
+   Cost recovery (S2) is kept distinct from revenue opportunity (S1/S4) so the
+   two are never pooled into one "recovered" number. Sections with no data are
+   N/A (null) and excluded from the overall. Practice answers give results-based
+   credit; they never penalize (the bad result already shows in the numbers). */
+function computeRevenueAudit(appData, controlData, extracted) {
+  appData = appData || {}; controlData = controlData || null; extracted = extracted || {};
+  const settings = appData.settings || {};
+  const rt = (appData.revenue_settings && appData.revenue_settings.targets) || {};
+  const cd = controlData || {};
+  const weeks = (appData.revenue_weeks || [])
+    .filter(w => w && ((num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0) > 0 || num(w.total_revenue) > 0))
+    .slice(-PERIOD_WEEKS);
+  const menuItems = (appData.menu_items || []).filter(i => num(i.price) != null && num(i.cost) != null && num(i.weekly_covers) != null);
+  const serverChecks = (appData.revenue_server_checks || appData.revenue_servers || []).filter(c => num(c.check_avg) != null);
+  const events = (appData.revenue_events || []).filter(e => num(e.revenue) != null);
 
-  const recentWeeks  = weeks.slice(-4);
-  const avgCheckAvg  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.check_avg||0),0)/recentWeeks.length : null;
-  const avgLaborPct  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.labor_pct_blended||0),0)/recentWeeks.length : null;
-  const avgRPLH      = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.rplh_blended||0),0)/recentWeeks.length : null;
-  const avgCovers    = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.covers||0),0)/recentWeeks.length : null;
-  const avgBarRev    = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.bar_revenue||0),0)/recentWeeks.length : null;
-  const avgFloorRev  = recentWeeks.length ? recentWeeks.reduce((s,w)=>s+(w.floor_revenue||0),0)/recentWeeks.length : null;
-  const totalAnnual  = (settings.annual_bar_revenue||0) + (settings.annual_food_revenue||0);
+  const checkTarget = num(rt.check_avg) != null ? rt.check_avg : 35;
+  const laborTarget = num(rt.labor_pct_blended) != null ? rt.labor_pct_blended
+    : (((num(rt.bar_labor_pct) != null ? rt.bar_labor_pct : 28)
+      + (num(rt.kitchen_labor_pct) != null ? rt.kitchen_labor_pct : 30)
+      + (num(rt.floor_labor_pct) != null ? rt.floor_labor_pct : 32)) / 3);
+  const rplhTarget = num(rt.rplh_dinner) != null ? rt.rplh_dinner : 75;
 
-  // Build a compact server roster string for the prompt
-  const serverRoster = servers.length
-    ? servers.slice(0,20).map((sv,i) => `  ${i+1}. ${sv.name||('Server '+(i+1))}${sv.role?' ('+sv.role+')':''}${sv.wage?' $'+sv.wage+'/hr':''}`).join('\n')
-    : '  None on roster';
+  // ── Revenue + covers base (weeks -> uploads -> settings annual) ──
+  const wkTotalRev = avg(weeks.map(w => num(w.total_revenue) != null ? w.total_revenue : (num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0)));
+  const annualTotal = (num(settings.annual_bar_revenue) || 0) + (num(settings.annual_food_revenue) || 0);
+  const monthlyRev = wkTotalRev != null ? wkTotalRev * WEEKS_PER_MONTH
+    : (num(extracted.monthly_revenue) != null ? num(extracted.monthly_revenue)
+      : (annualTotal > 0 ? annualTotal / 12 : null));
+  const wkCovers = avg(weeks.map(w => w.covers));
+  const monthlyCovers = wkCovers != null ? wkCovers * WEEKS_PER_MONTH
+    : (num(extracted.monthly_covers) != null ? num(extracted.monthly_covers) : null);
 
-  // Build recent weekly data summary
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = [`Week ${i+1}`];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.total_revenue) parts.push('Rev $'+w.total_revenue);
-        if (w.check_avg) parts.push('Check avg $'+w.check_avg);
-        if (w.covers) parts.push('Covers '+w.covers);
-        if (w.labor_pct_blended) parts.push('Labor '+w.labor_pct_blended+'%');
-        if (w.rplh_blended) parts.push('RPLH $'+w.rplh_blended);
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly data entered yet';
-
-  // Build menu items summary
-  const menuSummary = menuItems.length
-    ? menuItems.slice(0,30).map(m => `  ${m.name||'Item'} | ${m.category||''} | Price: $${m.price||0} | Cost: $${m.cost||0}`).join('\n')
-    : '  No menu items entered yet';
-
-  // Verified Control-module data — real logged Labor Control data the audit
-  // treats as ground truth for the sections it covers (map Section 8).
-  let controlBlock = '';
-  if (controlData && typeof controlData === 'object') {
-    const c = controlData, cl = [];
-    if (c.check_average != null)     cl.push('verified_check_average=$' + c.check_average + ' — S1 ground truth');
-    if (c.labor_pct_blended != null) cl.push('verified_labor_pct=' + c.labor_pct_blended + ' — S2 ground truth');
-    if (c.rplh_blended != null)      cl.push('verified_rplh=$' + c.rplh_blended + ' — S2 ground truth');
-    if (c.labor_hours != null)       cl.push('labor_hours_logged=' + c.labor_hours + ' labor_cost_$=' + c.labor_cost + ' — S2 ground truth');
-    if (c.roster_count)              cl.push('staff_on_roster=' + c.roster_count + ' — S4 server count ground truth');
-    if (cl.length) {
-      controlBlock = '\nVERIFIED CONTROL DATA — this operator runs Bar Cop\'s Labor Control module, and the weekly revenue and labor figures are confirmed records fed from Control. The figures below are real logged operational data, not estimates. Treat them as ground truth: score the sections they cover from these values, do not estimate those numbers or depend on uploaded files for them, and reflect this verified coverage in DATA_TIER_LABEL. Sections not covered here still rely on the uploads.\n'
-        + cl.map(l => '  ' + l).join('\n') + '\n';
-    }
+  // ── S1 — Check Average and Revenue (revenue opportunity) ──
+  const wkCheckAvg = avg(weeks.map(w => w.check_avg));
+  let checkAvg = num(cd.check_average) != null ? cd.check_average
+    : (wkCheckAvg != null ? wkCheckAvg : num(extracted.check_avg));
+  if (checkAvg == null && monthlyRev != null && monthlyCovers > 0) checkAvg = monthlyRev / monthlyCovers;
+  checkAvg = round2(checkAvg);
+  let s1 = null, s1Gap = 0;
+  if (checkAvg != null) {
+    const below = checkTarget - checkAvg;               // positive = below target
+    s1 = clampScore(below <= 1 ? 85 : below <= 3 ? 70 : below <= 5 ? 55 : 35);
+    if (below > 0 && monthlyCovers != null) s1Gap = round0(below * monthlyCovers);
   }
 
-  return `REVENUE AUDIT — respond with a single JSON object, no other text. Use app data below. Never output 0 for a score.
+  // ── S2 — Labor Efficiency (cost recovery) ──
+  const laborPct = round1(num(cd.labor_pct_blended) != null ? cd.labor_pct_blended
+    : (avg(weeks.map(w => w.labor_pct_blended)) != null ? avg(weeks.map(w => w.labor_pct_blended)) : num(extracted.labor_pct)));
+  const rplh = round0(num(cd.rplh_blended) != null ? cd.rplh_blended
+    : (avg(weeks.map(w => w.rplh_blended)) != null ? avg(weeks.map(w => w.rplh_blended)) : num(extracted.rplh)));
+  let s2 = null, s2Gap = 0;
+  if (laborPct != null) {
+    const over = laborPct - laborTarget;
+    s2 = over <= 1 ? 85 : over <= 3 ? 65 : over <= 5 ? 50 : 35;
+    if (extracted.labor_to_forecast === true) s2 += 10;   // scheduling to a forecast is a real control
+    s2 = clampScore(s2);
+    if (over > 0 && monthlyRev != null) s2Gap = round0((over / 100) * monthlyRev);
+  }
 
-SCORING (out of 100 each):
-S1 Check Avg: within $1 of target=85, within $3=70, within $5=55, >$5 below=35.
-S2 Labor: labor% vs target — within 1pt=85, within 3=65, >5 over=35. RPLH tracked adds 15.
-S3 Menu: items in system >20=60 base, 10-20=50, <10=40. POS mix data +30, pricing data +10.
-S4 Server: no report=45 base. With report: score spread. Servers on roster >0 adds 5.
-S5 Events: no data=50. Score if data present.
-S6: 4 specific revenue-side risk signals with HIGH/MEDIUM/LOW ratings (server-level patterns, daypart staffing anomalies, menu-item complaint concentration, missing pre-shift, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
-OVERALL: weighted avg S1-S5.
+  // ── S3 — Menu Performance (scored on Dog ratio; no fabricated dollar) ──
+  let stars = 0, plow = 0, puzzle = 0, dog = 0, menuKnown = false, topCategory = null;
+  if (menuItems.length >= 4) {
+    menuKnown = true;
+    const avgCM = avg(menuItems.map(i => i.price - i.cost));
+    const avgCov = avg(menuItems.map(i => i.weekly_covers));
+    menuItems.forEach(i => {
+      const hiM = (i.price - i.cost) >= avgCM, hiV = i.weekly_covers >= avgCov;
+      if (hiM && hiV) stars++; else if (!hiM && hiV) plow++; else if (hiM && !hiV) puzzle++; else dog++;
+    });
+    const catCov = {};
+    menuItems.forEach(i => { const c = i.category || 'Other'; catCov[c] = (catCov[c] || 0) + i.weekly_covers; });
+    topCategory = Object.keys(catCov).sort((a, b) => catCov[b] - catCov[a])[0] || null;
+  } else if (num(extracted.dogs_count) != null || num(extracted.stars_count) != null) {
+    menuKnown = true;
+    stars = num(extracted.stars_count) || 0; plow = num(extracted.plowhorses_count) || 0;
+    puzzle = num(extracted.puzzles_count) || 0; dog = num(extracted.dogs_count) || 0;
+  }
+  let s3 = null;
+  if (menuKnown) {
+    const total = stars + plow + puzzle + dog || 1;
+    const dogRatio = dog / total;
+    s3 = dogRatio <= 0.10 ? 80 : dogRatio <= 0.25 ? 60 : dogRatio <= 0.40 ? 45 : 30;
+    if (extracted.menu_engineered === true) s3 += 10;
+    s3 = clampScore(s3);
+  }
 
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''}
-annual_bar_rev=$${settings.annual_bar_revenue||0} | annual_food_rev=$${settings.annual_food_revenue||0}
-check_avg_target=$${targets.check_avg||35} | labor_target=${targets.floor_labor_pct||32}%
-rplh_targets: lunch=$${targets.rplh_lunch||50} dinner=$${targets.rplh_dinner||75} bar=$${targets.rplh_bar||65}
-servers_on_roster=${servers.length} | menu_items=${menuItems.length} | weeks_data=${weeks.length}
-avg_check_avg=$${avgCheckAvg?avgCheckAvg.toFixed(2):0} | avg_labor_pct=${avgLaborPct?avgLaborPct.toFixed(1):0}%
-avg_rplh=$${avgRPLH?avgRPLH.toFixed(2):0} | avg_covers_week=${avgCovers?Math.round(avgCovers):0}
-avg_bar_rev_week=$${avgBarRev?Math.round(avgBarRev):0} | avg_floor_rev_week=$${avgFloorRev?Math.round(avgFloorRev):0}
-monthly_covers_est=${avgCovers?Math.round(avgCovers*4.33):0} | monthly_rev_est=$${avgBarRev&&avgFloorRev?Math.round((avgBarRev+avgFloorRev)*4.33):0}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
-${serverRoster?'SERVERS:\n'+serverRoster:''}
-${controlBlock}
-Return this exact JSON (all values calculated):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"RFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":61,"TARGET_SCORE":65,
-"OVERALL_SCORE":[calc weighted avg],
-"S1_SCORE":[calc],"S1_CHECK_AVG":[from app:${avgCheckAvg?avgCheckAvg.toFixed(2):0}],"S1_CHECK_AVG_TARGET":${targets.check_avg||35},"S1_BAR_CHECK_AVG":[from report or est],"S1_FOOD_CHECK_AVG":[from report or est],"S1_COVER_COUNT":${avgCovers?Math.round(avgCovers*4.33):0},"S1_MONTHLY_REVENUE":${avgBarRev&&avgFloorRev?Math.round((avgBarRev+avgFloorRev)*4.33):0},"S1_MONTHLY_GAP":[calc: (target-actual)*covers],"S1_ANNUAL_GAP":[calc],
-"S2_SCORE":[calc],"S2_LABOR_PCT":[from app:${avgLaborPct?avgLaborPct.toFixed(1):30}],"S2_LABOR_TARGET_PCT":${targets.floor_labor_pct||32},"S2_RPLH":[from app:${avgRPLH?avgRPLH.toFixed(2):0}],"S2_RPLH_TARGET":${targets.rplh_dinner||75},"S2_LABOR_PERIOD":[calc],"S2_SCHED_VS_ACTUAL":[obs],"S2_OVERTIME_HRS":[file or null],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],
-"S3_SCORE":[calc],"S3_STARS_COUNT":[file or 0],"S3_PLOWHORSES_COUNT":[file or 0],"S3_DOGS_COUNT":[file or 0],"S3_PUZZLES_COUNT":[file or 0],"S3_TOP_CATEGORY":[file or est],"S3_MONTHLY_GAP":[calc or 0],"S3_PRICING_OPPORTUNITY":[calc or 0],
-"S4_SCORE":[calc],"S4_SERVER_COUNT":${servers.length||0},"S4_TOP_CHECK_AVG":[file or 0],"S4_BOTTOM_CHECK_AVG":[file or 0],"S4_PERFORMANCE_SPREAD":[calc],"S4_APP_ATTACH_RATE":[file or null],"S4_DESSERT_ATTACH_RATE":[file or null],"S4_PRESHIFT_BRIEFING":[obs],"S4_MONTHLY_GAP":[calc or 0],"S4_ANNUAL_GAP":[calc],
-"S5_SCORE":50,"S5_EVENT_REV_PERIOD":[file or null],"S5_EVENTS_PER_MONTH":[file or null],"S5_AVG_EVENT_REVENUE":[file or null],"S5_MINIMUM_MET":[file or null],"S5_CATERING_REV_PERIOD":[file or null],"S5_ANNUAL_EVENT_GAP":[file or null],"S5_MONTHLY_GAP":[file or null],
-"S6_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG1_LABEL":[specific title],"S6_SIG1_EVIDENCE":[specific with numbers],"S6_SIG1_GAP":[specific gap],"S6_SIG1_TOOL":[action],
-"S6_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG2_LABEL":[specific],"S6_SIG2_EVIDENCE":[specific],"S6_SIG2_GAP":[specific],"S6_SIG2_TOOL":[action],
-"S6_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG3_LABEL":[specific],"S6_SIG3_EVIDENCE":[specific],"S6_SIG3_GAP":[specific],"S6_SIG3_TOOL":[action],
-"S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
+  // ── S4 — Server Performance (grounded spread opportunity) ──
+  let s4 = null, topCA = null, botCA = null, spread = null, s4Gap = 0;
+  if (serverChecks.length >= 3) {
+    const cas = serverChecks.map(c => c.check_avg).sort((a, b) => a - b);
+    botCA = round2(cas[0]); topCA = round2(cas[cas.length - 1]);
+    const teamAvg = avg(cas);
+    spread = round2(topCA - botCA);
+    const spreadPct = teamAvg ? spread / teamAvg : 0;
+    s4 = spreadPct <= 0.15 ? 80 : spreadPct <= 0.30 ? 60 : spreadPct <= 0.50 ? 45 : 30;
+    if (extracted.pre_shift === 'every' || extracted.pre_shift === true) s4 += 10;
+    if (extracted.upsell_standard === true) s4 += 5;
+    s4 = clampScore(s4);
+    const bottomThird = cas.slice(0, Math.max(1, Math.floor(cas.length / 3)));
+    const botAvg = avg(bottomThird);
+    if (teamAvg != null && botAvg != null && teamAvg > botAvg && monthlyCovers != null) {
+      const botCovers = monthlyCovers * (bottomThird.length / serverChecks.length);
+      s4Gap = round0((teamAvg - botAvg) * botCovers);   // bottom third up to team average
+    }
+  } else if (num(extracted.top_check_avg) != null && num(extracted.bottom_check_avg) != null) {
+    // First-time audit: spread read off an uploaded server sales report.
+    topCA = round2(extracted.top_check_avg); botCA = round2(extracted.bottom_check_avg);
+    spread = round2(topCA - botCA);
+    const teamAvg = (topCA + botCA) / 2;               // midpoint estimate from top/bottom
+    const spreadPct = teamAvg ? spread / teamAvg : 0;
+    s4 = spreadPct <= 0.15 ? 80 : spreadPct <= 0.30 ? 60 : spreadPct <= 0.50 ? 45 : 30;
+    if (extracted.pre_shift === 'every' || extracted.pre_shift === true) s4 += 10;
+    if (extracted.upsell_standard === true) s4 += 5;
+    s4 = clampScore(s4);
+    if (monthlyCovers != null && teamAvg > botCA) s4Gap = round0((teamAvg - botCA) * (monthlyCovers / 3));
+  }
+
+  // ── S5 — Events and Private Dining (scored; no fabricated target dollar) ──
+  let s5 = null, eventsPerMonth = null, avgEventRev = null, eventRevPeriod = null;
+  if (events.length > 0) {
+    eventRevPeriod = round0(events.reduce((s, e) => s + (e.revenue || 0), 0));
+    eventsPerMonth = round1(events.length / 3);            // events span ~last 3 months
+    avgEventRev = round0(eventRevPeriod / events.length);
+    s5 = clampScore(eventsPerMonth >= 4 ? 80 : eventsPerMonth >= 2 ? 60 : eventsPerMonth >= 1 ? 45 : 30);
+  }
+
+  const overall = clampScore(avg([s1, s2, s3, s4, s5]));
+  const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
+  const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : (extracted.audit_period || 'Most recent month (uploaded data)');
+  const dataTier = (controlData && (cd.sources || []).length) ? 'Verified — Control module data'
+    : (weeks.length ? 'Standard — weekly data entered' : 'Baseline — uploaded data');
+
+  // Revenue opportunity (projected) vs cost recovery, kept separate.
+  const revenueOpportunity = (s1Gap || 0) + (s4Gap || 0);
+  const costRecovery = (s2Gap || 0);
+
+  return {
+    BAR_NAME: settings.bar_name || '',
+    BAR_CITY_STATE: settings.city_state || '',
+    AUDIT_PERIOD: auditPeriod,
+    DATA_TIER_LABEL: dataTier,
+    OVERALL_SCORE: overall,
+    INDUSTRY_AVG: 61,
+    TARGET_SCORE: 65,
+
+    S1_SCORE: s1,
+    S1_CHECK_AVG: checkAvg,
+    S1_CHECK_AVG_TARGET: round2(checkTarget),
+    S1_BAR_CHECK_AVG: round2(avg(weeks.map(w => w.bar_check_avg))),
+    S1_FOOD_CHECK_AVG: round2(avg(weeks.map(w => w.food_check_avg))),
+    S1_COVER_COUNT: round0(monthlyCovers),
+    S1_MONTHLY_REVENUE: round0(monthlyRev),
+    S1_MONTHLY_GAP: s1Gap,
+    S1_ANNUAL_GAP: round0(s1Gap * 12),
+
+    S2_SCORE: s2,
+    S2_LABOR_PCT: laborPct,
+    S2_LABOR_TARGET_PCT: round1(laborTarget),
+    S2_RPLH: rplh,
+    S2_RPLH_TARGET: round0(rplhTarget),
+    S2_LABOR_PERIOD: num(cd.labor_cost) != null ? cd.labor_cost : (laborPct != null && monthlyRev != null ? round0((laborPct / 100) * monthlyRev) : null),
+    S2_SCHED_VS_ACTUAL: extracted.sched_vs_actual || 'Not documented',
+    S2_OVERTIME_HRS: num(extracted.overtime_hrs) != null ? num(extracted.overtime_hrs) : null,
+    S2_MONTHLY_GAP: s2Gap,
+    S2_ANNUAL_GAP: round0(s2Gap * 12),
+
+    S3_SCORE: s3,
+    S3_STARS_COUNT: menuKnown ? stars : null,
+    S3_PLOWHORSES_COUNT: menuKnown ? plow : null,
+    S3_PUZZLES_COUNT: menuKnown ? puzzle : null,
+    S3_DOGS_COUNT: menuKnown ? dog : null,
+    S3_TOP_CATEGORY: topCategory || (extracted.top_category || 'Not available'),
+    S3_PRICING_OPPORTUNITY: 0,     // surfaced qualitatively; no invented menu-mix dollar
+    S3_MONTHLY_GAP: 0,
+
+    S4_SCORE: s4,
+    S4_SERVER_COUNT: serverChecks.length || (num(extracted.server_count) || 0) || (num(cd.roster_count) || 0),
+    S4_TOP_CHECK_AVG: topCA,
+    S4_BOTTOM_CHECK_AVG: botCA,
+    S4_PERFORMANCE_SPREAD: spread,
+    S4_APP_ATTACH_RATE: num(extracted.app_attach_rate) != null ? num(extracted.app_attach_rate) : null,
+    S4_DESSERT_ATTACH_RATE: num(extracted.dessert_attach_rate) != null ? num(extracted.dessert_attach_rate) : null,
+    S4_PRESHIFT_BRIEFING: extracted.pre_shift === 'every' ? 'Held every shift' : extracted.pre_shift === 'sometimes' ? 'Sometimes' : extracted.pre_shift === 'never' ? 'Not held' : 'Not documented',
+    S4_MONTHLY_GAP: s4Gap,
+    S4_ANNUAL_GAP: round0(s4Gap * 12),
+
+    S5_SCORE: s5,
+    S5_EVENT_REV_PERIOD: eventRevPeriod,
+    S5_EVENTS_PER_MONTH: eventsPerMonth,
+    S5_AVG_EVENT_REVENUE: avgEventRev,
+    S5_MINIMUM_MET: extracted.private_dining_min === true ? 'Yes' : (events.length ? 'Tracked' : 'No package'),
+    S5_CATERING_REV_PERIOD: num(extracted.catering_rev) != null ? num(extracted.catering_rev) : null,
+    S5_ANNUAL_EVENT_GAP: null,     // no fabricated target gap
+    S5_MONTHLY_GAP: 0,
+
+    // Headline totals, split honestly. Revenue opportunity is projected growth,
+    // not recovered cash; cost recovery (labor) is a real reducible cost.
+    REVENUE_OPPORTUNITY_MONTHLY: round0(revenueOpportunity),
+    COST_RECOVERY_MONTHLY: round0(costRecovery),
+    WEEKLY_GAP_AMT: '$' + Math.round((revenueOpportunity + costRecovery) / WEEKS_PER_MONTH).toLocaleString('en-US')
+  };
 }
 
-function getExtractionPrompt_Traffic(appData, urlData=null) {
-  const settings      = appData.settings || {};
-  const targets       = (appData.traffic_settings && appData.traffic_settings.targets) || {};
-  const weeks         = appData.traffic_weeks || [];
-  const recentWeeks   = weeks.slice(-4);
-  const avg = (fn) => { const v = recentWeeks.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
-  const avgGR  = avg(w=>w.google_rating);
-  const urlBlock = formatTrafficUrlDataForPrompt(urlData);
-  const avgRV  = avg(w=>w.new_reviews);
-  const avgRR  = avg(w=>w.response_rate);
-  const avgSS  = avg(w=>w.monthly_sessions);
-  const avgBR  = avg(w=>w.bounce_rate);
-  const avgIGF = avg(w=>w.ig_followers);
-  const avgIGP = avg(w=>w.ig_posts_month);
+/* computeTrafficAudit(appData, controlData, extracted, urlData)
+   Seven sections of digital presence. NO dollar figures anywhere — gaps are
+   real deficits ("response rate 42% vs 75%", "8 posts vs 12 benchmark").
+   Sources, in priority: live URL reads (urlData: PageSpeed website, Places
+   Google rating/reviews, Yelp) > screenshot-extracted values (extracted) >
+   the operator's weekly traffic metrics (traffic_weeks). A section with no
+   data is N/A (null) and excluded from the overall. Benchmarks are internal
+   Bar Cop benchmarks, never "industry average." */
+function computeTrafficAudit(appData, controlData, extracted, urlData) {
+  appData = appData || {}; extracted = extracted || {}; urlData = urlData || {};
+  const settings = appData.settings || {};
+  const ts = appData.traffic_settings || {};
+  const tgt = ts.targets || {};
+  const weeks = (appData.traffic_weeks || []).slice(-4);
+  const wk = (fn) => avg(weeks.map(fn));
+  const web = urlData.website || {};
+  const gbp = urlData.gbp || {};
+  const yelp = urlData.yelp || {};
 
-  // Build weekly data summary
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = ['Week ' + (i+1)];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.google_rating) parts.push('Google ' + w.google_rating + 'star');
-        if (w.new_reviews) parts.push('New reviews: ' + w.new_reviews);
-        if (w.response_rate) parts.push('Response rate: ' + w.response_rate + '%');
-        if (w.monthly_sessions) parts.push('Sessions: ' + w.monthly_sessions);
-        if (w.ig_followers) parts.push('IG followers: ' + w.ig_followers);
-        if (w.ig_posts_month) parts.push('IG posts: ' + w.ig_posts_month);
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly traffic data entered yet';
+  // Benchmarks (internal Bar Cop benchmarks; operator targets override).
+  const B = {
+    google_rating: num(tgt.google_rating) != null ? tgt.google_rating : 4.3,
+    review_count: 200, response_rate: num(tgt.response_rate) != null ? tgt.response_rate : 75,
+    sessions: num(tgt.monthly_sessions) != null ? tgt.monthly_sessions : 2000, bounce: 60,
+    gbp_posts: 8, photos: 100, ig_posts: 12, list_size: 500, open_rate: 35, recency_days: 7
+  };
+  const band = (good, mid, ok) => good ? 85 : mid ? 60 : ok ? 45 : 30;   // helper
 
-  return `TRAFFIC AUDIT — respond with a single JSON object, no other text. Use app data, fetched live URL data when present, and any uploaded screenshots. Never output 0 for a score.
+  // ── S1 — Google Business Profile / Listing ──
+  const haveGbp = gbp.rating != null || extracted.listing_claimed != null || extracted.photo_count != null || extracted.profile_completeness != null;
+  let s1 = null, s1Photos = num(extracted.photo_count), s1Posts = num(extracted.posts_last_30), s1Complete = num(extracted.profile_completeness);
+  if (haveGbp) {
+    let pts = 0, max = 0;
+    const boolPts = (v, w) => { max += w; if (v === true) pts += w; };
+    boolPts(extracted.listing_claimed, 25);
+    boolPts(extracted.hours_complete, 15);
+    boolPts(extracted.website_linked, 15);
+    boolPts(extracted.menu_link_active, 10);
+    if (s1Photos != null) { max += 20; pts += Math.min(20, (s1Photos / B.photos) * 20); }
+    if (s1Posts != null) { max += 15; pts += Math.min(15, (s1Posts / B.gbp_posts) * 15); }
+    s1 = max > 0 ? clampScore((pts / max) * 100) : null;
+    if (s1Complete == null && max > 0) s1Complete = round0((pts / max) * 100);
+  }
 
-${urlBlock}
+  // ── S2 — Website ──
+  const sessions = num(extracted.monthly_sessions) != null ? num(extracted.monthly_sessions) : round0(wk(w => w.monthly_sessions));
+  const bounce = num(extracted.bounce_rate) != null ? num(extracted.bounce_rate) : round1(wk(w => w.bounce_rate));
+  const perf = num(web.performance);
+  const haveWeb = perf != null || sessions != null || extracted.mobile_optimized != null;
+  let s2 = null;
+  if (haveWeb) {
+    let pts = 0, max = 0;
+    if (perf != null) { max += 40; pts += (perf / 100) * 40; }            // PageSpeed mobile performance
+    else if (extracted.mobile_optimized != null) { max += 40; pts += extracted.mobile_optimized === true ? 40 : 10; }
+    if (sessions != null) { max += 35; pts += Math.min(35, (sessions / B.sessions) * 35); }
+    if (bounce != null) { max += 25; pts += Math.max(0, Math.min(25, ((B.bounce - bounce) / B.bounce + 1) * 12.5)); }
+    s2 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
 
+  // ── S3 — Reviews ──
+  const gRating = round1(gbp.rating != null ? gbp.rating : (num(extracted.google_rating) != null ? num(extracted.google_rating) : wk(w => w.google_rating)));
+  const gCount = round0(gbp.review_count != null ? gbp.review_count : num(extracted.google_review_count));
+  const respRate = round0(num(extracted.response_rate) != null ? num(extracted.response_rate) : wk(w => w.response_rate));
+  const haveReviews = gRating != null || respRate != null;
+  let s3 = null;
+  if (haveReviews) {
+    let pts = 0, max = 0;
+    if (gRating != null) { max += 45; pts += Math.min(45, (gRating / B.google_rating) * 45); }
+    if (respRate != null) { max += 35; pts += Math.min(35, (respRate / B.response_rate) * 35); }
+    if (gCount != null) { max += 20; pts += Math.min(20, (gCount / B.review_count) * 20); }
+    s3 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
 
-SCORING (out of 100 each):
-S1 GBP: claimed+verified=20, hours+phone+website=15, menu linked=10, photos>50=15, posts>4/mo=15, response>75%=15, Q&A=10.
-S2 Website: exists+mobile=25, sessions vs 2000/mo benchmark scored, bounce<60%=15, menu in top3=15, online ordering=20.
-S3 Reviews: rating≥4.5=30, 4.3-4.5=20, 4.0-4.3=10, <4.0=0. Response rate scored. Review velocity scored. Recency scored.
-S4 Search: maps pack=40, NAP consistent=30, primary keyword=20, citations=10.
-S5 Social: IG profile=20, followers scored, post freq vs 12/mo scored, engagement if available.
-S6 Delivery: active platforms 20pts each (max 3), ratings scored, photos>10=15, menu complete=15, promo=10.
-S7 Email: list exists=20, size vs 500 benchmark, frequency scored, open rate if available, loyalty=15.
-S8: 4 specific traffic-side risk signals with HIGH/MEDIUM/LOW ratings (review velocity drops, unanswered review backlog, GBP staleness, platform-specific issues, posting schedule gaps, email channel dormancy, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
-OVERALL: weighted avg S1-S7.
+  // ── S4 — Search and SEO ──
+  const haveSeo = extracted.maps_pack != null || extracted.nap_consistent != null;
+  let s4 = null;
+  if (haveSeo) {
+    let pts = 0, max = 0;
+    const bp = (v, w) => { max += w; if (v === true) pts += w; };
+    bp(extracted.maps_pack, 50);
+    bp(extracted.nap_consistent, 50);
+    s4 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
 
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''}
-google_rating_target=${targets.google_rating||4.3} | review_velocity_target=${targets.review_velocity||8}/mo
-response_rate_target=${targets.response_rate||75}% | sessions_target=${targets.monthly_sessions||2000}/mo
-social_posts_target=${targets.social_posts_month||12}/mo | weeks_tracked=${weeks.length}
-avg_google_rating=${avgGR?avgGR.toFixed(2):'not tracked'} | avg_new_reviews_mo=${avgRV?avgRV.toFixed(1):'not tracked'}
-avg_response_rate=${avgRR?avgRR.toFixed(1)+'%':'not tracked'} | avg_monthly_sessions=${avgSS?Math.round(avgSS):'not tracked'}
-avg_bounce_rate=${avgBR?avgBR.toFixed(1)+'%':'not tracked'} | avg_ig_followers=${avgIGF?Math.round(avgIGF):'not tracked'}
-avg_ig_posts_mo=${avgIGP?avgIGP.toFixed(1):'not tracked'}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
+  // ── S5 — Social Media ──
+  const igPosts = num(extracted.ig_posts_last_30) != null ? num(extracted.ig_posts_last_30) : round0(wk(w => w.social_posts_month));
+  const igFollowers = num(extracted.ig_followers);
+  const haveSocial = igPosts != null || igFollowers != null;
+  let s5 = null;
+  if (haveSocial) {
+    let pts = 0, max = 0;
+    if (igPosts != null) { max += 60; pts += Math.min(60, (igPosts / B.ig_posts) * 60); }
+    if (igFollowers != null) { max += 40; pts += igFollowers > 0 ? 40 : 0; }
+    s5 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
 
-Return this exact JSON (all values calculated):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"TFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":58,"TARGET_SCORE":65,
-"OVERALL_SCORE":[calc],
-"S1_SCORE":[calc],"S1_LISTING_CLAIMED":[screenshot],"S1_LISTING_VERIFIED":[screenshot],"S1_HOURS_COMPLETE":[screenshot],"S1_PHONE_PRESENT":[screenshot],"S1_WEBSITE_LINKED":[screenshot],"S1_MENU_LINK_ACTIVE":[screenshot],"S1_CATEGORY_SET":[screenshot],"S1_ATTRIBUTES_COMPLETE":[screenshot],"S1_PHOTO_COUNT":[screenshot or 0],"S1_PHOTO_BENCHMARK":100,"S1_POSTS_LAST_30_DAYS":[screenshot or 0],"S1_POSTS_BENCHMARK":8,"S1_REVIEW_COUNT_GOOGLE":[screenshot],"S1_RATING_GOOGLE":[app:${avgGR?avgGR.toFixed(2):0}],"S1_REVIEW_RESPONSE_RATE":[app:${avgRR?Math.round(avgRR):0}],"S1_RESPONSE_BENCHMARK":75,"S1_QA_POPULATED":[screenshot],"S1_PROFILE_COMPLETENESS_PCT":[calc],"S1_MONTHLY_GAP":[est],"S1_ANNUAL_GAP":[calc],
-"S2_SCORE":[calc],"S2_WEBSITE_EXISTS":[screenshot],"S2_MOBILE_OPTIMIZED":[screenshot],"S2_MONTHLY_SESSIONS":[app:${avgSS?Math.round(avgSS):0}],"S2_SESSIONS_BENCHMARK":2000,"S2_BOUNCE_RATE":[app:${avgBR?avgBR.toFixed(1):0}],"S2_BOUNCE_BENCHMARK":60,"S2_MENU_PAGE_IN_TOP_3":[analytics],"S2_MENU_PAGE_SESSIONS":[analytics or 0],"S2_TOP_PAGES":[],"S2_ONLINE_ORDERING_PRESENT":[screenshot],"S2_RESERVATION_SYSTEM":[screenshot],"S2_AVG_SESSION_DURATION_SEC":[analytics or 0],"S2_PAGE_LOAD_SCORE":null,"S2_SOURCE_BREAKDOWN":null,"S2_MONTHLY_GAP":[est],"S2_ANNUAL_GAP":[calc],
-"S3_SCORE":[calc],"S3_GOOGLE_RATING":[app:${avgGR?avgGR.toFixed(2):0}],"S3_GOOGLE_RATING_BENCHMARK":4.3,"S3_GOOGLE_REVIEW_COUNT":[screenshot],"S3_GOOGLE_COUNT_BENCHMARK":200,"S3_RESPONSE_RATE":[app:${avgRR?Math.round(avgRR):0}],"S3_RESPONSE_BENCHMARK":75,"S3_YELP_RATING":[screenshot or 0],"S3_YELP_RATING_BENCHMARK":4.0,"S3_YELP_REVIEW_COUNT":[screenshot or 0],"S3_TRIPADVISOR_PRESENT":false,"S3_MOST_RECENT_REVIEW_DAYS":[screenshot],"S3_RECENCY_BENCHMARK":7,"S3_NEGATIVE_PATTERN":[obs],"S3_MONTHLY_GAP":[est],"S3_ANNUAL_GAP":[calc],"S3_UNANSWERED":[screenshot or 0],
-"S4_SCORE":[calc],"S4_MAPS_PACK_CONFIRMED":[screenshot],"S4_RANKING_REPORT_SUBMITTED":false,"S4_NAP_CONSISTENT":[screenshots],"S4_NAP_BUSINESS_NAME":"${settings.bar_name||''}","S4_NAP_ADDRESS":[screenshot],"S4_NAP_PHONE":[screenshot],"S4_WEBSITE_TITLES_ASSESSED":false,"S4_CITATION_COUNT":null,"S4_PRIMARY_KEYWORD":"${settings.bar_name?(settings.bar_name.split(' ')[0]||'').toLowerCase()+' bar':'bar [city]'}","S4_SECONDARY_KEYWORDS":[],"S4_MONTHLY_GAP":null,
-"S5_SCORE":[calc],"S5_IG_PROFILE_SUBMITTED":[true if uploaded],"S5_IG_FOLLOWERS":[app:${avgIGF?Math.round(avgIGF):0}],"S5_IG_POSTS_LAST_30":[app:${avgIGP?Math.round(avgIGP):0}],"S5_IG_POSTS_BENCHMARK":12,"S5_IG_ENGAGEMENT_RATE":[analytics or null],"S5_FB_FOLLOWERS":[screenshot or 0],"S5_FB_POSTS_LAST_30":[screenshot or 0],"S5_CONTENT_TYPE":[screenshot obs],"S5_FOOD_PHOTO_RATIO":[screenshot or 0],"S5_MONTHLY_GAP":[est],"S5_ANNUAL_GAP":[calc],
-"S6_SCORE":[calc],"S6_DOORDASH_ACTIVE":[screenshot],"S6_UBEREATS_ACTIVE":[screenshot],"S6_GRUBHUB_ACTIVE":[screenshot],"S6_PLATFORM_COUNT":[count],"S6_DOORDASH_RATING":[screenshot or null],"S6_UBEREATS_RATING":[screenshot or null],"S6_PHOTO_COUNT_DELIVERY":[screenshot or 0],"S6_MENU_COMPLETE":[screenshot],"S6_PROMO_ACTIVE":[screenshot],"S6_MONTHLY_GAP":[est],"S6_ANNUAL_GAP":[calc],
-"S7_SCORE":[calc],"S7_EMAIL_LIST_EXISTS":[screenshot],"S7_LIST_SIZE":[screenshot or 0],"S7_LIST_BENCHMARK":500,"S7_LAST_SEND_DAYS_AGO":[screenshot or null],"S7_SEND_FREQUENCY":[screenshot],"S7_OPEN_RATE":[analytics or null],"S7_OPEN_BENCHMARK":35,"S7_GROWTH_MECHANISM":[obs],"S7_LOYALTY_PROGRAM":[screenshot],"S7_MONTHLY_GAP":[est],"S7_ANNUAL_GAP":[calc],
-"S8_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG1_LABEL":[specific title],"S8_SIG1_EVIDENCE":[specific with numbers],"S8_SIG1_GAP":[specific gap],"S8_SIG1_TOOL":[action],
-"S8_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG2_LABEL":[specific],"S8_SIG2_EVIDENCE":[specific],"S8_SIG2_GAP":[specific],"S8_SIG2_TOOL":[action],
-"S8_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG3_LABEL":[specific],"S8_SIG3_EVIDENCE":[specific],"S8_SIG3_GAP":[specific],"S8_SIG3_TOOL":[action],
-"S8_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG4_LABEL":[specific],"S8_SIG4_EVIDENCE":[specific],"S8_SIG4_GAP":[specific],"S8_SIG4_TOOL":[action]`
+  // ── S6 — Delivery Platforms ──
+  const ddActive = extracted.doordash_active, ueActive = extracted.ubereats_active, ghActive = extracted.grubhub_active;
+  const haveDelivery = ddActive != null || ueActive != null || ghActive != null;
+  let s6 = null, platformCount = 0;
+  if (haveDelivery) {
+    [ddActive, ueActive, ghActive].forEach(a => { if (a === true) platformCount++; });
+    let pts = platformCount * 25;            // up to 75 for 3 platforms
+    if (extracted.menu_complete === true) pts += 12;
+    if (extracted.promo_active === true) pts += 13;
+    s6 = clampScore(Math.min(100, pts) || 30);
+  }
+
+  // ── S7 — Email and Loyalty ──
+  const listSize = num(extracted.list_size) != null ? num(extracted.list_size) : round0(wk(w => w.email_list_size));
+  const openRate = num(extracted.open_rate) != null ? num(extracted.open_rate) : round1(wk(w => w.email_open_rate));
+  const haveEmail = extracted.email_list_exists != null || listSize != null || openRate != null;
+  let s7 = null;
+  if (haveEmail) {
+    let pts = 0, max = 0;
+    if (extracted.email_list_exists != null || listSize != null) {
+      max += 20; if (extracted.email_list_exists === true || listSize > 0) pts += 20;
+    }
+    if (listSize != null) { max += 30; pts += Math.min(30, (listSize / B.list_size) * 30); }
+    if (openRate != null) { max += 35; pts += Math.min(35, (openRate / B.open_rate) * 35); }
+    if (extracted.growth_mechanism != null) { max += 15; if (extracted.growth_mechanism === true) pts += 15; }
+    s7 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
+
+  const overall = clampScore(avg([s1, s2, s3, s4, s5, s6, s7]));
+
+  // Deficit-based action items — NO dollars, real gaps vs benchmark.
+  const items = [];
+  if (respRate != null && respRate < B.response_rate) items.push({ action: 'Reply to reviews. Response rate ' + respRate + '% versus the ' + B.response_rate + '% benchmark.', gap_id: 'reviews' });
+  if (gRating != null && gRating < B.google_rating) items.push({ action: 'Lift your Google rating from ' + gRating + ' toward ' + B.google_rating + '.', gap_id: 'reviews' });
+  if (s1Posts != null && s1Posts < B.gbp_posts) items.push({ action: 'Post to Google Business Profile more. ' + s1Posts + ' posts in 30 days versus ' + B.gbp_posts + '.', gap_id: 'gbp' });
+  if (sessions != null && sessions < B.sessions) items.push({ action: 'Grow website traffic. ' + Math.round(sessions) + ' monthly sessions versus the ' + B.sessions + ' benchmark.', gap_id: 'website' });
+  if (igPosts != null && igPosts < B.ig_posts) items.push({ action: 'Post to Instagram more often. ' + igPosts + ' posts in 30 days versus ' + B.ig_posts + '.', gap_id: 'social' });
+  if (openRate != null && openRate < B.open_rate) items.push({ action: 'Improve email open rate. ' + openRate + '% versus the ' + B.open_rate + '% benchmark.', gap_id: 'email-loyalty' });
+  if (listSize != null && listSize < B.list_size) items.push({ action: 'Grow the email list. ' + Math.round(listSize) + ' subscribers versus ' + B.list_size + '.', gap_id: 'email-loyalty' });
+
+  const dataTier = (gbp.rating != null || web.performance != null || yelp.rating != null) ? 'Verified — live link data'
+    : (weeks.length ? 'Standard — weekly data entered' : 'Baseline — uploaded data');
+
+  const yn = (v) => v === true ? true : v === false ? false : null;
+  return {
+    BAR_NAME: settings.bar_name || '',
+    BAR_CITY_STATE: settings.city_state || '',
+    AUDIT_PERIOD: extracted.audit_period || 'Current digital presence',
+    DATA_TIER_LABEL: dataTier,
+    OVERALL_SCORE: overall,
+    INDUSTRY_AVG: 58,         // internal Bar Cop benchmark (relabeled in client)
+    TARGET_SCORE: 65,
+
+    S1_SCORE: s1,
+    S1_LISTING_CLAIMED: yn(extracted.listing_claimed),
+    S1_HOURS_COMPLETE: yn(extracted.hours_complete),
+    S1_WEBSITE_LINKED: yn(extracted.website_linked),
+    S1_MENU_LINK_ACTIVE: yn(extracted.menu_link_active),
+    S1_PHOTO_COUNT: s1Photos, S1_PHOTO_BENCHMARK: B.photos,
+    S1_POSTS_LAST_30_DAYS: s1Posts, S1_POSTS_BENCHMARK: B.gbp_posts,
+    S1_PROFILE_COMPLETENESS_PCT: s1Complete,
+    S1_MONTHLY_GAP: 0,        // Traffic carries no dollar gaps
+
+    S2_SCORE: s2,
+    S2_MOBILE_OPTIMIZED: perf != null ? (perf >= 50) : yn(extracted.mobile_optimized),
+    S2_MONTHLY_SESSIONS: sessions, S2_SESSIONS_BENCHMARK: B.sessions,
+    S2_BOUNCE_RATE: bounce, S2_BOUNCE_BENCHMARK: B.bounce,
+    S2_MENU_PAGE_IN_TOP_3: yn(extracted.menu_page_top3),
+    S2_ONLINE_ORDERING_PRESENT: yn(extracted.online_ordering),
+    S2_MONTHLY_GAP: 0,
+
+    S3_SCORE: s3,
+    S3_GOOGLE_RATING: gRating, S3_GOOGLE_RATING_BENCHMARK: B.google_rating,
+    S3_GOOGLE_REVIEW_COUNT: gCount,
+    S3_RESPONSE_RATE: respRate, S3_RESPONSE_BENCHMARK: B.response_rate,
+    S3_YELP_RATING: round1(yelp.rating != null ? yelp.rating : num(extracted.yelp_rating)),
+    S3_MOST_RECENT_REVIEW_DAYS: num(extracted.most_recent_review_days),
+    S3_UNANSWERED: num(extracted.unanswered),
+    S3_NEGATIVE_PATTERN: extracted.negative_pattern || null,
+    S3_MONTHLY_GAP: 0,
+
+    S4_SCORE: s4,
+    S4_MAPS_PACK_CONFIRMED: yn(extracted.maps_pack),
+    S4_NAP_CONSISTENT: yn(extracted.nap_consistent),
+    S4_NAP_BUSINESS_NAME: settings.bar_name || '',
+    S4_PRIMARY_KEYWORD: extracted.primary_keyword || null,
+
+    S5_SCORE: s5,
+    S5_IG_FOLLOWERS: igFollowers,
+    S5_IG_POSTS_LAST_30: igPosts, S5_IG_POSTS_BENCHMARK: B.ig_posts,
+    S5_FB_FOLLOWERS: num(extracted.fb_followers),
+    S5_CONTENT_TYPE: extracted.content_type || null,
+    S5_MONTHLY_GAP: 0,
+
+    S6_SCORE: s6,
+    S6_DOORDASH_ACTIVE: yn(ddActive), S6_UBEREATS_ACTIVE: yn(ueActive), S6_GRUBHUB_ACTIVE: yn(ghActive),
+    S6_DOORDASH_RATING: round1(num(extracted.doordash_rating)),
+    S6_UBEREATS_RATING: round1(num(extracted.ubereats_rating)),
+    S6_PHOTO_COUNT_DELIVERY: num(extracted.photo_count_delivery),
+    S6_MENU_COMPLETE: yn(extracted.menu_complete),
+    S6_PROMO_ACTIVE: yn(extracted.promo_active),
+    S6_MONTHLY_GAP: 0,
+
+    S7_SCORE: s7,
+    S7_EMAIL_LIST_EXISTS: yn(extracted.email_list_exists),
+    S7_LIST_SIZE: listSize, S7_LIST_BENCHMARK: B.list_size,
+    S7_OPEN_RATE: openRate, S7_OPEN_BENCHMARK: B.open_rate,
+    S7_SEND_FREQUENCY: extracted.send_frequency || null,
+    S7_LAST_SEND_DAYS_AGO: num(extracted.last_send_days),
+    S7_GROWTH_MECHANISM: yn(extracted.growth_mechanism),
+    S7_LOYALTY_PROGRAM: yn(extracted.loyalty),
+
+    action_items: items     // deficit-based, no dollar impact
+  };
 }
 
-// ── Stripe checkout session ───────────────────────────────────────────────────
-const BARCOP_PRICE_ID = 'price_1TZA54Gow04S066UjWZIRAlL';
-const ALL_MODULES     = ['profit', 'revenue', 'traffic'];
+module.exports = { computeProfitAudit, computeRevenueAudit, computeTrafficAudit };
 
-app.post('/api/create-checkout-session', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+// ── Self-test: node server/audit-compute.js ───────────────────────────────────
+if (require.main === module) {
+  // Representative single-unit operation (~$1M/yr). Bar pour cost over target,
+  // food slightly over, prime over — numbers chosen to verify gap math by hand.
+  const appData = {
+    settings: {
+      bar_name: 'The Anchor Bar & Kitchen', city_state: 'Austin, TX',
+      annual_bar_revenue: 624000, annual_food_revenue: 374400,
+      targets: { bar_pour_cost_pct: 22, food_cost_pct: 32, prime_cost_pct: 60 }
+    },
+    weeks: [1, 2, 3, 4].map(i => ({
+      period_end: `2026-04-0${i}`,
+      bar: { revenue: 10000, cost_pct: 27.0, labor: 2900 },
+      food: { revenue: 6000, cost_pct: 36.0, labor: 1900 },
+      prime_cost_pct: 63.0
+    })),
+    recipes: [{}, {}], bar_products: new Array(40), kitchen_products: new Array(30),
+    vendor_log: [{}, {}, {}], shifts: new Array(20), reconciliations: new Array(10)
+  };
+  const controlData = {
+    bar_cost_pct: 27.0, food_cost_pct: 36.0, prime_cost_pct: 63.0,
+    void_comp_count: 40, void_comp_total: 2600, void_comp_unauthorized: 12,
+    cash_reconciliations: 28, labor_cost: 19200, inventory_counts: 4, spot_checks: 6,
+    sources: ['Inventory Control counts', 'Shift Control void and comp log']
+  };
+  const d = computeProfitAudit(appData, controlData, { pour_method: 'Free pour', inv_variance_pct: 5.0 });
 
-  try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: BARCOP_PRICE_ID, quantity: 1 }],
-      success_url: 'https://app.barcop.com/?checkout=success',
-      cancel_url:  'https://app.barcop.com/?checkout=cancelled',
-      metadata: { user_id: userId }
-    });
-    res.json({ url: session.url });
-  } catch (e) {
-    console.error('Checkout session error:', e);
-    res.status(500).json({ error: e.message });
+  const monthlyBarRev = 10000 * 4.345;   // 43450
+  const monthlyFoodRev = 6000 * 4.345;   // 26070
+  const expS1Gap = Math.round(((27 - 22) / 100) * monthlyBarRev);   // 5% * 43450 = 2173
+  const expS3Gap = Math.round(((36 - 32) / 100) * monthlyFoodRev);  // 4% * 26070 = 1043
+  const periodTotalRev = (10000 + 6000) * 4;                        // 64000
+  const expVoidPct = Math.round(((2600 / periodTotalRev) * 100) * 10) / 10;  // 4.1%
+  const expS2Gap = Math.round(((expVoidPct - 2.0) / 100) * (monthlyBarRev + monthlyFoodRev));
+
+  const checks = [
+    ['S1_SCORE (diff 5 = band 45, +10 recipes, free pour earns no bonus = 55)', d.S1_SCORE, 55],
+    ['S1_MONTHLY_GAP', d.S1_MONTHLY_GAP, expS1Gap],
+    ['S3_MONTHLY_GAP', d.S3_MONTHLY_GAP, expS3Gap],
+    ['S2_VOID_COMP_PCT', d.S2_VOID_COMP_PCT, expVoidPct],
+    ['S2_MONTHLY_GAP', d.S2_MONTHLY_GAP, expS2Gap],
+    // Results-based: 4.1% void (2.1 over) = 25, -15 unauth (30%), +5 approval +5 recon = 20.
+    ['S2_SCORE results-based (bad rate scores LOW, not 100)', d.S2_SCORE, 20],
+    ['S2 score below benchmark-pass even with controls logged', d.S2_SCORE < 50, true],
+    // No invoice answer but vendor activity logged (50) + vendor log present (+10) = 60.
+    ['S4_SCORE results-based (vendor activity, matching unstated)', d.S4_SCORE, 60],
+    ['S5_COMBINED_COGS_GAP == S1+S3 gap (no double count beyond)', d.S5_COMBINED_COGS_GAP, expS1Gap + expS3Gap],
+    ['S5 prime % from control', d.S5_PRIME_COST_PCT, 63.0],
+    ['OVERALL is 1-100', d.OVERALL_SCORE >= 1 && d.OVERALL_SCORE <= 100, true]
+  ];
+  let pass = 0;
+  for (const [label, got, exp] of checks) {
+    const ok = got === exp;
+    if (ok) pass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
-});
+  console.log(`\n${pass}/${checks.length} checks passed`);
 
-// ── Stripe billing portal ─────────────────────────────────────────────────────
-app.post('/api/billing-portal', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-  try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const { createClient: mkClient } = require('@supabase/supabase-js');
-    const adminDb = mkClient(
-      'https://plpikfpintruksclkwyb.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    const { data, error } = await adminDb
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !data?.stripe_customer_id) {
-      return res.status(404).json({ error: 'No Stripe customer found for this account.' });
+  // ── Upload-only first-time audit: no weeks, no Control data; financials come
+  // from the model's extraction of uploaded files. Proves the gaps still compute.
+  console.log('\n--- Upload-only (first-time audit) path ---');
+  const firstTime = computeProfitAudit(
+    { settings: { bar_name: 'The Anchor Bar & Kitchen', city_state: 'Austin, TX', targets: {} } },
+    null,
+    {
+      // Mirrors the test CSVs: raw COGS dollars (code derives the cost %),
+      // voids_total + cash counts (code derives the rate), never matched.
+      audit_period: 'April 2026',
+      bar_revenue_monthly: 51500, bar_cogs_monthly: 14111,
+      food_revenue_monthly: 31000, food_cogs_monthly: 11098,
+      labor_cost_monthly: 24000, pour_method: 'Free pour',
+      voids_total: 3465, voids_no_approval_pct: 30,
+      cash_recon_count: 26, cash_short_count: 9, invoice_vs_po: 'Never matched'
     }
+  );
+  const ftBarGap = Math.round(((27.4 - 22) / 100) * 51500);  // cost% derived from COGS
+  const ftFoodGap = Math.round(((35.8 - 32) / 100) * 31000);
+  const ftChecks = [
+    ['upload bar cost % derived from COGS dollars', firstTime.S1_BAR_COST_PCT, 27.4],
+    ['upload food cost % derived from COGS dollars', firstTime.S3_FOOD_COST_PCT, 35.8],
+    ['upload S1_MONTHLY_GAP from file revenue', firstTime.S1_MONTHLY_GAP, ftBarGap],
+    ['upload S3_MONTHLY_GAP from file revenue', firstTime.S3_MONTHLY_GAP, ftFoodGap],
+    ['upload S2 scores the void rate (4.2%) low', firstTime.S2_SCORE < 50, true],
+    ['upload S2_MONTHLY_GAP computed', firstTime.S2_MONTHLY_GAP > 0, true],
+    ['upload AUDIT_PERIOD from file', firstTime.AUDIT_PERIOD, 'April 2026'],
+    ['S4 "Never matched" scores 40, not 80 (substring bug regression)', firstTime.S4_SCORE, 40],
+    ['upload OVERALL is 1-100', firstTime.OVERALL_SCORE >= 1 && firstTime.OVERALL_SCORE <= 100, true]
+  ];
+  // Sanity: a bar that matches every invoice should score 80 on S4.
+  const matched = computeProfitAudit({ settings: { targets: {} } }, null, { bar_revenue_monthly: 50000, invoice_vs_po: 'Matched every delivery' });
+  ftChecks.push(['S4 "Matched every delivery" scores 80', matched.S4_SCORE, 80]);
 
-    const session = await stripe.billingPortal.sessions.create({
-      customer: data.stripe_customer_id,
-      return_url: 'https://app.barcop.com/'
-    });
+  // Bar-only operation (no kitchen): Food Cost must be N/A and excluded from
+  // the overall, not scored as a default that drags the bar down.
+  const barOnly = computeProfitAudit({ settings: { targets: {} } }, null, {
+    bar_revenue_monthly: 60000, bar_cogs_monthly: 16440, pour_method: 'Free pour',
+    voids_total: 1500, invoice_vs_po: 'Spot checked'
+  });
+  ftChecks.push(['bar-only: S3 Food is N/A (null)', barOnly.S3_SCORE, null]);
+  ftChecks.push(['bar-only: S1 Bar still scored', barOnly.S1_SCORE > 0, true]);
+  ftChecks.push(['bar-only: OVERALL excludes Food (not dragged to ~25)', barOnly.OVERALL_SCORE >= 1 && barOnly.OVERALL_SCORE <= 100, true]);
+  // Food-only operation (no bar): mirror case.
+  const foodOnly = computeProfitAudit({ settings: { targets: {} } }, null, { food_revenue_monthly: 40000, food_cogs_monthly: 13200 });
+  ftChecks.push(['food-only: S1 Bar is N/A (null)', foodOnly.S1_SCORE, null]);
 
-    res.json({ url: session.url });
-  } catch (e) {
-    console.error('Billing portal error:', e);
-    res.status(500).json({ error: e.message });
+  // Operating-practice questions: same costs, better practices -> higher scores
+  // (the "update answers next audit and watch the score move" case).
+  const improved = computeProfitAudit({ settings: { targets: {} } }, null, {
+    bar_revenue_monthly: 51500, bar_cogs_monthly: 14111, food_revenue_monthly: 31000, food_cogs_monthly: 11098,
+    labor_cost_monthly: 24000, pour_method: 'Jiggered/measured', recipes_costed: 'all', inv_freq: 'Weekly',
+    void_approval: true, drawer_recon: true, voids_total: 3465, voids_no_approval_pct: 5,
+    invoice_vs_po: 'Matched every delivery', backup_vendors: 'Yes'
+  });
+  ftChecks.push(['practices: measured pour + costed recipes raise S1', improved.S1_SCORE > firstTime.S1_SCORE, true]);
+  ftChecks.push(['practices: costed recipes + counts raise S3', improved.S3_SCORE > firstTime.S3_SCORE, true]);
+  ftChecks.push(['practices: matched invoices + backups raise S4', improved.S4_SCORE > firstTime.S4_SCORE, true]);
+
+  // Unanswered vendor question + no vendor data -> S4 is N/A, never a manufactured score.
+  const noVendor = computeProfitAudit({ settings: { targets: {} } }, null, { bar_revenue_monthly: 50000, bar_cogs_monthly: 13700 });
+  ftChecks.push(['unanswered vendor + no data: S4 is N/A (null)', noVendor.S4_SCORE, null]);
+  let ftPass = 0;
+  for (const [label, got, exp] of ftChecks) {
+    const ok = got === exp; if (ok) ftPass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
-});
+  console.log(`\n${ftPass}/${ftChecks.length} upload-path checks passed`);
 
-// ── Stripe webhook ────────────────────────────────────────────────────────────
-const { createClient } = require('@supabase/supabase-js');
-const ws = require('ws');
-
-const supabaseAdmin = createClient(
-  'https://plpikfpintruksclkwyb.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { realtime: { transport: ws } }
-);
-
-app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-  const sig    = req.headers['stripe-signature'];
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, secret);
-  } catch (err) {
-    console.error('Webhook signature failed:', err.message);
-    return res.status(400).send('Webhook Error: ' + err.message);
+  // ── Revenue audit ───────────────────────────────────────────────────────────
+  console.log('\n--- Revenue audit ---');
+  const rWeeks = [1, 2, 3, 4].map(i => ({
+    period_end: `2026-04-0${i}`, total_revenue: 18000, covers: 600,
+    bar_revenue: 11000, floor_revenue: 7000, check_avg: 30.0, labor_pct_blended: 34.0, rplh_blended: 58
+  }));
+  const rMenu = [
+    { name: 'Burger', category: 'Entree', price: 16, cost: 6, weekly_covers: 120 },   // hi vol; margin 10
+    { name: 'Steak',  category: 'Entree', price: 38, cost: 14, weekly_covers: 40 },    // hi margin lo vol = puzzle
+    { name: 'Fries',  category: 'Side',   price: 7,  cost: 2,  weekly_covers: 150 },   // plowhorse-ish
+    { name: 'Wings',  category: 'Starter',price: 13, cost: 7,  weekly_covers: 30 },    // dog-ish
+    { name: 'Salad',  category: 'Starter',price: 12, cost: 4,  weekly_covers: 25 }
+  ];
+  const rServers = [{ name: 'A', check_avg: 38 }, { name: 'B', check_avg: 31 }, { name: 'C', check_avg: 24 }, { name: 'D', check_avg: 29 }];
+  const rev = computeRevenueAudit({
+    settings: { bar_name: 'The Anchor Bar & Kitchen' },
+    revenue_settings: { targets: { check_avg: 35 } },
+    revenue_weeks: rWeeks, menu_items: rMenu, revenue_server_checks: rServers, revenue_events: []
+  }, null, {});
+  const rExpCovers = 600 * 4.345;                                  // monthly covers
+  const rExpS1Gap = Math.round((35 - 30) * rExpCovers);            // (target-actual) x covers
+  const rChecks = [
+    ['Rev S1 check avg from weeks', rev.S1_CHECK_AVG, 30],
+    ['Rev S1 gap = ($5 below) x monthly covers', rev.S1_MONTHLY_GAP, rExpS1Gap],
+    ['Rev S1 gap is revenue opportunity (not cost)', rev.REVENUE_OPPORTUNITY_MONTHLY >= rev.S1_MONTHLY_GAP, true],
+    ['Rev S2 labor scored (34% over ~30 target)', rev.S2_SCORE > 0 && rev.S2_SCORE <= 100, true],
+    ['Rev S2 gap is cost recovery, kept separate', rev.COST_RECOVERY_MONTHLY, rev.S2_MONTHLY_GAP],
+    ['Rev S3 menu classified (counts sum to 5)', (rev.S3_STARS_COUNT + rev.S3_PLOWHORSES_COUNT + rev.S3_PUZZLES_COUNT + rev.S3_DOGS_COUNT), 5],
+    ['Rev S3 no fabricated dollar', rev.S3_MONTHLY_GAP, 0],
+    ['Rev S4 server spread computed', rev.S4_PERFORMANCE_SPREAD, 14],
+    ['Rev S4 grounded opportunity > 0', rev.S4_MONTHLY_GAP > 0, true],
+    ['Rev S5 events N/A when none', rev.S5_SCORE, null],
+    ['Rev OVERALL excludes N/A events', rev.OVERALL_SCORE >= 1 && rev.OVERALL_SCORE <= 100, true]
+  ];
+  // Events present -> S5 scores.
+  const revEv = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, revenue_events: [{ revenue: 2400 }, { revenue: 3100 }, { revenue: 1800 }] }, null, {});
+  rChecks.push(['Rev S5 scores when events exist', revEv.S5_SCORE > 0, true]);
+  // Check-average N/A when no covers anywhere.
+  const revNoCovers = computeRevenueAudit({ settings: { annual_bar_revenue: 600000 }, revenue_settings: { targets: {} } }, null, {});
+  rChecks.push(['Rev S1 N/A when no covers', revNoCovers.S1_SCORE, null]);
+  let rPass = 0;
+  for (const [label, got, exp] of rChecks) {
+    const ok = got === exp; if (ok) rPass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
+  console.log(`\n${rPass}/${rChecks.length} revenue checks passed`);
 
-  try {
-    if (event.type === 'checkout.session.completed') {
-      const session    = event.data.object;
-      const customerId = session.customer;
-      const email      = session.customer_details?.email || session.customer_email;
-
-      let userId = session.metadata?.user_id || null;
-
-      if (!userId && email) {
-        const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
-        const found = existing?.users?.find(u => u.email === email);
-        if (found) {
-          userId = found.id;
-        } else {
-          const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: { created_via: 'stripe_checkout' },
-          });
-          if (createErr) {
-            console.error('Failed to create Supabase user:', createErr.message);
-          } else {
-            userId = created.user.id;
-            console.log('Account created for new subscriber:', email);
-          }
-        }
-      }
-
-      if (userId) {
-        await supabaseAdmin.from('subscriptions').upsert({
-          user_id:             userId,
-          stripe_customer_id:  customerId,
-          subscription_status: 'active',
-          subscription_plan:   'full_access',
-          active_modules:      ALL_MODULES,
-          current_period_end:  null,
-          updated_at:          new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-      }
-    }
-
-    if (event.type === 'customer.subscription.updated') {
-      const sub        = event.data.object;
-      const customerId = sub.customer;
-      const status     = sub.status;
-      const periodEnd  = new Date(sub.current_period_end * 1000).toISOString();
-
-      await supabaseAdmin.from('subscriptions')
-        .update({
-          subscription_status: status,
-          current_period_end:  periodEnd,
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('stripe_customer_id', customerId);
-    }
-
-    if (event.type === 'customer.subscription.deleted') {
-      const sub        = event.data.object;
-      const customerId = sub.customer;
-
-      await supabaseAdmin.from('subscriptions')
-        .update({
-          subscription_status: 'canceled',
-          active_modules:      [],
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('stripe_customer_id', customerId);
-    }
-
-    res.json({ received: true });
-  } catch (err) {
-    console.error('Webhook handler error:', err);
-    res.status(500).json({ error: 'Webhook handler failed' });
+  // ── Traffic audit ───────────────────────────────────────────────────────────
+  console.log('\n--- Traffic audit ---');
+  // Live link data + a couple screenshots; no dollars anywhere.
+  const traf = computeTrafficAudit(
+    { settings: { bar_name: 'The Anchor Bar & Kitchen' }, traffic_settings: { targets: {} },
+      traffic_weeks: [{ google_rating: 4.1, response_rate: 45, monthly_sessions: 1400, bounce_rate: 62, social_posts_month: 6, email_list_size: 320, email_open_rate: 28 }] },
+    null,
+    { listing_claimed: true, hours_complete: true, website_linked: true, menu_link_active: true, photo_count: 60, posts_last_30: 4,
+      maps_pack: true, nap_consistent: true, ig_posts_last_30: 6, ig_followers: 1200 },
+    { website: { performance: 70 }, gbp: { rating: 4.1, review_count: 130 }, yelp: { rating: 4.0 } }
+  );
+  const tChecks = [
+    ['Traffic OVERALL 1-100', traf.OVERALL_SCORE >= 1 && traf.OVERALL_SCORE <= 100, true],
+    ['Traffic uses live Google rating', traf.S3_GOOGLE_RATING, 4.1],
+    ['Traffic uses live review count', traf.S3_GOOGLE_REVIEW_COUNT, 130],
+    ['Traffic website score from PageSpeed', traf.S2_SCORE > 0, true],
+    ['Traffic carries NO dollar gap (S1)', traf.S1_MONTHLY_GAP, 0],
+    ['Traffic carries NO weekly dollar', traf.WEEKLY_GAP_AMT, undefined],
+    ['Traffic benchmark is internal (58), not industry', traf.INDUSTRY_AVG, 58],
+    ['Traffic reviews scored (have rating+response)', traf.S3_SCORE > 0, true]
+  ];
+  // Section with no data is N/A: no delivery, no email signals -> null.
+  const trafThin = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { listing_claimed: true, photo_count: 40 }, {});
+  tChecks.push(['Traffic delivery N/A when no data', trafThin.S6_SCORE, null]);
+  tChecks.push(['Traffic email N/A when no data', trafThin.S7_SCORE, null]);
+  tChecks.push(['Traffic GBP scored from screenshot data', trafThin.S1_SCORE > 0, true]);
+  let tPass = 0;
+  for (const [label, got, exp] of tChecks) {
+    const ok = got === exp; if (ok) tPass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
-});
-
-// ── Bug report notification ──────────────────────────────────────────────────
-// Fires after the client successfully writes a bug report row to Supabase.
-// The DB record is the source of truth; this endpoint just sends a courtesy
-// email so the team gets pinged without polling the table. If Resend fails
-// or the env vars are missing, we still return ok=true — the report itself
-// is safely persisted, the email is best-effort.
-app.post('/api/report-bug-notify', async (req, res) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to     = process.env.BUG_REPORT_NOTIFY_EMAIL;
-  const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
-  if (!apiKey || !to) {
-    console.warn('report-bug-notify: RESEND_API_KEY or BUG_REPORT_NOTIFY_EMAIL not configured; skipping email');
-    return res.json({ ok: true, emailed: false, reason: 'not_configured' });
-  }
-  try {
-    const r = req.body || {};
-    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    const sevLabel = { minor:'Minor', moderate:'Moderate', major:'Major', critical:'Critical' }[r.severity] || 'Moderate';
-    const sevColor = { minor:'#888', moderate:'#9A5D34', major:'#C03828', critical:'#C03828' }[r.severity] || '#9A5D34';
-    const subject  = 'Bar Cop Bug: ' + (r.title || 'Untitled report');
-    const row = (label, value) => value
-      ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
-        + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
-      : '';
-    const html =
-        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#111;">'
-      +   '<div style="border-bottom:3px solid ' + sevColor + ';padding-bottom:14px;margin-bottom:18px;">'
-      +     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999;">Bar Cop Bug Report</div>'
-      +     '<div style="font-size:18px;font-weight:700;color:#111;margin-top:4px;">' + esc(r.title || 'Untitled report') + '</div>'
-      +     '<div style="font-size:12px;color:' + sevColor + ';font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;">' + sevLabel + ' severity</div>'
-      +   '</div>'
-      +   '<table style="width:100%;border-collapse:collapse;">'
-      +     row('What Happened',      r.what_happened)
-      +     row('Steps to Reproduce', r.steps_to_reproduce)
-      +     row('Expected Behavior',  r.expected_behavior)
-      +     row('Reporter Email',     r.user_email)
-      +     row('From Screen',        r.previous_screen)
-      +     row('Browser',            r.user_agent)
-      +     row('Viewport',           r.viewport)
-      +     row('Submitted',          new Date().toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }))
-      +   '</table>'
-      +   '<div style="margin-top:18px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px;">Full report is also in your Supabase bug_reports table.</div>'
-      + '</div>';
-
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html, reply_to: r.user_email || undefined })
-    });
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error('Resend send failed:', resp.status, txt);
-      return res.json({ ok: true, emailed: false, reason: 'send_failed' });
-    }
-    res.json({ ok: true, emailed: true });
-  } catch (e) {
-    console.error('report-bug-notify exception:', e);
-    res.json({ ok: true, emailed: false, reason: 'exception' });
-  }
-});
-
-// ── Support message notification ─────────────────────────────────────────────
-// Email-only contact form from the Hub "Contact Support" screen. No DB row
-// is kept — the support inbox is the record. The user's email is set as
-// reply_to so the team can hit Reply and write back directly.
-app.post('/api/support-message-notify', async (req, res) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to     = process.env.SUPPORT_NOTIFY_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL;
-  const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
-  if (!apiKey || !to) {
-    console.warn('support-message-notify: RESEND_API_KEY or notify email not configured');
-    return res.json({ ok: false, emailed: false, reason: 'not_configured' });
-  }
-  try {
-    const r = req.body || {};
-    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    const subject = 'Bar Cop Support: ' + (r.subject || '(no subject)');
-    const row = (label, value) => value
-      ? '<tr><td style="padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;width:160px;vertical-align:top;">' + esc(label) + '</td>'
-        + '<td style="padding:8px 12px;font-size:13px;color:#111;border-bottom:1px solid #eee;white-space:pre-wrap;">' + esc(value) + '</td></tr>'
-      : '';
-    const html =
-        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#111;">'
-      +   '<div style="border-bottom:3px solid #4C8EAB;padding-bottom:14px;margin-bottom:18px;">'
-      +     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999;">Bar Cop Support Message</div>'
-      +     '<div style="font-size:18px;font-weight:700;color:#111;margin-top:4px;">' + esc(r.subject || '(no subject)') + '</div>'
-      +     '<div style="font-size:12px;color:#4C8EAB;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;">' + esc(r.topic || 'Other') + '</div>'
-      +   '</div>'
-      +   '<table style="width:100%;border-collapse:collapse;">'
-      +     row('Message',         r.message)
-      +     row('Reporter Email',  r.user_email)
-      +     row('From Screen',     r.previous_screen)
-      +     row('Submitted',       new Date().toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }))
-      +   '</table>'
-      +   '<div style="margin-top:18px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px;">Reply directly to this email to respond to the user.</div>'
-      + '</div>';
-
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html, reply_to: r.user_email || undefined })
-    });
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error('Resend send failed:', resp.status, txt);
-      return res.json({ ok: false, emailed: false, reason: 'send_failed' });
-    }
-    res.json({ ok: true, emailed: true });
-  } catch (e) {
-    console.error('support-message-notify exception:', e);
-    res.json({ ok: false, emailed: false, reason: 'exception' });
-  }
-});
-
-// ── Invite user to an account (Phase 2 multi-user) ────────────────────────────
-// Admin sends an invite from App Settings → Team. Recipient gets a Supabase
-// magic-link email. When they sign up, the 24a trigger reads the metadata
-// (invited_to_account_id + invited_role) and links them to this account
-// instead of creating a new one for them.
-app.post('/api/invite-user', async (req, res) => {
-  try {
-    const { email, accountId, role, permissions } = req.body || {};
-    if (!email || !accountId) {
-      return res.status(400).json({ error: 'email and accountId required' });
-    }
-    // Permissions: optional JSON object { groupKey: 'add' | 'edit' } for staff role.
-    // Sanitized so only known levels are stored.
-    const cleanPerms = (permissions && typeof permissions === 'object')
-      ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'add' || v === 'edit')
-        )
-      : {};
-
-    // Verify the requester via their JWT (don't trust client-supplied user IDs)
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const inviterUserId = userData.user.id;
-
-    // Inviter must be an admin of the target account
-    const { data: membership, error: memberError } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', inviterUserId)
-      .single();
-
-    if (memberError || !membership || membership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can send invites' });
-    }
-
-    const validRoles = ['admin', 'staff', 'viewer'];
-    const inviteRole = validRoles.includes(role) ? role : 'staff';
-    const cleanEmail = String(email).toLowerCase().trim();
-
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      cleanEmail,
-      {
-        data: {
-          invited_to_account_id: accountId,
-          invited_role: inviteRole,
-          invited_permissions: cleanPerms
-        },
-        redirectTo: 'https://app.barcop.com/'
-      }
-    );
-
-    if (inviteError) {
-      // Common case: this person was previously invited/removed. Their auth
-      // row still exists, so Supabase refuses a new invite. Look up the
-      // existing user by email and add a membership row directly.
-      const errMsg = (inviteError.message || '').toLowerCase();
-      const isAlreadyRegistered = errMsg.includes('already') &&
-        (errMsg.includes('registered') || errMsg.includes('exists'));
-
-      if (isAlreadyRegistered) {
-        let existingUserId = null;
-        try {
-          const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-          const found = (usersData?.users || []).find(u => u.email && u.email.toLowerCase() === cleanEmail);
-          if (found) existingUserId = found.id;
-        } catch (e) {
-          console.error('listUsers fallback failed:', e);
-        }
-
-        if (!existingUserId) {
-          return res.status(500).json({ error: 'Email is already registered but the user record could not be located.' });
-        }
-
-        const { data: alreadyMember } = await supabaseAdmin
-          .from('memberships')
-          .select('id')
-          .eq('account_id', accountId)
-          .eq('user_id', existingUserId)
-          .maybeSingle();
-
-        if (alreadyMember) {
-          return res.status(400).json({ error: 'This person is already a member of this account.' });
-        }
-
-        const { error: insertError } = await supabaseAdmin
-          .from('memberships')
-          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: cleanPerms });
-
-        if (insertError) {
-          return res.status(500).json({ error: insertError.message });
-        }
-
-        // Also send a password recovery email so they can set (or reset) their
-        // password and sign in. Triggers the recovery flow in app.js which
-        // shows the set-password panel. Non-fatal if email send fails.
-        let emailSent = false;
-        try {
-          const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail, {
-            redirectTo: 'https://app.barcop.com/'
-          });
-          emailSent = !resetErr;
-          if (resetErr) console.error('Password reset email failed:', resetErr);
-        } catch (e) {
-          console.error('Password reset email exception:', e);
-        }
-
-        return res.json({ ok: true, email: cleanEmail, role: inviteRole, addedDirectly: true, emailSent });
-      }
-
-      console.error('Invite error:', inviteError);
-      return res.status(500).json({ error: inviteError.message || 'Invite failed' });
-    }
-
-    res.json({ ok: true, email: cleanEmail, role: inviteRole });
-  } catch (e) {
-    console.error('Invite exception:', e);
-    res.status(500).json({ error: e.message || 'Invite failed' });
-  }
-});
-
-// ── List members of an account (Phase 2 multi-user) ───────────────────────────
-// Returns every member of the account along with their email and role. Caller
-// must be a member of the account (any role) to see the list.
-app.post('/api/list-members', async (req, res) => {
-  try {
-    const { accountId } = req.body || {};
-    if (!accountId) return res.status(400).json({ error: 'accountId required' });
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership) {
-      return res.status(403).json({ error: 'Not a member of this account' });
-    }
-
-    const { data: memberships, error: listError } = await supabaseAdmin
-      .from('memberships')
-      .select('id, user_id, role, permissions, created_at')
-      .eq('account_id', accountId)
-      .order('created_at', { ascending: true });
-
-    if (listError) {
-      return res.status(500).json({ error: listError.message });
-    }
-
-    // Resolve emails via admin API
-    const members = [];
-    for (const m of memberships || []) {
-      try {
-        const { data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
-        members.push({
-          id: m.id,
-          user_id: m.user_id,
-          email: u?.user?.email || '(unknown)',
-          role: m.role,
-          permissions: m.permissions || {},
-          confirmed: !!u?.user?.confirmed_at,
-          created_at: m.created_at,
-          is_self: m.user_id === requesterUserId
-        });
-      } catch (e) {
-        members.push({
-          id: m.id,
-          user_id: m.user_id,
-          email: '(unknown)',
-          role: m.role,
-          permissions: m.permissions || {},
-          confirmed: false,
-          created_at: m.created_at,
-          is_self: m.user_id === requesterUserId
-        });
-      }
-    }
-
-    res.json({ ok: true, members, requesterRole: requesterMembership.role });
-  } catch (e) {
-    console.error('list-members exception:', e);
-    res.status(500).json({ error: e.message || 'List members failed' });
-  }
-});
-
-// ── Update a member's role (Phase 2 multi-user) ───────────────────────────────
-// Only admins can call. Cannot demote the last admin. Cannot change your own role.
-app.post('/api/update-member-role', async (req, res) => {
-  try {
-    const { accountId, membershipId, newRole } = req.body || {};
-    if (!accountId || !membershipId || !newRole) {
-      return res.status(400).json({ error: 'accountId, membershipId, newRole required' });
-    }
-    const validRoles = ['admin', 'staff', 'viewer'];
-    if (!validRoles.includes(newRole)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can change roles' });
-    }
-
-    const { data: target } = await supabaseAdmin
-      .from('memberships')
-      .select('id, user_id, role')
-      .eq('id', membershipId)
-      .eq('account_id', accountId)
-      .single();
-
-    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
-    if (target.user_id === requesterUserId) {
-      return res.status(400).json({ error: 'You cannot change your own role' });
-    }
-
-    // Last-admin protection: if demoting an admin, ensure another admin exists
-    if (target.role === 'admin' && newRole !== 'admin') {
-      const { count } = await supabaseAdmin
-        .from('memberships')
-        .select('id', { count: 'exact', head: true })
-        .eq('account_id', accountId)
-        .eq('role', 'admin');
-      if ((count || 0) <= 1) {
-        return res.status(400).json({ error: 'Cannot remove the last admin from this account' });
-      }
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('memberships')
-      .update({ role: newRole })
-      .eq('id', membershipId);
-
-    if (updateError) return res.status(500).json({ error: updateError.message });
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('update-member-role exception:', e);
-    res.status(500).json({ error: e.message || 'Update role failed' });
-  }
-});
-
-// ── Update a member's permissions (Phase 2 Item 25b) ──────────────────────────
-// Only admins can call. Permissions is a JSON object { groupKey: 'add' | 'edit' }.
-// Missing keys mean no access to that group.
-app.post('/api/update-member-permissions', async (req, res) => {
-  try {
-    const { accountId, membershipId, permissions } = req.body || {};
-    if (!accountId || !membershipId) {
-      return res.status(400).json({ error: 'accountId and membershipId required' });
-    }
-    const cleanPerms = (permissions && typeof permissions === 'object')
-      ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'add' || v === 'edit')
-        )
-      : {};
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can change permissions' });
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('memberships')
-      .update({ permissions: cleanPerms })
-      .eq('id', membershipId)
-      .eq('account_id', accountId);
-
-    if (updateError) return res.status(500).json({ error: updateError.message });
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('update-member-permissions exception:', e);
-    res.status(500).json({ error: e.message || 'Update permissions failed' });
-  }
-});
-
-// ── Remove a member from an account (Phase 2 multi-user) ──────────────────────
-// Only admins can call. Cannot remove the last admin. Cannot remove yourself.
-app.post('/api/remove-member', async (req, res) => {
-  try {
-    const { accountId, membershipId } = req.body || {};
-    if (!accountId || !membershipId) {
-      return res.status(400).json({ error: 'accountId and membershipId required' });
-    }
-
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.replace(/^Bearer\s+/, '');
-    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
-
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can remove members' });
-    }
-
-    const { data: target } = await supabaseAdmin
-      .from('memberships')
-      .select('id, user_id, role')
-      .eq('id', membershipId)
-      .eq('account_id', accountId)
-      .single();
-
-    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
-    if (target.user_id === requesterUserId) {
-      return res.status(400).json({ error: 'You cannot remove yourself' });
-    }
-
-    if (target.role === 'admin') {
-      const { count } = await supabaseAdmin
-        .from('memberships')
-        .select('id', { count: 'exact', head: true })
-        .eq('account_id', accountId)
-        .eq('role', 'admin');
-      if ((count || 0) <= 1) {
-        return res.status(400).json({ error: 'Cannot remove the last admin from this account' });
-      }
-    }
-
-    const { error: deleteError } = await supabaseAdmin
-      .from('memberships')
-      .delete()
-      .eq('id', membershipId);
-
-    if (deleteError) return res.status(500).json({ error: deleteError.message });
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('remove-member exception:', e);
-    res.status(500).json({ error: e.message || 'Remove member failed' });
-  }
-});
-
-// ── SPA fallback ──────────────────────────────────────────────────────────────
-app.get('*', (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-
-const server = app.listen(PORT, () => {
-  console.log('\n  Bar Cop Recovery\n  http://localhost:' + PORT + '\n');
-});
-server.timeout = 300000;
-server.headersTimeout = 310000;
+  console.log(`\n${tPass}/${tChecks.length} traffic checks passed`);
+}
