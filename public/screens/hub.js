@@ -66,11 +66,6 @@ S.Hub = {
     const wkOverdue = wkMods.filter(m => !m.current).map(m => m.name);
 
     // ── Key metrics ──
-    const invVar  = pW ? (pW.bar_variance || []).reduce((sum,v) => sum + (v.variance_dollar||0), 0) : null;
-    const recOpen = recs.length
-      ? recs.filter(r => { const d = daysSince(r.date); return d != null && d <= 30 && r.status && r.status !== 'OK'; }).length
-      : null;
-
     const band = (val, target, dir) => {
       if (val == null) return 'none';
       if (dir === 'low')  return val <= target ? 'good' : val <= target*1.1 ? 'warn' : 'bad';
@@ -133,29 +128,6 @@ S.Hub = {
     // never hidden behind a scrollbar. Overflow flagged in a small footer.
     const topItems = itemRows.slice(0, 8);
     const overflowItems = Math.max(0, itemRows.length - topItems.length);
-
-    // ── Last updated ──
-    const stamps = [];
-    [pWeeks,rWeeks,tWeeks].forEach(arr => arr.forEach(w => { if (w && w.saved_at) stamps.push(w.saved_at); }));
-    const prof = (data.traffic_settings || {}).profile || {};
-    ['gbp_reviewed_at','search_reviewed_at','web_reviewed_at','rev_reviewed_at','social_reviewed_at','delivery_reviewed_at','email_reviewed_at']
-      .forEach(k => { if (prof[k]) stamps.push(prof[k]); });
-    [pAudits,rAudits,tAudits].forEach(arr => arr.forEach(a => { if (a && a.date) stamps.push(a.date); }));
-    recs.forEach(r => { const ts = r && (r.saved_at || r.created_at); if (ts) stamps.push(ts); });
-
-    let lastStamp = null, lastT = -1;
-    stamps.forEach(str => {
-      const t = new Date(String(str).length<=10 ? str+'T00:00:00' : str).getTime();
-      if (!isNaN(t) && t > lastT) { lastT = t; lastStamp = str; }
-    });
-    let lastUpdatedTxt = 'No data entered yet';
-    if (lastStamp) {
-      const dateOnly = String(lastStamp).length <= 10;
-      const d = new Date(dateOnly ? lastStamp+'T00:00:00' : lastStamp);
-      const sameDay = d.toDateString() === new Date().toDateString();
-      const datePart = sameDay ? 'today' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      lastUpdatedTxt = 'Data last updated: ' + (dateOnly ? datePart : datePart + ' at ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}));
-    }
 
     const todayStr = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 
@@ -361,8 +333,8 @@ S.Hub = {
       const alertHead = '<div style="display:flex;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.35;">'
-        +   'metric' + (alerts.length===1?'':'s') + ' over target'
-        +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Address the worst-scoring first.</div>'
+        +   'item' + (alerts.length===1?'':'s') + ' to address'
+        +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Worst first.</div>'
         + '</div></div>';
       // Holding-the-line counter: metrics tracked minus metrics flagged as
       // alerts. Quiet positive counterpoint, fills the panel's empty space
@@ -713,7 +685,6 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app.sidebar-collapsed .sidebar-last-updated{display:none;}
         .hub-app .hd-metric{background:var(--panel);padding:8px 10px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
@@ -850,7 +821,18 @@ S.Hub = {
 
   },
 
-  _enter(screen, module) { App.showApp(module || 'profit'); App.navigate(screen); },
+  // Route from a Hub Dashboard click (alerts, tiles, PAI, readout). When
+  // module === 'hub', the screen value is a Hub-level screen key handled
+  // inline (no module shell); everything else routes to the module shell.
+  _enter(screen, module) {
+    if (module === 'hub') {
+      if (screen === 'permits' && S.HubPermits)              { S.HubPermits.open(); return; }
+      if (screen === 'operating-expenses' && S.HubOperatingExpenses) { S.HubOperatingExpenses.open(); return; }
+      if (screen === 'bar-cop-audit' && S.HubBarCopAudit)    { S.HubBarCopAudit.open(); return; }
+    }
+    App.showApp(module || 'profit');
+    App.navigate(screen);
+  },
 
   // Deep-link from the weekly readout into a module's Fix screen at a gap-area.
   _enterFix(module, gapId) {
@@ -1077,6 +1059,65 @@ S.Hub = {
         screen: 'cash-recon', mod: 'profit'
       });
     }
+
+    // 4b. Permits and licenses coming due — pulled from the Permits and
+    // Compliance log. Expired or due within 14 days = critical; within 30 = warn.
+    const permits = data.permits_compliance || [];
+    permits.forEach(p => {
+      if (!p || !p.renewal_date) return;
+      const d = new Date(String(p.renewal_date).length <= 10 ? p.renewal_date + 'T00:00:00' : p.renewal_date);
+      if (isNaN(d.getTime())) return;
+      const days = Math.floor((d.getTime() - Date.now()) / 86400000);
+      if (days < 0) {
+        out.push({
+          sev: 'bad',
+          text: (p.name || 'Permit') + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Renew before it costs a fine or shutdown.',
+          screen: 'permits', mod: 'hub'
+        });
+      } else if (days <= 14) {
+        out.push({
+          sev: 'bad',
+          text: (p.name || 'Permit') + ' renewal due in ' + days + ' day' + (days===1?'':'s') + '. Mark Renewed once paid so Books picks up the cost.',
+          screen: 'permits', mod: 'hub'
+        });
+      } else if (days <= 30) {
+        out.push({
+          sev: 'warn',
+          text: (p.name || 'Permit') + ' renewal due in ' + days + ' days. Get the check or card ready.',
+          screen: 'permits', mod: 'hub'
+        });
+      }
+    });
+
+    // 4c. Staff certifications expiring soon — pulled from Labor Control's
+    // certifications log. Expired or due within 14 days = critical; within 30 = warn.
+    const certs = (App.laborData && App.laborData.lc_certs) || [];
+    certs.forEach(c => {
+      if (!c || !c.expiration_date) return;
+      const d = new Date(String(c.expiration_date).length <= 10 ? c.expiration_date + 'T00:00:00' : c.expiration_date);
+      if (isNaN(d.getTime())) return;
+      const days = Math.floor((d.getTime() - Date.now()) / 86400000);
+      const certLabel = (c.cert_name || c.name || 'Certification') + (c.staff_name ? ' for ' + c.staff_name : '');
+      if (days < 0) {
+        out.push({
+          sev: 'bad',
+          text: certLabel + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Compliance gap until renewed.',
+          screen: 'lc-staff-roster', mod: 'labor'
+        });
+      } else if (days <= 14) {
+        out.push({
+          sev: 'bad',
+          text: certLabel + ' expires in ' + days + ' day' + (days===1?'':'s') + '. Schedule renewal now.',
+          screen: 'lc-staff-roster', mod: 'labor'
+        });
+      } else if (days <= 30) {
+        out.push({
+          sev: 'warn',
+          text: certLabel + ' expires in ' + days + ' days. Renewal window opens soon.',
+          screen: 'lc-staff-roster', mod: 'labor'
+        });
+      }
+    });
 
     // 5. Vendor price re-drift — fresh price increases in recent deliveries
     const dels = (App.inventoryData || {}).ic_deliveries || [];
