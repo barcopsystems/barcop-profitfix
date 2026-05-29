@@ -99,10 +99,6 @@ S.HubSettings = {
       + '</div>';
   },
 
-  secInventory() {
-    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Inventory Control has no platform-level preferences. Counting locations, vendors, and par levels are set inside the Inventory Control module, on each product and location.</div>';
-  },
-
   // Operation Links — operator's public URLs for each digital platform. The
   // Traffic Audit fetches public data from these (where possible) and Recovery
   // screens use them for "Open Live" click-throughs to the operator's actual
@@ -142,10 +138,6 @@ S.HubSettings = {
   // own Setup section (Cash Tolerances) so all Control setup stays with the
   // module it controls. Hub Settings keeps only genuinely cross-system fields.
 
-  secNotifications() {
-    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Alerts surface automatically on the Hub: metric breaches, forward-looking warnings, and Traffic activity reminders. There are no notification toggles to configure yet. When email or push delivery is added, its controls will live here.</div>';
-  },
-
   // ── Wiring ──────────────────────────────────────────────────────────────────
   wire(container) {
     container.querySelectorAll('.hs-save').forEach(btn => {
@@ -181,7 +173,6 @@ S.HubSettings = {
         food_labor_cost_pct:numOr('hs-fl', 30),
         prime_cost_pct:     numOr('hs-pc', 60)
       });
-      s._targets_saved = true;
       keys.push('settings');
     } else if (which === 'revenue') {
       const rs = App.data.revenue_settings = App.data.revenue_settings || {};
@@ -195,7 +186,6 @@ S.HubSettings = {
         rplh_bar:          numOr('hs-r-rb', 65),
         event_close_rate:  numOr('hs-r-ec', 40)
       });
-      rs._targets_saved = true;
       keys.push('revenue_settings');
     } else if (which === 'traffic') {
       const ts = App.data.traffic_settings = App.data.traffic_settings || {};
@@ -206,7 +196,6 @@ S.HubSettings = {
         monthly_sessions:   numOr('hs-t-ms', 2000),
         social_posts_month: numOr('hs-t-sp', 12)
       });
-      ts._targets_saved = true;
       keys.push('traffic_settings');
     } else if (which === 'links') {
       const ts = App.data.traffic_settings = App.data.traffic_settings || {};
@@ -783,7 +772,6 @@ S.HubSettings = {
     App.data.revenue_settings = App.data.revenue_settings || {};
     App.data.revenue_settings.targets = { check_avg:35, bar_labor_pct:28, kitchen_labor_pct:30,
       floor_labor_pct:32, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
-    App.data.revenue_settings._targets_saved = true;
 
     // Four servers carry the floor. Each week's covers split by these weights,
     // with the top server running a higher check average than the bottom.
@@ -956,7 +944,6 @@ S.HubSettings = {
     App.data.traffic_settings = App.data.traffic_settings || {};
     App.data.traffic_settings.targets = { google_rating:4.3, review_velocity:8,
       response_rate:75, monthly_sessions:2000, social_posts_month:12 };
-    App.data.traffic_settings._targets_saved = true;
     App.data.traffic_settings.profile = {
       // GBP scorecard
       gbp_claimed:true, gbp_hours:true, gbp_phone:true, gbp_website:true,
@@ -1225,7 +1212,7 @@ S.HubSettings = {
         S4_TOOL:'Audit citations quarterly and add new ones as new directories appear.',
         S5_SCORE:66, S5_IG_FOLLOWERS:2600, S5_IG_POSTS_LAST_30:14, S5_IG_POSTS_BENCHMARK:12,
         S5_FB_FOLLOWERS:1240, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:0,
-        S5_NARRATIVE:'Follower growth has compounded. Posting frequency is above benchmark with a balanced mix.',
+        S5_NARRATIVE:'Follower growth has accelerated. Posting frequency is above benchmark with a balanced mix.',
         S5_FINDING:'IG engagement rate is up to 2.4%. Reels are now in rotation.',
         S5_TOOL:'Add one staff-introduction post a month to deepen the human side.',
         S6_SCORE:68, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
@@ -2014,7 +2001,7 @@ S.HubSettings = {
     const defaults = DB._defaultData();
     App.data = {
       ...defaults,
-      settings: { ...s, onboarding_complete:true, _targets_saved:false }
+      settings: { ...s, onboarding_complete:true }
     };
     // Clear the three Control stores too — Inventory, Labor, and Shift.
     App.inventoryData = {};
