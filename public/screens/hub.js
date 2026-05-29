@@ -724,6 +724,7 @@ S.Hub = {
             </button>
             <button class="sidebar-mobile-close" id="hub-sidebar-mobile-close" aria-label="Close sidebar" type="button">&times;</button>
           </div>
+          <div class="sidebar-multi-loc" id="hub-sidebar-multi-loc"></div>
           <nav class="sidebar-nav">${sidebarNav}</nav>
           <div class="sidebar-footer">
             <button class="sidebar-btn" id="hub-signout">
