@@ -71,9 +71,10 @@ app.post('/api/generate-profit-audit', (req, res) => {
     if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
 
     const appDataStr = fields.appData?.[0] || '{}';
-    const notes      = fields.notes?.[0]   || '';
     let appData = {};
     try { appData = JSON.parse(appDataStr); } catch(e) {}
+    let practices = {};
+    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
 
     const uploadedFiles = [];
     for (const [key, fileArr] of Object.entries(files)) {
@@ -86,7 +87,7 @@ app.post('/api/generate-profit-audit', (req, res) => {
     try { controlData = JSON.parse(fields.controlData?.[0] || 'null'); } catch(e) {}
 
     try {
-      const auditData = await generateProfitAudit(apiKey, uploadedFiles, appData, notes, controlData);
+      const auditData = await generateProfitAudit(apiKey, uploadedFiles, appData, practices, controlData);
       res.json({ ok: true, auditData });
     } catch(e) {
       console.error('Profit audit error:', e);
@@ -106,25 +107,28 @@ app.post('/api/generate-profit-audit', (req, res) => {
       operator-voice prose, echoing the numbers, never recomputing.
    4. MERGE: computed numbers overwrite anything the model returned, so code's
       figures are always authoritative. See memory: audit-honesty-rebuild. */
-async function generateProfitAudit(apiKey, files, appData, notes, controlData) {
-  const extracted = await extractProfitInputs(apiKey, files, notes);
+async function generateProfitAudit(apiKey, files, appData, practices, controlData) {
+  const extracted = await extractProfitInputs(apiKey, files);
+  // Operator-stated practices are authoritative over anything the model read
+  // from a file — the operator knows whether they jigger or count inventory.
+  Object.assign(extracted, practices || {});
   const numbers = computeProfitAudit(appData, controlData, extracted);
   // Stamp identifiers code owns (not the model).
   numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
   numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateProfitNarrative(apiKey, numbers, notes);
+  const prose = await generateProfitNarrative(apiKey, numbers);
   // Computed numbers win over anything the model echoed back.
   return Object.assign({}, prose, numbers);
 }
 
 /* Extraction pass — returns observed input metrics from uploaded files only.
    Returns {} when no files (the common case: data already in app/Control). */
-async function extractProfitInputs(apiKey, files, notes) {
+async function extractProfitInputs(apiKey, files) {
   const fileContent = buildFileContent(files);
   if (fileContent.length === 0) return {};
   const instruction = `You are reading uploaded operator documents (a P&L or sales summary, a voids/comps/cash report, invoices, a recipe costing sheet, inventory counts) for a bar and restaurant profit audit. Extract ONLY the raw values you can actually see in the documents. Report dollar amounts as plain numbers and percentages as plain numbers (e.g. 27.4 not "27.4%"). Do NOT calculate ratios or scores yourself — if a report shows revenue and COGS dollars but not a cost %, return the dollars and leave the % null; the system computes the ratio. Respond with a single JSON object, no other text. Use null for anything not present. Fields:
 {"audit_period":[the month or date range the data covers, e.g. "April 2026", or null],"bar_revenue_monthly":[total bar/beverage revenue for the period or null],"food_revenue_monthly":[total food revenue for the period or null],"bar_cogs_monthly":[bar/beverage cost of goods in dollars or null],"food_cogs_monthly":[food cost of goods in dollars or null],"bar_cost_pct":[only if the report states it directly, else null],"food_cost_pct":[only if stated directly, else null],"labor_cost_monthly":[total labor cost for the period or null],"pour_method":["Free pour" / "Jiggered" / "Measured" or null],"inv_variance_pct":[number or null],"void_comp_pct":[voids+comps as % of sales if stated, else null],"voids_total":[voids+comps dollars if shown, else null],"voids_no_approval_pct":[number or null],"void_approval":[true if a manager-approval policy is evidenced, else null],"cash_recon_count":[number of drawer reconciliations shown or null],"cash_short_count":[number of shifts that came up short or null],"food_var_pct":[number or null],"inv_freq":["Weekly" / "Monthly" / "Never" or null],"waste_log":["Yes" or null],"bev_invoice_count":[integer or null],"food_invoice_count":[integer or null],"invoice_vs_po":["Matched every delivery" / "Spot checked" / "Never matched" or null],"backup_vendors":[text or null],"recipe_count":[number of costed recipes shown or null],"rplh_tracked":["Yes" or null]}`;
-  const content = fileContent.concat([{ type: 'text', text: (notes ? 'OPERATOR NOTES:\n' + notes + '\n\n' : '') + instruction }]);
+  const content = fileContent.concat([{ type: 'text', text: instruction }]);
   try {
     return await callClaudeForJSON(apiKey, content, 1500);
   } catch (e) {
@@ -134,12 +138,12 @@ async function extractProfitInputs(apiKey, files, notes) {
 }
 
 /* Narrative pass — the model writes prose around the code-computed numbers. */
-async function generateProfitNarrative(apiKey, d, notes) {
+async function generateProfitNarrative(apiKey, d) {
   const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a profit audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Write in plain operator voice. No emdashes (use a period or comma). Avoid the words "leverage", "compounds", "robust", "seamless". Respond with a single JSON object, no other text, with exactly these prose fields (reference the given numbers verbatim where relevant):
 {"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
 
 COMPUTED NUMBERS (final):
-${JSON.stringify(d, null, 1)}${notes ? '\n\nOPERATOR NOTES (for context):\n' + notes : ''}`;
+${JSON.stringify(d, null, 1)}`;
   try {
     return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
   } catch (e) {
