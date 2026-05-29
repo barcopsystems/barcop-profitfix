@@ -567,7 +567,219 @@ function computeRevenueAudit(appData, controlData, extracted) {
   };
 }
 
-module.exports = { computeProfitAudit, computeRevenueAudit };
+/* computeTrafficAudit(appData, controlData, extracted, urlData)
+   Seven sections of digital presence. NO dollar figures anywhere — gaps are
+   real deficits ("response rate 42% vs 75%", "8 posts vs 12 benchmark").
+   Sources, in priority: live URL reads (urlData: PageSpeed website, Places
+   Google rating/reviews, Yelp) > screenshot-extracted values (extracted) >
+   the operator's weekly traffic metrics (traffic_weeks). A section with no
+   data is N/A (null) and excluded from the overall. Benchmarks are internal
+   Bar Cop benchmarks, never "industry average." */
+function computeTrafficAudit(appData, controlData, extracted, urlData) {
+  appData = appData || {}; extracted = extracted || {}; urlData = urlData || {};
+  const settings = appData.settings || {};
+  const ts = appData.traffic_settings || {};
+  const tgt = ts.targets || {};
+  const weeks = (appData.traffic_weeks || []).slice(-4);
+  const wk = (fn) => avg(weeks.map(fn));
+  const web = urlData.website || {};
+  const gbp = urlData.gbp || {};
+  const yelp = urlData.yelp || {};
+
+  // Benchmarks (internal Bar Cop benchmarks; operator targets override).
+  const B = {
+    google_rating: num(tgt.google_rating) != null ? tgt.google_rating : 4.3,
+    review_count: 200, response_rate: num(tgt.response_rate) != null ? tgt.response_rate : 75,
+    sessions: num(tgt.monthly_sessions) != null ? tgt.monthly_sessions : 2000, bounce: 60,
+    gbp_posts: 8, photos: 100, ig_posts: 12, list_size: 500, open_rate: 35, recency_days: 7
+  };
+  const band = (good, mid, ok) => good ? 85 : mid ? 60 : ok ? 45 : 30;   // helper
+
+  // ── S1 — Google Business Profile / Listing ──
+  const haveGbp = gbp.rating != null || extracted.listing_claimed != null || extracted.photo_count != null || extracted.profile_completeness != null;
+  let s1 = null, s1Photos = num(extracted.photo_count), s1Posts = num(extracted.posts_last_30), s1Complete = num(extracted.profile_completeness);
+  if (haveGbp) {
+    let pts = 0, max = 0;
+    const boolPts = (v, w) => { max += w; if (v === true) pts += w; };
+    boolPts(extracted.listing_claimed, 25);
+    boolPts(extracted.hours_complete, 15);
+    boolPts(extracted.website_linked, 15);
+    boolPts(extracted.menu_link_active, 10);
+    if (s1Photos != null) { max += 20; pts += Math.min(20, (s1Photos / B.photos) * 20); }
+    if (s1Posts != null) { max += 15; pts += Math.min(15, (s1Posts / B.gbp_posts) * 15); }
+    s1 = max > 0 ? clampScore((pts / max) * 100) : null;
+    if (s1Complete == null && max > 0) s1Complete = round0((pts / max) * 100);
+  }
+
+  // ── S2 — Website ──
+  const sessions = num(extracted.monthly_sessions) != null ? num(extracted.monthly_sessions) : round0(wk(w => w.monthly_sessions));
+  const bounce = num(extracted.bounce_rate) != null ? num(extracted.bounce_rate) : round1(wk(w => w.bounce_rate));
+  const perf = num(web.performance);
+  const haveWeb = perf != null || sessions != null || extracted.mobile_optimized != null;
+  let s2 = null;
+  if (haveWeb) {
+    let pts = 0, max = 0;
+    if (perf != null) { max += 40; pts += (perf / 100) * 40; }            // PageSpeed mobile performance
+    else if (extracted.mobile_optimized != null) { max += 40; pts += extracted.mobile_optimized === true ? 40 : 10; }
+    if (sessions != null) { max += 35; pts += Math.min(35, (sessions / B.sessions) * 35); }
+    if (bounce != null) { max += 25; pts += Math.max(0, Math.min(25, ((B.bounce - bounce) / B.bounce + 1) * 12.5)); }
+    s2 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
+
+  // ── S3 — Reviews ──
+  const gRating = round1(gbp.rating != null ? gbp.rating : (num(extracted.google_rating) != null ? num(extracted.google_rating) : wk(w => w.google_rating)));
+  const gCount = round0(gbp.review_count != null ? gbp.review_count : num(extracted.google_review_count));
+  const respRate = round0(num(extracted.response_rate) != null ? num(extracted.response_rate) : wk(w => w.response_rate));
+  const haveReviews = gRating != null || respRate != null;
+  let s3 = null;
+  if (haveReviews) {
+    let pts = 0, max = 0;
+    if (gRating != null) { max += 45; pts += Math.min(45, (gRating / B.google_rating) * 45); }
+    if (respRate != null) { max += 35; pts += Math.min(35, (respRate / B.response_rate) * 35); }
+    if (gCount != null) { max += 20; pts += Math.min(20, (gCount / B.review_count) * 20); }
+    s3 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
+
+  // ── S4 — Search and SEO ──
+  const haveSeo = extracted.maps_pack != null || extracted.nap_consistent != null;
+  let s4 = null;
+  if (haveSeo) {
+    let pts = 0, max = 0;
+    const bp = (v, w) => { max += w; if (v === true) pts += w; };
+    bp(extracted.maps_pack, 50);
+    bp(extracted.nap_consistent, 50);
+    s4 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
+
+  // ── S5 — Social Media ──
+  const igPosts = num(extracted.ig_posts_last_30) != null ? num(extracted.ig_posts_last_30) : round0(wk(w => w.social_posts_month));
+  const igFollowers = num(extracted.ig_followers);
+  const haveSocial = igPosts != null || igFollowers != null;
+  let s5 = null;
+  if (haveSocial) {
+    let pts = 0, max = 0;
+    if (igPosts != null) { max += 60; pts += Math.min(60, (igPosts / B.ig_posts) * 60); }
+    if (igFollowers != null) { max += 40; pts += igFollowers > 0 ? 40 : 0; }
+    s5 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
+
+  // ── S6 — Delivery Platforms ──
+  const ddActive = extracted.doordash_active, ueActive = extracted.ubereats_active, ghActive = extracted.grubhub_active;
+  const haveDelivery = ddActive != null || ueActive != null || ghActive != null;
+  let s6 = null, platformCount = 0;
+  if (haveDelivery) {
+    [ddActive, ueActive, ghActive].forEach(a => { if (a === true) platformCount++; });
+    let pts = platformCount * 25;            // up to 75 for 3 platforms
+    if (extracted.menu_complete === true) pts += 12;
+    if (extracted.promo_active === true) pts += 13;
+    s6 = clampScore(Math.min(100, pts) || 30);
+  }
+
+  // ── S7 — Email and Loyalty ──
+  const listSize = num(extracted.list_size) != null ? num(extracted.list_size) : round0(wk(w => w.email_list_size));
+  const openRate = num(extracted.open_rate) != null ? num(extracted.open_rate) : round1(wk(w => w.email_open_rate));
+  const haveEmail = extracted.email_list_exists != null || listSize != null || openRate != null;
+  let s7 = null;
+  if (haveEmail) {
+    let pts = 0, max = 0;
+    if (extracted.email_list_exists != null || listSize != null) {
+      max += 20; if (extracted.email_list_exists === true || listSize > 0) pts += 20;
+    }
+    if (listSize != null) { max += 30; pts += Math.min(30, (listSize / B.list_size) * 30); }
+    if (openRate != null) { max += 35; pts += Math.min(35, (openRate / B.open_rate) * 35); }
+    if (extracted.growth_mechanism != null) { max += 15; if (extracted.growth_mechanism === true) pts += 15; }
+    s7 = max > 0 ? clampScore((pts / max) * 100) : null;
+  }
+
+  const overall = clampScore(avg([s1, s2, s3, s4, s5, s6, s7]));
+
+  // Deficit-based action items — NO dollars, real gaps vs benchmark.
+  const items = [];
+  if (respRate != null && respRate < B.response_rate) items.push({ action: 'Reply to reviews. Response rate ' + respRate + '% versus the ' + B.response_rate + '% benchmark.', gap_id: 'reviews' });
+  if (gRating != null && gRating < B.google_rating) items.push({ action: 'Lift your Google rating from ' + gRating + ' toward ' + B.google_rating + '.', gap_id: 'reviews' });
+  if (s1Posts != null && s1Posts < B.gbp_posts) items.push({ action: 'Post to Google Business Profile more. ' + s1Posts + ' posts in 30 days versus ' + B.gbp_posts + '.', gap_id: 'gbp' });
+  if (sessions != null && sessions < B.sessions) items.push({ action: 'Grow website traffic. ' + Math.round(sessions) + ' monthly sessions versus the ' + B.sessions + ' benchmark.', gap_id: 'website' });
+  if (igPosts != null && igPosts < B.ig_posts) items.push({ action: 'Post to Instagram more often. ' + igPosts + ' posts in 30 days versus ' + B.ig_posts + '.', gap_id: 'social' });
+  if (openRate != null && openRate < B.open_rate) items.push({ action: 'Improve email open rate. ' + openRate + '% versus the ' + B.open_rate + '% benchmark.', gap_id: 'email-loyalty' });
+  if (listSize != null && listSize < B.list_size) items.push({ action: 'Grow the email list. ' + Math.round(listSize) + ' subscribers versus ' + B.list_size + '.', gap_id: 'email-loyalty' });
+
+  const dataTier = (gbp.rating != null || web.performance != null || yelp.rating != null) ? 'Verified — live link data'
+    : (weeks.length ? 'Standard — weekly data entered' : 'Baseline — uploaded data');
+
+  const yn = (v) => v === true ? true : v === false ? false : null;
+  return {
+    BAR_NAME: settings.bar_name || '',
+    BAR_CITY_STATE: settings.city_state || '',
+    AUDIT_PERIOD: extracted.audit_period || 'Current digital presence',
+    DATA_TIER_LABEL: dataTier,
+    OVERALL_SCORE: overall,
+    INDUSTRY_AVG: 58,         // internal Bar Cop benchmark (relabeled in client)
+    TARGET_SCORE: 65,
+
+    S1_SCORE: s1,
+    S1_LISTING_CLAIMED: yn(extracted.listing_claimed),
+    S1_HOURS_COMPLETE: yn(extracted.hours_complete),
+    S1_WEBSITE_LINKED: yn(extracted.website_linked),
+    S1_MENU_LINK_ACTIVE: yn(extracted.menu_link_active),
+    S1_PHOTO_COUNT: s1Photos, S1_PHOTO_BENCHMARK: B.photos,
+    S1_POSTS_LAST_30_DAYS: s1Posts, S1_POSTS_BENCHMARK: B.gbp_posts,
+    S1_PROFILE_COMPLETENESS_PCT: s1Complete,
+    S1_MONTHLY_GAP: 0,        // Traffic carries no dollar gaps
+
+    S2_SCORE: s2,
+    S2_MOBILE_OPTIMIZED: perf != null ? (perf >= 50) : yn(extracted.mobile_optimized),
+    S2_MONTHLY_SESSIONS: sessions, S2_SESSIONS_BENCHMARK: B.sessions,
+    S2_BOUNCE_RATE: bounce, S2_BOUNCE_BENCHMARK: B.bounce,
+    S2_MENU_PAGE_IN_TOP_3: yn(extracted.menu_page_top3),
+    S2_ONLINE_ORDERING_PRESENT: yn(extracted.online_ordering),
+    S2_MONTHLY_GAP: 0,
+
+    S3_SCORE: s3,
+    S3_GOOGLE_RATING: gRating, S3_GOOGLE_RATING_BENCHMARK: B.google_rating,
+    S3_GOOGLE_REVIEW_COUNT: gCount,
+    S3_RESPONSE_RATE: respRate, S3_RESPONSE_BENCHMARK: B.response_rate,
+    S3_YELP_RATING: round1(yelp.rating != null ? yelp.rating : num(extracted.yelp_rating)),
+    S3_MOST_RECENT_REVIEW_DAYS: num(extracted.most_recent_review_days),
+    S3_UNANSWERED: num(extracted.unanswered),
+    S3_NEGATIVE_PATTERN: extracted.negative_pattern || null,
+    S3_MONTHLY_GAP: 0,
+
+    S4_SCORE: s4,
+    S4_MAPS_PACK_CONFIRMED: yn(extracted.maps_pack),
+    S4_NAP_CONSISTENT: yn(extracted.nap_consistent),
+    S4_NAP_BUSINESS_NAME: settings.bar_name || '',
+    S4_PRIMARY_KEYWORD: extracted.primary_keyword || null,
+
+    S5_SCORE: s5,
+    S5_IG_FOLLOWERS: igFollowers,
+    S5_IG_POSTS_LAST_30: igPosts, S5_IG_POSTS_BENCHMARK: B.ig_posts,
+    S5_FB_FOLLOWERS: num(extracted.fb_followers),
+    S5_CONTENT_TYPE: extracted.content_type || null,
+    S5_MONTHLY_GAP: 0,
+
+    S6_SCORE: s6,
+    S6_DOORDASH_ACTIVE: yn(ddActive), S6_UBEREATS_ACTIVE: yn(ueActive), S6_GRUBHUB_ACTIVE: yn(ghActive),
+    S6_DOORDASH_RATING: round1(num(extracted.doordash_rating)),
+    S6_UBEREATS_RATING: round1(num(extracted.ubereats_rating)),
+    S6_PHOTO_COUNT_DELIVERY: num(extracted.photo_count_delivery),
+    S6_MENU_COMPLETE: yn(extracted.menu_complete),
+    S6_PROMO_ACTIVE: yn(extracted.promo_active),
+    S6_MONTHLY_GAP: 0,
+
+    S7_SCORE: s7,
+    S7_EMAIL_LIST_EXISTS: yn(extracted.email_list_exists),
+    S7_LIST_SIZE: listSize, S7_LIST_BENCHMARK: B.list_size,
+    S7_OPEN_RATE: openRate, S7_OPEN_BENCHMARK: B.open_rate,
+    S7_SEND_FREQUENCY: extracted.send_frequency || null,
+    S7_LAST_SEND_DAYS_AGO: num(extracted.last_send_days),
+    S7_GROWTH_MECHANISM: yn(extracted.growth_mechanism),
+    S7_LOYALTY_PROGRAM: yn(extracted.loyalty),
+
+    action_items: items     // deficit-based, no dollar impact
+  };
+}
+
+module.exports = { computeProfitAudit, computeRevenueAudit, computeTrafficAudit };
 
 // ── Self-test: node server/audit-compute.js ───────────────────────────────────
 if (require.main === module) {
@@ -742,4 +954,37 @@ if (require.main === module) {
     console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
   console.log(`\n${rPass}/${rChecks.length} revenue checks passed`);
+
+  // ── Traffic audit ───────────────────────────────────────────────────────────
+  console.log('\n--- Traffic audit ---');
+  // Live link data + a couple screenshots; no dollars anywhere.
+  const traf = computeTrafficAudit(
+    { settings: { bar_name: 'The Anchor Bar & Kitchen' }, traffic_settings: { targets: {} },
+      traffic_weeks: [{ google_rating: 4.1, response_rate: 45, monthly_sessions: 1400, bounce_rate: 62, social_posts_month: 6, email_list_size: 320, email_open_rate: 28 }] },
+    null,
+    { listing_claimed: true, hours_complete: true, website_linked: true, menu_link_active: true, photo_count: 60, posts_last_30: 4,
+      maps_pack: true, nap_consistent: true, ig_posts_last_30: 6, ig_followers: 1200 },
+    { website: { performance: 70 }, gbp: { rating: 4.1, review_count: 130 }, yelp: { rating: 4.0 } }
+  );
+  const tChecks = [
+    ['Traffic OVERALL 1-100', traf.OVERALL_SCORE >= 1 && traf.OVERALL_SCORE <= 100, true],
+    ['Traffic uses live Google rating', traf.S3_GOOGLE_RATING, 4.1],
+    ['Traffic uses live review count', traf.S3_GOOGLE_REVIEW_COUNT, 130],
+    ['Traffic website score from PageSpeed', traf.S2_SCORE > 0, true],
+    ['Traffic carries NO dollar gap (S1)', traf.S1_MONTHLY_GAP, 0],
+    ['Traffic carries NO weekly dollar', traf.WEEKLY_GAP_AMT, undefined],
+    ['Traffic benchmark is internal (58), not industry', traf.INDUSTRY_AVG, 58],
+    ['Traffic reviews scored (have rating+response)', traf.S3_SCORE > 0, true]
+  ];
+  // Section with no data is N/A: no delivery, no email signals -> null.
+  const trafThin = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { listing_claimed: true, photo_count: 40 }, {});
+  tChecks.push(['Traffic delivery N/A when no data', trafThin.S6_SCORE, null]);
+  tChecks.push(['Traffic email N/A when no data', trafThin.S7_SCORE, null]);
+  tChecks.push(['Traffic GBP scored from screenshot data', trafThin.S1_SCORE > 0, true]);
+  let tPass = 0;
+  for (const [label, got, exp] of tChecks) {
+    const ok = got === exp; if (ok) tPass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
+  }
+  console.log(`\n${tPass}/${tChecks.length} traffic checks passed`);
 }
