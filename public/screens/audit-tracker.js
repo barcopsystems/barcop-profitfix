@@ -633,7 +633,10 @@ S.AuditTracker = {
     const revInput = (id, ph, val) => '<div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div>';
 
     const revCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">'
+      +   '<div style="font-size:16px;font-weight:800;color:var(--t1);">Annual Revenue</div>'
+      +   '<button class="btn btn-ghost btn-sm" id="at-how-btn">How this works</button>'
+      + '</div>'
       + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual revenue. This sets the dollar baselines for every gap in the audit. Enter at least one figure. Run a bar with no kitchen? Leave Food Revenue blank and the food sections are simply left out.</div>'
       + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
       + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Bar Revenue') + revInput('at-iz-bar-rev', '618000', d.barRev) + '</div>'
@@ -642,7 +645,7 @@ S.AuditTracker = {
 
     const uploadCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Add any reports to cover what the checklist above does not, or to add deeper per-item detail. Accepts PDF, Excel, CSV, or images.</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Add a report here to score a section Bar Cop cannot see yet, or for deeper per-item detail. Accepts PDF, Excel, CSV, or images.</div>'
       + this.renderFileSection('optional',  'Profit and Loss or Monthly Sales Summary', 'at-f-pl',     'at-pl',     'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report)')
       + this.renderFileSection('optional',  'Voids, Comps and Cash Report',             'at-f-loss',   'at-loss',   'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance)')
       + this.renderFileSection('optional',  'Invoices and Vendor Pricing',              'at-f-vendor', 'at-vendor', 'Scores Vendor Control (invoice matching, price drift)')
@@ -686,6 +689,12 @@ S.AuditTracker = {
 
     this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
 
+    document.getElementById('at-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Profit Audit Works', [
+      { p: ['The Profit Audit scores five areas: Bar Cost, Theft and Loss, Food Cost, Vendor Control, and Prime Cost. It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
+      { h: 'What Bar Cop already has', p: ['If you run the Inventory, Shift, and Labor Control systems, those numbers feed the audit automatically as verified ground truth. A brand-new operation has none yet, so this first audit reads from what you enter and upload.'] },
+      { h: 'The steps', p: ['1. Enter your annual revenue (the dollar baseline). A bar with no kitchen leaves Food blank.', '2. Upload any reports that cover a section Bar Cop cannot see yet (a P&L covers Bar, Food, and Prime in one file).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in as you log more.'] },
+      { h: 'The honest rule', p: ['Every score and dollar figure is computed in code from your real numbers, the same every time. A section with no data is left out, never guessed.'] }
+    ]));
     document.getElementById('at-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('at-iz-submit')?.addEventListener('click', () => {
       const barRev = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
