@@ -146,15 +146,16 @@ S.HubYearEnd = {
       XLSX.utils.book_append_sheet(wb, this._buildAuditHistory(year),      'Audit History');
       XLSX.utils.book_append_sheet(wb, this._buildOperationalEvents(year), 'Operational Events');
 
+      const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
       wb.Props = {
-        Title:        'Bar Cop Year-End Review, ' + year,
+        Title:        barName + ' - Year-End Review, ' + year,
         Subject:      App.deliverableFooter().workbookSubject,
-        Author:       (App.data?.settings?.bar_name) || 'Bar Cop',
+        Author:       barName,
         Company:      'Bar Cop',
         CreatedDate:  new Date()
       };
 
-      const filename = 'Bar Cop Year-End Review - ' + year + '.xlsx';
+      const filename = barName + ' - Year-End Review - ' + year + '.xlsx';
       XLSX.writeFile(wb, filename);
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
     } catch (e) {
