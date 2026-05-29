@@ -1490,6 +1490,29 @@ const App = {
     { key: 'email_platform', label: 'Email Platform',  urlKey: 'email_platform', placeholder: 'https://mailchimp.com or your tool' }
   ],
 
+  // Reusable "How this works" modal. sections = [{ h:'Header', p:['para', ...] }].
+  // A section with no h is intro paragraphs. Keeps step/explainer text off the
+  // page itself (see memory: how-this-works-pattern).
+  showHelpModal(title, sections) {
+    const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
+    const pp = t => '<p style="margin:0 0 10px;">' + t + '</p>';
+    let body = '';
+    (sections || []).forEach(s => { if (s.h) body += sh(s.h); (s.p || []).forEach(t => { body += pp(t); }); });
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
+    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
+      + '<button class="btn btn-ghost btn-sm" data-help-close>Close</button></div>'
+      + '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">' + body + '</div>';
+    m.appendChild(box);
+    const close = () => m.remove();
+    m.addEventListener('click', e => { if (e.target === m) close(); });
+    box.querySelector('[data-help-close]').addEventListener('click', close);
+    document.body.appendChild(m);
+  },
+
   // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
   // and the average-rating math in t-reports + t-dashboard. Key prefix maps to
   // the per-platform fields in traffic_weeks (dd_active, dd_rating, etc.) and
