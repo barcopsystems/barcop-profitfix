@@ -569,10 +569,16 @@ S.TrafficAudit = {
     const chip = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;margin:0 6px 6px 0;'
       + (c.ok ? 'background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);color:var(--t1);font-weight:700;' : 'background:var(--input);border:1px solid var(--b2);color:var(--t3);') + '">'
       + (c.ok ? '<span style="color:var(--gold);font-weight:800;">&#10003;</span>' : '<span style="color:var(--t4);font-weight:800;">&middot;</span>') + esc(c.label) + '</span>';
-    const controlCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">What Bar Cop already has</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">From your weekly traffic numbers. Your links below add live data; screenshots fill anything links cannot reach.</div>'
-      + '<div>' + checks.map(chip).join('') + '</div></div>';
+    // Only claim "already has" when weekly traffic numbers actually exist.
+    // Unlike the Control modules, Bar Cop does not auto-collect this — it only
+    // has what the operator logged in This Week.
+    const haveWeekly = checks.some(c => c.ok);
+    const controlCard = haveWeekly
+      ? '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">From your weekly traffic numbers</div>'
+        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">These come from what you logged in This Week. Your links below add live data; screenshots fill anything links cannot reach.</div>'
+        + '<div>' + checks.filter(c => c.ok).map(chip).join('') + '</div></div>'
+      : '<div class="card" style="margin-bottom:16px;"><div style="font-size:12px;color:var(--t2);line-height:1.6;">No weekly traffic numbers logged yet, so this audit reads entirely from the links and screenshots below. As you log weekly traffic in This Week, those numbers feed future audits automatically.</div></div>';
 
     // Inline link fields — pre-filled from Operation Links, saved on Generate.
     const linkRow = (key, label, ph) => '<div style="margin-bottom:10px;">'
