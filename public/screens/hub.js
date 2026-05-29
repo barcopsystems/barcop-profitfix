@@ -722,6 +722,7 @@ S.Hub = {
             <button class="sidebar-logo-toggle" id="hub-sidebar-toggle" title="Toggle sidebar">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>
             </button>
+            <button class="sidebar-mobile-close" id="hub-sidebar-mobile-close" aria-label="Close sidebar" type="button">&times;</button>
           </div>
           <nav class="sidebar-nav">${sidebarNav}</nav>
           <div class="sidebar-footer">
@@ -785,6 +786,7 @@ S.Hub = {
       hubApp?.classList.toggle('sidebar-open');
     });
     document.getElementById('hub-sidebar-backdrop')?.addEventListener('click', closeHubMobileSidebar);
+    document.getElementById('hub-sidebar-mobile-close')?.addEventListener('click', closeHubMobileSidebar);
 
     const navEl = container.querySelector('.sidebar-nav');
     if (navEl) navEl.addEventListener('click', (ev) => {
