@@ -186,7 +186,6 @@ S.HubUserAccounts = {
     document.getElementById('ua-clear-all')?.addEventListener('click', () => this.clearAll());
     document.getElementById('ua-reset-ob')?.addEventListener('click', async () => {
       App.data.settings.onboarding_complete = false;
-      App.data.settings._targets_saved = false;
       await App.saveKey('settings');
       window.location.reload();
     });
