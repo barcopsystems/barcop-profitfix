@@ -14,7 +14,7 @@ S.HubReportBug = {
   // shows "REPORT A BUG | Back to Dashboard".
   open() {
     this._state = 'form';
-    App.openHubFullPage('Report a Bug', (mount) => this.render(mount));
+    App.openHubFullPage('Report a Bug', (mount) => this.render(mount), 'report-bug');
   },
 
   render(container) {
