@@ -709,8 +709,7 @@ const DB = {
           rplh_bar: 65,
           event_close_rate: 40
         },
-        servers: [],
-        _targets_saved: false
+        servers: []
       },
       revenue_weeks: [],
       revenue_audits: [],
@@ -755,8 +754,7 @@ const DB = {
           gbp_view_to_visit:       2,
           social_profile_to_visit: 1,
           email_open_to_visit:     1
-        },
-        _targets_saved: false
+        }
       },
       traffic_weeks:   [],
       traffic_audits:  [],
