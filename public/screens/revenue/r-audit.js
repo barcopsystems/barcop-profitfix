@@ -29,11 +29,10 @@ S.RevenueAudit = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Revenue Audit</div>'
       + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One revenue audit every 30 days. Upload your POS reports and labor data. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
       + '</div>'
-      + (canRunAudit
-          ? '<button class="btn btn-primary" id="ra-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>'
-          : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' day' + (daysLeft===1?'':'s') + '</div>'
-            + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit</div></div>')
-      + '</div></div>';
+      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">'
+      +   '<button class="btn btn-primary" id="ra-new-btn">' + (canRunAudit ? (latest ? 'Generate New Audit' : 'Generate First Audit') : 'Review / Update Inputs') + '</button>'
+      +   (canRunAudit ? '' : '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>')
+      + '</div></div></div>';
 
     let latestCard = '';
     if (latest) {
@@ -576,6 +575,11 @@ S.RevenueAudit = {
     const s = App.data.settings || {};
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
+    // Form viewable anytime; the 30-day cadence gates only Generate.
+    const _a = (App.data.revenue_audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
+    const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
+    const canRun = _since >= 30;
+    const daysLeft = canRun ? 0 : 30 - _since;
 
     const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Revenue Audit</div>';
     const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
@@ -648,11 +652,13 @@ S.RevenueAudit = {
 
     const submitCard = '<div class="card">'
       + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>'
+      + (canRun
+          ? '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>'
+          : '<button class="btn btn-primary" id="ra-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
       + '<div id="ra-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
       + '<div style="flex:1;"></div>'
-      + '<button class="btn btn-ghost" id="ra-iz-cancel">Cancel</button></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Analysis takes 60 to 90 seconds.</div></div>';
+      + '<button class="btn btn-ghost" id="ra-iz-cancel">' + (canRun ? 'Cancel' : 'Back') + '</button></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'You can review and update your inputs now. The next audit can be generated in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '.') + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
 
