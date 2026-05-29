@@ -554,8 +554,96 @@ S.AuditTracker = {
       barRev:  s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '',
       foodRev: s.annual_food_revenue != null ? String(s.annual_food_revenue) : ''
     };
+    if (this._intakeDraft.notes == null) this._intakeDraft.notes = '';
     this.actions.innerHTML = '';
-    this.renderIntakeStep();
+    this.renderIntake();
+  },
+
+  // Single-page Profit intake. Revenue is the only required input; every upload
+  // is optional because an operator running Control already has the data, and
+  // the slots map 1:1 to the sections computeProfitAudit scores.
+  renderIntake() {
+    const s = App.data.settings || {};
+    const d = this._intakeDraft || {};
+    document.getElementById('topbar-sub').textContent = '';
+
+    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Audit</div>';
+    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name || 'Your Bar') + '</div>'
+      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
+      + '</div>';
+
+    // What Bar Cop already has from the last 30 days of Control data.
+    const cd = this.buildControlData();
+    const checks = [
+      { label: 'Bar Pour Cost',   ok: cd && cd.bar_cost_pct != null },
+      { label: 'Food Cost',       ok: cd && cd.food_cost_pct != null },
+      { label: 'Prime Cost',      ok: cd && cd.prime_cost_pct != null },
+      { label: 'Voids and Comps', ok: cd && cd.void_comp_count > 0 },
+      { label: 'Cash Variance',   ok: cd && cd.cash_reconciliations > 0 },
+      { label: 'Vendor Drift',    ok: cd && cd.deliveries_logged > 0 },
+      { label: 'Payroll / Labor', ok: cd && cd.labor_hours > 0 }
+    ];
+    const chip = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;margin:0 6px 6px 0;'
+      + (c.ok ? 'background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);color:var(--t1);font-weight:700;' : 'background:var(--input);border:1px solid var(--b2);color:var(--t3);') + '">'
+      + (c.ok ? '<span style="color:var(--gold);font-weight:800;">&#10003;</span>' : '<span style="color:var(--t4);font-weight:800;">&middot;</span>')
+      + esc(c.label) + '</span>';
+    const haveControl = cd && cd.sources && cd.sources.length;
+    const controlCard = haveControl
+      ? '<div class="card" style="margin-bottom:16px;">'
+        + '<div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">What Bar Cop already has</div>'
+        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">These come straight from your last 30 days of Control data as verified ground truth. You do not need to upload anything for the items checked below. Uploads only fill what is not checked, or add deeper per-item detail.</div>'
+        + '<div>' + checks.map(chip).join('') + '</div></div>'
+      : '<div class="card" style="margin-bottom:16px;"><div style="font-size:12px;color:var(--t2);line-height:1.6;">Bar Cop has no Control data yet for this bar, so this first audit reads from the reports you upload below. Once you run the Inventory, Shift and Labor Control systems for 30 days, those numbers flow in automatically and the uploads become optional.</div></div>';
+
+    const revLabel = (txt) => '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>' + txt + '</label>';
+    const revInput = (id, ph, val) => '<div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div>';
+
+    const revCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual bar and food revenue. This sets the dollar baselines for every gap in the audit.</div>'
+      + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Bar Revenue') + revInput('at-iz-bar-rev', '618000', d.barRev) + '</div>'
+      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Food Revenue') + revInput('at-iz-food-rev', '372000', d.foodRev) + '</div>'
+      + '</div></div>';
+
+    const uploadCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Add any reports to cover what the checklist above does not, or to add deeper per-item detail. Accepts PDF, Excel, CSV, or images.</div>'
+      + this.renderFileSection('optional',  'Profit and Loss or Monthly Sales Summary', 'at-f-pl',     'at-pl',     'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report)')
+      + this.renderFileSection('optional',  'Voids, Comps and Cash Report',             'at-f-loss',   'at-loss',   'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance)')
+      + this.renderFileSection('optional',  'Invoices and Vendor Pricing',              'at-f-vendor', 'at-vendor', 'Scores Vendor Control (invoice matching, price drift)')
+      + this.renderFileSection('highlight', 'Recipe Costing Sheet',                     'at-f-recipe', 'at-recipe', 'Adds repricing opportunities ranked by dollar impact, and recipe coverage')
+      + this.renderFileSection('optional',  'Inventory Count Sheets (Bar and Kitchen)', 'at-f-inv',    'at-inv',    'Adds per-product pour and food cost variance')
+      + '</div>';
+
+    const submitCard = '<div class="card">'
+      + '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">Additional Notes (optional)</label>'
+      + '<textarea id="at-iz-notes" rows="3" placeholder="Recent changes, seasonal factors, pour method, anything that affects how the numbers look." style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:Barlow,sans-serif;font-size:12px;padding:10px;width:100%;resize:vertical;margin-bottom:14px;">' + esc(d.notes || '') + '</textarea>'
+      + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>'
+      + '<div id="at-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
+      + '<div style="flex:1;"></div>'
+      + '<button class="btn btn-ghost" id="at-iz-cancel">Cancel</button></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Analysis takes 60 to 90 seconds.</div></div>';
+
+    this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + submitCard + '</div>';
+
+    document.getElementById('at-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
+    document.getElementById('at-iz-submit')?.addEventListener('click', () => {
+      const barRev = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
+      const foodRev = parseFloat(document.getElementById('at-iz-food-rev')?.value) || 0;
+      if (barRev === 0 && foodRev === 0) {
+        const st = document.getElementById('at-iz-status');
+        if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'Enter at least one revenue figure to run the audit.'; }
+        return;
+      }
+      this._intakeDraft.barRev = document.getElementById('at-iz-bar-rev')?.value || '';
+      this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
+      this._intakeDraft.notes = document.getElementById('at-iz-notes')?.value || '';
+      this.generateAudit();
+    });
   },
 
   intakeStepsHtml(total) {
@@ -749,8 +837,7 @@ S.AuditTracker = {
     };
     if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
-    const fileInputIds = ['at-f-pos-bev','at-f-bar-inv','at-f-exception','at-f-cash','at-f-bev-inv',
-      'at-f-vendor','at-f-pos-food','at-f-kit-inv','at-f-food-inv','at-f-recipe','at-f-prep','at-f-waste','at-f-payroll'];
+    const fileInputIds = ['at-f-pl','at-f-loss','at-f-vendor','at-f-recipe','at-f-inv'];
     const allFiles = [];
     for (const id of fileInputIds) {
       const inp = document.getElementById(id);
