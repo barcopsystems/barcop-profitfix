@@ -613,6 +613,7 @@ S.Hub = {
       settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       mail:    '<rect x="2.2" y="4" width="12.6" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 4.5l6.3 4.5 6.3-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      hubhome: '<rect x="2" y="2" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="2" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="2" y="9" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="9" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/>',
       audit:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       expense: '<path d="M3.5 2v13l1.5-1 1.5 1 1.5-1 1.5 1 1.5-1 1.5 1V2H3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 5.5v5M10 6.5H7.5a1 1 0 0 0 0 2H9.5a1 1 0 0 1 0 2H7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
       shield:  '<path d="M8.5 2L3 4v5c0 3 2.5 5 5.5 6 3-1 5.5-3 5.5-6V4l-5.5-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M6.5 8.5l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
@@ -629,17 +630,13 @@ S.Hub = {
     };
 
     const sidebarNav = ''
-      // Locations section — only visible when the operator belongs to more
-      // than one account (the multi-bar group case). Single-location operators
-      // never see the section header or its lone Dashboard link.
-      + ((DB.cachedAccounts && DB.cachedAccounts().length > 1)
-          ? ('<div class="nav-section">Locations</div>'
-             + navItem('group-dashboard', 'Dashboard', 'allBars', []))
-          : '')
-      // Analysis section — always visible. The Bar Cop Audit is the executive
-      // monthly read on the entire operation, distinct from the per-system
-      // recovery audits which live in their own sidebars. Single-location
-      // accounts see this section at the top of the Hub sidebar.
+      // Overview section -- The Hub link is the operator's way back to the
+      // Hub Dashboard from any other Hub-level screen. Multi-location operators
+      // get the Group Dashboard as a topbar button (next to the location
+      // switcher) instead of a sidebar entry, so it stays accessible from
+      // module screens too.
+      + '<div class="nav-section">Overview</div>'
+      + navItem('hub-home', 'The Hub', 'hubhome', [])
       + '<div class="nav-section">Analysis</div>'
       + navItem('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
       + '<div class="nav-section">Recovery</div>'
@@ -740,6 +737,7 @@ S.Hub = {
               <span class="topbar-sub">${todayStr}</span>
             </div>
             <div id="hub-topbar-account-switcher" style="display:none;"></div>
+            <div id="hub-topbar-group-dashboard" style="display:none;"></div>
             <div class="topbar-right"></div>
           </header>
           <main class="content">
@@ -753,6 +751,9 @@ S.Hub = {
         </div>
       </div>
     `;
+
+    // Default sidebar active state on the Hub Dashboard view.
+    if (App.setActiveHubNav) App.setActiveHubNav('hub-home');
 
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
@@ -775,19 +776,19 @@ S.Hub = {
       if (!item || item.classList.contains('nav-disabled')) return;
       const action = item.dataset.hubAction;
       if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
-      else if (action === 'getting-started') S.HubGettingStarted.open();
-      else if (action === 'help')            S.HubHelp.open();
-      else if (action === 'settings')        S.HubSettings.open();
-      else if (action === 'user-accounts')   S.HubUserAccounts.open();
-      else if (action === 'group-dashboard') S.HubGroupDashboard.open();
-      else if (action === 'bar-cop-audit')   S.HubBarCopAudit?.open?.();
+      else if (action === 'hub-home')           App.showHub();
+      else if (action === 'getting-started')    S.HubGettingStarted.open();
+      else if (action === 'help')               S.HubHelp.open();
+      else if (action === 'settings')           S.HubSettings.open();
+      else if (action === 'user-accounts')      S.HubUserAccounts.open();
+      else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();
       else if (action === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (action === 'permits')            S.HubPermits?.open?.();
-      else if (action === 'contact-support') S.HubSupport.open();
-      else if (action === 'report-bug')      S.HubReportBug.open();
+      else if (action === 'contact-support')    S.HubSupport.open();
+      else if (action === 'report-bug')         S.HubReportBug.open();
     });
 
     // Trend chart data point hover — populate and position the shared
