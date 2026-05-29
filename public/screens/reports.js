@@ -117,7 +117,7 @@ S.Reports={
         return;
       }
       this._renderQboPicker(mount, weeks);
-    });
+    }, 'weekly-pnl');
   },
 
   _renderQboPicker(panel, weeks){
