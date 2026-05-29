@@ -429,6 +429,10 @@ const App = {
     if (bdrop) bdrop.onclick = () => {
       document.getElementById('app').classList.remove('sidebar-open');
     };
+    const closeBtn = document.getElementById('sidebar-mobile-close');
+    if (closeBtn) closeBtn.onclick = () => {
+      document.getElementById('app').classList.remove('sidebar-open');
+    };
     // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
     // (a simplified tile view of their accessible tasks across all modules).
     // Admin and viewer get the normal flow.
