@@ -837,7 +837,10 @@ S.AuditTracker = {
     if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S3_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'food-cost' });
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S2_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'theft-loss' });
     if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY, gap_id: 'vendor-control' });
-    if (d.S5_COMBINED_COGS_GAP > 0) items.push({ action: 'Close prime cost gap. $' + Math.round(d.S5_COMBINED_COGS_GAP) + '/month combined COGS overage.', monthly_impact: d.S5_COMBINED_COGS_GAP, gap_id: 'prime-cost' });
+    // Prime cost (S5_COMBINED_COGS_GAP) is the bar + food COGS overage, i.e. it
+    // already equals S1 + S3. It is shown as context on the Prime Cost section,
+    // never added here as a recoverable item, or the Total Recoverable would
+    // double-count the same dollars. (Decision: audit-honesty-rebuild.)
     return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
   },
 
@@ -862,12 +865,30 @@ S.AuditTracker = {
       cd.prime_cost_pct = r1(avg(w => w.prime_cost_pct));
     }
 
+    // Period window — the audit covers the same trailing 4 weeks the cost
+    // percentages use. Scope every summed Control figure to that window so a
+    // bar with months of logged records does not overstate a one-period rate.
+    let windowStart = null;
+    if (weeks.length) {
+      const ends = weeks.map(w => w.period_end).sort();
+      const d = new Date(ends[0] + 'T00:00:00');
+      d.setDate(d.getDate() - 6);          // include the full first week of the window
+      windowStart = isNaN(d) ? null : d;
+    }
+    const inWindow = (rec) => {
+      if (!windowStart) return true;       // no weekly data — do not filter
+      const ds = rec && (rec.date || rec.created_at);
+      if (!ds) return true;                // undated — include rather than silently drop
+      const rd = new Date(('' + ds).slice(0, 10) + 'T00:00:00');
+      return isNaN(rd) ? true : rd >= windowStart;
+    };
+
     // Inventory Control — counts
-    const counts = inv.ic_counts || [];
+    const counts = (inv.ic_counts || []).filter(inWindow);
     if (counts.length) { cd.inventory_counts = counts.length; cd.sources.push('Inventory Control counts'); }
 
     // Inventory Control — deliveries and vendor price drift
-    const dels = inv.ic_deliveries || [];
+    const dels = (inv.ic_deliveries || []).filter(inWindow);
     if (dels.length) {
       let changes = 0;
       dels.forEach(d => (d.line_items || []).forEach(li => {
@@ -879,7 +900,7 @@ S.AuditTracker = {
     }
 
     // Inventory Control — spot checks (theft pour-variance signal)
-    const spots = inv.ic_spot_checks || [];
+    const spots = (inv.ic_spot_checks || []).filter(inWindow);
     if (spots.length) {
       cd.spot_checks = spots.length;
       cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
@@ -888,7 +909,7 @@ S.AuditTracker = {
     }
 
     // Shift Control — voids and comps
-    const vc = sh.sc_void_comps || [];
+    const vc = (sh.sc_void_comps || []).filter(inWindow);
     if (vc.length) {
       cd.void_comp_count = vc.length;
       cd.void_comp_total = r1(vc.reduce((s,v) => s + (v.amount || 0), 0));
@@ -897,18 +918,18 @@ S.AuditTracker = {
     }
 
     // Shift Control — drawer reconciliations and cash drops
-    const variances = sh.sc_variances || [];
+    const variances = (sh.sc_variances || []).filter(inWindow);
     if (variances.length) {
       cd.cash_reconciliations = variances.length;
       cd.cash_variance_total = r1(variances.reduce((s,v) => s + (v.variance || 0), 0));
       cd.cash_short_count = variances.filter(v => v.status === 'Short').length;
       cd.sources.push('Shift Control drawer reconciliation');
     }
-    const drops = sh.sc_cash_drops || [];
+    const drops = (sh.sc_cash_drops || []).filter(inWindow);
     if (drops.length) cd.cash_drops = drops.length;
 
     // Labor Control — actual hours and cost (prime cost labor)
-    const actuals = lab.lc_actuals || [];
+    const actuals = (lab.lc_actuals || []).filter(inWindow);
     if (actuals.length) {
       cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
       cd.labor_cost  = Math.round(actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0));
