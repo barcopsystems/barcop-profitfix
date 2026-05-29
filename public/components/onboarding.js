@@ -103,7 +103,7 @@ const Onboarding = {
       '<div class="ob-heading" style="text-align:center;margin-bottom:6px;">How Bar Cop Works</div>'
       + this._stepDots(3)
       + '<div style="' + this._boxStyle + '">'
-      +   'Three Control systems run the day: Inventory, Labor, Shift. Three Recovery systems run the diagnosis: Profit, Revenue, Traffic. Each Recovery system gives you a scored monthly Audit, a Fix Process that walks you through closing every gap step by step, and a Recovery Scoreboard that tallies every dollar you put back into the business. The Bar Cop Audit sits above all six and gives you the executive monthly read on the whole operation.'
+      +   'Three Control systems run the day: Inventory, Labor, Shift. Three Recovery systems run the diagnosis: Profit, Revenue, Traffic. Each Recovery system gives you a scored monthly Audit, a Fix Process that walks you through closing every gap, and a Recovery Scoreboard that tallies every dollar you put back into the business. The Bar Cop Audit sits above the six with the executive monthly read on the whole operation.'
       +   '<div style="margin-top:10px;">Next, complete the short setup list. Once your numbers are in, the systems start tracking, scoring, and measuring recovery automatically.</div>'
       + '</div>'
       + '<div class="ob-actions" style="display:flex;gap:10px;">'
