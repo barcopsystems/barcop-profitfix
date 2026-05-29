@@ -1477,7 +1477,7 @@ const App = {
   //         Settings → Operation Links).
   TRAFFIC_PLATFORMS: [
     { key: 'website',        label: 'Website',         urlKey: 'website',        placeholder: 'https://yourbar.com' },
-    { key: 'gbp',            label: 'Google',          urlKey: 'gbp',            placeholder: 'https://maps.google.com/?cid=...' },
+    { key: 'gbp',            label: 'Google Business Profile', urlKey: 'gbp',    placeholder: 'https://g.page/your-bar' },
     { key: 'yelp',           label: 'Yelp',            urlKey: 'yelp',           placeholder: 'https://yelp.com/biz/your-bar' },
     { key: 'instagram',      label: 'Instagram',       urlKey: 'instagram',      placeholder: 'https://instagram.com/yourbar' },
     { key: 'facebook',       label: 'Facebook',        urlKey: 'facebook',       placeholder: 'https://facebook.com/yourbar' },
