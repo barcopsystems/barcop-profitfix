@@ -597,15 +597,15 @@ S.AuditTracker = {
         + '<div>' + checks.map(chip).join('') + '</div></div>'
       : '<div class="card" style="margin-bottom:16px;"><div style="font-size:12px;color:var(--t2);line-height:1.6;">Bar Cop has no Control data yet for this bar, so this first audit reads from the reports you upload below. Once you run the Inventory, Shift and Labor Control systems for 30 days, those numbers flow in automatically and the uploads become optional.</div></div>';
 
-    const revLabel = (txt) => '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;flex-shrink:0;">Required</span>' + txt + '</label>';
+    const revLabel = (txt) => '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">' + txt + '</label>';
     const revInput = (id, ph, val) => '<div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div>';
 
     const revCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Annual Revenue</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual bar and food revenue. This sets the dollar baselines for every gap in the audit.</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual revenue. This sets the dollar baselines for every gap in the audit. Enter at least one figure. Run a bar with no kitchen? Leave Food Revenue blank and the food sections are simply left out.</div>'
       + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
       + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Bar Revenue') + revInput('at-iz-bar-rev', '618000', d.barRev) + '</div>'
-      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Food Revenue') + revInput('at-iz-food-rev', '372000', d.foodRev) + '</div>'
+      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Food Revenue (leave blank if none)') + revInput('at-iz-food-rev', '372000', d.foodRev) + '</div>'
       + '</div></div>';
 
     const uploadCard = '<div class="card" style="margin-bottom:16px;">'
