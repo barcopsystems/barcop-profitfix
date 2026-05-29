@@ -9,7 +9,7 @@ S.HubSettings = {
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows "APP SETTINGS | Back to Dashboard".
   open() {
-    App.openHubFullPage('App Settings', (mount) => this.render(mount));
+    App.openHubFullPage('App Settings', (mount) => this.render(mount), 'settings');
   },
 
   render(container) {
