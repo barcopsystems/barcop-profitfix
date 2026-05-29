@@ -86,7 +86,7 @@ S.HubGettingStarted = {
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows "GETTING STARTED | Back to Dashboard".
   open() {
-    App.openHubFullPage('Getting Started', (mount) => this.render(mount));
+    App.openHubFullPage('Getting Started', (mount) => this.render(mount), 'getting-started');
   },
 
   render(container) {
