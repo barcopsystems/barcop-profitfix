@@ -696,16 +696,11 @@ const App = {
     // Reset padding to 0 for full-page screens so the .screen wrapper inside
     // them controls spacing the same way module screens do.
     content.style.padding = '0';
-    // Rewrite the Hub topbar-left to match the module pattern: page title
-    // in uppercase weight 800, "Back to Dashboard" link to its right.
+    // Rewrite the Hub topbar-left to the page title. The sidebar's The Hub
+    // entry handles the return-to-dashboard path; no inline back link.
     const topbarLeft = document.querySelector('.hub-app .topbar .topbar-left');
     if (topbarLeft && title) {
-      topbarLeft.innerHTML = '<div style="display:flex;align-items:center;gap:14px;">'
-        +   '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">' + esc(title) + '</div>'
-        +   '<div style="font-size:11px;color:var(--t3);">|</div>'
-        +   '<button class="hub-fullpage-back" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer;padding:0;letter-spacing:0.3px;">Back to Dashboard</button>'
-        + '</div>';
-      topbarLeft.querySelector('.hub-fullpage-back')?.addEventListener('click', () => this.showHub());
+      topbarLeft.innerHTML = '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);">' + esc(title) + '</div>';
     }
     // Clear topbar-right so prior screen actions don't bleed across.
     const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
@@ -1057,14 +1052,12 @@ const App = {
   },
 
   _updateBackLink() {
+    // Inline back link removed. Sidebar nav (including The Hub entry) handles
+    // navigation; the topbar carries the page title only. _previousLocation
+    // is still tracked because other systems read it (bug report context,
+    // forward-alerts deep-link target labels, etc.).
     const sub = document.getElementById('topbar-sub');
-    if (!sub) return;
-    if (!this._previousLocation) { sub.innerHTML = ''; return; }
-    const label = String(this._previousLocation.label || 'previous')
-      .replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
-    sub.innerHTML = '<span class="topbar-sep">|</span>'
-      + '<a class="topbar-back-link" id="topbar-back-link">Back to ' + label + '</a>';
-    document.getElementById('topbar-back-link')?.addEventListener('click', () => this._goBackOne());
+    if (sub) sub.innerHTML = '';
   },
 
   _goBackOne() {
