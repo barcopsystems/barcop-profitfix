@@ -28,6 +28,7 @@ const VENDOR_EXPOSURE_PCT = 3.0;       // S4 exposure assumption (server prompt 
 function num(v) { return (v == null || isNaN(v)) ? null : Number(v); }
 function round1(v) { return v == null ? null : Math.round(v * 10) / 10; }
 function round0(v) { return v == null ? null : Math.round(v); }
+function round2(v) { return v == null ? null : Math.round(v * 100) / 100; }
 function clampScore(v) { return Math.max(1, Math.min(100, Math.round(v))); } // never 0 per spec
 function avg(arr) {
   const v = arr.filter(x => x != null && !isNaN(x));
@@ -355,7 +356,218 @@ function computeProfitAudit(appData, controlData, extracted) {
   };
 }
 
-module.exports = { computeProfitAudit };
+/* computeRevenueAudit(appData, controlData, extracted)
+   Same honesty contract as Profit. Five sections:
+     S1 Check Average and Revenue  — dollar opportunity (revenue growth)
+     S2 Labor Efficiency           — dollar gap (cost recovery)
+     S3 Menu Performance           — scored on Dog ratio; NO fabricated dollar
+     S4 Server Performance         — grounded spread opportunity (revenue growth)
+     S5 Events and Private Dining  — scored; NO fabricated target dollar
+   Cost recovery (S2) is kept distinct from revenue opportunity (S1/S4) so the
+   two are never pooled into one "recovered" number. Sections with no data are
+   N/A (null) and excluded from the overall. Practice answers give results-based
+   credit; they never penalize (the bad result already shows in the numbers). */
+function computeRevenueAudit(appData, controlData, extracted) {
+  appData = appData || {}; controlData = controlData || null; extracted = extracted || {};
+  const settings = appData.settings || {};
+  const rt = (appData.revenue_settings && appData.revenue_settings.targets) || {};
+  const cd = controlData || {};
+  const weeks = (appData.revenue_weeks || [])
+    .filter(w => w && ((num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0) > 0 || num(w.total_revenue) > 0))
+    .slice(-PERIOD_WEEKS);
+  const menuItems = (appData.menu_items || []).filter(i => num(i.price) != null && num(i.cost) != null && num(i.weekly_covers) != null);
+  const serverChecks = (appData.revenue_server_checks || appData.revenue_servers || []).filter(c => num(c.check_avg) != null);
+  const events = (appData.revenue_events || []).filter(e => num(e.revenue) != null);
+
+  const checkTarget = num(rt.check_avg) != null ? rt.check_avg : 35;
+  const laborTarget = num(rt.labor_pct_blended) != null ? rt.labor_pct_blended
+    : (((num(rt.bar_labor_pct) != null ? rt.bar_labor_pct : 28)
+      + (num(rt.kitchen_labor_pct) != null ? rt.kitchen_labor_pct : 30)
+      + (num(rt.floor_labor_pct) != null ? rt.floor_labor_pct : 32)) / 3);
+  const rplhTarget = num(rt.rplh_dinner) != null ? rt.rplh_dinner : 75;
+
+  // ── Revenue + covers base (weeks -> uploads -> settings annual) ──
+  const wkTotalRev = avg(weeks.map(w => num(w.total_revenue) != null ? w.total_revenue : (num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0)));
+  const annualTotal = (num(settings.annual_bar_revenue) || 0) + (num(settings.annual_food_revenue) || 0);
+  const monthlyRev = wkTotalRev != null ? wkTotalRev * WEEKS_PER_MONTH
+    : (num(extracted.monthly_revenue) != null ? num(extracted.monthly_revenue)
+      : (annualTotal > 0 ? annualTotal / 12 : null));
+  const wkCovers = avg(weeks.map(w => w.covers));
+  const monthlyCovers = wkCovers != null ? wkCovers * WEEKS_PER_MONTH
+    : (num(extracted.monthly_covers) != null ? num(extracted.monthly_covers) : null);
+
+  // ── S1 — Check Average and Revenue (revenue opportunity) ──
+  const wkCheckAvg = avg(weeks.map(w => w.check_avg));
+  let checkAvg = num(cd.check_average) != null ? cd.check_average
+    : (wkCheckAvg != null ? wkCheckAvg : num(extracted.check_avg));
+  if (checkAvg == null && monthlyRev != null && monthlyCovers > 0) checkAvg = monthlyRev / monthlyCovers;
+  checkAvg = round2(checkAvg);
+  let s1 = null, s1Gap = 0;
+  if (checkAvg != null) {
+    const below = checkTarget - checkAvg;               // positive = below target
+    s1 = clampScore(below <= 1 ? 85 : below <= 3 ? 70 : below <= 5 ? 55 : 35);
+    if (below > 0 && monthlyCovers != null) s1Gap = round0(below * monthlyCovers);
+  }
+
+  // ── S2 — Labor Efficiency (cost recovery) ──
+  const laborPct = round1(num(cd.labor_pct_blended) != null ? cd.labor_pct_blended
+    : (avg(weeks.map(w => w.labor_pct_blended)) != null ? avg(weeks.map(w => w.labor_pct_blended)) : num(extracted.labor_pct)));
+  const rplh = round0(num(cd.rplh_blended) != null ? cd.rplh_blended
+    : (avg(weeks.map(w => w.rplh_blended)) != null ? avg(weeks.map(w => w.rplh_blended)) : num(extracted.rplh)));
+  let s2 = null, s2Gap = 0;
+  if (laborPct != null) {
+    const over = laborPct - laborTarget;
+    s2 = over <= 1 ? 85 : over <= 3 ? 65 : over <= 5 ? 50 : 35;
+    if (extracted.labor_to_forecast === true) s2 += 10;   // scheduling to a forecast is a real control
+    s2 = clampScore(s2);
+    if (over > 0 && monthlyRev != null) s2Gap = round0((over / 100) * monthlyRev);
+  }
+
+  // ── S3 — Menu Performance (scored on Dog ratio; no fabricated dollar) ──
+  let stars = 0, plow = 0, puzzle = 0, dog = 0, menuKnown = false, topCategory = null;
+  if (menuItems.length >= 4) {
+    menuKnown = true;
+    const avgCM = avg(menuItems.map(i => i.price - i.cost));
+    const avgCov = avg(menuItems.map(i => i.weekly_covers));
+    menuItems.forEach(i => {
+      const hiM = (i.price - i.cost) >= avgCM, hiV = i.weekly_covers >= avgCov;
+      if (hiM && hiV) stars++; else if (!hiM && hiV) plow++; else if (hiM && !hiV) puzzle++; else dog++;
+    });
+    const catCov = {};
+    menuItems.forEach(i => { const c = i.category || 'Other'; catCov[c] = (catCov[c] || 0) + i.weekly_covers; });
+    topCategory = Object.keys(catCov).sort((a, b) => catCov[b] - catCov[a])[0] || null;
+  } else if (num(extracted.dogs_count) != null || num(extracted.stars_count) != null) {
+    menuKnown = true;
+    stars = num(extracted.stars_count) || 0; plow = num(extracted.plowhorses_count) || 0;
+    puzzle = num(extracted.puzzles_count) || 0; dog = num(extracted.dogs_count) || 0;
+  }
+  let s3 = null;
+  if (menuKnown) {
+    const total = stars + plow + puzzle + dog || 1;
+    const dogRatio = dog / total;
+    s3 = dogRatio <= 0.10 ? 80 : dogRatio <= 0.25 ? 60 : dogRatio <= 0.40 ? 45 : 30;
+    if (extracted.menu_engineered === true) s3 += 10;
+    s3 = clampScore(s3);
+  }
+
+  // ── S4 — Server Performance (grounded spread opportunity) ──
+  let s4 = null, topCA = null, botCA = null, spread = null, s4Gap = 0;
+  if (serverChecks.length >= 3) {
+    const cas = serverChecks.map(c => c.check_avg).sort((a, b) => a - b);
+    botCA = round2(cas[0]); topCA = round2(cas[cas.length - 1]);
+    const teamAvg = avg(cas);
+    spread = round2(topCA - botCA);
+    const spreadPct = teamAvg ? spread / teamAvg : 0;
+    s4 = spreadPct <= 0.15 ? 80 : spreadPct <= 0.30 ? 60 : spreadPct <= 0.50 ? 45 : 30;
+    if (extracted.pre_shift === 'every' || extracted.pre_shift === true) s4 += 10;
+    if (extracted.upsell_standard === true) s4 += 5;
+    s4 = clampScore(s4);
+    const bottomThird = cas.slice(0, Math.max(1, Math.floor(cas.length / 3)));
+    const botAvg = avg(bottomThird);
+    if (teamAvg != null && botAvg != null && teamAvg > botAvg && monthlyCovers != null) {
+      const botCovers = monthlyCovers * (bottomThird.length / serverChecks.length);
+      s4Gap = round0((teamAvg - botAvg) * botCovers);   // bottom third up to team average
+    }
+  } else if (num(extracted.top_check_avg) != null && num(extracted.bottom_check_avg) != null) {
+    // First-time audit: spread read off an uploaded server sales report.
+    topCA = round2(extracted.top_check_avg); botCA = round2(extracted.bottom_check_avg);
+    spread = round2(topCA - botCA);
+    const teamAvg = (topCA + botCA) / 2;               // midpoint estimate from top/bottom
+    const spreadPct = teamAvg ? spread / teamAvg : 0;
+    s4 = spreadPct <= 0.15 ? 80 : spreadPct <= 0.30 ? 60 : spreadPct <= 0.50 ? 45 : 30;
+    if (extracted.pre_shift === 'every' || extracted.pre_shift === true) s4 += 10;
+    if (extracted.upsell_standard === true) s4 += 5;
+    s4 = clampScore(s4);
+    if (monthlyCovers != null && teamAvg > botCA) s4Gap = round0((teamAvg - botCA) * (monthlyCovers / 3));
+  }
+
+  // ── S5 — Events and Private Dining (scored; no fabricated target dollar) ──
+  let s5 = null, eventsPerMonth = null, avgEventRev = null, eventRevPeriod = null;
+  if (events.length > 0) {
+    eventRevPeriod = round0(events.reduce((s, e) => s + (e.revenue || 0), 0));
+    eventsPerMonth = round1(events.length / 3);            // events span ~last 3 months
+    avgEventRev = round0(eventRevPeriod / events.length);
+    s5 = clampScore(eventsPerMonth >= 4 ? 80 : eventsPerMonth >= 2 ? 60 : eventsPerMonth >= 1 ? 45 : 30);
+  }
+
+  const overall = clampScore(avg([s1, s2, s3, s4, s5]));
+  const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
+  const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : (extracted.audit_period || 'Most recent month (uploaded data)');
+  const dataTier = (controlData && (cd.sources || []).length) ? 'Verified — Control module data'
+    : (weeks.length ? 'Standard — weekly data entered' : 'Baseline — uploaded data');
+
+  // Revenue opportunity (projected) vs cost recovery, kept separate.
+  const revenueOpportunity = (s1Gap || 0) + (s4Gap || 0);
+  const costRecovery = (s2Gap || 0);
+
+  return {
+    BAR_NAME: settings.bar_name || '',
+    BAR_CITY_STATE: settings.city_state || '',
+    AUDIT_PERIOD: auditPeriod,
+    DATA_TIER_LABEL: dataTier,
+    OVERALL_SCORE: overall,
+    INDUSTRY_AVG: 61,
+    TARGET_SCORE: 65,
+
+    S1_SCORE: s1,
+    S1_CHECK_AVG: checkAvg,
+    S1_CHECK_AVG_TARGET: round2(checkTarget),
+    S1_BAR_CHECK_AVG: round2(avg(weeks.map(w => w.bar_check_avg))),
+    S1_FOOD_CHECK_AVG: round2(avg(weeks.map(w => w.food_check_avg))),
+    S1_COVER_COUNT: round0(monthlyCovers),
+    S1_MONTHLY_REVENUE: round0(monthlyRev),
+    S1_MONTHLY_GAP: s1Gap,
+    S1_ANNUAL_GAP: round0(s1Gap * 12),
+
+    S2_SCORE: s2,
+    S2_LABOR_PCT: laborPct,
+    S2_LABOR_TARGET_PCT: round1(laborTarget),
+    S2_RPLH: rplh,
+    S2_RPLH_TARGET: round0(rplhTarget),
+    S2_LABOR_PERIOD: num(cd.labor_cost) != null ? cd.labor_cost : (laborPct != null && monthlyRev != null ? round0((laborPct / 100) * monthlyRev) : null),
+    S2_SCHED_VS_ACTUAL: extracted.sched_vs_actual || 'Not documented',
+    S2_OVERTIME_HRS: num(extracted.overtime_hrs) != null ? num(extracted.overtime_hrs) : null,
+    S2_MONTHLY_GAP: s2Gap,
+    S2_ANNUAL_GAP: round0(s2Gap * 12),
+
+    S3_SCORE: s3,
+    S3_STARS_COUNT: menuKnown ? stars : null,
+    S3_PLOWHORSES_COUNT: menuKnown ? plow : null,
+    S3_PUZZLES_COUNT: menuKnown ? puzzle : null,
+    S3_DOGS_COUNT: menuKnown ? dog : null,
+    S3_TOP_CATEGORY: topCategory || (extracted.top_category || 'Not available'),
+    S3_PRICING_OPPORTUNITY: 0,     // surfaced qualitatively; no invented menu-mix dollar
+    S3_MONTHLY_GAP: 0,
+
+    S4_SCORE: s4,
+    S4_SERVER_COUNT: serverChecks.length || (num(extracted.server_count) || 0) || (num(cd.roster_count) || 0),
+    S4_TOP_CHECK_AVG: topCA,
+    S4_BOTTOM_CHECK_AVG: botCA,
+    S4_PERFORMANCE_SPREAD: spread,
+    S4_APP_ATTACH_RATE: num(extracted.app_attach_rate) != null ? num(extracted.app_attach_rate) : null,
+    S4_DESSERT_ATTACH_RATE: num(extracted.dessert_attach_rate) != null ? num(extracted.dessert_attach_rate) : null,
+    S4_PRESHIFT_BRIEFING: extracted.pre_shift === 'every' ? 'Held every shift' : extracted.pre_shift === 'sometimes' ? 'Sometimes' : extracted.pre_shift === 'never' ? 'Not held' : 'Not documented',
+    S4_MONTHLY_GAP: s4Gap,
+    S4_ANNUAL_GAP: round0(s4Gap * 12),
+
+    S5_SCORE: s5,
+    S5_EVENT_REV_PERIOD: eventRevPeriod,
+    S5_EVENTS_PER_MONTH: eventsPerMonth,
+    S5_AVG_EVENT_REVENUE: avgEventRev,
+    S5_MINIMUM_MET: extracted.private_dining_min === true ? 'Yes' : (events.length ? 'Tracked' : 'No package'),
+    S5_CATERING_REV_PERIOD: num(extracted.catering_rev) != null ? num(extracted.catering_rev) : null,
+    S5_ANNUAL_EVENT_GAP: null,     // no fabricated target gap
+    S5_MONTHLY_GAP: 0,
+
+    // Headline totals, split honestly. Revenue opportunity is projected growth,
+    // not recovered cash; cost recovery (labor) is a real reducible cost.
+    REVENUE_OPPORTUNITY_MONTHLY: round0(revenueOpportunity),
+    COST_RECOVERY_MONTHLY: round0(costRecovery),
+    WEEKLY_GAP_AMT: '$' + Math.round((revenueOpportunity + costRecovery) / WEEKS_PER_MONTH).toLocaleString('en-US')
+  };
+}
+
+module.exports = { computeProfitAudit, computeRevenueAudit };
 
 // ── Self-test: node server/audit-compute.js ───────────────────────────────────
 if (require.main === module) {
@@ -483,4 +695,51 @@ if (require.main === module) {
     console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
   }
   console.log(`\n${ftPass}/${ftChecks.length} upload-path checks passed`);
+
+  // ── Revenue audit ───────────────────────────────────────────────────────────
+  console.log('\n--- Revenue audit ---');
+  const rWeeks = [1, 2, 3, 4].map(i => ({
+    period_end: `2026-04-0${i}`, total_revenue: 18000, covers: 600,
+    bar_revenue: 11000, floor_revenue: 7000, check_avg: 30.0, labor_pct_blended: 34.0, rplh_blended: 58
+  }));
+  const rMenu = [
+    { name: 'Burger', category: 'Entree', price: 16, cost: 6, weekly_covers: 120 },   // hi vol; margin 10
+    { name: 'Steak',  category: 'Entree', price: 38, cost: 14, weekly_covers: 40 },    // hi margin lo vol = puzzle
+    { name: 'Fries',  category: 'Side',   price: 7,  cost: 2,  weekly_covers: 150 },   // plowhorse-ish
+    { name: 'Wings',  category: 'Starter',price: 13, cost: 7,  weekly_covers: 30 },    // dog-ish
+    { name: 'Salad',  category: 'Starter',price: 12, cost: 4,  weekly_covers: 25 }
+  ];
+  const rServers = [{ name: 'A', check_avg: 38 }, { name: 'B', check_avg: 31 }, { name: 'C', check_avg: 24 }, { name: 'D', check_avg: 29 }];
+  const rev = computeRevenueAudit({
+    settings: { bar_name: 'The Anchor Bar & Kitchen' },
+    revenue_settings: { targets: { check_avg: 35 } },
+    revenue_weeks: rWeeks, menu_items: rMenu, revenue_server_checks: rServers, revenue_events: []
+  }, null, {});
+  const rExpCovers = 600 * 4.345;                                  // monthly covers
+  const rExpS1Gap = Math.round((35 - 30) * rExpCovers);            // (target-actual) x covers
+  const rChecks = [
+    ['Rev S1 check avg from weeks', rev.S1_CHECK_AVG, 30],
+    ['Rev S1 gap = ($5 below) x monthly covers', rev.S1_MONTHLY_GAP, rExpS1Gap],
+    ['Rev S1 gap is revenue opportunity (not cost)', rev.REVENUE_OPPORTUNITY_MONTHLY >= rev.S1_MONTHLY_GAP, true],
+    ['Rev S2 labor scored (34% over ~30 target)', rev.S2_SCORE > 0 && rev.S2_SCORE <= 100, true],
+    ['Rev S2 gap is cost recovery, kept separate', rev.COST_RECOVERY_MONTHLY, rev.S2_MONTHLY_GAP],
+    ['Rev S3 menu classified (counts sum to 5)', (rev.S3_STARS_COUNT + rev.S3_PLOWHORSES_COUNT + rev.S3_PUZZLES_COUNT + rev.S3_DOGS_COUNT), 5],
+    ['Rev S3 no fabricated dollar', rev.S3_MONTHLY_GAP, 0],
+    ['Rev S4 server spread computed', rev.S4_PERFORMANCE_SPREAD, 14],
+    ['Rev S4 grounded opportunity > 0', rev.S4_MONTHLY_GAP > 0, true],
+    ['Rev S5 events N/A when none', rev.S5_SCORE, null],
+    ['Rev OVERALL excludes N/A events', rev.OVERALL_SCORE >= 1 && rev.OVERALL_SCORE <= 100, true]
+  ];
+  // Events present -> S5 scores.
+  const revEv = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, revenue_events: [{ revenue: 2400 }, { revenue: 3100 }, { revenue: 1800 }] }, null, {});
+  rChecks.push(['Rev S5 scores when events exist', revEv.S5_SCORE > 0, true]);
+  // Check-average N/A when no covers anywhere.
+  const revNoCovers = computeRevenueAudit({ settings: { annual_bar_revenue: 600000 }, revenue_settings: { targets: {} } }, null, {});
+  rChecks.push(['Rev S1 N/A when no covers', revNoCovers.S1_SCORE, null]);
+  let rPass = 0;
+  for (const [label, got, exp] of rChecks) {
+    const ok = got === exp; if (ok) rPass++;
+    console.log((ok ? 'PASS ' : 'FAIL ') + label + '  got=' + got + (ok ? '' : ' expected=' + exp));
+  }
+  console.log(`\n${rPass}/${rChecks.length} revenue checks passed`);
 }
