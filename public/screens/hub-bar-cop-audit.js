@@ -59,7 +59,7 @@ S.HubBarCopAudit = {
       this.container = mount;
       this._viewingId = null;
       this.renderMain();
-    });
+    }, 'bar-cop-audit');
   },
 
   // ── Utilities ───────────────────────────────────────────────────────────
