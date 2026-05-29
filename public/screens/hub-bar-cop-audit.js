@@ -104,10 +104,14 @@ S.HubBarCopAudit = {
     return earliest;
   },
   _hasEnoughData() {
-    const earliest = this._earliestDataDate();
-    if (!earliest) return false;
-    const days = this._daysSince(earliest);
-    return days != null && days >= this.MIN_DATA_DAYS;
+    // No hard time lock. The audit can be generated as soon as at least one
+    // sub-score has the data to compute honestly; the rest show N/A and fill
+    // in as the operator logs more. (Replaces the old 60-day global gate.)
+    return [
+      this._scoreOperationalDiscipline(), this._scoreCashIntegrity(),
+      this._scoreInventoryExecution(), this._scoreLaborHygiene(),
+      this._scoreRecoveryAction(), this._scoreOperationalConsistency()
+    ].some(s => s && s.score != null);
   },
   _canRunAudit() {
     const a = this.audits();
@@ -120,6 +124,17 @@ S.HubBarCopAudit = {
   },
 
   // ── Sub-score engines ───────────────────────────────────────────────────
+  // Honest scoring rule: a component with no data to judge is marked na (Not
+  // enough data) and EXCLUDED from the sub-score — never defaulted to 50. A
+  // sub-score with no scorable components returns null (N/A) and drops out of
+  // the overall. This replaces the old 0.5/1.0 placeholders that produced a
+  // confident score on a barely-used operation.
+  _rollup(detail) {
+    detail.forEach(c => { c.pct = (c.na || c.ratio == null || isNaN(c.ratio)) ? null : Math.round(c.ratio * 100); });
+    const scored = detail.filter(c => !c.na && c.ratio != null && !isNaN(c.ratio));
+    const score = scored.length ? Math.round((scored.reduce((s, c) => s + c.ratio, 0) / scored.length) * 100) : null;
+    return { score, detail };
+  },
 
   // 1. Operational Discipline. Daily and weekly procedures actually being
   //    done over the last 30 days. Each component contributes equally to the
@@ -137,17 +152,18 @@ S.HubBarCopAudit = {
     const wkSpots   = spotChecks.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));
     const wkShifts  = shifts.filter(s => this._withinWindow(s.date, this.WINDOW_DAYS));
 
-    // Expected: opens + closes daily (30 each), counts weekly (4), spot checks weekly (4),
-    // shifts ~60/mo (about 2 per day for a typical bar). Operator-honest fractions.
+    // Completion procedures are only judged when the operation is active in the
+    // window. With nothing logged at all, these are N/A (not a 0% failing grade).
+    const active = wkShifts.length > 0 || opens.length > 0 || closes.length > 0 || wkCounts.length > 0 || wkSpots.length > 0;
     const components = [
-      { label: 'Opening checklist completion',  ratio: Math.min(1, opens.length   / 30) },
-      { label: 'Closing checklist completion',  ratio: Math.min(1, closes.length  / 30) },
-      { label: 'Inventory counts completed',    ratio: Math.min(1, wkCounts.length / 4) },
-      { label: 'Spot checks completed',         ratio: Math.min(1, wkSpots.length  / 4) },
-      { label: 'Shifts logged',                 ratio: Math.min(1, wkShifts.length / 30) }
+      { label: 'Opening checklist completion',  ratio: Math.min(1, opens.length   / 30), na: !active, extra: opens.length  + ' opening checklists logged' },
+      { label: 'Closing checklist completion',  ratio: Math.min(1, closes.length  / 30), na: !active, extra: closes.length + ' closing checklists logged' },
+      { label: 'Inventory counts completed',    ratio: Math.min(1, wkCounts.length / 4),  na: !active, extra: wkCounts.length + ' of 4 expected weekly' },
+      { label: 'Spot checks completed',         ratio: Math.min(1, wkSpots.length  / 4),  na: !active, extra: wkSpots.length  + ' of 4 expected weekly' },
+      { label: 'Shifts logged',                 ratio: Math.min(1, wkShifts.length / 30), na: !active, extra: wkShifts.length + ' shifts in window' }
     ];
 
-    // Audit-on-time bonus across the three recovery audits.
+    // Recovery-audit cadence. N/A until that audit has been run at least once.
     const recoveryAudits = [
       { name: 'Profit Recovery',  list: App.data?.audits },
       { name: 'Revenue Recovery', list: App.data?.revenue_audits },
@@ -158,13 +174,10 @@ S.HubBarCopAudit = {
       const latest = arr.length ? arr[arr.length - 1] : null;
       const since = latest ? this._daysSince(latest.date) : null;
       const onTime = since != null && since <= 35; // 30-day rule with 5-day grace
-      components.push({ label: r.name + ' audit on time', ratio: onTime ? 1 : 0 });
+      components.push({ label: r.name + ' audit on time', ratio: onTime ? 1 : 0, na: arr.length === 0, extra: arr.length === 0 ? 'No audit run yet' : (onTime ? 'Current' : 'Overdue') });
     });
 
-    const total = components.reduce((s, c) => s + c.ratio, 0);
-    const score = Math.round((total / components.length) * 100);
-    components.forEach(c => { c.pct = Math.round(c.ratio * 100); });
-    return { score, detail: components };
+    return this._rollup(components);
   },
 
   // 2. Cash Integrity. Variance trend + drawer + drop + auth compliance.
@@ -186,12 +199,10 @@ S.HubBarCopAudit = {
     const totalAbsVar = wkVar.reduce((s, v) => s + Math.abs(parseFloat(v.variance) || 0), 0);
     const totalRev    = wkShifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
     const varPct      = totalRev > 0 ? (totalAbsVar / totalRev) * 100 : 0;
-    const varRatio    = totalRev === 0 ? 0.5 : Math.max(0, 1 - (varPct / 1)); // 1%+ → 0, 0% → 1
+    const varRatio    = Math.max(0, 1 - (varPct / 1)); // 1%+ → 0, 0% → 1
 
     // Drawer count completion: expected one per shift.
-    const drawerRatio = wkShifts.length > 0
-      ? Math.min(1, wkDrawers.length / wkShifts.length)
-      : 0.5;
+    const drawerRatio = wkShifts.length > 0 ? Math.min(1, wkDrawers.length / wkShifts.length) : null;
 
     // Authorization compliance on large voids/comps (over threshold).
     const overThresh = wkVoids.filter(v => (parseFloat(v.amount) || 0) >= threshold);
@@ -201,18 +212,15 @@ S.HubBarCopAudit = {
     // Cash drops activity (at least one drop per shift where revenue > $500).
     const cashShifts = wkShifts.filter(s => (parseFloat(s.total_revenue) || 0) > 500);
     const wkDrops    = drops.filter(d => this._withinWindow(d.date, this.WINDOW_DAYS));
-    const dropRatio  = cashShifts.length > 0
-      ? Math.min(1, wkDrops.length / cashShifts.length)
-      : 0.5;
+    const dropRatio  = cashShifts.length > 0 ? Math.min(1, wkDrops.length / cashShifts.length) : null;
 
     const components = [
-      { label: 'Cash variance trend (lower is better)', ratio: varRatio,    pct: Math.round(varRatio * 100),    extra: totalRev > 0 ? varPct.toFixed(2) + '% of revenue handled' : 'No revenue logged in window' },
-      { label: 'Drawer counts per shift',               ratio: drawerRatio, pct: Math.round(drawerRatio * 100), extra: wkDrawers.length + ' counts on ' + wkShifts.length + ' shifts' },
-      { label: 'Large void/comp authorization',         ratio: authRatio,   pct: Math.round(authRatio * 100),   extra: authorized.length + ' of ' + overThresh.length + ' over $' + threshold + ' authorized' },
-      { label: 'Cash drops on revenue shifts',          ratio: dropRatio,   pct: Math.round(dropRatio * 100),   extra: wkDrops.length + ' drops on ' + cashShifts.length + ' shifts over $500' }
+      { label: 'Cash variance trend (lower is better)', ratio: varRatio,    na: totalRev === 0,         extra: totalRev > 0 ? varPct.toFixed(2) + '% of revenue handled' : 'No revenue logged in window' },
+      { label: 'Drawer counts per shift',               ratio: drawerRatio, na: wkShifts.length === 0,  extra: wkDrawers.length + ' counts on ' + wkShifts.length + ' shifts' },
+      { label: 'Large void/comp authorization',         ratio: authRatio,   na: wkVoids.length === 0,   extra: wkVoids.length === 0 ? 'No voids/comps logged' : (authorized.length + ' of ' + overThresh.length + ' over $' + threshold + ' authorized') },
+      { label: 'Cash drops on revenue shifts',          ratio: dropRatio,   na: cashShifts.length === 0, extra: wkDrops.length + ' drops on ' + cashShifts.length + ' shifts over $500' }
     ];
-    const score = Math.round((components.reduce((s, c) => s + c.ratio, 0) / components.length) * 100);
-    return { score, detail: components };
+    return this._rollup(components);
   },
 
   // 3. Inventory Execution. Count cadence + discrepancy resolution + variance.
@@ -224,37 +232,32 @@ S.HubBarCopAudit = {
     const wkCounts = counts.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));
     const wkSpots  = spotChecks.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));
 
-    // Count cadence: expected weekly (4 in 30 days). Bonus for spot checks.
+    // Inventory is judged only when the operator runs inventory at all.
+    const invActive = wkCounts.length > 0 || wkSpots.length > 0;
     const countRatio = Math.min(1, wkCounts.length / 4);
     const spotRatio  = Math.min(1, wkSpots.length / 4);
 
-    // Discrepancy resolution rate: of those opened in the last 90 days, what
-    // percentage have status='resolved' (not 'open' or 'credit-requested').
+    // Discrepancy resolution rate over the last 90 days. N/A with no discrepancies on file.
     const recentDiscrep = discrep.filter(d => this._withinWindow(d.date, 90));
     const resolved      = recentDiscrep.filter(d => d.status === 'resolved');
-    const discrepRatio  = recentDiscrep.length === 0
-      ? 1
-      : resolved.length / recentDiscrep.length;
+    const discrepRatio  = recentDiscrep.length === 0 ? null : resolved.length / recentDiscrep.length;
 
-    // Discrepancy aging: discrepancies open more than 60 days deduct.
+    // Discrepancy aging: open more than 60 days deduct. N/A with no discrepancies at all.
     const aging = discrep.filter(d => d.status !== 'resolved' && this._daysSince(d.date) > 60);
-    const agingRatio = aging.length === 0 ? 1 : Math.max(0, 1 - aging.length / 5); // 5+ aging = 0
+    const agingRatio = discrep.length === 0 ? null : (aging.length === 0 ? 1 : Math.max(0, 1 - aging.length / 5));
 
-    // Spot check variance trend: ratio of clean (low variance) checks last 30 days.
+    // Spot check clean-variance rate. N/A when no spot checks in the window.
     const cleanSpots = wkSpots.filter(s => Math.abs(parseFloat(s.total_variance_dollar) || 0) < 5);
-    const spotPassRatio = wkSpots.length === 0
-      ? 0.5
-      : cleanSpots.length / wkSpots.length;
+    const spotPassRatio = wkSpots.length === 0 ? null : cleanSpots.length / wkSpots.length;
 
     const components = [
-      { label: 'Inventory counts on schedule',          ratio: countRatio,   pct: Math.round(countRatio * 100),   extra: wkCounts.length + ' of 4 expected weekly counts' },
-      { label: 'Spot checks completed',                 ratio: spotRatio,    pct: Math.round(spotRatio * 100),    extra: wkSpots.length + ' of 4 expected weekly' },
-      { label: 'Vendor discrepancy resolution rate',    ratio: discrepRatio, pct: Math.round(discrepRatio * 100), extra: resolved.length + ' of ' + recentDiscrep.length + ' resolved in last 90 days' },
-      { label: 'No discrepancies aging past 60 days',   ratio: agingRatio,   pct: Math.round(agingRatio * 100),   extra: aging.length + ' open discrepancies aging' },
-      { label: 'Spot check clean variance rate',        ratio: spotPassRatio, pct: Math.round(spotPassRatio * 100), extra: cleanSpots.length + ' of ' + wkSpots.length + ' under $5 variance' }
+      { label: 'Inventory counts on schedule',          ratio: countRatio,   na: !invActive,                  extra: wkCounts.length + ' of 4 expected weekly counts' },
+      { label: 'Spot checks completed',                 ratio: spotRatio,    na: !invActive,                  extra: wkSpots.length + ' of 4 expected weekly' },
+      { label: 'Vendor discrepancy resolution rate',    ratio: discrepRatio, na: recentDiscrep.length === 0,  extra: recentDiscrep.length === 0 ? 'No discrepancies filed' : (resolved.length + ' of ' + recentDiscrep.length + ' resolved in last 90 days') },
+      { label: 'No discrepancies aging past 60 days',   ratio: agingRatio,   na: discrep.length === 0,        extra: discrep.length === 0 ? 'No discrepancies filed' : (aging.length + ' open discrepancies aging') },
+      { label: 'Spot check clean variance rate',        ratio: spotPassRatio, na: wkSpots.length === 0,       extra: cleanSpots.length + ' of ' + wkSpots.length + ' under $5 variance' }
     ];
-    const score = Math.round((components.reduce((s, c) => s + c.ratio, 0) / components.length) * 100);
-    return { score, detail: components };
+    return this._rollup(components);
   },
 
   // 4. Labor Hygiene. Schedule adherence, callouts, OT, certs, coaching,
@@ -271,61 +274,50 @@ S.HubBarCopAudit = {
     const wkCallouts = callouts.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));
     const wkNotes    = notes.filter(n => this._withinWindow(n.date, 90));
 
-    // Schedule adherence: total actual hours vs total scheduled in window.
-    // Within 5% = perfect, 10%+ deviation = 0.
-    let schedScore = 0.5;
-    if (wkActuals.length > 0) {
+    const laborActive = wkActuals.length > 0;
+
+    // Schedule adherence: actual vs scheduled hours. N/A without both.
+    let schedScore = null, schedExtra = 'No logged hours in window';
+    if (laborActive) {
       const totalActual = wkActuals.reduce((s, a) => s + (parseFloat(a.hours) || 0), 0);
       const wkSchedules = schedules.filter(s => this._withinWindow(s.date, this.WINDOW_DAYS));
       const totalSched  = wkSchedules.reduce((s, x) => s + (parseFloat(x.hours) || 0), 0);
       if (totalSched > 0) {
         const dev = Math.abs(totalActual - totalSched) / totalSched;
-        schedScore = Math.max(0, 1 - (dev / 0.10)); // 0% dev = 1, 10%+ = 0
-      }
+        schedScore = Math.max(0, 1 - (dev / 0.10));
+        schedExtra = Math.round(totalActual) + ' actual vs ' + Math.round(totalSched) + ' scheduled hours';
+      } else { schedExtra = 'No schedule logged to compare against'; }
     }
 
-    // Callout frequency: ideal < 1 per 20 shifts in window.
-    const expShifts = wkActuals.length || 1;
-    const calloutRate = wkCallouts.length / Math.max(20, expShifts) * 20;
-    const calloutScore = Math.max(0, 1 - calloutRate); // 0 callouts = 1, 1+ per 20 = 0
+    // Callout frequency: ideal < 1 per 20 shifts. N/A without logged hours.
+    const calloutRate = wkCallouts.length / Math.max(20, wkActuals.length || 1) * 20;
+    const calloutScore = laborActive ? Math.max(0, 1 - calloutRate) : null;
 
-    // OT incidents: weeks where any staff exceeded 40 hours.
-    // Simplified: count actuals > 40 hours in the window.
+    // OT incidents: actuals over 40 hours in the window.
     const otCount = wkActuals.filter(a => (parseFloat(a.hours) || 0) > 40).length;
-    const otScore = Math.max(0, 1 - (otCount / 5)); // 5+ OT incidents = 0
+    const otScore = laborActive ? Math.max(0, 1 - (otCount / 5)) : null;
 
-    // Certifications expiring in next 30 days deduct.
-    const expiring = certs.filter(c => {
-      if (!c.expiration_date) return false;
-      const days = this._daysSince(c.expiration_date) * -1;
-      return days >= 0 && days <= 30;
-    });
-    const expired = certs.filter(c => {
-      if (!c.expiration_date) return false;
-      const days = this._daysSince(c.expiration_date);
-      return days != null && days > 0;
-    });
-    const certScore = certs.length === 0
-      ? 0.5
-      : Math.max(0, 1 - (expiring.length + expired.length * 2) / Math.max(certs.length, 3));
+    // Certifications. N/A when none are on file.
+    const expiring = certs.filter(c => { if (!c.expiration_date) return false; const days = this._daysSince(c.expiration_date) * -1; return days >= 0 && days <= 30; });
+    const expired  = certs.filter(c => { if (!c.expiration_date) return false; const days = this._daysSince(c.expiration_date); return days != null && days > 0; });
+    const certScore = certs.length === 0 ? null : Math.max(0, 1 - (expiring.length + expired.length * 2) / Math.max(certs.length, 3));
 
-    // Coaching log activity: at least one note per 90 days.
-    const coachingScore = wkNotes.length > 0 ? 1 : 0;
+    // Coaching log activity — judged only when there is staff/labor activity.
+    const coachingScore = laborActive ? (wkNotes.length > 0 ? 1 : 0) : null;
 
-    // Wage + tip-credit policy configured (boolean signal — no breach log).
+    // Wage policy configured — a real yes/no, judged when the operator runs labor.
     const policyConfigured = !!(wage.state_min_wage && (wage.state_min_wage > 0));
-    const policyScore = policyConfigured ? 1 : 0;
+    const policyScore = laborActive ? (policyConfigured ? 1 : 0) : null;
 
     const components = [
-      { label: 'Schedule adherence',                  ratio: schedScore,    pct: Math.round(schedScore * 100),    extra: wkActuals.length + ' actuals vs scheduled hours' },
-      { label: 'Callout frequency',                   ratio: calloutScore,  pct: Math.round(calloutScore * 100),  extra: wkCallouts.length + ' callouts in window' },
-      { label: 'Overtime incidents under control',    ratio: otScore,       pct: Math.round(otScore * 100),       extra: otCount + ' shifts over 40 hours' },
-      { label: 'Certifications current',              ratio: certScore,     pct: Math.round(certScore * 100),     extra: expired.length + ' expired, ' + expiring.length + ' expiring in 30 days' },
-      { label: 'Coaching log activity',               ratio: coachingScore, pct: Math.round(coachingScore * 100), extra: wkNotes.length + ' coaching notes in last 90 days' },
-      { label: 'Wage policy configured',              ratio: policyScore,   pct: Math.round(policyScore * 100),   extra: policyConfigured ? 'State minimum wage set in Wage Policies' : 'Wage Policies not configured' }
+      { label: 'Schedule adherence',                  ratio: schedScore,    na: schedScore == null,         extra: schedExtra },
+      { label: 'Callout frequency',                   ratio: calloutScore,  na: !laborActive,               extra: wkCallouts.length + ' callouts in window' },
+      { label: 'Overtime incidents under control',    ratio: otScore,       na: !laborActive,               extra: otCount + ' shifts over 40 hours' },
+      { label: 'Certifications current',              ratio: certScore,     na: certs.length === 0,         extra: certs.length === 0 ? 'No certifications on file' : (expired.length + ' expired, ' + expiring.length + ' expiring in 30 days') },
+      { label: 'Coaching log activity',               ratio: coachingScore, na: !laborActive,               extra: wkNotes.length + ' coaching notes in last 90 days' },
+      { label: 'Wage policy configured',              ratio: policyScore,   na: !laborActive,               extra: policyConfigured ? 'State minimum wage set in Wage Policies' : 'Wage Policies not configured' }
     ];
-    const score = Math.round((components.reduce((s, c) => s + c.ratio, 0) / components.length) * 100);
-    return { score, detail: components };
+    return this._rollup(components);
   },
 
   // 5. Recovery Action. Did the operator act on what Bar Cop surfaced?
@@ -360,22 +352,18 @@ S.HubBarCopAudit = {
       });
     }
 
-    // Component 1: act-on-gaps ratio = fixes-in-window / surfaced.
-    const actRatio = surfaced === 0
-      ? 0.5
-      : Math.min(1, wkFixes.length / surfaced);
+    // Component 1: act-on-gaps. N/A until an audit has surfaced something.
+    const actRatio = surfaced === 0 ? null : Math.min(1, wkFixes.length / surfaced);
 
-    // Component 2: dollar-conversion = recovered / total-logged.
-    const convRatio = fixLog.length === 0
-      ? 0.5
-      : Math.min(1, recoveredCount / fixLog.length);
+    // Component 2: of the fixes logged, how many produced real favorable movement.
+    // N/A until at least one fix is logged.
+    const convRatio = fixLog.length === 0 ? null : Math.min(1, recoveredCount / fixLog.length);
 
     const components = [
-      { label: 'Acting on surfaced gaps',                ratio: actRatio,  pct: Math.round(actRatio * 100),  extra: wkFixes.length + ' fixes logged in last 30 days against ' + surfaced + ' surfaced gaps' },
-      { label: 'Fixes that produced dollar movement',    ratio: convRatio, pct: Math.round(convRatio * 100), extra: recoveredCount + ' of ' + fixLog.length + ' total logged fixes matured with positive dollars' }
+      { label: 'Acting on surfaced gaps',                ratio: actRatio,  na: surfaced === 0,      extra: surfaced === 0 ? 'No audit has surfaced gaps yet' : (wkFixes.length + ' fixes logged in last 30 days against ' + surfaced + ' surfaced gaps') },
+      { label: 'Fixes that produced movement',           ratio: convRatio, na: fixLog.length === 0, extra: fixLog.length === 0 ? 'No fixes logged yet' : (recoveredCount + ' of ' + fixLog.length + ' logged fixes produced favorable movement') }
     ];
-    const score = Math.round((components.reduce((s, c) => s + c.ratio, 0) / components.length) * 100);
-    return { score, detail: components };
+    return this._rollup(components);
   },
 
   // 6. Operational Consistency. Week-over-week variance in stable metrics
@@ -386,37 +374,30 @@ S.HubBarCopAudit = {
 
     // Coefficient of variation: stddev / mean. Lower = more consistent.
     // 0% CV = perfect, 15%+ CV = 0.
+    // Needs at least 3 weeks to mean anything; otherwise N/A (no 0.5 placeholder).
     const cvScore = (values) => {
       const v = values.filter(x => x != null && !isNaN(x));
-      if (v.length < 3) return 0.5; // not enough data
+      if (v.length < 3) return null;
       const mean = v.reduce((s, x) => s + x, 0) / v.length;
-      if (mean === 0) return 0.5;
+      if (mean === 0) return null;
       const variance = v.reduce((s, x) => s + Math.pow(x - mean, 2), 0) / v.length;
-      const stddev = Math.sqrt(variance);
-      const cv = stddev / Math.abs(mean);
+      const cv = Math.sqrt(variance) / Math.abs(mean);
       return Math.max(0, 1 - (cv / 0.15));
     };
-
-    // Weekly covers (from revenue_weeks if available, else from sc_shifts roll-up)
     const coversCV = cvScore(revWeeks.map(w => (parseFloat(w.covers) || 0)));
-
-    // Weekly labor % (combined departments)
     const laborPctCV = cvScore(weeks.map(w => {
       const rev = (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0);
       const lab = parseFloat(w.labor_total) || 0;
       return rev > 0 ? (lab / rev) * 100 : null;
     }));
-
-    // Weekly pour cost %
     const pourCostCV = cvScore(weeks.map(w => parseFloat(w.bar?.cost_pct)));
 
     const components = [
-      { label: 'Weekly covers consistency',         ratio: coversCV,   pct: Math.round(coversCV * 100),   extra: revWeeks.length + ' weeks of revenue data' },
-      { label: 'Weekly labor % consistency',        ratio: laborPctCV, pct: Math.round(laborPctCV * 100), extra: weeks.length + ' weeks of P&L data' },
-      { label: 'Weekly pour cost % consistency',    ratio: pourCostCV, pct: Math.round(pourCostCV * 100), extra: weeks.length + ' weeks of P&L data' }
+      { label: 'Weekly covers consistency',         ratio: coversCV,   na: coversCV == null,   extra: revWeeks.length + ' weeks of revenue data (need 3+)' },
+      { label: 'Weekly labor % consistency',        ratio: laborPctCV, na: laborPctCV == null, extra: weeks.length + ' weeks of P&L data (need 3+)' },
+      { label: 'Weekly pour cost % consistency',    ratio: pourCostCV, na: pourCostCV == null, extra: weeks.length + ' weeks of P&L data (need 3+)' }
     ];
-    const score = Math.round((components.reduce((s, c) => s + c.ratio, 0) / components.length) * 100);
-    return { score, detail: components };
+    return this._rollup(components);
   },
 
   // ── Top Operational Exposures ───────────────────────────────────────────
@@ -434,9 +415,12 @@ S.HubBarCopAudit = {
     const aging = discrep.filter(d => d.status !== 'resolved' && this._daysSince(d.date) > 60);
     if (aging.length) {
       const totalClaimed = aging.reduce((s, d) => s + (parseFloat(d.overcharge || d.claimed_amount) || 0), 0);
+      const totalRecovered = aging.reduce((s, d) => s + (parseFloat(d.recovered_amount || d.credited_amount) || 0), 0);
       out.push({
         label:    aging.length + ' vendor discrepancies open past 60 days',
-        detail:   '$' + Math.round(totalClaimed).toLocaleString() + ' claimed, $0 recovered. Push the vendor or write it off.',
+        detail:   '$' + Math.round(totalClaimed).toLocaleString() + ' claimed'
+                  + (totalRecovered > 0 ? ', $' + Math.round(totalRecovered).toLocaleString() + ' recovered so far' : ' still unresolved')
+                  + '. Push the vendor or write it off.',
         severity: 'critical',
         screen:   'vendor-discrepancy'
       });
@@ -711,13 +695,17 @@ S.HubBarCopAudit = {
     const rec    = this._scoreRecoveryAction();
     const cons   = this._scoreOperationalConsistency();
     const subs   = [disc.score, cash.score, inv.score, labor.score, rec.score, cons.score];
-    const overall = Math.round(subs.reduce((s, x) => s + x, 0) / subs.length);
+    // Average only the sub-scores that actually have data. A score is honest
+    // about how much of the operation it could see (sub_scores_covered of 6).
+    const scored = subs.filter(x => x != null && !isNaN(x));
+    const overall = scored.length ? Math.round(scored.reduce((s, x) => s + x, 0) / scored.length) : null;
 
     return {
       id:          App.uid ? App.uid() : ('bca-' + Date.now()),
       date:        new Date().toISOString(),
       bar_name:    (App.data?.settings?.bar_name) || 'Your Operation',
       overall_score: overall,
+      sub_scores_covered: scored.length,
       sub_scores: {
         operational_discipline:   disc.score,
         cash_integrity:           cash.score,
@@ -792,10 +780,8 @@ S.HubBarCopAudit = {
 
     let requestRight = '';
     if (!enough) {
-      const daysShort = Math.max(0, this.MIN_DATA_DAYS - daysOfData);
-      requestRight = '<div style="text-align:right;flex-shrink:0;">'
-        + '<div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysShort + ' day' + (daysShort === 1 ? '' : 's') + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until audit unlocks</div></div>';
+      requestRight = '<div style="text-align:right;flex-shrink:0;max-width:240px;">'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;">Log some Inventory, Shift, or Labor Control data and the audit can score it.</div></div>';
     } else if (canRunAudit) {
       requestRight = '<button class="btn btn-primary" id="bca-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>';
     } else {
@@ -805,11 +791,8 @@ S.HubBarCopAudit = {
     }
 
     const requestBody = enough
-      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. Executive operational read across every system. Six sub-scores, top exposures, recurring patterns, and the recovery activity snapshot. Print or save as a PDF from your browser.'
-      : 'Bar Cop Audit opens after the operation has ' + this.MIN_DATA_DAYS + ' days of logged data across Inventory, Labor, and Shift Control. '
-        + (daysOfData > 0
-            ? 'You have ' + daysOfData + ' day' + (daysOfData === 1 ? '' : 's') + ' of data so far.'
-            : 'No Control data logged yet. Start with Take Inventory, Log Shift, and Log Hours.');
+      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. Executive operational read across every system. Each of the six sub-scores fills in as you log the data behind it, and shows N/A until then. Top exposures, recurring patterns, and recovery activity included. Print or save as a PDF from your browser.'
+      : 'The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Start logging in Inventory, Shift, and Labor Control and it scores what it can, filling in the rest over time.';
 
     const requestCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -1000,26 +983,34 @@ S.HubBarCopAudit = {
     ];
 
     const subBlock = (key, name) => {
-      const sc = (audit.sub_scores && audit.sub_scores[key]) || 0;
-      const col = App.scoreColor(sc);
+      const raw = audit.sub_scores && audit.sub_scores[key];
+      const isNA = raw == null;
+      const sc = isNA ? null : raw;
+      const col = isNA ? 'var(--t3)' : App.scoreColor(sc);
       const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
       const breakdown = detail.length
         ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
           + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Score Breakdown</div>'
-          + detail.map(c => '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-size:12px;color:var(--t2);">'
-              + '<div style="flex:1;">' + esc(c.label) + (c.extra ? ' <span style="color:var(--t3);font-size:11px;">(' + esc(c.extra) + ')</span>' : '') + '</div>'
-              + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:' + App.scoreColor(c.pct) + ';width:50px;text-align:right;">' + c.pct + '</div>'
-              + '</div>').join('')
+          + detail.map(c => {
+              const naC = c.na || c.pct == null;
+              return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-size:12px;color:var(--t2);">'
+                + '<div style="flex:1;">' + esc(c.label) + (c.extra ? ' <span style="color:var(--t3);font-size:11px;">(' + esc(c.extra) + ')</span>' : '') + '</div>'
+                + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:' + (naC ? 'var(--t3)' : App.scoreColor(c.pct)) + ';width:50px;text-align:right;font-size:' + (naC ? '11px' : '14px') + ';">' + (naC ? 'N/A' : c.pct) + '</div>'
+                + '</div>';
+            }).join('')
           + '</div>'
         : '';
+      const scoreBlock = isNA
+        ? '<div style="text-align:right;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
+        : '<div style="text-align:right;">'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + col + ';line-height:1;">' + sc + '</div>'
+          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + sc + '%;background:' + col + ';border-radius:3px;"></div></div>'
+          + '</div>';
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
         +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Sub-Score</div>'
         +     '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
-        +   '<div style="text-align:right;">'
-        +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + col + ';line-height:1;">' + sc + '</div>'
-        +     '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + sc + '%;background:' + col + ';border-radius:3px;"></div></div>'
-        +   '</div>'
+        +   scoreBlock
         + '</div>'
         + breakdown
         + '</div>';
@@ -1074,7 +1065,7 @@ S.HubBarCopAudit = {
       + '<div class="calc">'
       +   '<div class="calc-item"><div class="calc-label">Gaps Surfaced</div><div class="calc-val">' + snap.gaps + '</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Fixes Logged (30d)</div><div class="calc-val ' + (snap.fixesLogged > 0 ? 'good' : '') + '">' + snap.fixesLogged + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Dollars Recovered (Annualized)</div><div class="calc-val ' + (snap.dollarsRecovered > 0 ? 'good' : '') + '">' + App.fmtCurrency(snap.dollarsRecovered, 0) + '</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Recovered to date</div><div class="calc-val ' + (snap.dollarsRecovered > 0 ? 'good' : '') + '">' + App.fmtCurrency(snap.dollarsRecovered, 0) + '</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Still Measuring</div><div class="calc-val">' + snap.stillMeasuring + '</div></div>'
       + '</div>'
       + '</div>';
