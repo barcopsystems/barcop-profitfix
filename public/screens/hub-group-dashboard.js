@@ -78,7 +78,12 @@ S.HubGroupDashboard = {
     const lastT = tWeeks.length ? tWeeks[tWeeks.length - 1] : null;
     const barRev = lastW?.bar?.revenue || 0;
     const foodRev = lastW?.food?.revenue || 0;
+    // Bar Cop Audit — the executive monthly score across the whole operation.
+    // Latest audit per account; null if the bar has not run one yet.
+    const bcaAudits = Array.isArray(d.bar_cop_audits) ? d.bar_cop_audits : [];
+    const lastBCA   = bcaAudits.length ? bcaAudits[bcaAudits.length - 1] : null;
     return {
+      barCopAudit: lastBCA?.overall_score ?? null,
       weeklyRevenue: (barRev + foodRev) || null,
       pourCost:  lastW?.bar?.cost_pct ?? null,
       foodCost:  lastW?.food?.cost_pct ?? null,
@@ -93,6 +98,15 @@ S.HubGroupDashboard = {
         googleRating: t.google_rating ?? 4.3
       }
     };
+  },
+
+  // Audit-score color band. Mirrors the at-a-glance softScore used on the Hub
+  // Dashboard so the Group view feels visually consistent with the per-bar view.
+  _scoreColor(v) {
+    if (v == null) return 'var(--t3)';
+    if (v >= 70) return 'var(--green)';
+    if (v >= 50) return 'var(--gold)';
+    return 'var(--red)';
   },
 
   // Bar Cop's standard green/amber/red banding logic
@@ -119,6 +133,7 @@ S.HubGroupDashboard = {
   _fmtPct(v) { return v == null ? '--' : v.toFixed(1) + '%'; },
   _fmtCur(v) { return v == null ? '--' : App.fmtCurrency(v); },
   _fmtRating(v) { return v == null ? '--' : v.toFixed(1) + ' ★'; },
+  _fmtScore(v) { return v == null ? '--' : String(Math.round(v)); },
 
   _render(panel, accounts, dataByAccount) {
     if (!accounts || accounts.length === 0) {
@@ -147,6 +162,7 @@ S.HubGroupDashboard = {
 
     const header = '<thead><tr style="border-bottom:1px solid var(--b2);">'
       + '<th style="' + labelStyle + 'text-align:left;padding-left:14px;">Bar</th>'
+      + '<th style="' + labelStyle + '">Bar Cop Audit</th>'
       + '<th style="' + labelStyle + '">Weekly Revenue</th>'
       + '<th style="' + labelStyle + '">Pour Cost</th>'
       + '<th style="' + labelStyle + '">Food Cost</th>'
@@ -162,8 +178,10 @@ S.HubGroupDashboard = {
       const primeBand = this._band(m.primeCost, m.targets.primeCost, 'low');
       const laborBand = this._band(m.laborPct,  m.targets.laborPct,  'low');
       const grBand    = this._band(m.googleRating, m.targets.googleRating, 'high');
+      const auditColor = this._scoreColor(m.barCopAudit);
       return '<tr class="gd-row" data-account="' + esc(a.id) + '" style="border-bottom:1px solid var(--b2);cursor:pointer;transition:background 0.12s;">'
         + '<td style="' + nameStyle + '">' + esc(a.name) + '</td>'
+        + '<td style="' + cellStyle + 'color:' + auditColor + ';">' + this._fmtScore(m.barCopAudit) + (m.barCopAudit != null ? '<span style="font-family:\'Barlow\',sans-serif;font-size:10px;color:var(--t3);font-weight:600;margin-left:2px;">/ 100</span>' : '') + '</td>'
         + '<td style="' + cellStyle + 'color:var(--t1);">' + this._fmtCur(m.weeklyRevenue) + '</td>'
         + '<td style="' + cellStyle + 'color:' + this._bandColor(pourBand) + ';">' + this._fmtPct(m.pourCost) + '</td>'
         + '<td style="' + cellStyle + 'color:' + this._bandColor(foodBand) + ';">' + this._fmtPct(m.foodCost) + '</td>'
