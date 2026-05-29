@@ -125,12 +125,14 @@ function computeProfitAudit(appData, controlData, extracted) {
 
   // ── S1 — Bar Cost and Pour Control ──
   const recipeCount = recipes.length || (num(extracted.recipe_count) || 0);
+  const recipesCosted = (extracted.recipes_costed || '').toLowerCase();
+  const haveCostedRecipes = recipeCount > 0 || recipesCosted === 'some' || recipesCosted === 'all';
   // Results-based bonus: only a measured/jiggered pour earns credit. Free pour
   // is the bad behavior, not a control — it earns nothing.
   const pourStr = (extracted.pour_method || '').toLowerCase();
   const measuredPour = pourStr.includes('jigger') || pourStr.includes('measur');
   let s1 = scoreCostVsTarget(barCostPct, barTarget, [85, 65, 45, 25]) || 25;
-  if (recipeCount > 0) s1 += 10;
+  if (haveCostedRecipes) s1 += 10;
   if (measuredPour) s1 += 5;
   s1 = clampScore(s1);
   const s1Diff = (barCostPct != null && barTarget != null) ? barCostPct - barTarget : 0;
@@ -143,7 +145,7 @@ function computeProfitAudit(appData, controlData, extracted) {
   // Scored on actual loss behavior: void/comp rate vs benchmark, unauthorized
   // void rate, and cash short rate. Documented controls give modest capped
   // credit that cannot rescue a bad rate. (Decision 8, audit-honesty-rebuild.)
-  const haveCashRecon = (num(cd.cash_reconciliations) > 0) || recons.length > 0;
+  const haveCashRecon = (num(cd.cash_reconciliations) > 0) || recons.length > 0 || extracted.drawer_recon === true;
   const haveShiftChecks = shifts.length > 0 || num(cd.spot_checks) > 0;
   const haveApprovalPolicy = !!extracted.void_approval || num(cd.void_comp_unauthorized) != null;
   // Void/comp rate from period-scoped Control sum vs period total revenue.
@@ -199,7 +201,7 @@ function computeProfitAudit(appData, controlData, extracted) {
   const haveInvFreq = num(cd.inventory_counts) > 0
     || (invFreqStr !== '' && !invFreqStr.includes('never') && !invFreqStr.includes('none') && !invFreqStr.includes('not'));
   let s3 = scoreCostVsTarget(foodCostPct, foodTarget, [85, 65, 45, 25]) || 25;
-  if (kitchenProducts.length > 0) s3 += 10;
+  if (haveCostedRecipes) s3 += 10;   // costed recipes control food cost (behavior, not setup)
   if (haveInvFreq) s3 += 5;
   s3 = clampScore(s3);
   const s3Diff = (foodCostPct != null && foodTarget != null) ? foodCostPct - foodTarget : 0;
@@ -288,7 +290,10 @@ function computeProfitAudit(appData, controlData, extracted) {
     S1_INV_VARIANCE_PCT: invVarPct != null ? invVarPct : 0,
     S1_INV_VARIANCE_AMT: invVarAmt != null ? invVarAmt : 0,
     S1_POUR_METHOD: extracted.pour_method || 'Not documented',
-    S1_RECIPE_COVERAGE: `${recipeCount} recipes`,
+    S1_RECIPE_COVERAGE: recipesCosted === 'all' ? 'All recipes costed'
+      : recipesCosted === 'some' ? 'Some recipes costed'
+      : recipesCosted === 'none' ? 'No costed recipes'
+      : `${recipeCount} recipes`,
     S1_MONTHLY_GAP: s1MonthlyGap,
     S1_ANNUAL_GAP: round0(s1MonthlyGap * 12),
 
@@ -451,6 +456,18 @@ if (require.main === module) {
   // Food-only operation (no bar): mirror case.
   const foodOnly = computeProfitAudit({ settings: { targets: {} } }, null, { food_revenue_monthly: 40000, food_cogs_monthly: 13200 });
   ftChecks.push(['food-only: S1 Bar is N/A (null)', foodOnly.S1_SCORE, null]);
+
+  // Operating-practice questions: same costs, better practices -> higher scores
+  // (the "update answers next audit and watch the score move" case).
+  const improved = computeProfitAudit({ settings: { targets: {} } }, null, {
+    bar_revenue_monthly: 51500, bar_cogs_monthly: 14111, food_revenue_monthly: 31000, food_cogs_monthly: 11098,
+    labor_cost_monthly: 24000, pour_method: 'Jiggered/measured', recipes_costed: 'all', inv_freq: 'Weekly',
+    void_approval: true, drawer_recon: true, voids_total: 3465, voids_no_approval_pct: 5,
+    invoice_vs_po: 'Matched every delivery', backup_vendors: 'Yes'
+  });
+  ftChecks.push(['practices: measured pour + costed recipes raise S1', improved.S1_SCORE > firstTime.S1_SCORE, true]);
+  ftChecks.push(['practices: costed recipes + counts raise S3', improved.S3_SCORE > firstTime.S3_SCORE, true]);
+  ftChecks.push(['practices: matched invoices + backups raise S4', improved.S4_SCORE > firstTime.S4_SCORE, true]);
   let ftPass = 0;
   for (const [label, got, exp] of ftChecks) {
     const ok = got === exp; if (ok) ftPass++;
