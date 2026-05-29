@@ -333,15 +333,16 @@ S.HubBooks = {
 
       // Workbook properties so the disclaimer is visible in Excel's File >
       // Properties pane too, not only in the sheet footers.
+      const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
       wb.Props = {
-        Title:        'Bar Cop Books, ' + this._monthLabel(monthKey),
+        Title:        barName + ' - Books, ' + this._monthLabel(monthKey),
         Subject:      App.deliverableFooter().workbookSubject,
-        Author:       (App.data?.settings?.bar_name) || 'Bar Cop',
+        Author:       barName,
         Company:      'Bar Cop',
         CreatedDate:  new Date()
       };
 
-      const filename = 'Bar Cop Books - ' + this._monthLabel(monthKey) + '.xlsx';
+      const filename = barName + ' - Books - ' + this._monthLabel(monthKey) + '.xlsx';
       XLSX.writeFile(wb, filename);
 
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
