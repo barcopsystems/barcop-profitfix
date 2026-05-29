@@ -538,6 +538,35 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 }
 .sidebar-mobile-close:hover{border-color:rgba(255,255,255,0.25);color:var(--w);}
 
+/* Mobile-only multi-location slot at the top of the sidebar. Holds the
+   location switcher dropdown + the Group Dashboard button for operators
+   with more than one bar. Hidden on desktop where the topbar variants are
+   visible instead. */
+.sidebar-multi-loc{
+  display:none;
+  padding:14px 14px 16px;
+  border-bottom:1px solid var(--b2);
+  flex-direction:column;gap:10px;
+}
+.sidebar-multi-loc-label{
+  font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--t3);
+}
+.sidebar-multi-loc select{
+  width:100%;height:40px;
+  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;
+  padding:0 10px;cursor:pointer;outline:none;
+}
+.sidebar-multi-loc .smm-group-btn{
+  width:100%;height:40px;
+  background:transparent;border:1px solid var(--b1);border-radius:var(--r);
+  color:var(--t2);font-family:'Barlow',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;
+  transition:border-color 0.12s,color 0.12s;
+}
+.sidebar-multi-loc .smm-group-btn:hover{border-color:var(--gold);color:var(--gold);}
+
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
    wire a click handler to close. Created on demand by the hamburger handler. */
 .sidebar-backdrop{
@@ -575,10 +604,25 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
      explicit out once the sidebar has slid over the topbar. */
   .sidebar-mobile-close{display:flex;}
 
-  /* Topbar density: tighter padding, smaller title. */
+  /* Topbar density: tighter padding, smaller title, hide the date subtitle
+     to keep the bar name from squeezing. Title truncates with an ellipsis
+     if the bar name is unusually long instead of wrapping into the topbar. */
   .topbar{padding:0 12px;}
-  .topbar-title{font-size:11px;letter-spacing:1.4px;}
-  .topbar-sub{font-size:10px;margin-left:6px;}
+  .topbar-left{min-width:0;}
+  .topbar-title{font-size:12px;letter-spacing:1.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .topbar-sub{display:none !important;}
+
+  /* Topbar account switcher + Group Dashboard button hide on mobile -- they
+     move into the sidebar (.sidebar-multi-loc slot) instead. The topbar
+     stays clean with just hamburger + bar name. */
+  #topbar-account-switcher,
+  #topbar-group-dashboard,
+  #hub-topbar-account-switcher,
+  #hub-topbar-group-dashboard{display:none !important;}
+
+  /* Sidebar multi-loc slot becomes visible. Render at the top of the
+     sidebar so it sits above the nav, just under the logo bar. */
+  .sidebar-multi-loc{display:flex;}
 
   /* Screen container padding tightens on narrow viewports. Bottom padding
      stays generous so the last card/button on a screen never butts up
