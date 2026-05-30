@@ -207,7 +207,10 @@ S.InventoryLocations = {
   _productsModalHTML() {
     return '<div id="il-prod-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
       + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;max-width:460px;width:92%;max-height:80vh;overflow:auto;">'
-      + '<div style="font-size:14px;font-weight:800;color:var(--w);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Products In This Location</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px;">'
+      +   '<div style="font-size:14px;font-weight:800;color:var(--w);text-transform:uppercase;letter-spacing:0.5px;">Products In This Location</div>'
+      +   '<button type="button" id="il-prod-x" aria-label="Close" style="border:none;background:none;color:var(--t2);font-size:22px;line-height:1;cursor:pointer;padding:0;">&times;</button>'
+      + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.6;">Check every product stocked here. Unchecking removes this location from that product.</div>'
       + '<div id="il-prod-modal-body"></div>'
       + '<div class="card-actions" style="margin-top:16px;">'
@@ -330,6 +333,7 @@ S.InventoryLocations = {
       document.getElementById('il-add-products')?.addEventListener('click', () => this._openProductsModal(l.name));
       document.getElementById('il-prod-done')?.addEventListener('click', () => this._applyProductsModal(l.name));
       document.getElementById('il-prod-cancel')?.addEventListener('click', () => { const m = document.getElementById('il-prod-modal'); if (m) m.style.display = 'none'; });
+      document.getElementById('il-prod-x')?.addEventListener('click', () => { const m = document.getElementById('il-prod-modal'); if (m) m.style.display = 'none'; });
     }
     if (profileMode === 'edit') {
       const nameEl = document.getElementById('il-name');
