@@ -1669,23 +1669,43 @@ S.HubSettings = {
       90:[0.7,1.9], 91:[34,91], 92:[27,72], 93:[14,38], 94:[7,19], 95:[22,58],
       96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8]
     };
-    const icCountItem = (p, qty) => ({
-      product_id:p.id, name:p.name, category:p.category,
-      fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
-      unit_cost:p.unit_cost, value:+(qty * p.unit_cost).toFixed(2), notes:''
-    });
-    const mkCount = (daysAgo, pick) => {
+    const icCountItem = (p, qty) => {
+      // Bottle beer unit_cost is per CASE; value the counted bottles at per-bottle
+      // cost (unit_cost / case_size), mirroring the live Take Inventory screen
+      // (ic-take-inventory.js). Every other category values at unit_cost. Without
+      // this, beer inventory valuation inflates ~24x (count total_value, Stock
+      // report, books Schedule-C) and reads obviously fake to an operator.
+      const perUnit = (p.category === 'Bottle Beer' && p.case_size) ? p.unit_cost / p.case_size : p.unit_cost;
+      return {
+        product_id:p.id, name:p.name, category:p.category,
+        fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
+        unit_cost:p.unit_cost, value:+(qty * perUnit).toFixed(2), notes:''
+      };
+    };
+    const mkCount = (daysAgo, pick, countedBy) => {
       const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
-      return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:'Maria G.',
+      return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:countedBy || 'Maria G.',
         locations:['Liquor Room','Back Bar','Walk-in Cooler','Kitchen Line'],
         items:items, item_count:items.length,
         total_value:+items.reduce((s, it) => s + it.value, 0).toFixed(2),
         created_at:daysAgoISO(daysAgo) };
     };
+    // The recent three counts drive the live weekly COGS + variance window and
+    // must stay exactly as-is. The older weekly counts (back ~12 weeks) oscillate
+    // around the well-stocked day-7 level so inventory reads flat across the
+    // quarter (beginning ~= ending), with a couple of busy-week draw-downs — the
+    // sawtooth a real bar shows. Deterministic multipliers keep it reproducible.
+    const icOlderCounters = ['Carlos P.', 'Maria G.', 'Jake T.'];
+    const icOlderWeeks = [
+      [21, 1.05], [28, 0.92], [35, 1.10], [42, 0.86], [49, 1.03],
+      [56, 0.95], [63, 1.09], [70, 0.90], [77, 1.04], [84, 0.98]
+    ];
     App.inventoryData.ic_counts = [
       mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
       mkCount(7,  i => icTotals[i][1]),
       mkCount(0,  i => icTotals[i][0]),
+      ...icOlderWeeks.map(([d, m], k) =>
+        mkCount(d, i => +(icTotals[i][1] * m).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
     ];
 
     // Deliveries — all dated 8+ days back so none fall inside the last count
@@ -1724,6 +1744,57 @@ S.HubSettings = {
         icDLine(icProducts[3], 12, 31.00, 31.00),
       ]),
     ];
+
+    // ── Full quarter of delivery history (ties to COGS) ───────────────────────
+    // Each SKU is reordered on its own cadence based on how fast it moves in
+    // dollars: big movers weekly, mid every 2-3 weeks, slow movers monthly. A SKU
+    // only lands on an invoice the week it's due, so each invoice reads like a
+    // real reorder (the items that dropped to par) at ~8-15 lines, and the qty
+    // refills the gap since the last drop. Summed over the quarter this
+    // auto-ties to ~12 weeks of usage. The most recent ~14 days are left light on
+    // purpose: the inventory draw-down those weeks is what the seeded Open /
+    // Submitted orders in the pipeline will refill. The whole chain reconciles —
+    // beginning count + purchases - ending count lands within 2% of the booked
+    // 12-week COGS.
+    const icWkUsage = {}; Object.keys(icTotals).forEach(i => { icWkUsage[i] = icTotals[i][1] - icTotals[i][0]; });
+    const icEffUnitPrice = p => (p.category === 'Bottle Beer' && p.case_size)
+      ? +(p.unit_cost / p.case_size).toFixed(2) : p.unit_cost;
+    const icOrderInterval = uv => uv >= 60 ? 1 : uv >= 25 ? 2 : uv >= 10 ? 3 : 4;
+    let icInvSeq = 1000;
+    const mkVendorDelivery = (daysAgo, vendor, prefix, allowBump) => {
+      const weekIndex = Math.round(daysAgo / 7);
+      const lines = [];
+      icProducts.forEach((p, i) => {
+        if (p.vendor !== vendor) return;
+        const usage = icWkUsage[i] || 0;
+        const base  = icEffUnitPrice(p);
+        const uv    = usage * base;
+        if (uv < 3) return;                                  // negligible mover, not reordered in-window
+        const interval = icOrderInterval(uv);
+        if (weekIndex % interval !== (i % interval)) return; // not due this week
+        const qty = Math.max(1, Math.round(usage * interval));
+        const price = (allowBump && (i % 7 === 0)) ? +(base * 1.06).toFixed(2) : base;
+        lines.push(icDLine(p, qty, price, base));
+      });
+      if (lines.length === 0) return null;
+      icInvSeq += 1;
+      return mkDelivery(daysAgo, vendor, prefix + '-' + icInvSeq, lines);
+    };
+    // Vendor truck days across the quarter. Skips the most recent ~14 days (to
+    // preserve the draw-down + the live variance window) and the existing
+    // invoices' days above.
+    const icDeliveryPlan = [
+      ...[17, 24, 38, 45, 52, 59, 66, 73, 80].map(d => [d, 'Republic National', 'RN']),
+      ...[20, 27, 34, 41, 48, 55, 62, 69, 76, 83].map(d => [d, 'Sysco Foods', 'SY']),
+      ...[21, 28, 35, 42, 49, 56, 63, 70, 77, 84].map(d => [d, "Glazer's Beer & Bev", 'GLZ']),
+      ...[22, 36, 50, 64, 78].map(d => [d, 'Austin Beerworks', 'ABW']),
+      ...[19, 26, 33, 40, 47, 54, 61, 68, 75, 82].map(d => [d, 'Local Produce Co.', 'LPC']),
+      ...[30, 58].map(d => [d, 'Restaurant Depot', 'RD']),
+    ];
+    icDeliveryPlan.forEach(([d, vn, pre], k) => {
+      const del = mkVendorDelivery(d, vn, pre, (k % 5 === 0));
+      if (del) App.inventoryData.ic_deliveries.push(del);
+    });
 
     // Spot checks — feed the Theft Risk pour-variance signal.
     const icSpotItem = (p, pre, post, sold, flagged) => {
