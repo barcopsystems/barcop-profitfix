@@ -42,6 +42,43 @@ S.InventorySpotCheck = {
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
+  // ── Count input by product type (mirrors Take Inventory) ─────────────────
+  // Pourable (liquor/wine/draft/bottled mixer) uses the fill slider — a keg
+  // outline for draft; bottle beer uses cases + loose; food/dry goods use a
+  // plain number. slotId is unique per pre/post slot so both read back cleanly.
+  _isCaseBeer(p) { return p.category === 'Bottle Beer' && p.case_size && p.case_size > 0; },
+  _isPourable(p) { return !!(p.container_size_oz && p.pour_size_oz); },
+  spInputHTML(slotId, p) {
+    if (this._isCaseBeer(p)) {
+      return '<div class="form-row" style="gap:10px;">'
+        + '<div class="f" style="width:104px;"><label>Cases</label><div class="fw"><input class="suf sp-cases" data-slot="' + slotId + '" type="number" min="0" step="1" value="0" style="height:42px;text-align:center;"/><span class="suf">cs</span></div></div>'
+        + '<div class="f" style="width:110px;"><label>Loose</label><div class="fw"><input class="suf sp-loose" data-slot="' + slotId + '" type="number" min="0" step="1" value="0" style="height:42px;text-align:center;"/><span class="suf">btl</span></div></div>'
+        + '</div>';
+    }
+    if (this._isPourable(p)) {
+      return BottleSlider.html(slotId, { value: 0, fulls: 0, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') });
+    }
+    return '<div class="f" style="width:170px;"><label>Count</label><div class="fw"><input class="suf sp-num" data-slot="' + slotId + '" type="number" min="0" step="0.1" value="0" style="height:42px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div></div>';
+  },
+  spMount(slotId, p, onChange) {
+    if (!this._isCaseBeer(p) && this._isPourable(p)) { BottleSlider.mount(slotId, onChange); return; }
+    document.querySelectorAll('[data-slot="' + slotId + '"]').forEach(inp => inp.addEventListener('input', onChange));
+  },
+  spRead(slotId, p) {
+    if (this._isCaseBeer(p)) {
+      const cs = parseFloat(document.querySelector('.sp-cases[data-slot="' + slotId + '"]')?.value) || 0;
+      const loose = parseFloat(document.querySelector('.sp-loose[data-slot="' + slotId + '"]')?.value) || 0;
+      const total = cs * (p.case_size || 1) + loose;
+      return { fulls: total, value: 0, total };
+    }
+    if (this._isPourable(p)) {
+      const g = (BottleSlider.get ? BottleSlider.get(slotId) : null) || { fulls: 0, value: 0 };
+      return { fulls: g.fulls || 0, value: g.value || 0, total: (g.fulls || 0) + (g.value || 0) };
+    }
+    const n = parseFloat(document.querySelector('.sp-num[data-slot="' + slotId + '"]')?.value) || 0;
+    return { fulls: n, value: 0, total: n };
+  },
+
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -79,11 +116,11 @@ S.InventorySpotCheck = {
       + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">'
         + '<div style="flex:1;min-width:220px;">'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Pre-Shift Count</div>'
-          + BottleSlider.html('sp-pre-' + lid, { value: 0, fulls: 0, category: p.category })
+          + this.spInputHTML('sp-pre-' + lid, p)
         + '</div>'
         + '<div style="flex:1;min-width:220px;">'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Post-Shift Count</div>'
-          + BottleSlider.html('sp-post-' + lid, { value: 0, fulls: 0, category: p.category })
+          + this.spInputHTML('sp-post-' + lid, p)
         + '</div>'
       + '</div>'
       // Mid-shift restock + POS pours sold inputs.
@@ -172,8 +209,8 @@ S.InventorySpotCheck = {
         // Mount the two BottleSliders for this line. Slider changes do not
         // bubble as input events, so we recompute the line from the slider
         // onChange callback directly.
-        BottleSlider.mount('sp-pre-'  + lid, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
-        BottleSlider.mount('sp-post-' + lid, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
+        this.spMount('sp-pre-'  + lid, p, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
+        this.spMount('sp-post-' + lid, p, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
         this.recalcLine(newLine);
         this.recalcTotal();
       }
@@ -202,11 +239,10 @@ S.InventorySpotCheck = {
     const p = this.productById(line.dataset.pid);
     if (!p) return null;
     const lid = line.dataset.lid;
-    const pre  = BottleSlider.get ? BottleSlider.get('sp-pre-'  + lid) : null;
-    const post = BottleSlider.get ? BottleSlider.get('sp-post-' + lid) : null;
-    if (!pre || !post) return null;
-    const preTotal  = (pre.fulls || 0) + (pre.value || 0);
-    const postTotal = (post.fulls || 0) + (post.value || 0);
+    const pre  = this.spRead('sp-pre-'  + lid, p);
+    const post = this.spRead('sp-post-' + lid, p);
+    const preTotal  = pre.total;
+    const postTotal = post.total;
     const num = sel => { const v = parseFloat(line.querySelector(sel)?.value); return isNaN(v) ? null : v; };
     const added = num('.sp-added') || 0;
     const sold  = num('.sp-sold');
