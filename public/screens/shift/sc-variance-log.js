@@ -73,7 +73,7 @@ S.ShiftVarianceLog = {
         + '<button class="btn btn-primary" id="vl-add-first">Log Variance</button></div>';
     } else {
       const net = variances.reduce((t, v) => t + (v.variance || 0), 0);
-      const flagged = variances.filter(v => v.status !== 'Within Tolerance').length;
+      const flagged = variances.filter(v => v.status === 'Over' || v.status === 'Short').length;
       const summary = '<div class="calc" style="margin-bottom:16px;">'
         + '<div class="calc-item"><div class="calc-label">Variances</div><div class="calc-val">' + variances.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Net Over/Short</div><div class="calc-val ' + (net < 0 ? 'warn' : '') + '">'
