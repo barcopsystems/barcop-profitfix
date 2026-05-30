@@ -608,11 +608,12 @@ S.InventoryProducts = {
 
   // Required fields per category — matches isComplete() exactly so the
   // .field-missing highlights surface the same items as the Incomplete badge.
-  // All categories require name + unit cost. Pourable (Liquor/Wine/Draft
-  // Beer) also require container size, pour size, and menu price. Bottle
-  // Beer requires container size + case size. Food/Misc just need basics.
+  // All categories require name, unit cost, and a primary location (a product
+  // with no location can't be counted). Pourable (Liquor/Wine/Draft Beer) also
+  // require container size, pour size, and menu price. Bottle Beer requires
+  // container size + case size. Food/Misc just need the basics.
   _requiredFieldIds(cat) {
-    const ids = ['ip-name', 'ip-cost'];
+    const ids = ['ip-name', 'ip-cost', 'ip-loc1'];
     if (cat === 'Bottle Beer') {
       ids.push('ip-size', 'ip-case-size');
     } else if (this.isPourable(cat)) {
