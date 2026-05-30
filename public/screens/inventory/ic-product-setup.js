@@ -424,9 +424,6 @@ S.InventoryProducts = {
     if (!this.CATEGORIES.includes(category)) category = 'Liquor';
     this.editId = id || null;
     this._formCategory = category;
-    const ep = id ? this.products().find(x => x.id === id) : null;
-    this._formLocations = ep ? App.productLocations(ep) : [];
-    this._formPrimary = (ep && ep.primary_location) || this._formLocations[0] || '';
     this.renderForm();
   },
 
@@ -491,9 +488,8 @@ S.InventoryProducts = {
       + '<input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>'
       + '<div class="f"><label>Primary Vendor ' + tt('ic-primary-vendor') + '</label>'
       + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
-      + '<div class="f"><label>Stored In ' + tt('ic-primary-location') + '</label>'
-      + '<div id="ip-loc-chips" style="display:flex;flex-wrap:wrap;align-items:center;min-height:28px;margin-bottom:6px;">' + this._locChipsHTML() + '</div>'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-loc-add">+ Add locations</button></div>'
+      + '<div class="f"><label>Primary Location ' + tt('ic-primary-location') + '</label>'
+      + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
     + '</div>';
 
     // ── Row 2: category-specific size/cost/par fields ─────────────────────
@@ -578,7 +574,7 @@ S.InventoryProducts = {
       + '<textarea id="ip-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div>'
     + '</div>';
 
-    this.container.innerHTML = '<div class="screen"><div class="card">'
+    const formCard = '<div class="card">'
       + header
       + row1
       + row2
@@ -589,82 +585,12 @@ S.InventoryProducts = {
         + '<button class="btn btn-ghost" id="ip-cancel">Cancel</button>'
         + '<span id="ip-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
-    + '</div></div>' + this._locModalHTML();
+    + '</div>';
+    // Popup over the products list (which stays mounted behind), instead of
+    // swapping the whole page out.
+    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 920 });
 
     this._wireForm();
-  },
-
-  // ── Multi-location "Stored In" control ──────────────────────────────────
-  // A product can live in many locations (walk-in, main bar, back bar, tubs).
-  // Selections are held in component state (_formLocations / _formPrimary) and
-  // committed on Save, so re-rendering the form does not lose them.
-  _locChipsHTML() {
-    const locs = this._formLocations || [];
-    if (!locs.length) return '<span style="font-size:11px;color:var(--t4);">No locations yet &mdash; click Add locations</span>';
-    return locs.map(l => '<span style="display:inline-flex;align-items:center;gap:5px;background:var(--input);border:1px solid var(--b1);border-radius:3px;padding:3px 8px;font-size:11px;color:var(--t1);margin:0 6px 4px 0;">'
-      + (l === this._formPrimary ? '<span title="Primary" style="color:var(--gold);">&#9733;</span>' : '')
-      + esc(l)
-      + '<button type="button" class="ip-loc-rm" data-loc="' + esc(l) + '" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px;">&times;</button>'
-      + '</span>').join('');
-  },
-  _redrawLocChips() {
-    const el = document.getElementById('ip-loc-chips');
-    if (!el) return;
-    el.innerHTML = this._locChipsHTML();
-    el.querySelectorAll('.ip-loc-rm').forEach(b => b.addEventListener('click', () => {
-      const loc = b.dataset.loc;
-      this._formLocations = (this._formLocations || []).filter(l => l !== loc);
-      if (this._formPrimary === loc) this._formPrimary = this._formLocations[0] || '';
-      this._redrawLocChips();
-      this._refreshMissing();
-    }));
-  },
-  _locModalHTML() {
-    return '<div id="ip-loc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;max-width:420px;width:92%;max-height:80vh;overflow:auto;">'
-      + '<div style="font-size:14px;font-weight:800;color:var(--w);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Stored In Locations</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.6;">Check every location this product is stocked in. Tap the star to set the primary location (used as the default for ordering).</div>'
-      + '<div id="ip-loc-modal-body"></div>'
-      + '<div class="card-actions" style="margin-top:16px;">'
-      + '<button type="button" class="btn btn-primary" id="ip-loc-done">Done</button>'
-      + '<button type="button" class="btn btn-ghost" id="ip-loc-cancel">Cancel</button>'
-      + '</div></div></div>';
-  },
-  _openLocModal() {
-    const m = document.getElementById('ip-loc-modal');
-    if (!m) return;
-    const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived).map(l => l.name);
-    const sel = new Set(this._formLocations || []);
-    const body = locs.length ? locs.map(name => {
-      const checked = sel.has(name), isPrim = name === this._formPrimary;
-      return '<label style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
-        + '<input type="checkbox" class="ip-loc-cb" value="' + esc(name) + '"' + (checked ? ' checked' : '') + ' style="accent-color:var(--gold);width:15px;height:15px;"/>'
-        + '<span style="flex:1;">' + esc(name) + '</span>'
-        + '<button type="button" class="ip-loc-star" data-loc="' + esc(name) + '" title="Set primary" style="border:none;background:none;cursor:pointer;font-size:15px;color:' + (isPrim ? 'var(--gold)' : 'var(--t4)') + ';">&#9733;</button>'
-        + '</label>';
-    }).join('') : '<div style="font-size:12px;color:var(--t4);">No locations set up yet. Add them under Set Locations first.</div>';
-    document.getElementById('ip-loc-modal-body').innerHTML = body;
-    m.dataset.primary = this._formPrimary || '';
-    m.querySelectorAll('.ip-loc-star').forEach(b => b.addEventListener('click', () => {
-      const loc = b.dataset.loc;
-      m.querySelectorAll('.ip-loc-cb').forEach(cb => { if (cb.value === loc) cb.checked = true; });
-      m.querySelectorAll('.ip-loc-star').forEach(s => { s.style.color = 'var(--t4)'; });
-      b.style.color = 'var(--gold)';
-      m.dataset.primary = loc;
-    }));
-    m.style.display = 'flex';
-  },
-  _applyLocModal() {
-    const m = document.getElementById('ip-loc-modal');
-    if (!m) return;
-    const checked = [...m.querySelectorAll('.ip-loc-cb')].filter(cb => cb.checked).map(cb => cb.value);
-    this._formLocations = checked;
-    let prim = m.dataset.primary || '';
-    if (!checked.includes(prim)) prim = checked[0] || '';
-    this._formPrimary = prim;
-    m.style.display = 'none';
-    this._redrawLocChips();
-    this._refreshMissing();
   },
 
   _namePlaceholder(cat) {
@@ -723,8 +649,8 @@ S.InventoryProducts = {
   },
 
   _wireForm() {
-    document.getElementById('ip-back')?.addEventListener('click', () => this.renderLanding());
-    document.getElementById('ip-cancel')?.addEventListener('click', () => this.renderLanding());
+    document.getElementById('ip-back')?.addEventListener('click', () => { App.closeModal('ip-form-modal'); this.renderLanding(); });
+    document.getElementById('ip-cancel')?.addEventListener('click', () => { App.closeModal('ip-form-modal'); this.renderLanding(); });
     document.getElementById('ip-save')?.addEventListener('click', () => this.save());
     document.getElementById('ip-name')?.focus();
 
@@ -742,16 +668,11 @@ S.InventoryProducts = {
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
     // Field-missing refresh on the other required inputs
-    ['ip-name', 'ip-vendor'].forEach(fid =>
+    ['ip-name', 'ip-vendor', 'ip-loc1'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this._refreshMissing())
     );
     document.getElementById('ip-vendor')?.addEventListener('change', () => this._refreshMissing());
-
-    // Multi-location "Stored In" control: chip removal + Add-locations modal.
-    this._redrawLocChips();
-    document.getElementById('ip-loc-add')?.addEventListener('click', () => this._openLocModal());
-    document.getElementById('ip-loc-done')?.addEventListener('click', () => this._applyLocModal());
-    document.getElementById('ip-loc-cancel')?.addEventListener('click', () => { const m = document.getElementById('ip-loc-modal'); if (m) m.style.display = 'none'; });
+    document.getElementById('ip-loc1')?.addEventListener('change', () => this._refreshMissing());
 
     // Edit mode: changing the category dropdown re-renders the form for the
     // new category. Field values that map directly persist via the existing
@@ -873,6 +794,14 @@ S.InventoryProducts = {
     const stateEl = document.querySelector('.ip-active-state');
     const active = stateEl ? stateEl.dataset.active === 'true' : true;
 
+    // Primary location is the product's "home" (ordering/transfer default).
+    // Any additional locations are managed from the Locations screen; preserve
+    // them and make sure the primary is always included in locations[].
+    const primaryLoc = document.getElementById('ip-loc1')?.value.trim() || '';
+    const existingProd = this.editId ? this.products().find(x => x.id === this.editId) : null;
+    const locSet = new Set(existingProd && Array.isArray(existingProd.locations) ? existingProd.locations : []);
+    if (primaryLoc) locSet.add(primaryLoc);
+
     const prod = {
       id:                  this.editId || App.uid(),
       name,
@@ -888,8 +817,8 @@ S.InventoryProducts = {
       menu_price:          price,
       par_level:           num('ip-par'),
       reorder_point:       num('ip-reorder'),
-      locations:           (this._formLocations || []).slice(),
-      primary_location:    this._formPrimary || (this._formLocations || [])[0] || '',
+      locations:           [...locSet],
+      primary_location:    primaryLoc,
       active,
       notes:               document.getElementById('ip-notes')?.value.trim() || '',
       pours_per_container: pours,
@@ -916,6 +845,7 @@ S.InventoryProducts = {
     if (ok) {
       App.markSetupDone('gs_ic_products');
       this.activeCat = prod.category;
+      App.closeModal('ip-form-modal');
       this.renderLanding();
     } else if (btn) {
       btn.disabled = false;
