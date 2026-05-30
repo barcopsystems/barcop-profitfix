@@ -43,7 +43,7 @@ S.InventoryOrderSheet = {
     const onHandBottles = {};
     const onHandItem = {};
     (latest.items || []).forEach(it => {
-      onHandBottles[it.product_id] = it.total || 0;
+      onHandBottles[it.product_id] = (onHandBottles[it.product_id] || 0) + (it.total || 0);
       onHandItem[it.product_id] = it;
     });
 
