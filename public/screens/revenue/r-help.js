@@ -119,7 +119,7 @@ S.RevenueHelp = {
       ]},
       { t: 'RPLH Tracker', qa: [
         { q: 'What is RPLH?',
-          a: 'Revenue Per Labor Hour. Total revenue divided by total labor hours for the period. The single best measure of labor productivity. Higher RPLH means you are producing more revenue per hour of labor cost, regardless of headcount. Industry benchmarks vary by concept; full-service typically targets $50-$75/hr blended.' },
+          a: 'Revenue Per Labor Hour. Total revenue divided by total labor hours for the period. The single best measure of labor productivity. Higher RPLH means you are producing more revenue per hour of labor cost, regardless of headcount. Benchmarks vary by concept; many full-service operators use $50 to $75 per hour blended as a starting point. Set your own target in Settings.' },
         { q: 'What does the RPLH Tracker show?',
           a: 'Blended RPLH against target for the recent weeks. Hours come from Labor Control lc_actuals. Revenue comes from Shift Control sc_shifts. No double entry — both feeds are always-on (Rule 14). The Optimal Staffing Calculator below the tracker lets you back into how many labor hours fit your revenue forecast at your RPLH target.' }
       ]},
