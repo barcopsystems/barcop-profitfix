@@ -1313,6 +1313,21 @@ S.HubSettings = {
       { name:'Triple Sec',               category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.75, unit_cost:9.00,  par_level:12,  reorder_point:5,   primary_location:'Back Bar' },
       { name:'Lime Juice (qt)',          category:'Misc',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
       { name:'Simple Syrup (qt)',        category:'Misc',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
+      // Kitchen ingredients (appended so existing index-based recipes stay valid).
+      { name:'Brioche Bun (each)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:0.55,  par_level:240, reorder_point:80,  primary_location:'Dry Storage' },
+      { name:'Beefsteak Tomato (lb)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:2.40,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
+      { name:'Mixed Greens (case)',      category:'Food',        vendor:'Local Produce Co.',   unit_cost:24.00, par_level:14,  reorder_point:5,   primary_location:'Walk-in Cooler' },
+      { name:'Applewood Bacon (lb)',     category:'Food',        vendor:'Sysco Foods',         unit_cost:6.50,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
+      { name:'Russet Potato (lb)',       category:'Food',        vendor:'Local Produce Co.',   unit_cost:1.10,  par_level:200, reorder_point:60,  primary_location:'Dry Storage' },
+      { name:'Atlantic Cod (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:9.20,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
+      { name:'Salmon Fillet (lb)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:12.40, par_level:50,  reorder_point:18,  primary_location:'Walk-in Cooler' },
+      { name:'Gulf Shrimp (lb)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:11.80, par_level:50,  reorder_point:18,  primary_location:'Walk-in Cooler' },
+      { name:'Pork Chop (each)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:4.60,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
+      { name:'Hass Avocado (each)',      category:'Food',        vendor:'Local Produce Co.',   unit_cost:1.20,  par_level:90,  reorder_point:30,  primary_location:'Walk-in Cooler' },
+      { name:'Large Eggs (dozen)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:3.40,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
+      { name:'Arborio Rice (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:3.10,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
+      { name:'Parmesan (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:8.90,  par_level:30,  reorder_point:10,  primary_location:'Walk-in Cooler' },
+      { name:'Beef Brisket (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:6.80,  par_level:80,  reorder_point:24,  primary_location:'Walk-in Cooler' },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
       const cpp   = pours ? p.unit_cost / pours : null;
@@ -1357,30 +1372,62 @@ S.HubSettings = {
       const item = rMenu.find(m => m.name === itemName);
       if (item) item.recipe = recipe;
     };
+    // Look an ingredient id up by product name (robust against index shifts).
+    const icp = nm => (icProducts.find(p => p.name === nm) || {}).id;
+    const ing = (nm, quantity) => ({ source: 'product', id: icp(nm), quantity: quantity });
     attachRecipe('House Margarita', {
       mode: 'single',
       ingredients: [
-        { source: 'product', id: icProducts[1].id,  quantity: 1.5 },  // Espolòn Tequila
-        { source: 'product', id: icProducts[16].id, quantity: 0.75 }, // Triple Sec
-        { source: 'product', id: icProducts[17].id, quantity: 1 }     // Lime Juice
+        { source: 'product', id: icProducts[1].id,  quantity: 1 },     // Espolòn Tequila (1 pour)
+        { source: 'product', id: icProducts[16].id, quantity: 0.5 },   // Triple Sec
+        { source: 'product', id: icProducts[17].id, quantity: 0.04 }   // Lime Juice (fraction of qt)
       ],
       plate_yield: null
     });
     attachRecipe('Anchor Burger', {
       mode: 'food',
       ingredients: [
-        { source: 'product', id: icProducts[9].id,  quantity: 0.33 }, // Ground Beef
-        { source: 'product', id: icProducts[11].id, quantity: 0.12 }  // Cheddar Cheese
+        ing('Ground Beef 80/20 (lb)', 0.33),
+        ing('Brioche Bun (each)',     1),
+        ing('Cheddar Cheese (lb)',    0.12),
+        ing('Applewood Bacon (lb)',   0.10),
+        ing('Beefsteak Tomato (lb)',  0.08),
+        ing('Mixed Greens (case)',    0.03)
       ],
       plate_yield: 1
     });
     attachRecipe('Old Fashioned', {
       mode: 'single',
-      ingredients: [
-        { source: 'product', id: icProducts[2].id, quantity: 2 } // Bulleit Bourbon
-      ],
+      // Spirit quantity = pours; mixer quantity = fraction of the qt container
+      // (the seed costs Misc mixers off unit_cost, so keep these small/realistic).
+      ingredients: [ ing('Bulleit Bourbon', 1.3), ing('Simple Syrup (qt)', 0.02) ],
       plate_yield: null
     });
+    // More plate + cocktail recipes, all built from real Inventory products.
+    // Not every item carries a recipe (by design) — these cover the headline
+    // dishes so Recipe Cost Analysis and Menu Engineering have real coverage.
+    attachRecipe('Brisket Sandwich', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Beef Brisket (lb)', 0.35), ing('Brioche Bun (each)', 1), ing('Mixed Greens (case)', 0.02) ] });
+    attachRecipe('Fish and Chips', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Atlantic Cod (lb)', 0.40), ing('Russet Potato (lb)', 0.50) ] });
+    attachRecipe('Chicken Caesar', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Chicken Thigh (lb)', 0.30), ing('Romaine (case)', 0.05), ing('Parmesan (lb)', 0.05) ] });
+    attachRecipe('Steak Frites', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Beef Brisket (lb)', 0.50), ing('Russet Potato (lb)', 0.45) ] });
+    attachRecipe('Shrimp Tacos', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Gulf Shrimp (lb)', 0.30), ing('Flour Tortilla (case)', 0.02), ing('Hass Avocado (each)', 0.5) ] });
+    attachRecipe('Pan-Seared Salmon', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Salmon Fillet (lb)', 0.40), ing('Arborio Rice (lb)', 0.15), ing('Mixed Greens (case)', 0.03) ] });
+    attachRecipe('Grilled Pork Chop', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Pork Chop (each)', 1), ing('Russet Potato (lb)', 0.40) ] });
+    attachRecipe('Mushroom Risotto', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Arborio Rice (lb)', 0.25), ing('Parmesan (lb)', 0.06) ] });
+    attachRecipe('Breakfast Tacos', { mode: 'food', plate_yield: 1, ingredients: [
+      ing('Large Eggs (dozen)', 0.25), ing('Flour Tortilla (case)', 0.02), ing('Cheddar Cheese (lb)', 0.06), ing('Applewood Bacon (lb)', 0.08) ] });
+    attachRecipe('Paloma', { mode: 'single', plate_yield: null, ingredients: [
+      ing('Espolòn Tequila Blanco', 1), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02) ] });
+    attachRecipe('Whiskey Sour', { mode: 'single', plate_yield: null, ingredients: [
+      ing('Bulleit Bourbon', 1.3), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
     // Re-compute cost on items that just got a recipe so the menu engineering
     // numbers stay consistent on first render (before any save fires).
     rMenu.forEach(m => {
