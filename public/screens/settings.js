@@ -2151,6 +2151,132 @@ S.HubSettings = {
     ];
     App.laborData.lc_staff = lcStaff;
 
+    // ════════════════════════════════════════════════════════════════════
+    //  INVENTORY OPERATIONS LOGS — Empties, Transfers, Order History, and the
+    //  staff link for Adjustments. Seeded here (not up in the inventory block)
+    //  because every one of these forms requires a real staff member for
+    //  Performed By / Witnessed By — a record seeded with an empty staff id
+    //  would fail the form's own open->save round trip. icProducts, icByName,
+    //  dateStr, daysAgoISO and adjAt are all still in loadSample scope.
+    // ════════════════════════════════════════════════════════════════════
+    const staffIdByName = nm => (lcStaff.find(s => s.name === nm) || {}).id || '';
+
+    // Link the Adjustment records (seeded earlier, before the roster existed)
+    // to real staff so each one round-trips through the form's required
+    // "Performed By" instead of failing validation on Update.
+    (App.inventoryData.ic_adjustments || []).forEach(a => {
+      if (!a.performed_by_id && a.performed_by) a.performed_by_id = staffIdByName(a.performed_by);
+    });
+
+    // ── Empties Log ──────────────────────────────────────────────────────
+    // The real back-door routine over the trailing ~12 weeks. Austin has no
+    // bottle-deposit law, so empty glass/cans are Recycle at $0 (honest — the
+    // Deposit Value tile stays empty for those). Empty kegs carry a real
+    // distributor deposit, logged Return for Deposit so the deposit credit is
+    // tracked. One Trash line for glass that broke in the bin.
+    const mkEmpty = (daysAgo, prodName, qty, unit, disposition, by, deposit, notes) => {
+      const p = icByName(prodName) || {};
+      return { id:uid(), date:dateStr(daysAgo), product_id:p.id || '', product_name:p.name || prodName,
+        category:p.category || '', quantity:qty, unit, deposit_amount:deposit || 0,
+        disposition, performed_by_id:staffIdByName(by), performed_by:by, notes:notes || '',
+        created_at:daysAgoISO(daysAgo) };
+    };
+    App.inventoryData.ic_empties = [
+      mkEmpty(82, "Tito's Handmade Vodka", 9, 'bottles', 'Recycle', 'Devin R.', 0, 'Weekly well-liquor empties to recycling.'),
+      mkEmpty(82, 'House Cabernet', 14, 'bottles', 'Recycle', 'Devin R.', 0, ''),
+      mkEmpty(78, 'ABW Pearl Snap (1/2 bbl)', 2, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Empty kegs back to Austin Beerworks, deposit credited.'),
+      mkEmpty(71, 'Modelo Especial', 96, 'bottles', 'Recycle', 'Devin R.', 0, 'Weekend beer empties.'),
+      mkEmpty(64, 'Bulleit Bourbon', 6, 'bottles', 'Recycle', 'Maria G.', 0, ''),
+      mkEmpty(64, 'House Chardonnay', 11, 'bottles', 'Recycle', 'Maria G.', 0, ''),
+      mkEmpty(57, 'Live Oak Hefeweizen', 1, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Single empty keg return.'),
+      mkEmpty(50, 'Lone Star', 72, 'bottles', 'Recycle', 'Devin R.', 0, ''),
+      mkEmpty(43, "Tito's Handmade Vodka", 8, 'bottles', 'Recycle', 'Ashley B.', 0, ''),
+      mkEmpty(43, 'House Cabernet', 3, 'bottles', 'Trash', 'Ashley B.', 0, 'Broke in the bin, not recyclable.'),
+      mkEmpty(36, 'ABW Pearl Snap (1/2 bbl)', 3, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Three empties back on the Tuesday delivery.'),
+      mkEmpty(29, 'Corona', 60, 'bottles', 'Recycle', 'Devin R.', 0, ''),
+      mkEmpty(22, 'Espolòn Tequila Blanco', 7, 'bottles', 'Recycle', 'Maria G.', 0, ''),
+      mkEmpty(15, 'House Chardonnay', 12, 'bottles', 'Recycle', 'Devin R.', 0, ''),
+      mkEmpty(8,  "Real Ale Fireman's 4", 2, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Empty kegs staged for pickup.'),
+      mkEmpty(3,  'Modelo Especial', 84, 'bottles', 'Recycle', 'Devin R.', 0, 'Weekend beer empties.'),
+    ];
+
+    // ── Transfer Log ─────────────────────────────────────────────────────
+    // The daily restock routine now that stock lives in multiple locations:
+    // Liquor Room -> Main Bar wells, Walk-in -> Back Bar (wine), Walk-in ->
+    // Main Bar (beer + keg swaps), Walk-in / Dry Storage -> Kitchen Line. Real
+    // products, real cadence, a couple counted out and witnessed at shift change.
+    const mkXfer = (daysAgo, hour, min, prodName, qty, unit, from, to, by, witness, notes) => {
+      const p = icByName(prodName) || {};
+      return { id:uid(), date_time:adjAt(daysAgo, hour, min),
+        from_location:from, to_location:to, product_id:p.id || '', product_name:p.name || prodName,
+        category:p.category || '', quantity:qty, unit,
+        performed_by_id:staffIdByName(by), performed_by:by,
+        witnessed_by_id:witness ? staffIdByName(witness) : '', witnessed_by:witness || '',
+        notes:notes || '', created_at:daysAgoISO(daysAgo) };
+    };
+    App.inventoryData.ic_transfers = [
+      mkXfer(80, 16, 30, "Tito's Handmade Vodka", 3, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', 'Pre-shift well restock.'),
+      mkXfer(80, 16, 35, 'House Cabernet', 8, 'bottles', 'Walk-in Cooler', 'Back Bar', 'Maria G.', '', ''),
+      mkXfer(73, 15, 0,  'ABW Pearl Snap (1/2 bbl)', 1, 'kegs', 'Walk-in Cooler', 'Main Bar', 'Jake T.', 'Carlos P.', 'Keg swap, tapped fresh.'),
+      mkXfer(73, 17, 10, 'Modelo Especial', 48, 'bottles', 'Walk-in Cooler', 'Main Bar', 'Devin R.', '', 'Two cases to the bar cooler.'),
+      mkXfer(66, 16, 20, 'Bulleit Bourbon', 2, 'bottles', 'Liquor Room', 'Main Bar', 'Ashley B.', '', ''),
+      mkXfer(66, 11, 45, 'Ground Beef 80/20', 40, 'lbs', 'Walk-in Cooler', 'Kitchen Line', 'Luis V.', '', 'Lunch prep pull.'),
+      mkXfer(59, 16, 15, 'House Chardonnay', 10, 'bottles', 'Walk-in Cooler', 'Back Bar', 'Maria G.', '', ''),
+      mkXfer(59, 10, 30, 'Russet Potato', 50, 'lbs', 'Dry Storage', 'Kitchen Line', 'Sam P.', '', 'Fry station par.'),
+      mkXfer(52, 15, 50, 'Live Oak Hefeweizen', 1, 'kegs', 'Walk-in Cooler', 'Main Bar', 'Jake T.', '', 'Keg swap.'),
+      mkXfer(45, 16, 40, "Tito's Handmade Vodka", 4, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', ''),
+      mkXfer(45, 12, 5,  'Chicken Thigh', 30, 'lbs', 'Walk-in Cooler', 'Kitchen Line', 'Hector M.', '', ''),
+      mkXfer(38, 17, 0,  'Corona', 48, 'bottles', 'Walk-in Cooler', 'Main Bar', 'Devin R.', '', 'Weekend stock up.'),
+      mkXfer(31, 16, 25, 'Bulleit Bourbon', 3, 'bottles', 'Liquor Room', 'Main Bar', 'Ashley B.', 'Carlos P.', 'Counted out together at shift change.'),
+      mkXfer(24, 15, 30, 'ABW Pearl Snap (1/2 bbl)', 1, 'kegs', 'Walk-in Cooler', 'Main Bar', 'Jake T.', '', 'Keg swap.'),
+      mkXfer(17, 16, 10, 'House Cabernet', 12, 'bottles', 'Walk-in Cooler', 'Back Bar', 'Maria G.', '', 'Heavy reservation night, extra red on hand.'),
+      mkXfer(17, 11, 20, 'Flour Tortilla', 4, 'units', 'Dry Storage', 'Kitchen Line', 'Luis V.', '', ''),
+      mkXfer(9,  16, 45, 'Modelo Especial', 24, 'bottles', 'Walk-in Cooler', 'Main Bar', 'Devin R.', '', ''),
+      mkXfer(2,  15, 40, "Maker's Mark", 2, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', ''),
+    ];
+
+    // ── Order History ────────────────────────────────────────────────────
+    // The recurring ordering cadence that precedes the seeded deliveries.
+    // Older orders are Received (dated to line up with ic_deliveries); the two
+    // most recent are still in the pipeline (Submitted / Open). Line items use
+    // the Order Sheet's exact shape — per-case for bottle beer, per-unit
+    // otherwise — so totals tie to the product costs.
+    const mkOrder = (daysAgo, vendor, status, pairs) => {
+      const lineItems = pairs.map(([nm, qty]) => {
+        const p = icByName(nm) || {};
+        const isCaseBeer = p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
+        const cost = p.unit_cost != null ? p.unit_cost : 0;
+        return { product_id:p.id || '', name:p.name || nm, qty,
+          unit_cost:cost, extended:+(qty * cost).toFixed(2),
+          display_unit:isCaseBeer ? 'case' : 'unit', case_size:isCaseBeer ? p.case_size : null };
+      });
+      const rec = { id:uid(), vendor, date:dateStr(daysAgo), status,
+        line_items:lineItems, item_count:lineItems.length,
+        total:+lineItems.reduce((t, i) => t + i.extended, 0).toFixed(2),
+        custom:true, created_at:daysAgoISO(daysAgo) };
+      if (status === 'Received')  rec.received_at  = daysAgoISO(daysAgo - 3);
+      if (status === 'Submitted') rec.submitted_at = daysAgoISO(daysAgo);
+      return rec;
+    };
+    App.inventoryData.ic_orders = [
+      mkOrder(34, 'Republic National', 'Received', [
+        ["Tito's Handmade Vodka", 24], ['Espolòn Tequila Blanco', 18], ['Bulleit Bourbon', 12]]),
+      mkOrder(27, "Glazer's Beer & Bev", 'Received', [
+        ['Modelo Especial', 20], ['Lone Star', 15], ['Corona', 10]]),
+      mkOrder(20, 'Sysco Foods', 'Received', [
+        ['Ground Beef 80/20', 200], ['Chicken Thigh', 160], ['Cheddar Cheese', 80]]),
+      mkOrder(18, 'Austin Beerworks', 'Received', [
+        ['ABW Pearl Snap (1/2 bbl)', 4], ['ABW Fire Eagle IPA', 2]]),
+      mkOrder(13, 'Republic National', 'Received', [
+        ["Tito's Handmade Vodka", 24], ["Hendrick's Gin", 12], ["Maker's Mark", 6]]),
+      mkOrder(11, 'Local Produce Co.', 'Received', [
+        ['Beefsteak Tomato', 30], ['Mixed Greens', 8], ['Hass Avocado', 60]]),
+      mkOrder(5,  'Sysco Foods', 'Submitted', [
+        ['Ground Beef 80/20', 200], ['Salmon Fillet', 40], ['Gulf Shrimp', 40]]),
+      mkOrder(2,  "Glazer's Beer & Bev", 'Open', [
+        ['Modelo Especial', 16], ['White Claw', 10], ['Stella Artois', 8]]),
+    ];
+
     // Phase 0: now that lcStaff exists, patch staff_id onto every sc_void_comps
     // record so the Server Scorecard (Phase 4) can show comps per server with
     // a real foreign-key link. Same patch lets Theft Risk run by-employee math.
