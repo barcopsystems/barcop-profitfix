@@ -89,10 +89,10 @@ S.LaborWeeklySummary = {
       + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val '
       + (hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good') + '">'
       + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val '
+      + '<div class="calc-item"><div class="calc-label">Labor % (vs Forecast)</div><div class="calc-val '
       + (laborPct == null ? '' : laborPct > target ? 'warn' : 'good') + '">'
       + (laborPct != null ? App.fmtPct(laborPct) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">'
+      + '<div class="calc-item"><div class="calc-label">RPLH (vs Forecast)</div><div class="calc-val">'
       + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
       + '</div>';
 
