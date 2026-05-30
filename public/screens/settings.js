@@ -1290,8 +1290,10 @@ S.HubSettings = {
       { id:uid(), name:'Local Produce Co.',   rep:'Gabe Flores', phone:'512-555-0177', email:'orders@localproduce.example', delivery_days:'Tue, Fri', payment_terms:'Net 15', account_number:'LPC-3050',  notes:'Produce and dairy', created_at:new Date().toISOString() },
     ];
 
-    App.inventoryData.ic_locations = ['Main Bar','Back Bar','Liquor Room','Walk-in Cooler','Kitchen Line','Dry Storage']
-      .map(n => ({ id:uid(), name:n, archived:false }));
+    App.inventoryData.ic_locations = [
+      ['Main Bar','bar'], ['Back Bar','bar'], ['Liquor Room','bar'],
+      ['Walk-in Cooler','both'], ['Kitchen Line','kitchen'], ['Dry Storage','both']
+    ].map(([n, type]) => ({ id:uid(), name:n, type, archived:false }));
 
     // Categories must match Profit's BAR_CATS / KITCHEN_CATS for the COGS feed.
     const icProducts = [
@@ -1364,6 +1366,12 @@ S.HubSettings = {
       // the pour, mirroring the product form's effectiveBottleCost().
       const effCost = (p.category === 'Bottle Beer' && p.case_size) ? p.unit_cost / p.case_size : p.unit_cost;
       const cpp   = pours ? effCost / pours : null;
+      // Names carry no unit suffix; the unit lives in unit_type and is shown in
+      // the Par / Order Qty / On-Hand columns. Derive unit_type from the legacy
+      // "(lb)"-style suffix and strip it from the display name.
+      const um = (p.name || '').match(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i);
+      const cleanName = um ? p.name.replace(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i, '') : p.name;
+      const unitType  = p.unit_type || (um ? um[1].toLowerCase() : null);
       return { id:uid(), brand:'', sub_category:'', secondary_location:'', notes:'', active:true,
         container_size_oz:null, pour_size_oz:null, menu_price:null,
         pours_per_container:pours, cost_per_pour:cpp,
@@ -1371,7 +1379,7 @@ S.HubSettings = {
         // Phase 0: cost_history captures every auto-update from Receive Delivery
         // price changes. Empty on fresh data; populated as deliveries log price moves.
         cost_history:[],
-        ...p };
+        ...p, name: cleanName, unit_type: unitType };
     });
     // Multi-location stocking: the same SKU lives in storage AND at the
     // service bars, the way a real bar runs. locations[0] stays the primary.
@@ -1416,7 +1424,12 @@ S.HubSettings = {
       if (item) item.recipe = recipe;
     };
     // Look an ingredient id up by product name (robust against index shifts).
-    const icp = nm => (icProducts.find(p => p.name === nm) || {}).id;
+    // Tolerant lookup: recipe ingredient names may still carry the legacy
+    // "(lb)" suffix, but product names were stripped of it — match either way.
+    const icp = nm => {
+      const clean = (nm || '').replace(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i, '');
+      return (icProducts.find(p => p.name === clean) || {}).id;
+    };
     const ing = (nm, quantity) => ({ source: 'product', id: icp(nm), quantity: quantity });
     attachRecipe('House Margarita', {
       mode: 'single',
