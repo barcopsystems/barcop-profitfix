@@ -402,10 +402,10 @@ S.InventoryTakeInventory = {
   },
 
   // ── Review ────────────────────────────────────────────────────────────────
-  // For bottle beer with case_size, the operator entered cases + loose
-  // bottles. Total bottles = (cases * case_size) + loose. Value uses
-  // cost-per-case for case-tracked beer (unit_cost stores cost per case
-  // when case_size is set), divided through to per-bottle.
+  // Bottle beer is counted and stored in CASES. The operator enters full cases +
+  // loose bottles; on-hand = cases + (loose / case_size), kept as a decimal
+  // number of cases. Value is at the per-case cost (unit_cost is per case for
+  // beer). Every other category is already counted in its container unit.
   rows() {
     const out = [];
     this.groups().forEach(g => g.products.forEach(p => {
@@ -415,14 +415,8 @@ S.InventoryTakeInventory = {
       if (isCaseBeer) {
         const cases = c.cases || 0;
         const loose = c.loose || 0;
-        total = cases * p.case_size + loose;
-        // unit_cost is cost-per-case for case-tracked beer.
-        if (p.unit_cost != null) {
-          const costPerBottle = p.case_size > 0 ? (p.unit_cost / p.case_size) : 0;
-          value = total * costPerBottle;
-        } else {
-          value = null;
-        }
+        total = cases + (p.case_size > 0 ? loose / p.case_size : 0);
+        value = p.unit_cost != null ? total * p.unit_cost : null;
       } else {
         total = (c.fulls || 0) + (c.value || 0);
         value = p.unit_cost != null ? total * p.unit_cost : null;
@@ -441,7 +435,7 @@ S.InventoryTakeInventory = {
       const fullCol = r.isCaseBeer ? (r.c.cases || 0) + ' cases' : (r.c.fulls || 0);
       const openCol = r.isCaseBeer ? (r.c.loose || 0) + ' loose' : (r.c.value || 0).toFixed(1);
       const totalCol = r.isCaseBeer
-        ? (r.total + ' btl (' + (r.c.cases || 0) + ' &times; ' + r.p.case_size + ' + ' + (r.c.loose || 0) + ')')
+        ? (r.total.toFixed(2) + ' cases (' + (r.c.cases || 0) + ' + ' + (r.c.loose || 0) + ' loose)')
         : r.total.toFixed(1);
       return '<tr>'
         + '<td><div class="val">' + esc(r.p.name) + '</div>'
