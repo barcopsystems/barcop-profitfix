@@ -2754,4 +2754,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   wireAuth();
   App.init();
+
+  // Quality-of-life: focusing any number input selects its current value, so a
+  // prepopulated "0" is overwritten the moment the operator types instead of
+  // having to delete it first (matches the bottle/keg slider's level field).
+  // Delegated on document so it also covers inputs rendered later (count cards,
+  // popups, spot check). setTimeout lets the browser's own focus handling run
+  // first, otherwise the selection gets cleared on some browsers.
+  document.addEventListener('focusin', e => {
+    const el = e.target;
+    if (el && el.tagName === 'INPUT' && el.type === 'number') {
+      setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
+    }
+  });
 });
