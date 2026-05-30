@@ -419,6 +419,8 @@ S.AuditTracker = {
         ['Bev COGS Period',         cur(d.S1_BEV_COGS_PERIOD)],
         ['Inventory Variance %',    pct(d.S1_INV_VARIANCE_PCT), d.S1_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
         ['Inventory Variance $',    cur(d.S1_INV_VARIANCE_AMT), d.S1_INV_VARIANCE_AMT > 500 ? 'warn' : ''],
+        ['Draft Beer Yield',        d.S1_DRAFT_YIELD_PCT != null ? d.S1_DRAFT_YIELD_PCT + '%' : '', (d.S1_DRAFT_LOSS_PCT != null && d.S1_DRAFT_LOSS_PCT >= 12) ? 'warn' : (d.S1_DRAFT_YIELD_PCT != null ? 'good' : '')],
+        ['Draft Yield Loss',        d.S1_DRAFT_LOSS_PCT != null ? d.S1_DRAFT_LOSS_PCT + '% to foam and over-pour' : '', d.S1_DRAFT_LOSS_PCT >= 12 ? 'warn' : ''],
         ['Pour Method',             d.S1_POUR_METHOD],
         ['Recipe Coverage',         d.S1_RECIPE_COVERAGE],
         ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
@@ -428,6 +430,9 @@ S.AuditTracker = {
         ['Void/Comp %',             pct(d.S2_VOID_COMP_PCT), d.S2_VOID_COMP_PCT > 2 ? 'warn' : ''],
         ['Void/Comp Amount',        cur(d.S2_VOID_COMP_AMT), d.S2_VOID_COMP_AMT > 0 ? 'warn' : ''],
         ['Unauthorized Voids %',    pct(d.S2_VOIDS_NO_APPROVAL_PCT), d.S2_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
+        ['Discount % of Sales',     d.S2_DISCOUNT_PCT != null ? d.S2_DISCOUNT_PCT + '%' + (d.S2_DISCOUNT_BENCHMARK_PCT != null ? ' (Benchmark: under ' + d.S2_DISCOUNT_BENCHMARK_PCT + '%)' : '') : '', (d.S2_DISCOUNT_PCT != null && d.S2_DISCOUNT_BENCHMARK_PCT != null && d.S2_DISCOUNT_PCT > d.S2_DISCOUNT_BENCHMARK_PCT) ? 'warn' : ''],
+        ['Discount Total',          d.S2_DISCOUNT_PCT != null ? cur(d.S2_DISCOUNT_TOTAL) : ''],
+        ['No-Sale Drawer Opens',    d.S2_NO_SALE_COUNT != null ? num(d.S2_NO_SALE_COUNT) : '', d.S2_NO_SALE_COUNT > 0 ? 'warn' : ''],
         ['Drawer Reconciliation',   d.S2_DRAWER_RECON],
         ['Cash Policy Documented',  d.S2_CASH_POLICY],
         ['Void Approval Required',  d.S2_VOID_APPROVAL],
@@ -1019,8 +1024,16 @@ S.AuditTracker = {
   extractActionItems(d) {
     const items = [];
     if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Reduce bar pour cost. $' + Math.round(d.S1_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S1_MONTHLY_GAP, gap_id: 'pour-cost' });
+    // Draft yield loss routes to the same pour-cost lever. No separate dollar
+    // (monthly_impact 0) — the loss already sits inside the bar pour cost gap.
+    if (d.S1_DRAFT_LOSS_PCT != null && d.S1_DRAFT_LOSS_PCT >= 12) items.push({ action: 'Cut draft yield loss. ' + d.S1_DRAFT_LOSS_PCT + '% of every keg is going to foam and over-pour. Tune line temperature, pressure, and pour discipline.', monthly_impact: 0, gap_id: 'pour-cost' });
     if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S3_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'food-cost' });
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S2_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'theft-loss' });
+    // Discount + no-sale theft vectors. Surfaced as flagged behavior (no separate
+    // recoverable dollar — not all discounts are recoverable, and no-sale opens
+    // have no honest dollar without an investigation).
+    if (d.S2_DISCOUNT_PCT != null && d.S2_DISCOUNT_BENCHMARK_PCT != null && d.S2_DISCOUNT_PCT > d.S2_DISCOUNT_BENCHMARK_PCT) items.push({ action: 'Tighten discount control. Discounts are ' + d.S2_DISCOUNT_PCT + '% of sales vs an under-' + d.S2_DISCOUNT_BENCHMARK_PCT + '% benchmark. Require manager authorization on every discount.', monthly_impact: 0, gap_id: 'theft-loss' });
+    if (d.S2_NO_SALE_COUNT >= 10) items.push({ action: 'Review no-sale drawer opens. ' + d.S2_NO_SALE_COUNT + ' no-sale register opens this period. Set a no-sale policy and log a reason for every one, it is the simplest cover for pocketing cash.', monthly_impact: 0, gap_id: 'theft-loss' });
     if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY, gap_id: 'vendor-control' });
     // Prime cost (S5_COMBINED_COGS_GAP) is the bar + food COGS overage, i.e. it
     // already equals S1 + S3. It is shown as context on the Prime Cost section,
