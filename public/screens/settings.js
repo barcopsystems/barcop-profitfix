@@ -405,7 +405,7 @@ S.HubSettings = {
       const exp = 600 + Math.round(Math.random()*400);
       const cnt = exp + Math.round((Math.random()-0.5)*30);
       const os  = cnt - exp;
-      recons.push({ id:uid(), date:dateStr(i*3), shift:['AM','PM','Close'][i%3], register:'1', cashier:shiftNames[i%5], opening_bank:200, expected_cash:exp, counted_cash:cnt, credit_debit:Math.round(Math.random()*800)+400, over_short:os, tolerance:10, status:Math.abs(os)<=10?'OK':os>0?'Over':'Short', saved_at:new Date().toISOString() });
+      recons.push({ id:uid(), date:dateStr(i*3), shift:['AM','PM','Close'][i%3], register:'1', cashier:shiftNames[i%5], opening_bank:200, expected_cash:exp, counted_cash:cnt, credit_debit:Math.round(Math.random()*800)+400, over_short:os, tolerance:10, status:Math.abs(os)<=10?'Within Tolerance':os>0?'Over':'Short', saved_at:new Date().toISOString() });
     }
     App.data.reconciliations = recons;
 
@@ -1851,7 +1851,7 @@ S.HubSettings = {
           drawer:    scDrawers[vi % scDrawers.length].name,
           cashier:mgrs[(a.wk + vi) % 3],
           expected_cash:exp, counted_cash:exp + variance, variance:variance,
-          tolerance:10, status:Math.abs(variance) <= 10 ? 'OK' : variance < 0 ? 'Short' : 'Over',
+          tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
           reason:'', notes:'', created_at:new Date().toISOString()
         });
       });
@@ -1863,7 +1863,7 @@ S.HubSettings = {
     // Report can subtract comp pours from "used." Voids stay product-less
     // (assumed pre-pour, not subtracted from variance). staff_id gets patched
     // in after lcStaff is built (below).
-    const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Derek W.', 'Carlos P.'];
+    const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Devin R.', 'Carlos P.'];
     const compProductNames = ['Tito\'s Handmade Vodka', 'House Cabernet', "Hendrick's Gin", 'Bulleit Bourbon'];
     const findProdId = (name) => (icProducts.find(p => p.name === name) || {}).id || '';
     const scVoidComps = [];
