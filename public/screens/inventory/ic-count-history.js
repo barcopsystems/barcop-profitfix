@@ -94,15 +94,22 @@ S.InventoryCountHistory = {
     const meta = (label, val) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
 
-    // Case-aware columns: bottle beer items recorded with case_size show
-    // "X cases" / "Y loose" / "Z btl" instead of fulls / partial / total.
+    // Case-aware columns: bottle beer is counted and stored in CASES (decimal),
+    // shown as full cases / loose bottles / total cases. case_size comes from the
+    // snapshot or the live product so older or seeded counts still resolve.
+    const prodFor = id => ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
     const itemRows = items.map(it => {
-      const isCaseBeer = it.case_size_at_count && (it.cases != null || it.loose != null);
-      const fullCol = isCaseBeer ? ((it.cases || 0) + ' cases') : (it.fulls || 0);
-      const openCol = isCaseBeer ? ((it.loose || 0) + ' loose') : (it.partial || 0).toFixed(1);
+      const p = prodFor(it.product_id);
+      const caseSize = it.case_size_at_count || (p && p.case_size) || 0;
+      const isCaseBeer = (it.category === 'Bottle Beer' || (p && p.category === 'Bottle Beer')) && caseSize > 0;
+      const totalCases = it.total || 0;
+      const whole = isCaseBeer ? (it.cases != null ? it.cases : Math.floor(totalCases)) : 0;
+      const loose = isCaseBeer ? (it.loose != null ? it.loose : Math.round((totalCases - Math.floor(totalCases)) * caseSize)) : 0;
+      const fullCol = isCaseBeer ? (whole + ' cases') : (it.fulls || 0);
+      const openCol = isCaseBeer ? (loose + ' loose') : (it.partial || 0).toFixed(1);
       const totalCol = isCaseBeer
-        ? ((it.total || 0) + ' btl')
-        : (it.total || 0).toFixed(1);
+        ? (totalCases.toFixed(2) + ' cases')
+        : (totalCases.toFixed(1) + (p ? ' ' + (App.productUnit(p) || '') : ''));
       const unitCostCol = it.unit_cost != null
         ? (App.fmtCurrency(it.unit_cost) + (isCaseBeer ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : ''))
         : '<span style="color:var(--t4);">-</span>';
@@ -126,16 +133,18 @@ S.InventoryCountHistory = {
 
     let compareCard = '';
     if (compare) {
+      const prodForCmp = id => ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
       const map = {};
-      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); });
-      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); });
+      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)) }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); });
+      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)) }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); });
       const older = new Date(compare.created_at || compare.date) < new Date(count.created_at || count.date);
       const cmpRows = Object.values(map).map(m => {
         const a = m.a || 0, b = m.b || 0, change = a - b;
+        const u = m.unit ? ' ' + m.unit : '';
         return '<tr><td><div class="val">' + esc(m.name) + '</div></td>'
-          + '<td>' + b.toFixed(1) + '</td>'
-          + '<td>' + a.toFixed(1) + '</td>'
-          + '<td class="' + (change < 0 ? 'neg' : change > 0 ? 'pos' : '') + '">' + (change > 0 ? '+' : '') + change.toFixed(1) + '</td>'
+          + '<td>' + esc(b.toFixed(1) + u) + '</td>'
+          + '<td>' + esc(a.toFixed(1) + u) + '</td>'
+          + '<td class="' + (change < 0 ? 'neg' : change > 0 ? 'pos' : '') + '">' + (change > 0 ? '+' : '') + esc(change.toFixed(1) + u) + '</td>'
           + '</tr>';
       }).join('');
       compareCard = '<div class="card"><div class="card-title">Comparison</div>'
