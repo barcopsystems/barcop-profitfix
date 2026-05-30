@@ -33,36 +33,33 @@ S.InventoryOrderSheet = {
   },
 
   // products below par in the latest count, grouped by vendor.
-  // For bottle beer with case_size, on-hand is converted from bottles to
-  // cases (par_level is already in cases for case-tracked beer) so the
-  // par comparison and the suggested order quantity are both in case units.
+  // On-hand is stored in container units for every category (cases for bottle
+  // beer, bottles for liquor/wine, kegs for draft). par_level is in the same
+  // unit, so the par comparison and the suggested order quantity need no
+  // conversion.
   belowParByVendor() {
     const asc = this.countsAsc();
     if (asc.length === 0) return null;
     const latest = asc[asc.length - 1];
-    const onHandBottles = {};
+    const onHand = {};
     const onHandItem = {};
     (latest.items || []).forEach(it => {
-      onHandBottles[it.product_id] = (onHandBottles[it.product_id] || 0) + (it.total || 0);
+      onHand[it.product_id] = (onHand[it.product_id] || 0) + (it.total || 0);
       onHandItem[it.product_id] = it;
     });
 
     const groups = {};
-    Object.keys(onHandBottles).forEach(pid => {
+    Object.keys(onHand).forEach(pid => {
       const p = this.productById(pid);
       if (!p || p.par_level == null || p.par_level === '' || !(p.par_level > 0)) return;
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
-      // For case-tracked beer: convert raw-bottle on-hand into cases.
-      // par_level is already in cases for case-tracked beer.
-      const oh = isCaseBeer ? ((onHandBottles[pid] || 0) / p.case_size) : (onHandBottles[pid] || 0);
+      const oh = onHand[pid] || 0;
       if (oh >= p.par_level) return;
       const vendor = p.vendor || 'Unassigned';
       if (!groups[vendor]) groups[vendor] = [];
       groups[vendor].push({
         product: p,
         on_hand: oh,
-        on_hand_raw_bottles: isCaseBeer ? (onHandBottles[pid] || 0) : null,
-        on_hand_loose: isCaseBeer ? ((onHandBottles[pid] || 0) % p.case_size) : null,
         par: p.par_level,
         suggested: Math.max(1, Math.ceil(p.par_level - oh)),
         unit_cost: p.unit_cost != null ? p.unit_cost : 0,
