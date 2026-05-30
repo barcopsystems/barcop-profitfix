@@ -138,6 +138,27 @@ S.PrepBatches = {
       return;
     }
 
+    // Keep stored batch costs in sync with current product costs so the list and
+    // any menu item that rolls up cost_per_serving never show a stale number when
+    // an ingredient's price has changed since the batch was last edited.
+    let _batchCostChanged = false;
+    batches.forEach(b => {
+      const ingRows = (b.ingredients || []).map(i => ({ cost_per_unit: this.unitCost(this.prodById(i.product_id)), quantity: i.quantity || 0 }));
+      const out = this.computeRows(ingRows, b.batch_yield, b.batch_yield_unit, b.serving_size, b.serving_size_unit);
+      if (Math.abs((b.total_cost || 0) - (out.total_cost || 0)) > 0.005
+          || Math.abs((b.cost_per_serving || 0) - (out.cost_per_serving || 0)) > 0.005) {
+        b.total_cost = out.total_cost;
+        b.cost_per_serving = out.cost_per_serving;
+        b.servings_per_batch = out.servings_per_batch;
+        (b.ingredients || []).forEach(ing => {
+          ing.cost_per_unit = this.unitCost(this.prodById(ing.product_id));
+          ing.total_cost = (ing.cost_per_unit || 0) * (ing.quantity || 0);
+        });
+        _batchCostChanged = true;
+      }
+    });
+    if (_batchCostChanged) App.saveInventory();
+
     const rows = batches.map(b => {
       return '<tr>'
         + '<td><div class="val">' + esc(b.name) + '</div></td>'
