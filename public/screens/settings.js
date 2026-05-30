@@ -851,43 +851,48 @@ S.HubSettings = {
 
     // ── Menu — the Anchor's full card, costed for Menu Engineering ──
     const rMenu = [
-      ['Loaded Nachos',     'Appetizers', 12, 3.60,  95],
-      ['Smoked Wings',      'Appetizers', 13, 4.20, 110],
-      ['Fried Pickles',     'Appetizers',  8, 1.80,  58],
-      ['Pretzel Bites',     'Appetizers',  9, 2.10,  40],
-      ['Anchor Burger',     'Entrees',    16, 4.80, 140],
-      ['Brisket Sandwich',  'Entrees',    15, 5.20,  88],
-      ['Fish and Chips',    'Entrees',    17, 5.60,  52],
-      ['Chicken Caesar',    'Entrees',    14, 3.90,  70],
-      ['Steak Frites',      'Entrees',    26, 9.10,  38],
-      ['Veggie Grain Bowl', 'Entrees',    13, 3.20,  30],
-      ['Old Fashioned',     'Cocktails',  12, 2.40, 130],
-      ['House Margarita',   'Cocktails',  11, 2.10, 145],
-      ['Espresso Martini',  'Cocktails',  13, 2.90,  78],
-      ['Paloma',            'Cocktails',  11, 2.20,  62],
-      ['Austin IPA Draft',  'Beer',        6, 1.30, 320],
-      ['Modelo Especial',   'Beer',        5, 1.35, 180],
-      ['Bud Light',         'Beer',        4, 1.10, 150],
-      ['House Red Blend',   'Wine',        9, 2.20,  64],
-      ['Sauvignon Blanc',   'Wine',        9, 2.30,  70],
-      ['Skillet Cookie',    'Desserts',    8, 1.90,  48],
-      ['Key Lime Pie',      'Desserts',    7, 1.70,  30],
-      // ── Expanded full card (craft cocktail bar + American bistro + brunch) ──
-      ['Deviled Eggs',         'Appetizers', 9,  2.10,  64],
+      // Plate Items tab — food only (valid plate categories: Appetizers,
+      // Entrees, Desserts, Specials). Beer + wine are NOT plate items; they are
+      // added below as linked Inventory menu items once ic_products exists.
+      ['Loaded Nachos',        'Appetizers', 12, 3.60,  95],
+      ['Smoked Wings',         'Appetizers', 13, 4.20, 110],
+      ['Fried Pickles',        'Appetizers',  8, 1.80,  58],
+      ['Pretzel Bites',        'Appetizers',  9, 2.10,  40],
+      ['Deviled Eggs',         'Appetizers',  9, 2.10,  64],
       ['Charcuterie Board',    'Appetizers', 18, 7.20,  48],
       ['Crispy Brussels',      'Appetizers', 11, 2.80,  72],
       ['Hummus and Flatbread', 'Appetizers', 10, 2.40,  50],
       ['Calamari',             'Appetizers', 14, 4.60,  66],
       ['Street Corn Ribs',     'Appetizers', 10, 2.30,  54],
       ['Tuna Poke',            'Appetizers', 16, 6.40,  44],
+      ['Truffle Fries',        'Appetizers',  8, 1.90, 120],
+      ['House Salad',          'Appetizers',  7, 1.60,  70],
+      ['Mac and Cheese',       'Appetizers',  9, 2.40,  64],
+      ['Avocado Toast',        'Appetizers', 12, 3.00,  78],
+      ['Breakfast Tacos',      'Appetizers', 11, 2.80, 110],
+      ['Anchor Burger',        'Entrees',    16, 4.80, 140],
+      ['Brisket Sandwich',     'Entrees',    15, 5.20,  88],
+      ['Fish and Chips',       'Entrees',    17, 5.60,  52],
+      ['Chicken Caesar',       'Entrees',    14, 3.90,  70],
+      ['Steak Frites',         'Entrees',    26, 9.10,  38],
+      ['Veggie Grain Bowl',    'Entrees',    13, 3.20,  30],
       ['Shrimp Tacos',         'Entrees',    16, 5.40,  84],
       ['Grilled Pork Chop',    'Entrees',    27, 8.80,  36],
       ['Pan-Seared Salmon',    'Entrees',    25, 8.20,  58],
       ['Braised Short Rib',    'Entrees',    29, 9.60,  42],
       ['Mushroom Risotto',     'Entrees',    19, 5.10,  34],
-      ['Truffle Fries',        'Sides',      8,  1.90, 120],
-      ['House Salad',          'Sides',      7,  1.60,  70],
-      ['Mac and Cheese',       'Sides',      9,  2.40,  64],
+      ['Chicken and Waffles',  'Entrees',    16, 4.80,  92],
+      ['Brunch Burger',        'Entrees',    15, 4.60,  70],
+      ['Shakshuka',            'Entrees',    14, 3.90,  46],
+      ['Skillet Cookie',       'Desserts',    8, 1.90,  48],
+      ['Key Lime Pie',         'Desserts',    7, 1.70,  30],
+      ['Creme Brulee',         'Desserts',    9, 2.10,  44],
+      ['Chocolate Torte',      'Desserts',    9, 2.30,  38],
+      // Cocktail Items tab — composed drinks (category 'Cocktails').
+      ['Old Fashioned',        'Cocktails',  12, 2.40, 130],
+      ['House Margarita',      'Cocktails',  11, 2.10, 145],
+      ['Espresso Martini',     'Cocktails',  13, 2.90,  78],
+      ['Paloma',               'Cocktails',  11, 2.20,  62],
       ['Negroni',              'Cocktails',  13, 2.60,  74],
       ['Whiskey Sour',         'Cocktails',  12, 2.30,  88],
       ['Manhattan',            'Cocktails',  14, 2.80,  66],
@@ -898,22 +903,6 @@ S.HubSettings = {
       ['Boulevardier',         'Cocktails',  14, 2.90,  40],
       ['Aviation',             'Cocktails',  13, 2.70,  36],
       ['Cosmopolitan',         'Cocktails',  12, 2.40,  52],
-      ['Lone Star',            'Beer',       4,  0.90, 130],
-      ['Live Oak Hefeweizen',  'Beer',       7,  1.55,  96],
-      ['Pinthouse Pale Ale',   'Beer',       7,  1.60, 110],
-      ['Stella Artois',        'Beer',       6,  1.40,  88],
-      ['Pinot Noir',           'Wine',       12, 3.10,  56],
-      ['Cabernet Sauvignon',   'Wine',       13, 3.40,  60],
-      ['Rose',                 'Wine',       10, 2.60,  72],
-      ['Prosecco',             'Wine',       11, 2.80,  50],
-      ['Chardonnay',           'Wine',       11, 2.90,  58],
-      ['Creme Brulee',         'Desserts',   9,  2.10,  44],
-      ['Chocolate Torte',      'Desserts',   9,  2.30,  38],
-      ['Chicken and Waffles',  'Brunch',     16, 4.80,  92],
-      ['Brunch Burger',        'Brunch',     15, 4.60,  70],
-      ['Avocado Toast',        'Brunch',     12, 3.00,  78],
-      ['Breakfast Tacos',      'Brunch',     11, 2.80, 110],
-      ['Shakshuka',            'Brunch',     14, 3.90,  46],
     ].map(m => ({ id:uid(), name:m[0], category:m[1], price:m[2], cost:m[3], weekly_covers:m[4], notes:'', recipe:null, created_at:new Date().toISOString(), updated_at:new Date().toISOString() }));
     App.data.menu_items = rMenu;
     const rItem = nm => rMenu.find(x => x.name === nm);
@@ -1337,6 +1326,26 @@ S.HubSettings = {
         ...p };
     });
     App.inventoryData.ic_products = icProducts;
+
+    // ── Beer + Wine as linked Menu Inventory Items ──────────────────────────
+    // Direct-pour beverages live in the menu's Inventory Items tab, LINKED to
+    // the Inventory Control product (the screen classifies on linked_product_id,
+    // not category, so a free-floating 'Beer'/'Wine' row would wrongly show as a
+    // Plate Item). Cost flows from the product's cost-per-pour. These are the
+    // bar's actual stocked beer/wine — the menu only offers what Inventory
+    // carries. rMenu is the same array as App.data.menu_items, so pushing here
+    // adds them to the live menu.
+    const invMenuItem = (p, price, covers) => ({
+      id:uid(), name:p.name, category:(App.MENU_IC_TO_CAT[p.category] || 'Beer'),
+      price:price, cost:+((p.cost_per_pour || 0)).toFixed(2), weekly_covers:covers,
+      prev_weekly_covers:null, weekly_covers_updated_at:null, notes:'', recipe:null,
+      linked_product_id:p.id, pour_size_oz:null, target_cost_pct:null,
+      created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+    });
+    const icByName = nm => icProducts.find(p => p.name === nm);
+    [ ['ABW Pearl Snap (1/2 bbl)', 6, 320], ['Modelo Especial', 6, 180],
+      ['Lone Star', 5, 150], ['House Cabernet', 10, 64], ['House Chardonnay', 9, 70]
+    ].forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(invMenuItem(p, row[1], row[2])); });
 
     // ── Recipes attached to menu items + standalone batches ─────────────────
     // Recipes now live EMBEDDED in App.data.menu_items as the optional
