@@ -19,7 +19,7 @@ S.InventoryProducts = {
   _formCategory: null,     // category being entered/edited in the open form
   activeCat: 'Liquor',     // list filter for the existing-products table
 
-  CATEGORIES: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
+  get CATEGORIES() { return App.IC_CATEGORIES; },   // single source on App
 
   // Per-category form spec: labels, defaults, which fields show.
   // The single renderForm() method reads this to assemble each form.
@@ -129,7 +129,7 @@ S.InventoryProducts = {
 
   // Unit types offered to Food and Misc. Operator can also pick "custom" and
   // type a free-form unit (gal, qt, dozen, etc.) if their item does not fit.
-  UNIT_TYPES: ['lb','oz','each','case','bag','gallon','quart','pint','dozen'],
+  get UNIT_TYPES() { return App.IC_FOOD_UNIT_TYPES; },   // single source on App
 
   SIZES: [
     {g:'Spirits',l:'50ml (1.7 oz)',oz:1.7},{g:'Spirits',l:'200ml (6.8 oz)',oz:6.8},
@@ -312,7 +312,7 @@ S.InventoryProducts = {
           + '<td>' + costDisplay + '</td>'
           + '<td>' + (pourable && p.cost_per_pour != null ? App.fmtCurrency(p.cost_per_pour) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
-          + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm ip-edit" data-id="' + p.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm ip-del" data-id="' + p.id + '">Delete</button>'
@@ -797,6 +797,12 @@ S.InventoryProducts = {
     const err  = document.getElementById('ip-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } this._saving = false; };
     if (!name) { fail('Product name required.'); return; }
+    // Guard against duplicate product names (catches inactive products too), the
+    // same way Vendors and Locations block duplicates.
+    const allProds = (App.inventoryData && App.inventoryData.ic_products) || [];
+    if (allProds.find(x => x.id !== this.editId && (x.name || '').trim().toLowerCase() === name.toLowerCase())) {
+      fail('A product named "' + name + '" already exists. Use a different name or edit that product.'); return;
+    }
 
     const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
     const oz    = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
@@ -1074,7 +1080,7 @@ S.InventoryProducts = {
       + '<div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:var(--w);margin-bottom:12px;">How Importing ' + esc(spec.title || cat) + ' Works</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">'
         + '<p style="margin:0 0 10px;"><strong style="color:var(--gold);">The file.</strong> A CSV or Excel (.xlsx / .xls) export from your POS, a distributor order guide, or your own spreadsheet. First row must be the column headers; one product per row.</p>'
-        + '<p style="margin:0 0 6px;"><strong style="color:var(--gold);">The columns.</strong> Only <strong>Name</strong> is required &mdash; the rest are optional and can be filled in after import. Your headers don\'t need to match exactly; these common names are auto-recognized:</p>'
+        + '<p style="margin:0 0 6px;"><strong style="color:var(--gold);">The columns.</strong> Only <strong>Name</strong> is required. The rest are optional and can be filled in after import. Your headers don\'t need to match exactly; these common names are auto-recognized:</p>'
         + '<table style="border-collapse:collapse;margin:0 0 10px;"><tbody>' + rowsH + '</tbody></table>'
         + '<p style="margin:0;"><strong style="color:var(--gold);">The mapping.</strong> After you drop the file, this box turns into a mapping screen with your columns auto-matched to each field. Fix any that are wrong, set ones you want to ignore to (skip), then Import. Every row imports as a ' + esc(spec.title || cat) + ' product; rows missing required data show as Incomplete to finish later.</p>'
       + '</div></div>';
