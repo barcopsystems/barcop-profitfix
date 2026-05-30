@@ -1360,7 +1360,10 @@ S.HubSettings = {
       { name:'Cranberry Juice (qt)',     category:'Misc',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12, reorder_point:4,   primary_location:'Back Bar' },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
-      const cpp   = pours ? p.unit_cost / pours : null;
+      // Bottle Beer unit_cost is per CASE; convert to per-bottle before costing
+      // the pour, mirroring the product form's effectiveBottleCost().
+      const effCost = (p.category === 'Bottle Beer' && p.case_size) ? p.unit_cost / p.case_size : p.unit_cost;
+      const cpp   = pours ? effCost / pours : null;
       return { id:uid(), brand:'', sub_category:'', secondary_location:'', notes:'', active:true,
         container_size_oz:null, pour_size_oz:null, menu_price:null,
         pours_per_container:pours, cost_per_pour:cpp,
