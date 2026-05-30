@@ -1231,6 +1231,18 @@ const App = {
     return parseFloat(li.qty) || 0;
   },
 
+  // Every location a product is stocked in. Products carry a locations[]
+  // array (a SKU can live in many spots — walk-in, main bar, back bar, tubs).
+  // Back-compat: products created before multi-location only have a single
+  // primary_location, so fall back to that. Returns [] if neither is set.
+  // Used by counting (a product appears under each of its locations) and by
+  // every on-hand reader (which sums the product's per-location count lines).
+  productLocations(p) {
+    if (!p) return [];
+    if (Array.isArray(p.locations) && p.locations.length) return p.locations.slice();
+    return p.primary_location ? [p.primary_location] : [];
+  },
+
   // Per-bottle cost for any product. For case-tracked Bottle Beer (case_size
   // > 0), unit_cost is stored as cost-per-case; divide by case_size to get
   // per-bottle. For everything else unit_cost is already per single
