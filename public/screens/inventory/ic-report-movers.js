@@ -21,35 +21,18 @@ S.InventoryMoversReport = {
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
+  // Built on App.computeUsagePair. "Used" is floored at zero (a restock/recount
+  // period can't show negative usage), in each product's container unit.
   computeForPair(startC, endC) {
-    // Sum each product's lines (a product can be counted in multiple locations).
-    const sMap = {}; (startC.items || []).forEach(it => {
-      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
-      else sMap[it.product_id] = { ...it };
-    });
-    const eMap = {}; (endC.items   || []).forEach(it => {
-      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
-      else eMap[it.product_id] = { ...it };
-    });
-    const purch = {};
-    this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
-      .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
-      }));
+    const base = App.computeUsagePair(startC, endC, this.deliveries());
     const rows = [];
-    Object.keys(eMap).forEach(pid => {
-      if (!sMap[pid]) return;
-      const p = this.productById(pid) || {};
-      const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
-      // Bottle beer is counted in cases (case_size bottles per case); other
-      // categories by their container (pours_per_container servings).
-      const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
-      const ppc = isCaseBeer ? p.case_size : (p.pours_per_container || null);
-      const unitCost = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
+    Object.keys(base).forEach(pid => {
+      const b = base[pid];
+      const used = Math.max(0, b.rawUsed);
       rows.push({
-        pid, name: eMap[pid].name, category: eMap[pid].category || p.category || '',
-        used, usageCost: unitCost != null ? used * unitCost : 0,
-        poursMade: ppc != null ? used * ppc : null
+        pid, product: b.product, name: b.name, category: b.category,
+        used, usageCost: b.unitCost != null ? used * b.unitCost : 0,
+        poursMade: b.servingsPerUnit != null ? used * b.servingsPerUnit : null
       });
     });
     return rows;
@@ -127,14 +110,14 @@ S.InventoryMoversReport = {
     const isCost = key === 'usageCost';
     const body = ranked.map(r => {
       const pct = Math.min(100, Math.abs(r[key]) / max * 100);
-      const val = isCost ? App.fmtCurrency(r[key]) : (r[key] || 0).toFixed(1);
+      const val = isCost ? App.fmtCurrency(r[key]) : esc(App.qtyWithUnit(r.product, r[key]));
       return '<tr><td><div class="val">' + esc(r.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
         + '<td style="width:42%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
         + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div>'
         + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + val + '</span></div></td>'
-        + '<td>' + (r.used || 0).toFixed(1) + '</td>'
+        + '<td>' + esc(App.qtyWithUnit(r.product, r.used)) + '</td>'
         + '<td>' + App.fmtCurrency(r.usageCost || 0) + '</td></tr>';
     }).join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + caption + '</div>'
@@ -155,15 +138,16 @@ S.InventoryMoversReport = {
       const prev = priorMap[r.pid];
       const change = prev != null ? r.used - prev : null;
       const changePct = prev ? change / prev * 100 : null;
-      return { name: r.name, category: r.category, prev: prev != null ? prev : null, cur: r.used, change, changePct };
+      return { name: r.name, category: r.category, unit: App.productUnit(r.product), prev: prev != null ? prev : null, cur: r.used, change, changePct };
     }).sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
     if (!rows.length) return this.emptyBody();
     const body = rows.map(r => {
       const arrow = r.change == null ? '' : r.change > 0.05 ? '&#9650; ' : r.change < -0.05 ? '&#9660; ' : '';
       const cls = r.change == null ? '' : r.change > 0.05 ? 'pos' : r.change < -0.05 ? 'neg' : '';
+      const u = r.unit ? ' ' + r.unit : '';
       return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
-        + '<td>' + (r.prev != null ? r.prev.toFixed(1) : '<span style="color:var(--t4);">new</span>') + '</td>'
-        + '<td>' + r.cur.toFixed(1) + '</td>'
+        + '<td>' + (r.prev != null ? esc(r.prev.toFixed(1) + u) : '<span style="color:var(--t4);">new</span>') + '</td>'
+        + '<td>' + esc(r.cur.toFixed(1) + u) + '</td>'
         + '<td class="' + cls + '">' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
         + '<td class="' + cls + '">' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
         + '</tr>';
