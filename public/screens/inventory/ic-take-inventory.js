@@ -209,7 +209,7 @@ S.InventoryTakeInventory = {
     const all = this.products();
     const locs = this.draft.custom_locations || [];
     if (locs.length > 0) {
-      return all.filter(p => locs.includes(p.primary_location || ''));
+      return all.filter(p => App.productLocations(p).some(l => locs.includes(l)));
     }
     // Legacy fallbacks for drafts created before the rebuild.
     const t = this.draft.type;
@@ -223,9 +223,12 @@ S.InventoryTakeInventory = {
     const order = ((App.inventoryData && App.inventoryData.ic_locations) || [])
       .filter(l => !l.archived).map(l => l.name);
     const byLoc = {};
+    const picked = this.draft.custom_locations || [];
     prods.forEach(p => {
-      const loc = p.primary_location || 'Unassigned';
-      (byLoc[loc] = byLoc[loc] || []).push(p);
+      let plocs = App.productLocations(p);
+      if (picked.length) plocs = plocs.filter(l => picked.includes(l));
+      if (!plocs.length) plocs = [p.primary_location || 'Unassigned'];
+      plocs.forEach(loc => { (byLoc[loc] = byLoc[loc] || []).push(p); });
     });
     // Sort products within each location by the per-location sequence set
     // on the Locations Manage Order screen. Products with no sequence sort
@@ -259,13 +262,13 @@ S.InventoryTakeInventory = {
     if (this.locStep < 0) this.locStep = 0;
 
     const grp = groups[this.locStep];
-    const total = this.countProducts().length;
+    const total = groups.reduce((s, g) => s + g.products.length, 0);
     const done = Object.keys(this.draft.counts).length;
     const pct = total ? Math.round(done / total * 100) : 0;
     const isLast = this.locStep === groups.length - 1;
 
     const cards = grp.products.map(p => {
-      const c = this.draft.counts[p.id] || { value: 0, fulls: 0, notes: '' };
+      const c = this.draft.counts[p.id + '@@' + grp.location] || { value: 0, fulls: 0, notes: '' };
       // Bottle beer with case_size set uses a case + loose-bottle input
       // pair. Bottles either are full or empty (no partial level applies),
       // so the slider does not fit. Everything else uses the partial slider.
@@ -320,8 +323,9 @@ S.InventoryTakeInventory = {
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       if (isCaseBeer) return; // case + loose inputs handled below, not the slider
       BottleSlider.mount(p.id, (v) => {
-        const prev = this.draft.counts[p.id] || {};
-        this.draft.counts[p.id] = { value: v.value, fulls: v.fulls, notes: prev.notes || '' };
+        const key = p.id + '@@' + grp.location;
+        const prev = this.draft.counts[key] || {};
+        this.draft.counts[key] = { value: v.value, fulls: v.fulls, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
@@ -335,8 +339,9 @@ S.InventoryTakeInventory = {
         if (!card) return;
         const cases = parseInt(card.querySelector('.ti-cases')?.value) || 0;
         const loose = parseInt(card.querySelector('.ti-loose')?.value) || 0;
-        const prev = this.draft.counts[pid] || {};
-        this.draft.counts[pid] = { cases, loose, notes: prev.notes || '' };
+        const key = pid + '@@' + grp.location;
+        const prev = this.draft.counts[key] || {};
+        this.draft.counts[key] = { cases, loose, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
@@ -345,8 +350,9 @@ S.InventoryTakeInventory = {
     this.container.querySelectorAll('.ti-note').forEach(inp => {
       inp.addEventListener('input', () => {
         const pid = inp.dataset.pid;
-        const cur = this.draft.counts[pid] || { value: 0, fulls: 0 };
-        this.draft.counts[pid] = { value: cur.value, fulls: cur.fulls, notes: inp.value };
+        const key = pid + '@@' + grp.location;
+        const cur = this.draft.counts[key] || { value: 0, fulls: 0 };
+        this.draft.counts[key] = { value: cur.value, fulls: cur.fulls, notes: inp.value };
         this.saveDraft();
         this.updateProgress();
       });
@@ -361,7 +367,7 @@ S.InventoryTakeInventory = {
   },
 
   updateProgress() {
-    const total = this.countProducts().length;
+    const total = this.groups().reduce((s, g) => s + g.products.length, 0);
     const done = Object.keys(this.draft.counts).length;
     const txt = document.getElementById('ti-prog-txt');
     const bar = document.getElementById('ti-prog-bar');
@@ -375,8 +381,9 @@ S.InventoryTakeInventory = {
   // cost-per-case for case-tracked beer (unit_cost stores cost per case
   // when case_size is set), divided through to per-bottle.
   rows() {
-    return this.countProducts().map(p => {
-      const c = this.draft.counts[p.id] || { value: 0, fulls: 0, notes: '' };
+    const out = [];
+    this.groups().forEach(g => g.products.forEach(p => {
+      const c = this.draft.counts[p.id + '@@' + g.location] || { value: 0, fulls: 0, notes: '' };
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       let total, value;
       if (isCaseBeer) {
@@ -394,8 +401,9 @@ S.InventoryTakeInventory = {
         total = (c.fulls || 0) + (c.value || 0);
         value = p.unit_cost != null ? total * p.unit_cost : null;
       }
-      return { p, c, total, value, isCaseBeer };
-    });
+      out.push({ p, c, total, value, isCaseBeer, location: g.location });
+    }));
+    return out;
   },
 
   renderReview() {
@@ -456,6 +464,7 @@ S.InventoryTakeInventory = {
           product_id: r.p.id,
           name:       r.p.name,
           category:   r.p.category || '',
+          location:            r.location,
           cases:               r.c.cases || 0,
           loose:               r.c.loose || 0,
           case_size_at_count:  r.p.case_size || null,
@@ -471,6 +480,7 @@ S.InventoryTakeInventory = {
         product_id: r.p.id,
         name:       r.p.name,
         category:   r.p.category || '',
+        location:   r.location,
         fulls:      r.c.fulls || 0,
         partial:    r.c.value || 0,
         total:      r.total,
@@ -485,7 +495,7 @@ S.InventoryTakeInventory = {
       type:        this.draft.type,
       counted_by_id: this.draft.counted_by_id || '',
       counted_by:  this.draft.counted_by || (App.staffById(this.draft.counted_by_id) || {}).name || '',
-      locations:   [...new Set(rows.map(r => r.p.primary_location || 'Unassigned'))],
+      locations:   [...new Set(rows.map(r => r.location || 'Unassigned'))],
       items,
       item_count:  items.length,
       total_value: items.reduce((s, i) => s + (i.value || 0), 0),
