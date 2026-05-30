@@ -604,15 +604,17 @@ S.TrafficAudit = {
 
     const screenshotsCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Screenshots</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional, but these are where most of your score comes from. Add a screenshot for anything your website link cannot reach: your Google and Yelp ratings, data behind a login, and your social and delivery pages. Accepts images, PDF, or exports.</div>'
-      + this.renderFileSection('highlight', 'Google Review Page (rating, reviews)',      'ta-f-google-reviews', 'ta-google-reviews', 'Your Google rating, review count, response rate, and recency. This is how Bar Cop scores your Google reviews.')
-      + this.renderFileSection('highlight', 'Yelp Listing (rating, reviews)',            'ta-f-yelp',           'ta-yelp',           'Your Yelp rating and review count for cross-platform reputation.')
-      + this.renderFileSection('highlight', 'Website Analytics (sessions, bounce rate)', 'ta-f-analytics',      'ta-analytics',      'Sessions and bounce live behind your analytics login, not in the public page.')
-      + this.renderFileSection('optional',  'GBP Insights (impressions, calls)',         'ta-f-gbp-insights',   'ta-gbp-insights',   'Adds the impression-to-action funnel.')
-      + this.renderFileSection('optional',  'Search Results (maps pack)',                'ta-f-search',         'ta-search',         'Confirms maps-pack presence and search visibility.')
-      + this.renderFileSection('optional',  'Instagram Profile',                         'ta-f-instagram',      'ta-instagram',      'Follower count, post frequency, content.')
-      + this.renderFileSection('optional',  'Delivery Platform Dashboard',               'ta-f-delivery',       'ta-delivery',       'Rating, photos, menu completeness, promos.')
-      + this.renderFileSection('optional',  'Email Platform',                            'ta-f-email',          'ta-email',          'List size, send frequency, open rate.')
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional, but these are where most of your score comes from. Drop in a screenshot for anything your website link cannot reach: your Google and Yelp ratings, data behind a login, and your social and delivery pages. One drop zone takes them all.</div>'
+      + FileDrop.render('ta-drop', { items: [
+          { t: 'Google Review Page (rating, reviews)',      s: 'Your Google rating, review count, response rate, and recency. This is how Bar Cop scores your Google reviews.', hi: true },
+          { t: 'Yelp Listing (rating, reviews)',            s: 'Your Yelp rating and review count for cross-platform reputation.', hi: true },
+          { t: 'Website Analytics (sessions, bounce rate)', s: 'Sessions and bounce live behind your analytics login, not in the public page.', hi: true },
+          { t: 'GBP Insights (impressions, calls)',         s: 'Adds the impression-to-action funnel.' },
+          { t: 'Search Results (maps pack)',                s: 'Confirms maps-pack presence and search visibility.' },
+          { t: 'Instagram Profile',                         s: 'Follower count, post frequency, content.' },
+          { t: 'Delivery Platform Dashboard',               s: 'Rating, photos, menu completeness, promos.' },
+          { t: 'Email Platform',                            s: 'List size, send frequency, open rate.' }
+        ] })
       + '</div>';
 
     const pr = d.practices || {};
@@ -642,6 +644,7 @@ S.TrafficAudit = {
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'You can review and update your links and inputs now. The next audit can be generated in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '.') + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">' + linksCard + controlCard + screenshotsCard + questionsCard + submitCard + '</div>';
+    FileDrop.attach('ta-drop');
 
     document.getElementById('ta-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Traffic Audit Works', [
       { p: ['The Traffic Audit scores your digital presence across seven areas. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers.'] },
@@ -867,15 +870,12 @@ S.TrafficAudit = {
     if (draftP.loyalty === 'true' || draftP.loyalty === 'false') practices.loyalty = draftP.loyalty === 'true';
     form.append('practices', JSON.stringify(practices));
 
-    const fileInputIds = ['ta-f-google-reviews', 'ta-f-yelp', 'ta-f-analytics', 'ta-f-gbp-insights', 'ta-f-search', 'ta-f-instagram', 'ta-f-delivery', 'ta-f-email'];
-    let taFileCount = 0;
-    fileInputIds.forEach(id => {
-      const inp = document.getElementById(id);
-      if (inp?.files) { for (const f of inp.files) { form.append('file', f); taFileCount++; } }
-    });
+    // Screenshots come from the single shared drop zone.
+    const dropFiles = FileDrop.getFiles('ta-drop');
+    for (const f of dropFiles) form.append('file', f, f.name);
 
     // Validation — the website link, screenshots, or weekly data all count.
-    const hasRealData = taFileCount > 0 || (App.data.traffic_weeks && App.data.traffic_weeks.length > 0)
+    const hasRealData = dropFiles.length > 0 || (App.data.traffic_weeks && App.data.traffic_weeks.length > 0)
       || savedUrls.website;
     if (!hasRealData) {
       setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your screenshots.', 'var(--red)');
