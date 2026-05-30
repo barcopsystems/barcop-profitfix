@@ -1259,8 +1259,14 @@ const App = {
     overlay.id = id;
     overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(0,0,0,0.7);'
       + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 16px;';
-    overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;">' + html + '</div>';
+    // Always-visible corner X so the popup closes without scrolling to a button.
+    const closeX = opts.noClose ? '' : '<button type="button" class="app-modal-x" aria-label="Close" '
+      + 'style="position:absolute;top:-4px;right:0;width:32px;height:32px;border:1px solid var(--b1);border-radius:6px;'
+      + 'background:var(--surface);color:var(--t2);font-size:20px;line-height:1;cursor:pointer;z-index:2;">&times;</button>';
+    overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;position:relative;">' + closeX + html + '</div>';
     host.appendChild(overlay);
+    const x = overlay.querySelector('.app-modal-x');
+    if (x) x.addEventListener('click', () => App.closeModal(id));
     return overlay;
   },
   closeModal(id) {
