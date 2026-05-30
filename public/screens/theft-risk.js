@@ -307,12 +307,16 @@ S.TheftRisk = {
         ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
           .filter(d => d.date > start.date && d.date <= end.date)
           .forEach(d => (d.line_items || []).forEach(li => {
-            if (li.product_id === productId) purch += (App.bottlesFromDeliveryLine ? App.bottlesFromDeliveryLine(li) : (li.qty || 0));
+            if (li.product_id === productId) purch += (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (li.qty || 0));
           }));
         const used = (si.total || 0) + purch - (ei.total || 0);
-        const pp = p.pours_per_container || (p.container_size_oz && p.pour_size_oz ? p.container_size_oz / p.pour_size_oz : 0);
+        // Bottle beer is counted in cases (case_size servings/case); other
+        // categories pour pours_per_container servings per container.
+        const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
+        const pp = isCaseBeer ? p.case_size
+          : (p.pours_per_container || (p.container_size_oz && p.pour_size_oz ? p.container_size_oz / p.pour_size_oz : 0));
         const actualPours = used * pp;
-        const cost = (App.bottleCost ? App.bottleCost(p) : (p.unit_cost || 0)) || 0;
+        const cost = (App.unitCost ? App.unitCost(p) : (p.unit_cost || 0)) || 0;
         const actualDollars = used * cost;
         step2Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
           + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Live Data &middot; ' + esc(start.date) + ' to ' + esc(end.date) + '</div>'
