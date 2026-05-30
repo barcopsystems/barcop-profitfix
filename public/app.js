@@ -1316,6 +1316,78 @@ const App = {
     return isNaN(c) ? null : c;
   },
 
+  // True when a product is case-tracked bottle beer. The single predicate every
+  // inventory screen should use instead of re-checking category + case_size.
+  isCaseBeer(p) {
+    return !!(p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0);
+  },
+
+  // Format a quantity with the product's container unit, e.g. "3.3 cases",
+  // "12 btls", "2 kegs", "40 lb". Keeps every quantity column labeled so a
+  // number is never ambiguous about which unit it is in. decimals defaults to a
+  // tidy 1 place for fractional values, whole numbers print without a decimal.
+  qtyWithUnit(p, n, decimals) {
+    if (n == null || isNaN(n)) return '-';
+    const num = Number(n);
+    const txt = (num % 1 === 0) ? String(num) : num.toFixed(decimals == null ? 1 : decimals);
+    const u = this.productUnit(p);
+    return u ? (txt + ' ' + u) : txt;
+  },
+
+  // Shared usage builder for the count-pair reports (Usage, Variance, Top
+  // Movers, Dynamic Pars, Dashboard). Returns a per-product map of the raw
+  // building blocks in CONTAINER units (cases for bottle beer, bottles for
+  // liquor/wine, kegs for draft, stock unit for food). Each report layers its
+  // own policy on top: floor at zero, subtract comps/waste (Variance only),
+  // derive theoretical sales, etc. Centralizing this kills the unit drift that
+  // came from five separate copies of the same math.
+  //   start/end : ic_counts records (start older, end newer)
+  //   deliveries: ic_deliveries (purchases dated in (start.date, end.date])
+  // Per product: { product, name, category, starting, ending, purchases,
+  //   rawUsed (= starting + purchases - ending, NOT floored), unitCost (per
+  //   container, null if unknown), isCaseBeer, servingsPerUnit (bottles per case
+  //   for beer, pours_per_container otherwise), ozPerUnit }.
+  computeUsagePair(start, end, deliveries) {
+    const out = {};
+    const sMap = {}, eMap = {};
+    ((start && start.items) || []).forEach(it => {
+      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
+      else sMap[it.product_id] = { ...it };
+    });
+    ((end && end.items) || []).forEach(it => {
+      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
+      else eMap[it.product_id] = { ...it };
+    });
+    const purch = {};
+    (deliveries || [])
+      .filter(d => d.date && start && end && d.date > start.date && d.date <= end.date)
+      .forEach(d => (d.line_items || []).forEach(li => {
+        purch[li.product_id] = (purch[li.product_id] || 0) + this.unitsFromDeliveryLine(li);
+      }));
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    Object.keys(eMap).forEach(pid => {
+      if (!sMap[pid]) return;
+      const ei = eMap[pid], si = sMap[pid];
+      const p = prods.find(x => x.id === pid) || {};
+      const starting  = parseFloat(si.total) || 0;
+      const ending    = parseFloat(ei.total) || 0;
+      const purchases = purch[pid] || 0;
+      const isCaseBeer = this.isCaseBeer(p);
+      const unitCost = (p.unit_cost != null) ? this.unitCost(p) : this.unitCostFromCountItem(ei);
+      const servingsPerUnit = isCaseBeer ? p.case_size : (p.pours_per_container || null);
+      const ozPerUnit = isCaseBeer
+        ? (p.container_size_oz != null ? p.case_size * p.container_size_oz : null)
+        : (p.container_size_oz != null ? p.container_size_oz : null);
+      out[pid] = {
+        product: p, name: ei.name || p.name || '(unnamed)', category: ei.category || p.category || '',
+        starting, ending, purchases, rawUsed: starting + purchases - ending,
+        unitCost: unitCost != null ? unitCost : null,
+        isCaseBeer, servingsPerUnit, ozPerUnit
+      };
+    });
+    return out;
+  },
+
   // Staff picker <option> markup. Used by every form that asks for a person
   // (manager, cashier, server, witness, recorded-by, etc.) so the operator
   // picks from the roster instead of free-typing a name that might not
@@ -1451,6 +1523,12 @@ const App = {
   // and the inline isBar() check below.
   BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
   KITCHEN_CATS: ['Food', 'Misc'],
+
+  // Full Inventory Control product category list (the product form picker) and
+  // the Food/Misc stock-unit list. Single source so take-inventory,
+  // product-setup and the log forms never drift from each other.
+  IC_CATEGORIES: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
+  IC_FOOD_UNIT_TYPES: ['lb', 'oz', 'each', 'case', 'bag', 'gallon', 'quart', 'pint', 'dozen'],
 
   // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
   // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
