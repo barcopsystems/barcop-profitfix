@@ -1459,15 +1459,47 @@ S.HubSettings = {
       created_at:daysAgoISO(daysAgo)
     });
     App.inventoryData.ic_spot_checks = [
-      mkSpot(12, [
+      mkSpot(26, [
         icSpotItem(icProducts[0], 4,   1.0, 44, true),
         icSpotItem(icProducts[2], 3,   0.7, 33, true),
         icSpotItem(icProducts[1], 3,   1.1, 40, false),
+      ]),
+      mkSpot(19, [
+        icSpotItem(icProducts[0], 4,   1.2, 48, false),
+        icSpotItem(icProducts[4], 3,   0.9, 32, false),
+      ]),
+      mkSpot(12, [
+        icSpotItem(icProducts[0], 4,   1.3, 52, false),
+        icSpotItem(icProducts[2], 3,   1.0, 39, false),
       ]),
       mkSpot(4, [
         icSpotItem(icProducts[0], 4,   1.4, 56, false),
         icSpotItem(icProducts[3], 2.5, 0.8, 38, false),
       ]),
+    ];
+
+    // ── Vendor Discrepancies ─────────────────────────────────────────────
+    // A disciplined operator catches overcharges and chases most of them down.
+    // Three caught and recovered, one still in Credit Requested (the filed-but-
+    // uncollected credit the Profit Audit surfaces under Vendor Control). All
+    // recent, none aging past 60 days. Feeds Inventory Execution + the BCA.
+    App.data.vendor_discrepancies = [
+      { id:uid(), date:dateStr(52), vendor:'Republic National', reference:'RN-54880', type:'Overcharge',
+        product_id:icProducts[0].id, sku:icProducts[0].name, units:24, agreed_price:21.40, invoiced_price:22.65,
+        overcharge:30, notes:'Billed above agreed case price', status:'Resolved', source:'manual',
+        filed_at:daysAgoISO(52), resolved_at:daysAgoISO(40), recovered_amount:30 },
+      { id:uid(), date:dateStr(33), vendor:'Sysco Foods', reference:'SY-90201', type:'Short Delivery',
+        product_id:icProducts[9].id, sku:icProducts[9].name, units:8, agreed_price:4.20, invoiced_price:4.20,
+        overcharge:34, notes:'Two cases short, caught at receiving', status:'Resolved', source:'manual',
+        filed_at:daysAgoISO(33), resolved_at:daysAgoISO(22), recovered_amount:34 },
+      { id:uid(), date:dateStr(21), vendor:'Republic National', reference:'RN-55021', type:'Overcharge',
+        product_id:icProducts[2].id, sku:icProducts[2].name, units:12, agreed_price:27.90, invoiced_price:28.90,
+        overcharge:12, notes:'Price drift on a single line', status:'Resolved', source:'manual',
+        filed_at:daysAgoISO(21), resolved_at:daysAgoISO(12), recovered_amount:12 },
+      { id:uid(), date:dateStr(11), vendor:"Glazer's Beer & Bev", reference:'GLZ-3402', type:'Overcharge',
+        product_id:icProducts[6].id, sku:icProducts[6].name, units:48, agreed_price:1.35, invoiced_price:1.50,
+        overcharge:72, notes:'Unagreed price increase, credit requested', status:'Credit Requested', source:'manual',
+        filed_at:daysAgoISO(11), resolved_at:null },
     ];
 
     // ── Inventory Adjustment Log ─────────────────────────────────────────
@@ -1580,6 +1612,24 @@ S.HubSettings = {
       });
     });
     App.shiftData.sc_shifts = scShifts;
+
+    // ── Opening + Closing Checklists ──
+    // One of each per operating day. A disciplined, recovered operation runs at
+    // near-100% completion with the rare item missed. Feeds the Bar Cop Audit's
+    // Operational Discipline (opening + closing completion) and the shift-close
+    // exception read. Type strings match the checklist screens ('Opening' /
+    // 'Closing'); done_count/total_count are the real fields those screens save.
+    const scChecklists = [];
+    scShifts.forEach((sh, i) => {
+      const mgr = mgrs[i % 3];
+      const openDone  = (i % 9 === 0) ? 9  : 10;   // ~89% of days fully complete
+      const closeDone = (i % 7 === 0) ? 13 : 14;   // ~86% fully complete
+      scChecklists.push({ id:uid(), date:sh.date, type:'Opening', shift_type:'AM',
+        completed_by:mgr, completed_by_id:'', done_count:openDone, total_count:10, created_at:new Date().toISOString() });
+      scChecklists.push({ id:uid(), date:sh.date, type:'Closing', shift_type:'Close',
+        completed_by:mgr, completed_by_id:'', done_count:closeDone, total_count:14, created_at:new Date().toISOString() });
+    });
+    App.shiftData.sc_checklists = scChecklists;
 
     // Drawer reconciliations — variance tightens after the fix week.
     const scVariances = [];
