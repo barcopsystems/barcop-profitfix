@@ -16,11 +16,12 @@ const BottleSlider = {
   _inst: {},
   TOP: 16, BOT: 218,   // viewBox y-range of the fillable interior
 
+  // Fill color per category, from the locked palette (no hardcoded hex).
   COLORS: {
-    'Liquor':'#DBAB46', 'Spirits':'#DBAB46', 'Wine':'#8B1A1A',
-    'Bottle Beer':'#DBAB46', 'Draft Beer':'#E8C84A', 'Food':'#4888A8', 'Misc':'#4888A8'
+    'Liquor':'var(--gold)', 'Spirits':'var(--gold)', 'Wine':'var(--red)',
+    'Bottle Beer':'var(--gold)', 'Draft Beer':'var(--gold)', 'Food':'var(--steel)', 'Misc':'var(--steel)'
   },
-  colorFor(cat) { return this.COLORS[cat] || '#DBAB46'; },
+  colorFor(cat) { return this.COLORS[cat] || 'var(--gold)'; },
 
   _snap(v) { v = Math.round((Number(v) || 0) * 100) / 100; return Math.max(0, Math.min(1, v)); },
   _fmt(n)  { return (Math.round(n * 100) / 100).toFixed(2); },
@@ -67,7 +68,7 @@ const BottleSlider = {
       +   '<rect x="0" y="0" width="90" height="230" fill="rgba(255,255,255,0.04)" clip-path="url(#' + clip + ')"/>'
       +   '<rect class="bs-fill" x="0" width="90" fill="' + col + '" clip-path="url(#' + clip + ')" '
       +     'y="' + this._fillY(value) + '" height="' + this._fillH(value) + '"/>'
-      +   '<line class="bs-handle" x1="12" x2="78" y1="' + this._fillY(value) + '" y2="' + this._fillY(value) + '" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>'
+      +   '<line class="bs-handle" x1="12" x2="78" y1="' + this._fillY(value) + '" y2="' + this._fillY(value) + '" stroke="var(--w)" stroke-width="2.5" stroke-linecap="round"/>'
       +   outline
       + '</svg>'
 
