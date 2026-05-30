@@ -216,7 +216,7 @@ S.InventoryTransfers = {
     // Sensible default units per category. Operator can pick or default lands
     // on the most common. For Bottle Beer / Draft Beer we allow Cases too.
     let opts = ['bottles', 'units'];
-    if (productCategory === 'Bottle Beer') opts = ['bottles', 'cases'];
+    if (productCategory === 'Bottle Beer') opts = ['cases', 'bottles'];
     else if (productCategory === 'Draft Beer') opts = ['kegs'];
     else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
@@ -254,7 +254,7 @@ S.InventoryTransfers = {
         + '<div class="f" style="width:120px;flex-shrink:0;"><label>Quantity</label>'
           + '<input type="number" id="tr-qty" min="0" step="0.5" value="' + v(t?.quantity) + '" placeholder="0"/></div>'
         + '<div class="f" style="width:120px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="tr-unit">' + this.unitOptions(initialCat, initialUnit || 'bottles') + '</select></div>'
+          + '<select id="tr-unit">' + this.unitOptions(initialCat, initialUnit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles')) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="flex:1;min-width:180px;"><label>From Location</label>'
@@ -285,7 +285,7 @@ S.InventoryTransfers = {
       const p = this.productById(e.target.value);
       if (!p) return;
       const unitSel = document.getElementById('tr-unit');
-      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'bottles' : (p.category === 'Draft Beer' ? 'kegs' : 'units'));
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'units'));
       const fromSel = document.getElementById('tr-from');
       if (fromSel && !fromSel.value && p.primary_location) fromSel.value = p.primary_location;
     });
