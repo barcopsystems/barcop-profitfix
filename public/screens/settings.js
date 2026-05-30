@@ -1373,6 +1373,15 @@ S.HubSettings = {
         cost_history:[],
         ...p };
     });
+    // Multi-location stocking: the same SKU lives in storage AND at the
+    // service bars, the way a real bar runs. locations[0] stays the primary.
+    const stockIn = (names, locs) => names.forEach(nm => {
+      const pr = icProducts.find(x => x.name === nm);
+      if (pr) { pr.locations = locs.slice(); pr.primary_location = locs[0]; }
+    });
+    stockIn(['Modelo Especial', 'Lone Star'], ['Walk-in Cooler', 'Main Bar', 'Back Bar']);
+    stockIn(["Tito's Handmade Vodka", 'Espolòn Tequila Blanco', 'Bulleit Bourbon', "Hendrick's Gin"], ['Liquor Room', 'Main Bar']);
+    stockIn(['House Cabernet', 'House Chardonnay', 'Prosecco'], ['Back Bar', 'Walk-in Cooler']);
     App.inventoryData.ic_products = icProducts;
 
     // ── Beer + Wine as linked Menu Inventory Items ──────────────────────────
