@@ -56,7 +56,7 @@ S.ShiftReportsCash = {
 
     const dropTotal = drops.reduce((t, d) => t + (d.amount || 0), 0);
     const netVar = vars.reduce((t, v) => t + (v.variance || 0), 0);
-    const flagged = vars.filter(v => v.status && v.status !== 'Within Tolerance').length;
+    const flagged = vars.filter(v => v.status === 'Over' || v.status === 'Short').length;
 
     const summary = '<div class="calc" style="margin-bottom:16px;">'
       + '<div class="calc-item"><div class="calc-label">Cash Drops</div><div class="calc-val">' + drops.length + '</div></div>'
