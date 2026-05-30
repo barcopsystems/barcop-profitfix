@@ -591,7 +591,7 @@ S.HubYearEnd = {
       totalRev ? (totalWages / totalRev) : null,
       totalHours ? (totalRev / totalHours) : null]);
 
-    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per week (hours over 40 = OT, paid at 1.5x base wage). Revenue from Shift Control shifts. RPLH = Revenue per Labor Hour.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per week (hours over 40 = OT, paid at 1.5x base wage). Revenue from Shift Control shifts. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on the Annual Summary and P&L by Month sheets, which use your weekly booked labor.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
