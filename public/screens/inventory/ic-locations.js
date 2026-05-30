@@ -374,6 +374,12 @@ S.InventoryLocations = {
             if (p.primary_location === old)   p.primary_location = name;
             if (p.secondary_location === old) p.secondary_location = name;
             if (Array.isArray(p.locations))   p.locations = p.locations.map(x => x === old ? name : x);
+            // Carry the curated per-location sort order across the rename so the
+            // operator's arrangement isn't orphaned under the old name.
+            if (p.location_sequences && p.location_sequences[old] != null) {
+              p.location_sequences[name] = p.location_sequences[old];
+              delete p.location_sequences[old];
+            }
           });
         }
       }
