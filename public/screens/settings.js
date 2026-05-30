@@ -1360,6 +1360,49 @@ S.HubSettings = {
       { name:'Cold Brew Concentrate (qt)',category:'Misc',       vendor:'Sysco Foods',         unit_cost:9.00,  par_level:8,  reorder_point:3,   primary_location:'Walk-in Cooler' },
       { name:'Ginger Beer (qt)',         category:'Misc',        vendor:"Glazer's Beer & Bev", unit_cost:3.00,  par_level:18, reorder_point:6,   primary_location:'Walk-in Cooler' },
       { name:'Cranberry Juice (qt)',     category:'Misc',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12, reorder_point:4,   primary_location:'Back Bar' },
+      // ── Expanded bar stock (full lineup for a craft cocktail bar) ──────────
+      { name:'Ketel One',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:28.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
+      { name:'Grey Goose',               category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:34.00, menu_price:13, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Tanqueray',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:26.00, menu_price:11, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Roku Gin',                 category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:30.00, menu_price:12, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Don Julio Blanco',         category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:45.00, menu_price:14, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Casamigos Reposado',       category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:48.00, menu_price:15, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:"Maker's Mark",             category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:27.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
+      { name:'Woodford Reserve',         category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:35.00, menu_price:13, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Buffalo Trace',            category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:26.00, menu_price:11, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Rittenhouse Rye',          category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:24.00, menu_price:10, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Jameson',                  category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:28.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
+      { name:'Macallan 12',              category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:65.00, menu_price:18, par_level:3, reorder_point:1, primary_location:'Liquor Room' },
+      { name:"Dewar's",                  category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:26.00, menu_price:10, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Mount Gay Eclipse',        category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:22.00, menu_price:10, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Sailor Jerry Spiced',      category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:21.00, menu_price:9,  par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Hennessy VS',              category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:38.00, menu_price:14, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Aperol',                   category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.0, unit_cost:24.00, menu_price:9,  par_level:4, reorder_point:2, primary_location:'Back Bar' },
+      { name:'St-Germain',               category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:0.75, unit_cost:32.00, menu_price:10, par_level:3, reorder_point:1, primary_location:'Back Bar' },
+      { name:'Cointreau',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:0.75, unit_cost:33.00, menu_price:10, par_level:3, reorder_point:1, primary_location:'Back Bar' },
+      { name:'Disaronno Amaretto',       category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.0, unit_cost:25.00, menu_price:9,  par_level:3, reorder_point:1, primary_location:'Back Bar' },
+      { name:'Green Chartreuse',         category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:0.75, unit_cost:60.00, menu_price:12, par_level:2, reorder_point:1, primary_location:'Back Bar' },
+      { name:'Pinot Noir',               category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:13.00, menu_price:12, par_level:18, reorder_point:6, primary_location:'Back Bar' },
+      { name:'Malbec',                   category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:12.00, menu_price:11, par_level:18, reorder_point:6, primary_location:'Back Bar' },
+      { name:'Red Blend',                category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:11.00, menu_price:10, par_level:18, reorder_point:6, primary_location:'Back Bar' },
+      { name:'Sauvignon Blanc',          category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:12.00, menu_price:11, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
+      { name:'Pinot Grigio',             category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:11.00, menu_price:10, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
+      { name:'Rosé',                     category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:12.00, menu_price:11, par_level:14, reorder_point:5, primary_location:'Walk-in Cooler' },
+      { name:'Champagne',                category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:2, unit_cost:30.00, menu_price:14, par_level:12, reorder_point:4, primary_location:'Walk-in Cooler' },
+      { name:'Dry Vermouth',             category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.0, unit_cost:11.00, menu_price:8, par_level:4, reorder_point:2, primary_location:'Back Bar' },
+      { name:'Cabernet Reserve',         category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:22.00, menu_price:16, par_level:8, reorder_point:3, primary_location:'Back Bar' },
+      { name:'Chardonnay Reserve',       category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:20.00, menu_price:15, par_level:8, reorder_point:3, primary_location:'Walk-in Cooler' },
+      { name:'Bud Light',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:28.80, menu_price:5, case_size:24, par_level:12, reorder_point:4, primary_location:'Walk-in Cooler' },
+      { name:'Corona',                   category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:33.60, menu_price:6, case_size:24, par_level:10, reorder_point:4, primary_location:'Walk-in Cooler' },
+      { name:'Stella Artois',            category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:38.40, menu_price:7, case_size:24, par_level:8,  reorder_point:3, primary_location:'Walk-in Cooler' },
+      { name:'Athletic NA',              category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:33.60, menu_price:6, case_size:24, par_level:6,  reorder_point:2, primary_location:'Walk-in Cooler' },
+      { name:'White Claw',               category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:38.40, menu_price:6, case_size:24, par_level:10, reorder_point:4, primary_location:'Walk-in Cooler' },
+      { name:'Austin Eastciders',        category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:43.20, menu_price:7, case_size:24, par_level:8,  reorder_point:3, primary_location:'Walk-in Cooler' },
+      { name:'Live Oak Hefeweizen',      category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:180.00, menu_price:6, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler' },
+      { name:"Real Ale Fireman's 4",     category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:165.00, menu_price:6, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler' },
+      { name:'ABW Fire Eagle IPA',       category:'Draft Beer', vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16, unit_cost:190.00, menu_price:7, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler' },
+      { name:'Independence Stout',       category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:175.00, menu_price:6, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
+      { name:'Seasonal Rotating Tap',    category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:185.00, menu_price:7, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
       // Bottle Beer unit_cost is per CASE; convert to per-bottle before costing
@@ -1381,15 +1424,16 @@ S.HubSettings = {
         cost_history:[],
         ...p, name: cleanName, unit_type: unitType };
     });
-    // Multi-location stocking: the same SKU lives in storage AND at the
-    // service bars, the way a real bar runs. locations[0] stays the primary.
-    const stockIn = (names, locs) => names.forEach(nm => {
-      const pr = icProducts.find(x => x.name === nm);
-      if (pr) { pr.locations = locs.slice(); pr.primary_location = locs[0]; }
+    // Multi-location stocking: bar products live in storage AND at the service
+    // bars, the way a real bar runs. locations[0] is the primary (ordering home).
+    icProducts.forEach(p => {
+      let locs = null;
+      if (p.category === 'Liquor')           locs = ['Liquor Room', 'Main Bar'];
+      else if (p.category === 'Wine')        locs = ['Back Bar', 'Walk-in Cooler'];
+      else if (p.category === 'Bottle Beer') locs = ['Walk-in Cooler', 'Main Bar', 'Back Bar'];
+      else if (p.category === 'Draft Beer')  locs = ['Walk-in Cooler', 'Main Bar'];
+      if (locs) { p.locations = locs.slice(); p.primary_location = locs[0]; }
     });
-    stockIn(['Modelo Especial', 'Lone Star'], ['Walk-in Cooler', 'Main Bar', 'Back Bar']);
-    stockIn(["Tito's Handmade Vodka", 'Espolòn Tequila Blanco', 'Bulleit Bourbon', "Hendrick's Gin"], ['Liquor Room', 'Main Bar']);
-    stockIn(['House Cabernet', 'House Chardonnay', 'Prosecco'], ['Back Bar', 'Walk-in Cooler']);
     App.inventoryData.ic_products = icProducts;
 
     // ── Beer + Wine as linked Menu Inventory Items ──────────────────────────
@@ -1410,7 +1454,15 @@ S.HubSettings = {
     });
     const icByName = nm => icProducts.find(p => p.name === nm);
     [ ['ABW Pearl Snap (1/2 bbl)', 6, 320], ['Modelo Especial', 6, 180],
-      ['Lone Star', 5, 150], ['House Cabernet', 10, 64], ['House Chardonnay', 9, 70]
+      ['Lone Star', 5, 150], ['House Cabernet', 10, 64], ['House Chardonnay', 9, 70],
+      // Expanded beer + wine list — the menu offers what Inventory now carries.
+      ['Bud Light', 5, 210], ['Corona', 6, 160], ['Stella Artois', 7, 90],
+      ['Athletic NA', 6, 40], ['White Claw', 6, 120], ['Austin Eastciders', 7, 70],
+      ['Live Oak Hefeweizen', 6, 240], ["Real Ale Fireman's 4", 6, 200], ['ABW Fire Eagle IPA', 7, 220],
+      ['Independence Stout', 6, 110], ['Seasonal Rotating Tap', 7, 130],
+      ['Pinot Noir', 12, 80], ['Malbec', 11, 70], ['Red Blend', 10, 90],
+      ['Sauvignon Blanc', 11, 85], ['Pinot Grigio', 10, 75], ['Rosé', 11, 60], ['Champagne', 14, 30],
+      ['Cabernet Reserve', 16, 24], ['Chardonnay Reserve', 15, 22]
     ].forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(invMenuItem(p, row[1], row[2])); });
 
     // ── Recipes attached to menu items + standalone batches ─────────────────
@@ -1596,21 +1648,26 @@ S.HubSettings = {
     // the icCOGS feed reads cleanly as (start - end) x unit cost. Realistic
     // weekly turnover is spread across EVERY product (not concentrated in a
     // few), so the usage/variance reports read like a real operating week and
-    // the count-derived COGS sums to ~$2,755 bar / ~$2,362 food — in line with
-    // the booked weekly P&L for this volume.
+    // the count-derived COGS sums to ~$2,758 bar / ~$2,362 food — in line with
+    // the booked weekly P&L for this volume. Regenerated for the full bar stock.
     const icTotals = {
-      0:[8,21], 1:[8,21], 2:[6,16], 3:[5,13], 4:[8,21],
-      5:[8,21], 6:[182,485], 7:[136,363], 8:[1.8,4.8], 9:[17,45],
-      10:[11,30], 11:[8,22], 12:[1.1,3], 13:[0.8,2.2], 14:[1.1,3],
-      15:[1.4,3.7], 16:[0.9,2.4], 17:[2.2,5.9], 18:[1.7,4.5], 19:[50,134],
-      20:[7,19], 21:[1.7,4.5], 22:[8,22], 23:[34,90], 24:[8,22],
-      25:[8,21], 26:[7,19], 27:[10,27], 28:[25,67], 29:[8,22],
-      30:[4,11], 31:[4,11], 32:[11,30], 33:[4,11], 34:[31,82],
-      35:[7,18], 36:[4,11], 37:[22,59], 38:[6,16], 39:[34,90],
-      40:[5,13], 41:[5,13], 42:[5,14], 43:[4,11], 44:[8,22],
-      45:[4,11], 46:[1.7,4.5], 47:[2.8,7.5], 48:[4,11], 49:[2.2,5.9],
-      50:[0.8,2.1], 51:[0.6,1.6], 52:[0.8,2.1], 53:[0.9,2.4], 54:[4,10],
-      55:[1.8,4.8], 56:[0.5,1.3], 57:[1.4,3.7], 58:[2.2,5.9], 59:[1.7,4.5]
+      0:[1.6,4.3], 1:[1.4,3.8], 2:[1.3,3.4], 3:[0.9,2.4], 4:[2.2,5.8], 5:[2.2,5.8],
+      6:[34,91], 7:[27,72], 8:[0.5,1.3], 9:[17,45], 10:[11,30], 11:[8,22],
+      12:[1.1,3], 13:[0.8,2.2], 14:[1.1,3], 15:[1.4,3.7], 16:[0.4,1], 17:[2.2,5.9],
+      18:[1.7,4.5], 19:[50,134], 20:[7,19], 21:[1.7,4.5], 22:[8,22], 23:[34,90],
+      24:[8,22], 25:[8,21], 26:[7,19], 27:[10,27], 28:[25,67], 29:[8,22],
+      30:[4,11], 31:[4,11], 32:[11,30], 33:[4,11], 34:[31,82], 35:[7,18],
+      36:[4,11], 37:[22,59], 38:[6,16], 39:[34,90], 40:[5,13], 41:[5,13],
+      42:[5,14], 43:[4,11], 44:[8,22], 45:[4,11], 46:[1.7,4.5], 47:[2.8,7.5],
+      48:[4,11], 49:[2.2,5.9], 50:[0.3,0.8], 51:[0.2,0.6], 52:[0.3,0.8], 53:[0.3,0.8],
+      54:[0.9,2.4], 55:[0.5,1.4], 56:[0.1,0.3], 57:[1.4,3.7], 58:[2.2,5.9], 59:[1.7,4.5],
+      60:[1.6,4.3], 61:[0.9,2.4], 62:[1.3,3.4], 63:[0.7,1.9], 64:[0.9,2.4], 65:[0.7,1.9],
+      66:[1.6,4.3], 67:[0.9,2.4], 68:[1.3,3.4], 69:[0.7,1.9], 70:[1.4,3.8], 71:[0.4,1],
+      72:[0.9,2.4], 73:[0.7,1.9], 74:[0.7,1.9], 75:[0.7,1.9], 76:[0.5,1.4], 77:[0.4,1],
+      78:[0.5,1.4], 79:[0.4,1], 80:[0.3,0.8], 81:[2.5,6.7], 82:[2.2,5.8], 83:[2.9,7.7],
+      84:[2.7,7.2], 85:[2.3,6.2], 86:[1.8,4.8], 87:[0.9,2.4], 88:[0.4,1], 89:[0.7,1.9],
+      90:[0.7,1.9], 91:[34,91], 92:[27,72], 93:[14,38], 94:[7,19], 95:[22,58],
+      96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8]
     };
     const icCountItem = (p, qty) => ({
       product_id:p.id, name:p.name, category:p.category,
