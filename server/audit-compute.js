@@ -488,6 +488,23 @@ function computeRevenueAudit(appData, controlData, extracted) {
     if (below > 0 && monthlyCovers != null) s1Gap = round0(below * monthlyCovers);
   }
 
+  // ── Daypart performance (expands S1) ──
+  // Check average split by daypart (lunch/dinner/late). Blended numbers hide a
+  // bleeding lunch. Honest ONLY when at least two dayparts are present; else
+  // N/A. Diagnostic surfacing — NO separate dollar and NO score change (the
+  // blended check average already scores S1, so a daypart dollar would double-
+  // count). Routes to the daypart staffing + targeted-upsell fix.
+  const dpCheck = { Lunch: num(extracted.lunch_check_avg), Dinner: num(extracted.dinner_check_avg), Late: num(extracted.late_check_avg) };
+  const dpEntries = Object.keys(dpCheck).map(k => [k, dpCheck[k]]).filter(([, v]) => v != null);
+  let dpWeakest = null, dpWeakestCheck = null, dpStrongestCheck = null, dpSpread = null;
+  if (dpEntries.length >= 2) {
+    dpEntries.sort((a, b) => a[1] - b[1]);
+    dpWeakest = dpEntries[0][0];
+    dpWeakestCheck = round2(dpEntries[0][1]);
+    dpStrongestCheck = round2(dpEntries[dpEntries.length - 1][1]);
+    dpSpread = round2(dpStrongestCheck - dpWeakestCheck);
+  }
+
   // ── Beverage attachment / drink incidence (expands S1) ──
   // Drinks per guest is the single biggest margin lever for a bar+kitchen. It
   // is a RESULT (decision 8): a measured low attach genuinely drags the score.
@@ -624,6 +641,10 @@ function computeRevenueAudit(appData, controlData, extracted) {
     S1_BEV_ATTACH_BENCHMARK: BEV_ATTACH_BENCHMARK,
     S1_BEV_INCIDENCE_PCT: statedIncidence != null ? round1(statedIncidence) : null,
     S1_BEV_UNITS: bevUnits,
+    S1_DAYPART_WEAKEST: dpWeakest,
+    S1_DAYPART_WEAKEST_CHECK: dpWeakestCheck,
+    S1_DAYPART_STRONGEST_CHECK: dpStrongestCheck,
+    S1_DAYPART_SPREAD: dpSpread,
     S1_MONTHLY_GAP: s1Gap,
     S1_ANNUAL_GAP: round0(s1Gap * 12),
 
@@ -775,6 +796,13 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   const gCount = round0(gbp.review_count != null ? gbp.review_count : num(extracted.google_review_count));
   const respRate = round0(num(extracted.response_rate) != null ? num(extracted.response_rate) : wk(w => w.response_rate));
   const haveReviews = gRating != null || respRate != null;
+  // Review generation system (expands S3) — a real velocity lever. Operator-
+  // stated practice; credit only when active (never a penalty). Recurring
+  // complaint THEMES are read qualitatively by the model into negative_pattern
+  // and surfaced as an OPERATIONAL finding (slow service is a kitchen/floor
+  // problem, not a reputation one), never scored as an invented metric.
+  const reviewGeneration = (extracted.review_generation === true || extracted.review_generation === false) ? extracted.review_generation : null;
+  const negativeTheme = (extracted.negative_pattern && String(extracted.negative_pattern).trim()) ? String(extracted.negative_pattern).trim() : null;
   let s3 = null;
   if (haveReviews) {
     let pts = 0, max = 0;
@@ -782,6 +810,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     if (respRate != null) { max += 35; pts += Math.min(35, (respRate / B.response_rate) * 35); }
     if (gCount != null) { max += 20; pts += Math.min(20, (gCount / B.review_count) * 20); }
     s3 = max > 0 ? clampScore((pts / max) * 100) : null;
+    if (reviewGeneration === true) s3 = clampScore(s3 + 5);   // active review generation drives velocity
   }
 
   // ── S4 — Search and SEO ──
@@ -861,6 +890,10 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   if (igPosts != null && igPosts < B.ig_posts) items.push({ action: 'Post to Instagram more often. ' + igPosts + ' posts in 30 days versus ' + B.ig_posts + '.', gap_id: 'social' });
   if (openRate != null && openRate < B.open_rate) items.push({ action: 'Improve email open rate. ' + openRate + '% versus the ' + B.open_rate + '% benchmark.', gap_id: 'email-loyalty' });
   if (deliveryMarkup === false) items.push({ action: 'Mark up your delivery menu prices. Pricing delivery the same as dine-in hands the 20 to 30 percent platform commission straight out of your margin on every order.', gap_id: 'delivery' });
+  if (reviewGeneration === false) items.push({ action: 'Build a review generation system. Asking every happy table for a review is the single biggest lever on review volume and recency.', gap_id: 'reviews' });
+  // Recurring complaint themes are an OPERATIONAL signal, not a reputation one —
+  // route them to the floor/kitchen, not to review management.
+  if (negativeTheme) items.push({ action: 'Fix the operational root cause behind your reviews. The recurring theme is "' + negativeTheme + '". Reviews are the symptom, the floor or kitchen is the fix.', gap_id: 'reviews' });
   if (listSize != null && listSize < B.list_size) items.push({ action: 'Grow the email list. ' + Math.round(listSize) + ' subscribers versus ' + B.list_size + '.', gap_id: 'email-loyalty' });
 
   const dataTier = (gbp.rating != null || web.performance != null || yelp.rating != null) ? 'Verified — live link data'
@@ -909,6 +942,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     S3_MOST_RECENT_REVIEW_DAYS: num(extracted.most_recent_review_days),
     S3_UNANSWERED: num(extracted.unanswered),
     S3_NEGATIVE_PATTERN: extracted.negative_pattern || null,
+    S3_REVIEW_GENERATION: reviewGeneration,
     S3_MONTHLY_GAP: 0,
 
     S4_SCORE: s4,
@@ -1168,6 +1202,14 @@ if (require.main === module) {
   rChecks.push(['Rev S3 recent repricing credits score', plRecent.S3_SCORE > plBase.S3_SCORE, true]);
   rChecks.push(['Rev S3 stale pricing flagged', plStale.S3_PRICING_STALE, true]);
   rChecks.push(['Rev S3 stale pricing does not penalize score', plStale.S3_SCORE, plBase.S3_SCORE]);
+  // Daypart (S1 expansion): >=2 dayparts -> weakest + spread computed; <2 -> N/A.
+  // Diagnostic only, no score change.
+  const dpYes = computeRevenueAudit({ settings: {}, revenue_settings: { targets: { check_avg: 35 } } }, null, { monthly_covers: 1000, monthly_revenue: 35000, check_avg: 34, lunch_check_avg: 16, dinner_check_avg: 38 });
+  const dpNo  = computeRevenueAudit({ settings: {}, revenue_settings: { targets: { check_avg: 35 } } }, null, { monthly_covers: 1000, monthly_revenue: 35000, check_avg: 34, dinner_check_avg: 38 });
+  rChecks.push(['Rev S1 daypart weakest identified', dpYes.S1_DAYPART_WEAKEST, 'Lunch']);
+  rChecks.push(['Rev S1 daypart spread computed', dpYes.S1_DAYPART_SPREAD, 22]);
+  rChecks.push(['Rev S1 daypart N/A with one daypart', dpNo.S1_DAYPART_WEAKEST, null]);
+  rChecks.push(['Rev S1 daypart does not change score', dpYes.S1_SCORE, dpNo.S1_SCORE]);
   let rPass = 0;
   for (const [label, got, exp] of rChecks) {
     const ok = got === exp; if (ok) rPass++;
@@ -1223,6 +1265,12 @@ if (require.main === module) {
   tChecks.push(['Traffic S6 delivery markup N/A when unanswered', delvBase.S6_DELIVERY_MARKUP, null]);
   tChecks.push(['Traffic S6 no-markup drags score', delvNo.S6_SCORE < delvBase.S6_SCORE, true]);
   tChecks.push(['Traffic S6 markup credits score', delvYes.S6_SCORE > delvBase.S6_SCORE, true]);
+  // Review generation (S3 expansion): active credits a scored S3, unanswered is
+  // N/A. Negative theme passes through for the operational action item.
+  const revGenBase = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { google_rating: 4.2, response_rate: 60 }, {});
+  const revGenYes  = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { google_rating: 4.2, response_rate: 60, review_generation: true }, {});
+  tChecks.push(['Traffic S3 review generation N/A when unanswered', revGenBase.S3_REVIEW_GENERATION, null]);
+  tChecks.push(['Traffic S3 active review generation credits score', revGenYes.S3_SCORE > revGenBase.S3_SCORE, true]);
   let tPass = 0;
   for (const [label, got, exp] of tChecks) {
     const ok = got === exp; if (ok) tPass++;
