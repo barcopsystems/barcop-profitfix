@@ -31,7 +31,7 @@ S.ThisWeek = {
     ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
       .filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
       }));
     let cogs = 0, any = false;
     Object.keys(eMap).forEach(pid => {
@@ -39,8 +39,8 @@ S.ThisWeek = {
       const p = prods.find(x => x.id === pid);
       if (!p || !cats.includes(p.category)) return;
       const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
-      const bc = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
-      if (bc != null) { cogs += used * bc; any = true; }
+      const c = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
+      if (c != null) { cogs += used * c; any = true; }
     });
     return any ? cogs : null;
   },
