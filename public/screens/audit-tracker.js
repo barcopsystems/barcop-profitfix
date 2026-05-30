@@ -458,6 +458,9 @@ S.AuditTracker = {
         ['Price Verification',      d.S4_PRICE_VERIFY],
         ['Annual Bid Process',      d.S4_ANNUAL_BIDS],
         ['Backup Vendors',          d.S4_BACKUP_VENDORS],
+        ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : '', d.S4_UNCOLLECTED_CREDITS > 0 ? 'warn' : ''],
+        ['Credits Recovered',       d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
+        ['Credit Recovery Rate',    d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : '', (d.S4_CREDIT_RECOVERY_PCT != null && d.S4_CREDIT_RECOVERY_PCT < 40) ? 'warn' : ''],
         ['Monthly Exposure',        cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
         ['Annual Exposure',         cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
       ]),
@@ -1035,6 +1038,10 @@ S.AuditTracker = {
     if (d.S2_DISCOUNT_PCT != null && d.S2_DISCOUNT_BENCHMARK_PCT != null && d.S2_DISCOUNT_PCT > d.S2_DISCOUNT_BENCHMARK_PCT) items.push({ action: 'Tighten discount control. Discounts are ' + d.S2_DISCOUNT_PCT + '% of sales vs an under-' + d.S2_DISCOUNT_BENCHMARK_PCT + '% benchmark. Require manager authorization on every discount.', monthly_impact: 0, gap_id: 'theft-loss' });
     if (d.S2_NO_SALE_COUNT >= 10) items.push({ action: 'Review no-sale drawer opens. ' + d.S2_NO_SALE_COUNT + ' no-sale register opens this period. Set a no-sale policy and log a reason for every one, it is the simplest cover for pocketing cash.', monthly_impact: 0, gap_id: 'theft-loss' });
     if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY, gap_id: 'vendor-control' });
+    // Uncollected vendor credits are real filed overcharges. Surfaced with the
+    // actual dollar in text; monthly_impact 0 (a one-time recovery, not monthly,
+    // and kept out of the headline so it never double-counts vendor exposure).
+    if (d.S4_UNCOLLECTED_CREDITS > 0) items.push({ action: 'Chase your filed vendor credits. $' + Math.round(d.S4_UNCOLLECTED_CREDITS) + ' in flagged overcharges is filed but not yet recovered across ' + (d.S4_OPEN_CREDIT_COUNT || 0) + ' open discrepanc' + (d.S4_OPEN_CREDIT_COUNT === 1 ? 'y' : 'ies') + '. The work of catching it is already done.', monthly_impact: 0, gap_id: 'vendor-control' });
     // Prime cost (S5_COMBINED_COGS_GAP) is the bar + food COGS overage, i.e. it
     // already equals S1 + S3. It is shown as context on the Prime Cost section,
     // never added here as a recoverable item, or the Total Recoverable would
