@@ -296,7 +296,7 @@ window.FixPanel = {
     const body = '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">'
       + p('Two pieces work together: the Scoreboard up top tracks what you have already recovered, and the Fix Areas list below shows where the operation is still leaking. Same workflow, opposite ends.')
       + sh('The Scoreboard')
-      + p('Tracks what Bar Cop has put back in your register, in dollars per year. No projections. No industry averages. Your own weekly numbers, measured before and after each fix.')
+      + p('Tracks what Bar Cop has actually put back in your register since each fix went in. This is realized to date, not a projection: your measured per-week improvement times the weeks that have passed since the fix. An "on pace for $X per year" run-rate may appear as a clearly labeled secondary line, never as money already earned. Your own weekly numbers, measured before and after each fix. No industry averages.')
       + sh('Fix Areas')
       + p('The current weekly status of each gap. The band (On Target, Watch, Over) and dollar figure read from the latest week of your data, scored against your target. The dollar is the annualized cost of being off target at this week\'s pace.')
       + p('Once you check steps in The Fix Process for a gap, the row also shows your step progress. Once you mark the fix implemented, the progress hides and the Scoreboard up top is where to watch.')
@@ -305,7 +305,7 @@ window.FixPanel = {
       + p('2. Pick a gap and open the fix process. Every step is a link into the part of Bar Cop that does the work.')
       + p('3. When the fix is in place, click Mark Implemented and lock in the date.')
       + sh('What Happens Next')
-      + p('Bar Cop watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after, multiplies the improvement by your revenue base, and annualizes it.')
+      + p('Bar Cop watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after and multiplies the improvement by your revenue base to get your per-week recovery. The Scoreboard shows that recovery realized to date, the weekly figure times the weeks since the fix, with the annual pace as a clearly labeled secondary line.')
       + p('You see a preliminary figure once 2 weeks of after-data exist. It firms up over the next 6 weeks and settles at 8.')
       + sh('The Honest Rule')
       + p('A dollar figure only shows when the math comes from real data Bar Cop already holds. If a fix cannot be dollarized honestly (most Traffic fixes), it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
@@ -443,7 +443,7 @@ window.FixPanel = {
         if (r && r.status === 'ok' && r.dollars > 0) recovered += r.dollars;
       });
       status = recovered > 0
-        ? 'Implemented · ' + App.fmtCurrency(recovered, 0) + ' /yr'
+        ? 'Implemented · ' + App.fmtCurrency(recovered, 0) + ' recovered'
         : 'Implemented';
     } else if (stepsDone > 0 && stepsTotal > 0) {
       status = stepsDone + ' of ' + stepsTotal + ' steps';
@@ -576,7 +576,9 @@ window.FixPanel = {
           const move = r.fmt(r.before) + ' to ' + r.fmt(r.after);
           if (r.dollars != null && r.dollars > 0) {
             good = true;
-            result = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' a year. ' + r.label + ' ' + move + '.'
+            result = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far'
+              + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '')
+              + '. ' + r.label + ' ' + move + '.'
               + (r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data so far.');
           } else {
             result = r.label + ' has not improved since this fix. ' + move + '.';
