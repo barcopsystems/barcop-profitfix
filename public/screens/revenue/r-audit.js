@@ -406,6 +406,10 @@ S.RevenueAudit = {
         ['Bar Check Average',            cur(d.S1_BAR_CHECK_AVG)],
         ['Food Check Average',           cur(d.S1_FOOD_CHECK_AVG)],
         ['Monthly Cover Count',          num(d.S1_COVER_COUNT)],
+        ['Beverage Attachment',          d.S1_BEV_PER_COVER != null ? d.S1_BEV_PER_COVER + ' drinks per guest' : '', (d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null && d.S1_BEV_PER_COVER < d.S1_BEV_ATTACH_BENCHMARK) ? 'warn' : (d.S1_BEV_PER_COVER != null ? 'good' : '')],
+        ['Attachment Benchmark',         d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null ? d.S1_BEV_ATTACH_BENCHMARK + ' drinks per guest' : ''],
+        ['Drinks Sold (period)',         d.S1_BEV_PER_COVER != null ? num(d.S1_BEV_UNITS) : ''],
+        ['Checks With a Drink',          d.S1_BEV_INCIDENCE_PCT != null ? d.S1_BEV_INCIDENCE_PCT + '%' : ''],
         ['Monthly Revenue',              cur(d.S1_MONTHLY_REVENUE)],
         ['Monthly Gap vs Target',        cur(d.S1_MONTHLY_GAP), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',                   cur(d.S1_ANNUAL_GAP),  d.S1_ANNUAL_GAP  > 0 ? 'warn' : ''],
@@ -951,6 +955,11 @@ S.RevenueAudit = {
   extractActionItems(d) {
     const items = [];
     if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Close check average gap. $' + Math.round(d.S1_MONTHLY_GAP) + '/month at current cover count.', monthly_impact: d.S1_MONTHLY_GAP, gap_id: 'check-average' });
+    // Beverage attachment routes to the same check-average lever. No separate
+    // dollar (monthly_impact 0) so it never double-counts the check-average gap.
+    if (d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null && d.S1_BEV_PER_COVER < d.S1_BEV_ATTACH_BENCHMARK) {
+      items.push({ action: 'Lift beverage attachment. ' + d.S1_BEV_PER_COVER + ' drinks per guest vs a ' + d.S1_BEV_ATTACH_BENCHMARK + ' benchmark. Build the drink into every table, it is the highest-margin add.', monthly_impact: 0, gap_id: 'check-average' });
+    }
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce labor cost. $' + Math.round(d.S2_MONTHLY_GAP) + '/month over target.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'labor-scheduling' });
     if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Improve menu mix. $' + Math.round(d.S3_MONTHLY_GAP) + '/month opportunity from repricing Dogs.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'menu-engineering' });
     if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Close server performance spread. $' + Math.round(d.S4_MONTHLY_GAP) + '/month from bottom third to team average.', monthly_impact: d.S4_MONTHLY_GAP, gap_id: 'server-performance' });
