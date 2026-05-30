@@ -104,7 +104,7 @@ S.TrafficHelp = {
         { q: 'What is the Loyalty Redemptions field for?',
           a: 'The monthly count of loyalty rewards your guests actually redeemed. Total members is one number, but redemptions tell you whether the program is being used. A loyalty program with 800 members and 5 redemptions a month is a database, not a program. The redemptions count surfaces on the Loyalty card next to member count so the comparison is always visible.' },
         { q: 'What email open rate should I expect?',
-          a: 'The benchmark is 20 percent or higher. Bar and restaurant lists run a little above the all-industry average because guests who opted in genuinely like the place. Below 15 percent usually means one of three things: the list went stale from infrequent sending, the subject lines are weak, or the list was built from low-quality signups. Tighten the subject line, send around the time guests decide where to eat, and clear inactive contacts off the list.' }
+          a: 'The Bar Cop benchmark is 20 percent or higher, since guests who opted in genuinely like the place. Below 15 percent usually means one of three things: the list went stale from infrequent sending, the subject lines are weak, or the list was built from low-quality signups. Tighten the subject line, send around the time guests decide where to eat, and clear inactive contacts off the list.' }
       ]},
       { t: 'VIP Regulars', qa: [
         { q: 'What is the VIP Regulars Log?',
@@ -148,11 +148,11 @@ S.TrafficHelp = {
       ]},
       { t: 'Settings', qa: [
         { q: 'Where do I set my Traffic targets?',
-          a: 'In Hub Settings, on the Traffic Targets card. Google rating goal, new reviews per month, response rate percent, monthly sessions, and social posts per month. Industry benchmarks are pre-filled. Adjust them to your operation. Click Save Data when you change them.' },
+          a: 'In Hub Settings, on the Traffic Targets card. Google rating goal, new reviews per month, response rate percent, monthly sessions, and social posts per month. Bar Cop benchmarks are pre-filled. Adjust them to your operation. Click Save Data when you change them.' },
         { q: 'Where do I add my platform URLs?',
           a: 'In Hub Settings, on the Operation Links card. Website, Google, Yelp, Instagram, Facebook, DoorDash, Uber Eats, Grubhub, ezCater, OpenTable, Resy, Email Platform. These power the Live Links strip on the Traffic Dashboard for one-click access to your live listings.' },
         { q: 'What Google rating target should I set?',
-          a: 'The industry benchmark is 4.3 or higher. Below 4.0 is where search filtering starts cutting you out. Many guests and platforms exclude results below 4.0 by default. If you are below 4.0, set your target at 4.0 first. Hit that, then move to 4.3.' }
+          a: 'The Bar Cop benchmark is 4.3 or higher. Below 4.0 is where search filtering starts cutting you out. Many guests and platforms exclude results below 4.0 by default. If you are below 4.0, set your target at 4.0 first. Hit that, then move to 4.3.' }
       ]}
     ];
 
