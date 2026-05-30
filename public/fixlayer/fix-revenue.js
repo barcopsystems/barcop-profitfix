@@ -192,7 +192,8 @@ FIX.revenue = [
       'Setting check average targets without a four-week baseline. A target with no baseline is a guess.',
       'Treating upselling as a personality trait rather than a learned sequence. Every server can follow a written, trained sequence.',
       'Forgetting the beverage pairing. A specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.',
-      'Not watching beverage attachment. The Revenue Audit reads your drinks per guest off the POS. Below the benchmark means tables are sitting without a drink in front of them, the single biggest margin leak on the floor. Make the first-round drink the opening move at every table.'
+      'Not watching beverage attachment. The Revenue Audit reads your drinks per guest off the POS. Below the benchmark means tables are sitting without a drink in front of them, the single biggest margin leak on the floor. Make the first-round drink the opening move at every table.',
+      'Reading one blended check average. A healthy dinner can hide a bleeding lunch. The Revenue Audit splits check average by daypart when your POS breaks it out. A wide spread means the weak daypart needs its own menu, staffing, and upsell focus, not the same plan as your strong one.'
     ]
   },
 
