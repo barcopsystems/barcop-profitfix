@@ -88,7 +88,7 @@ FIX.traffic = [
     id: 'reviews',
     name: 'Reviews',
     module: 'traffic',
-    summary: 'Recent reviews rank you and reassure the guest who is deciding tonight.',
+    summary: 'Recent reviews rank you and reassure the guest who is deciding tonight. Volume comes from asking every happy table, and a recurring complaint theme is an operational signal to fix on the floor, not a reputation problem to manage.',
 
     process: {
       steps: [
