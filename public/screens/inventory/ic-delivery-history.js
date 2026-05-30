@@ -47,9 +47,15 @@ S.InventoryDeliveryHistory = {
         + '</select></div></div>';
 
       const rows = filtered.map(d => {
-        const disc = d.has_discrepancy
-          ? '<span class="badge badge-warn">' + (d.price_change_count || 1) + ' Price Change' + ((d.price_change_count || 1) === 1 ? '' : 's') + '</span>'
-          : '<span class="badge badge-dim">Clean</span>';
+        let disc;
+        if (d.has_discrepancy) {
+          const parts = [];
+          if (d.price_change_count) parts.push(d.price_change_count + ' Price Change' + (d.price_change_count === 1 ? '' : 's'));
+          if (d.short_count_count)  parts.push(d.short_count_count + ' Short Count' + (d.short_count_count === 1 ? '' : 's'));
+          disc = '<span class="badge badge-warn">' + (parts.join(' &middot; ') || 'Discrepancy') + '</span>';
+        } else {
+          disc = '<span class="badge badge-dim">Clean</span>';
+        }
         return '<tr class="dh-row" data-id="' + d.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
           + '<td>' + esc(d.vendor || '-') + '</td>'
@@ -92,7 +98,8 @@ S.InventoryDeliveryHistory = {
 
     const itemRows = items.map(it => {
       const isCase = it.display_unit === 'case';
-      const unitSuffix = isCase ? ' cases' : '';
+      const p = ((App.inventoryData && App.inventoryData.ic_products) || []).find(pr => pr.id === it.product_id);
+      const unitSuffix = isCase ? ' cases' : (p ? ' ' + (App.productUnit(p) || '') : '');
       const priceSuffix = isCase ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '';
       const change = it.price_changed
         ? '<span style="color:var(--gold);font-weight:700;">was ' + App.fmtCurrency(it.prev_price) + '</span>'
