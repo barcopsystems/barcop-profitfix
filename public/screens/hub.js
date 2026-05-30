@@ -102,7 +102,26 @@ S.Hub = {
         text: m.label + ' at ' + m.disp + ' · target ' + m.tgt,
         screen: m.screen, mod: m.mod
       }));
-    const alerts = metricAlerts.concat(this.forwardAlerts())
+    // Audit-based alerts so "All Clear" is honest: a recovery audit scoring
+    // below target, or one overdue / never run, is a real open item. We do NOT
+    // dump audit action items here (they have their own Priority panel).
+    const auditAlerts = [];
+    [ { name:'Profit', a:pA, screen:'audit-tracker', mod:'profit' },
+      { name:'Revenue', a:rA, screen:'r-audit', mod:'revenue' },
+      { name:'Traffic', a:tA, screen:'t-audit', mod:'traffic' }
+    ].forEach(d => {
+      if (!d.a) { auditAlerts.push({ sev:'warn', text: d.name + ' audit not run yet', screen:d.screen, mod:d.mod }); return; }
+      const score  = d.a.overall_score;
+      const target = (d.a.raw && d.a.raw.TARGET_SCORE) || 65;
+      if (score != null && score < target) {
+        auditAlerts.push({ sev: score < target - 10 ? 'bad' : 'warn', text: d.name + ' audit at ' + score + ' · target ' + target + '+', screen:d.screen, mod:d.mod });
+      }
+      const daysSince = d.a.date ? Math.floor((Date.now() - new Date(d.a.date + 'T00:00:00').getTime()) / 86400000) : null;
+      if (daysSince != null && daysSince > 30) {
+        auditAlerts.push({ sev:'warn', text: d.name + ' audit overdue · last run ' + daysSince + ' days ago', screen:d.screen, mod:d.mod });
+      }
+    });
+    const alerts = metricAlerts.concat(this.forwardAlerts()).concat(auditAlerts)
       .sort((a,b) => sevRank[a.sev] - sevRank[b.sev])
       .slice(0, 50);
 
@@ -157,7 +176,7 @@ S.Hub = {
              overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--gold)' : 'var(--t4)',
-             anyAudit ? 'Recoverable across audited systems' : 'Run an audit to surface this')
+             anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
              netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
@@ -199,7 +218,7 @@ S.Hub = {
           + '<div style="display:flex;align-items:baseline;gap:12px;">'
           +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
           +     score + '<span style="font-family:\'Barlow\',sans-serif;font-size:11px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
-          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Industry avg ' + indAvg + ' &middot; Your target 65+</div>'
+          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Bar Cop benchmark ' + indAvg + ' &middot; Your target 65+</div>'
           + '</div>'
           // Status bar shortened on the right so it clears the "Next Audit"
           // countdown / "Run Audit" button area (~85px wide on the right
@@ -229,8 +248,17 @@ S.Hub = {
         const monthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
         const weekly  = monthly / 4.345;
         const parts = [];
-        if (weekly > 0) {
-          parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--red-soft);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
+        // Module-aware: Profit cost leaks read "Leaking" (red); Revenue is mostly
+        // projected growth so it reads "Opportunity" (gold), never pooled as a
+        // leak; Traffic carries no dollar figures, so no weekly dollar line.
+        if (mod === 'traffic') {
+          // no dollar line for Traffic — deficits live in the audit itself
+        } else if (weekly > 0) {
+          if (mod === 'revenue') {
+            parts.push('<span style="color:var(--t3);">Opportunity <span style="color:var(--gold);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
+          } else {
+            parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--red-soft);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
+          }
         } else {
           parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
         }
@@ -352,7 +380,7 @@ S.Hub = {
       const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
         + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;">All Clear</div>'
-        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">No metrics are off target right now.</div>'
+        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Weekly metrics on target and every recovery audit run, current, and at or above target.</div>'
         + '</div>';
       alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${allClear}</div>`;
     }
