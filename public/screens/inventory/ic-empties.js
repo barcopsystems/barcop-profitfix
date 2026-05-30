@@ -274,7 +274,7 @@ S.InventoryEmpties = {
     const quantity = parseFloat(document.getElementById('em-qty')?.value);
     if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
     const disposition = document.getElementById('em-disp')?.value;
-    if (!disposition) { fail('Pick a disposition (Recycle / Return / Trash).'); return; }
+    if (!disposition) { fail('Pick a disposition (Recycle, Return for Deposit, or Trash).'); return; }
     const performedById = document.getElementById('em-by')?.value;
     if (!performedById) { fail('Pick who logged this.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
