@@ -650,12 +650,14 @@ S.AuditTracker = {
 
     const uploadCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Add a report here to score a section Bar Cop cannot see yet, or for deeper per-item detail. Accepts PDF, Excel, CSV, or images.</div>'
-      + this.renderFileSection('optional',  'Profit and Loss or Monthly Sales Summary', 'at-f-pl',     'at-pl',     'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report)')
-      + this.renderFileSection('optional',  'Voids, Comps and Cash Report',             'at-f-loss',   'at-loss',   'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance)')
-      + this.renderFileSection('optional',  'Invoices and Vendor Pricing',              'at-f-vendor', 'at-vendor', 'Scores Vendor Control (invoice matching, price drift)')
-      + this.renderFileSection('highlight', 'Recipe Costing Sheet',                     'at-f-recipe', 'at-recipe', 'Adds repricing opportunities ranked by dollar impact, and recipe coverage')
-      + this.renderFileSection('optional',  'Inventory Count Sheets (Bar and Kitchen)', 'at-f-inv',    'at-inv',    'Adds per-product pour and food cost variance')
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Drop in any of the reports below to score a section Bar Cop cannot see yet, or for deeper per-item detail. One drop zone takes them all.</div>'
+      + FileDrop.render('at-drop', { items: [
+          { t: 'Profit and Loss or Monthly Sales Summary', s: 'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report).' },
+          { t: 'Voids, Comps and Cash Report',             s: 'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance).' },
+          { t: 'Invoices and Vendor Pricing',              s: 'Scores Vendor Control (invoice matching, price drift).' },
+          { t: 'Recipe Costing Sheet',                     s: 'Adds repricing opportunities ranked by dollar impact, and recipe coverage.', hi: true },
+          { t: 'Inventory Count Sheets (Bar and Kitchen)', s: 'Adds per-product pour and food cost variance.' }
+        ] })
       + '</div>';
 
     // Operating-practice questions. These move scores but are not in financial
@@ -695,6 +697,7 @@ S.AuditTracker = {
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'You can review and update your inputs now. The next audit can be generated in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '. Your changes here are saved when you generate it.') + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
+    FileDrop.attach('at-drop');
 
     document.getElementById('at-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Profit Audit Works', [
       { p: ['The Profit Audit scores five areas: Bar Cost, Theft and Loss, Food Cost, Vendor Control, and Prime Cost. It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
@@ -918,12 +921,9 @@ S.AuditTracker = {
     };
     if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
-    const fileInputIds = ['at-f-pl','at-f-loss','at-f-vendor','at-f-recipe','at-f-inv'];
-    const allFiles = [];
-    for (const id of fileInputIds) {
-      const inp = document.getElementById(id);
-      if (inp?.files) for (const f of inp.files) allFiles.push({file:f, field:id});
-    }
+    // Single shared drop zone — all files pool under one field; the server
+    // extraction reads them together regardless of field name.
+    const allFiles = FileDrop.getFiles('at-drop').map(f => ({ file: f, field: 'file' }));
 
     const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
     const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
