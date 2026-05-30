@@ -1045,6 +1045,13 @@ const App = {
     nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
       el.addEventListener('click', () => App.showHub());
     });
+    // Report a Bug opens the shared bug-report flow (same as the Hub sidebar).
+    nav.querySelectorAll('.nav-item[data-nav="report-bug"]').forEach(el => {
+      el.addEventListener('click', () => {
+        document.getElementById('app')?.classList.remove('sidebar-open');
+        if (window.S && S.HubReportBug && S.HubReportBug.open) S.HubReportBug.open();
+      });
+    });
     // Hide section headers with no visible items below them
     nav.querySelectorAll('.nav-section').forEach(sec => {
       let hasVisible = false;
