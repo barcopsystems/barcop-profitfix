@@ -1243,6 +1243,44 @@ const App = {
     return p.primary_location ? [p.primary_location] : [];
   },
 
+  // Shared modal/popup host. Renders `html` into a fixed full-screen overlay so
+  // a form can pop OVER the current page instead of swapping it out. `layer`
+  // sets z-index: 9000 for a base popup, 9100 for one opened from inside
+  // another popup (keeps nested modals stacking correctly). Returns the overlay.
+  openModal(html, opts) {
+    opts = opts || {};
+    const id = opts.id || 'app-modal';
+    const layer = opts.layer || 9000;
+    let host = document.getElementById('app-modal-host');
+    if (!host) { host = document.createElement('div'); host.id = 'app-modal-host'; document.body.appendChild(host); }
+    const old = document.getElementById(id);
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(0,0,0,0.7);'
+      + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 16px;';
+    overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;">' + html + '</div>';
+    host.appendChild(overlay);
+    return overlay;
+  },
+  closeModal(id) {
+    const el = document.getElementById(id || 'app-modal');
+    if (el) el.remove();
+  },
+
+  // Display unit for a product's Par / Order Qty / On-Hand columns. Bottle beer
+  // pars/orders in cases, draft in kegs, liquor/wine in bottles; Food/Misc use
+  // the product's unit_type (lb, each, case, qt…). Keeps every category's
+  // quantity columns labeled the same way instead of baking the unit into the
+  // product name.
+  productUnit(p) {
+    if (!p) return '';
+    if (p.category === 'Bottle Beer') return 'cases';
+    if (p.category === 'Draft Beer')  return 'kegs';
+    if (p.category === 'Liquor' || p.category === 'Wine') return 'btls';
+    return p.unit_type || '';
+  },
+
   // Per-bottle cost for any product. For case-tracked Bottle Beer (case_size
   // > 0), unit_cost is stored as cost-per-case; divide by case_size to get
   // per-bottle. For everything else unit_cost is already per single
