@@ -498,7 +498,10 @@ S.ShiftActiveShift = {
     const closingCheck = ((App.shiftData && App.shiftData.sc_checklists) || [])
       .filter(c => c.date === s.date && (c.type || '').toLowerCase().includes('clos'))
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] || null;
-    const checklistDone = closingCheck ? (closingCheck.completion_pct || 0) : null;
+    // Completion % from the real saved counts (completion_pct is never persisted).
+    const checklistDone = closingCheck
+      ? (closingCheck.total_count ? Math.round((closingCheck.done_count || 0) / closingCheck.total_count * 100) : 0)
+      : null;
     const checklistIncomplete = checklistDone != null && checklistDone < 100;
 
     const item = (key, count, title, sub, target, color) => {
@@ -1027,7 +1030,7 @@ S.ShiftActiveShift = {
         counted_cash:  d.counted_cash || 0,
         variance:      cashVariance,
         tolerance:     tol,
-        status:        Math.abs(cashVariance) <= tol ? 'OK' : cashVariance < 0 ? 'Short' : 'Over',
+        status:        Math.abs(cashVariance) <= tol ? 'Within Tolerance' : cashVariance < 0 ? 'Short' : 'Over',
         reason:        '',
         notes:         'Auto-logged from Shift Close wizard',
         source:        'shift-close',
