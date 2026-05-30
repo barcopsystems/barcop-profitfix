@@ -607,22 +607,28 @@ S.Hub = {
           + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
           + modBadge(it.module)
           + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.label) + '</div>'
-          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
+          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + (it.kind === 'cost' ? 'var(--red-soft)' : 'var(--gold)') + ';">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
           + '</div>';
       }).join('');
+      // Split hero: recoverable cost leak (red) and projected revenue
+      // opportunity (gold) shown as two distinct figures, never pooled into one
+      // "leaking" total (decision 2). Each appears only when it has dollars.
+      const heroNum = (val, color, label) => '<div style="display:flex;align-items:baseline;gap:6px;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + color + ';line-height:1;">' + App.fmtCurrency(val, 0) + '</div>'
+        + '<div style="font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.06em;text-transform:uppercase;line-height:1.2;">/wk<br>' + label + '</div>'
+        + '</div>';
       readoutBody = ''
-        + '<div style="display:flex;align-items:baseline;gap:10px;">'
-        +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + App.fmtCurrency(readout.total, 0) + '</div>'
-        +   '<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ week</div>'
+        + '<div style="display:flex;align-items:baseline;gap:22px;flex-wrap:wrap;">'
+        +   (readout.leakTotal > 0 ? heroNum(readout.leakTotal, 'var(--red)', 'leaking') : '')
+        +   (readout.oppTotal  > 0 ? heroNum(readout.oppTotal,  'var(--gold)', 'opportunity') : '')
         + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);margin-top:5px;">'
-        +   App.fmtCurrency(readout.total * 52, 0) + ' annualized at this pace '
-        +   '<span style="color:var(--t4);">&middot;</span> '
-        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's')
+        + '<div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.4;">'
+        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's') + '. '
+        +   'Leaks are recoverable cost, opportunity is projected revenue growth.'
         + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
-    const readoutPanel = `<div style="${PANEL}">${panelTitle('Leaking This Week')}${readoutBody}</div>`;
+    const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Gaps')}${readoutBody}</div>`;
 
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
@@ -902,18 +908,23 @@ S.Hub = {
      action_items.monthly_impact divided by 4.345. A gap-area only counts when
      its weekly dollar loss computes from real data. */
   weeklyReadout() {
-    if (!window.Recovery || !window.FIX) return { items: [], total: 0 };
+    if (!window.Recovery || !window.FIX) return { items: [], total: 0, leakTotal: 0, oppTotal: 0 };
     const seen = {};
     const items = [];
+    // Split honestly (decision 2): a cost gap is a recoverable LEAK; everything
+    // else is projected REVENUE opportunity. labor-scheduling is a cost gap even
+    // though it lives in the Revenue audit, so we categorize by gap, not module.
+    const kindOf = (gapId) => (Recovery.COST_GAPS || []).indexOf(gapId) !== -1 ? 'cost' : 'revenue';
 
     // Profit + Revenue — live metric-based
     [['profit'], ['revenue']].forEach(([mod]) => {
       (FIX[mod] || []).forEach(g => {
+        if ((Recovery.COMPOSITE_GAPS || []).indexOf(g.id) !== -1) return;   // skip composite (double-count)
         const imp = Recovery.gapImpact(g.id);
         if (!imp || imp.onTarget || !(imp.dollars > 0)) return;
         if (seen[imp.label]) return;
         seen[imp.label] = true;
-        items.push({ label: imp.label, gapId: g.id, module: mod,
+        items.push({ label: imp.label, gapId: g.id, module: mod, kind: kindOf(g.id),
                      weekly: imp.dollars / 52, band: imp.band });
       });
     });
@@ -943,13 +954,15 @@ S.Hub = {
         const label = gap ? gap.name : 'Traffic';
         if (seen[label]) return;
         seen[label] = true;
-        items.push({ label, gapId, module: 'traffic',
+        items.push({ label, gapId, module: 'traffic', kind: 'revenue',
                      weekly: it.monthly_impact / 4.345, band: 'over' });
       });
     }
 
     items.sort((a, b) => b.weekly - a.weekly);
-    return { items: items, total: items.reduce((s, x) => s + x.weekly, 0) };
+    const leakTotal = items.filter(x => x.kind === 'cost').reduce((s, x) => s + x.weekly, 0);
+    const oppTotal  = items.filter(x => x.kind === 'revenue').reduce((s, x) => s + x.weekly, 0);
+    return { items: items, total: items.reduce((s, x) => s + x.weekly, 0), leakTotal: leakTotal, oppTotal: oppTotal };
   },
 
   /* Forward-looking alerts (Section 10.4) — predictive signals, not just
