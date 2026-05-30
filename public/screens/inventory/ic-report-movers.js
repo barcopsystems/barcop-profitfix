@@ -34,18 +34,21 @@ S.InventoryMoversReport = {
     const purch = {};
     this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
       }));
     const rows = [];
     Object.keys(eMap).forEach(pid => {
       if (!sMap[pid]) return;
       const p = this.productById(pid) || {};
       const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
-      const ppc = p.pours_per_container || null;
-      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
+      // Bottle beer is counted in cases (case_size bottles per case); other
+      // categories by their container (pours_per_container servings).
+      const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
+      const ppc = isCaseBeer ? p.case_size : (p.pours_per_container || null);
+      const unitCost = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
       rows.push({
         pid, name: eMap[pid].name, category: eMap[pid].category || p.category || '',
-        used, usageCost: bottleCost != null ? used * bottleCost : 0,
+        used, usageCost: unitCost != null ? used * unitCost : 0,
         poursMade: ppc != null ? used * ppc : null
       });
     });
