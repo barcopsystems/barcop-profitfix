@@ -52,7 +52,7 @@ FIX.revenue = [
     id: 'pricing',
     name: 'Pricing',
     module: 'revenue',
-    summary: 'Menus priced by feel drift below cost as ingredients rise.',
+    summary: 'Menus priced by feel drift below cost as ingredients rise. Going more than a year without a price increase, which the Revenue Audit flags, means you have absorbed every cost increase since.',
 
     process: {
       steps: [
