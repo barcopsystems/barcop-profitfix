@@ -380,6 +380,9 @@ S.TrafficAudit = {
     };
 
     const yN = v => v ? 'Yes' : 'No';
+    // Tri-state: true/false render, null (not assessed) renders blank so the row
+    // auto-hides instead of showing a misleading "No".
+    const triNA = v => v === true ? 'Yes' : v === false ? 'No' : '';
     const pct = v => v != null ? v + '%' : '';
     const num = v => v != null ? String(v) : '';
     const dol = v => v ? App.fmtCurrency(v) : '';
@@ -407,7 +410,13 @@ S.TrafficAudit = {
         ['Monthly Sessions', num(d.S2_MONTHLY_SESSIONS) + (d.S2_SESSIONS_BENCHMARK ? ' (Benchmark: ' + d.S2_SESSIONS_BENCHMARK + ')' : '')],
         ['Bounce Rate', pct(d.S2_BOUNCE_RATE) + (d.S2_BOUNCE_BENCHMARK ? ' (Benchmark: under ' + d.S2_BOUNCE_BENCHMARK + '%)' : '')],
         ['Menu Page in Top 3', yN(d.S2_MENU_PAGE_IN_TOP_3)],
-        ['Online Ordering Present', yN(d.S2_ONLINE_ORDERING_PRESENT)],
+        ['Menu Is a Web Page (not a PDF)', triNA(d.S2_MENU_IS_WEB_PAGE)],
+        ['Online Ordering Link', triNA(d.S2_ONLINE_ORDERING_PRESENT)],
+        ['Reservation / Booking Link', triNA(d.S2_RESERVATIONS_PRESENT)],
+        ['Click-to-Call on Mobile', triNA(d.S2_CLICK_TO_CALL)],
+        ['Mobile Layout Set', triNA(d.S2_MOBILE_VIEWPORT)],
+        ['Hours on the Homepage', triNA(d.S2_HOURS_ON_PAGE)],
+        ['Conversion Elements Present', d.S2_CONVERSION_ELEMENTS_ASSESSED != null ? d.S2_CONVERSION_ELEMENTS_PRESENT + ' of ' + d.S2_CONVERSION_ELEMENTS_ASSESSED : ''],
         ['Monthly Gap', dol(d.S2_MONTHLY_GAP)],
       ]),
       sectionBlock(3, 'Reviews', d.S3_SCORE, [
