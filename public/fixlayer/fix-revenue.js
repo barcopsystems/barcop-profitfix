@@ -160,7 +160,7 @@ FIX.revenue = [
     id: 'check-average',
     name: 'Check Average and Upsell',
     module: 'revenue',
-    summary: 'Check average per cover is the floor\'s biggest revenue lever.',
+    summary: 'Check average per cover is the floor\'s biggest revenue lever, and beverage attachment (the share of guests who order a drink) is the highest-margin piece of it.',
 
     process: {
       steps: [
@@ -191,7 +191,8 @@ FIX.revenue = [
       'Coaching the whole team when only two servers are below average. A general message has no impact on the two who need it and creates resistance from the rest.',
       'Setting check average targets without a four-week baseline. A target with no baseline is a guess.',
       'Treating upselling as a personality trait rather than a learned sequence. Every server can follow a written, trained sequence.',
-      'Forgetting the beverage pairing. A specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.'
+      'Forgetting the beverage pairing. A specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.',
+      'Not watching beverage attachment. The Revenue Audit reads your drinks per guest off the POS. Below the benchmark means tables are sitting without a drink in front of them, the single biggest margin leak on the floor. Make the first-round drink the opening move at every table.'
     ]
   },
 
