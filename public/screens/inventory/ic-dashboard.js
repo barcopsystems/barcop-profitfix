@@ -46,10 +46,9 @@ S.InventoryDashboard = {
     const latest = asc.length ? asc[asc.length - 1] : null;
     const items = latest ? (latest.items || []) : [];
 
-    // Below par — products in the latest count under their par level.
-    // For bottle beer with case_size, par_level is in cases. Convert the
-    // total bottles in the count to cases before comparing so the
-    // below-par check uses the same unit on both sides.
+    // Below par — products in the latest count under their par level. On-hand and
+    // par_level are both in container units (cases for bottle beer, bottles for
+    // liquor/wine, kegs for draft), so no conversion is needed.
     // Aggregate the latest count's lines by product first — a product can be
     // stocked and counted in several locations, so sum those lines before
     // comparing on-hand to par.
@@ -59,15 +58,13 @@ S.InventoryDashboard = {
       const p = this.productById(pid);
       if (!p || p.par_level == null || p.par_level === '') return null;
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
-      const rawBottles = totById[pid];
-      const onHand = isCaseBeer ? (rawBottles / p.case_size) : rawBottles;
+      const onHand = totById[pid];
       if (onHand >= p.par_level) return null;
       return {
         name: p.name,
         onHand,
         par: p.par_level,
         isCaseBeer,
-        rawBottles,
         caseSize: isCaseBeer ? p.case_size : null
       };
     }).filter(Boolean);
