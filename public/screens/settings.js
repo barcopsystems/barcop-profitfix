@@ -1669,19 +1669,28 @@ S.HubSettings = {
       90:[0.7,1.9], 91:[34,91], 92:[27,72], 93:[14,38], 94:[7,19], 95:[22,58],
       96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8]
     };
-    const icCountItem = (p, qty) => {
-      // Bottle beer unit_cost is per CASE; value the counted bottles at per-bottle
-      // cost (unit_cost / case_size), mirroring the live Take Inventory screen
-      // (ic-take-inventory.js). Every other category values at unit_cost. Without
-      // this, beer inventory valuation inflates ~24x (count total_value, Stock
-      // report, books Schedule-C) and reads obviously fake to an operator.
-      const perUnit = (p.category === 'Bottle Beer' && p.case_size) ? p.unit_cost / p.case_size : p.unit_cost;
-      return {
-        product_id:p.id, name:p.name, category:p.category,
-        fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
-        unit_cost:p.unit_cost, value:+(qty * perUnit).toFixed(2), notes:''
-      };
-    };
+    // Bottle beer is counted, ordered and valued by the CASE (the one canonical
+    // unit). icTotals above were authored in bottles, so convert every beer index
+    // to cases (divide by case_size). The dollar value is unchanged (cases x
+    // per-case == bottles x per-bottle). Then set realistic case pars tied to
+    // weekly usage so on-hand (cases) vs par (cases) reads coherently.
+    icProducts.forEach((p, i) => {
+      if (p.category === 'Bottle Beer' && p.case_size && icTotals[i]) {
+        icTotals[i] = [icTotals[i][0] / p.case_size, icTotals[i][1] / p.case_size];
+        const wkCases = Math.max(0.5, icTotals[i][1] - icTotals[i][0]);
+        p.par_level     = Math.max(2, Math.ceil(wkCases * 2));
+        p.reorder_point = Math.max(1, Math.ceil(wkCases));
+      }
+    });
+    // On-hand value = counted quantity x unit_cost, in container units for every
+    // category (cases for beer, bottles for liquor/wine, kegs for draft, stock
+    // unit for food). unit_cost is stored per container, so this is a straight
+    // multiply with no per-category special case.
+    const icCountItem = (p, qty) => ({
+      product_id:p.id, name:p.name, category:p.category,
+      fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
+      unit_cost:p.unit_cost, value:+(qty * (p.unit_cost || 0)).toFixed(2), notes:''
+    });
     const mkCount = (daysAgo, pick, countedBy) => {
       const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
       return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:countedBy || 'Maria G.',
@@ -1710,13 +1719,19 @@ S.HubSettings = {
 
     // Deliveries — all dated 8+ days back so none fall inside the last count
     // period. Two carry price increases, which Vendor Watch surfaces.
-    const icDLine = (p, qty, price, prev) => ({
-      product_id:p.id, name:p.name,
-      container_size_oz:p.container_size_oz != null ? p.container_size_oz : null,
-      qty:qty, price_per_unit:price, prev_price:prev,
-      price_changed:(prev != null && Math.abs(price - prev) > 0.001),
-      extended:+(qty * price).toFixed(2)
-    });
+    const icDLine = (p, qty, price, prev) => {
+      const isCaseBeer = p.category === 'Bottle Beer' && p.case_size;
+      return {
+        product_id:p.id, name:p.name,
+        container_size_oz:p.container_size_oz != null ? p.container_size_oz : null,
+        qty:qty, price_per_unit:price, prev_price:prev,
+        price_changed:(prev != null && Math.abs(price - prev) > 0.001),
+        extended:+(qty * price).toFixed(2),
+        // Bottle beer is received by the CASE: qty is in cases, price is per case.
+        display_unit: isCaseBeer ? 'case' : 'unit',
+        case_size_at_receive: isCaseBeer ? p.case_size : null
+      };
+    };
     const mkDelivery = (daysAgo, vendor, inv, lines) => ({
       id:uid(), vendor:vendor, date:dateStr(daysAgo), invoice_number:inv, driver:'', notes:'',
       line_items:lines, item_count:lines.length,
@@ -1731,8 +1746,8 @@ S.HubSettings = {
         icDLine(icProducts[2], 12, 27.90, 27.90),
       ]),
       mkDelivery(24, "Glazer's Beer & Bev", 'GLZ-3318', [
-        icDLine(icProducts[6], 480, 1.35, 1.28),
-        icDLine(icProducts[7], 360, 0.95, 0.95),
+        icDLine(icProducts[6], 20, 32.40, 30.72),
+        icDLine(icProducts[7], 15, 22.80, 22.80),
       ]),
       mkDelivery(17, 'Sysco Foods', 'SY-90455', [
         icDLine(icProducts[9],  200, 4.20, 3.95),
@@ -1757,8 +1772,6 @@ S.HubSettings = {
     // beginning count + purchases - ending count lands within 2% of the booked
     // 12-week COGS.
     const icWkUsage = {}; Object.keys(icTotals).forEach(i => { icWkUsage[i] = icTotals[i][1] - icTotals[i][0]; });
-    const icEffUnitPrice = p => (p.category === 'Bottle Beer' && p.case_size)
-      ? +(p.unit_cost / p.case_size).toFixed(2) : p.unit_cost;
     const icOrderInterval = uv => uv >= 60 ? 1 : uv >= 25 ? 2 : uv >= 10 ? 3 : 4;
     let icInvSeq = 1000;
     const mkVendorDelivery = (daysAgo, vendor, prefix, allowBump) => {
@@ -1766,13 +1779,13 @@ S.HubSettings = {
       const lines = [];
       icProducts.forEach((p, i) => {
         if (p.vendor !== vendor) return;
-        const usage = icWkUsage[i] || 0;
-        const base  = icEffUnitPrice(p);
+        const usage = icWkUsage[i] || 0;                        // container units (cases for beer)
+        const base  = (p.unit_cost != null) ? p.unit_cost : 0;  // per container (per case for beer)
         const uv    = usage * base;
         if (uv < 3) return;                                  // negligible mover, not reordered in-window
         const interval = icOrderInterval(uv);
         if (weekIndex % interval !== (i % interval)) return; // not due this week
-        const qty = Math.max(1, Math.round(usage * interval));
+        const qty = Math.max(1, Math.round(usage * interval)); // whole containers (cases for beer)
         const price = (allowBump && (i % 7 === 0)) ? +(base * 1.06).toFixed(2) : base;
         lines.push(icDLine(p, qty, price, base));
       });
@@ -2306,45 +2319,50 @@ S.HubSettings = {
       mkXfer(2,  15, 40, "Maker's Mark", 2, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', ''),
     ];
 
-    // ── Order History ────────────────────────────────────────────────────
-    // The recurring ordering cadence that precedes the seeded deliveries.
-    // Older orders are Received (dated to line up with ic_deliveries); the two
-    // most recent are still in the pipeline (Submitted / Open). Line items use
-    // the Order Sheet's exact shape — per-case for bottle beer, per-unit
-    // otherwise — so totals tie to the product costs.
-    const mkOrder = (daysAgo, vendor, status, pairs) => {
+    // ── Order History (mirrors Delivery History one-to-one) ───────────────
+    // Every delivery was placed as an order first, so Order History mirrors
+    // Delivery History: each Received order carries the same vendor, the same
+    // line items and the same dollars as its delivery, dated a vendor-specific
+    // lead time earlier. Bottle beer is in CASES on both (the canonical unit).
+    // Two recent orders are still in the pipeline (Submitted / Open): the
+    // reorders that refill the current draw-down, not yet delivered, which is why
+    // the most recent days have no matching delivery.
+    const orderLeadDays = { 'Republic National':3, "Glazer's Beer & Bev":2, 'Sysco Foods':1,
+      'Austin Beerworks':4, 'Local Produce Co.':1, 'Restaurant Depot':5 };
+    const deliveryToOrder = (del) => {
+      const lead = orderLeadDays[del.vendor] != null ? orderLeadDays[del.vendor] : 2;
+      const lineItems = del.line_items.map(li => ({
+        product_id:li.product_id, name:li.name, qty:li.qty,
+        unit_cost:li.price_per_unit, extended:li.extended,
+        display_unit:li.display_unit || 'unit', case_size:li.case_size_at_receive || null
+      }));
+      const delDate = new Date(del.date + 'T00:00:00');
+      const ordDate = new Date(delDate); ordDate.setDate(ordDate.getDate() - lead);
+      return { id:uid(), vendor:del.vendor, date:ordDate.toISOString().slice(0, 10), status:'Received',
+        line_items:lineItems, item_count:lineItems.length, total:del.total, custom:true,
+        created_at:ordDate.toISOString(), received_at:delDate.toISOString() };
+    };
+    const mkPendingOrder = (daysAgo, vendor, status, pairs) => {
       const lineItems = pairs.map(([nm, qty]) => {
         const p = icByName(nm) || {};
         const isCaseBeer = p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
         const cost = p.unit_cost != null ? p.unit_cost : 0;
-        return { product_id:p.id || '', name:p.name || nm, qty,
-          unit_cost:cost, extended:+(qty * cost).toFixed(2),
-          display_unit:isCaseBeer ? 'case' : 'unit', case_size:isCaseBeer ? p.case_size : null };
+        return { product_id:p.id || '', name:p.name || nm, qty, unit_cost:cost,
+          extended:+(qty * cost).toFixed(2), display_unit:isCaseBeer ? 'case' : 'unit',
+          case_size:isCaseBeer ? p.case_size : null };
       });
       const rec = { id:uid(), vendor, date:dateStr(daysAgo), status,
         line_items:lineItems, item_count:lineItems.length,
         total:+lineItems.reduce((t, i) => t + i.extended, 0).toFixed(2),
         custom:true, created_at:daysAgoISO(daysAgo) };
-      if (status === 'Received')  rec.received_at  = daysAgoISO(daysAgo - 3);
       if (status === 'Submitted') rec.submitted_at = daysAgoISO(daysAgo);
       return rec;
     };
     App.inventoryData.ic_orders = [
-      mkOrder(34, 'Republic National', 'Received', [
-        ["Tito's Handmade Vodka", 24], ['Espolòn Tequila Blanco', 18], ['Bulleit Bourbon', 12]]),
-      mkOrder(27, "Glazer's Beer & Bev", 'Received', [
-        ['Modelo Especial', 20], ['Lone Star', 15], ['Corona', 10]]),
-      mkOrder(20, 'Sysco Foods', 'Received', [
-        ['Ground Beef 80/20', 200], ['Chicken Thigh', 160], ['Cheddar Cheese', 80]]),
-      mkOrder(18, 'Austin Beerworks', 'Received', [
-        ['ABW Pearl Snap (1/2 bbl)', 4], ['ABW Fire Eagle IPA', 2]]),
-      mkOrder(13, 'Republic National', 'Received', [
-        ["Tito's Handmade Vodka", 24], ["Hendrick's Gin", 12], ["Maker's Mark", 6]]),
-      mkOrder(11, 'Local Produce Co.', 'Received', [
-        ['Beefsteak Tomato', 30], ['Mixed Greens', 8], ['Hass Avocado', 60]]),
-      mkOrder(5,  'Sysco Foods', 'Submitted', [
+      ...(App.inventoryData.ic_deliveries || []).map(deliveryToOrder),
+      mkPendingOrder(5, 'Sysco Foods', 'Submitted', [
         ['Ground Beef 80/20', 200], ['Salmon Fillet', 40], ['Gulf Shrimp', 40]]),
-      mkOrder(2,  "Glazer's Beer & Bev", 'Open', [
+      mkPendingOrder(2, "Glazer's Beer & Bev", 'Open', [
         ['Modelo Especial', 16], ['White Claw', 10], ['Stella Artois', 8]]),
     ];
 
