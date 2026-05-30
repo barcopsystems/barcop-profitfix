@@ -229,7 +229,7 @@ S.InventoryAdjustments = {
 
   unitOptions(productCategory, selected) {
     let opts = ['bottles', 'units'];
-    if (productCategory === 'Bottle Beer') opts = ['bottles', 'cases'];
+    if (productCategory === 'Bottle Beer') opts = ['cases', 'bottles'];
     else if (productCategory === 'Draft Beer') opts = ['kegs'];
     else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
@@ -243,7 +243,7 @@ S.InventoryAdjustments = {
 
     const initialProdId = r?.product_id || '';
     const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
-    const initialUnit = r?.unit || (initialCat === 'Bottle Beer' ? 'bottles' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles');
+    const initialUnit = r?.unit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles');
     const initialReason = r?.reason || 'Damage';
     const initialDir = r?.direction || this._dirFor(initialReason);
 
@@ -313,7 +313,7 @@ S.InventoryAdjustments = {
     document.getElementById('adj-prod')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
       const unitSel = document.getElementById('adj-unit');
-      if (unitSel && p) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'bottles' : (p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+      if (unitSel && p) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
       this.recalc();
     });
 
@@ -337,15 +337,18 @@ S.InventoryAdjustments = {
       set('adj-c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
       return;
     }
-    // For bottle beer with case_size, the operator picks bottles OR cases
-    let bottles = qty;
-    if (product.category === 'Bottle Beer' && unit === 'cases' && product.case_size) {
-      bottles = qty * product.case_size;
+    // Cost is shown per the chosen unit: per case when writing off cases, per
+    // bottle when writing off loose bottles, per container for everything else.
+    let perUnitCost, unitLabel;
+    if (product.category === 'Bottle Beer' && product.case_size) {
+      if (unit === 'cases') { perUnitCost = App.unitCost(product) || 0; unitLabel = '/case'; }
+      else { perUnitCost = App.bottleCost(product) || 0; unitLabel = '/bottle'; }
+    } else {
+      perUnitCost = App.unitCost(product) || 0; unitLabel = '/unit';
     }
-    const perBottleCost = (App.bottleCost ? App.bottleCost(product) : (product.unit_cost || 0)) || 0;
-    const value = bottles * perBottleCost;
+    const value = qty * perUnitCost;
     set('adj-c-value', value > 0 ? App.fmtCurrency(value) : '-');
-    set('adj-c-unitcost', perBottleCost > 0 ? App.fmtCurrency(perBottleCost) + (product.category === 'Bottle Beer' ? '/bottle' : '/unit') : '-', 'dim');
+    set('adj-c-unitcost', perUnitCost > 0 ? App.fmtCurrency(perUnitCost) + unitLabel : '-', 'dim');
   },
 
   async save() {
@@ -370,13 +373,15 @@ S.InventoryAdjustments = {
     const witnessedById = document.getElementById('adj-witness')?.value || '';
     const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
 
-    // Snapshot cost so the value is honest even after future cost changes.
-    let bottles = quantity;
-    if (product.category === 'Bottle Beer' && unit === 'cases' && product.case_size) {
-      bottles = quantity * product.case_size;
+    // Snapshot the per-unit cost (for the chosen unit) so the value stays honest
+    // even after future cost changes.
+    let perUnitCost;
+    if (product.category === 'Bottle Beer' && product.case_size) {
+      perUnitCost = (unit === 'cases') ? (App.unitCost(product) || 0) : (App.bottleCost(product) || 0);
+    } else {
+      perUnitCost = App.unitCost(product) || 0;
     }
-    const perBottleCost = (App.bottleCost ? App.bottleCost(product) : (product.unit_cost || 0)) || 0;
-    const value = bottles * perBottleCost;
+    const value = quantity * perUnitCost;
 
     const rec = {
       id:                       this.editId || App.uid(),
@@ -388,7 +393,7 @@ S.InventoryAdjustments = {
       unit,
       direction,
       reason,
-      unit_cost_at_adjustment:  perBottleCost,
+      unit_cost_at_adjustment:  perUnitCost,
       value,
       performed_by_id:          performedById,
       performed_by:             performedBy,
