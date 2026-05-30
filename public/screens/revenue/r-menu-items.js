@@ -810,6 +810,17 @@ S.RevenueMenuItems = {
       if (!isNaN(pourVal) && pourVal > 0) pourSizeOz = pourVal;
     }
 
+    // If this is an edit, snapshot the prior weekly_covers before overwriting
+    // so Menu Engineering can show the Menu Mix Delta column ("covers vs prior
+    // update"). Only snapshot when the value actually changes — typing the
+    // same number twice shouldn't reset the prior anchor.
+    let prevCovers = existing?.prev_weekly_covers ?? null;
+    let coversUpdatedAt = existing?.weekly_covers_updated_at || null;
+    if (existing && existing.weekly_covers != null && covers !== existing.weekly_covers) {
+      prevCovers = existing.weekly_covers;
+      coversUpdatedAt = new Date().toISOString();
+    }
+
     const entry = {
       id:                 existing?.id || App.uid(),
       name,
@@ -827,17 +838,6 @@ S.RevenueMenuItems = {
       created_at:         existing?.created_at || new Date().toISOString(),
       updated_at:         new Date().toISOString()
     };
-
-    // If this is an edit, snapshot the prior weekly_covers before overwriting
-    // so Menu Engineering can show the Menu Mix Delta column ("covers vs prior
-    // update"). Only snapshot when the value actually changes — typing the
-    // same number twice shouldn't reset the prior anchor.
-    let prevCovers = existing?.prev_weekly_covers ?? null;
-    let coversUpdatedAt = existing?.weekly_covers_updated_at || null;
-    if (existing && existing.weekly_covers != null && covers !== existing.weekly_covers) {
-      prevCovers = existing.weekly_covers;
-      coversUpdatedAt = new Date().toISOString();
-    }
 
     // If this is an edit and the price changed, auto-write a revenue_price_log
     // entry + a fix_log entry so Menu Engineering's Pricing Review Log and the
