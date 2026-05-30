@@ -410,6 +410,8 @@ S.RevenueAudit = {
         ['Attachment Benchmark',         d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null ? d.S1_BEV_ATTACH_BENCHMARK + ' drinks per guest' : ''],
         ['Drinks Sold (period)',         d.S1_BEV_PER_COVER != null ? num(d.S1_BEV_UNITS) : ''],
         ['Checks With a Drink',          d.S1_BEV_INCIDENCE_PCT != null ? d.S1_BEV_INCIDENCE_PCT + '%' : ''],
+        ['Weakest Daypart',              d.S1_DAYPART_WEAKEST ? d.S1_DAYPART_WEAKEST + ' at ' + cur(d.S1_DAYPART_WEAKEST_CHECK) : '', d.S1_DAYPART_SPREAD >= 4 ? 'warn' : ''],
+        ['Daypart Check Spread',         d.S1_DAYPART_SPREAD != null ? cur(d.S1_DAYPART_SPREAD) + ' (weakest to strongest)' : ''],
         ['Monthly Revenue',              cur(d.S1_MONTHLY_REVENUE)],
         ['Monthly Gap vs Target',        cur(d.S1_MONTHLY_GAP), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',                   cur(d.S1_ANNUAL_GAP),  d.S1_ANNUAL_GAP  > 0 ? 'warn' : ''],
@@ -964,6 +966,11 @@ S.RevenueAudit = {
     // dollar (monthly_impact 0) so it never double-counts the check-average gap.
     if (d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null && d.S1_BEV_PER_COVER < d.S1_BEV_ATTACH_BENCHMARK) {
       items.push({ action: 'Lift beverage attachment. ' + d.S1_BEV_PER_COVER + ' drinks per guest vs a ' + d.S1_BEV_ATTACH_BENCHMARK + ' benchmark. Build the drink into every table, it is the highest-margin add.', monthly_impact: 0, gap_id: 'check-average' });
+    }
+    // Daypart diagnostic — surfaced only when a real gap exists. No dollar (the
+    // blended check-average gap already carries it).
+    if (d.S1_DAYPART_SPREAD >= 4 && d.S1_DAYPART_WEAKEST) {
+      items.push({ action: 'Work your weakest daypart. ' + d.S1_DAYPART_WEAKEST + ' runs a ' + Math.round(d.S1_DAYPART_WEAKEST_CHECK) + ' dollar check against ' + Math.round(d.S1_DAYPART_STRONGEST_CHECK) + ' at your strongest. Targeted menu, staffing, and upsell there close most of the gap.', monthly_impact: 0, gap_id: 'check-average' });
     }
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce labor cost. $' + Math.round(d.S2_MONTHLY_GAP) + '/month over target.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'labor-scheduling' });
     if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Improve menu mix. $' + Math.round(d.S3_MONTHLY_GAP) + '/month opportunity from repricing Dogs.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'menu-engineering' });
