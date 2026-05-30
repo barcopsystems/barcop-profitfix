@@ -505,6 +505,7 @@ S.InventoryReceiveDelivery = {
 
   // ── Save ──────────────────────────────────────────────────────────────────
   async save() {
+    if (!App.canEdit('ic-receive-delivery')) return;   // staff-permission guard
     const err = document.getElementById('rd-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
