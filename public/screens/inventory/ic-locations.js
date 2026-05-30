@@ -17,7 +17,7 @@ S.InventoryLocations = {
   locationById(id) { return this.locations().find(l => l.id === id); },
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   productCount(name) {
-    return this.products().filter(p => p.primary_location === name || p.secondary_location === name).length;
+    return this.products().filter(p => App.productLocations(p).includes(name)).length;
   },
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -198,8 +198,51 @@ S.InventoryLocations = {
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="il-back">&laquo; Back to Locations</button></div>'
       + nameCard + arrangeCard
-      + '</div>';
+      + '</div>' + this._productsModalHTML();
     this.wireUnified(locId, profileMode, l);
+  },
+
+  // ── Reverse door: assign products to this location from the location side ──
+  _productsModalHTML() {
+    return '<div id="il-prod-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
+      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;max-width:460px;width:92%;max-height:80vh;overflow:auto;">'
+      + '<div style="font-size:14px;font-weight:800;color:var(--w);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Products In This Location</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.6;">Check every product stocked here. Unchecking removes this location from that product.</div>'
+      + '<div id="il-prod-modal-body"></div>'
+      + '<div class="card-actions" style="margin-top:16px;">'
+      + '<button type="button" class="btn btn-primary" id="il-prod-done">Done</button>'
+      + '<button type="button" class="btn btn-ghost" id="il-prod-cancel">Cancel</button>'
+      + '</div></div></div>';
+  },
+  _openProductsModal(locName) {
+    const m = document.getElementById('il-prod-modal');
+    if (!m) return;
+    const prods = this.products().filter(p => p.active !== false).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const body = prods.length ? prods.map(p => {
+      const inLoc = App.productLocations(p).includes(locName);
+      return '<label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
+        + '<input type="checkbox" class="il-prod-cb" value="' + esc(p.id) + '"' + (inLoc ? ' checked' : '') + ' style="accent-color:var(--gold);width:15px;height:15px;"/>'
+        + '<span style="flex:1;">' + esc(p.name) + '</span>'
+        + '<span style="font-size:10px;color:var(--t3);">' + esc(p.category || '') + '</span>'
+        + '</label>';
+    }).join('') : '<div style="font-size:12px;color:var(--t4);">No products yet. Add products in the Products screen first.</div>';
+    document.getElementById('il-prod-modal-body').innerHTML = body;
+    m.style.display = 'flex';
+  },
+  async _applyProductsModal(locName) {
+    const m = document.getElementById('il-prod-modal');
+    if (!m) return;
+    const checkedIds = new Set([...m.querySelectorAll('.il-prod-cb')].filter(cb => cb.checked).map(cb => cb.value));
+    this.products().forEach(p => {
+      if (p.active === false) return; // only products shown in the modal
+      const set = new Set(App.productLocations(p));
+      if (checkedIds.has(p.id)) set.add(locName); else set.delete(locName);
+      p.locations = [...set];
+      if (!p.locations.includes(p.primary_location)) p.primary_location = p.locations[0] || '';
+    });
+    m.style.display = 'none';
+    const ok = await App.saveInventory();
+    if (ok) this.renderUnified(this.detailId, 'view');
   },
 
   // Back-compat aliases for any caller still using the old names.
@@ -229,9 +272,10 @@ S.InventoryLocations = {
 
   renderArrangeCard(l) {
     const prods = this.sortedProductsForLocation(l.name);
+    const addBtn = '<div style="margin-bottom:12px;"><button class="btn btn-ghost btn-sm" id="il-add-products">+ Add / remove products in ' + esc(l.name) + '</button></div>';
     let body;
     if (prods.length === 0) {
-      body = '<div style="font-size:12px;color:var(--t3);">No products assigned here yet. Assign products to ' + esc(l.name) + ' from the Products screen using the Primary Location field, then come back to set their shelf order.</div>';
+      body = addBtn + '<div style="font-size:12px;color:var(--t3);">No products stocked here yet. Use &ldquo;Add / remove products&rdquo; above to stock this location, or set it on a product in the Products screen.</div>';
     } else {
       const rows = prods.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
         + DragReorder.handleCellHTML()
@@ -241,7 +285,7 @@ S.InventoryLocations = {
         + '<td>' + esc(p.category || '-') + '</td>'
         + '<td>' + (p.par_level != null && p.par_level !== '' ? p.par_level : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '</tr>').join('');
-      body = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
+      body = addBtn + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
         + 'Grab the &#x2630; handle on the left and drag a product up or down to put it where it sits on the shelf or rail at this location. Take Inventory at ' + esc(l.name) + ' will count them in this order.'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
@@ -260,6 +304,12 @@ S.InventoryLocations = {
       else { this.detailId = null; this.renderList(); }
     });
     document.getElementById('il-save')?.addEventListener('click', () => this.saveLocation(locId));
+    // Reverse door: add/remove products in this location.
+    if (l) {
+      document.getElementById('il-add-products')?.addEventListener('click', () => this._openProductsModal(l.name));
+      document.getElementById('il-prod-done')?.addEventListener('click', () => this._applyProductsModal(l.name));
+      document.getElementById('il-prod-cancel')?.addEventListener('click', () => { const m = document.getElementById('il-prod-modal'); if (m) m.style.display = 'none'; });
+    }
     if (profileMode === 'edit') {
       const nameEl = document.getElementById('il-name');
       nameEl?.focus();
@@ -297,6 +347,7 @@ S.InventoryLocations = {
           this.products().forEach(p => {
             if (p.primary_location === old)   p.primary_location = name;
             if (p.secondary_location === old) p.secondary_location = name;
+            if (Array.isArray(p.locations))   p.locations = p.locations.map(x => x === old ? name : x);
           });
         }
       }
@@ -321,7 +372,7 @@ S.InventoryLocations = {
   // by name. Products with no recorded sequence sort to the end so new
   // products do not jump above the operator's curated order.
   sortedProductsForLocation(locationName) {
-    const list = this.products().filter(p => p.primary_location === locationName);
+    const list = this.products().filter(p => App.productLocations(p).includes(locationName));
     return list.slice().sort((a, b) => {
       const sa = (a.location_sequences && a.location_sequences[locationName] != null) ? a.location_sequences[locationName] : Number.MAX_SAFE_INTEGER;
       const sb = (b.location_sequences && b.location_sequences[locationName] != null) ? b.location_sequences[locationName] : Number.MAX_SAFE_INTEGER;
