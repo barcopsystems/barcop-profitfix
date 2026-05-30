@@ -10,8 +10,8 @@ S.InventoryTakeInventory = {
   draft: null,
   locStep: 0,
   DRAFT_KEY: 'ic_count_draft',
-  BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
-  KITCHEN_CATS: ['Food', 'Misc'],
+  get BAR_CATS() { return App.BAR_CATS; },         // single source on App
+  get KITCHEN_CATS() { return App.KITCHEN_CATS; },
 
   products() {
     const all = (App.inventoryData && App.inventoryData.ic_products) || [];
@@ -289,6 +289,8 @@ S.InventoryTakeInventory = {
             + '</div>'
             + '<div style="align-self:center;font-size:11px;color:var(--t3);">'
               + (p.case_size + ' btl/case')
+              + '<div class="ti-echo" data-pid="' + p.id + '" style="color:var(--gold);font-weight:700;margin-top:2px;">= '
+                + ((c.cases || 0) + (p.case_size ? (c.loose || 0) / p.case_size : 0)).toFixed(2) + ' cases</div>'
             + '</div>'
           + '</div>';
       } else if (isPourable) {
@@ -301,7 +303,7 @@ S.InventoryTakeInventory = {
             + '<div class="fw"><input class="suf ti-num" type="number" min="0" step="0.1" data-pid="' + p.id + '" value="' + (c.value != null ? c.value : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div>'
           + '</div></div>';
       }
-      return '<div class="card" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" style="margin-bottom:12px;">'
+      return '<div class="card" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" style="margin-bottom:12px;">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + esc(p.category || 'Uncategorized')
         + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</div>'
@@ -353,6 +355,9 @@ S.InventoryTakeInventory = {
         if (!card) return;
         const cases = parseInt(card.querySelector('.ti-cases')?.value) || 0;
         const loose = parseInt(card.querySelector('.ti-loose')?.value) || 0;
+        const caseSize = parseFloat(card.dataset.caseSize) || 0;
+        const echo = card.querySelector('.ti-echo');
+        if (echo) echo.textContent = '= ' + (cases + (caseSize ? loose / caseSize : 0)).toFixed(2) + ' cases';
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
         this.draft.counts[key] = { cases, loose, notes: prev.notes || '' };
@@ -473,6 +478,7 @@ S.InventoryTakeInventory = {
 
   // ── Submit ────────────────────────────────────────────────────────────────
   async submit() {
+    if (!App.canEdit('ic-take-inventory')) return;   // staff-permission guard
     const rows = this.rows();
     // Build per-item records. For bottle beer with case_size, store the
     // case-aware fields (cases, loose, case_size_at_count) alongside the
@@ -488,9 +494,9 @@ S.InventoryTakeInventory = {
           cases:               r.c.cases || 0,
           loose:               r.c.loose || 0,
           case_size_at_count:  r.p.case_size || null,
-          fulls:               r.total,    // total bottles (legacy compat)
+          fulls:               r.c.cases || 0,   // full cases (total is decimal cases)
           partial:             0,
-          total:               r.total,
+          total:               r.total,           // on-hand in cases (cases + loose/case_size)
           unit_cost:           r.p.unit_cost != null ? r.p.unit_cost : null,
           value:               r.value,
           notes:               r.c.notes || ''
