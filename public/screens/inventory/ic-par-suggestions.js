@@ -53,11 +53,12 @@ S.InventoryParSuggestions = {
     for (let i = 1; i < recent.length; i++) {
       const startC = recent[i - 1];
       const endC   = recent[i];
-      const sItem = (startC.items || []).find(it => it.product_id === productId);
-      const eItem = (endC.items   || []).find(it => it.product_id === productId);
-      if (!sItem || !eItem) continue;
-      const start = parseFloat(sItem.total) || 0;
-      const end   = parseFloat(eItem.total) || 0;
+      // Sum a product's lines across all locations it was counted in.
+      const sItems = (startC.items || []).filter(it => it.product_id === productId);
+      const eItems = (endC.items   || []).filter(it => it.product_id === productId);
+      if (!sItems.length || !eItems.length) continue;
+      const start = sItems.reduce((s, it) => s + (parseFloat(it.total) || 0), 0);
+      const end   = eItems.reduce((s, it) => s + (parseFloat(it.total) || 0), 0);
       const purch = this.deliveries()
         .filter(d => d.date > startC.date && d.date <= endC.date)
         .reduce((s, d) => s + (d.line_items || [])
