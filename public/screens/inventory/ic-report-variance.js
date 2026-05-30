@@ -57,19 +57,27 @@ S.InventoryVarianceReport = {
       if (v.type !== 'Comp') return;
       if (v.date <= startDate || v.date > endDate) return;
       const entry = bump(v.product_id, v.units);
-      entry.comp_units += parseFloat(v.units) || 0;
+      // Comps are logged in serving units (a comped beer is one bottle); convert
+      // bottle beer to cases so the subtraction unit-matches "used" (cases).
+      const p = this.productById(v.product_id) || {};
+      const units = parseFloat(v.units) || 0;
+      entry.comp_units += (p.category === 'Bottle Beer' && p.case_size) ? units / p.case_size : units;
     });
     this.waste().forEach(w => {
       if (!w.product_id || w.units == null) return;
       if (w.date <= startDate || w.date > endDate) return;
       const entry = bump(w.product_id, w.units);
-      // Draft waste comes in as oz; convert to keg-units using the product's
-      // container_size_oz so the subtraction unit-matches "used" (kegs).
+      // Convert waste into the product's container unit so it matches "used":
+      // draft waste comes in oz -> kegs; bottle beer waste comes in bottles ->
+      // cases; everything else is already in its container unit.
       const p = this.productById(w.product_id) || {};
+      const units = parseFloat(w.units) || 0;
       if (p.category === 'Draft Beer' && p.container_size_oz) {
-        entry.waste_units += (parseFloat(w.units) || 0) / p.container_size_oz;
+        entry.waste_units += units / p.container_size_oz;
+      } else if (p.category === 'Bottle Beer' && p.case_size) {
+        entry.waste_units += units / p.case_size;
       } else {
-        entry.waste_units += parseFloat(w.units) || 0;
+        entry.waste_units += units;
       }
     });
     return out;
@@ -91,7 +99,7 @@ S.InventoryVarianceReport = {
     const purch = {};
     this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
       }));
     const adj = this.adjustmentsMap(startC.date, endC.date);
     const map = {};
@@ -102,8 +110,15 @@ S.InventoryVarianceReport = {
       const a = adj[pid] || { comp_units: 0, waste_units: 0 };
       const adjustments = (a.comp_units || 0) + (a.waste_units || 0);
       const used = Math.max(rawUsed - adjustments, 0);
-      const ppc = p.pours_per_container || null;
-      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
+      // Servings + ounces per inventory unit. For bottle beer one unit is a case
+      // (case_size bottles; case_size x container_size_oz ounces); for everything
+      // else one unit is the container (pours_per_container servings).
+      const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
+      const ppc = isCaseBeer ? p.case_size : (p.pours_per_container || null);
+      const ozPerUnit = isCaseBeer
+        ? (p.container_size_oz != null ? p.case_size * p.container_size_oz : null)
+        : (p.container_size_oz != null ? p.container_size_oz : null);
+      const unitCost = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
       map[pid] = {
         product: p, name: eMap[pid].name,
         rawUsed, adjustments,
@@ -111,8 +126,8 @@ S.InventoryVarianceReport = {
         wasteUnits: a.waste_units || 0,
         used,
         poursMade: ppc != null ? used * ppc : null,
-        ouncesUsed: p.container_size_oz != null ? used * p.container_size_oz : null,
-        usageCost: bottleCost != null ? used * bottleCost : null
+        ouncesUsed: ozPerUnit != null ? used * ozPerUnit : null,
+        usageCost: unitCost != null ? used * unitCost : null
       };
     });
     return map;
