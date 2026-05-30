@@ -114,10 +114,10 @@ S.ShiftWaste = {
         + '<button class="btn btn-primary" id="wl-add-first">Log Waste / Spill</button></div>';
     } else {
       const totalCost = recs.reduce((t, r) => t + (r.cost || 0), 0);
-      const totalUnits = recs.reduce((t, r) => t + (r.units || 0), 0);
+      // No "Total Units" tile — waste rows mix unit types (bottles, ounces, food
+      // units), so summing them is apples-to-oranges. Cost is the honest total.
       const summary = '<div class="calc" style="margin-bottom:16px;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + recs.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Units</div><div class="calc-val">' + totalUnits.toFixed(2).replace(/\.00$/, '') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Cost</div><div class="calc-val warn">' + App.fmtCurrency(totalCost) + '</div></div>'
         + '</div>';
       const rows = recs.map(r => {
