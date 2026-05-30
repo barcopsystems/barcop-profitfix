@@ -261,23 +261,6 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Dashboard</span>
       </div>
-      <div class="nav-section">Setup</div>
-      <div class="nav-item" data-screen="ic-product-setup" id="nav-ic-product-setup">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Add Products</span>
-      </div>
-      <div class="nav-item" data-screen="ic-prep-batches" id="nav-ic-prep-batches">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 4h9v3a4.5 4.5 0 0 1-4.5 4.5A4.5 4.5 0 0 1 4 7V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 14h12M7 11.5v2.5M10 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Prep Batches</span>
-      </div>
-      <div class="nav-item" data-screen="ic-locations" id="nav-ic-locations">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 15s5-4.2 5-8a5 5 0 0 0-10 0c0 3.8 5 8 5 8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="7" r="1.8" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Set Locations</span>
-      </div>
-      <div class="nav-item" data-screen="ic-vendors" id="nav-ic-vendors">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 4.5v4c0 3.5 5.5 6.5 5.5 6.5s5.5-3 5.5-6.5v-4L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">List Vendors</span>
-      </div>
       <div class="nav-section">Counts</div>
       <div class="nav-item" data-screen="ic-take-inventory" id="nav-ic-take-inventory">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3.5" y="3" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3V1.7h4V3M6 7.5h5M6 10.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -343,10 +326,31 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11l3.5-3.5 2.5 2.5L13 4M10 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Top Movers</span>
       </div>
+      <div class="nav-section">Setup</div>
+      <div class="nav-item" data-screen="ic-product-setup" id="nav-ic-product-setup">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Add Products</span>
+      </div>
+      <div class="nav-item" data-screen="ic-prep-batches" id="nav-ic-prep-batches">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 4h9v3a4.5 4.5 0 0 1-4.5 4.5A4.5 4.5 0 0 1 4 7V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 14h12M7 11.5v2.5M10 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Prep Batches</span>
+      </div>
+      <div class="nav-item" data-screen="ic-locations" id="nav-ic-locations">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 15s5-4.2 5-8a5 5 0 0 0-10 0c0 3.8 5 8 5 8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="7" r="1.8" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Set Locations</span>
+      </div>
+      <div class="nav-item" data-screen="ic-vendors" id="nav-ic-vendors">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 4.5v4c0 3.5 5.5 6.5 5.5 6.5s5.5-3 5.5-6.5v-4L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">List Vendors</span>
+      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="ic-help" id="nav-ic-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
         <span class="nav-label">Help and FAQ</span>
+      </div>
+      <div class="nav-item" data-nav="report-bug" id="nav-ic-report-bug">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span class="nav-label">Report a Bug</span>
       </div>
     `;
   }
