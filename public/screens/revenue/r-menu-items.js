@@ -729,10 +729,19 @@ S.RevenueMenuItems = {
     set('ri-cps', cps > 0 ? App.fmtCurrency(cps) : '-');
     set('ri-cpct', cpct != null ? cpct.toFixed(1) + '%' : '-', cpct != null && tpct > 0 ? (cpct > tpct ? 'warn' : 'good') : '');
     set('ri-tgt-d', tpct > 0 ? tpct.toFixed(1) + '%' : '-');
+    // Only let the recipe drive the cost field when a real ingredient is in
+    // the builder (id + qty > 0). A blank starter row must NOT take over and
+    // wipe a manually entered cost — otherwise opening a no-recipe item to
+    // edit zeroes its cost and silently flips it to Incomplete on save.
     const costInp = document.getElementById('ri-cost');
-    if (costInp && this.rows.length) {
-      costInp.value = cps > 0 ? cps.toFixed(2) : '';
-      costInp.disabled = true;
+    if (costInp) {
+      const hasRealRecipe = this.rows.some(r => r.id && (parseFloat(r.quantity) || 0) > 0);
+      if (hasRealRecipe) {
+        costInp.value = cps > 0 ? cps.toFixed(2) : '';
+        costInp.disabled = true;
+      } else {
+        costInp.disabled = false;
+      }
     }
     this.refreshFieldMissing();
   },
