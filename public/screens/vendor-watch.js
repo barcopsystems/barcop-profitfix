@@ -35,7 +35,7 @@ S.VendorWatch = {
     let purch = 0;
     ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
       .filter(d => d.date > s.date && d.date <= e.date)
-      .forEach(d => (d.line_items || []).forEach(li => { if (li.product_id === pid) purch += App.bottlesFromDeliveryLine(li); }));
+      .forEach(d => (d.line_items || []).forEach(li => { if (li.product_id === pid) purch += App.unitsFromDeliveryLine(li); }));
     const used = (si.total || 0) + purch - (ei.total || 0);
     const days = (new Date(e.date + 'T00:00:00').getTime() - new Date(s.date + 'T00:00:00').getTime()) / 86400000;
     if (days <= 0) return null;
