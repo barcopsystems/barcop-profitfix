@@ -50,6 +50,7 @@ S.InventoryParSuggestions = {
     const recent = counts.slice(-Math.max(2, windowWeeks + 1));
     let total_usage = 0;
     let weeks_analyzed = 0;
+    let total_weeks = 0;
     for (let i = 1; i < recent.length; i++) {
       const startC = recent[i - 1];
       const endC   = recent[i];
@@ -65,29 +66,27 @@ S.InventoryParSuggestions = {
           .filter(li => li.product_id === productId)
           .reduce((ss, li) => ss + (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0)), 0), 0);
       const used = Math.max(0, start + purch - end);
+      // Weight by the ACTUAL time between the two counts so "weekly" is honest
+      // even when counts are not exactly seven days apart.
+      const days = (new Date(endC.date + 'T00:00:00').getTime() - new Date(startC.date + 'T00:00:00').getTime()) / 86400000;
       total_usage += used;
+      total_weeks += days > 0 ? days / 7 : 1;
       weeks_analyzed++;
     }
-    if (weeks_analyzed === 0) return null;
-    return { weeks_analyzed, total_usage, avg_weekly: total_usage / weeks_analyzed };
+    if (weeks_analyzed === 0 || total_weeks <= 0) return null;
+    return { weeks_analyzed, total_usage, avg_weekly: total_usage / total_weeks };
   },
 
   computeSuggestion(product, settings) {
     const usage = this.weeklyUsageFor(product.id, settings.window_weeks);
-    if (!usage) return { ...usage, suggested: null, status: 'No data', reasoning: 'Need at least two counts for this product to suggest.' };
+    if (!usage) return { weeks_analyzed: 0, avg_weekly: null, suggested: null, status: 'No data', reasoning: 'Need at least two counts for this product to suggest.' };
     const cycleWeeks = (settings.cycle_days || 7) / 7;
     const buffer = (settings.buffer_pct || 0) / 100;
     let suggested = usage.avg_weekly * cycleWeeks * (1 + buffer);
-    // Usage is counted in cases for bottle beer, so suggested is already in
-    // cases; just round up to a whole case.
-    if (product.category === 'Bottle Beer' && product.case_size > 0) {
-      suggested = Math.ceil(suggested);
-    } else {
-      // Every other category: round UP to a whole unit. Operators order in
-      // whole bottles, kegs, cases, lbs — partial units don't exist on a
-      // vendor sheet. Ceiling means we err on the side of not running out.
-      suggested = Math.ceil(suggested);
-    }
+    // Round UP to a whole unit (cases for bottle beer, bottles, kegs, lbs).
+    // Usage is already in the product's stock unit. Operators order in whole
+    // units, so the ceiling errs on the side of not running out.
+    suggested = Math.ceil(suggested);
     const current = Math.round(parseFloat(product.par_level) || 0);
     const delta = suggested - current;
     let status = 'No Change';
@@ -176,7 +175,7 @@ S.InventoryParSuggestions = {
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">' + esc(p.category || '') + '</div></td>'
         + '<td>' + currentDisp + '</td>'
-        + '<td>' + (r.avg_weekly != null ? r.avg_weekly.toFixed(1) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td>' + (r.avg_weekly != null ? esc(App.qtyWithUnit(p, r.avg_weekly)) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '<td>' + suggDisp + '</td>'
         + '<td style="color:' + deltaColor + ';font-weight:700;">' + deltaDisp + '</td>'
         + '<td>' + statusBadge + '</td>'
@@ -263,7 +262,7 @@ S.InventoryParSuggestions = {
     await App.saveInventory();
     this.selected = {};
     const status = document.getElementById('ps-status');
-    if (status) { status.textContent = '✓ Applied ' + applied + ' par update' + (applied === 1 ? '' : 's') + '.'; status.style.display = 'inline'; }
+    if (status) { status.textContent = 'Applied ' + applied + ' par update' + (applied === 1 ? '' : 's') + '.'; status.style.display = 'inline'; }
     this.draw();
   }
 };
