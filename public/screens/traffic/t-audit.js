@@ -588,24 +588,26 @@ S.TrafficAudit = {
     const linkRow = (key, label, ph) => '<div style="margin-bottom:10px;">'
       + '<label style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--t3);display:block;margin-bottom:4px;">' + esc(label) + '</label>'
       + '<input type="url" id="ta-link-' + key + '" value="' + esc(urls[key] || '') + '" placeholder="' + ph + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:8px 10px;width:100%;outline:none;"/></div>';
-    // Only the three links that drive a live score appear on the audit. The
-    // rest live in Settings (Operation Links) for the quick-access card.
-    const linkPlatforms = (App.TRAFFIC_PLATFORMS || []).filter(p => ['website', 'gbp', 'yelp'].indexOf(p.urlKey) !== -1);
+    // Only the Website link drives a live score (PageSpeed). The rest live in
+    // Settings (Operation Links) for the quick-access card. Google and Yelp
+    // ratings come from screenshots below, not a live read.
+    const linkPlatforms = (App.TRAFFIC_PLATFORMS || []).filter(p => p.urlKey === 'website');
     const linksCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">'
-      +   '<div style="font-size:16px;font-weight:800;color:var(--t1);">Your Links</div>'
+      +   '<div style="font-size:16px;font-weight:800;color:var(--t1);">Your Website</div>'
       +   '<button class="btn btn-ghost btn-sm" id="ta-how-btn">How this works</button>'
       + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">These three read live for your score: website speed, Google rating and reviews, and Yelp. If they are saved in Settings they are already filled in. Everything else is a screenshot below.</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px;">'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Your website is the one link Bar Cop reads live for your score: speed, mobile, SEO, and best practices. If it is saved in Settings it is already filled in. Everything else, including your Google and Yelp ratings, comes from a screenshot below.</div>'
+      + '<div style="max-width:480px;">'
       + linkPlatforms.map(p => linkRow(p.urlKey, p.label, p.placeholder || '')).join('')
       + '</div></div>';
 
     const screenshotsCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Screenshots</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Add these for what your links cannot reach (data behind a login) or as a fallback. Accepts images, PDF, or exports.</div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional, but these are where most of your score comes from. Add a screenshot for anything your website link cannot reach: your Google and Yelp ratings, data behind a login, and your social and delivery pages. Accepts images, PDF, or exports.</div>'
+      + this.renderFileSection('highlight', 'Google Review Page (rating, reviews)',      'ta-f-google-reviews', 'ta-google-reviews', 'Your Google rating, review count, response rate, and recency. This is how Bar Cop scores your Google reviews.')
+      + this.renderFileSection('highlight', 'Yelp Listing (rating, reviews)',            'ta-f-yelp',           'ta-yelp',           'Your Yelp rating and review count for cross-platform reputation.')
       + this.renderFileSection('highlight', 'Website Analytics (sessions, bounce rate)', 'ta-f-analytics',      'ta-analytics',      'Sessions and bounce live behind your analytics login, not in the public page.')
-      + this.renderFileSection('optional',  'Google Review Page (fallback)',             'ta-f-google-reviews', 'ta-google-reviews', 'Backup if the live Google read is unavailable.')
       + this.renderFileSection('optional',  'GBP Insights (impressions, calls)',         'ta-f-gbp-insights',   'ta-gbp-insights',   'Adds the impression-to-action funnel.')
       + this.renderFileSection('optional',  'Search Results (maps pack)',                'ta-f-search',         'ta-search',         'Confirms maps-pack presence and search visibility.')
       + this.renderFileSection('optional',  'Instagram Profile',                         'ta-f-instagram',      'ta-instagram',      'Follower count, post frequency, content.')
@@ -643,9 +645,9 @@ S.TrafficAudit = {
 
     document.getElementById('ta-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Traffic Audit Works', [
       { p: ['The Traffic Audit scores your digital presence across seven areas. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers.'] },
-      { h: 'Reads live from a link', p: ['Your Website, Google Business Profile, and Yelp links are read live: website speed, your Google rating and reviews, and your Yelp rating. Those three score from the link alone.'] },
-      { h: 'Needs a screenshot', p: ['Instagram, Facebook, delivery platforms, and email sit behind a login Bar Cop cannot read. Upload a screenshot in the Screenshots section to score those. A link to them only powers the quick-access card in Traffic Recovery, it does not score them.'] },
-      { h: 'The steps', p: ['1. Confirm or paste your Website, Google, and Yelp links.', '2. Upload a screenshot for any other area you want scored.', '3. Answer the two quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
+      { h: 'Reads live from a link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once in Settings and it is ready every audit.'] },
+      { h: 'Needs a screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email all sit behind a login or carry data a link cannot reach. Upload a screenshot in the Screenshots section to score those.'] },
+      { h: 'The steps', p: ['1. Confirm or paste your Website link.', '2. Upload a screenshot for your Google reviews, Yelp, and any other area you want scored.', '3. Answer the two quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
     ]));
     document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
@@ -843,9 +845,10 @@ S.TrafficAudit = {
     if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
 
     const draftP = this._intakeDraft?.practices || {};
-    // Collect the inline links and save them back to Operation Links so the
-    // operator enters them once and the audit can read them live next time.
-    const linkKeys = ['website', 'gbp', 'yelp'];   // only the score-driving links live on the audit
+    // Collect the website link and save it back to Operation Links so the
+    // operator enters it once and the audit can read it live next time. Google
+    // and Yelp are screenshot-only — no live link read.
+    const linkKeys = ['website'];   // the only score-driving live link
     const savedUrls = Object.assign({}, (App.data.traffic_settings && App.data.traffic_settings.urls) || {});
     linkKeys.forEach(k => { const el = document.getElementById('ta-link-' + k); if (el) savedUrls[k] = (el.value || '').trim(); });
     if (!App.data.traffic_settings) App.data.traffic_settings = {};
@@ -856,29 +859,24 @@ S.TrafficAudit = {
 
     const form = new FormData();
     form.append('appData', JSON.stringify(App.data));
-    // Links + a place query (name + city) so the server can read Google Places
-    // and Yelp live where keys are configured.
-    const urlsPayload = Object.assign({}, savedUrls, {
-      place_query: [App.data.settings?.bar_name, App.data.settings?.city_state].filter(Boolean).join(' '),
-      city_state: App.data.settings?.city_state || ''
-    });
-    form.append('urls', JSON.stringify(urlsPayload));
+    // Only the website is read live (PageSpeed). No Google Places / Yelp query.
+    form.append('urls', JSON.stringify(savedUrls));
     // Practices — unanswered ('') omitted so it has no score effect.
     const practices = {};
     if (draftP.growth_mechanism === 'true' || draftP.growth_mechanism === 'false') practices.growth_mechanism = draftP.growth_mechanism === 'true';
     if (draftP.loyalty === 'true' || draftP.loyalty === 'false') practices.loyalty = draftP.loyalty === 'true';
     form.append('practices', JSON.stringify(practices));
 
-    const fileInputIds = ['ta-f-analytics', 'ta-f-google-reviews', 'ta-f-gbp-insights', 'ta-f-search', 'ta-f-instagram', 'ta-f-delivery', 'ta-f-email'];
+    const fileInputIds = ['ta-f-google-reviews', 'ta-f-yelp', 'ta-f-analytics', 'ta-f-gbp-insights', 'ta-f-search', 'ta-f-instagram', 'ta-f-delivery', 'ta-f-email'];
     let taFileCount = 0;
     fileInputIds.forEach(id => {
       const inp = document.getElementById(id);
       if (inp?.files) { for (const f of inp.files) { form.append('file', f); taFileCount++; } }
     });
 
-    // Validation — links, screenshots, or weekly data all count as real input.
+    // Validation — the website link, screenshots, or weekly data all count.
     const hasRealData = taFileCount > 0 || (App.data.traffic_weeks && App.data.traffic_weeks.length > 0)
-      || savedUrls.gbp || savedUrls.website || savedUrls.yelp;
+      || savedUrls.website;
     if (!hasRealData) {
       setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your screenshots.', 'var(--red)');
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
