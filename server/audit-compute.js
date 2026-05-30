@@ -24,6 +24,8 @@ const WEEKS_PER_MONTH = 4.345;
 const PERIOD_WEEKS = 4;
 const VOID_COMP_BENCHMARK_PCT = 2.0;   // S2 benchmark (server prompt S2_BENCHMARK_PCT)
 const VENDOR_EXPOSURE_PCT = 3.0;       // S4 exposure assumption (server prompt S4_EXPOSURE_PCT)
+const BEV_ATTACH_BENCHMARK = 0.85;     // Revenue S1: drinks per guest, internal Bar Cop benchmark for a bar+kitchen
+const DISCOUNT_BENCHMARK_PCT = 2.0;    // Profit S2: discounts as % of sales, internal benchmark
 
 function num(v) { return (v == null || isNaN(v)) ? null : Number(v); }
 function round1(v) { return v == null ? null : Math.round(v * 10) / 10; }
@@ -135,6 +137,29 @@ function computeProfitAudit(appData, controlData, extracted) {
   let s1 = scoreCostVsTarget(barCostPct, barTarget, [85, 65, 45, 25]) || 25;
   if (haveCostedRecipes) s1 += 10;
   if (measuredPour) s1 += 5;
+  // ── Draft beer yield (expands S1) ──
+  // Units sold vs theoretical from kegs = yield %. 100 - yield = the loss to
+  // foam, over-pour, and line cleaning (15-25% is routine). Honest only from a
+  // stated yield, OR kegs + units sold + theoretical units per keg (we never
+  // assume keg size or pour). Else N/A. Draft loss already lives inside the
+  // bar-cost % dollar, so NO separate dollar is emitted (avoid double count) —
+  // it nudges the S1 score (a measured result, decision 8) and surfaces as a
+  // deficit that routes to the draft-system fix.
+  const draftYieldPct = (() => {
+    const stated = num(extracted.draft_yield_pct);
+    if (stated != null) return round1(Math.max(0, Math.min(100, stated)));
+    const kegs = num(extracted.draft_kegs_purchased);
+    const sold = num(extracted.draft_units_sold);
+    const perKeg = num(extracted.draft_units_per_keg);
+    if (kegs > 0 && sold != null && perKeg > 0) return round1(Math.max(0, Math.min(100, (sold / (kegs * perKeg)) * 100)));
+    return null;
+  })();
+  const draftLossPct = draftYieldPct != null ? round1(Math.max(0, 100 - draftYieldPct)) : null;
+  if (draftLossPct != null) {
+    if (draftLossPct <= 8) s1 += 5;          // tight pour control
+    else if (draftLossPct >= 20) s1 -= 8;    // major foam / over-pour loss
+    else if (draftLossPct >= 12) s1 -= 4;
+  }
   s1 = clampScore(s1);
   const s1Diff = (barCostPct != null && barTarget != null) ? barCostPct - barTarget : 0;
   const s1MonthlyGap = (s1Diff > 0 && monthlyBarRev != null) ? round0((s1Diff / 100) * monthlyBarRev) : 0;
@@ -189,6 +214,23 @@ function computeProfitAudit(appData, controlData, extracted) {
     const shortRate = shortCount / reconCount;
     if (shortRate > 0.30) s2 -= 10;
     else if (shortRate > 0.15) s2 -= 5;
+  }
+  // ── Discount abuse + no-sale drawer opens (expands S2) ──
+  // Excessive discounts and no-sale register opens are theft vectors the
+  // void/comp + cash-variance view misses. Honest from a POS exception report
+  // or Control. Discounts score off discount % of sales vs an internal
+  // benchmark (a measured result). No-sale opens are surfaced as a flagged
+  // behavior + action item; we do not invent a penalty magnitude for them
+  // without an honest denominator. Discounts are a distinct POS category from
+  // voids/comps, so there is no double count.
+  const discountTotal = num(cd.discount_total) != null ? num(cd.discount_total) : num(extracted.discount_total);
+  const discountCount = num(cd.discount_count) != null ? num(cd.discount_count) : num(extracted.discount_count);
+  const noSaleCount = num(cd.no_sale_count) != null ? num(cd.no_sale_count) : num(extracted.no_sale_count);
+  const discountPct = (discountTotal != null && periodTotalRev > 0) ? round1((discountTotal / periodTotalRev) * 100) : null;
+  if (discountPct != null) {
+    const over = discountPct - DISCOUNT_BENCHMARK_PCT;
+    if (over > 2) s2 -= 10;
+    else if (over > 0) s2 -= 5;
   }
   // Modest, capped credit for controls that genuinely reduce risk — never
   // enough to rescue a bad rate.
@@ -295,6 +337,8 @@ function computeProfitAudit(appData, controlData, extracted) {
     S1_BEV_COGS_PERIOD: bevCogsPeriod,
     S1_INV_VARIANCE_PCT: invVarPct != null ? invVarPct : 0,
     S1_INV_VARIANCE_AMT: invVarAmt != null ? invVarAmt : 0,
+    S1_DRAFT_YIELD_PCT: draftYieldPct,
+    S1_DRAFT_LOSS_PCT: draftLossPct,
     S1_POUR_METHOD: extracted.pour_method || 'Not documented',
     S1_RECIPE_COVERAGE: recipesCosted === 'all' ? 'All recipes costed'
       : recipesCosted === 'some' ? 'Some recipes costed'
@@ -307,6 +351,11 @@ function computeProfitAudit(appData, controlData, extracted) {
     S2_VOID_COMP_PCT: voidCompPct,
     S2_VOID_COMP_AMT: voidCompAmt,
     S2_VOIDS_NO_APPROVAL_PCT: voidsNoApprovalPct,
+    S2_DISCOUNT_TOTAL: discountTotal,
+    S2_DISCOUNT_PCT: discountPct,
+    S2_DISCOUNT_BENCHMARK_PCT: DISCOUNT_BENCHMARK_PCT,
+    S2_DISCOUNT_COUNT: discountCount,
+    S2_NO_SALE_COUNT: noSaleCount,
     S2_CASH_POLICY: haveCashRecon ? 'Reconciliation performed' : 'Not documented',
     S2_VOID_APPROVAL: haveApprovalPolicy ? 'Manager approval tracked' : 'Not documented',
     S2_DRAWER_RECON: num(cd.cash_reconciliations) > 0 ? `Yes — ${cd.cash_reconciliations} entries` : (recons.length ? `Yes — ${recons.length} entries` : 'No'),
@@ -407,6 +456,23 @@ function computeRevenueAudit(appData, controlData, extracted) {
     const below = checkTarget - checkAvg;               // positive = below target
     s1 = clampScore(below <= 1 ? 85 : below <= 3 ? 70 : below <= 5 ? 55 : 35);
     if (below > 0 && monthlyCovers != null) s1Gap = round0(below * monthlyCovers);
+  }
+
+  // ── Beverage attachment / drink incidence (expands S1) ──
+  // Drinks per guest is the single biggest margin lever for a bar+kitchen. It
+  // is a RESULT (decision 8): a measured low attach genuinely drags the score.
+  // Honest only when a beverage count is available alongside covers; else N/A.
+  // We do NOT emit a separate dollar for it — raising drink attach is one way to
+  // raise the check average, so its dollar already lives inside S1's check-avg
+  // gap. Double-counting it would inflate the headline (root cause B). It shows
+  // as a deficit (per-cover vs benchmark) and routes to the beverage-program fix.
+  const bevUnits = num(extracted.bev_units_sold);            // beverage items sold, report period
+  const statedIncidence = num(extracted.bev_incidence_pct);  // % of checks with a drink, if POS states it
+  const bevPerCover = (bevUnits != null && monthlyCovers > 0) ? round2(bevUnits / monthlyCovers) : null;
+  if (s1 != null && bevPerCover != null) {
+    if (bevPerCover >= BEV_ATTACH_BENCHMARK) s1 = clampScore(s1 + 5);
+    else if (bevPerCover < BEV_ATTACH_BENCHMARK * 0.6) s1 = clampScore(s1 - 8);
+    else if (bevPerCover < BEV_ATTACH_BENCHMARK) s1 = clampScore(s1 - 4);
   }
 
   // ── S2 — Labor Efficiency (cost recovery) ──
@@ -516,6 +582,10 @@ function computeRevenueAudit(appData, controlData, extracted) {
     S1_FOOD_CHECK_AVG: round2(avg(weeks.map(w => w.food_check_avg))),
     S1_COVER_COUNT: round0(monthlyCovers),
     S1_MONTHLY_REVENUE: round0(monthlyRev),
+    S1_BEV_PER_COVER: bevPerCover,                        // drinks per guest (N/A when no bev count)
+    S1_BEV_ATTACH_BENCHMARK: BEV_ATTACH_BENCHMARK,
+    S1_BEV_INCIDENCE_PCT: statedIncidence != null ? round1(statedIncidence) : null,
+    S1_BEV_UNITS: bevUnits,
     S1_MONTHLY_GAP: s1Gap,
     S1_ANNUAL_GAP: round0(s1Gap * 12),
 
@@ -616,7 +686,35 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   const sessions = num(extracted.monthly_sessions) != null ? num(extracted.monthly_sessions) : round0(wk(w => w.monthly_sessions));
   const bounce = num(extracted.bounce_rate) != null ? num(extracted.bounce_rate) : round1(wk(w => w.bounce_rate));
   const perf = num(web.performance);
-  const haveWeb = perf != null || sessions != null || extracted.mobile_optimized != null;
+  // Website conversion structure — code-detected from a raw HTML fetch (free, no
+  // API; web.structure), or read off a homepage/menu screenshot (extracted).
+  // Online ordering, reservations, click-to-call, a mobile viewport, hours on
+  // the page, and a real web menu (not just a PDF) are the structural elements
+  // that turn a visit into an order or a booking. NO dollars (Traffic rule) —
+  // missing ones surface as deficits. Honest booleans only; null when unknown.
+  const struct = web.structure || {};
+  const conv = (structKey, exKey) => {
+    const h = struct[structKey];
+    if (h === true || h === false) return h;
+    const e = extracted[exKey];
+    return (e === true || e === false) ? e : null;
+  };
+  const cOrdering     = conv('online_ordering', 'online_ordering');
+  const cReservations = conv('reservations', 'reservation_system');
+  const cClickToCall  = conv('click_to_call', 'click_to_call');
+  const cViewport     = conv('mobile_viewport', 'mobile_optimized');
+  const cHours        = conv('hours_present', 'hours_present');
+  // Menu as a real web page vs a PDF (a known mobile leak). HTML fetch reports
+  // menu_is_pdf; a screenshot read can set menu_is_web.
+  const cMenuWeb = struct.menu_is_pdf === true ? false
+    : struct.menu_is_pdf === false ? true
+    : extracted.menu_is_web === true ? true
+    : extracted.menu_is_web === false ? false : null;
+  const convChecks = [cOrdering, cReservations, cClickToCall, cViewport, cHours, cMenuWeb];
+  const convAssessed = convChecks.filter(v => v === true || v === false).length;
+  const convPresent = convChecks.filter(v => v === true).length;
+  const haveConv = convAssessed > 0;
+  const haveWeb = perf != null || sessions != null || extracted.mobile_optimized != null || haveConv;
   let s2 = null;
   if (haveWeb) {
     let pts = 0, max = 0;
@@ -624,6 +722,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     else if (extracted.mobile_optimized != null) { max += 40; pts += extracted.mobile_optimized === true ? 40 : 10; }
     if (sessions != null) { max += 35; pts += Math.min(35, (sessions / B.sessions) * 35); }
     if (bounce != null) { max += 25; pts += Math.max(0, Math.min(25, ((B.bounce - bounce) / B.bounce + 1) * 12.5)); }
+    if (haveConv) { max += 30; pts += (convPresent / convAssessed) * 30; }   // conversion structure
     s2 = max > 0 ? clampScore((pts / max) * 100) : null;
   }
 
@@ -700,6 +799,13 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   if (gRating != null && gRating < B.google_rating) items.push({ action: 'Lift your Google rating from ' + gRating + ' toward ' + B.google_rating + '.', gap_id: 'reviews' });
   if (s1Posts != null && s1Posts < B.gbp_posts) items.push({ action: 'Post to Google Business Profile more. ' + s1Posts + ' posts in 30 days versus ' + B.gbp_posts + '.', gap_id: 'gbp' });
   if (sessions != null && sessions < B.sessions) items.push({ action: 'Grow website traffic. ' + Math.round(sessions) + ' monthly sessions versus the ' + B.sessions + ' benchmark.', gap_id: 'website' });
+  // Website conversion deficits (no dollars — structural gaps that lose orders).
+  if (cMenuWeb === false) items.push({ action: 'Put your menu on a real web page. A PDF menu is a mobile dead end, guests pinch and zoom and leave.', gap_id: 'website' });
+  if (cOrdering === false) items.push({ action: 'Add an online ordering link to the website. There is no path from a visit to an order right now.', gap_id: 'website' });
+  if (cReservations === false) items.push({ action: 'Add a reservation or booking link to the website.', gap_id: 'website' });
+  if (cClickToCall === false) items.push({ action: 'Make the phone number click-to-call on mobile so a guest can call in one tap.', gap_id: 'website' });
+  if (cViewport === false) items.push({ action: 'Fix the mobile layout. The site is not set up for phones, where most of your traffic is.', gap_id: 'website' });
+  if (cHours === false) items.push({ action: 'Put your hours on the homepage. Guests checking if you are open should not have to dig.', gap_id: 'website' });
   if (igPosts != null && igPosts < B.ig_posts) items.push({ action: 'Post to Instagram more often. ' + igPosts + ' posts in 30 days versus ' + B.ig_posts + '.', gap_id: 'social' });
   if (openRate != null && openRate < B.open_rate) items.push({ action: 'Improve email open rate. ' + openRate + '% versus the ' + B.open_rate + '% benchmark.', gap_id: 'email-loyalty' });
   if (listSize != null && listSize < B.list_size) items.push({ action: 'Grow the email list. ' + Math.round(listSize) + ' subscribers versus ' + B.list_size + '.', gap_id: 'email-loyalty' });
@@ -732,7 +838,14 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     S2_MONTHLY_SESSIONS: sessions, S2_SESSIONS_BENCHMARK: B.sessions,
     S2_BOUNCE_RATE: bounce, S2_BOUNCE_BENCHMARK: B.bounce,
     S2_MENU_PAGE_IN_TOP_3: yn(extracted.menu_page_top3),
-    S2_ONLINE_ORDERING_PRESENT: yn(extracted.online_ordering),
+    S2_ONLINE_ORDERING_PRESENT: cOrdering,
+    S2_RESERVATIONS_PRESENT: cReservations,
+    S2_CLICK_TO_CALL: cClickToCall,
+    S2_MOBILE_VIEWPORT: cViewport,
+    S2_HOURS_ON_PAGE: cHours,
+    S2_MENU_IS_WEB_PAGE: cMenuWeb,
+    S2_CONVERSION_ELEMENTS_PRESENT: haveConv ? convPresent : null,
+    S2_CONVERSION_ELEMENTS_ASSESSED: haveConv ? convAssessed : null,
     S2_MONTHLY_GAP: 0,
 
     S3_SCORE: s3,
@@ -832,6 +945,22 @@ if (require.main === module) {
     ['S5 prime % from control', d.S5_PRIME_COST_PCT, 63.0],
     ['OVERALL is 1-100', d.OVERALL_SCORE >= 1 && d.OVERALL_SCORE <= 100, true]
   ];
+  // Draft beer yield (S1 expansion): present -> yield/loss computed and a high
+  // loss drags S1; absent -> N/A and score unchanged.
+  const draftBase = computeProfitAudit({ settings: { annual_bar_revenue: 600000 } }, null, { bar_cost_pct: 22 });
+  const draftLow  = computeProfitAudit({ settings: { annual_bar_revenue: 600000 } }, null, { bar_cost_pct: 22, draft_kegs_purchased: 10, draft_units_per_keg: 124, draft_units_sold: 1000 });
+  checks.push(['Profit S1 draft yield computed', draftLow.S1_DRAFT_YIELD_PCT, 80.6]);
+  checks.push(['Profit S1 draft loss computed', draftLow.S1_DRAFT_LOSS_PCT, 19.4]);
+  checks.push(['Profit S1 draft N/A when absent', draftBase.S1_DRAFT_YIELD_PCT, null]);
+  checks.push(['Profit S1 high draft loss drags score', draftLow.S1_SCORE < draftBase.S1_SCORE, true]);
+  // Discount + no-sale (S2 expansion): present -> discount % computed and high
+  // discounts drag S2; absent -> N/A and score unchanged.
+  const discBase = computeProfitAudit({ settings: { annual_bar_revenue: 600000, annual_food_revenue: 360000 } }, { void_comp_total: 0, void_comp_count: 0, sources: [] }, {});
+  const discHigh = computeProfitAudit({ settings: { annual_bar_revenue: 600000, annual_food_revenue: 360000 } }, { void_comp_total: 0, void_comp_count: 0, sources: [] }, { discount_total: 4000, no_sale_count: 12 });
+  checks.push(['Profit S2 discount % computed', discHigh.S2_DISCOUNT_PCT, 5]);
+  checks.push(['Profit S2 no-sale surfaced', discHigh.S2_NO_SALE_COUNT, 12]);
+  checks.push(['Profit S2 discount/no-sale N/A when absent', discBase.S2_DISCOUNT_PCT, null]);
+  checks.push(['Profit S2 high discounts drag score', discHigh.S2_SCORE < discBase.S2_SCORE, true]);
   let pass = 0;
   for (const [label, got, exp] of checks) {
     const ok = got === exp;
@@ -949,6 +1078,13 @@ if (require.main === module) {
   // Check-average N/A when no covers anywhere.
   const revNoCovers = computeRevenueAudit({ settings: { annual_bar_revenue: 600000 }, revenue_settings: { targets: {} } }, null, {});
   rChecks.push(['Rev S1 N/A when no covers', revNoCovers.S1_SCORE, null]);
+  // Beverage attachment (S1 expansion): present -> drinks-per-guest computed and
+  // a low attach drags the score; absent -> N/A and score unchanged.
+  const revBevBase = computeRevenueAudit({ settings: {}, revenue_settings: { targets: { check_avg: 35 } } }, null, { monthly_covers: 1000, monthly_revenue: 35000, check_avg: 34 });
+  const revBevLow  = computeRevenueAudit({ settings: {}, revenue_settings: { targets: { check_avg: 35 } } }, null, { monthly_covers: 1000, monthly_revenue: 35000, check_avg: 34, bev_units_sold: 500 });
+  rChecks.push(['Rev S1 bev attach per-guest computed', revBevLow.S1_BEV_PER_COVER, 0.5]);
+  rChecks.push(['Rev S1 low bev attach drags score', revBevLow.S1_SCORE < revBevBase.S1_SCORE, true]);
+  rChecks.push(['Rev S1 bev attach N/A when no bev data', revBevBase.S1_BEV_PER_COVER, null]);
   let rPass = 0;
   for (const [label, got, exp] of rChecks) {
     const ok = got === exp; if (ok) rPass++;
@@ -983,6 +1119,19 @@ if (require.main === module) {
   tChecks.push(['Traffic delivery N/A when no data', trafThin.S6_SCORE, null]);
   tChecks.push(['Traffic email N/A when no data', trafThin.S7_SCORE, null]);
   tChecks.push(['Traffic GBP scored from screenshot data', trafThin.S1_SCORE > 0, true]);
+  // Website conversion structure (S2 expansion): present -> elements counted,
+  // PDF menu flagged, S2 lower than a same-site read with no structure; absent
+  // -> conversion fields N/A. No dollars anywhere.
+  const trafConv = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { mobile_optimized: true },
+    { website: { performance: 70, structure: { online_ordering: false, reservations: false, click_to_call: true, mobile_viewport: true, hours_present: true, menu_is_pdf: true } } });
+  const trafNoConv = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, {}, { website: { performance: 70 } });
+  tChecks.push(['Traffic S2 conversion present count', trafConv.S2_CONVERSION_ELEMENTS_PRESENT, 3]);
+  tChecks.push(['Traffic S2 conversion assessed count', trafConv.S2_CONVERSION_ELEMENTS_ASSESSED, 6]);
+  tChecks.push(['Traffic S2 PDF menu flagged not web', trafConv.S2_MENU_IS_WEB_PAGE, false]);
+  tChecks.push(['Traffic S2 click-to-call detected', trafConv.S2_CLICK_TO_CALL, true]);
+  tChecks.push(['Traffic S2 conversion N/A when no structure', trafNoConv.S2_CONVERSION_ELEMENTS_ASSESSED, null]);
+  tChecks.push(['Traffic S2 lower with missing conversion', trafConv.S2_SCORE < trafNoConv.S2_SCORE, true]);
+  tChecks.push(['Traffic S2 conversion carries no dollar', trafConv.S2_MONTHLY_GAP, 0]);
   let tPass = 0;
   for (const [label, got, exp] of tChecks) {
     const ok = got === exp; if (ok) tPass++;
