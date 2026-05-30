@@ -253,17 +253,22 @@ S.InventoryProducts = {
     const cards = this.CATEGORIES.map(c => {
       const n = all.filter(p => (p.category || '') === c).length;
       const incomplete = all.filter(p => (p.category || '') === c && !this.isComplete(p)).length;
-      const badge = incomplete > 0
-        ? '<div style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--red);margin-top:6px;">' + incomplete + ' INCOMPLETE</div>'
+      const incText = incomplete > 0
+        ? '<div style="font-size:10px;color:var(--t4);margin-top:3px;">' + incomplete + ' incomplete</div>'
         : '';
       return '<div class="ip-card" data-cat="' + esc(c) + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:32px 22px 26px;cursor:pointer;text-align:center;transition:border-color 0.15s;">'
-        + '<div style="font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:8px;">' + esc(c) + '</div>'
+        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 18px;text-align:center;">'
+        + '<div style="font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">' + esc(c) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + '</div>'
-        + badge
-        + '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:22px;">'
-          + '<span class="ip-card-add" data-cat="' + esc(c) + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add Products</span>'
-          + '<button type="button" class="ip-card-imp" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 11px;cursor:pointer;">Import CSV</button>'
+        + incText
+        + '<div style="margin-top:16px;">'
+          + '<button type="button" class="ip-card-add" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 14px;cursor:pointer;">+ Add Product Manually</button>'
+          + '<div style="font-size:10px;color:var(--t4);margin:10px 0 8px;">or</div>'
+          + '<div class="ip-drop" data-cat="' + esc(c) + '" style="border:1px dashed var(--b1);border-radius:6px;padding:14px 8px;cursor:pointer;transition:border-color 0.15s,background 0.15s;">'
+            + '<div style="font-size:12px;color:var(--t2);font-weight:600;">Drop your file here</div>'
+            + '<div style="font-size:9px;color:var(--t4);margin-top:3px;letter-spacing:0.3px;">or browse to choose &middot; CSV or Excel</div>'
+          + '</div>'
+          + '<input type="file" class="ip-drop-input" data-cat="' + esc(c) + '" accept=".csv,.xlsx,.xls" style="display:none;"/>'
         + '</div>'
         + '</div>';
     }).join('');
@@ -371,19 +376,40 @@ S.InventoryProducts = {
   wireLanding() {
     this.container.onclick = ev => {
       const addLink = ev.target.closest('.ip-card-add');
-      const impLink = ev.target.closest('.ip-card-imp');
-      const card    = ev.target.closest('.ip-card');
       const tab     = ev.target.closest('.ic-tab');
       const edit    = ev.target.closest('.ip-edit');
       const del     = ev.target.closest('.ip-del');
 
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
-      if (impLink) { ev.stopPropagation(); this.showImport(impLink.dataset.cat); return; }
-      if (card)    { ev.stopPropagation(); this.showForm(card.dataset.cat); return; }
       if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
     };
+
+    // Per-category import (Option B): each card's drop zone is its own target,
+    // so the file's category is unambiguous. Drop or browse -> parse -> mapper.
+    this.container.querySelectorAll('.ip-drop').forEach(zone => {
+      const cat = zone.dataset.cat;
+      const input = this.container.querySelector('.ip-drop-input[data-cat="' + cat + '"]');
+      const hi = on => {
+        zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)';
+        zone.style.background = on ? 'rgba(219,171,70,0.08)' : 'transparent';
+      };
+      zone.addEventListener('click', () => input && input.click());
+      ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(true); }));
+      ['dragleave', 'dragend'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(false); }));
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); e.stopPropagation(); hi(false);
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) { this._formCategory = cat; this.readImportFile(file); }
+      });
+    });
+    this.container.querySelectorAll('.ip-drop-input').forEach(input => {
+      input.addEventListener('change', ev => {
+        const file = ev.target.files[0];
+        if (file) { this._formCategory = input.dataset.cat; this.readImportFile(file); }
+      });
+    });
 
     const updateSel = () => {
       const checked = this.container.querySelectorAll('.ip-chk:checked');
@@ -965,6 +991,7 @@ S.InventoryProducts = {
   showImportError(msg) {
     const preview = document.getElementById('ip-imp-preview');
     if (preview) preview.innerHTML = '<div style="color:var(--red);font-size:12px;margin-top:12px;">' + esc(msg) + '</div>';
+    else if (typeof alert === 'function') alert(msg);
   },
 
   // Category-specific column maps. Each category gets only the fields that
