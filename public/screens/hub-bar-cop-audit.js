@@ -177,6 +177,19 @@ S.HubBarCopAudit = {
       components.push({ label: r.name + ' audit on time', ratio: onTime ? 1 : 0, na: arr.length === 0, extra: arr.length === 0 ? 'No audit run yet' : (onTime ? 'Current' : 'Overdue') });
     });
 
+    // Deferred maintenance — open equipment/facility issues aging past a
+    // reasonable fix window are a discipline gap (small fixes become failures).
+    // N/A until anything is logged; full credit when the backlog is clear.
+    const maint = (App.shiftData?.sc_maintenance) || [];
+    const openMaint = maint.filter(m => m.status && m.status !== 'Resolved');
+    const deferredMaint = openMaint.filter(m => { const d = this._daysSince(m.date_reported); return d != null && d > 14; });
+    components.push({
+      label: 'Maintenance backlog cleared',
+      ratio: openMaint.length === 0 ? 1 : Math.max(0, 1 - (deferredMaint.length / 5)),
+      na: maint.length === 0,
+      extra: maint.length === 0 ? 'No maintenance logged' : (deferredMaint.length + ' open over 14 days')
+    });
+
     return this._rollup(components);
   },
 
@@ -410,6 +423,29 @@ S.HubBarCopAudit = {
     const variances = (App.shiftData?.sc_variances)  || [];
     const checklists = (App.shiftData?.sc_checklists) || [];
     const permits   = (App.data?.permits_compliance) || [];
+    const maint     = (App.shiftData?.sc_maintenance) || [];
+
+    // Deferred maintenance — high-priority open items are real exposure (a
+    // failing walk-in or ice machine is lost product plus an emergency bill),
+    // and items aging open are deferred fixes turning into failures.
+    const openMaint    = maint.filter(m => m.status && m.status !== 'Resolved');
+    const highMaint    = openMaint.filter(m => ['high', 'urgent', 'critical'].indexOf((m.priority || '').toLowerCase()) !== -1);
+    const agingMaint   = openMaint.filter(m => { const d = this._daysSince(m.date_reported); return d != null && d > 21; });
+    if (highMaint.length) {
+      out.push({
+        label:    highMaint.length + ' high-priority maintenance item' + (highMaint.length === 1 ? '' : 's') + ' open',
+        detail:   'Equipment flagged urgent and still unresolved. A failing walk-in or ice machine is lost product and an emergency repair bill. Close these first.',
+        severity: 'critical',
+        screen:   'sc-maintenance'
+      });
+    } else if (agingMaint.length) {
+      out.push({
+        label:    agingMaint.length + ' maintenance item' + (agingMaint.length === 1 ? '' : 's') + ' open over 21 days',
+        detail:   'Deferred maintenance turns small fixes into equipment failures. Schedule or escalate them.',
+        severity: 'warn',
+        screen:   'sc-maintenance'
+      });
+    }
 
     // Aging vendor discrepancies (open + over 60 days).
     const aging = discrep.filter(d => d.status !== 'resolved' && this._daysSince(d.date) > 60);
