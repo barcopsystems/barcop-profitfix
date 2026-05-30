@@ -1,420 +1,701 @@
 'use strict';
 
-/* ── Profit Recovery — This Week (weekly confirm screen) ──────────────────────
-   Thin weekly entry: Period, Bar, Food. COGS auto-fills from Inventory Control;
-   Revenue auto-fills from Shift Control and Labor from Labor Control once those
-   modules are built. Every field is editable as an override. Saves to
-   App.data.weeks. Inventory counts and variance are owned by Inventory Control. */
+/* ── Profit Recovery — Theft Risk (auto-scored) ───────────────────────────────
+   Restructured per the platform map: the Theft Risk score is computed from
+   operational data — Inventory Control spot checks (ic_spot_checks), Shift
+   Control voids/comps (sc_void_comps), and cash variances (sc_variances) — plus
+   a manual judgment the operator can add. No more 12-question manual scorecard.
+   Snapshots are saved to App.data.theft_scores. */
 
-S.ThisWeek = {
-  draft: null,
-  DRAFT_KEY: 'pf_draft',
-  // Bar / Kitchen category lists read from App canonical (see app.js BAR_CATS
-  // / KITCHEN_CATS) so the lists never drift across the three Profit Recovery
-  // screens that read them.
-  get BAR_CATS()     { return App.BAR_CATS; },
-  get KITCHEN_CATS() { return App.KITCHEN_CATS; },
+S.TheftRisk = {
+  _manual: null,
+  MANUAL_LEVELS: [
+    { label: 'Strong controls',  score: 5 },
+    { label: 'Adequate controls', score: 30 },
+    { label: 'Some concern',     score: 60 },
+    { label: 'Serious concern',  score: 90 }
+  ],
+  // Comp categories that count as loss for theft scoring. Staff Meal and
+  // Shift Drink are policy expense — they should NOT inflate the void/comp
+  // signal. Voids always count (a voided drink could still have been poured).
+  LOSS_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery'],
 
-  // ── Inventory Control COGS feed ───────────────────────────────────────────
-  hasIC() {
-    return (((App.inventoryData && App.inventoryData.ic_counts) || []).length) >= 2;
-  },
-  icCOGS(cats) {
-    const counts = [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
-    if (counts.length < 2) return null;
-    const startC = counts[counts.length - 2], endC = counts[counts.length - 1];
-    const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
-    const sMap = {}; (startC.items || []).forEach(it => sMap[it.product_id] = it);
-    const eMap = {}; (endC.items || []).forEach(it => eMap[it.product_id] = it);
-    const purch = {};
-    ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
-      .filter(d => d.date > startC.date && d.date <= endC.date)
-      .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
-      }));
-    let cogs = 0, any = false;
-    Object.keys(eMap).forEach(pid => {
-      if (!sMap[pid]) return;
-      const p = prods.find(x => x.id === pid);
-      if (!p || !cats.includes(p.category)) return;
-      const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
-      const c = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
-      if (c != null) { cogs += used * c; any = true; }
+  spotChecks() { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
+  // Only loss-bearing voids/comps. Filters out Staff Meal + Shift Drink
+  // policy expenses so the score reflects actual exposure.
+  voidComps() {
+    return ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => {
+      if (r.type === 'Void') return true;
+      // For comps, treat missing/legacy category as Customer Comp (loss).
+      const cat = r.category || 'Customer Comp';
+      return this.LOSS_COMP_CATEGORIES.includes(cat);
     });
-    return any ? cogs : null;
+  },
+  variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
+  adjustments() { return ((App.inventoryData && App.inventoryData.ic_adjustments) || []); },
+  products() {
+    return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
+  },
+  productById(id) {
+    return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
   },
 
-  // ── Shift Control revenue feed ────────────────────────────────────────────
-  hasShifts() {
-    return (((App.shiftData && App.shiftData.sc_shifts) || []).length) > 0;
+  manualScore(level) {
+    const m = this.MANUAL_LEVELS.find(x => x.label === level);
+    return m ? m.score : null;
   },
-  // sum bar/floor shift revenue for the 7-day week ending at periodEnd
-  shiftRevenue(periodEnd) {
-    const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
-    if (!shifts.length || !periodEnd) return null;
-    const startD = new Date(periodEnd + 'T00:00:00');
-    if (isNaN(startD.getTime())) return null;
-    startD.setDate(startD.getDate() - 6);
-    const start = startD.toISOString().slice(0, 10);
-    let bar = 0, food = 0, any = false;
-    shifts.forEach(s => {
-      if (!s.date || s.date < start || s.date > periodEnd) return;
-      bar += s.bar_revenue || 0;
-      food += s.floor_revenue || 0;
-      any = true;
-    });
-    return any ? { bar, food } : { bar: 0, food: 0 };
+  scoreClass(score) {
+    if (score == null) return 'dim';
+    return score <= 30 ? 'good' : score <= 60 ? '' : 'warn';
+  },
+  ratingFor(score) {
+    if (score == null) return 'Not Enough Data';
+    return score <= 30 ? 'Low Risk: Strong Controls'
+         : score <= 60 ? 'Moderate Risk: Tighten Controls'
+         : 'High Risk: Immediate Action';
   },
 
-  // ── Labor Control labor feed ──────────────────────────────────────────────
-  hasLabor() {
-    return (((App.laborData && App.laborData.lc_actuals) || []).length) > 0;
-  },
-  // sum logged labor cost for the 7-day week ending at periodEnd, split bar vs food
-  laborCost(periodEnd) {
-    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
-    if (!actuals.length || !periodEnd) return null;
-    const startD = new Date(periodEnd + 'T00:00:00');
-    if (isNaN(startD.getTime())) return null;
-    startD.setDate(startD.getDate() - 6);
-    const start = startD.toISOString().slice(0, 10);
-    const posDept = {};
-    ((App.laborData && App.laborData.lc_positions) || []).forEach(p => { posDept[p.id] = p.department; });
-    let bar = 0, food = 0, any = false;
-    actuals.forEach(a => {
-      if (!a.date || a.date < start || a.date > periodEnd) return;
-      any = true;
-      if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
-      else food += a.cost || 0;
-    });
-    return any ? { bar, food } : { bar: 0, food: 0 };
-  },
+  // ── Signals ─────────────────────────────────────────────────────────────────
+  // Minimum samples before a signal scores. Below these, a single flag would
+  // swing the score wildly, so the signal returns null (Not Enough Data) and is
+  // excluded from the blended score rather than reported as confident risk.
+  MIN_POUR_ITEMS: 8,
+  MIN_VOIDS: 10,
+  MIN_VARIANCES: 5,
 
-  // ── Draft ─────────────────────────────────────────────────────────────────
-  loadDraft() {
-    try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
-    const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
-    const periodEnd = App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0, 10);
-    const sr = this.shiftRevenue(periodEnd);
-    const lc = this.laborCost(periodEnd);
+  pourSignal() {
+    const items = [];
+    this.spotChecks().forEach(c => (c.items || []).forEach(it => items.push(it)));
+    if (items.length < this.MIN_POUR_ITEMS) return { score: null, checks: this.spotChecks().length, items: items.length, insufficient: true };
+    const flagged = items.filter(i => i.flagged).length;
+    const rate = flagged / items.length;
+    const varDollar = items.reduce((t, i) => t + Math.max(0, i.variance_dollar || 0), 0);
+    // Transparent: the risk score IS the flagged-pour rate as a percent.
     return {
-      week_num: App.nextWeekNum ? App.nextWeekNum() : 1,
-      period_end: periodEnd,
-      bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
-      food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
-      // Catering: optional third revenue stream for operators who do
-      // off-premise events. Operators who don't cater leave it blank — it
-      // adds zero to totals so it's invisible if unused.
-      catering: { revenue: '', cogs: '', labor: '' },
-      // 3rd-party platform fees (DoorDash, UberEats, Toast Tabs, etc).
-      // Operating cost, NOT part of prime cost or COGS. Sits as its own line
-      // on Books and Year-End. Operators who don't do delivery leave blank.
-      platform_fees: '',
-      notes: ''
+      score: Math.min(100, Math.round(rate * 100)),
+      checks: this.spotChecks().length, items: items.length,
+      flagged, rate, varDollar
     };
   },
-  saveDraft() { try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
-  clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} this.draft = null; },
+  voidSignal() {
+    const vc = this.voidComps();
+    if (vc.length < this.MIN_VOIDS) return { score: null, count: vc.length, insufficient: true };
+    const unauth = vc.filter(r => !r.authorized_by || !String(r.authorized_by).trim()).length;
+    const rate = unauth / vc.length;
+    const total = vc.reduce((t, r) => t + (r.amount || 0), 0);
+    // Risk score = share of voids/comps rung without manager authorization.
+    return {
+      score: Math.min(100, Math.round(rate * 100)),
+      count: vc.length, unauth, rate, total
+    };
+  },
+  cashSignal() {
+    const vars = this.variances();
+    if (vars.length < this.MIN_VARIANCES) return { score: null, count: vars.length, insufficient: true };
+    const shorts = vars.filter(v => v.status === 'Short');
+    const rate = shorts.length / vars.length;
+    const netShort = vars.reduce((t, v) => t + Math.min(0, v.variance || 0), 0);
+    // Risk score = share of drawer reconciliations that came up short.
+    return {
+      score: Math.min(100, Math.round(rate * 100)),
+      count: vars.length, shorts: shorts.length, rate, netShort
+    };
+  },
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Unauthorized large comps. Reads sc_void_comps where auth_threshold_override
+  // is true — meaning the operator saved a Comp over the Hub Settings threshold
+  // without a manager in Authorized By and acknowledged the warning. This is
+  // one of the most common bar-theft patterns (bartender comping a round of
+  // drinks without manager involvement) and the auth override is the explicit
+  // signal that it happened. 90-day window.
+  unauthorizedLargeCompsSignal() {
+    const all = ((App.shiftData && App.shiftData.sc_void_comps) || []);
+    if (all.length === 0) return { score: null, count: 0, total: 0 };
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const flagged = all.filter(r =>
+      r.auth_threshold_override === true && (r.date || '') >= cutoffStr);
+    const total = flagged.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    return {
+      score: flagged.length > 0 ? Math.min(100, flagged.length * 20) : 0,
+      count: flagged.length,
+      total
+    };
+  },
+
+  // Confirmed theft from the Inventory Adjustment log (reason='Theft'). These
+  // are documented losses the operator has already attributed — strongest
+  // signal of all four because there's no inference, just acknowledged events.
+  // 90-day window so the score reflects what's recently happening, not
+  // permanent history from years ago.
+  theftConfirmedSignal() {
+    const all = this.adjustments();
+    if (all.length === 0) return { score: null, count: 0 };
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const recent = all.filter(a => {
+      if (a.reason !== 'Theft') return false;
+      const date = (a.date_time || '').slice(0, 10);
+      return date >= cutoffStr;
+    });
+    const totalValue = recent.reduce((t, a) => t + Math.abs(a.value || 0), 0);
+    // 25 points per confirmed event, capped at 100. Stack value as context.
+    return {
+      score: recent.length > 0 ? Math.min(100, recent.length * 25) : 0,
+      count: recent.length,
+      totalValue
+    };
+  },
+
   render(container, actions) {
     this.container = container;
-    if (actions) actions.innerHTML = '';
-    if (!this.draft) this.draft = this.loadDraft();
-    this.draw();
+    const saved = (App.data && App.data.theft_manual) || {};
+    this._manual = { level: saved.level || '', notes: saved.notes || '' };
+
+    actions.innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.textContent = 'Save Scorecard';
+    btn.addEventListener('click', () => this.save());
+    actions.appendChild(btn);
+    // Quarterly Theft & Loss Brief PDF — single-page summary for owner /
+    // bookkeeper / insurance reviews. Opens a styled HTML page sized for
+    // print, auto-fires window.print() so it saves cleanly as a PDF.
+    const briefBtn = document.createElement('button');
+    briefBtn.className = 'btn btn-ghost btn-sm';
+    briefBtn.textContent = 'Print Theft & Loss Brief';
+    briefBtn.addEventListener('click', () => this.printBrief());
+    actions.appendChild(briefBtn);
+    this.renderMain();
   },
 
-  feedNote(kind) {
-    if (kind === 'cogs') {
-      return this.hasIC()
-        ? 'Auto-filled from Inventory Control. <a href="#" onclick="S.ThisWeek.pullCOGS();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No inventory counts yet, count in Inventory Control, or enter manually.';
-    }
-    if (kind === 'revenue') {
-      return this.hasShifts()
-        ? 'Auto-filled from Shift Control, the weekly sum of logged shift revenue. <a href="#" onclick="S.ThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No shifts logged in Shift Control yet, log shifts there, or enter manually.';
-    }
-    if (kind === 'labor') {
-      return this.hasLabor()
-        ? 'Auto-filled from Labor Control, logged hours costed and split Bar vs Food. <a href="#" onclick="S.ThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No hours logged in Labor Control yet, log hours there, or enter manually.';
-    }
-    return '';
-  },
+  printBrief() {
+    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
+    const confirmed = this.theftConfirmedSignal();
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
+    const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
+    const manScore = this.manualScore(this._manual?.level);
+    let overall;
+    if (autoScore != null && manScore != null) overall = Math.round(autoScore * 0.65 + manScore * 0.35);
+    else if (autoScore != null) overall = autoScore;
+    else if (manScore != null) overall = manScore;
+    else overall = null;
 
-  moneyField(id, label, value, kind) {
-    return '<div class="f w-md"><label>' + label + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">' + this.feedNote(kind) + '</div></div>';
-  },
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Catering: optional third revenue line. Renders the same shape as the Bar
-  // / Food cards but with no Pull Latest links (no Control source feeds
-  // catering numbers — the operator types them) and no target % comparison
-  // (catering margin varies too widely by event type to anchor a single target).
-  cateringCard(data) {
-    const inputRow = (id, label, value) =>
-      '<div class="f w-md"><label>' + label + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">Operator entry. Leave blank if you do not cater.</div></div>';
-    return '<div class="card"><div class="card-title">Catering / Events (optional)</div>'
-      + '<div class="form-row">'
-      + inputRow('tw-cr', 'Catering Revenue', data.revenue)
-      + inputRow('tw-cl', 'Catering Labor',   data.labor)
-      + inputRow('tw-cc', 'Catering COGS',    data.cogs)
+    // 90-day window for the brief — same window the confirmed-theft signal uses.
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const inWindow = (d) => d && String(d).slice(0, 10) >= cutoffStr;
+
+    const recentVCs = this.voidComps().filter(r => inWindow(r.date));
+    const recentVars = this.variances().filter(v => inWindow(v.date));
+    const recentSpots = this.spotChecks().filter(c => inWindow(c.date));
+    const recentAdj = this.adjustments().filter(a => inWindow((a.date_time || '').slice(0, 10)));
+
+    const investigations = (App.data?.variance_investigations || []);
+    const openInv = investigations.filter(i => i.status !== 'resolved');
+    const resolvedInv = investigations.filter(i => i.status === 'resolved' && inWindow(i.resolved_date));
+
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
+      + '<title>' + esc(barName) + ' Theft & Loss Brief, ' + today + '</title>'
+      + '<style>'
+      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
+      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
+      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
+      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
+      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
+      + 'td { padding: 4px 6px; border-bottom: 1px solid #eee; }'
+      + 'td.right { text-align: right; font-variant-numeric: tabular-nums; }'
+      + 'td.bold { font-weight: bold; }'
+      + 'td.muted { color: #666; font-size: 12px; }'
+      + '.score { font-size: 56px; font-weight: 700; line-height: 1; }'
+      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
+      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
+      + '</style></head><body>'
+      + '<h1>' + esc(barName) + ' Theft & Loss Brief<span class="sub">90-day review, generated ' + esc(today) + '</span></h1>'
+      + '<h2>Overall Risk Score</h2>'
+      + '<table><tr><td><div class="score">' + (overall != null ? overall : '-') + '</div></td>'
+      + '<td class="right"><strong>' + esc(this.ratingFor(overall)) + '</strong>'
+      + (autoScore != null ? '<br><span style="color:#666;font-size:11px;">Auto-score ' + autoScore + ' from operational data</span>' : '')
+      + (manScore != null ? '<br><span style="color:#666;font-size:11px;">Manual judgment ' + manScore + '</span>' : '')
+      + '</td></tr></table>'
+
+      + '<h2>Signal Summary</h2>'
+      + '<table>'
+      + '<tr><td>Pour Variance (spot checks)</td><td class="right">' + (pour.score != null ? pour.score : '-') + (pour.flagged ? ' &nbsp;<span style="color:#666;">' + pour.flagged + ' of ' + pour.items + ' flagged</span>' : '') + '</td></tr>'
+      + '<tr><td>Voids & Comps (loss-bearing only)</td><td class="right">' + (voids.score != null ? voids.score : '-') + (voids.count ? ' &nbsp;<span style="color:#666;">' + voids.count + ' loss records, ' + fmt$(voids.total) + '</span>' : '') + '</td></tr>'
+      + '<tr><td>Cash Variance</td><td class="right">' + (cash.score != null ? cash.score : '-') + (cash.count ? ' &nbsp;<span style="color:#666;">' + cash.shorts + ' shorts of ' + cash.count + ' counts, ' + fmt$(Math.abs(cash.netShort)) + ' net short</span>' : '') + '</td></tr>'
+      + '<tr><td>Unauthorized Large Comps</td><td class="right">' + (unauthComps.score != null ? unauthComps.score : '-') + (unauthComps.count ? ' &nbsp;<span style="color:#666;">' + unauthComps.count + ' over threshold without auth, ' + fmt$(unauthComps.total) + '</span>' : '') + '</td></tr>'
+      + '<tr><td>Confirmed Theft (adjustment log)</td><td class="right">' + (confirmed.score != null ? confirmed.score : '-') + (confirmed.count ? ' &nbsp;<span style="color:#666;">' + confirmed.count + ' events, ' + fmt$(confirmed.totalValue) + '</span>' : '') + '</td></tr>'
+      + '</table>'
+
+      + '<h2>90-Day Event Counts</h2>'
+      + '<table>'
+      + '<tr><td>Spot checks run</td><td class="right">' + recentSpots.length + '</td></tr>'
+      + '<tr><td>Voids and comps logged (loss-bearing)</td><td class="right">' + recentVCs.length + '</td></tr>'
+      + '<tr><td>Cash variances logged</td><td class="right">' + recentVars.length + '</td></tr>'
+      + '<tr><td>Inventory adjustments logged</td><td class="right">' + recentAdj.length + '</td></tr>'
+      + '</table>'
+
+      + '<h2>Variance Investigations</h2>'
+      + '<table>'
+      + '<tr><td>Open investigations</td><td class="right">' + openInv.length + '</td></tr>'
+      + '<tr><td>Resolved in window</td><td class="right">' + resolvedInv.length + '</td></tr>'
+      + '</table>'
+      + (openInv.length > 0
+          ? '<p style="font-size:12px;color:#444;margin-top:6px;">Open: ' + openInv.map(i => esc(i.sku || '(unnamed)')).join(', ') + '</p>'
+          : '')
+
+      + '<div class="footer">Generated from your logged Bar Cop data on ' + esc(today) + '. '
+      + 'Bar Cop is a software tool, not a forensic auditor, attorney, or insurance adjuster. '
+      + 'Use this brief as a reference point for your own review; consult the relevant professional before acting on any conclusion.'
       + '</div>'
-      + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Catering Cost %</div><div class="calc-val" id="tw-cpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Catering Labor %</div><div class="calc-val" id="tw-clpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Gross Contribution</div><div class="calc-val" id="tw-ccontrib">-</div></div>'
-      + '</div></div>';
+      + '<script>setTimeout(function(){window.print();}, 300);</script>'
+      + '</body></html>';
+
+    const w = window.open('', '_blank');
+    if (!w) { alert('Pop-up blocked. Allow pop-ups for Bar Cop and try again.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
   },
 
-  sectionCard(title, prefix, data) {
-    return '<div class="card"><div class="card-title">' + title + '</div>'
-      + '<div class="form-row">'
-      + this.moneyField('tw-' + prefix + 'r', title + ' Revenue ' + tt('bar-revenue'), data.revenue, 'revenue')
-      + this.moneyField('tw-' + prefix + 'l', title + ' Labor ' + tt('bar-labor'), data.labor, 'labor')
-      + this.moneyField('tw-' + prefix + 'c', title + ' COGS ' + tt('bar-cogs'), data.cogs, 'cogs')
-      + '</div>'
-      + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">' + title + ' Cost %</div><div class="calc-val" id="tw-' + prefix + 'pct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">' + title + ' Labor %</div><div class="calc-val" id="tw-' + prefix + 'lpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target %</div><div class="calc-val" id="tw-' + prefix + 'vpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target $</div><div class="calc-val" id="tw-' + prefix + 'vdol">-</div></div>'
-      + '</div></div>';
-  },
+  /* Guided Variance Investigation (Section 10) — the Fix System's 6-step
+     variance process as a trackable workflow on a flagged product. */
+  VARIANCE_STEPS: [
+    { title: 'Verify the count',
+      detail: 'Pull the product count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error.' },
+    { title: 'Calculate theoretical usage',
+      detail: 'POS sales by drink type times recipe ounces, compared against the actual ounce movement from the count.' },
+    { title: 'Identify the shifts',
+      detail: 'Use the opening and closing counts to find which shifts the variance landed on.' },
+    { title: 'Talk to the bar manager',
+      detail: 'Ask what they noticed on those shifts: breakage, waste, comps, or unusual activity.' },
+    { title: 'Run a mid-shift count',
+      detail: 'Run an unannounced mid-shift count on the flagged product during a service period.' },
+    { title: 'Document the finding',
+      detail: 'Write down the finding and the resolution before closing, even when it is inconclusive.' }
+  ],
 
-  draw() {
-    const d = this.draft;
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title">Period</div>'
-      + '<div class="form-row">'
-      + '<div class="f" style="width:100px;"><label>Week # ' + tt('tw-week-num') + '</label><input type="number" id="tw-wk" value="' + esc(String(d.week_num)) + '" min="1" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div class="f" style="width:160px;"><label>Period End Date ' + tt('tw-period-end') + '</label><input type="date" id="tw-end" value="' + esc(d.period_end) + '" oninput="S.ThisWeek.onInput()"/></div>'
-      + '</div></div>'
-      + this.sectionCard('Bar', 'b', d.bar)
-      + this.sectionCard('Food', 'f', d.food)
-      + this.cateringCard(d.catering || { revenue: '', cogs: '', labor: '' })
-      + '<div class="card"><div class="card-title">Other Operating Costs</div>'
-      + '<div class="form-row">'
-      + '<div class="f w-md"><label>3rd-Party Platform Fees</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">DoorDash, UberEats, Toast Tabs, or any platform fee for the week. Sits as its own operating expense line on Books and Year-End.</div>'
-      + '</div></div></div>'
-      + '<div class="card"><div class="card-title">Review</div>'
-      + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="tw-totrev">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Forecast</div><div class="calc-val" id="tw-fcst">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val" id="tw-fcgap">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Prime Cost %</div><div class="calc-val" id="tw-prime">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + (App.data.settings.targets?.prime_cost_pct ?? 60) + '%</div></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label><textarea id="tw-notes" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary btn-lg" id="tw-save">Save Week</button>'
-      + '<span id="tw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+  _inv(id) { return (App.data.variance_investigations || []).find(x => x.id === id); },
 
-    document.getElementById('tw-save')?.addEventListener('click', () => this.saveWeek());
-    this.calc();
-  },
-
-  onInput() {
-    this.collect();
-    this.saveDraft();
-    this.calc();
-  },
-
-  collect() {
-    const v = id => document.getElementById(id)?.value ?? '';
-    const d = this.draft;
-    d.week_num = v('tw-wk'); d.period_end = v('tw-end');
-    d.bar.revenue = v('tw-br'); d.bar.cogs = v('tw-bc'); d.bar.labor = v('tw-bl');
-    d.food.revenue = v('tw-fr'); d.food.cogs = v('tw-fc'); d.food.labor = v('tw-fl');
-    if (!d.catering) d.catering = { revenue: '', cogs: '', labor: '' };
-    d.catering.revenue = v('tw-cr'); d.catering.cogs = v('tw-cc'); d.catering.labor = v('tw-cl');
-    d.platform_fees = v('tw-pf');
-    d.notes = v('tw-notes');
-  },
-
-  // True when the operator has typed a value that meaningfully differs from
-  // what Control wants to pull in. 50-cent tolerance avoids false alarms on
-  // floating-point noise.
-  _isOverride(id, incoming) {
-    const cur = parseFloat(document.getElementById(id)?.value);
-    if (isNaN(cur) || cur === 0) return false;
-    const inc = parseFloat(incoming);
-    if (isNaN(inc)) return false;
-    return Math.abs(cur - inc) > 0.5;
-  },
-  async _confirmOverride(title, message) {
-    return App.confirm({ title, message, confirmText: 'Overwrite', cancelText: 'Keep Mine' });
-  },
-
-  async pullCOGS() {
-    const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
-    const incoming = {};
-    if (bc != null) incoming['tw-bc'] = bc;
-    if (fc != null) incoming['tw-fc'] = fc;
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
-    if (conflicted) {
-      const ok = await this._confirmOverride(
-        'Overwrite your COGS numbers?',
-        'Your typed Bar or Food COGS don\'t match what Inventory Control just computed. Pulling latest will replace them.'
-      );
-      if (!ok) return;
+  // Live data for a specific product, pulled from the same Control sources
+  // the Variance Report uses. Returns { step2, step3 } HTML strings, or empty
+  // strings when no product_id (legacy free-text investigations).
+  investigationLiveData(productId) {
+    if (!productId) {
+      return { step2: '<div style="font-size:11px;color:var(--t4);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">Open a new investigation from the dropdown above to wire live count + spot-check data into this step.</div>', step3: '' };
     }
-    if (bc != null) { const el = document.getElementById('tw-bc'); if (el) el.value = bc.toFixed(2); }
-    if (fc != null) { const el = document.getElementById('tw-fc'); if (el) el.value = fc.toFixed(2); }
-    this.onInput();
-  },
+    const p = this.productById(productId);
+    if (!p) return { step2: '', step3: '' };
 
-  async pullRevenue() {
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
-    const sr = this.shiftRevenue(pe);
-    if (!sr) return;
-    const incoming = { 'tw-br': sr.bar, 'tw-fr': sr.food };
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
-    if (conflicted) {
-      const ok = await this._confirmOverride(
-        'Overwrite your revenue numbers?',
-        'Your typed Bar or Food revenue don\'t match Shift Control. Pulling latest will replace them.'
-      );
-      if (!ok) return;
-    }
-    const br = document.getElementById('tw-br'); if (br) br.value = sr.bar.toFixed(2);
-    const fr = document.getElementById('tw-fr'); if (fr) fr.value = sr.food.toFixed(2);
-    this.onInput();
-  },
-
-  async pullLabor() {
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
-    const lc = this.laborCost(pe);
-    if (!lc) return;
-    const incoming = { 'tw-bl': lc.bar, 'tw-fl': lc.food };
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
-    if (conflicted) {
-      const ok = await this._confirmOverride(
-        'Overwrite your labor numbers?',
-        'Your typed Bar or Food labor don\'t match Labor Control. Pulling latest will replace them.'
-      );
-      if (!ok) return;
-    }
-    const bl = document.getElementById('tw-bl'); if (bl) bl.value = lc.bar.toFixed(2);
-    const fl = document.getElementById('tw-fl'); if (fl) fl.value = lc.food.toFixed(2);
-    this.onInput();
-  },
-
-  calc() {
-    const num = id => parseFloat(document.getElementById(id)?.value) || 0;
-    const t = App.data.settings.targets || {};
-    const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
-
-    const section = (prefix, target) => {
-      const rev = num('tw-' + prefix + 'r'), cogs = num('tw-' + prefix + 'c'), labor = num('tw-' + prefix + 'l');
-      const pct = rev > 0 ? cogs / rev * 100 : null;
-      const lpct = rev > 0 ? labor / rev * 100 : null;
-      const vp = pct != null ? pct - target : null;
-      const vd = pct != null ? ((pct - target) / 100) * rev : null;
-      set('tw-' + prefix + 'pct', pct != null ? App.fmtPct(pct) : '-', pct != null ? (pct > target ? 'warn' : 'good') : '');
-      set('tw-' + prefix + 'lpct', lpct != null ? App.fmtPct(lpct) : '-');
-      set('tw-' + prefix + 'vpct', vp != null ? (vp > 0 ? '+' : '') + App.fmtPct(vp) : '-', vp != null ? (vp > 0 ? 'warn' : 'good') : '');
-      set('tw-' + prefix + 'vdol', vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-', vd != null ? (vd > 0 ? 'warn' : 'good') : '');
-    };
-    section('b', t.bar_pour_cost_pct ?? 22);
-    section('f', t.food_cost_pct ?? 32);
-
-    // Catering tile math: read-only display, doesn't anchor a target since
-    // catering margin varies too widely by event type.
-    const cr = num('tw-cr'), cc = num('tw-cc'), cl = num('tw-cl');
-    const cpct = cr > 0 ? cc / cr * 100 : null;
-    const clpct = cr > 0 ? cl / cr * 100 : null;
-    const ccontrib = cr - cc - cl;
-    set('tw-cpct',    cpct  != null ? App.fmtPct(cpct)  : '-');
-    set('tw-clpct',   clpct != null ? App.fmtPct(clpct) : '-');
-    set('tw-ccontrib', cr > 0 ? App.fmtCurrency(ccontrib) : '-', cr > 0 ? (ccontrib >= 0 ? 'good' : 'warn') : '');
-
-    // Catering revenue rolls into Total Revenue; catering COGS + labor roll
-    // into prime cost since they're real product + payroll cost. Platform
-    // fees do NOT roll into prime — they're shown as a separate operating
-    // expense line on Books and Year-End.
-    const tRev = num('tw-br') + num('tw-fr') + cr;
-    const tCost = num('tw-bc') + num('tw-fc') + num('tw-bl') + num('tw-fl') + cc + cl;
-    const prime = tRev > 0 ? tCost / tRev * 100 : null;
-    const pTarget = t.prime_cost_pct ?? 60;
-    set('tw-totrev', tRev > 0 ? App.fmtCurrency(tRev) : '-');
-    // Forecast vs actual: read this week's forecast keyed by week_start
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
-    const fc = (pe && App.forecastForWeek) ? App.forecastForWeek(pe) : null;
-    const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
-    set('tw-fcst', fcTotal > 0 ? App.fmtCurrency(fcTotal) : '-', fcTotal > 0 ? 'dim' : '');
-    const fcGap = fcTotal > 0 && tRev > 0 ? tRev - fcTotal : null;
-    set('tw-fcgap', fcGap != null ? (fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap) : '-', fcGap != null ? (fcGap >= 0 ? 'good' : 'warn') : '');
-    set('tw-prime', prime != null ? App.fmtPct(prime) : '-', prime != null ? (prime > pTarget ? 'warn' : 'good') : '');
-  },
-
-  async saveWeek() {
-    this.collect();
-    const d = this.draft;
-    const err = document.getElementById('tw-err');
-    const numF = v => parseFloat(v) || 0;
-    const bRev = numF(d.bar.revenue), bCogs = numF(d.bar.cogs), bLab = numF(d.bar.labor);
-    const fRev = numF(d.food.revenue), fCogs = numF(d.food.cogs), fLab = numF(d.food.labor);
-    const cRev = numF(d.catering?.revenue), cCogs = numF(d.catering?.cogs), cLab = numF(d.catering?.labor);
-    const pFees = numF(d.platform_fees);
-    if (bRev + fRev + cRev === 0) {
-      if (err) { err.textContent = 'Enter at least one revenue figure before saving.'; err.style.display = 'inline'; }
-      return;
-    }
-    const t = App.data.settings.targets || {};
-    const bTarget = t.bar_pour_cost_pct ?? 22, fTarget = t.food_cost_pct ?? 32;
-    const tRev = bRev + fRev + cRev;
-    const tCost = bCogs + fCogs + bLab + fLab + cCogs + cLab;
-    const bPct = bRev > 0 ? bCogs / bRev * 100 : 0;
-    const fPct = fRev > 0 ? fCogs / fRev * 100 : 0;
-
-    const week = {
-      id: App.uid(),
-      week_num: parseInt(d.week_num) || 1,
-      period_end: d.period_end,
-      saved_at: new Date().toISOString(),
-      bar: {
-        revenue: bRev, cogs: bCogs, labor: bLab, cost_pct: bPct,
-        labor_pct: bRev > 0 ? bLab / bRev * 100 : 0,
-        vs_target_pct: bPct - bTarget, vs_target_dollar: ((bPct - bTarget) / 100) * bRev
-      },
-      food: {
-        revenue: fRev, cogs: fCogs, labor: fLab, cost_pct: fPct,
-        labor_pct: fRev > 0 ? fLab / fRev * 100 : 0,
-        vs_target_pct: fPct - fTarget, vs_target_dollar: ((fPct - fTarget) / 100) * fRev
-      },
-      catering: {
-        revenue: cRev, cogs: cCogs, labor: cLab,
-        cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0,
-        labor_pct: cRev > 0 ? cLab / cRev * 100 : 0
-      },
-      platform_fees: pFees,
-      prime_cost_pct: tRev > 0 ? tCost / tRev * 100 : 0,
-      notes: d.notes || ''
-    };
-
-    if (!App.data.weeks) App.data.weeks = [];
-    App.data.weeks.push(week);
-    const btn = document.getElementById('tw-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveKey('weeks');
-    if (ok) {
-      this.clearDraft();
-      if (App.updatePeriod) App.updatePeriod();
-      App.markSetupDone('gs_p_week');
-      App.navigate('dashboard');
+    // Step 2 — theoretical vs actual usage from the latest two ic_counts
+    // bracket + deliveries between them. Same math the Usage Report uses.
+    const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).slice()
+      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+    let step2Html = '';
+    if (counts.length >= 2) {
+      const start = counts[counts.length - 2], end = counts[counts.length - 1];
+      const si = (start.items || []).find(it => it.product_id === productId);
+      const ei = (end.items || []).find(it => it.product_id === productId);
+      if (si && ei) {
+        let purch = 0;
+        ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
+          .filter(d => d.date > start.date && d.date <= end.date)
+          .forEach(d => (d.line_items || []).forEach(li => {
+            if (li.product_id === productId) purch += (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (li.qty || 0));
+          }));
+        const used = (si.total || 0) + purch - (ei.total || 0);
+        // Bottle beer is counted in cases (case_size servings/case); other
+        // categories pour pours_per_container servings per container.
+        const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
+        const pp = isCaseBeer ? p.case_size
+          : (p.pours_per_container || (p.container_size_oz && p.pour_size_oz ? p.container_size_oz / p.pour_size_oz : 0));
+        const actualPours = used * pp;
+        const cost = (App.unitCost ? App.unitCost(p) : (p.unit_cost || 0)) || 0;
+        const actualDollars = used * cost;
+        step2Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
+          + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Live Data &middot; ' + esc(start.date) + ' to ' + esc(end.date) + '</div>'
+          + '<div>Used: <strong>' + used.toFixed(2) + ' containers</strong> (' + actualPours.toFixed(1) + ' pours, ' + App.fmtCurrency(actualDollars) + ')</div>'
+          + '<div style="color:var(--t3);margin-top:4px;">Starting count ' + (si.total || 0).toFixed(2) + ' + purchases ' + purch.toFixed(2) + ' - ending count ' + (ei.total || 0).toFixed(2) + '</div>'
+          + '<div style="color:var(--t3);margin-top:4px;">Compare against your POS pours sold for the same window. Variance Report in Inventory Control has the full POS-match math when you upload sales data.</div>'
+          + '</div>';
+      } else {
+        step2Html = '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">This product was not counted on both of the last two inventories. Run a count in Inventory Control to populate the math here.</div>';
+      }
     } else {
-      App.data.weeks.pop();
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Week'; }
-      if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+      step2Html = '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">Need two inventory counts to compute usage. Run a count in Inventory Control.</div>';
     }
+
+    // Step 3 — recent spot checks where this product was flagged. Helps the
+    // operator narrow which shifts the variance landed on.
+    const recentSpots = this.spotChecks().slice()
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map(c => {
+        const item = (c.items || []).find(i => i.product_id === productId);
+        if (!item) return null;
+        return { date: c.date, shift: c.shift, checked_by: c.checked_by, item };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+    let step3Html = '';
+    if (recentSpots.length) {
+      const rows = recentSpots.map(s => {
+        const flag = s.item.flagged ? '<span style="color:var(--red);font-weight:700;">FLAGGED</span>' : '<span style="color:var(--t3);">ok</span>';
+        const vd = s.item.variance_dollar != null ? App.fmtCurrency(s.item.variance_dollar) : '-';
+        return '<div style="display:flex;gap:10px;padding:4px 0;font-size:11px;border-bottom:1px solid var(--b2);">'
+          + '<span style="color:var(--t2);width:100px;">' + esc(s.date) + '</span>'
+          + '<span style="color:var(--t3);width:90px;">' + esc(s.shift || '-') + '</span>'
+          + '<span style="color:var(--t3);flex:1;">' + esc(s.checked_by || '-') + '</span>'
+          + '<span style="width:80px;text-align:right;color:' + (s.item.flagged ? 'var(--red)' : 'var(--t2)') + ';">' + vd + '</span>'
+          + '<span style="width:80px;text-align:right;">' + flag + '</span>'
+          + '</div>';
+      }).join('');
+      step3Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
+        + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Recent Spot Checks for This Product</div>'
+        + rows
+        + '</div>';
+    }
+    return { step2: step2Html, step3: step3Html };
+  },
+
+  // Paper worksheet operator can walk the back-bar with, then enter findings
+  // into Bar Cop after. Same paper-to-digital pattern as the Shift Control logs.
+  printBlankInvestigation() {
+    App.printBlankSheet({
+      title: 'Variance Investigation Worksheet',
+      subtitle: 'Work the six steps in order on a single flagged product. Manager enters findings into Bar Cop after.',
+      columns: [
+        { label: 'Step',         width: '8%'  },
+        { label: 'Task',         width: '32%' },
+        { label: 'What You Did', width: '30%' },
+        { label: 'Finding',      width: '30%' }
+      ],
+      rows: 6
+    });
+  },
+
+  investigationsCard() {
+    const invs = App.data.variance_investigations || [];
+    const open = invs.filter(i => i.status !== 'resolved');
+    const resolved = invs.filter(i => i.status === 'resolved');
+    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;'
+      + 'color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
+
+    // Build the product dropdown grouped by category (Liquor, Wine, Beer first).
+    const prods = this.products();
+    const catOrder = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const cats = [...new Set(prods.map(p => p.category || 'Other'))]
+      .sort((a, b) => {
+        const ia = catOrder.indexOf(a), ib = catOrder.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+    let productOpts = '<option value="">Pick a product to investigate...</option>';
+    cats.forEach(cat => {
+      productOpts += '<optgroup label="' + esc(cat) + '">';
+      prods.filter(p => (p.category || 'Other') === cat)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .forEach(p => {
+          productOpts += '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
+        });
+      productOpts += '</optgroup>';
+    });
+
+    let html = '<div class="card"><div class="card-title">Variance Investigations</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
+      + 'When a product shows unexplained variance, open an investigation and work the six steps in order. '
+      + 'It keeps the process honest and leaves a record.</div>'
+      + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:14px;">'
+      + '<div class="f" style="width:280px;"><label>Flagged Product</label>'
+      + '<select class="vi-product-select" style="' + inputStyle + 'width:100%;height:38px;">' + productOpts + '</select></div>'
+      + '<button class="btn btn-primary vi-open-btn">Open Investigation</button>'
+      + '<button class="btn btn-ghost btn-sm vi-print-blank" style="margin-left:auto;">Print Blank Worksheet</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:18px;line-height:1.5;">'
+      + 'Tip: a flagged Spot Check in Inventory Control can open an investigation pre-filled for you. Look for the Investigate button on the spot check detail.'
+      + '</div>';
+
+    open.forEach(inv => {
+      const doneN = inv.steps.filter(s => s.done).length;
+      html += '<div style="border:1px solid var(--b1);border-radius:4px;padding:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<span style="font-size:13px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(inv.sku) + '</span>'
+        + '<span style="font-size:11px;color:var(--t3);">opened ' + esc(inv.opened_date) + '</span>'
+        + '<span style="font-size:11px;font-weight:700;color:var(--gold);margin-left:auto;">' + doneN + ' of 6 steps</span>'
+        + '</div>';
+      // Live data block for Step 2 (theoretical vs actual) and Step 3 (recent
+      // spot checks) — only shows when the investigation is linked to a real
+      // product_id (which the spot-check entry path + the new dropdown both
+      // capture). Closes the orphan where Step 2 used to be "operator does
+      // the math by hand."
+      const liveData = this.investigationLiveData(inv.product_id);
+      inv.steps.forEach((s, idx) => {
+        const st = this.VARIANCE_STEPS[idx];
+        let extra = '';
+        if (idx === 1 && liveData.step2) extra = liveData.step2;  // theoretical vs actual
+        if (idx === 2 && liveData.step3) extra = liveData.step3;  // shift attribution
+        html += '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);">'
+          + '<input type="checkbox" class="vi-step-check" data-inv="' + inv.id + '" data-step="' + idx + '"'
+          + (s.done ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;width:15px;height:15px;accent-color:var(--gold);"/>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:12px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+          + (idx + 1) + '. ' + esc(st.title) + '</div>'
+          + '<div style="font-size:11px;color:var(--t3);line-height:1.55;margin:3px 0 6px;">' + esc(st.detail) + '</div>'
+          + extra
+          + '<input type="text" class="vi-finding" data-inv="' + inv.id + '" data-step="' + idx + '" '
+          + 'value="' + esc(s.finding) + '" placeholder="What you found" style="' + inputStyle + 'width:100%;"/>'
+          + '</div></div>';
+      });
+      html += '<div style="margin-top:12px;">'
+        + '<label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
+        + '<textarea class="vi-resolution" data-inv="' + inv.id + '" rows="2" '
+        + 'placeholder="The conclusion, even if inconclusive" style="' + inputStyle + 'width:100%;margin-top:5px;resize:vertical;">'
+        + esc(inv.resolution || '') + '</textarea>'
+        + '<div style="display:flex;gap:10px;margin-top:10px;">'
+        + '<button class="btn btn-primary btn-sm vi-resolve-btn" data-inv="' + inv.id + '">Resolve and Close</button>'
+        + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
+        + '</div></div></div>';
+    });
+    if (!open.length) {
+      html += '<div style="font-size:12px;color:var(--t4);">No open investigations.</div>';
+    }
+
+    if (resolved.length) {
+      html += '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 8px;">Resolved</div>'
+        + resolved.slice().reverse().map(inv =>
+          '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
+          + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-top:5px;"></span>'
+          + '<div style="flex:1;min-width:0;"><span style="font-weight:700;color:var(--t1);">' + esc(inv.sku) + '</span> '
+          + '<span style="color:var(--t3);">resolved ' + esc(inv.resolved_date || '') + '</span>'
+          + (inv.resolution ? '<div style="color:var(--t2);line-height:1.55;margin-top:2px;">' + esc(inv.resolution) + '</div>' : '')
+          + '</div>'
+          + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
+          + '</div>').join('');
+    }
+    return html + '</div>';
+  },
+
+  renderMain() {
+    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
+    const confirmed = this.theftConfirmedSignal();
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
+    const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
+    const manScore = this.manualScore(this._manual.level);
+
+    let overall;
+    if (autoScore != null && manScore != null) overall = Math.round(autoScore * 0.65 + manScore * 0.35);
+    else if (autoScore != null) overall = autoScore;
+    else if (manScore != null) overall = manScore;
+    else overall = null;
+
+    // ── Headline score ──
+    const sc = this.scoreClass(overall);
+    const scoreCard = '<div class="card"><div class="card-title">Theft Risk Score</div>'
+      + '<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;">'
+      + '<div style="font-family:\'Barlow Condensed\';font-size:52px;font-weight:600;line-height:1;color:'
+      + (sc === 'good' ? 'var(--gold)' : sc === 'warn' ? 'var(--red)' : 'var(--w)') + ';">'
+      + (overall != null ? overall : '-') + '</div>'
+      + '<div><div style="font-size:13px;font-weight:800;color:'
+      + (sc === 'good' ? 'var(--gold)' : sc === 'warn' ? 'var(--red)' : 'var(--t2)') + ';text-transform:uppercase;letter-spacing:1px;">'
+      + esc(this.ratingFor(overall)) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">0 = strong controls &middot; 100 = high risk'
+      + (autoScore != null ? ' &middot; auto-score ' + autoScore + ' from operational data' : '')
+      + (manScore != null ? ' &middot; manual judgment ' + manScore : '') + '</div></div>'
+      + '</div></div>';
+
+    // ── Signal cards ──
+    const signalCard = (title, sig, body) => {
+      const cls = this.scoreClass(sig.score);
+      const scoreTxt = sig.score != null ? sig.score : '-';
+      return '<div class="card"><div class="card-title">' + title + '</div>'
+        + '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">'
+        + '<div style="font-family:\'Barlow Condensed\';font-size:34px;font-weight:600;color:'
+        + (cls === 'good' ? 'var(--gold)' : cls === 'warn' ? 'var(--red)' : 'var(--t3)') + ';min-width:54px;">' + scoreTxt + '</div>'
+        + '<div style="flex:1;min-width:200px;font-size:12px;color:var(--t2);line-height:1.6;">' + body + '</div>'
+        + '</div></div>';
+    };
+
+    const pourBody = pour.score == null
+      ? 'No spot checks logged yet. Run spot checks in Inventory Control to score pour variance.'
+      : pour.flagged + ' of ' + pour.items + ' checked products flagged across ' + pour.checks
+        + ' spot check' + (pour.checks === 1 ? '' : 's') + '. '
+        + App.fmtCurrency(pour.varDollar) + ' of unexplained pour variance. '
+        + (pour.rate > 0.25 ? 'A high flag rate points to over-pouring or product walking out.'
+           : 'Flag rate is contained.');
+    const voidBody = voids.score == null
+      ? 'No voids or comps logged yet. Shift Control\'s Void and Comp Log feeds this signal.'
+      : voids.unauth + ' of ' + voids.count + ' voids/comps had no authorizing manager recorded. '
+        + App.fmtCurrency(voids.total) + ' in total voids and comps. '
+        + (voids.rate > 0.3 ? 'Unauthorized voids are the most common theft vector. Require manager sign-off.'
+           : 'Most voids and comps are authorized.');
+    const cashBody = cash.score == null
+      ? 'No cash variances logged yet. Shift Control\'s Variance Log feeds this signal.'
+      : cash.shorts + ' of ' + cash.count + ' drawer counts came up short. '
+        + App.fmtCurrency(Math.abs(cash.netShort)) + ' net shortage. '
+        + (cash.rate > 0.3 ? 'Repeated shortages from the same drawers or cashiers warrant a closer look.'
+           : 'Shortage rate is within a normal range.');
+
+    const confirmedBody = confirmed.score == null
+      ? 'No inventory adjustments logged yet. Documented theft events from the Adjustment Log feed this signal directly.'
+      : confirmed.count === 0
+        ? 'No theft events logged in the last 90 days. Adjustments with other reasons (damage, expiration, found) do not score here.'
+        : confirmed.count + ' confirmed theft event' + (confirmed.count === 1 ? '' : 's')
+          + ' logged in the last 90 days, totaling ' + App.fmtCurrency(confirmed.totalValue) + '. '
+          + (confirmed.count >= 3 ? 'Multiple confirmed events points to an ongoing problem, not a one-off.'
+             : 'Documented but contained. Keep an eye on whether it repeats.');
+
+    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
+    const thresholdLabel = (!isNaN(threshold) && threshold > 0) ? '$' + threshold : 'your threshold';
+    const unauthBody = unauthComps.score == null
+      ? 'No void/comp records logged yet. Setting a Comp Auth Threshold in Hub Settings enables this signal.'
+      : unauthComps.count === 0
+        ? 'No unauthorized large comps in the last 90 days. Every comp over ' + thresholdLabel + ' had a manager in the Authorized By field, which is what you want.'
+        : unauthComps.count + ' comp' + (unauthComps.count === 1 ? '' : 's')
+          + ' over ' + thresholdLabel + ' filed in the last 90 days without manager authorization, totaling ' + App.fmtCurrency(unauthComps.total) + '. '
+          + (unauthComps.count >= 3 ? 'A pattern of unauthorized large comps is one of the most common bar-theft vectors. Tighten the rule.'
+             : 'One instance can be a busy night. Repeats are a pattern.');
+
+    const signals = signalCard('Pour Variance &middot; Spot Checks', pour, pourBody)
+      + signalCard('Voids &amp; Comps', voids, voidBody)
+      + signalCard('Cash Variance', cash, cashBody)
+      + signalCard('Unauthorized Large Comps', unauthComps, unauthBody)
+      + signalCard('Confirmed Theft &middot; Adjustment Log', confirmed, confirmedBody);
+
+    // ── Manual judgment ──
+    const levelOpts = '<option value="">No manual judgment</option>'
+      + this.MANUAL_LEVELS.map(m => '<option' + (this._manual.level === m.label ? ' selected' : '') + '>' + m.label + '</option>').join('');
+    const manualCard = '<div class="card"><div class="card-title">Manual Judgment</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
+      + 'Operational data does not see everything. Add your own read on cameras, policies, staffing, and '
+      + 'staff behavior. It is blended into the overall score.</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Your Assessment</label>'
+      + '<select id="tr-manual">' + levelOpts + '</select></div></div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="tr-notes" rows="2" placeholder="What concerns you, or what controls are working">'
+      + esc(this._manual.notes) + '</textarea></div></div>'
+      + '<div id="tr-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;">Scorecard saved.</div>'
+      + '</div>';
+
+    // ── History ──
+    const hist = (App.data.theft_scores || []).slice(-6).reverse();
+    let histCard = '';
+    if (hist.length) {
+      const rows = hist.map(s => {
+        const ov = s.overall != null ? s.overall : s.total;
+        const cls = this.scoreClass(ov);
+        return '<tr><td>' + (s.date ? String(s.date).slice(0, 10) : '-') + '</td>'
+          + '<td class="' + (cls === 'good' ? 'pos' : cls === 'warn' ? 'neg' : '') + ' val">' + (ov != null ? ov : '-') + '</td>'
+          + '<td>' + esc(s.rating || '-') + '</td></tr>';
+      }).join('');
+      histCard = '<div class="card"><div class="card-title">Recent Scorecards</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Score</th><th>Rating</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + scoreCard + signals + manualCard
+      + this.investigationsCard() + histCard + '</div>';
+
+    document.getElementById('tr-manual')?.addEventListener('change', e => {
+      this._manual.notes = document.getElementById('tr-notes')?.value || '';
+      this._manual.level = e.target.value;
+      this.renderMain();
+    });
+    document.getElementById('tr-notes')?.addEventListener('input', e => {
+      this._manual.notes = e.target.value;
+    });
+
+    // ── Variance investigation wiring ──
+    this.container.querySelectorAll('.vi-open-btn').forEach(b => b.addEventListener('click', () => {
+      const sel = this.container.querySelector('.vi-product-select');
+      const productId = sel && sel.value;
+      if (!productId) { if (sel) sel.style.borderColor = 'var(--red)'; return; }
+      const p = this.productById(productId);
+      const sku = (p && p.name) || productId;
+      App.data.variance_investigations = App.data.variance_investigations || [];
+      App.data.variance_investigations.push({
+        id: App.uid(),
+        product_id: productId,
+        sku,
+        opened_date: new Date().toISOString().slice(0, 10),
+        status: 'open',
+        steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })),
+        resolution: ''
+      });
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelector('.vi-print-blank')?.addEventListener('click', () => this.printBlankInvestigation());
+    this.container.querySelectorAll('.vi-step-check').forEach(c => c.addEventListener('change', () => {
+      const inv = this._inv(c.dataset.inv); if (!inv) return;
+      inv.steps[+c.dataset.step].done = c.checked;
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-finding').forEach(i => i.addEventListener('change', () => {
+      const inv = this._inv(i.dataset.inv); if (!inv) return;
+      inv.steps[+i.dataset.step].finding = i.value;
+      App.saveKey('variance_investigations');
+    }));
+    this.container.querySelectorAll('.vi-resolution').forEach(t => t.addEventListener('change', () => {
+      const inv = this._inv(t.dataset.inv); if (!inv) return;
+      inv.resolution = t.value;
+      App.saveKey('variance_investigations');
+    }));
+    this.container.querySelectorAll('.vi-resolve-btn').forEach(b => b.addEventListener('click', () => {
+      const inv = this._inv(b.dataset.inv); if (!inv) return;
+      const ta = this.container.querySelector('.vi-resolution[data-inv="' + inv.id + '"]');
+      if (ta) inv.resolution = ta.value;
+      inv.status = 'resolved';
+      inv.resolved_date = new Date().toISOString().slice(0, 10);
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+    this.container.querySelectorAll('.vi-remove').forEach(b => b.addEventListener('click', () => {
+      App.data.variance_investigations = (App.data.variance_investigations || []).filter(x => x.id !== b.dataset.inv);
+      App.saveKey('variance_investigations');
+      this.renderMain();
+    }));
+  },
+
+  async save() {
+    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
+    const confirmed = this.theftConfirmedSignal();
+    const unauthComps = this.unauthorizedLargeCompsSignal();
+    const autoScores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
+    const autoScore = autoScores.length ? Math.round(autoScores.reduce((a, b) => a + b, 0) / autoScores.length) : null;
+    const manScore = this.manualScore(this._manual.level);
+    let overall;
+    if (autoScore != null && manScore != null) overall = Math.round(autoScore * 0.65 + manScore * 0.35);
+    else if (autoScore != null) overall = autoScore;
+    else if (manScore != null) overall = manScore;
+    else overall = null;
+
+    App.data.theft_manual = { level: this._manual.level, notes: this._manual.notes };
+    if (!App.data.theft_scores) App.data.theft_scores = [];
+    App.data.theft_scores.push({
+      id: App.uid(),
+      date: new Date().toISOString(),
+      auto_score: autoScore,
+      signals: { pour: pour.score, voids: voids.score, cash: cash.score, confirmed: confirmed.score, unauthComps: unauthComps.score },
+      manual_level: this._manual.level,
+      manual_score: manScore,
+      notes: this._manual.notes,
+      overall,
+      rating: this.ratingFor(overall)
+    });
+    App.data.last_theft_score_date = new Date().toISOString();
+
+    await App.saveKey('theft_manual');
+    await App.saveKey('theft_scores');
+    await App.saveKey('last_theft_score_date');
+    const m = document.getElementById('tr-msg');
+    if (m) { m.style.display = 'block'; setTimeout(() => { if (m) m.style.display = 'none'; }, 2500); }
+    this.renderMain();
   }
 };
