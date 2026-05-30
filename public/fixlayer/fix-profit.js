@@ -13,7 +13,7 @@ FIX.profit = [
     id: 'pour-cost',
     name: 'Pour Cost',
     module: 'profit',
-    summary: 'The gap between what you spent on bar product and what you sold.',
+    summary: 'The gap between what you spent on bar product and what you sold, including the draft beer lost to foam, over-pour, and line cleaning.',
 
     process: {
       steps: [
@@ -45,7 +45,8 @@ FIX.profit = [
       'Estimating partial bottles by eye instead of measuring them. A back bar with 40 open bottles builds a real error into every calculation.',
       'Letting the count slip when a manager is out. The system dies from a missed cycle, not a bad number. Write the process down so it lives in paper, not people.',
       'Starting a variance investigation with a conversation instead of the data. Verify the count first. Many spikes turn out to be a counting error, not a person.',
-      'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.'
+      'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.',
+      'Ignoring draft yield. The Profit Audit compares units sold against what your kegs should have poured. Losing more than 12 to 15 percent to foam and over-pour means the lines, the temperature, the pressure, or the pour are off. A keg that should pour 124 pints and only rings up 100 is a quarter of every keg gone.'
     ]
   },
 
@@ -53,7 +54,7 @@ FIX.profit = [
     id: 'theft-loss',
     name: 'Theft and Loss',
     module: 'profit',
-    summary: 'Cash, product, and comp loss that never shows as a line item.',
+    summary: 'Cash, product, and comp loss that never shows as a line item, including discount abuse and no-sale drawer opens.',
 
     process: {
       steps: [
@@ -90,6 +91,7 @@ FIX.profit = [
       'Skipping the delivery inspection when the truck arrives mid-service. That is exactly when short counts happen and are hardest to dispute later.',
       'Having no written comp authorization policy. A comp that needs no manager sign-off is an unauthorized expense you approved by silence.',
       'Treating all comps the same. A manager comp for service recovery and a bartender comp for a regular are different things and must be tracked separately.',
+      'Ignoring discounts and no-sale opens. The Profit Audit reads both off your POS exception report. Discounts running above 2 percent of sales, or a stack of no-sale drawer opens, are theft vectors that never show as voids or comps. Require manager authorization on discounts and a logged reason for every no-sale.',
       'Using behavioral indicators to accuse someone. They direct attention. They are not evidence.'
     ]
   },
