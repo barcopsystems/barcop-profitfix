@@ -430,6 +430,7 @@ S.RevenueAudit = {
         ['Dogs on Menu',                 num(d.S3_DOGS_COUNT), d.S3_DOGS_COUNT > 3 ? 'warn' : ''],
         ['Puzzles on Menu',              num(d.S3_PUZZLES_COUNT)],
         ['Top Category by Revenue',      d.S3_TOP_CATEGORY || ''],
+        ['Last Price Increase',          d.S3_LAST_PRICE_INCREASE || '', d.S3_PRICING_STALE === true ? 'warn' : ''],
         ['Menu Mix Gap',                 cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Pricing Opportunity',          cur(d.S3_PRICING_OPPORTUNITY)],
       ]),
@@ -565,6 +566,7 @@ S.RevenueAudit = {
         upsell_standard:    boolStr(p.upsell_standard),
         private_dining_min: boolStr(p.private_dining_min),
         menu_engineered:    boolStr(p.menu_engineered),
+        last_price_increase: p.last_price_increase || '',
         labor_to_forecast:  boolStr(p.labor_to_forecast)
       }
     };
@@ -653,6 +655,7 @@ S.RevenueAudit = {
       + qRow('Server upsell standard taught and tracked?','upsell_standard',  [['false','No'],['true','Yes']])
       + qRow('Private dining package with a spend minimum?','private_dining_min',[['false','No'],['true','Yes']])
       + qRow('Menu repriced or engineered in last 6 months?','menu_engineered',[['false','No'],['true','Yes']])
+      + qRow('When did you last raise menu prices?',    'last_price_increase',[['within_6mo','Within 6 months'],['6_12mo','6 to 12 months'],['over_year','Over a year ago'],['never','Cannot recall']])
       + qRow('Labor scheduled to a sales forecast?',    'labor_to_forecast',  [['false','No'],['true','Yes']])
       + '</div></div>';
 
@@ -692,6 +695,7 @@ S.RevenueAudit = {
         upsell_standard:    val('upsell_standard'),
         private_dining_min: val('private_dining_min'),
         menu_engineered:    val('menu_engineered'),
+        last_price_increase: val('last_price_increase'),
         labor_to_forecast:  val('labor_to_forecast')
       };
       this.generateAudit();
@@ -893,6 +897,7 @@ S.RevenueAudit = {
       if (draftP.upsell_standard === 'true' || draftP.upsell_standard === 'false') practices.upsell_standard = draftP.upsell_standard === 'true';
       if (draftP.private_dining_min === 'true' || draftP.private_dining_min === 'false') practices.private_dining_min = draftP.private_dining_min === 'true';
       if (draftP.menu_engineered === 'true' || draftP.menu_engineered === 'false') practices.menu_engineered = draftP.menu_engineered === 'true';
+      if (draftP.last_price_increase) practices.last_price_increase = draftP.last_price_increase;
       if (draftP.labor_to_forecast === 'true' || draftP.labor_to_forecast === 'false') practices.labor_to_forecast = draftP.labor_to_forecast === 'true';
 
       const auditAppData = JSON.parse(JSON.stringify(App.data));
@@ -962,6 +967,9 @@ S.RevenueAudit = {
     }
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce labor cost. $' + Math.round(d.S2_MONTHLY_GAP) + '/month over target.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'labor-scheduling' });
     if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Improve menu mix. $' + Math.round(d.S3_MONTHLY_GAP) + '/month opportunity from repricing Dogs.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'menu-engineering' });
+    // Pricing lag — operator-stated, no fabricated dollar (we have no per-item
+    // price-vs-market data). Surfaced as a finding routing to repricing.
+    if (d.S3_PRICING_STALE === true) items.push({ action: 'Reprice the menu. Your last price increase was ' + (d.S3_LAST_PRICE_INCREASE ? d.S3_LAST_PRICE_INCREASE.toLowerCase() : 'over a year ago') + '. Inflation has quietly eaten the margin on every plate since then.', monthly_impact: 0, gap_id: 'pricing' });
     if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Close server performance spread. $' + Math.round(d.S4_MONTHLY_GAP) + '/month from bottom third to team average.', monthly_impact: d.S4_MONTHLY_GAP, gap_id: 'server-performance' });
     if (d.S5_MONTHLY_GAP > 0) items.push({ action: 'Grow event revenue. $' + Math.round(d.S5_MONTHLY_GAP) + '/month gap to target.', monthly_impact: d.S5_MONTHLY_GAP, gap_id: 'events-catering' });
     return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
