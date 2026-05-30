@@ -605,6 +605,8 @@ S.HubBooks = {
     rows.push(['  Plus Purchases (from receive-delivery log this month)', purchases, '', '', '']);
     rows.push(['  Less Ending Inventory (count dated ' + endingCount.date + ')', endingValue != null ? -endingValue : null, '', '', '']);
     rows.push(['  Cost of Goods Sold (calculated)', calcCogs, '', '', '']);
+    rows.push(this._lineRow('Note: this is the count-based Schedule C COGS (beginning + purchases - ending). It will not exactly match the Total COGS on the Income Statement, which is summed from your weekly numbers. The count-based figure here is the more accurate physical cost of goods. Give your accountant both.', COL_COUNT));
+    merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
     rows.push(blank());
 
     // Subtotal by category
