@@ -29,8 +29,16 @@ S.InventoryUsageReport = {
 
   // ── Usage computation ─────────────────────────────────────────────────────
   computeForPair(startC, endC) {
-    const startMap = {}; (startC.items || []).forEach(it => startMap[it.product_id] = it);
-    const endMap   = {}; (endC.items   || []).forEach(it => endMap[it.product_id]   = it);
+    // Sum each product's lines (a product can be counted in multiple
+    // locations) into one entry, keeping metadata from the first occurrence.
+    const startMap = {}; (startC.items || []).forEach(it => {
+      if (startMap[it.product_id]) startMap[it.product_id].total = (startMap[it.product_id].total || 0) + (it.total || 0);
+      else startMap[it.product_id] = { ...it };
+    });
+    const endMap   = {}; (endC.items   || []).forEach(it => {
+      if (endMap[it.product_id]) endMap[it.product_id].total = (endMap[it.product_id].total || 0) + (it.total || 0);
+      else endMap[it.product_id] = { ...it };
+    });
     const dels = this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date);
     const purch = {};
     dels.forEach(d => (d.line_items || []).forEach(li => {
