@@ -570,8 +570,8 @@ function computeRevenueAudit(appData, controlData, extracted) {
 /* computeTrafficAudit(appData, controlData, extracted, urlData)
    Seven sections of digital presence. NO dollar figures anywhere — gaps are
    real deficits ("response rate 42% vs 75%", "8 posts vs 12 benchmark").
-   Sources, in priority: live URL reads (urlData: PageSpeed website, Places
-   Google rating/reviews, Yelp) > screenshot-extracted values (extracted) >
+   Sources, in priority: live website read (urlData.website: PageSpeed) >
+   screenshot-extracted values (extracted, including Google and Yelp ratings) >
    the operator's weekly traffic metrics (traffic_weeks). A section with no
    data is N/A (null) and excluded from the overall. Benchmarks are internal
    Bar Cop benchmarks, never "industry average." */
@@ -583,6 +583,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   const weeks = (appData.traffic_weeks || []).slice(-4);
   const wk = (fn) => avg(weeks.map(fn));
   const web = urlData.website || {};
+  // Google and Yelp ratings are screenshot-only now (no external rating APIs).
   const gbp = urlData.gbp || {};
   const yelp = urlData.yelp || {};
 
@@ -957,19 +958,20 @@ if (require.main === module) {
 
   // ── Traffic audit ───────────────────────────────────────────────────────────
   console.log('\n--- Traffic audit ---');
-  // Live link data + a couple screenshots; no dollars anywhere.
+  // Live website (PageSpeed) + screenshot-extracted Google/Yelp; no dollars.
   const traf = computeTrafficAudit(
     { settings: { bar_name: 'The Anchor Bar & Kitchen' }, traffic_settings: { targets: {} },
       traffic_weeks: [{ google_rating: 4.1, response_rate: 45, monthly_sessions: 1400, bounce_rate: 62, social_posts_month: 6, email_list_size: 320, email_open_rate: 28 }] },
     null,
     { listing_claimed: true, hours_complete: true, website_linked: true, menu_link_active: true, photo_count: 60, posts_last_30: 4,
-      maps_pack: true, nap_consistent: true, ig_posts_last_30: 6, ig_followers: 1200 },
-    { website: { performance: 70 }, gbp: { rating: 4.1, review_count: 130 }, yelp: { rating: 4.0 } }
+      maps_pack: true, nap_consistent: true, ig_posts_last_30: 6, ig_followers: 1200,
+      google_rating: 4.1, google_review_count: 130, yelp_rating: 4.0 },
+    { website: { performance: 70 } }
   );
   const tChecks = [
     ['Traffic OVERALL 1-100', traf.OVERALL_SCORE >= 1 && traf.OVERALL_SCORE <= 100, true],
-    ['Traffic uses live Google rating', traf.S3_GOOGLE_RATING, 4.1],
-    ['Traffic uses live review count', traf.S3_GOOGLE_REVIEW_COUNT, 130],
+    ['Traffic uses screenshot Google rating', traf.S3_GOOGLE_RATING, 4.1],
+    ['Traffic uses screenshot review count', traf.S3_GOOGLE_REVIEW_COUNT, 130],
     ['Traffic website score from PageSpeed', traf.S2_SCORE > 0, true],
     ['Traffic carries NO dollar gap (S1)', traf.S1_MONTHLY_GAP, 0],
     ['Traffic carries NO weekly dollar', traf.WEEKLY_GAP_AMT, undefined],
