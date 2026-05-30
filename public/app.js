@@ -1213,21 +1213,13 @@ const App = {
   },
 
   // Convert a delivery line_items[i] entry to total bottles. Used wherever
-  // inventory math needs raw-bottle counts (usage, variance, COGS, vendor
-  // watch annual usage, top movers, books inventory valuation, etc.).
-  //
-  // New deliveries store total_units pre-computed and display_unit='case'
-  // when the product is bottle beer with case_size set. Old deliveries
-  // (pre case-tracking) just have qty which was always in bottles.
-  bottlesFromDeliveryLine(li) {
+  // Container-unit quantity from a delivery line. The canonical inventory unit
+  // for every category is the container it is ordered, received and counted in:
+  // a CASE for bottle beer, a bottle for liquor/wine, a keg for draft, the stock
+  // unit for food. Delivery line qty is always stored in that container unit, so
+  // this is a straight read (bottle beer qty is in cases, not bottles).
+  unitsFromDeliveryLine(li) {
     if (!li) return 0;
-    if (li.total_units != null) {
-      const t = parseFloat(li.total_units);
-      if (!isNaN(t)) return t;
-    }
-    if (li.display_unit === 'case' && li.case_size_at_receive) {
-      return (parseFloat(li.qty) || 0) * (parseFloat(li.case_size_at_receive) || 1);
-    }
     return parseFloat(li.qty) || 0;
   },
 
@@ -1303,18 +1295,25 @@ const App = {
     return cost;
   },
 
-  // Per-bottle cost resolved from a count item snapshot. Used when the
-  // source product was deleted/disabled and we fall back to the historical
-  // unit_cost saved on the count item. Mirrors bottleCost but reads the
-  // snapshot's category and case_size_at_count fields.
-  bottleCostFromCountItem(it) {
+  // Per-CONTAINER cost for inventory math (on-hand value, usage cost, COGS,
+  // variance dollars, stock value, vendor watch, top movers, books valuation).
+  // unit_cost is stored per container for EVERY category — per case for bottle
+  // beer, per bottle for liquor/wine, per keg for draft, per stock unit for food
+  // — so this is a straight read. The ONLY place a per-bottle cost is used is the
+  // menu, because a beer is sold by the bottle: see bottleCost (menuItemCost,
+  // recipes, spot-check pour variance, waste).
+  unitCost(p) {
+    if (!p || p.unit_cost == null) return null;
+    const c = parseFloat(p.unit_cost);
+    return isNaN(c) ? null : c;
+  },
+  // Per-container cost resolved from a count-item snapshot. Used when the source
+  // product was deleted/disabled and we fall back to the unit_cost saved on the
+  // count item (already per container).
+  unitCostFromCountItem(it) {
     if (!it || it.unit_cost == null) return null;
-    const cost = parseFloat(it.unit_cost);
-    if (isNaN(cost)) return null;
-    if (it.category === 'Bottle Beer' && it.case_size_at_count && it.case_size_at_count > 0) {
-      return cost / it.case_size_at_count;
-    }
-    return cost;
+    const c = parseFloat(it.unit_cost);
+    return isNaN(c) ? null : c;
   },
 
   // Staff picker <option> markup. Used by every form that asks for a person
