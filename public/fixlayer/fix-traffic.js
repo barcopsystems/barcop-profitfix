@@ -205,7 +205,7 @@ FIX.traffic = [
     id: 'delivery',
     name: 'Delivery Platforms',
     module: 'traffic',
-    summary: 'A delivery listing is a storefront most operators never check.',
+    summary: 'A delivery listing is a storefront most operators never check, and pricing it the same as dine-in hands the 20 to 30 percent commission straight out of your margin.',
 
     process: {
       steps: [
