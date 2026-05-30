@@ -127,7 +127,7 @@ async function extractProfitInputs(apiKey, files) {
   const fileContent = buildFileContent(files);
   if (fileContent.length === 0) return {};
   const instruction = `You are reading uploaded operator documents (a P&L or sales summary, a voids/comps/cash report, invoices, a recipe costing sheet, inventory counts) for a bar and restaurant profit audit. Extract ONLY the raw values you can actually see in the documents. Report dollar amounts as plain numbers and percentages as plain numbers (e.g. 27.4 not "27.4%"). Do NOT calculate ratios or scores yourself — if a report shows revenue and COGS dollars but not a cost %, return the dollars and leave the % null; the system computes the ratio. Respond with a single JSON object, no other text. Use null for anything not present. Fields:
-{"audit_period":[the month or date range the data covers, e.g. "April 2026", or null],"bar_revenue_monthly":[total bar/beverage revenue for the period or null],"food_revenue_monthly":[total food revenue for the period or null],"bar_cogs_monthly":[bar/beverage cost of goods in dollars or null],"food_cogs_monthly":[food cost of goods in dollars or null],"bar_cost_pct":[only if the report states it directly, else null],"food_cost_pct":[only if stated directly, else null],"labor_cost_monthly":[total labor cost for the period or null],"pour_method":["Free pour" / "Jiggered" / "Measured" or null],"inv_variance_pct":[number or null],"void_comp_pct":[voids+comps as % of sales if stated, else null],"voids_total":[voids+comps dollars if shown, else null],"voids_no_approval_pct":[number or null],"void_approval":[true if a manager-approval policy is evidenced, else null],"cash_recon_count":[number of drawer reconciliations shown or null],"cash_short_count":[number of shifts that came up short or null],"food_var_pct":[number or null],"inv_freq":["Weekly" / "Monthly" / "Never" or null],"waste_log":["Yes" or null],"bev_invoice_count":[integer or null],"food_invoice_count":[integer or null],"invoice_vs_po":["Matched every delivery" / "Spot checked" / "Never matched" or null],"backup_vendors":[text or null],"recipe_count":[number of costed recipes shown or null],"rplh_tracked":["Yes" or null]}`;
+{"audit_period":[the month or date range the data covers, e.g. "April 2026", or null],"bar_revenue_monthly":[total bar/beverage revenue for the period or null],"food_revenue_monthly":[total food revenue for the period or null],"bar_cogs_monthly":[bar/beverage cost of goods in dollars or null],"food_cogs_monthly":[food cost of goods in dollars or null],"bar_cost_pct":[only if the report states it directly, else null],"food_cost_pct":[only if stated directly, else null],"labor_cost_monthly":[total labor cost for the period or null],"pour_method":["Free pour" / "Jiggered" / "Measured" or null],"inv_variance_pct":[number or null],"draft_yield_pct":[only if a report states draft beer yield or keg yield as a percent, else null],"draft_kegs_purchased":[number of kegs purchased in the period, else null],"draft_units_sold":[draft beer units/pints sold in the period from POS, else null],"draft_units_per_keg":[only if stated, the theoretical units/pints a full keg yields at this bar's keg size and pour, else null],"void_comp_pct":[voids+comps as % of sales if stated, else null],"voids_total":[voids+comps dollars if shown, else null],"voids_no_approval_pct":[number or null],"discount_total":[total discount/promo dollars for the period from a POS exception or discount report, else null],"discount_count":[number of discounts applied, else null],"no_sale_count":[number of no-sale register/drawer opens from a POS exception report, else null],"void_approval":[true if a manager-approval policy is evidenced, else null],"cash_recon_count":[number of drawer reconciliations shown or null],"cash_short_count":[number of shifts that came up short or null],"food_var_pct":[number or null],"inv_freq":["Weekly" / "Monthly" / "Never" or null],"waste_log":["Yes" or null],"bev_invoice_count":[integer or null],"food_invoice_count":[integer or null],"invoice_vs_po":["Matched every delivery" / "Spot checked" / "Never matched" or null],"backup_vendors":[text or null],"recipe_count":[number of costed recipes shown or null],"rplh_tracked":["Yes" or null]}`;
   const content = fileContent.concat([{ type: 'text', text: instruction }]);
   try {
     return await callClaudeForJSON(apiKey, content, 1500);
@@ -238,7 +238,7 @@ async function extractTrafficInputs(apiKey, files) {
   const fileContent = buildFileContent(files);
   if (fileContent.length === 0) return {};
   const instruction = `You are reading uploaded screenshots and exports for a bar and restaurant digital-presence (TRAFFIC) audit: Google Business Profile, website analytics, Google/Yelp review pages, search results, Instagram/Facebook, delivery dashboards, email platform. Extract ONLY what you can see. Booleans as true/false, numbers as plain numbers, percentages as plain numbers. NO dollar figures, NO scores. Use null for anything not present. Respond with a single JSON object, no other text:
-{"listing_claimed":[true/false/null],"hours_complete":[t/f/null],"website_linked":[t/f/null],"menu_link_active":[t/f/null],"photo_count":[int/null],"posts_last_30":[int/null],"profile_completeness":[percent/null],"mobile_optimized":[t/f/null],"monthly_sessions":[int/null],"bounce_rate":[percent/null],"menu_page_top3":[t/f/null],"online_ordering":[t/f/null],"google_rating":[number/null],"google_review_count":[int/null],"response_rate":[percent/null],"most_recent_review_days":[int/null],"unanswered":[int/null],"negative_pattern":[short text/null],"yelp_rating":[number/null],"maps_pack":[t/f/null],"nap_consistent":[t/f/null],"primary_keyword":[text/null],"ig_followers":[int/null],"ig_posts_last_30":[int/null],"fb_followers":[int/null],"content_type":[text/null],"doordash_active":[t/f/null],"ubereats_active":[t/f/null],"grubhub_active":[t/f/null],"doordash_rating":[number/null],"ubereats_rating":[number/null],"photo_count_delivery":[int/null],"menu_complete":[t/f/null],"promo_active":[t/f/null],"email_list_exists":[t/f/null],"list_size":[int/null],"open_rate":[percent/null],"send_frequency":[text/null],"last_send_days":[int/null],"growth_mechanism":[t/f/null],"loyalty":[t/f/null]}`;
+{"listing_claimed":[true/false/null],"hours_complete":[t/f/null],"website_linked":[t/f/null],"menu_link_active":[t/f/null],"photo_count":[int/null],"posts_last_30":[int/null],"profile_completeness":[percent/null],"mobile_optimized":[t/f/null],"monthly_sessions":[int/null],"bounce_rate":[percent/null],"menu_page_top3":[t/f/null],"online_ordering":[t/f/null],"reservation_system":[t/f/null],"click_to_call":[true if the homepage shows a tappable phone number, else t/f/null],"hours_present":[true if business hours are shown on the homepage, else t/f/null],"menu_is_web":[true if the menu is a real web page, false if it is a PDF or image, else null],"google_rating":[number/null],"google_review_count":[int/null],"response_rate":[percent/null],"most_recent_review_days":[int/null],"unanswered":[int/null],"negative_pattern":[short text/null],"yelp_rating":[number/null],"maps_pack":[t/f/null],"nap_consistent":[t/f/null],"primary_keyword":[text/null],"ig_followers":[int/null],"ig_posts_last_30":[int/null],"fb_followers":[int/null],"content_type":[text/null],"doordash_active":[t/f/null],"ubereats_active":[t/f/null],"grubhub_active":[t/f/null],"doordash_rating":[number/null],"ubereats_rating":[number/null],"photo_count_delivery":[int/null],"menu_complete":[t/f/null],"promo_active":[t/f/null],"email_list_exists":[t/f/null],"list_size":[int/null],"open_rate":[percent/null],"send_frequency":[text/null],"last_send_days":[int/null],"growth_mechanism":[t/f/null],"loyalty":[t/f/null]}`;
   const content = fileContent.concat([{ type: 'text', text: instruction }]);
   try {
     return await callClaudeForJSON(apiKey, content, 1500);
@@ -316,7 +316,7 @@ async function extractRevenueInputs(apiKey, files) {
   const fileContent = buildFileContent(files);
   if (fileContent.length === 0) return {};
   const instruction = `You are reading uploaded operator documents (a POS sales summary, server sales report, menu sales mix, menu price list, labor schedule/payroll, event records) for a bar and restaurant REVENUE audit. Extract ONLY the raw values you can see. Numbers as plain numbers, percentages as plain numbers. Do NOT calculate ratios or scores — the system does that. Use null for anything not present. Respond with a single JSON object, no other text:
-{"audit_period":[month or range or null],"monthly_revenue":[total monthly revenue or null],"monthly_covers":[total monthly guests/covers or null],"check_avg":[average check if stated, else null],"labor_pct":[labor as % of revenue if stated, else null],"rplh":[revenue per labor hour if stated, else null],"overtime_hrs":[number or null],"sched_vs_actual":[text like "214 scheduled / 247 actual" or null],"stars_count":[menu items, integer or null],"plowhorses_count":[integer or null],"puzzles_count":[integer or null],"dogs_count":[integer or null],"top_category":[best-selling category name or null],"server_count":[number of servers on the report or null],"top_check_avg":[highest server check average or null],"bottom_check_avg":[lowest server check average or null],"app_attach_rate":[appetizer attach % or null],"dessert_attach_rate":[dessert attach % or null],"catering_rev":[catering revenue for the period or null]}`;
+{"audit_period":[month or range or null],"monthly_revenue":[total monthly revenue or null],"monthly_covers":[total monthly guests/covers or null],"check_avg":[average check if stated, else null],"labor_pct":[labor as % of revenue if stated, else null],"rplh":[revenue per labor hour if stated, else null],"overtime_hrs":[number or null],"sched_vs_actual":[text like "214 scheduled / 247 actual" or null],"stars_count":[menu items, integer or null],"plowhorses_count":[integer or null],"puzzles_count":[integer or null],"dogs_count":[integer or null],"top_category":[best-selling category name or null],"server_count":[number of servers on the report or null],"top_check_avg":[highest server check average or null],"bottom_check_avg":[lowest server check average or null],"app_attach_rate":[appetizer attach % or null],"dessert_attach_rate":[dessert attach % or null],"catering_rev":[catering revenue for the period or null],"bev_units_sold":[total beverage/drink items sold for the period as a plain integer, from a POS product-mix or category sales report, else null],"bev_incidence_pct":[only if the report states the percent of checks that included a beverage, else null]}`;
   const content = fileContent.concat([{ type: 'text', text: instruction }]);
   try {
     return await callClaudeForJSON(apiKey, content, 1500);
@@ -400,7 +400,60 @@ async function fetchTrafficUrlData(urls) {
     }
   }
 
+  // Raw HTML structural read (free, no API key) — conversion elements a code
+  // fetch can detect honestly: online ordering, reservations, click-to-call,
+  // mobile viewport, hours on the page, and whether the menu is a PDF.
+  if (urls.website) {
+    const structure = await fetchWebsiteStructure(urls.website);
+    if (structure) {
+      out.website = out.website || { url: urls.website, fetchedAt: new Date().toISOString() };
+      out.website.structure = structure;
+    }
+  }
+
   return out.website ? out : null;
+}
+
+/* Raw HTML fetch -> code-detectable website conversion structure. Heuristic but
+   honest: a positive match means the element is present. tel: links and the
+   viewport meta are exact; ordering/reservations/hours use broad keyword sets to
+   minimize false negatives; menu_is_pdf is only set when a menu link is found.
+   Any failure returns null and S2 falls back to screenshot/PageSpeed only. */
+async function fetchWebsiteStructure(url) {
+  try {
+    const ctrl = new AbortController();
+    const tmo = setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BarCopBot/1.0; +https://barcop.com)' } });
+    clearTimeout(tmo);
+    if (!r.ok) return null;
+    let html = await r.text();
+    if (!html) return null;
+    html = html.slice(0, 600000);
+    const low = html.toLowerCase();
+    const has = (re) => re.test(low);
+    const online_ordering = has(/toasttab|chownow|doordash|ubereats|uber eats|grubhub|seamless|slice\.com|order ?online|online ?order|\border now\b|\/order(?:[\/"'?]|$)|menufy|olo\.com|popmenu order|square ?online|clover ?online/);
+    const reservations    = has(/opentable|resy\.com|sevenrooms|exploretock|tock\.com|\breserve\b|reservation|book a table|\bbook now\b|booking/);
+    const click_to_call   = has(/href=["']tel:/);
+    const mobile_viewport = has(/<meta[^>]+name=["']viewport["']/);
+    const hours_present   = has(/\bhours\b|hours of operation|open today|we'?re open|\bmon(?:day)?\b[^<]{0,12}[-–—][^<]{0,12}|\bsun(?:day)?\b[^<]{0,12}[-–—]/);
+    // Menu link target — is the menu a real web page or a PDF?
+    let menu_is_pdf = null;
+    const anchors = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+    for (const a of anchors) {
+      const hrefMatch = a.match(/href=["']([^"']+)["']/i);
+      if (!hrefMatch) continue;
+      const href = hrefMatch[1].toLowerCase();
+      const text = a.replace(/<[^>]+>/g, '').toLowerCase();
+      if (text.includes('menu') || /\/menu|menu\.|-menu/.test(href)) {
+        if (/\.pdf(\?|$)/.test(href)) { menu_is_pdf = true; break; }
+        menu_is_pdf = false;   // a menu link that is not a PDF — keep scanning in case a later one is a PDF
+      }
+    }
+    return { url, online_ordering, reservations, click_to_call, mobile_viewport, hours_present, menu_is_pdf, fetchedAt: new Date().toISOString() };
+  } catch (e) {
+    console.warn('[audit] website structure fetch failed:', e.message);
+    return null;
+  }
 }
 
 function formatTrafficUrlDataForPrompt(urlData) {
@@ -419,6 +472,17 @@ function formatTrafficUrlDataForPrompt(urlData) {
     if (w.totalBlockingTimeMs      != null) lines.push('  Total Blocking Time: '      + w.totalBlockingTimeMs      + ' ms');
     if (w.cumulativeLayoutShift    != null) lines.push('  Cumulative Layout Shift: '  + w.cumulativeLayoutShift.toFixed(3));
     if (w.speedIndexMs             != null) lines.push('  Speed Index: '              + w.speedIndexMs             + ' ms');
+    if (w.structure) {
+      const s = w.structure;
+      const yn = (v) => v === true ? 'yes' : v === false ? 'no' : 'unknown';
+      lines.push('  Website conversion structure (read from the live page HTML):');
+      lines.push('    Online ordering link: ' + yn(s.online_ordering));
+      lines.push('    Reservation/booking link: ' + yn(s.reservations));
+      lines.push('    Click-to-call (tel: link): ' + yn(s.click_to_call));
+      lines.push('    Mobile viewport set: ' + yn(s.mobile_viewport));
+      lines.push('    Hours on the page: ' + yn(s.hours_present));
+      lines.push('    Menu is a real web page (not a PDF): ' + (s.menu_is_pdf === true ? 'no, it is a PDF' : s.menu_is_pdf === false ? 'yes' : 'no menu link found'));
+    }
   }
   return lines.join('\n');
 }
