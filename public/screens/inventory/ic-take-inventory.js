@@ -273,8 +273,14 @@ S.InventoryTakeInventory = {
       // pair. Bottles either are full or empty (no partial level applies),
       // so the slider does not fit. Everything else uses the partial slider.
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
-      const countInput = isCaseBeer
-        ? '<div class="form-row" style="gap:14px;justify-content:center;margin-bottom:14px;">'
+      // Input type by what the product actually is: case+loose for bottle beer,
+      // a fill slider for anything poured from a container (liquor, wine, draft
+      // keg, bottled mixers), and a plain number for food / dry goods counted
+      // by weight or unit.
+      const isPourable = !!(p.container_size_oz && p.pour_size_oz);
+      let countInput;
+      if (isCaseBeer) {
+        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin-bottom:14px;">'
             + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cases</label>'
               + '<div class="fw"><input class="suf ti-cases" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.cases != null ? c.cases : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">cases</span></div>'
             + '</div>'
@@ -284,10 +290,17 @@ S.InventoryTakeInventory = {
             + '<div style="align-self:center;font-size:11px;color:var(--t3);">'
               + (p.case_size + ' btl/case')
             + '</div>'
-          + '</div>'
-        : '<div style="display:flex;justify-content:center;margin-bottom:14px;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category })
           + '</div>';
+      } else if (isPourable) {
+        countInput = '<div style="display:flex;justify-content:center;margin-bottom:14px;">'
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') })
+          + '</div>';
+      } else {
+        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin-bottom:14px;">'
+          + '<div class="f" style="width:220px;flex-shrink:0;"><label>Count</label>'
+            + '<div class="fw"><input class="suf ti-num" type="number" min="0" step="0.1" data-pid="' + p.id + '" value="' + (c.value != null ? c.value : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div>'
+          + '</div></div>';
+      }
       return '<div class="card" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" style="margin-bottom:12px;">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + esc(p.category || 'Uncategorized')
@@ -322,6 +335,7 @@ S.InventoryTakeInventory = {
     grp.products.forEach(p => {
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       if (isCaseBeer) return; // case + loose inputs handled below, not the slider
+      if (!(p.container_size_oz && p.pour_size_oz)) return; // food/dry: number input, wired below
       BottleSlider.mount(p.id, (v) => {
         const key = p.id + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
@@ -347,12 +361,24 @@ S.InventoryTakeInventory = {
         this.updateProgress();
       });
     });
+    // Food / dry-goods plain number input.
+    this.container.querySelectorAll('.ti-num').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const pid = inp.dataset.pid;
+        const key = pid + '@@' + grp.location;
+        const prev = this.draft.counts[key] || {};
+        this.draft.counts[key] = { value: parseFloat(inp.value) || 0, fulls: 0, notes: prev.notes || '' };
+        this.draft._locStep = this.locStep;
+        this.saveDraft();
+        this.updateProgress();
+      });
+    });
     this.container.querySelectorAll('.ti-note').forEach(inp => {
       inp.addEventListener('input', () => {
         const pid = inp.dataset.pid;
         const key = pid + '@@' + grp.location;
-        const cur = this.draft.counts[key] || { value: 0, fulls: 0 };
-        this.draft.counts[key] = { value: cur.value, fulls: cur.fulls, notes: inp.value };
+        const cur = this.draft.counts[key] || {};
+        this.draft.counts[key] = { ...cur, notes: inp.value };
         this.saveDraft();
         this.updateProgress();
       });
