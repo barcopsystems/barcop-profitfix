@@ -1300,8 +1300,8 @@ S.HubSettings = {
       { name:"Hendrick's Gin",           category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:31.00, menu_price:12, par_level:10,  reorder_point:5,   primary_location:'Liquor Room' },
       { name:'House Cabernet',           category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:9.50,  menu_price:10, par_level:24,  reorder_point:10,  primary_location:'Back Bar' },
       { name:'House Chardonnay',         category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:8.75,  menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Walk-in Cooler' },
-      { name:'Modelo Especial',          category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:1.35,  menu_price:6,  case_size:24, par_level:480, reorder_point:144, primary_location:'Walk-in Cooler' },
-      { name:'Lone Star',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:0.95,  menu_price:5,  case_size:24, par_level:360, reorder_point:120, primary_location:'Walk-in Cooler' },
+      { name:'Modelo Especial',          category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:32.40, menu_price:6,  case_size:24, par_level:480, reorder_point:144, primary_location:'Walk-in Cooler' },
+      { name:'Lone Star',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:22.80, menu_price:5,  case_size:24, par_level:360, reorder_point:120, primary_location:'Walk-in Cooler' },
       { name:'ABW Pearl Snap (1/2 bbl)', category:'Draft Beer',  vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16,  unit_cost:165.00,menu_price:6,  par_level:6,   reorder_point:2,   primary_location:'Walk-in Cooler' },
       { name:'Ground Beef 80/20 (lb)',   category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:4.20,  par_level:240, reorder_point:80,  primary_location:'Walk-in Cooler' },
       { name:'Chicken Thigh (lb)',       category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:2.95,  par_level:200, reorder_point:60,  primary_location:'Walk-in Cooler' },
@@ -1567,26 +1567,24 @@ S.HubSettings = {
 
     // Count totals per product index: [current (today), one week ago].
     // Usage = week-ago minus today; no deliveries land in the last 7 days, so
-    // the icCOGS feed reads cleanly as (start - end) x unit cost. Tuned so the
-    // feed computes to Anchor week 12: ~$2,729 bar and ~$2,364 food COGS.
-    // Indices 0-18 are the original counted set that carries the tuned COGS.
-    // Indices 19-32 are the appended kitchen ingredients; they carry equal
-    // start/end counts (zero net usage this period) so they appear in stock
-    // without altering the tuned COGS tie.
+    // the icCOGS feed reads cleanly as (start - end) x unit cost. Realistic
+    // weekly turnover is spread across EVERY product (not concentrated in a
+    // few), so the usage/variance reports read like a real operating week and
+    // the count-derived COGS sums to ~$2,755 bar / ~$2,362 food — in line with
+    // the booked weekly P&L for this volume.
     const icTotals = {
-      0:[9,25], 1:[8,21], 2:[7,17], 3:[6,10], 4:[10,25], 5:[9,22],
-      6:[96,456], 7:[72,332], 8:[2,6], 9:[40,220], 10:[35,199],
-      11:[18,88], 12:[4,15], 13:[5,19], 14:[3,9], 15:[2,6],
-      16:[2,4], 17:[6,14], 18:[3,7],
-      19:[160,160], 20:[26,26], 21:[9,9], 22:[38,38], 23:[130,130],
-      24:[38,38], 25:[32,32], 26:[30,30], 27:[40,40], 28:[58,58],
-      29:[26,26], 30:[28,28], 31:[20,20], 32:[52,52],
-      33:[12,12], 34:[40,40], 35:[22,22], 36:[18,18], 37:[60,60],
-      38:[20,20], 39:[50,50], 40:[16,16], 41:[30,30], 42:[24,24],
-      43:[20,20], 44:[30,30], 45:[25,25], 46:[8,8],   47:[10,10],
-      48:[14,14], 49:[12,12], 50:[4,4],   51:[3,3],   52:[4,4],
-      53:[4,4],   54:[12,12], 55:[5,5],   56:[2,2],   57:[6,6],
-      58:[10,10], 59:[8,8]
+      0:[8,21], 1:[8,21], 2:[6,16], 3:[5,13], 4:[8,21],
+      5:[8,21], 6:[182,485], 7:[136,363], 8:[1.8,4.8], 9:[17,45],
+      10:[11,30], 11:[8,22], 12:[1.1,3], 13:[0.8,2.2], 14:[1.1,3],
+      15:[1.4,3.7], 16:[0.9,2.4], 17:[2.2,5.9], 18:[1.7,4.5], 19:[50,134],
+      20:[7,19], 21:[1.7,4.5], 22:[8,22], 23:[34,90], 24:[8,22],
+      25:[8,21], 26:[7,19], 27:[10,27], 28:[25,67], 29:[8,22],
+      30:[4,11], 31:[4,11], 32:[11,30], 33:[4,11], 34:[31,82],
+      35:[7,18], 36:[4,11], 37:[22,59], 38:[6,16], 39:[34,90],
+      40:[5,13], 41:[5,13], 42:[5,14], 43:[4,11], 44:[8,22],
+      45:[4,11], 46:[1.7,4.5], 47:[2.8,7.5], 48:[4,11], 49:[2.2,5.9],
+      50:[0.8,2.1], 51:[0.6,1.6], 52:[0.8,2.1], 53:[0.9,2.4], 54:[4,10],
+      55:[1.8,4.8], 56:[0.5,1.3], 57:[1.4,3.7], 58:[2.2,5.9], 59:[1.7,4.5]
     };
     const icCountItem = (p, qty) => ({
       product_id:p.id, name:p.name, category:p.category,
