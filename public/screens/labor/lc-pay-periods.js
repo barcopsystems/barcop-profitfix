@@ -225,14 +225,14 @@ S.LaborPayPeriods = {
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + agg.totals.hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val">' + App.fmtCurrency(agg.totals.cost) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">OT Premium</div><div class="calc-val ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">OT Pay</div><div class="calc-val ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Gross</div><div class="calc-val good">' + App.fmtCurrency(agg.totals.gross) + '</div></div>'
       + '</div>'
       + (belowMinCount > 0
           ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:10px;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. Make up the difference before payroll runs.</div>'
           : '')
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Premium</th><th>Gross</th><th>Tip Credit</th>'
+        + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Export Payroll CSV</button>'
@@ -355,7 +355,7 @@ S.LaborPayPeriods = {
     const header = [
       'Staff Name', 'Position', 'Week Start', 'Week End',
       'Regular Hours', 'OT Hours', 'Total Hours',
-      'Wage Rate', 'Regular Cost', 'OT Premium', 'Gross Pay',
+      'Wage Rate', 'Regular Cost', 'OT Pay', 'Gross Pay',
       'Tipped Position', 'Tip Share', 'Effective Hourly', 'Tip Credit Status'
     ];
     const rows = agg.rows.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(r => {
