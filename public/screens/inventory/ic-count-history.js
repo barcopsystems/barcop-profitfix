@@ -127,8 +127,8 @@ S.InventoryCountHistory = {
     let compareCard = '';
     if (compare) {
       const map = {};
-      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name }; map[it.product_id].a = it.total || 0; });
-      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name }; map[it.product_id].b = it.total || 0; });
+      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); });
+      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); });
       const older = new Date(compare.created_at || compare.date) < new Date(count.created_at || count.date);
       const cmpRows = Object.values(map).map(m => {
         const a = m.a || 0, b = m.b || 0, change = a - b;
