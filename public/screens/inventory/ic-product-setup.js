@@ -254,21 +254,16 @@ S.InventoryProducts = {
       const n = all.filter(p => (p.category || '') === c).length;
       const incomplete = all.filter(p => (p.category || '') === c && !this.isComplete(p)).length;
       const incText = incomplete > 0
-        ? '<div style="font-size:10px;color:var(--t4);margin-top:3px;">' + incomplete + ' incomplete</div>'
+        ? '<div style="font-size:10px;color:var(--t4);margin-top:6px;">' + incomplete + ' incomplete</div>'
         : '';
       return '<div class="ip-card" data-cat="' + esc(c) + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 18px;text-align:center;">'
+        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px 20px 24px;text-align:center;">'
         + '<div style="font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">' + esc(c) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + '</div>'
         + incText
-        + '<div style="margin-top:16px;">'
-          + '<button type="button" class="ip-card-add" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 14px;cursor:pointer;">+ Add Product Manually</button>'
-          + '<div style="font-size:10px;color:var(--t4);margin:10px 0 8px;">or</div>'
-          + '<div class="ip-drop" data-cat="' + esc(c) + '" style="border:1px dashed var(--b1);border-radius:6px;padding:14px 8px;cursor:pointer;transition:border-color 0.15s,background 0.15s;">'
-            + '<div style="font-size:12px;color:var(--t2);font-weight:600;">Drop your file here</div>'
-            + '<div style="font-size:9px;color:var(--t4);margin-top:3px;letter-spacing:0.3px;">or browse to choose &middot; CSV or Excel</div>'
-          + '</div>'
-          + '<input type="file" class="ip-drop-input" data-cat="' + esc(c) + '" accept=".csv,.xlsx,.xls" style="display:none;"/>'
+        + '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:20px;">'
+          + '<span class="ip-card-add" data-cat="' + esc(c) + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add Single Product</span>'
+          + '<button type="button" class="ip-card-imp" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;cursor:pointer;">Upload Product List</button>'
         + '</div>'
         + '</div>';
     }).join('');
@@ -354,7 +349,10 @@ S.InventoryProducts = {
       + '<button class="btn btn-danger" id="ip-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + cardsBlock + tabs + body + '</div>' + modal;
+    // When an upload is active, the lower area becomes the in-place import
+    // panel (drop zone -> column mapper) instead of the product list.
+    const lower = this._import ? this.importPanelHTML() : (tabs + body);
+    this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>' + modal;
     this.wireLanding();
   },
 
@@ -376,40 +374,36 @@ S.InventoryProducts = {
   wireLanding() {
     this.container.onclick = ev => {
       const addLink = ev.target.closest('.ip-card-add');
+      const impLink = ev.target.closest('.ip-card-imp');
       const tab     = ev.target.closest('.ic-tab');
       const edit    = ev.target.closest('.ip-edit');
       const del     = ev.target.closest('.ip-del');
 
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
+      if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat, stage: 'drop' }; this._formCategory = impLink.dataset.cat; this.renderLanding(); return; }
       if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
     };
 
-    // Per-category import (Option B): each card's drop zone is its own target,
-    // so the file's category is unambiguous. Drop or browse -> parse -> mapper.
-    this.container.querySelectorAll('.ip-drop').forEach(zone => {
-      const cat = zone.dataset.cat;
-      const input = this.container.querySelector('.ip-drop-input[data-cat="' + cat + '"]');
-      const hi = on => {
-        zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)';
-        zone.style.background = on ? 'rgba(219,171,70,0.08)' : 'transparent';
-      };
-      zone.addEventListener('click', () => input && input.click());
-      ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(true); }));
-      ['dragleave', 'dragend'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(false); }));
-      zone.addEventListener('drop', e => {
-        e.preventDefault(); e.stopPropagation(); hi(false);
-        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-        if (file) { this._formCategory = cat; this.readImportFile(file); }
-      });
-    });
-    this.container.querySelectorAll('.ip-drop-input').forEach(input => {
-      input.addEventListener('change', ev => {
-        const file = ev.target.files[0];
-        if (file) { this._formCategory = input.dataset.cat; this.readImportFile(file); }
-      });
-    });
+    // In-place import panel (drop zone -> column mapper, same spot). Wired only
+    // while an upload is active for a category.
+    if (this._import) {
+      document.getElementById('ip-imp-how')?.addEventListener('click', () => this.showImportHelp(this._import.cat));
+      document.getElementById('ip-imp-cancel')?.addEventListener('click', () => { this._import = null; this.renderLanding(); });
+      if (this._import.stage === 'mapper') {
+        document.getElementById('ip-imp-run')?.addEventListener('click', () => this.runImport());
+      } else {
+        const zone = this.container.querySelector('.ip-drop');
+        const input = document.getElementById('ip-imp-input');
+        const hi = on => { if (!zone) return; zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'rgba(219,171,70,0.08)' : 'transparent'; };
+        zone?.addEventListener('click', () => input && input.click());
+        ['dragenter', 'dragover'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(true); }));
+        ['dragleave', 'dragend'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(false); }));
+        zone?.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); hi(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) { this._formCategory = this._import.cat; this.readImportFile(f); } });
+        input?.addEventListener('change', ev => { const f = ev.target.files[0]; if (f) { this._formCategory = this._import.cat; this.readImportFile(f); } });
+      }
+    }
 
     const updateSel = () => {
       const checked = this.container.querySelectorAll('.ip-chk:checked');
@@ -904,33 +898,6 @@ S.InventoryProducts = {
   // import time so the mapping schema can include only category-relevant
   // columns (Case Size for Bottle Beer, Keg Size for Draft, Unit Type for
   // Food and Misc) and we never compute cost_per_pour with the wrong divisor.
-  showImport(category) {
-    if (!this.CATEGORIES.includes(category)) category = 'Liquor';
-    this._formCategory = category;
-    const spec = this.FORM_SPEC[category];
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="ip-back">&#8592; Back to Products</button></div>'
-      + '<div class="card-title">Import ' + esc(spec.title) + ' from File</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">'
-      + 'Upload a CSV or Excel file exported from your POS, your distributor order guide, or a spreadsheet you maintain. '
-      + 'Bar Cop reads your columns and shows a mapping screen so you can match them to the right fields. '
-      + 'Every row imports as ' + esc(spec.title) + ', any missing data shows as Incomplete and can be filled in afterwards.</div>'
-      + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Accepted formats: CSV, XLSX, XLS</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f"><label>Select File</label><input type="file" id="ip-imp-file" accept=".csv,.xlsx,.xls" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:8px;font-size:12px;cursor:pointer;"/></div>'
-      + '</div>'
-      + '<div id="ip-imp-preview"></div>'
-      + '<div class="card-actions"><button class="btn btn-ghost" id="ip-cancel">Cancel</button></div>'
-      + '</div></div>';
-
-    document.getElementById('ip-back')?.addEventListener('click', () => this.renderLanding());
-    document.getElementById('ip-cancel')?.addEventListener('click', () => this.renderLanding());
-    document.getElementById('ip-imp-file')?.addEventListener('change', ev => {
-      const file = ev.target.files[0];
-      if (file) this.readImportFile(file);
-    });
-  },
 
   readImportFile(file) {
     const preview = document.getElementById('ip-imp-preview');
@@ -964,7 +931,7 @@ S.InventoryProducts = {
       vals.push(cur.trim());
       return vals;
     });
-    this.showColumnMapper(headers, rows);
+    this._importHeaders = headers; this._importRows = rows; if (this._import) this._import.stage = 'mapper'; this.renderLanding();
   },
 
   parseXLSX(buffer) {
@@ -975,7 +942,7 @@ S.InventoryProducts = {
       if (data.length < 2) { this.showImportError('File appears empty.'); return; }
       const headers = data[0].map(h => String(h).trim());
       const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));
-      this.showColumnMapper(headers, rows);
+      this._importHeaders = headers; this._importRows = rows; if (this._import) this._import.stage = 'mapper'; this.renderLanding();
     };
     if (typeof XLSX === 'undefined') {
       const script = document.createElement('script');
@@ -1051,40 +1018,67 @@ S.InventoryProducts = {
     return map;
   },
 
-  showColumnMapper(headers, rows) {
-    const preview = document.getElementById('ip-imp-preview');
-    if (!preview) return;
-    this._importRows = rows;
-    this._importHeaders = headers;
-    const cat = this._formCategory || 'Liquor';
+  // In-place import panel rendered in the landing's lower area. Two stages:
+  // 'drop' (drag-drop / browse zone) then 'mapper' (column matching) — same
+  // spot, no page change. Wired in wireLanding().
+  importPanelHTML() {
+    const cat = this._import.cat;
+    const spec = this.FORM_SPEC[cat] || {};
+    const header = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+      + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-how">How This Works</button>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-cancel">Cancel</button>'
+      + '</div></div>';
+    if (this._import.stage === 'mapper') {
+      return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>';
+    }
+    return '<div class="card">' + header
+      + '<div class="ip-drop" style="border:1px dashed var(--b1);border-radius:8px;padding:46px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;">'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your file here</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
+      + '</div>'
+      + '<input type="file" id="ip-imp-input" accept=".csv,.xlsx,.xls" style="display:none;"/>'
+      + '</div>';
+  },
+
+  columnMapperBodyHTML() {
+    const cat = this._import.cat;
     const spec = this.FORM_SPEC[cat];
+    const headers = this._importHeaders || [], rows = this._importRows || [];
     const fields = this.importFieldsForCategory(cat);
     const autoMap = this.autoMap(headers, fields);
     const optsFor = sel => '<option value="">(skip)</option>'
       + headers.map(h => '<option value="' + esc(h) + '"' + (h === sel ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
-
-    let html = '<div class="divider"></div><div class="card"><div class="card-title">Map Your Columns &middot; ' + esc(spec.title) + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;">'
-      + 'Found <strong style="color:var(--w);">' + rows.length + ' rows</strong> in your file. '
-      + 'Match each field to its column. Anything you leave on (skip) will be blank on the imported product, which can be filled in afterwards.</div>'
+    let html = '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;">'
+      + 'Found <strong style="color:var(--w);">' + rows.length + ' row' + (rows.length === 1 ? '' : 's') + '</strong> in your file. '
+      + 'Match each field to its column; anything left on (skip) imports blank and can be filled in later.</div>'
       + '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">';
-
     fields.forEach(f => {
       html += '<div class="f" style="width:240px;flex-shrink:0;">'
         + '<label>' + esc(f.label) + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
         + '<select id="ipm-' + f.key + '">' + optsFor(autoMap[f.key] || '') + '</select></div>';
     });
+    html += '</div><div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button></div>';
+    return html;
+  },
 
-    html += '</div>'
-      + '<div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-ghost" id="ip-cancel">Cancel</button>'
-      + '<button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button>'
+  showImportHelp(cat) {
+    const spec = this.FORM_SPEC[cat] || {};
+    const fields = this.importFieldsForCategory(cat);
+    const rowsH = fields.map(f => '<tr><td style="padding:4px 14px 4px 0;color:var(--t1);white-space:nowrap;vertical-align:top;">'
+        + esc(f.label) + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</td>'
+        + '<td style="padding:4px 0;color:var(--t3);font-size:11px;">' + esc(f.aliases.slice(0, 4).join(', ')) + '</td></tr>').join('');
+    const html = '<div class="card" style="text-align:left;">'
+      + '<div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:var(--w);margin-bottom:12px;">How Importing ' + esc(spec.title || cat) + ' Works</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">'
+        + '<p style="margin:0 0 10px;"><strong style="color:var(--gold);">The file.</strong> A CSV or Excel (.xlsx / .xls) export from your POS, a distributor order guide, or your own spreadsheet. First row must be the column headers; one product per row.</p>'
+        + '<p style="margin:0 0 6px;"><strong style="color:var(--gold);">The columns.</strong> Only <strong>Name</strong> is required &mdash; the rest are optional and can be filled in after import. Your headers don\'t need to match exactly; these common names are auto-recognized:</p>'
+        + '<table style="border-collapse:collapse;margin:0 0 10px;"><tbody>' + rowsH + '</tbody></table>'
+        + '<p style="margin:0;"><strong style="color:var(--gold);">The mapping.</strong> After you drop the file, this box turns into a mapping screen with your columns auto-matched to each field. Fix any that are wrong, set ones you want to ignore to (skip), then Import. Every row imports as a ' + esc(spec.title || cat) + ' product; rows missing required data show as Incomplete to finish later.</p>'
       + '</div></div>';
-
-    preview.innerHTML = html;
-    document.getElementById('ip-cancel')?.addEventListener('click', () => this.renderLanding());
-    document.getElementById('ip-imp-run')?.addEventListener('click', () => this.runImport());
+    App.openModal(html, { id: 'ip-imp-help', layer: 9100, maxWidth: 560 });
   },
 
   async runImport() {
@@ -1160,6 +1154,7 @@ S.InventoryProducts = {
       this.activeCat = cat;
       this.editId = null;
       this._formCategory = null;
+      this._import = null;
       this.renderLanding();
     } else if (msg) {
       if (btn) { btn.disabled = false; btn.textContent = 'Import ' + imported.length + ' Products'; }
