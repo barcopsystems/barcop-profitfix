@@ -1029,7 +1029,7 @@ S.HubBooks = {
     (App.inventoryData?.ic_deliveries || [])
       .filter(d => d.date && d.date > startCount.date && d.date <= endCount.date)
       .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.bottlesFromDeliveryLine(li);
+        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
       }));
 
     const products = (App.inventoryData?.ic_products || []);
@@ -1044,8 +1044,8 @@ S.HubBooks = {
       const endQty   = parseFloat(eMap[pid].total) || 0;
       const purchQty = purch[pid] || 0;
       const usedQty  = startQty + purchQty - endQty;
-      const bottleCost = (p.unit_cost != null) ? App.bottleCost(p) : App.bottleCostFromCountItem(eMap[pid]);
-      const usedValue = bottleCost != null ? usedQty * bottleCost : 0;
+      const unitCost = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
+      const usedValue = unitCost != null ? usedQty * unitCost : 0;
       detail.push({
         name: eMap[pid].name || p.name || '(unnamed)',
         category: eMap[pid].category || p.category || '',
