@@ -120,7 +120,7 @@ S.ShiftHandoff = {
       lines.push('');
     }
     if (ex.closingCheck) {
-      lines.push('CLOSING CHECKLIST: ' + (ex.closingCheck.completion_pct || 0) + '% complete');
+      lines.push('CLOSING CHECKLIST: ' + (ex.closingCheck.total_count ? Math.round((ex.closingCheck.done_count || 0) / ex.closingCheck.total_count * 100) : 0) + '% complete');
       lines.push('');
     }
     const sNotes = Array.isArray(shift.shift_notes) ? shift.shift_notes : [];
@@ -199,7 +199,7 @@ S.ShiftHandoff = {
 
     const checklistSection = ex.closingCheck
       ? '<h2>Closing Checklist</h2>'
-        + '<div class="meta">' + (ex.closingCheck.completion_pct || 0) + '% complete'
+        + '<div class="meta">' + (ex.closingCheck.total_count ? Math.round((ex.closingCheck.done_count || 0) / ex.closingCheck.total_count * 100) : 0) + '% complete'
         + (ex.closingCheck.completed_by ? ' &middot; ' + escH(ex.closingCheck.completed_by) : '') + '</div>'
       : '';
 
