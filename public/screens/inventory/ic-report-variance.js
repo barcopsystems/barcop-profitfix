@@ -87,47 +87,27 @@ S.InventoryVarianceReport = {
     const period = this.currentPeriod();
     if (!period) return {};
     const { startC, endC } = period;
-    // Sum each product's lines (a product can be counted in multiple locations).
-    const sMap = {}; (startC.items || []).forEach(it => {
-      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
-      else sMap[it.product_id] = { ...it };
-    });
-    const eMap = {}; (endC.items   || []).forEach(it => {
-      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
-      else eMap[it.product_id] = { ...it };
-    });
-    const purch = {};
-    this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
-      .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
-      }));
+    // Base usage (container units) from the shared helper; Variance then subtracts
+    // known comps + waste (already converted to the product's container unit in
+    // adjustmentsMap) so "Adjusted Used" is the amount that should match POS.
+    const base = App.computeUsagePair(startC, endC, this.deliveries());
     const adj = this.adjustmentsMap(startC.date, endC.date);
     const map = {};
-    Object.keys(eMap).forEach(pid => {
-      if (!sMap[pid]) return;
-      const p = this.productById(pid) || {};
-      const rawUsed = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
+    Object.keys(base).forEach(pid => {
+      const b = base[pid];
+      const p = b.product || {};
       const a = adj[pid] || { comp_units: 0, waste_units: 0 };
       const adjustments = (a.comp_units || 0) + (a.waste_units || 0);
-      const used = Math.max(rawUsed - adjustments, 0);
-      // Servings + ounces per inventory unit. For bottle beer one unit is a case
-      // (case_size bottles; case_size x container_size_oz ounces); for everything
-      // else one unit is the container (pours_per_container servings).
-      const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
-      const ppc = isCaseBeer ? p.case_size : (p.pours_per_container || null);
-      const ozPerUnit = isCaseBeer
-        ? (p.container_size_oz != null ? p.case_size * p.container_size_oz : null)
-        : (p.container_size_oz != null ? p.container_size_oz : null);
-      const unitCost = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
+      const used = Math.max(b.rawUsed - adjustments, 0);
       map[pid] = {
-        product: p, name: eMap[pid].name,
-        rawUsed, adjustments,
+        product: p, name: b.name,
+        rawUsed: b.rawUsed, adjustments,
         compUnits: a.comp_units || 0,
         wasteUnits: a.waste_units || 0,
         used,
-        poursMade: ppc != null ? used * ppc : null,
-        ouncesUsed: ozPerUnit != null ? used * ozPerUnit : null,
-        usageCost: unitCost != null ? used * unitCost : null
+        poursMade:  b.servingsPerUnit != null ? used * b.servingsPerUnit : null,
+        ouncesUsed: b.ozPerUnit != null ? used * b.ozPerUnit : null,
+        usageCost:  b.unitCost != null ? used * b.unitCost : null
       };
     });
     return map;
@@ -173,8 +153,10 @@ S.InventoryVarianceReport = {
         if (!p) mi = this.menuItemById(mappedId);
       }
       if (p) {
-        // Direct product match — qty × pour_size_oz oz
-        const oz = (parseFloat(pr.qty) || 0) * (parseFloat(p.pour_size_oz) || 0);
+        // Direct product match — qty × oz per sold unit. A beer sold by the bottle
+        // has no pour_size_oz, so fall back to the bottle's container_size_oz.
+        const ozPer = parseFloat(p.pour_size_oz) || (App.isCaseBeer(p) ? (parseFloat(p.container_size_oz) || 0) : 0);
+        const oz = (parseFloat(pr.qty) || 0) * ozPer;
         addProduct(p.id, oz, pr.qty, pr.sales, false);
       } else if (mi) {
         // Menu item match — explode into per-product oz
@@ -410,7 +392,7 @@ S.InventoryVarianceReport = {
       + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-      + 'Bottles Used is what your counts say left inventory between the two dates. Comps and Waste are subtracted because both are known non-revenue losses already logged. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error). FROM RECIPE products were consumed through menu item recipes — POS rows for those menu items get exploded through the recipe so each ingredient gets its share.'
+      + 'Used (Raw) is what your counts say left inventory between the two dates, in each product\'s stock unit (cases for bottle beer, bottles for liquor and wine, kegs for draft). Comps and Waste are subtracted because both are known non-revenue losses already logged. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error). FROM RECIPE products were consumed through menu item recipes, so POS rows for those menu items get exploded through the recipe and each ingredient gets its share.'
       + '</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
