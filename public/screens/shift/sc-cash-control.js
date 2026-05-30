@@ -96,7 +96,7 @@ S.ShiftCashControl = {
         amount:    Math.abs(variance),
         direction: 'none',
         variance,
-        status:    v.status || (Math.abs(variance) <= (v.tolerance || 10) ? 'OK' : variance < 0 ? 'Short' : 'Over'),
+        status:    v.status || (Math.abs(variance) <= (v.tolerance || 10) ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over'),
         source_screen: 'sc-variance-log',
         source_id:     v.id
       });
@@ -125,7 +125,7 @@ S.ShiftCashControl = {
     const drops       = stream.filter(s => s.category === 'safe' && s.type === 'Cash Drop');
     const safeOut     = stream.filter(s => s.category === 'safe' && s.direction === 'out');
     const variances   = stream.filter(s => s.category === 'variance');
-    const flagged     = variances.filter(v => v.status !== 'OK');
+    const flagged     = variances.filter(v => v.status === 'Over' || v.status === 'Short');
     const netVariance = variances.reduce((s, v) => s + (v.variance || 0), 0);
 
     const headerBalance = '<div class="card" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">'
@@ -178,9 +178,10 @@ S.ShiftCashControl = {
         if (s.category === 'variance') {
           // Variance: signed delta with status badge
           const sign = s.variance > 0 ? '+' : s.variance < 0 ? '-' : '';
-          const cls  = s.status === 'OK' ? 'pos' : 'neg';
+          const isFlag = s.status === 'Over' || s.status === 'Short';
+          const cls  = isFlag ? 'neg' : 'pos';
           amountCell = '<span class="' + cls + '">' + sign + App.fmtCurrency(Math.abs(s.variance)) + '</span>';
-          const sColor = s.status === 'OK' ? 'var(--gold)' : 'var(--red)';
+          const sColor = isFlag ? 'var(--red)' : 'var(--gold)';
           statusCell = '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + sColor + ';border:1px solid ' + sColor + ';border-radius:3px;padding:2px 6px;">' + esc(s.status) + '</span>';
         } else {
           // Safe activity (in/out)
