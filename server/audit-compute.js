@@ -258,7 +258,27 @@ function computeProfitAudit(appData, controlData, extracted) {
   // invoice-matching answer and no logged vendor activity. An unanswered
   // question never manufactures a score. ──
   const matchState = (extracted.invoice_vs_po || '').toLowerCase();
-  const haveVendorActivity = vendorLog.length > 0 || num(cd.deliveries_logged) > 0;
+  // ── Uncollected vendor credits (expands S4) ──
+  // Filed discrepancies are real overcharges the operator already caught. The
+  // leak is the credit owed but never chased. From the in-app discrepancy log:
+  // outstanding = filed but not Resolved (overcharge $), recovered = what came
+  // back. A low recovery rate with credits still open is poor follow-through
+  // (a measured result). Filing discrepancies counts as vendor activity. These
+  // are real filed dollars distinct from the % exposure estimate, surfaced on
+  // their own — NOT folded into the recoverable headline (would muddy the
+  // exposure figure). N/A when nothing is filed.
+  const discreps = appData.vendor_discrepancies || [];
+  let uncollectedCredits = null, recoveredCredits = null, openCreditCount = null, creditRecoveryPct = null;
+  if (discreps.length > 0) {
+    const outstanding = discreps.filter(r => r.status && r.status !== 'Resolved');
+    openCreditCount = outstanding.length;
+    uncollectedCredits = round0(outstanding.reduce((s, r) => s + (num(r.overcharge) || 0), 0));
+    recoveredCredits = round0(discreps.filter(r => r.status === 'Resolved')
+      .reduce((s, r) => s + (num(r.recovered_amount) != null ? num(r.recovered_amount) : (num(r.overcharge) || 0)), 0));
+    const addressed = (recoveredCredits || 0) + (uncollectedCredits || 0);
+    creditRecoveryPct = addressed > 0 ? round0((recoveredCredits / addressed) * 100) : null;
+  }
+  const haveVendorActivity = vendorLog.length > 0 || num(cd.deliveries_logged) > 0 || discreps.length > 0;
   let s4 = null;
   if (matchState) {
     if (matchState.includes('never') || matchState.includes('not ') || matchState.includes('no ')) s4 = 40;
@@ -273,6 +293,12 @@ function computeProfitAudit(appData, controlData, extracted) {
     // Results-based: credit only real backup vendors. "None"/"No" earns nothing.
     const backupStr = (extracted.backup_vendors || '').toLowerCase();
     if (backupStr !== '' && !backupStr.includes('none') && backupStr !== 'no' && !backupStr.startsWith('no ')) s4 += 5;
+    // Credit follow-through (a measured result): chasing filed credits earns
+    // modest credit; filing them and not collecting drags the score.
+    if (creditRecoveryPct != null) {
+      if (creditRecoveryPct >= 75) s4 += 5;
+      else if (creditRecoveryPct < 40 && openCreditCount >= 2) s4 -= 8;
+    }
     s4 = clampScore(s4);
   }
   const vendorSpendMonthly = round0((bevCogsPeriod != null || foodCogsPeriod != null)
@@ -383,6 +409,10 @@ function computeProfitAudit(appData, controlData, extracted) {
     S4_PRICE_VERIFY: vendorLog.length > 0 ? `Active — ${vendorLog.length} changes logged` : 'Not documented',
     S4_ANNUAL_BIDS: extracted.annual_bids || 'Not documented',
     S4_BACKUP_VENDORS: extracted.backup_vendors || 'Not documented',
+    S4_UNCOLLECTED_CREDITS: uncollectedCredits,
+    S4_RECOVERED_CREDITS: recoveredCredits,
+    S4_OPEN_CREDIT_COUNT: openCreditCount,
+    S4_CREDIT_RECOVERY_PCT: creditRecoveryPct,
     S4_EXPOSURE_MONTHLY: s4ExposureMonthly,
     S4_EXPOSURE_ANNUAL: round0(s4ExposureMonthly * 12),
 
@@ -507,12 +537,20 @@ function computeRevenueAudit(appData, controlData, extracted) {
     stars = num(extracted.stars_count) || 0; plow = num(extracted.plowhorses_count) || 0;
     puzzle = num(extracted.puzzles_count) || 0; dog = num(extracted.dogs_count) || 0;
   }
+  // Pricing lag (expands S3) — when prices last rose. Recent repricing to
+  // inflation is a real margin control (credit, gated to a scored S3, never a
+  // penalty per the practice rule). Stale/never surfaces as a finding + action
+  // item. Operator-stated; N/A when unanswered.
+  const priceLag = (extracted.last_price_increase || '').toLowerCase();
+  const repriceRecent = priceLag === 'within_6mo' || priceLag === '6_12mo';
+  const repriceStale = priceLag === 'over_year' || priceLag === 'never';
   let s3 = null;
   if (menuKnown) {
     const total = stars + plow + puzzle + dog || 1;
     const dogRatio = dog / total;
     s3 = dogRatio <= 0.10 ? 80 : dogRatio <= 0.25 ? 60 : dogRatio <= 0.40 ? 45 : 30;
     if (extracted.menu_engineered === true) s3 += 10;
+    if (repriceRecent) s3 += 5;     // actively repricing to inflation
     s3 = clampScore(s3);
   }
 
@@ -607,6 +645,12 @@ function computeRevenueAudit(appData, controlData, extracted) {
     S3_DOGS_COUNT: menuKnown ? dog : null,
     S3_TOP_CATEGORY: topCategory || (extracted.top_category || 'Not available'),
     S3_PRICING_OPPORTUNITY: 0,     // surfaced qualitatively; no invented menu-mix dollar
+    S3_LAST_PRICE_INCREASE: priceLag === 'within_6mo' ? 'Within 6 months'
+      : priceLag === '6_12mo' ? '6 to 12 months ago'
+      : priceLag === 'over_year' ? 'Over a year ago'
+      : priceLag === 'never' ? 'Cannot recall'
+      : null,
+    S3_PRICING_STALE: repriceStale ? true : (repriceRecent ? false : null),
     S3_MONTHLY_GAP: 0,
 
     S4_SCORE: s4,
@@ -766,6 +810,12 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   // ── S6 — Delivery Platforms ──
   const ddActive = extracted.doordash_active, ueActive = extracted.ubereats_active, ghActive = extracted.grubhub_active;
   const haveDelivery = ddActive != null || ueActive != null || ghActive != null;
+  // Delivery markup strategy (expands S6) — whether delivery menu prices are
+  // marked up to offset the 20-30% platform commission. Pricing delivery like
+  // dine-in loses money on every order. Operator-stated (practice) or read off a
+  // screenshot. NO dollars (Traffic rule) — a missing markup is a deficit.
+  const deliveryMarkup = (extracted.delivery_markup === true || extracted.delivery_markup === false) ? extracted.delivery_markup : null;
+  const deliveryCommissionPct = num(extracted.delivery_commission_pct);
   let s6 = null, platformCount = 0;
   if (haveDelivery) {
     [ddActive, ueActive, ghActive].forEach(a => { if (a === true) platformCount++; });
@@ -773,6 +823,8 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     if (extracted.menu_complete === true) pts += 12;
     if (extracted.promo_active === true) pts += 13;
     s6 = clampScore(Math.min(100, pts) || 30);
+    if (deliveryMarkup === true) s6 = clampScore(s6 + 8);        // pricing protects margin
+    else if (deliveryMarkup === false) s6 = clampScore(s6 - 10); // losing margin on every order
   }
 
   // ── S7 — Email and Loyalty ──
@@ -808,6 +860,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
   if (cHours === false) items.push({ action: 'Put your hours on the homepage. Guests checking if you are open should not have to dig.', gap_id: 'website' });
   if (igPosts != null && igPosts < B.ig_posts) items.push({ action: 'Post to Instagram more often. ' + igPosts + ' posts in 30 days versus ' + B.ig_posts + '.', gap_id: 'social' });
   if (openRate != null && openRate < B.open_rate) items.push({ action: 'Improve email open rate. ' + openRate + '% versus the ' + B.open_rate + '% benchmark.', gap_id: 'email-loyalty' });
+  if (deliveryMarkup === false) items.push({ action: 'Mark up your delivery menu prices. Pricing delivery the same as dine-in hands the 20 to 30 percent platform commission straight out of your margin on every order.', gap_id: 'delivery' });
   if (listSize != null && listSize < B.list_size) items.push({ action: 'Grow the email list. ' + Math.round(listSize) + ' subscribers versus ' + B.list_size + '.', gap_id: 'email-loyalty' });
 
   const dataTier = (gbp.rating != null || web.performance != null || yelp.rating != null) ? 'Verified — live link data'
@@ -878,6 +931,8 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     S6_PHOTO_COUNT_DELIVERY: num(extracted.photo_count_delivery),
     S6_MENU_COMPLETE: yn(extracted.menu_complete),
     S6_PROMO_ACTIVE: yn(extracted.promo_active),
+    S6_DELIVERY_MARKUP: deliveryMarkup,
+    S6_DELIVERY_COMMISSION_PCT: deliveryCommissionPct,
     S6_MONTHLY_GAP: 0,
 
     S7_SCORE: s7,
@@ -961,6 +1016,19 @@ if (require.main === module) {
   checks.push(['Profit S2 no-sale surfaced', discHigh.S2_NO_SALE_COUNT, 12]);
   checks.push(['Profit S2 discount/no-sale N/A when absent', discBase.S2_DISCOUNT_PCT, null]);
   checks.push(['Profit S2 high discounts drag score', discHigh.S2_SCORE < discBase.S2_SCORE, true]);
+  // Uncollected vendor credits (S4 expansion): present -> outstanding + recovery
+  // rate computed and poor follow-through drags S4; absent -> N/A.
+  const credAppData = { settings: { annual_bar_revenue: 600000 }, vendor_discrepancies: [
+    { status: 'Open', overcharge: 400 }, { status: 'Credit Requested', overcharge: 350 },
+    { status: 'Resolved', overcharge: 200, recovered_amount: 200 }
+  ] };
+  const credLow = computeProfitAudit(credAppData, null, { invoice_vs_po: 'Spot checked' });
+  const credNone = computeProfitAudit({ settings: { annual_bar_revenue: 600000 } }, null, { invoice_vs_po: 'Spot checked' });
+  checks.push(['Profit S4 uncollected credits summed', credLow.S4_UNCOLLECTED_CREDITS, 750]);
+  checks.push(['Profit S4 recovered credits summed', credLow.S4_RECOVERED_CREDITS, 200]);
+  checks.push(['Profit S4 credit recovery rate', credLow.S4_CREDIT_RECOVERY_PCT, 21]);
+  checks.push(['Profit S4 poor follow-through drags score', credLow.S4_SCORE < credNone.S4_SCORE, true]);
+  checks.push(['Profit S4 credits N/A when none filed', credNone.S4_UNCOLLECTED_CREDITS, null]);
   let pass = 0;
   for (const [label, got, exp] of checks) {
     const ok = got === exp;
@@ -1085,6 +1153,21 @@ if (require.main === module) {
   rChecks.push(['Rev S1 bev attach per-guest computed', revBevLow.S1_BEV_PER_COVER, 0.5]);
   rChecks.push(['Rev S1 low bev attach drags score', revBevLow.S1_SCORE < revBevBase.S1_SCORE, true]);
   rChecks.push(['Rev S1 bev attach N/A when no bev data', revBevBase.S1_BEV_PER_COVER, null]);
+  // Pricing lag (S3 expansion): recent repricing credits a scored S3, stale is
+  // flagged, unanswered is N/A. Uses the menu sample so S3 is scored.
+  const rMenuPL = [
+    { name: 'A', category: 'Entree', price: 20, cost: 6, weekly_covers: 100 },
+    { name: 'B', category: 'Entree', price: 18, cost: 7, weekly_covers: 90 },
+    { name: 'C', category: 'Side', price: 8, cost: 2, weekly_covers: 120 },
+    { name: 'D', category: 'Starter', price: 12, cost: 5, weekly_covers: 30 }
+  ];
+  const plBase   = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, menu_items: rMenuPL }, null, {});
+  const plRecent = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, menu_items: rMenuPL }, null, { last_price_increase: 'within_6mo' });
+  const plStale  = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, menu_items: rMenuPL }, null, { last_price_increase: 'over_year' });
+  rChecks.push(['Rev S3 pricing lag N/A when unanswered', plBase.S3_PRICING_STALE, null]);
+  rChecks.push(['Rev S3 recent repricing credits score', plRecent.S3_SCORE > plBase.S3_SCORE, true]);
+  rChecks.push(['Rev S3 stale pricing flagged', plStale.S3_PRICING_STALE, true]);
+  rChecks.push(['Rev S3 stale pricing does not penalize score', plStale.S3_SCORE, plBase.S3_SCORE]);
   let rPass = 0;
   for (const [label, got, exp] of rChecks) {
     const ok = got === exp; if (ok) rPass++;
@@ -1132,6 +1215,14 @@ if (require.main === module) {
   tChecks.push(['Traffic S2 conversion N/A when no structure', trafNoConv.S2_CONVERSION_ELEMENTS_ASSESSED, null]);
   tChecks.push(['Traffic S2 lower with missing conversion', trafConv.S2_SCORE < trafNoConv.S2_SCORE, true]);
   tChecks.push(['Traffic S2 conversion carries no dollar', trafConv.S2_MONTHLY_GAP, 0]);
+  // Delivery markup (S6 expansion): no markup drags S6, markup credits it,
+  // unanswered is N/A. No dollars.
+  const delvBase = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { doordash_active: true, menu_complete: true }, {});
+  const delvNo   = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { doordash_active: true, menu_complete: true, delivery_markup: false }, {});
+  const delvYes  = computeTrafficAudit({ settings: {}, traffic_settings: {} }, null, { doordash_active: true, menu_complete: true, delivery_markup: true }, {});
+  tChecks.push(['Traffic S6 delivery markup N/A when unanswered', delvBase.S6_DELIVERY_MARKUP, null]);
+  tChecks.push(['Traffic S6 no-markup drags score', delvNo.S6_SCORE < delvBase.S6_SCORE, true]);
+  tChecks.push(['Traffic S6 markup credits score', delvYes.S6_SCORE > delvBase.S6_SCORE, true]);
   let tPass = 0;
   for (const [label, got, exp] of tChecks) {
     const ok = got === exp; if (ok) tPass++;
