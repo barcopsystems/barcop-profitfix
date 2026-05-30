@@ -1477,11 +1477,18 @@ S.HubSettings = {
     // Usage = week-ago minus today; no deliveries land in the last 7 days, so
     // the icCOGS feed reads cleanly as (start - end) x unit cost. Tuned so the
     // feed computes to Anchor week 12: ~$2,729 bar and ~$2,364 food COGS.
+    // Indices 0-18 are the original counted set that carries the tuned COGS.
+    // Indices 19-32 are the appended kitchen ingredients; they carry equal
+    // start/end counts (zero net usage this period) so they appear in stock
+    // without altering the tuned COGS tie.
     const icTotals = {
       0:[9,25], 1:[8,21], 2:[7,17], 3:[6,10], 4:[10,25], 5:[9,22],
       6:[96,456], 7:[72,332], 8:[2,6], 9:[40,220], 10:[35,199],
       11:[18,88], 12:[4,15], 13:[5,19], 14:[3,9], 15:[2,6],
-      16:[2,4], 17:[6,14], 18:[3,7]
+      16:[2,4], 17:[6,14], 18:[3,7],
+      19:[160,160], 20:[26,26], 21:[9,9], 22:[38,38], 23:[130,130],
+      24:[38,38], 25:[32,32], 26:[30,30], 27:[40,40], 28:[58,58],
+      29:[26,26], 30:[28,28], 31:[20,20], 32:[52,52]
     };
     const icCountItem = (p, qty) => ({
       product_id:p.id, name:p.name, category:p.category,
