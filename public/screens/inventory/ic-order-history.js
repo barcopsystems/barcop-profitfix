@@ -58,7 +58,9 @@ S.InventoryOrderHistory = {
       const qty  = li.qty || 0;
       const unit = parseFloat(li.unit_cost || 0).toFixed(2);
       const ext  = parseFloat(li.extended  || 0).toFixed(2);
-      lines.push('  ' + (li.name || '(unnamed)') + '  -  qty ' + qty + '  @  $' + unit + '  =  $' + ext);
+      const isCase = li.display_unit === 'case';
+      lines.push('  ' + (li.name || '(unnamed)') + '  -  ' + qty + (isCase ? ' cases' : '')
+        + '  @  $' + unit + (isCase ? '/case' : '') + '  =  $' + ext);
     });
     lines.push('');
     lines.push('Order total: $' + parseFloat(order.total || 0).toFixed(2));
@@ -126,22 +128,14 @@ S.InventoryOrderHistory = {
         + '<td>' + this.statusBadge(o.status) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm oh-view" data-id="' + o.id + '">View</button>'
-        + '<button class="btn btn-danger btn-sm oh-del" data-id="' + o.id + '">Delete</button>'
+        + (App.canEdit('ic-order-history') ? '<button class="btn btn-danger btn-sm oh-del" data-id="' + o.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    const modal = '<div id="oh-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this order?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="oh-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="oh-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       const row = ev.target.closest('.oh-row');
       const view = ev.target.closest('.oh-view');
@@ -161,12 +155,15 @@ S.InventoryOrderHistory = {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="oh-export">Export PDF</button>';
     document.getElementById('oh-export')?.addEventListener('click', () => window.print());
 
-    const rows = (o.line_items || []).map(li => '<tr>'
-      + '<td><div class="val">' + esc(li.name) + '</div></td>'
-      + '<td>' + (li.qty || 0) + '</td>'
-      + '<td>' + App.fmtCurrency(li.unit_cost || 0) + '</td>'
-      + '<td class="val">' + App.fmtCurrency(li.extended || 0) + '</td>'
-      + '</tr>').join('');
+    const rows = (o.line_items || []).map(li => {
+      const isCase = li.display_unit === 'case';
+      return '<tr>'
+        + '<td><div class="val">' + esc(li.name) + '</div></td>'
+        + '<td>' + (li.qty || 0) + (isCase ? ' cases' : '') + '</td>'
+        + '<td>' + App.fmtCurrency(li.unit_cost || 0) + (isCase ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '') + '</td>'
+        + '<td class="val">' + App.fmtCurrency(li.extended || 0) + '</td>'
+        + '</tr>';
+    }).join('');
 
     const received  = o.status === 'Received';
     const submitted = o.status === 'Submitted';
@@ -201,9 +198,10 @@ S.InventoryOrderHistory = {
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + submitRow
       + '<div class="card-actions">'
-      + (received ? '' : '<button class="btn btn-primary" id="oh-submit">' + (submitted ? 'Resend to Vendor' : 'Email to Vendor') + '</button>')
-      + '<button class="btn ' + (received ? 'btn-ghost' : 'btn-ghost') + '" id="oh-status">'
-      + (received ? 'Reopen Order' : 'Mark Received') + '</button>'
+      + (App.canEdit('ic-order-history')
+          ? ((received ? '' : '<button class="btn btn-primary" id="oh-submit">' + (submitted ? 'Resend to Vendor' : 'Email to Vendor') + '</button>')
+             + '<button class="btn btn-ghost" id="oh-status">' + (received ? 'Reopen Order' : 'Mark Received') + '</button>')
+          : '')
       + (received ? '' : '<button class="btn btn-ghost" id="oh-receive">Log the Delivery</button>')
       + '</div></div></div>';
 
@@ -224,18 +222,11 @@ S.InventoryOrderHistory = {
     this.renderDetail(id);
   },
 
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('oh-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('oh-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('oh-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      App.inventoryData.ic_orders = this.orders().filter(x => x.id !== delId);
-      await App.saveInventory();
-      this.renderList();
-    };
+  async confirmDel(id) {
+    const ok = await App.confirm({ title: 'Delete this order?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
+    App.inventoryData.ic_orders = this.orders().filter(x => x.id !== id);
+    await App.saveInventory();
+    this.renderList();
   }
 };
