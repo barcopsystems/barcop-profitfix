@@ -158,8 +158,10 @@ S.HubBarCopAudit = {
     const counts     = (App.inventoryData?.ic_counts) || [];
     const spotChecks = (App.inventoryData?.ic_spot_checks) || [];
 
-    const opens   = checklists.filter(c => c.type === 'open'    && this._withinWindow(c.date, this.WINDOW_DAYS));
-    const closes  = checklists.filter(c => c.type === 'closing' && this._withinWindow(c.date, this.WINDOW_DAYS));
+    // Checklist screens write type 'Opening'/'Closing'; match case-insensitively
+    // (also tolerates legacy 'open'/'closing').
+    const opens   = checklists.filter(c => (c.type || '').toLowerCase().indexOf('open') === 0 && this._withinWindow(c.date, this.WINDOW_DAYS));
+    const closes  = checklists.filter(c => (c.type || '').toLowerCase().indexOf('clos') === 0 && this._withinWindow(c.date, this.WINDOW_DAYS));
     const wkCounts  = counts.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));
     const wkSpots   = spotChecks.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));
     const wkShifts  = shifts.filter(s => this._withinWindow(s.date, this.WINDOW_DAYS));
@@ -264,11 +266,11 @@ S.HubBarCopAudit = {
 
     // Discrepancy resolution rate over the last 90 days. N/A with no discrepancies on file.
     const recentDiscrep = discrep.filter(d => this._withinWindow(d.date, 90));
-    const resolved      = recentDiscrep.filter(d => d.status === 'resolved');
+    const resolved      = recentDiscrep.filter(d => (d.status || '').toLowerCase() === 'resolved');
     const discrepRatio  = recentDiscrep.length === 0 ? null : resolved.length / recentDiscrep.length;
 
     // Discrepancy aging: open more than 60 days deduct. N/A with no discrepancies at all.
-    const aging = discrep.filter(d => d.status !== 'resolved' && this._daysSince(d.date) > 60);
+    const aging = discrep.filter(d => (d.status || '').toLowerCase() !== 'resolved' && this._daysSince(d.date) > 60);
     const agingRatio = discrep.length === 0 ? null : (aging.length === 0 ? 1 : Math.max(0, 1 - aging.length / 5));
 
     // Spot check clean-variance rate. N/A when no spot checks in the window.
@@ -466,7 +468,7 @@ S.HubBarCopAudit = {
     }
 
     // Aging vendor discrepancies (open + over 60 days).
-    const aging = discrep.filter(d => d.status !== 'resolved' && this._daysSince(d.date) > 60);
+    const aging = discrep.filter(d => (d.status || '').toLowerCase() !== 'resolved' && this._daysSince(d.date) > 60);
     if (aging.length) {
       const totalClaimed = aging.reduce((s, d) => s + (parseFloat(d.overcharge || d.claimed_amount) || 0), 0);
       const totalRecovered = aging.reduce((s, d) => s + (parseFloat(d.recovered_amount || d.credited_amount) || 0), 0);
