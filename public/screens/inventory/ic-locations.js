@@ -191,8 +191,9 @@ S.InventoryLocations = {
       ? this.renderNameEditCard(l, isNew)
       : this.renderNameViewCard(l);
     const arrangeCard = isNew
-      ? '<div class="card"><div class="card-title">Arrange Products</div>'
-        + '<div style="font-size:12px;color:var(--t3);">Save the location above first. Once it exists, every product whose Primary Location is set to this location will appear here in a draggable list. Drag the handles to match your shelf or rail order so Take Inventory walks them in order.</div></div>'
+      ? '<div class="card"><div class="card-title">Products In This Location</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Name the location and choose what&rsquo;s stored here, then add the products that live in it.</div>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="il-add-products-new">+ Save &amp; add products</button></div>'
       : this.renderArrangeCard(l);
 
     this.container.innerHTML = '<div class="screen">'
@@ -217,7 +218,13 @@ S.InventoryLocations = {
   _openProductsModal(locName) {
     const m = document.getElementById('il-prod-modal');
     if (!m) return;
-    const prods = this.products().filter(p => p.active !== false).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // Filter to the categories this location stocks (Bar / Kitchen / Both) so
+    // food never shows for a bar location and liquor never shows for the line.
+    const loc = this.locations().find(l => l.name === locName);
+    const type = (loc && loc.type) || 'both';
+    const BAR = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'];
+    const allowed = type === 'bar' ? (c => BAR.includes(c)) : type === 'kitchen' ? (c => !BAR.includes(c)) : (() => true);
+    const prods = this.products().filter(p => p.active !== false && allowed(p.category)).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const body = prods.length ? prods.map(p => {
       const inLoc = App.productLocations(p).includes(locName);
       return '<label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
@@ -262,6 +269,12 @@ S.InventoryLocations = {
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f w-lg"><label>Location Name</label>'
       + '<input type="text" id="il-name" value="' + esc(l?.name || '') + '" placeholder="Walk-In Cooler"/></div>'
+      + '<div class="f w-md"><label>What&rsquo;s stored here</label>'
+      + '<select id="il-type">'
+      + '<option value="both"' + ((l?.type || 'both') === 'both' ? ' selected' : '') + '>Bar &amp; Kitchen</option>'
+      + '<option value="bar"' + (l?.type === 'bar' ? ' selected' : '') + '>Bar only</option>'
+      + '<option value="kitchen"' + (l?.type === 'kitchen' ? ' selected' : '') + '>Kitchen only</option>'
+      + '</select></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="il-save">' + (isNew ? 'Save Location' : 'Update Location') + '</button>'
@@ -304,6 +317,14 @@ S.InventoryLocations = {
       else { this.detailId = null; this.renderList(); }
     });
     document.getElementById('il-save')?.addEventListener('click', () => this.saveLocation(locId));
+    // New location: save it (using the entered name + type) then open the
+    // add-products checklist on the freshly created location.
+    document.getElementById('il-add-products-new')?.addEventListener('click', async () => {
+      const nm = document.getElementById('il-name')?.value.trim();
+      if (!nm) { const err = document.getElementById('il-err'); if (err) { err.textContent = 'Enter a location name first.'; err.style.display = 'inline'; } return; }
+      await this.saveLocation(null);
+      this._openProductsModal(nm);
+    });
     // Reverse door: add/remove products in this location.
     if (l) {
       document.getElementById('il-add-products')?.addEventListener('click', () => this._openProductsModal(l.name));
@@ -343,6 +364,7 @@ S.InventoryLocations = {
       if (l) {
         const old = l.name;
         l.name = name;
+        l.type = document.getElementById('il-type')?.value || l.type || 'both';
         if (old !== name) {
           this.products().forEach(p => {
             if (p.primary_location === old)   p.primary_location = name;
@@ -353,7 +375,7 @@ S.InventoryLocations = {
       }
     } else {
       savedId = App.uid();
-      this.locations().push({ id: savedId, name, archived: false });
+      this.locations().push({ id: savedId, name, type: document.getElementById('il-type')?.value || 'both', archived: false });
     }
 
     const btn = document.getElementById('il-save');
