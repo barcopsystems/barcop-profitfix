@@ -623,12 +623,14 @@ S.RevenueAudit = {
 
     const uploadCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Add a report here to score a section Bar Cop cannot see yet, or for deeper detail. Accepts PDF, Excel, CSV, or images.</div>'
-      + this.renderFileSection('optional',  'POS Sales Summary',            'ra-f-pos',    'ra-pos',    'Scores Check Average (revenue, covers, blended check average)')
-      + this.renderFileSection('highlight', 'Server Sales Report',          'ra-f-server', 'ra-server', 'Scores Server Performance (check average by server, spread, top and bottom)')
-      + this.renderFileSection('optional',  'Menu Sales Mix and Pricing',   'ra-f-menu',   'ra-menu',   'Scores Menu Performance (Stars, Plowhorses, Dogs, pricing)')
-      + this.renderFileSection('optional',  'Labor Schedule or Payroll',    'ra-f-labor',  'ra-labor',  'Scores Labor Efficiency (labor percent, RPLH, overtime)')
-      + this.renderFileSection('optional',  'Event and Catering Records',   'ra-f-events', 'ra-events', 'Scores Events and Private Dining (event revenue, frequency)')
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Drop in any of the reports below to score a section Bar Cop cannot see yet, or for deeper detail. One drop zone takes them all.</div>'
+      + FileDrop.render('ra-drop', { items: [
+          { t: 'POS Sales Summary',          s: 'Scores Check Average (revenue, covers, blended check average).' },
+          { t: 'Server Sales Report',        s: 'Scores Server Performance (check average by server, spread, top and bottom).', hi: true },
+          { t: 'Menu Sales Mix and Pricing', s: 'Scores Menu Performance (Stars, Plowhorses, Dogs, pricing).' },
+          { t: 'Labor Schedule or Payroll',  s: 'Scores Labor Efficiency (labor percent, RPLH, overtime).' },
+          { t: 'Event and Catering Records', s: 'Scores Events and Private Dining (event revenue, frequency).' }
+        ] })
       + '</div>';
 
     const pr = d.practices || {};
@@ -661,6 +663,7 @@ S.RevenueAudit = {
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'You can review and update your inputs now. The next audit can be generated in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '.') + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
+    FileDrop.attach('ra-drop');
 
     document.getElementById('ra-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Revenue Audit Works', [
       { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
@@ -861,14 +864,10 @@ S.RevenueAudit = {
     const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
     const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
 
-    // Validation — do not run an audit with nothing to analyze
-    const fileInputIds = ['ra-f-pos', 'ra-f-server', 'ra-f-menu', 'ra-f-labor', 'ra-f-events'];
-    let raFileCount = 0;
-    fileInputIds.forEach(id => {
-      const inp = document.getElementById(id);
-      if (inp?.files) raFileCount += inp.files.length;
-    });
-    const hasRealData = raFileCount > 0 || (App.data.revenue_weeks && App.data.revenue_weeks.length > 0) || barRev > 0 || foodRev > 0;
+    // Validation — do not run an audit with nothing to analyze. Files come from
+    // the single shared drop zone.
+    const dropFiles = FileDrop.getFiles('ra-drop');
+    const hasRealData = dropFiles.length > 0 || (App.data.revenue_weeks && App.data.revenue_weeks.length > 0) || barRev > 0 || foodRev > 0;
     if (!hasRealData) {
       setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your POS and labor reports.', 'var(--red)');
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
@@ -899,10 +898,7 @@ S.RevenueAudit = {
       form.append('practices', JSON.stringify(practices));
       const controlData = this.buildControlData();
       if (controlData) form.append('controlData', JSON.stringify(controlData));
-      for (const id of fileInputIds) {
-        const inp = document.getElementById(id);
-        if (inp?.files) for (const f of inp.files) form.append(id, f, f.name);
-      }
+      for (const f of dropFiles) form.append('file', f, f.name);
 
       const res  = await fetch('/api/generate-revenue-audit', { method:'POST', body: form });
       const data = await res.json();
