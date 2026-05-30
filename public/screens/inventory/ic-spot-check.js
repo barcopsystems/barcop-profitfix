@@ -316,6 +316,7 @@ S.InventorySpotCheck = {
   },
 
   async save() {
+    if (!App.canEdit('ic-spot-check')) return;   // staff-permission guard
     const err = document.getElementById('sp-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('sp-date')?.value;
