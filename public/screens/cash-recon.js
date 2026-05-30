@@ -49,7 +49,7 @@ S.CashRecon = {
 
     // ── Summary ──
     const netVar = variances.reduce((t, v) => t + (v.variance || 0), 0);
-    const flagged = variances.filter(v => v.status && v.status !== 'Within Tolerance').length;
+    const flagged = variances.filter(v => v.status === 'Over' || v.status === 'Short').length;
     const dropTotal = drops.reduce((t, d) => t + (d.amount || 0), 0);
 
     const summary = '<div class="calc" style="margin-bottom:16px;">'
