@@ -1328,6 +1328,35 @@ S.HubSettings = {
       { name:'Arborio Rice (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:3.10,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
       { name:'Parmesan (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:8.90,  par_level:30,  reorder_point:10,  primary_location:'Walk-in Cooler' },
       { name:'Beef Brisket (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:6.80,  par_level:80,  reorder_point:24,  primary_location:'Walk-in Cooler' },
+      // Ingredients added for the full recipe-costed menu (C reseed 2026-05-30).
+      // Every menu recipe ingredient must exist here as a product.
+      { name:'Tortilla Chips (bag)',     category:'Food',        vendor:'Sysco Foods',         unit_cost:3.00,  par_level:24,  reorder_point:8,   primary_location:'Dry Storage' },
+      { name:'Chicken Wings (lb)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:2.40,  par_level:120, reorder_point:40,  primary_location:'Walk-in Cooler' },
+      { name:'Brussels Sprouts (lb)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:2.20,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
+      { name:'Chickpeas (lb)',           category:'Food',        vendor:'Sysco Foods',         unit_cost:1.50,  par_level:30,  reorder_point:10,  primary_location:'Dry Storage' },
+      { name:'Flatbread (each)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:0.60,  par_level:120, reorder_point:40,  primary_location:'Dry Storage' },
+      { name:'Calamari (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:6.00,  par_level:30,  reorder_point:10,  primary_location:'Walk-in Cooler' },
+      { name:'Sweet Corn (each)',        category:'Food',        vendor:'Local Produce Co.',   unit_cost:0.55,  par_level:120, reorder_point:40,  primary_location:'Walk-in Cooler' },
+      { name:'Ahi Tuna (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:14.00, par_level:24,  reorder_point:8,   primary_location:'Walk-in Cooler' },
+      { name:'Elbow Pasta (lb)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:1.40,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
+      { name:'Sourdough Loaf (each)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:3.50,  par_level:30,  reorder_point:10,  primary_location:'Dry Storage' },
+      { name:'Quinoa (lb)',              category:'Food',        vendor:'Sysco Foods',         unit_cost:3.20,  par_level:30,  reorder_point:10,  primary_location:'Dry Storage' },
+      { name:'Beef Short Rib (lb)',      category:'Food',        vendor:'Sysco Foods',         unit_cost:7.50,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
+      { name:'Waffle Mix (lb)',          category:'Food',        vendor:'Sysco Foods',         unit_cost:1.80,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
+      { name:'Mayonnaise (qt)',          category:'Misc',        vendor:'Sysco Foods',         unit_cost:4.00,  par_level:12,  reorder_point:4,   primary_location:'Walk-in Cooler' },
+      { name:'Heavy Cream (qt)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:4.50,  par_level:16,  reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Charcuterie Selection (lb)',category:'Food',       vendor:'Local Produce Co.',   unit_cost:12.00, par_level:20,  reorder_point:7,   primary_location:'Walk-in Cooler' },
+      { name:'Dark Chocolate (lb)',      category:'Food',        vendor:'Sysco Foods',         unit_cost:6.50,  par_level:20,  reorder_point:7,   primary_location:'Dry Storage' },
+      { name:'Coffee Liqueur',           category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.0, unit_cost:19.00, par_level:8,  reorder_point:3, primary_location:'Back Bar' },
+      { name:'Campari',                  category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.0, unit_cost:26.00, par_level:6,  reorder_point:2, primary_location:'Back Bar' },
+      { name:'Sweet Vermouth',           category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.0, unit_cost:11.00, par_level:6,  reorder_point:2, primary_location:'Back Bar' },
+      { name:'Mezcal',                   category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:33.00, par_level:6,  reorder_point:2, primary_location:'Liquor Room' },
+      { name:'Prosecco',                 category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:2.0, unit_cost:12.00, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
+      { name:'White Rum',                category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:14.00, par_level:8,  reorder_point:3, primary_location:'Liquor Room' },
+      { name:'Maraschino Liqueur',       category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.5, unit_cost:24.00, par_level:4,  reorder_point:2, primary_location:'Back Bar' },
+      { name:'Cold Brew Concentrate (qt)',category:'Misc',       vendor:'Sysco Foods',         unit_cost:9.00,  par_level:8,  reorder_point:3,   primary_location:'Walk-in Cooler' },
+      { name:'Ginger Beer (qt)',         category:'Misc',        vendor:"Glazer's Beer & Bev", unit_cost:3.00,  par_level:18, reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Cranberry Juice (qt)',     category:'Misc',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12, reorder_point:4,   primary_location:'Back Bar' },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
       const cpp   = pours ? p.unit_cost / pours : null;
@@ -1429,6 +1458,69 @@ S.HubSettings = {
       ing('Espolòn Tequila Blanco', 1), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02) ] });
     attachRecipe('Whiskey Sour', { mode: 'single', plate_yield: null, ingredients: [
       ing('Bulleit Bourbon', 1.3), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
+
+    // ── C reseed (2026-05-30): recipe-cost the rest of the menu off real
+    // Inventory products so nearly every item is recipe-driven and costs auto-
+    // flow. Five simple/prepared items stay manual-cost by design (Fried
+    // Pickles, Pretzel Bites, Truffle Fries, Skillet Cookie, Key Lime Pie).
+    attachRecipe('Loaded Nachos', { mode:'food', plate_yield:1, ingredients:[
+      ing('Tortilla Chips (bag)', 0.5), ing('Cheddar Cheese (lb)', 0.15), ing('Ground Beef 80/20 (lb)', 0.20) ] });
+    attachRecipe('Smoked Wings', { mode:'food', plate_yield:1, ingredients:[
+      ing('Chicken Wings (lb)', 1.2) ] });
+    attachRecipe('Deviled Eggs', { mode:'food', plate_yield:1, ingredients:[
+      ing('Large Eggs (dozen)', 0.5), ing('Mayonnaise (qt)', 0.05) ] });
+    attachRecipe('Charcuterie Board', { mode:'food', plate_yield:1, ingredients:[
+      ing('Charcuterie Selection (lb)', 0.4), ing('Cheddar Cheese (lb)', 0.15), ing('Flatbread (each)', 1) ] });
+    attachRecipe('Crispy Brussels', { mode:'food', plate_yield:1, ingredients:[
+      ing('Brussels Sprouts (lb)', 0.6), ing('Applewood Bacon (lb)', 0.12) ] });
+    attachRecipe('Hummus and Flatbread', { mode:'food', plate_yield:1, ingredients:[
+      ing('Chickpeas (lb)', 0.5), ing('Flatbread (each)', 2) ] });
+    attachRecipe('Calamari', { mode:'food', plate_yield:1, ingredients:[
+      ing('Calamari (lb)', 0.5), ing('Lime Juice (qt)', 0.02) ] });
+    attachRecipe('Street Corn Ribs', { mode:'food', plate_yield:1, ingredients:[
+      ing('Sweet Corn (each)', 3), ing('Parmesan (lb)', 0.05) ] });
+    attachRecipe('Tuna Poke', { mode:'food', plate_yield:1, ingredients:[
+      ing('Ahi Tuna (lb)', 0.30), ing('Hass Avocado (each)', 0.5), ing('Arborio Rice (lb)', 0.10) ] });
+    attachRecipe('House Salad', { mode:'food', plate_yield:1, ingredients:[
+      ing('Mixed Greens (case)', 0.05), ing('Beefsteak Tomato (lb)', 0.10) ] });
+    attachRecipe('Mac and Cheese', { mode:'food', plate_yield:1, ingredients:[
+      ing('Elbow Pasta (lb)', 0.30), ing('Cheddar Cheese (lb)', 0.30), ing('Heavy Cream (qt)', 0.06) ] });
+    attachRecipe('Avocado Toast', { mode:'food', plate_yield:1, ingredients:[
+      ing('Hass Avocado (each)', 1.5), ing('Sourdough Loaf (each)', 0.2), ing('Large Eggs (dozen)', 0.17) ] });
+    attachRecipe('Veggie Grain Bowl', { mode:'food', plate_yield:1, ingredients:[
+      ing('Quinoa (lb)', 0.30), ing('Mixed Greens (case)', 0.05), ing('Hass Avocado (each)', 0.5) ] });
+    attachRecipe('Braised Short Rib', { mode:'food', plate_yield:1, ingredients:[
+      ing('Beef Short Rib (lb)', 1.0), ing('Russet Potato (lb)', 0.40) ] });
+    attachRecipe('Chicken and Waffles', { mode:'food', plate_yield:1, ingredients:[
+      ing('Chicken Thigh (lb)', 0.6), ing('Waffle Mix (lb)', 0.5) ] });
+    attachRecipe('Brunch Burger', { mode:'food', plate_yield:1, ingredients:[
+      ing('Ground Beef 80/20 (lb)', 0.33), ing('Brioche Bun (each)', 1), ing('Applewood Bacon (lb)', 0.10), ing('Large Eggs (dozen)', 0.08), ing('Cheddar Cheese (lb)', 0.08) ] });
+    attachRecipe('Shakshuka', { mode:'food', plate_yield:1, ingredients:[
+      ing('Large Eggs (dozen)', 0.33), ing('Beefsteak Tomato (lb)', 0.40), ing('Chickpeas (lb)', 0.15) ] });
+    attachRecipe('Creme Brulee', { mode:'food', plate_yield:1, ingredients:[
+      ing('Heavy Cream (qt)', 0.25), ing('Large Eggs (dozen)', 0.17) ] });
+    attachRecipe('Chocolate Torte', { mode:'food', plate_yield:1, ingredients:[
+      ing('Dark Chocolate (lb)', 0.20), ing('Large Eggs (dozen)', 0.10), ing('Heavy Cream (qt)', 0.05) ] });
+    attachRecipe('Espresso Martini', { mode:'single', plate_yield:null, ingredients:[
+      ing("Tito's Handmade Vodka", 1.0), ing('Coffee Liqueur', 0.75), ing('Cold Brew Concentrate (qt)', 0.05) ] });
+    attachRecipe('Negroni', { mode:'single', plate_yield:null, ingredients:[
+      ing("Hendrick's Gin", 0.8), ing('Campari', 0.8), ing('Sweet Vermouth', 0.8) ] });
+    attachRecipe('Manhattan', { mode:'single', plate_yield:null, ingredients:[
+      ing('Bulleit Bourbon', 1.3), ing('Sweet Vermouth', 0.5) ] });
+    attachRecipe('Mezcal Mule', { mode:'single', plate_yield:null, ingredients:[
+      ing('Mezcal', 1.0), ing('Lime Juice (qt)', 0.04), ing('Ginger Beer (qt)', 0.13) ] });
+    attachRecipe('Spicy Margarita', { mode:'single', plate_yield:null, ingredients:[
+      ing('Espolòn Tequila Blanco', 1.0), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.04) ] });
+    attachRecipe('French 75', { mode:'single', plate_yield:null, ingredients:[
+      ing("Hendrick's Gin", 0.8), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02), ing('Prosecco', 1) ] });
+    attachRecipe('Mojito', { mode:'single', plate_yield:null, ingredients:[
+      ing('White Rum', 1.5), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
+    attachRecipe('Boulevardier', { mode:'single', plate_yield:null, ingredients:[
+      ing('Bulleit Bourbon', 1.0), ing('Campari', 0.8), ing('Sweet Vermouth', 0.8) ] });
+    attachRecipe('Aviation', { mode:'single', plate_yield:null, ingredients:[
+      ing("Hendrick's Gin", 1.0), ing('Maraschino Liqueur', 0.5), ing('Lime Juice (qt)', 0.03) ] });
+    attachRecipe('Cosmopolitan', { mode:'single', plate_yield:null, ingredients:[
+      ing("Tito's Handmade Vodka", 1.0), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.03), ing('Cranberry Juice (qt)', 0.1) ] });
     // Re-compute cost on items that just got a recipe so the menu engineering
     // numbers stay consistent on first render (before any save fires).
     rMenu.forEach(m => {
@@ -1488,7 +1580,13 @@ S.HubSettings = {
       16:[2,4], 17:[6,14], 18:[3,7],
       19:[160,160], 20:[26,26], 21:[9,9], 22:[38,38], 23:[130,130],
       24:[38,38], 25:[32,32], 26:[30,30], 27:[40,40], 28:[58,58],
-      29:[26,26], 30:[28,28], 31:[20,20], 32:[52,52]
+      29:[26,26], 30:[28,28], 31:[20,20], 32:[52,52],
+      33:[12,12], 34:[40,40], 35:[22,22], 36:[18,18], 37:[60,60],
+      38:[20,20], 39:[50,50], 40:[16,16], 41:[30,30], 42:[24,24],
+      43:[20,20], 44:[30,30], 45:[25,25], 46:[8,8],   47:[10,10],
+      48:[14,14], 49:[12,12], 50:[4,4],   51:[3,3],   52:[4,4],
+      53:[4,4],   54:[12,12], 55:[5,5],   56:[2,2],   57:[6,6],
+      58:[10,10], 59:[8,8]
     };
     const icCountItem = (p, qty) => ({
       product_id:p.id, name:p.name, category:p.category,
