@@ -31,6 +31,7 @@ S.HubBarCopAudit = {
   MIN_DATA_DAYS:         60,   // before this much history exists, empty state
   AUDIT_INTERVAL_DAYS:   30,
   RETENTION_CAP:         12,   // keep last 12 audits (1 year), match recovery audits
+  MIN_SUBS_FOR_OVERALL:  3,    // need this many of 6 sub-scores covered for an honest overall
 
   audits() {
     if (!Array.isArray(App.data.bar_cop_audits)) App.data.bar_cop_audits = [];
@@ -104,14 +105,19 @@ S.HubBarCopAudit = {
     return earliest;
   },
   _hasEnoughData() {
-    // No hard time lock. The audit can be generated as soon as at least one
-    // sub-score has the data to compute honestly; the rest show N/A and fill
-    // in as the operator logs more. (Replaces the old 60-day global gate.)
-    return [
+    // No hard time lock. The audit can be generated as soon as there is ANYTHING
+    // real to show — a scored sub-score, or at least one scorable component (even
+    // if its sub-score is N/A for thin coverage), or a surfaced exposure. The
+    // scores degrade to N/A honestly; generation is not blocked just because no
+    // sub-score cleared the confidence bar yet. (Replaces the old 60-day gate.)
+    const subs = [
       this._scoreOperationalDiscipline(), this._scoreCashIntegrity(),
       this._scoreInventoryExecution(), this._scoreLaborHygiene(),
       this._scoreRecoveryAction(), this._scoreOperationalConsistency()
-    ].some(s => s && s.score != null);
+    ];
+    if (subs.some(s => s && s.score != null)) return true;
+    if (subs.some(s => s && (s.detail || []).some(c => !c.na && c.ratio != null && !isNaN(c.ratio)))) return true;
+    return this._topExposures().length > 0;
   },
   _canRunAudit() {
     const a = this.audits();
@@ -129,10 +135,16 @@ S.HubBarCopAudit = {
   // sub-score with no scorable components returns null (N/A) and drops out of
   // the overall. This replaces the old 0.5/1.0 placeholders that produced a
   // confident score on a barely-used operation.
+  MIN_COMPONENTS: 2,   // a sub-score needs this many scorable components to be honest
   _rollup(detail) {
     detail.forEach(c => { c.pct = (c.na || c.ratio == null || isNaN(c.ratio)) ? null : Math.round(c.ratio * 100); });
     const scored = detail.filter(c => !c.na && c.ratio != null && !isNaN(c.ratio));
-    const score = scored.length ? Math.round((scored.reduce((s, c) => s + c.ratio, 0) / scored.length) * 100) : null;
+    // One signal is not enough to claim a confident number (a 100 off a single
+    // "audit on time" component is exactly the thin-data lie we kill). Below the
+    // minimum, the whole sub-score is N/A.
+    const score = scored.length >= this.MIN_COMPONENTS
+      ? Math.round((scored.reduce((s, c) => s + c.ratio, 0) / scored.length) * 100)
+      : null;
     return { score, detail };
   },
 
@@ -365,16 +377,22 @@ S.HubBarCopAudit = {
       });
     }
 
-    // Component 1: act-on-gaps. N/A until an audit has surfaced something.
-    const actRatio = surfaced === 0 ? null : Math.min(1, wkFixes.length / surfaced);
+    // With zero fixes ever logged there is no recovery activity to judge yet, so
+    // the whole sub-score is N/A — never a harsh "0, you are not acting" on the
+    // day the first audit surfaced gaps but no second has come around to fix.
+    const noFixes = fixLog.length === 0;
+
+    // Component 1: act-on-gaps. N/A until an audit has surfaced something AND at
+    // least one fix has been logged.
+    const actRatio = (surfaced === 0 || noFixes) ? null : Math.min(1, wkFixes.length / surfaced);
 
     // Component 2: of the fixes logged, how many produced real favorable movement.
     // N/A until at least one fix is logged.
-    const convRatio = fixLog.length === 0 ? null : Math.min(1, recoveredCount / fixLog.length);
+    const convRatio = noFixes ? null : Math.min(1, recoveredCount / fixLog.length);
 
     const components = [
-      { label: 'Acting on surfaced gaps',                ratio: actRatio,  na: surfaced === 0,      extra: surfaced === 0 ? 'No audit has surfaced gaps yet' : (wkFixes.length + ' fixes logged in last 30 days against ' + surfaced + ' surfaced gaps') },
-      { label: 'Fixes that produced movement',           ratio: convRatio, na: fixLog.length === 0, extra: fixLog.length === 0 ? 'No fixes logged yet' : (recoveredCount + ' of ' + fixLog.length + ' logged fixes produced favorable movement') }
+      { label: 'Acting on surfaced gaps',                ratio: actRatio,  na: surfaced === 0 || noFixes, extra: noFixes ? 'No recovery activity yet' : (surfaced === 0 ? 'No audit has surfaced gaps yet' : (wkFixes.length + ' fixes logged in last 30 days against ' + surfaced + ' surfaced gaps')) },
+      { label: 'Fixes that produced movement',           ratio: convRatio, na: noFixes,                   extra: noFixes ? 'No fixes logged yet' : (recoveredCount + ' of ' + fixLog.length + ' logged fixes produced favorable movement') }
     ];
     return this._rollup(components);
   },
@@ -733,8 +751,12 @@ S.HubBarCopAudit = {
     const subs   = [disc.score, cash.score, inv.score, labor.score, rec.score, cons.score];
     // Average only the sub-scores that actually have data. A score is honest
     // about how much of the operation it could see (sub_scores_covered of 6).
+    // An overall off one or two thin signals says almost nothing, so it needs at
+    // least MIN_SUBS_FOR_OVERALL of 6 covered; below that the overall is N/A.
     const scored = subs.filter(x => x != null && !isNaN(x));
-    const overall = scored.length ? Math.round(scored.reduce((s, x) => s + x, 0) / scored.length) : null;
+    const overall = scored.length >= this.MIN_SUBS_FOR_OVERALL
+      ? Math.round(scored.reduce((s, x) => s + x, 0) / scored.length)
+      : null;
 
     return {
       id:          App.uid ? App.uid() : ('bca-' + Date.now()),
@@ -842,12 +864,13 @@ S.HubBarCopAudit = {
     let latestCard = '';
     if (latest) {
       const prev = audits[1] || null;
-      const scoreColor = App.scoreColor(latest.overall_score || 0);
-      const scoreLabel = App.scoreLabel(latest.overall_score || 0);
+      const overallNA = latest.overall_score == null;
+      const scoreColor = overallNA ? 'var(--t3)' : App.scoreColor(latest.overall_score);
+      const scoreLabel = overallNA ? 'Not enough data yet' : App.scoreLabel(latest.overall_score);
 
       let progressBanner = '';
-      if (prev) {
-        const diff = (latest.overall_score || 0) - (prev.overall_score || 0);
+      if (prev && latest.overall_score != null && prev.overall_score != null) {
+        const diff = latest.overall_score - prev.overall_score;
         progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
           + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + diff + ' pts</div>'
@@ -857,8 +880,18 @@ S.HubBarCopAudit = {
 
       const sections = latest.sections || {};
       const sectionRows = Object.entries(sections).map(([name, score]) => {
+        // N/A sub-score: same "Not enough data" treatment the detail page uses,
+        // never a raw red "null". No bar, no change arrow.
+        if (score == null) {
+          return '<tr>'
+            + '<td style="color:var(--t2);padding:8px 12px;">' + esc(name) + '</td>'
+            + '<td style="padding:8px 12px;width:140px;"></td>'
+            + '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);padding:8px 12px;">N/A</td>'
+            + '<td style="font-size:11px;color:var(--t4);padding:8px 12px;">Not enough data</td>'
+            + '</tr>';
+        }
         const ps   = prev?.sections?.[name];
-        const diff = ps != null ? score - ps : null;
+        const diff = (ps != null) ? score - ps : null;
         const bar  = Math.min(100, Math.max(0, score));
         return '<tr>'
           + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
@@ -876,7 +909,7 @@ S.HubBarCopAudit = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div>'
         + '</div>'
         + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score || 0) + '</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (overallNA ? 'N/A' : latest.overall_score) + '</div>'
         + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
         + '<button class="btn btn-ghost btn-sm bca-view-btn" data-idx="0">View Full Audit</button>'
         + '</div>'
@@ -901,10 +934,13 @@ S.HubBarCopAudit = {
     if (audits.length > 1) {
       const rows = audits.map((a, i) => {
         const p    = audits[i + 1];
-        const diff = p ? (a.overall_score || 0) - (p.overall_score || 0) : null;
+        const naA  = a.overall_score == null;
+        const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
         return '<tr>'
           + '<td>' + (a.date || '').slice(0, 10) + '</td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score || 0) + ';">' + (a.overall_score || 0) + '</td>'
+          + (naA
+              ? '<td style="font-size:11px;font-weight:800;color:var(--t3);">N/A</td>'
+              : '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score) + ';">' + a.overall_score + '</td>')
           + (diff != null ? '<td style="color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + diff + ' pts</td>' : '<td></td>')
           + '<td>' + (a.exposures ? a.exposures.length : 0) + '</td>'
           + '<td>' + (a.patterns ? a.patterns.length : 0) + '</td>'
@@ -949,9 +985,10 @@ S.HubBarCopAudit = {
     const sorted = audits.slice().sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     const W = 700, H = 180, PAD = { t: 24, r: 20, b: 36, l: 40 };
     const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
-    const scores = sorted.map(a => a.overall_score || 0);
-    const minY = Math.max(0, Math.min(...scores) - 10);
-    const maxY = Math.min(100, Math.max(...scores) + 10);
+    const scores = sorted.map(a => a.overall_score == null ? null : a.overall_score);
+    const validScores = scores.filter(v => v != null);
+    const minY = validScores.length ? Math.max(0, Math.min(...validScores) - 10) : 0;
+    const maxY = validScores.length ? Math.min(100, Math.max(...validScores) + 10) : 100;
     const xs = i => PAD.l + (sorted.length > 1 ? (i / (sorted.length - 1)) * cw : cw / 2);
     const ys = v => PAD.t + ch - ((v - minY) / (maxY - minY || 1)) * ch;
 
@@ -985,7 +1022,8 @@ S.HubBarCopAudit = {
       '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (a.date || '').slice(0, 7) + '</text>'
     ).join('');
     const dots = sorted.map((a, i) => {
-      const v   = a.overall_score || 0;
+      const v   = a.overall_score;
+      if (v == null) return '';   // no dot for an N/A audit
       const col = App.scoreHex(v);
       return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(v).toFixed(1) + '" r="5" fill="#0A1520" stroke="' + col + '" stroke-width="2.5"/>'
         + '<text x="' + xs(i).toFixed(1) + '" y="' + (ys(v) - 10).toFixed(1) + '" text-anchor="middle" fill="' + col + '" font-family="\'Barlow Condensed\',sans-serif" font-size="13" font-weight="700">' + v + '</text>';
@@ -1005,9 +1043,10 @@ S.HubBarCopAudit = {
   // ── Render: single audit detail (single-page layout) ────────────────────
   _renderDetail(audit) {
     this._viewingId = audit.id;
-    const overall = audit.overall_score || 0;
-    const scoreColor = App.scoreColor(overall);
-    const scoreLabel = App.scoreLabel(overall);
+    const overallNA = audit.overall_score == null;
+    const overall = overallNA ? null : audit.overall_score;
+    const scoreColor = overallNA ? 'var(--t3)' : App.scoreColor(overall);
+    const scoreLabel = overallNA ? 'Not Enough Data Yet' : App.scoreLabel(overall);
 
     const SUB_NAMES = [
       ['operational_discipline',  'Operational Discipline'],
@@ -1133,13 +1172,13 @@ S.HubBarCopAudit = {
       +   '</div>'
       +   '<div style="text-align:right;">'
       +     '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Operational Health</div>'
-      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + overall + '</div>'
+      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (overallNA ? 'N/A' : overall) + '</div>'
       +   '</div>'
       + '</div>'
       + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
       +   '<div style="flex:1;min-width:240px;">'
-      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(scoreLabel) + ' Operational Health</div>'
-      +     App.scoreBar(overall)
+      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(scoreLabel) + (overallNA ? '' : ' Operational Health') + '</div>'
+      +     (overallNA ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + (audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, Shift, and Labor Control and the overall fills in.</div>' : App.scoreBar(overall))
       +   '</div>'
       +   '<div id="bca-outlook-mount" style="flex-shrink:0;"></div>'
       + '</div>'
