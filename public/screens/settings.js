@@ -1287,9 +1287,10 @@ S.HubSettings = {
       { id:uid(), name:'Austin Beerworks',    rep:'Priya Shah',  phone:'512-555-0119', email:'priya@abw.example',     delivery_days:'Thu',      payment_terms:'COD',    account_number:'ABW-0093',   notes:'Local draft', created_at:new Date().toISOString() },
       { id:uid(), name:'Sysco Foods',         rep:'Tom Becker',  phone:'512-555-0203', email:'tbecker@sysco.example', delivery_days:'Mon, Thu', payment_terms:'Net 30', account_number:'SYS-88120',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), name:'Restaurant Depot',    rep:'Walk-in',     phone:'512-555-0250', email:'',                      delivery_days:'Pickup',   payment_terms:'COD',    account_number:'',           notes:'Supplies and paper', created_at:new Date().toISOString() },
+      { id:uid(), name:'Local Produce Co.',   rep:'Gabe Flores', phone:'512-555-0177', email:'orders@localproduce.example', delivery_days:'Tue, Fri', payment_terms:'Net 15', account_number:'LPC-3050',  notes:'Produce and dairy', created_at:new Date().toISOString() },
     ];
 
-    App.inventoryData.ic_locations = ['Main Bar','Back Bar','Liquor Room','Walk-in Cooler','Kitchen Line']
+    App.inventoryData.ic_locations = ['Main Bar','Back Bar','Liquor Room','Walk-in Cooler','Kitchen Line','Dry Storage']
       .map(n => ({ id:uid(), name:n, archived:false }));
 
     // Categories must match Profit's BAR_CATS / KITCHEN_CATS for the COGS feed.
@@ -1300,8 +1301,8 @@ S.HubSettings = {
       { name:"Hendrick's Gin",           category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:31.00, menu_price:12, par_level:10,  reorder_point:5,   primary_location:'Liquor Room' },
       { name:'House Cabernet',           category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:9.50,  menu_price:10, par_level:24,  reorder_point:10,  primary_location:'Back Bar' },
       { name:'House Chardonnay',         category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:8.75,  menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Walk-in Cooler' },
-      { name:'Modelo Especial',          category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:32.40, menu_price:6,  case_size:24, par_level:480, reorder_point:144, primary_location:'Walk-in Cooler' },
-      { name:'Lone Star',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:22.80, menu_price:5,  case_size:24, par_level:360, reorder_point:120, primary_location:'Walk-in Cooler' },
+      { name:'Modelo Especial',          category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:32.40, menu_price:6,  case_size:24, par_level:20,  reorder_point:6, primary_location:'Walk-in Cooler' },
+      { name:'Lone Star',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:22.80, menu_price:5,  case_size:24, par_level:15,  reorder_point:5, primary_location:'Walk-in Cooler' },
       { name:'ABW Pearl Snap (1/2 bbl)', category:'Draft Beer',  vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16,  unit_cost:165.00,menu_price:6,  par_level:6,   reorder_point:2,   primary_location:'Walk-in Cooler' },
       { name:'Ground Beef 80/20 (lb)',   category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:4.20,  par_level:240, reorder_point:80,  primary_location:'Walk-in Cooler' },
       { name:'Chicken Thigh (lb)',       category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:2.95,  par_level:200, reorder_point:60,  primary_location:'Walk-in Cooler' },
