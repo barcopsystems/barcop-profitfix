@@ -64,6 +64,7 @@ S.InventoryDashboard = {
         name: p.name,
         onHand,
         par: p.par_level,
+        unit: App.productUnit(p),
         isCaseBeer,
         caseSize: isCaseBeer ? p.case_size : null
       };
@@ -108,9 +109,7 @@ S.InventoryDashboard = {
             + '<span style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>'
             + '<div style="flex:1;font-size:13px;color:var(--t1);">' + esc(b.name)
             + ' <span style="color:var(--t3);font-size:11px;">on hand '
-            + (b.isCaseBeer
-                ? (b.onHand.toFixed(1) + ' cases / par ' + b.par + ' cases')
-                : (b.onHand.toFixed(1) + ' / par ' + b.par))
+            + (b.onHand.toFixed(1) + (b.unit ? ' ' + b.unit : '') + ' / par ' + b.par + (b.unit ? ' ' + b.unit : ''))
             + '</span></div>'
             + '<button class="btn btn-ghost btn-sm ic-d-order" style="margin:0;">Add to Order</button></div>').join('')
         + '</div>';
@@ -136,7 +135,7 @@ S.InventoryDashboard = {
     const moverRows = movers.length
       ? movers.map(m => '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b2);">'
           + '<span style="font-size:12px;color:var(--t2);">' + esc(m.name) + '</span>'
-          + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + m.used.toFixed(1) + ' used</span></div>').join('')
+          + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + esc(App.qtyWithUnit(m.product, m.used)) + ' used</span></div>').join('')
       : '<div style="font-size:12px;color:var(--t3);">Two counts are needed to measure movement.</div>';
 
     const periodCard = '<div class="card"><div class="card-title">This Period</div>'
