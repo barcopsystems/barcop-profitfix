@@ -75,6 +75,9 @@ S.TrafficInquiries = {
     const recentClosed = all.filter(i => this.CLOSED.includes(i.status) && i.date_received && new Date(i.date_received) >= ninetyAgo);
     const recentBooked = recentClosed.filter(i => i.status === 'Booked');
     const conversion = recentClosed.length ? Math.round(100 * recentBooked.length / recentClosed.length) : null;
+    // A conversion % off 1-2 closed inquiries is noise (1 of 1 = 100%). Only show
+    // the rate once there is a real sample; show the raw count until then.
+    const convShown = recentClosed.length >= 5;
 
     const openInquiries = all.filter(i => !this.CLOSED.includes(i.status));
     const stale = openInquiries.filter(i => { const d = this.daysSince(i.date_received); return d != null && d >= 3; });
@@ -83,7 +86,7 @@ S.TrafficInquiries = {
       + '<div class="calc-item"><div class="calc-label">Open Inquiries</div><div class="calc-val ' + (openInquiries.length ? 'good' : '') + '">' + openInquiries.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Stale (3+ Days)</div><div class="calc-val ' + (stale.length ? 'warn' : '') + '">' + stale.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Booked (Last 90d)</div><div class="calc-val">' + recentBooked.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Conversion (Last 90d)</div><div class="calc-val ' + (conversion != null && conversion >= 50 ? 'good' : conversion != null && conversion < 25 ? 'warn' : '') + '">' + (conversion != null ? conversion + '%' : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Conversion (Last 90d)</div><div class="calc-val ' + (convShown && conversion >= 50 ? 'good' : convShown && conversion < 25 ? 'warn' : '') + '">' + (convShown ? conversion + '%' : (recentClosed.length ? recentBooked.length + ' of ' + recentClosed.length : '-')) + '</div></div>'
       + '</div>';
 
     let html;
