@@ -79,8 +79,15 @@ S.InventoryVarianceReport = {
     const period = this.currentPeriod();
     if (!period) return {};
     const { startC, endC } = period;
-    const sMap = {}; (startC.items || []).forEach(it => sMap[it.product_id] = it);
-    const eMap = {}; (endC.items   || []).forEach(it => eMap[it.product_id] = it);
+    // Sum each product's lines (a product can be counted in multiple locations).
+    const sMap = {}; (startC.items || []).forEach(it => {
+      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
+      else sMap[it.product_id] = { ...it };
+    });
+    const eMap = {}; (endC.items   || []).forEach(it => {
+      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
+      else eMap[it.product_id] = { ...it };
+    });
     const purch = {};
     this.deliveries().filter(d => d.date > startC.date && d.date <= endC.date)
       .forEach(d => (d.line_items || []).forEach(li => {
