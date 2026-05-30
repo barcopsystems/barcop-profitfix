@@ -1014,9 +1014,16 @@ S.HubBooks = {
       return this._finishSheet(wsEmpty, rows.length, merges, COL_WIDTHS);
     }
 
-    // Build the usage map per product.
-    const sMap = {}; (startCount.items || []).forEach(it => sMap[it.product_id] = it);
-    const eMap = {}; (endCount.items   || []).forEach(it => eMap[it.product_id] = it);
+    // Build the usage map per product. A product can be counted in several
+    // locations, so sum its lines into one entry (keep metadata from the first).
+    const sMap = {}; (startCount.items || []).forEach(it => {
+      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
+      else sMap[it.product_id] = { ...it };
+    });
+    const eMap = {}; (endCount.items   || []).forEach(it => {
+      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
+      else eMap[it.product_id] = { ...it };
+    });
 
     const purch = {};
     (App.inventoryData?.ic_deliveries || [])
