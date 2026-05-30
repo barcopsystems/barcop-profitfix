@@ -33,6 +33,20 @@ const BottleSlider = {
     const fulls = Math.max(0, parseInt(opts.fulls) || 0);
     const col = this.colorFor(opts.category || 'Liquor');
     const clip = 'bsclip-' + id;
+    // Shape: a keg outline for Draft Beer, a bottle outline otherwise. The
+    // fill/level mechanic is identical — only the silhouette and the noun
+    // ("Keg" vs "Bottle") change.
+    const shape = opts.shape === 'keg' ? 'keg' : 'bottle';
+    const noun  = shape === 'keg' ? 'Keg' : 'Bottle';
+    const clipD = shape === 'keg'
+      ? 'M21 30 Q21 19 33 19 L57 19 Q69 19 69 30 L69 200 Q69 211 57 211 L33 211 Q21 211 21 200 Z'
+      : 'M43 16 L43 53 C43 60 21 66 20 90 L20 208 Q20 218 29 218 L61 218 Q70 218 70 208 L70 90 C69 66 47 60 47 53 L47 16 Z';
+    const outline = shape === 'keg'
+      ? '<path d="M19 30 Q19 16 33 16 L57 16 Q71 16 71 30 L71 200 Q71 214 57 214 L33 214 Q19 214 19 200 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+        + '<line x1="20" x2="70" y1="40" y2="40" stroke="var(--b1)" stroke-width="2"/>'
+        + '<line x1="20" x2="70" y1="190" y2="190" stroke="var(--b1)" stroke-width="2"/>'
+      : '<rect x="38" y="6" width="14" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+        + '<path d="M40 14 L40 52 C40 58 18 64 16 88 L16 210 Q16 222 28 222 L62 222 Q74 222 74 210 L74 88 C72 64 50 58 50 52 L50 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>';
 
     return '<div class="bs" data-bs="' + esc(String(id)) + '" tabindex="0" '
       + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;">'
@@ -41,28 +55,27 @@ const BottleSlider = {
       +   '<button type="button" class="bs-minus" aria-label="One less full bottle">&#8722;</button>'
       +   '<div style="text-align:center;min-width:62px;">'
       +     '<div class="bs-fulls" style="font-family:\'Barlow Condensed\',sans-serif;font-size:26px;font-weight:700;color:var(--t1);line-height:1;">' + fulls + '</div>'
-      +     '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:2px;">Full Bottles</div>'
+      +     '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:2px;">Full ' + noun + 's</div>'
       +   '</div>'
       +   '<button type="button" class="bs-plus" aria-label="One more full bottle">+</button>'
       + '</div>'
 
       + '<svg class="bs-svg" viewBox="0 0 90 230" width="92" height="210" style="touch-action:none;cursor:pointer;display:block;">'
       +   '<defs><clipPath id="' + clip + '">'
-      +     '<path d="M43 16 L43 53 C43 60 21 66 20 90 L20 208 Q20 218 29 218 L61 218 Q70 218 70 208 L70 90 C69 66 47 60 47 53 L47 16 Z"/>'
+      +     '<path d="' + clipD + '"/>'
       +   '</clipPath></defs>'
       +   '<rect x="0" y="0" width="90" height="230" fill="rgba(255,255,255,0.04)" clip-path="url(#' + clip + ')"/>'
       +   '<rect class="bs-fill" x="0" width="90" fill="' + col + '" clip-path="url(#' + clip + ')" '
       +     'y="' + this._fillY(value) + '" height="' + this._fillH(value) + '"/>'
       +   '<line class="bs-handle" x1="12" x2="78" y1="' + this._fillY(value) + '" y2="' + this._fillY(value) + '" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>'
-      +   '<rect x="38" y="6" width="14" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-      +   '<path d="M40 14 L40 52 C40 58 18 64 16 88 L16 210 Q16 222 28 222 L62 222 Q74 222 74 210 L74 88 C72 64 50 58 50 52 L50 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+      +   outline
       + '</svg>'
 
       + '<div style="text-align:center;">'
       +   '<input class="bs-val" type="number" step="0.01" min="0" max="1" inputmode="decimal" '
       +     'aria-label="Open bottle level (0 to 1)" value="' + value.toFixed(2) + '" '
       +     'style="color:' + col + ';"/>'
-      +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">Open Bottle</div>'
+      +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">Open ' + noun + '</div>'
       + '</div>'
 
       + '<div style="font-size:11px;font-weight:700;color:var(--t2);">Total on hand: '
