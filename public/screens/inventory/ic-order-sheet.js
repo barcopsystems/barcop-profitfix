@@ -411,7 +411,7 @@ S.InventoryOrderSheet = {
   lineRowHTML(product, qty, onHand, par) {
     const isCaseBeer = (product.category === 'Bottle Beer') && product.case_size && product.case_size > 0;
     const unitCost = product.unit_cost != null ? product.unit_cost : 0;
-    const unitLabel = isCaseBeer ? 'cases' : '';
+    const unit = App.productUnit(product);
 
     let onHandTxt;
     if (onHand == null || isNaN(onHand)) {
@@ -422,10 +422,11 @@ S.InventoryOrderSheet = {
       const loose = totalBottles % product.case_size;
       onHandTxt = cases + ' cases' + (loose > 0 ? ' + ' + loose + ' btl' : '');
     } else {
-      onHandTxt = Number(onHand).toFixed(1);
+      const n = Number(onHand);
+      onHandTxt = (n % 1 === 0 ? n.toString() : n.toFixed(1)) + (unit ? ' ' + unit : '');
     }
     const parTxt = (par != null && par !== '' && !isNaN(par))
-      ? (par + (isCaseBeer ? ' cases' : ''))
+      ? (par + (unit ? ' ' + unit : ''))
       : '-';
 
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
@@ -434,8 +435,8 @@ S.InventoryOrderSheet = {
       + '<td>' + onHandTxt + '</td>'
       + '<td>' + parTxt + '</td>'
       + '<td><input type="number" class="os-qty" data-cost="' + unitCost + '" data-product-id="' + esc(product.id || '') + '" min="0" step="1" '
-      + 'value="' + qty + '" style="width:80px;"/>' + (unitLabel ? ' <span style="font-size:10px;color:var(--t3);">' + unitLabel + '</span>' : '') + '</td>'
-      + '<td>' + App.fmtCurrency(unitCost) + (isCaseBeer ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '') + '</td>'
+      + 'value="' + qty + '" style="width:80px;"/>' + (unit ? ' <span style="font-size:10px;color:var(--t3);">' + unit + '</span>' : '') + '</td>'
+      + '<td>' + App.fmtCurrency(unitCost) + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(qty * unitCost) + '</td>'
       + '<td><button class="btn btn-ghost btn-sm os-remove">Remove</button></td>'
       + '</tr>';
