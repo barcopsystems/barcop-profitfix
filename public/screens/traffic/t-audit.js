@@ -426,7 +426,8 @@ S.TrafficAudit = {
         ['Most Recent Review', d.S3_MOST_RECENT_REVIEW_DAYS != null ? d.S3_MOST_RECENT_REVIEW_DAYS + ' days ago' : ''],
         ['Yelp Rating', d.S3_YELP_RATING ? d.S3_YELP_RATING + '★' : ''],
         ['Unanswered Reviews', num(d.S3_UNANSWERED)],
-        ['Negative Pattern', d.S3_NEGATIVE_PATTERN || ''],
+        ['Review Generation System', triNA(d.S3_REVIEW_GENERATION)],
+        ['Recurring Theme (operational)', d.S3_NEGATIVE_PATTERN || ''],
         ['Monthly Gap', dol(d.S3_MONTHLY_GAP)],
       ]),
       sectionBlock(4, 'Search and SEO', d.S4_SCORE, [
@@ -544,7 +545,7 @@ S.TrafficAudit = {
     const p = s.traffic_practices || {};
     const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
     this._intakeDraft = {
-      practices: { growth_mechanism: boolStr(p.growth_mechanism), loyalty: boolStr(p.loyalty), delivery_markup: boolStr(p.delivery_markup) }
+      practices: { growth_mechanism: boolStr(p.growth_mechanism), loyalty: boolStr(p.loyalty), delivery_markup: boolStr(p.delivery_markup), review_generation: boolStr(p.review_generation) }
     };
     this.actions.innerHTML = '';
     this.renderIntake();
@@ -643,6 +644,7 @@ S.TrafficAudit = {
       + qRow('Email signup or list-growth mechanism in place?', 'growth_mechanism', [['false', 'No'], ['true', 'Yes']])
       + qRow('Loyalty or rewards program?', 'loyalty', [['false', 'No'], ['true', 'Yes']])
       + qRow('Delivery menu prices marked up to offset commission?', 'delivery_markup', [['false', 'No'], ['true', 'Yes']])
+      + qRow('Review generation system asking guests for reviews?', 'review_generation', [['false', 'No'], ['true', 'Yes']])
       + '</div></div>';
 
     const submitCard = '<div class="card">'
@@ -667,7 +669,7 @@ S.TrafficAudit = {
     document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
       const val = id => (document.getElementById('ta-q-' + id) || {}).value || '';
-      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty'), delivery_markup: val('delivery_markup') };
+      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty'), delivery_markup: val('delivery_markup'), review_generation: val('review_generation') };
       this.generateAudit();
     });
   },
@@ -881,6 +883,7 @@ S.TrafficAudit = {
     if (draftP.growth_mechanism === 'true' || draftP.growth_mechanism === 'false') practices.growth_mechanism = draftP.growth_mechanism === 'true';
     if (draftP.loyalty === 'true' || draftP.loyalty === 'false') practices.loyalty = draftP.loyalty === 'true';
     if (draftP.delivery_markup === 'true' || draftP.delivery_markup === 'false') practices.delivery_markup = draftP.delivery_markup === 'true';
+    if (draftP.review_generation === 'true' || draftP.review_generation === 'false') practices.review_generation = draftP.review_generation === 'true';
     form.append('practices', JSON.stringify(practices));
 
     // Screenshots come from the single shared drop zone.
