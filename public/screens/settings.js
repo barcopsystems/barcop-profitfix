@@ -1686,11 +1686,24 @@ S.HubSettings = {
     // category (cases for beer, bottles for liquor/wine, kegs for draft, stock
     // unit for food). unit_cost is stored per container, so this is a straight
     // multiply with no per-category special case.
-    const icCountItem = (p, qty) => ({
-      product_id:p.id, name:p.name, category:p.category,
-      fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
-      unit_cost:p.unit_cost, value:+(qty * (p.unit_cost || 0)).toFixed(2), notes:''
-    });
+    const icCountItem = (p, qty) => {
+      // Bottle beer is counted as full cases + loose bottles, stored as a decimal
+      // number of cases — identical to what the Take Inventory form writes, so a
+      // seeded count round-trips through the form and Count History detects it as
+      // case beer (carries cases / loose / case_size_at_count).
+      if (p.category === 'Bottle Beer' && p.case_size) {
+        const whole = Math.floor(qty);
+        const loose = Math.round((qty - whole) * p.case_size);
+        const total = whole + loose / p.case_size;
+        return { product_id:p.id, name:p.name, category:p.category,
+          cases:whole, loose, case_size_at_count:p.case_size,
+          fulls:whole, partial:0, total,
+          unit_cost:p.unit_cost, value:+(total * (p.unit_cost || 0)).toFixed(2), notes:'' };
+      }
+      return { product_id:p.id, name:p.name, category:p.category,
+        fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
+        unit_cost:p.unit_cost, value:+(qty * (p.unit_cost || 0)).toFixed(2), notes:'' };
+    };
     const mkCount = (daysAgo, pick, countedBy) => {
       const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
       return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:countedBy || 'Maria G.',
