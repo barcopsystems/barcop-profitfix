@@ -474,12 +474,12 @@ S.InventoryProducts = {
         + titleHTML
         + statusHTML
       + '</div>'
-      + '<button class="btn btn-ghost btn-sm" id="ip-back">&#8592; Back to Products</button>'
     + '</div>';
 
     // ── Row 1: identity fields (Name, Brand, Sub-Cat, Vendor, Location) ────
-    // Grid layout so all five always fit on one row regardless of screen width.
-    const row1 = '<div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1.3fr 1.3fr;gap:14px;align-items:start;">'
+    // Auto-fit grid: fits all five on one row on wide screens and wraps/stacks
+    // cleanly on narrow screens instead of overflowing the form container.
+    const row1 = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:start;">'
       + '<div class="f"><label>Product Name ' + tt('ic-product-name') + '</label>'
       + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
       + '<div class="f"><label>Brand ' + tt('ic-brand') + '</label>'
