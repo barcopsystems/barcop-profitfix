@@ -1350,8 +1350,9 @@ S.HubSettings = {
     // bar's actual stocked beer/wine — the menu only offers what Inventory
     // carries. rMenu is the same array as App.data.menu_items, so pushing here
     // adds them to the live menu.
+    const IC_TO_MENU = App.MENU_IC_TO_CAT || { 'Bottle Beer':'Beer', 'Draft Beer':'Beer', 'Wine':'Wine', 'Misc':'NA Beverages' };
     const invMenuItem = (p, price, covers) => ({
-      id:uid(), name:p.name, category:(App.MENU_IC_TO_CAT[p.category] || 'Beer'),
+      id:uid(), name:p.name, category:(IC_TO_MENU[p.category] || 'Beer'),
       price:price, cost:+((p.cost_per_pour || 0)).toFixed(2), weekly_covers:covers,
       prev_weekly_covers:null, weekly_covers_updated_at:null, notes:'', recipe:null,
       linked_product_id:p.id, pour_size_oz:null, target_cost_pct:null,
