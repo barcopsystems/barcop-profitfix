@@ -148,7 +148,7 @@ FIX.profit = [
     id: 'vendor-control',
     name: 'Vendor Control',
     module: 'profit',
-    summary: 'Price drift, short counts, and quiet substitutions on every invoice.',
+    summary: 'Price drift, short counts, and quiet substitutions on every invoice, plus the filed credits still owed to you that never get chased.',
 
     process: {
       steps: [
