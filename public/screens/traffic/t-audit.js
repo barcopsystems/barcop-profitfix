@@ -451,6 +451,8 @@ S.TrafficAudit = {
         ['Photo Count', num(d.S6_PHOTO_COUNT_DELIVERY)],
         ['Menu Complete', yN(d.S6_MENU_COMPLETE)],
         ['Promotion Active', yN(d.S6_PROMO_ACTIVE)],
+        ['Delivery Prices Marked Up', triNA(d.S6_DELIVERY_MARKUP), d.S6_DELIVERY_MARKUP === false ? 'warn' : ''],
+        ['Platform Commission', d.S6_DELIVERY_COMMISSION_PCT != null ? d.S6_DELIVERY_COMMISSION_PCT + '%' : ''],
         ['Monthly Gap', dol(d.S6_MONTHLY_GAP)],
       ]),
       sectionBlock(7, 'Email and Loyalty', d.S7_SCORE, [
@@ -542,7 +544,7 @@ S.TrafficAudit = {
     const p = s.traffic_practices || {};
     const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
     this._intakeDraft = {
-      practices: { growth_mechanism: boolStr(p.growth_mechanism), loyalty: boolStr(p.loyalty) }
+      practices: { growth_mechanism: boolStr(p.growth_mechanism), loyalty: boolStr(p.loyalty), delivery_markup: boolStr(p.delivery_markup) }
     };
     this.actions.innerHTML = '';
     this.renderIntake();
@@ -635,11 +637,12 @@ S.TrafficAudit = {
         + '<select id="ta-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:120px;">' + opts + '</select></div>';
     };
     const questionsCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Couple Quick Questions</div>'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Few Quick Questions</div>'
       + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These are not in your reports. Select Answer = no effect on the score.</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 28px;">'
       + qRow('Email signup or list-growth mechanism in place?', 'growth_mechanism', [['false', 'No'], ['true', 'Yes']])
       + qRow('Loyalty or rewards program?', 'loyalty', [['false', 'No'], ['true', 'Yes']])
+      + qRow('Delivery menu prices marked up to offset commission?', 'delivery_markup', [['false', 'No'], ['true', 'Yes']])
       + '</div></div>';
 
     const submitCard = '<div class="card">'
@@ -659,12 +662,12 @@ S.TrafficAudit = {
       { p: ['The Traffic Audit scores your digital presence across seven areas. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers.'] },
       { h: 'Reads live from a link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once in Settings and it is ready every audit.'] },
       { h: 'Needs a screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email all sit behind a login or carry data a link cannot reach. Upload a screenshot in the Screenshots section to score those.'] },
-      { h: 'The steps', p: ['1. Confirm or paste your Website link.', '2. Upload a screenshot for your Google reviews, Yelp, and any other area you want scored.', '3. Answer the two quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
+      { h: 'The steps', p: ['1. Confirm or paste your Website link.', '2. Upload a screenshot for your Google reviews, Yelp, and any other area you want scored.', '3. Answer the few quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
     ]));
     document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
       const val = id => (document.getElementById('ta-q-' + id) || {}).value || '';
-      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty') };
+      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty'), delivery_markup: val('delivery_markup') };
       this.generateAudit();
     });
   },
@@ -877,6 +880,7 @@ S.TrafficAudit = {
     const practices = {};
     if (draftP.growth_mechanism === 'true' || draftP.growth_mechanism === 'false') practices.growth_mechanism = draftP.growth_mechanism === 'true';
     if (draftP.loyalty === 'true' || draftP.loyalty === 'false') practices.loyalty = draftP.loyalty === 'true';
+    if (draftP.delivery_markup === 'true' || draftP.delivery_markup === 'false') practices.delivery_markup = draftP.delivery_markup === 'true';
     form.append('practices', JSON.stringify(practices));
 
     // Screenshots come from the single shared drop zone.
