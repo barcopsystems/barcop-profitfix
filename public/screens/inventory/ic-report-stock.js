@@ -23,7 +23,7 @@ S.InventoryStockReport = {
   },
   itemValue(it) {
     if (it.value != null) return it.value;
-    const bc = App.bottleCostFromCountItem(it);
+    const bc = App.unitCostFromCountItem(it);
     return bc != null ? (it.total || 0) * bc : 0;
   },
   itemLoc(it) {
