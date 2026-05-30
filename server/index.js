@@ -196,9 +196,8 @@ app.post('/api/generate-traffic-audit', (req, res) => {
     try { appData = JSON.parse(appDataStr); } catch(e) {}
     let practices = {};
     try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
-    // Operator's saved links. Server reads public data from these (PageSpeed for
-    // website, Google Places for rating/reviews, Yelp Fusion) so the audit reads
-    // live where possible and only needs screenshots for what links cannot cover.
+    // Operator's saved links. Server reads the website live via PageSpeed; Google
+    // and Yelp ratings come from uploaded screenshots (no external rating APIs).
     let urls = null;
     try { urls = JSON.parse(fields.urls?.[0] || 'null'); } catch(e) {}
 
@@ -345,23 +344,21 @@ ${JSON.stringify(d, null, 1)}`;
 // Pulls live data from the operator's saved URLs in traffic_settings.urls so
 // the audit can score what is publicly visible without requiring a screenshot.
 //
-// Two sources currently:
-//   1) Website  — calls Google PageSpeed Insights API (free, sanctioned). Returns
-//                 performance, accessibility, SEO, and best-practices scores.
-//                 Requires PAGESPEED_API_KEY env var to be set. If missing or the
-//                 call fails, returns null and the audit falls back to operator
-//                 screenshot uploads.
-//   2) GBP      — plain HTML fetch of the operator's Google Business Profile URL.
-//                 Returns the rendered listing HTML which Claude can read for
-//                 rating, review count, photo count, hours, categories, recent
-//                 reviews. No API key needed. Best-effort — some GBP URLs may be
-//                 blocked or rate-limited.
+// One source: the operator's Website, via the Google PageSpeed Insights API
+// (free, sanctioned). Returns performance, accessibility, SEO, and best-practices
+// scores. Requires PAGESPEED_API_KEY env var. If missing or the call fails,
+// returns null and the audit falls back to operator screenshot uploads.
 //
-// Both fetches have short timeouts and fail-safe: any error returns null and
-// the rest of the audit continues normally.
+// Google + Yelp ratings are screenshot-only by design — no external rating APIs
+// (attribution/terms baggage, and Bar Cop's solo-operator model favors zero
+// external dependencies). The engine reads google_rating / yelp_rating from
+// uploaded screenshots instead.
+//
+// The fetch has a short timeout and fails safe: any error returns null and the
+// rest of the audit continues normally.
 async function fetchTrafficUrlData(urls) {
   if (!urls || typeof urls !== 'object') return null;
-  const out = { website: null, gbp: null };
+  const out = { website: null };
 
   // PageSpeed Insights for the operator's website (mobile strategy)
   const psKey = process.env.PAGESPEED_API_KEY;
@@ -403,67 +400,7 @@ async function fetchTrafficUrlData(urls) {
     }
   }
 
-  // Google rating + review count via Google Places API (accurate, sanctioned).
-  // Needs GOOGLE_PLACES_API_KEY and a place query (bar name + city). Gracefully
-  // absent until the key is set — then S3 Reviews falls back to a screenshot.
-  const placeQuery = urls.place_query || urls.gbp_query;
-  if (placeQuery) {
-    const g = await fetchGooglePlaces(placeQuery);
-    if (g) out.gbp = g;
-  }
-
-  // Yelp rating + count via Yelp Fusion (free tier). Needs YELP_API_KEY.
-  if (placeQuery) {
-    const y = await fetchYelp(placeQuery, urls.city_state);
-    if (y) out.yelp = y;
-  }
-
-  return (out.website || out.gbp || out.yelp) ? out : null;
-}
-
-/* Google Places — text search -> rating + review count. Returns null if no key
-   or no match, so the audit simply scores Reviews from a screenshot instead. */
-async function fetchGooglePlaces(query) {
-  const key = process.env.GOOGLE_PLACES_API_KEY;
-  if (!key || !query) return null;
-  try {
-    const url = 'https://maps.googleapis.com/maps/api/place/textsearch/json?query='
-      + encodeURIComponent(query) + '&key=' + key;
-    const ctrl = new AbortController();
-    const tmo = setTimeout(() => ctrl.abort(), 15000);
-    const r = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(tmo);
-    if (!r.ok) return null;
-    const data = await r.json();
-    const hit = (data.results || [])[0];
-    if (!hit || hit.rating == null) return null;
-    return { rating: hit.rating, review_count: hit.user_ratings_total ?? null, name: hit.name, fetchedAt: new Date().toISOString() };
-  } catch (e) {
-    console.warn('[audit] Google Places fetch failed:', e.message);
-    return null;
-  }
-}
-
-/* Yelp Fusion — business search -> rating + review count. Null without a key. */
-async function fetchYelp(term, location) {
-  const key = process.env.YELP_API_KEY;
-  if (!key || !term) return null;
-  try {
-    const url = 'https://api.yelp.com/v3/businesses/search?term='
-      + encodeURIComponent(term) + '&location=' + encodeURIComponent(location || term) + '&limit=1';
-    const ctrl = new AbortController();
-    const tmo = setTimeout(() => ctrl.abort(), 15000);
-    const r = await fetch(url, { signal: ctrl.signal, headers: { Authorization: 'Bearer ' + key } });
-    clearTimeout(tmo);
-    if (!r.ok) return null;
-    const data = await r.json();
-    const biz = (data.businesses || [])[0];
-    if (!biz || biz.rating == null) return null;
-    return { rating: biz.rating, count: biz.review_count ?? null, name: biz.name, fetchedAt: new Date().toISOString() };
-  } catch (e) {
-    console.warn('[audit] Yelp fetch failed:', e.message);
-    return null;
-  }
+  return out.website ? out : null;
 }
 
 function formatTrafficUrlDataForPrompt(urlData) {
@@ -482,13 +419,6 @@ function formatTrafficUrlDataForPrompt(urlData) {
     if (w.totalBlockingTimeMs      != null) lines.push('  Total Blocking Time: '      + w.totalBlockingTimeMs      + ' ms');
     if (w.cumulativeLayoutShift    != null) lines.push('  Cumulative Layout Shift: '  + w.cumulativeLayoutShift.toFixed(3));
     if (w.speedIndexMs             != null) lines.push('  Speed Index: '              + w.speedIndexMs             + ' ms');
-  }
-  if (urlData.gbp) {
-    lines.push('');
-    lines.push('GOOGLE BUSINESS PROFILE (public page HTML): ' + urlData.gbp.url);
-    lines.push('--- BEGIN GBP HTML ---');
-    lines.push(urlData.gbp.html);
-    lines.push('--- END GBP HTML ---');
   }
   return lines.join('\n');
 }
