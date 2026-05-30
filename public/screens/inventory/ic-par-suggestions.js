@@ -63,7 +63,7 @@ S.InventoryParSuggestions = {
         .filter(d => d.date > startC.date && d.date <= endC.date)
         .reduce((s, d) => s + (d.line_items || [])
           .filter(li => li.product_id === productId)
-          .reduce((ss, li) => ss + (App.bottlesFromDeliveryLine ? App.bottlesFromDeliveryLine(li) : (parseFloat(li.qty) || 0)), 0), 0);
+          .reduce((ss, li) => ss + (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0)), 0), 0);
       const used = Math.max(0, start + purch - end);
       total_usage += used;
       weeks_analyzed++;
@@ -78,9 +78,10 @@ S.InventoryParSuggestions = {
     const cycleWeeks = (settings.cycle_days || 7) / 7;
     const buffer = (settings.buffer_pct || 0) / 100;
     let suggested = usage.avg_weekly * cycleWeeks * (1 + buffer);
-    // For Bottle Beer with case_size, round up to nearest case (par stored in cases)
+    // Usage is counted in cases for bottle beer, so suggested is already in
+    // cases; just round up to a whole case.
     if (product.category === 'Bottle Beer' && product.case_size > 0) {
-      suggested = Math.ceil(suggested / product.case_size);
+      suggested = Math.ceil(suggested);
     } else {
       // Every other category: round UP to a whole unit. Operators order in
       // whole bottles, kegs, cases, lbs — partial units don't exist on a
