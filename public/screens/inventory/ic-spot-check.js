@@ -48,6 +48,24 @@ S.InventorySpotCheck = {
   // plain number. slotId is unique per pre/post slot so both read back cleanly.
   _isCaseBeer(p) { return p.category === 'Bottle Beer' && p.case_size && p.case_size > 0; },
   _isPourable(p) { return !!(p.container_size_oz && p.pour_size_oz); },
+  // Units and wording specific to the product: liquor and wine restock in
+  // bottles and sell in pours, bottle beer restocks and sells in bottles, draft
+  // restocks by the keg and sells in pours.
+  _restockUnit(p) { return p.category === 'Draft Beer' ? 'kegs' : 'btl'; },
+  _posUnit(p)     { return this._isCaseBeer(p) ? 'btl' : 'pours'; },
+  _posLabel(p)    { return this._isCaseBeer(p) ? 'POS Bottles Sold' : 'POS Pours Sold'; },
+  _servingWord(p) { return this._isCaseBeer(p) ? 'bottles' : 'pours'; },
+
+  showHowTo() {
+    App.showHelpModal('How the Spot Check Works', [
+      { p: ['A spot check is a fast theft and overpour check on a few high-risk bar products for one shift. You count a product before and after the shift, tell Bar Cop what the POS rang, and it shows whether what left the bar matches what was sold.'] },
+      { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top-shelf liquor and your fast movers. Spot checks are bar only, so the picker holds liquor, wine, bottle beer, and draft.'] },
+      { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider.'] },
+      { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the POS rang for that product: pours for liquor, wine, and draft, bottles for bottle beer.'] },
+      { h: 'Reading The Result', p: ['Bar Cop works out what should have been sold from your counts and compares it to the POS. A gap flags red. A positive variance means more left the bar than was rung in, the classic sign of overpouring, give-aways, or theft.'] },
+      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. A flagged product can be sent straight to a Variance Investigation in Theft Risk with one click. Spot checks also feed your Theft Risk score and the Bar Cop Audit.'] }
+    ]);
+  },
   spInputHTML(slotId, p) {
     if (this._isCaseBeer(p)) {
       return '<div class="form-row" style="gap:10px;">'
@@ -86,17 +104,16 @@ S.InventorySpotCheck = {
     this.renderMain();
   },
 
+  // Spot checks are a bar control, so the picker holds bar products only
+  // (liquor, wine, bottle beer, draft). Food and Misc are excluded.
   productOptions() {
-    const prods = this.products();
-    const cats = [...new Set(prods.map(p => p.category || 'Other'))]
-      .sort((a, b) => {
-        const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b);
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-      });
+    const bar = App.BAR_CATS;
+    const prods = this.products().filter(p => bar.includes(p.category));
+    const cats = bar.filter(c => prods.some(p => p.category === c));
     let h = '<option value="">Add a product to check...</option>';
     cats.forEach(cat => {
       h += '<optgroup label="' + esc(cat) + '">';
-      prods.filter(p => (p.category || 'Other') === cat)
+      prods.filter(p => p.category === cat)
         .forEach(p => { h += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; });
       h += '</optgroup>';
     });
@@ -125,17 +142,15 @@ S.InventorySpotCheck = {
       + '</div>'
       // Mid-shift restock + POS pours sold inputs.
       + '<div class="form-row" style="gap:14px;margin-bottom:10px;">'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Restocked Mid-Shift</label>'
-          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">btl</span></div>'
-          + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">Full bottles added from storage during the shift.</div>'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Restocked Mid-Shift ' + tt(p.category === 'Draft Beer' ? 'sp-restock-keg' : 'sp-restock') + '</label>'
+          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._restockUnit(p) + '</span></div>'
         + '</div>'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>POS Pours Sold</label>'
-          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">pours</span></div>'
-          + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">From your POS report for this shift.</div>'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>' + this._posLabel(p) + ' ' + tt(this._isCaseBeer(p) ? 'sp-pos-btl' : 'sp-pos-pours') + '</label>'
+          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._posUnit(p) + '</span></div>'
         + '</div>'
       + '</div>'
       + '<div class="sp-result" style="font-size:12px;color:var(--t3);line-height:1.6;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;">'
-      + 'Drag pre and post sliders, then enter POS pours to see the variance. ' + (pp ? pp.toFixed(1) : '1') + ' pours per container.</div>'
+      + 'Set the pre and post counts, then enter POS ' + this._servingWord(p) + ' sold, to see the variance.</div>'
       + '</div>';
   },
 
@@ -161,7 +176,9 @@ S.InventorySpotCheck = {
     const defaultShift = active && active.shift_type ? active.shift_type : 'Dinner';
     const shiftOpts = (App.SHIFT_TYPES || ['Brunch','Lunch','Dinner','Late Night','Full Day'])
       .map(t => '<option' + (t === defaultShift ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const setup = '<div class="card"><div class="card-title">Spot Check</div>'
+    const setup = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Spot Check</span>'
+      + '<button class="btn btn-ghost btn-sm" id="sp-how">How This Works</button></div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="sp-date" value="' + today + '" style="height:44px;"/></div>'
@@ -218,9 +235,11 @@ S.InventorySpotCheck = {
     });
     document.getElementById('sp-save')?.addEventListener('click', () => this.save());
     this.container.onclick = ev => {
+      const how = ev.target.closest('#sp-how');
       const hrow = ev.target.closest('.sp-hrow');
       const hview = ev.target.closest('.sp-hview');
       const hdel = ev.target.closest('.sp-hdel');
+      if (how) { this.showHowTo(); return; }
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
       else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
@@ -268,33 +287,34 @@ S.InventorySpotCheck = {
     if (!r) {
       line.dataset.vd = '0';
       line.dataset.flag = '0';
-      if (res) res.innerHTML = 'Set the pre and post bottle levels to start the variance calculation.';
+      if (res) res.innerHTML = 'Set the pre and post counts to start the variance calculation.';
       return;
     }
+    const sw = this._servingWord(r.p);
     line.dataset.vd = r.vd != null ? r.vd : '0';
     if (r.preTotal === 0 && r.postTotal === 0) {
       line.dataset.flag = '0';
-      if (res) res.innerHTML = 'Set the pre and post bottle levels to start the variance calculation.';
+      if (res) res.innerHTML = 'Set the pre and post counts to start the variance calculation.';
       return;
     }
     const usedTxt = 'Used ' + r.used.toFixed(2) + ' container'
       + (Math.abs(r.used - 1) < 0.001 ? '' : 's')
       + (r.added > 0 ? ' (restocked ' + r.added + ' mid-shift)' : '')
-      + ' &middot; ' + r.poured.toFixed(1) + ' pours actual';
+      + ' &middot; ' + r.poured.toFixed(1) + ' ' + sw + ' actual';
     if (r.variance == null) {
       line.dataset.flag = '0';
-      if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + '.</span> Enter POS pours sold to see the variance.';
+      if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + '.</span> Enter POS ' + sw + ' sold to see the variance.';
       return;
     }
-    // Flag when variance is meaningfully off (more than ~half a pour or $1
-    // either direction). Positive variance = overpoured/possible theft.
-    // Negative variance = unusual, could be spill or miscount.
+    // Flag when variance is meaningfully off (more than ~half a serving or $1
+    // either direction). Positive variance = more left the bar than was rung in.
     const flagged = Math.abs(r.variance) > 0.5 && Math.abs(r.vd) >= 1;
     line.dataset.flag = flagged ? '1' : '0';
     const cls = flagged ? 'var(--red)' : 'var(--gold)';
-    const direction = r.variance > 0 ? 'Overpoured' : (r.variance < 0 ? 'Underpoured' : 'On target');
-    if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + ' &middot; ' + r.sold.toFixed(0) + ' pours rung in.</span><br>'
-      + '<span style="color:' + cls + ';font-weight:700;">' + direction + ' by ' + Math.abs(r.variance).toFixed(1) + ' pours &middot; '
+    const direction = r.variance > 0 ? 'Over' : (r.variance < 0 ? 'Under' : 'On target');
+    const byTxt = r.variance === 0 ? '' : ' by ' + Math.abs(r.variance).toFixed(1) + ' ' + sw;
+    if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + ' &middot; ' + r.sold.toFixed(0) + ' ' + sw + ' rung in.</span><br>'
+      + '<span style="color:' + cls + ';font-weight:700;">' + direction + byTxt + ' &middot; '
       + (r.vd > 0 ? '+' : '') + App.fmtCurrency(r.vd) + '</span>';
   },
 
@@ -415,8 +435,7 @@ S.InventorySpotCheck = {
   renderDetail(id) {
     const c = this.checks().find(x => x.id === id);
     if (!c) { this.renderMain(); return; }
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button>';
-    document.getElementById('sp-export')?.addEventListener('click', () => window.print());
+    this.actions.innerHTML = '';
 
     const rows = (c.items || []).map(it => {
       const vd = it.variance_dollar;
@@ -440,8 +459,9 @@ S.InventorySpotCheck = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sp-back">&#8592; Back to Spot Check</button></div>'
-      + '<div class="card"><div class="card-title">Spot Check &middot; ' + this.fmtDate(c.date) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Spot Check &middot; ' + this.fmtDate(c.date) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Shift</div><div class="calc-val">' + esc(c.shift || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Checked By</div><div class="calc-val">' + esc(c.checked_by || '-') + '</div></div>'
@@ -454,7 +474,7 @@ S.InventorySpotCheck = {
       + '<th>Variance</th><th>Variance $</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#sp-back')) this.render(this.container, this.actions);
+      if (ev.target.closest('#sp-export')) { window.print(); return; }
       const inv = ev.target.closest('.sp-investigate');
       if (inv) {
         ev.stopPropagation();
