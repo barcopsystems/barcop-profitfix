@@ -52,8 +52,7 @@ S.InventoryTakeInventory = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ti-how">How This Works</button>';
-    document.getElementById('ti-how')?.addEventListener('click', () => this.showHowTo());
+    actions.innerHTML = '';
     if (this.draft && this.draft._view) this.route();
     else this.renderSetup();
   },
@@ -110,7 +109,7 @@ S.InventoryTakeInventory = {
         + '<button class="btn btn-primary" id="ti-go-locs">Go to Locations</button></div>';
     } else {
       const locCards = locs.map(l => {
-        const productCount = this.products().filter(p => p.primary_location === l.name).length;
+        const productCount = this.products().filter(p => App.productLocations(p).includes(l.name)).length;
         return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--b1);border-radius:6px;cursor:pointer;margin-bottom:8px;">'
           + '<input type="checkbox" class="ti-loc" value="' + esc(l.name) + '" style="width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;"/>'
           + '<div style="flex:1;">'
@@ -122,7 +121,9 @@ S.InventoryTakeInventory = {
     }
 
     this.container.innerHTML = '<div class="screen">' + resumeBar
-      + '<div class="card"><div class="card-title">Start an Inventory Count</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Start an Inventory Count</span>'
+      + '<button class="btn btn-ghost btn-sm" id="ti-how">How This Works</button></div>'
       + locPicker
       + '<div class="form-row" style="gap:16px;margin-top:14px;">'
       + '<div class="f w-md"><label>Counted By</label>'
@@ -134,6 +135,7 @@ S.InventoryTakeInventory = {
       + '</div></div></div>';
 
     this.container.onclick = null;
+    document.getElementById('ti-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ti-go-locs')?.addEventListener('click', () => App.navigate('ic-locations'));
     document.getElementById('ti-resume')?.addEventListener('click', () => {
       this.draft = this.loadDraft();
