@@ -20,7 +20,6 @@ S.InventoryParSuggestions = {
   // Default settings — persisted to App.inventoryData.par_settings on change
   defaults: { window_weeks: 8, buffer_pct: 30, cycle_days: 7 },
   filterCategory: '',
-  selected: {},   // { product_id: true }
 
   settings() {
     if (!App.inventoryData) App.inventoryData = {};
@@ -168,12 +167,7 @@ S.InventoryParSuggestions = {
         : r.status === 'Reduce' ? '<span style="font-weight:700;color:var(--red);">Reduce</span>'
         : r.status === 'No data' ? '<span style="color:var(--t4);">No data</span>'
         : '<span style="color:var(--t3);">OK</span>';
-      const canSelect = r.suggested != null && r.status !== 'No Change';
-      const checkbox = canSelect
-        ? '<input type="checkbox" class="ps-chk" data-id="' + p.id + '"' + (this.selected[p.id] ? ' checked' : '') + ' style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/>'
-        : '';
       return '<tr>'
-        + '<td style="width:36px;">' + checkbox + '</td>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">' + esc(p.category || '') + '</div></td>'
         + '<td>' + currentDisp + '</td>'
@@ -182,27 +176,25 @@ S.InventoryParSuggestions = {
         + '<td style="color:' + deltaColor + ';font-weight:700;">' + deltaDisp + '</td>'
         + '<td>' + statusText + '</td>'
         + '<td><div style="font-size:10px;color:var(--t3);">' + esc(r.reasoning || '') + '</div></td>'
+        + '<td><div class="row-actions"><button class="btn btn-primary btn-sm ps-update" data-id="' + p.id + '" data-suggested="' + r.suggested + '">Update Par</button></div></td>'
         + '</tr>';
     }).join('');
 
     const tableCard = '<div class="card"><div class="card-title">Par Suggestions</div>'
-      + '<div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:14px;">'
-        + '<div class="f" style="width:220px;"><label>Filter by Category</label><select id="ps-cat">' + catOpts + '</select></div>'
-        + (rows.length > 0 ? '<button class="btn btn-primary btn-sm" id="ps-apply" style="margin-left:auto;">Apply Dynamic Pars</button>' : '')
-        + '<span id="ps-status" style="font-size:11px;color:var(--gold);display:none;"></span>'
-      + '</div>'
+      + '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:220px;">'
+        + '<label>Filter by Category</label><select id="ps-cat">' + catOpts + '</select></div></div>'
       + (rows.length === 0
           ? '<div style="font-size:13px;color:var(--t3);padding:10px 0;">No pars need changing right now.</div>'
           : '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-            + '<th></th><th>Product</th><th>Current Par</th><th>Avg Wkly Usage</th><th>Suggested Par</th><th>Delta</th><th>Status</th><th>Math</th>'
+            + '<th>Product</th><th>Current Par</th><th>Avg Wkly Usage</th><th>Suggested Par</th><th>Delta</th><th>Status</th><th>Math</th><th></th>'
             + '</tr></thead><tbody>' + trs + '</tbody></table></div>')
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + settingsCard + tableCard + '</div>';
-    this.wire(rows);
+    this.wire();
   },
 
-  wire(rows) {
+  wire() {
     const onChange = async (id, val, key) => {
       const s = this.settings();
       const n = parseInt(val, 10);
@@ -217,44 +209,23 @@ S.InventoryParSuggestions = {
     document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(null, e.target.value, 'cycle_days'));
     document.getElementById('ps-cat')?.addEventListener('change',    e => { this.filterCategory = e.target.value || ''; this.draw(); });
 
-    this.container.querySelectorAll('.ps-chk').forEach(cb => {
-      cb.addEventListener('change', e => {
-        const id = e.target.dataset.id;
-        if (e.target.checked) this.selected[id] = true;
-        else delete this.selected[id];
-      });
+    // One deliberate Update per product: the operator weighs each suggestion on
+    // its own, applies the one row, and it drops off the list once its par
+    // matches usage.
+    this.container.querySelectorAll('.ps-update').forEach(btn => {
+      btn.addEventListener('click', () => this.applyOne(btn.dataset.id, parseFloat(btn.dataset.suggested)));
     });
-    document.getElementById('ps-apply')?.addEventListener('click', () => this.applySelected(rows));
   },
 
-  async applySelected(rows) {
-    const ids = Object.keys(this.selected);
-    if (!ids.length) {
-      App.confirm({ title: 'No products selected', message: 'Tick the box next to each product whose par you want to update, then click Apply Dynamic Pars.', confirmText: 'OK', cancelText: 'Cancel' });
-      return;
-    }
-    const ok = await App.confirm({
-      title: 'Apply suggested par to ' + ids.length + ' product' + (ids.length === 1 ? '' : 's') + '?',
-      message: 'This sets the Par number on each selected product to the suggested value. You can still change any product\'s Par by hand on Add Products anytime.',
-      confirmText: 'Apply',
-      cancelText: 'Cancel'
-    });
-    if (!ok) return;
+  async applyOne(productId, suggested) {
+    if (!productId || suggested == null || isNaN(suggested)) return;
     const products = (App.inventoryData && App.inventoryData.ic_products) || [];
-    let applied = 0;
-    rows.forEach(r => {
-      if (!this.selected[r.product.id] || r.suggested == null) return;
-      const p = products.find(x => x.id === r.product.id);
-      if (!p) return;
-      p.par_level = r.suggested;
-      p.par_updated_at = new Date().toISOString();
-      p.par_source = 'auto-suggestion';
-      applied++;
-    });
+    const p = products.find(x => x.id === productId);
+    if (!p) return;
+    p.par_level = suggested;
+    p.par_updated_at = new Date().toISOString();
+    p.par_source = 'auto-suggestion';
     await App.saveInventory();
-    this.selected = {};
-    const status = document.getElementById('ps-status');
-    if (status) { status.textContent = 'Applied ' + applied + ' par update' + (applied === 1 ? '' : 's') + '.'; status.style.display = 'inline'; }
     this.draw();
   }
 };
