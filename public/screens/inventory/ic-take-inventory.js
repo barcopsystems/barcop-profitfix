@@ -52,9 +52,26 @@ S.InventoryTakeInventory = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '';
+    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ti-how">How This Works</button>';
+    document.getElementById('ti-how')?.addEventListener('click', () => this.showHowTo());
     if (this.draft && this.draft._view) this.route();
     else this.renderSetup();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Inventory Count Works', [
+      { p: ['An inventory count is a snapshot of everything you have on hand right now, priced out so Bar Cop can tell you what you used, what to reorder, and where you are leaking. Count the same way every time and the numbers stay honest.'] },
+      { h: 'What You Are Counting', p: ['Bar Cop walks you through your products one location at a time. Go shelf by shelf and enter what is physically there. Anything you do not touch is recorded as zero, so only skip a product if it is truly empty.'] },
+      { h: 'Pick Your Locations', p: ['Most operators count one location at a time and come back for the rest later. Pick a single location for a quick section count, or pick several to run a full inventory in one session. You count and finalize each location\'s products together.'] },
+      { h: 'How To Enter Each Product', p: [
+        'Liquor, wine, and bottled mixers use the fill slider. Set the number of full bottles, then drag the slider to the level of the open bottle. Draft beer uses the same slider shaped like a keg.',
+        'Bottle beer is counted by the case. Enter full cases and any loose bottles, and Bar Cop shows the running total in cases as you type.',
+        'Food and dry goods use a plain number in the product\'s own unit, like pounds, cases, or each.'
+      ] },
+      { h: 'It Saves As You Go', p: ['Your count saves to this device automatically. If you close the tab or lose signal partway through, come back and pick up where you left off. Nothing is final until you submit.'] },
+      { h: 'Review And Submit', p: ['When you reach the end, Bar Cop shows a review of every product, its total, and its value. Go back and fix anything that looks off, then submit. Submitting writes a finalized count that you cannot change by accident.'] },
+      { h: 'What The Count Feeds', p: ['Every finalized count powers your dashboard, the usage and variance reports, dynamic par suggestions, and your cost of goods. Two counts let Bar Cop measure what you used between them, so count on a regular schedule, like every week, to keep the numbers sharp.'] }
+    ]);
   },
 
   route() {
@@ -101,14 +118,7 @@ S.InventoryTakeInventory = {
             + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + productCount + ' product' + (productCount === 1 ? '' : 's') + ' assigned</div>'
           + '</div></label>';
       }).join('');
-      locPicker = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-        + 'Pick the location you want to count right now. Most operators count one location at a time and come back for the others later. Pick more than one if you are doing a full inventory in one session.'
-        + '</div>'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-          + '<button type="button" class="btn btn-ghost btn-sm" id="ti-loc-all">Select all</button>'
-          + '<button type="button" class="btn btn-ghost btn-sm" id="ti-loc-none">Clear</button>'
-        + '</div>'
-        + locCards;
+      locPicker = locCards;
     }
 
     this.container.innerHTML = '<div class="screen">' + resumeBar
@@ -125,12 +135,6 @@ S.InventoryTakeInventory = {
 
     this.container.onclick = null;
     document.getElementById('ti-go-locs')?.addEventListener('click', () => App.navigate('ic-locations'));
-    document.getElementById('ti-loc-all')?.addEventListener('click', () => {
-      this.container.querySelectorAll('.ti-loc').forEach(c => { c.checked = true; });
-    });
-    document.getElementById('ti-loc-none')?.addEventListener('click', () => {
-      this.container.querySelectorAll('.ti-loc').forEach(c => { c.checked = false; });
-    });
     document.getElementById('ti-resume')?.addEventListener('click', () => {
       this.draft = this.loadDraft();
       if (this.draft) {
