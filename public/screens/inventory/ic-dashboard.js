@@ -98,10 +98,10 @@ S.InventoryDashboard = {
     });
     comps.push({ key: 'shrink', label: 'Shrinkage (30d)', raw: shrink, lowerBetter: true, fmt: v => App.fmtCurrency(v) });
 
-    // Count cadence (gap to prior count)
+    // Days between counts (gap to prior count)
     if (prevC) {
       const gap = (end - new Date(prevC.date + 'T00:00:00').getTime()) / 86400000;
-      comps.push({ key: 'cadence', label: 'Count cadence', raw: gap, lowerBetter: true, fmt: v => Math.round(v) + 'd apart' });
+      comps.push({ key: 'count_gap', label: 'Days between counts', raw: gap, lowerBetter: true, fmt: v => Math.round(v) + 'd apart' });
     }
 
     // Dead stock value (on hand but didn't move this period)
@@ -228,7 +228,7 @@ S.InventoryDashboard = {
       + card('To Reorder', App.fmtCurrency(reorderTotal),
              reorderCount ? reorderCount + ' item' + (reorderCount === 1 ? '' : 's') + ' &middot; ' + vendors.length + ' vendor' + (vendors.length === 1 ? '' : 's') : 'Everything at par',
              reorderCount ? 'over-target' : 'on-target')
-      + card('Used This Period', periodCost != null ? App.fmtCurrency(periodCost) : '&mdash;',
+      + card('Used This Period', periodCost != null ? App.fmtCurrency(periodCost) : '-',
              prev ? this.fmtDate(prev.date) + ' &rarr; ' + this.fmtDate(latest.date) : 'Needs two counts')
       + card('Count Freshness', lastAge === 0 ? 'Today' : lastAge + 'd ago', esc(latest.type || 'Count') + ' count', freshCls);
 
