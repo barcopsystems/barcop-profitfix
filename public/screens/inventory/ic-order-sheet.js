@@ -32,6 +32,16 @@ S.InventoryOrderSheet = {
     this.renderMain();
   },
 
+  showHowTo() {
+    App.showHelpModal('How the Order Sheet Works', [
+      { p: ['The Order Sheet turns your latest count into orders. Anything below par shows up under the vendor you buy it from, already filled to the quantity that brings you back to par. You can also build an order from scratch up top.'] },
+      { h: 'Suggested Orders', p: ['Each vendor card below lists their products that fell under par in your last count, with on-hand, par, and a suggested order quantity. Adjust any quantity, add a product the count missed with Add Item, then Create Order. Bottle beer is ordered by the case.'] },
+      { h: 'New Custom Order', p: ['Use the card up top to build an order off-cycle, like a party order or a one-time buy, without waiting on a count. Pick the vendor, add the products and quantities, then create it the same way.'] },
+      { h: 'One Order Per Vendor', p: ['Once you create an order for a vendor, that vendor drops off the suggested list and shows under Already Ordered, so you do not double-order. The order sits in Order History as Open until you receive it.'] },
+      { h: 'Closing The Loop', p: ['When the delivery shows up, go to Receive Delivery and match it to the open order. The line items pre-fill, you confirm against the invoice, and Bar Cop marks the order Received.'] }
+    ]);
+  },
+
   // products below par in the latest count, grouped by vendor.
   // On-hand is stored in container units for every category (cases for bottle
   // beer, bottles for liquor/wine, kegs for draft). par_level is in the same
@@ -131,21 +141,14 @@ S.InventoryOrderSheet = {
         + ' count has an open order in flight. Mark those received in Order History as deliveries arrive.</div></div>';
     } else {
       body = hiddenNotice
-        + '<div style="font-size:12px;color:var(--t3);margin-bottom:16px;">'
-        + 'Suggested from the ' + esc(this.fmtDate(data.latest.date)) + ' count. '
-        + 'Adjust quantities, then create an order per vendor.</div>'
         + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
     }
 
-    // Always show the New Custom Order button at the top of the screen.
-    const newCustomBtn = '<div style="margin-bottom:16px;display:flex;justify-content:flex-end;">'
-      + '<button class="btn btn-ghost btn-sm" id="os-new-custom">+ New Custom Order</button>'
-      + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + newCustomBtn + this.customOrderPanelHTML() + body + '</div>';
+    // The custom order card lives at the top of the screen, always open.
+    this.container.innerHTML = '<div class="screen">' + this.customOrderPanelHTML() + body + '</div>';
 
     document.getElementById('os-go-history')?.addEventListener('click', () => App.navigate('ic-order-history'));
-    document.getElementById('os-new-custom')?.addEventListener('click', () => this.openCustomOrder());
+    document.getElementById('os-how')?.addEventListener('click', () => this.showHowTo());
 
     // Per-card input handler for the quantity field on existing lines.
     this.container.querySelectorAll('.os-vcard').forEach(card => {
@@ -291,19 +294,12 @@ S.InventoryOrderSheet = {
     this.refreshPicker(card);
   },
 
-  // ── Custom Order open/close + create ─────────────────────────────────────
-  openCustomOrder() {
-    const panel = this.container.querySelector('.os-custom');
-    if (panel) panel.style.display = '';
-    const btn = document.getElementById('os-new-custom');
-    if (btn) btn.style.display = 'none';
-  },
-
+  // ── Custom Order reset + create ──────────────────────────────────────────
+  // The custom order card is always open at the top. Cancel resets it back to
+  // the blank vendor-pick state in place rather than hiding it.
   closeCustomOrder() {
     const panel = this.container.querySelector('.os-custom');
     if (!panel) return;
-    // Reset to blank state for the next time.
-    panel.style.display = 'none';
     panel.dataset.vendor = '';
     const sel = panel.querySelector('.os-co-vendor');
     if (sel) sel.value = '';
@@ -314,8 +310,6 @@ S.InventoryOrderSheet = {
     const err = panel.querySelector('.os-verr');
     if (err) { err.textContent = ''; err.style.display = 'none'; }
     this.recalcVendor(panel);
-    const btn = document.getElementById('os-new-custom');
-    if (btn) btn.style.display = '';
   },
 
   onCustomVendorChange(vendorName) {
@@ -516,8 +510,10 @@ S.InventoryOrderSheet = {
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const opts = '<option value="">Select vendor...</option>'
       + vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
-    return '<div class="card os-vcard os-custom" data-vendor="" style="display:none;">'
-      + '<div class="card-title">New Custom Order</div>'
+    return '<div class="card os-vcard os-custom" data-vendor="">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>New Custom Order</span>'
+      + '<button class="btn btn-ghost btn-sm" id="os-how">How This Works</button></div>'
       + '<div class="form-row" style="margin-bottom:12px;">'
         + '<div class="f" style="width:280px;"><label>Vendor</label>'
           + '<select class="os-co-vendor">' + opts + '</select>'
