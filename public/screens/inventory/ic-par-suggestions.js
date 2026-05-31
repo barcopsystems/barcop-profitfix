@@ -14,7 +14,7 @@
    delivery cycle override lives on the product record (Phase 2; v1 uses
    global default for everyone).
 
-   "Apply Selected" updates par_level on each ic_product in one save. */
+   "Apply Dynamic Pars" updates par_level on each ic_product in one save. */
 
 S.InventoryParSuggestions = {
   // Default settings — persisted to App.inventoryData.par_settings on change
@@ -101,9 +101,18 @@ S.InventoryParSuggestions = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ps-export">Export PDF</button>';
-    document.getElementById('ps-export')?.addEventListener('click', () => window.print());
+    actions.innerHTML = '';
     this.draw();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Dynamic Pars Work', [
+      { p: ['A par is the amount you want on hand for a product. Set it right and the Order Sheet keeps you stocked without tying up cash in dead inventory. Dynamic Pars reads your real usage from your counts and suggests a par for every product, so you are not guessing.'] },
+      { h: 'How The Suggestion Is Built', p: ['Bar Cop averages how fast each product actually moved over your recent counts, covers one delivery cycle of that usage, then adds a safety buffer. The math: average weekly usage times your delivery cycle, plus the buffer.'] },
+      { h: 'The Three Settings', p: ['Window is how many weeks of counts to average. Buffer is the safety cushion on top of usage. Delivery Cycle is how often you reorder. Change any of them and every suggestion recomputes on the spot.'] },
+      { h: 'Reading The Table', p: ['Each product shows its current par, average weekly usage, the suggested par, and whether to Increase or Reduce. No data means there are not enough counts yet to suggest. The longer your count history, the sharper the suggestion.'] },
+      { h: 'Applying Them', p: ['Tick the products you want to update, or use Select All, then Apply Dynamic Pars to write the suggested par onto each one. You can always override an individual par by hand on Product Setup.'] }
+    ]);
   },
 
   draw() {
@@ -123,19 +132,16 @@ S.InventoryParSuggestions = {
       + cats.map(c => '<option value="' + esc(c) + '"' + (this.filterCategory === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
 
     // Settings card
-    const settingsCard = '<div class="card"><div class="card-title">Suggestion Settings</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6;">'
-        + 'Adjust how the suggested par is computed. Wider window smooths out one-week spikes; higher buffer protects against stock-out; cycle days is how often you order. The math: avg weekly usage × (cycle_days/7) × (1 + buffer).'
-      + '</div>'
+    const settingsCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Dynamic Pars Settings</span>'
+      + '<button class="btn btn-ghost btn-sm" id="ps-how">How This Works</button></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Window (weeks)</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Window (weeks) ' + tt('ic-par-window') + '</label>'
           + '<input type="number" id="ps-window" min="2" max="26" step="1" value="' + settings.window_weeks + '"/></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Buffer (%)</label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Buffer (%) ' + tt('ic-par-buffer') + '</label>'
           + '<div class="fw"><input class="suf" type="number" id="ps-buffer" min="0" max="100" step="5" value="' + settings.buffer_pct + '"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Delivery Cycle (days)</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Delivery Cycle (days) ' + tt('ic-par-cycle') + '</label>'
           + '<input type="number" id="ps-cycle" min="1" max="30" step="1" value="' + settings.cycle_days + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Filter Category</label>'
-          + '<select id="ps-cat">' + catOpts + '</select></div>'
       + '</div></div>';
 
     // Compute suggestions
@@ -148,24 +154,16 @@ S.InventoryParSuggestions = {
         return (order[a.status] || 9) - (order[b.status] || 9);
       });
 
-    const actionable = rows.filter(r => r.status === 'Increase' || r.status === 'Reduce').length;
-    const noData    = rows.filter(r => r.status === 'No data').length;
-    const summary = '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Products Analyzed</div><div class="calc-val">' + rows.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Changes Suggested</div><div class="calc-val ' + (actionable > 0 ? 'warn' : '') + '">' + actionable + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">No Data</div><div class="calc-val">' + noData + '</div></div>'
-      + '</div>';
-
     const trs = rows.map(r => {
       const p = r.product;
       const currentDisp = r.current != null ? r.current.toString() + (p.category === 'Bottle Beer' && p.case_size > 0 ? ' cs' : '') : '-';
       const suggDisp = r.suggested != null ? r.suggested.toString() + (p.category === 'Bottle Beer' && p.case_size > 0 ? ' cs' : '') : '<span style="color:var(--t4);">-</span>';
       const deltaColor = r.delta > 0 ? 'var(--gold)' : r.delta < 0 ? 'var(--red)' : 'var(--t3)';
       const deltaDisp = r.delta != null ? (r.delta > 0 ? '+' : '') + r.delta.toString() : '-';
-      const statusBadge = r.status === 'Increase' ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:2px 6px;">INCREASE</span>'
-        : r.status === 'Reduce' ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--red);border:1px solid var(--red);border-radius:3px;padding:2px 6px;">REDUCE</span>'
-        : r.status === 'No data' ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--t4);">NO DATA</span>'
-        : '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--t3);">OK</span>';
+      const statusText = r.status === 'Increase' ? '<span style="font-weight:700;color:var(--gold);">Increase</span>'
+        : r.status === 'Reduce' ? '<span style="font-weight:700;color:var(--red);">Reduce</span>'
+        : r.status === 'No data' ? '<span style="color:var(--t4);">No data</span>'
+        : '<span style="color:var(--t3);">OK</span>';
       const canSelect = r.suggested != null && r.status !== 'No Change';
       const checkbox = canSelect
         ? '<input type="checkbox" class="ps-chk" data-id="' + p.id + '"' + (this.selected[p.id] ? ' checked' : '') + ' style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/>'
@@ -178,17 +176,20 @@ S.InventoryParSuggestions = {
         + '<td>' + (r.avg_weekly != null ? esc(App.qtyWithUnit(p, r.avg_weekly)) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '<td>' + suggDisp + '</td>'
         + '<td style="color:' + deltaColor + ';font-weight:700;">' + deltaDisp + '</td>'
-        + '<td>' + statusBadge + '</td>'
+        + '<td>' + statusText + '</td>'
         + '<td><div style="font-size:10px;color:var(--t3);">' + esc(r.reasoning || '') + '</div></td>'
         + '</tr>';
     }).join('');
 
-    const tableCard = '<div class="card"><div class="card-title">Suggestions</div>'
-      + summary
+    const filterRow = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:200px;">'
+      + '<label>Filter Category</label><select id="ps-cat">' + catOpts + '</select></div></div>';
+
+    const tableCard = '<div class="card"><div class="card-title">Par Suggestions</div>'
+      + filterRow
       + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
-        + '<button class="btn btn-ghost btn-sm" id="ps-sel-actionable">Select All Changes</button>'
-        + '<button class="btn btn-ghost btn-sm" id="ps-sel-clear">Clear Selection</button>'
-        + '<button class="btn btn-primary btn-sm" id="ps-apply" style="margin-left:auto;">Apply Selected</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ps-sel-actionable">Select All</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ps-sel-clear">Clear</button>'
+        + '<button class="btn btn-primary btn-sm" id="ps-apply" style="margin-left:auto;">Apply Dynamic Pars</button>'
         + '<span id="ps-status" style="font-size:11px;color:var(--gold);margin-left:8px;display:none;"></span>'
       + '</div>'
       + (rows.length === 0
@@ -211,6 +212,7 @@ S.InventoryParSuggestions = {
       await App.saveInventory();
       this.draw();
     };
+    document.getElementById('ps-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ps-window')?.addEventListener('change', e => onChange(null, e.target.value, 'window_weeks'));
     document.getElementById('ps-buffer')?.addEventListener('change', e => onChange(null, e.target.value, 'buffer_pct'));
     document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(null, e.target.value, 'cycle_days'));
@@ -238,7 +240,7 @@ S.InventoryParSuggestions = {
   async applySelected(rows) {
     const ids = Object.keys(this.selected);
     if (!ids.length) {
-      App.confirm({ title: 'No products selected', message: 'Tick the box next to each product whose par you want to update, then click Apply Selected.', confirmText: 'OK', cancelText: 'Cancel' });
+      App.confirm({ title: 'No products selected', message: 'Tick the box next to each product whose par you want to update, then click Apply Dynamic Pars.', confirmText: 'OK', cancelText: 'Cancel' });
       return;
     }
     const ok = await App.confirm({
