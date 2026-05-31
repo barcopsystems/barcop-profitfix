@@ -161,6 +161,8 @@ S.InventoryOrderSheet = {
     this.container.querySelector('.os-co-vendor')?.addEventListener('change', (ev) => this.onCustomVendorChange(ev.target.value));
 
     this.container.onclick = ev => {
+      const parNudge = ev.target.closest('.os-par-nudge');
+      if (parNudge) { App.navigate('ic-par-suggestions'); return; }
       const take    = ev.target.closest('#os-take');
       const rm      = ev.target.closest('.os-remove');
       const create  = ev.target.closest('.os-create');
@@ -477,11 +479,37 @@ S.InventoryOrderSheet = {
       + '</div>';
   },
 
+  // Count how many products on a card have a par meaningfully off versus the
+  // dynamic par suggestion (off by a whole unit AND at least 25% of current,
+  // the same threshold as the Dashboard nudge). Scopes the nudge to the
+  // products on that vendor card.
+  parIssueCount(products) {
+    const PS = S.InventoryParSuggestions;
+    if (!PS || !PS.computeSuggestion || !PS.settings) return 0;
+    const settings = PS.settings();
+    let off = 0;
+    (products || []).forEach(p => {
+      if (!p || p.par_level == null || p.par_level === '') return;
+      const sug = PS.computeSuggestion(p, settings);
+      if (!sug || sug.suggested == null) return;
+      const cur = Math.round(parseFloat(p.par_level) || 0);
+      const diff = Math.abs(sug.suggested - cur);
+      if (diff >= 1 && diff >= cur * 0.25) off++;
+    });
+    return off;
+  },
+
   vendorCard(vendor, lines) {
     const rows = lines.map(l =>
       this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)
     ).join('');
     const existingIds = lines.map(l => l.product.id || '').filter(Boolean);
+    const parOff = this.parIssueCount(lines.map(l => l.product));
+    const parNudge = parOff > 0
+      ? '<div class="os-par-nudge" style="margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;max-width:540px;">'
+        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--gold);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> look off versus your real usage. Tuning them sharpens these reorder numbers.</span>'
+        + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>'
+      : '';
 
     return '<div class="card os-vcard" data-vendor="' + this.cssEsc(vendor) + '">'
       + '<div class="card-title">' + esc(vendor) + '</div>'
@@ -493,6 +521,7 @@ S.InventoryOrderSheet = {
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val os-vcount">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val good os-vtotal">$0</div></div>'
+      + parNudge
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary os-create" data-vendor="' + this.cssEsc(vendor) + '">Create Order</button>'
