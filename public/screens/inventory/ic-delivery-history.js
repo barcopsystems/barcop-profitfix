@@ -62,9 +62,9 @@ S.InventoryDeliveryHistory = {
           const parts = [];
           if (d.price_change_count) parts.push(d.price_change_count + ' Price Change' + (d.price_change_count === 1 ? '' : 's'));
           if (d.short_count_count)  parts.push(d.short_count_count + ' Short Count' + (d.short_count_count === 1 ? '' : 's'));
-          disc = '<span class="badge badge-warn">' + (parts.join(' &middot; ') || 'Discrepancy') + '</span>';
+          disc = '<span style="color:var(--gold);font-weight:700;">' + (parts.join(' &middot; ') || 'Discrepancy') + '</span>';
         } else {
-          disc = '<span class="badge badge-dim">Clean</span>';
+          disc = '<span style="color:var(--green);font-weight:600;">Clean</span>';
         }
         return '<tr class="dh-row" data-id="' + d.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
