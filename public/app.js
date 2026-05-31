@@ -190,6 +190,10 @@ const TT = {
     'ic-notes':         {t:'Notes',b:'Free-form notes for your own reference. Anything that helps you or a new manager understand this product. Does not show up on operational screens.',e:'Substitute for Espolon when out, vendor only delivers Tuesday, holiday seasonal item'},
     'ic-cost-per-bottle-calc':{t:'Cost per Bottle',b:'Cost per Case divided by Case Size. Per-bottle cost Bar Cop uses for pour cost math.',e:'$32.40 case / 24 bottles = $1.35 per bottle'},
     'ic-bottles-per-case':{t:'Bottles per Case',b:'Echo of the Case Size you set above, shown alongside the per-bottle cost for quick sanity check.',e:'24 bottles in a case of standard domestic beer'},
+    'sp-restock':     {t:'Restocked Mid-Shift',b:'Full bottles you brought up from storage and added to the bar after the pre-shift count. Bar Cop adds these to what you started with, so the amount used comes out honest.',e:'Pre-shift 3 bottles, restocked 6 mid-shift, post-shift 4 means you used 5, not 1'},
+    'sp-restock-keg': {t:'Restocked Mid-Shift',b:'Fresh kegs you tapped after the pre-shift count. Bar Cop adds them to the keg you started with so the pour count stays honest across a keg change.',e:'Started near empty, blew the keg and tapped a fresh one, count the fresh keg here'},
+    'sp-pos-pours':   {t:'POS Pours Sold',b:'Pours your POS rang in for this product this shift. Bar Cop compares it to what your pre and post counts say you poured. A large gap points to overpouring, give-aways, or theft.',e:'Counts say 40 pours left the bottle, POS rang 33, that is 7 pours unaccounted for'},
+    'sp-pos-btl':     {t:'POS Bottles Sold',b:'Bottles your POS rang in for this beer this shift. Bar Cop compares it to the bottles your counts say left the cooler. A gap is give-aways, walk-offs, or theft.',e:'Counts say 48 bottles left the cooler, POS rang 44, that is 4 bottles unaccounted for'},
   },
   show(icon) {
     const id = icon.dataset.tt;
