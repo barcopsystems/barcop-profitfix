@@ -93,7 +93,7 @@ S.InventoryParSuggestions = {
       status = delta > 0 ? 'Increase' : 'Reduce';
     }
     return { ...usage, suggested, current, delta, status,
-      reasoning: usage.avg_weekly.toFixed(2) + '/wk × ' + cycleWeeks.toFixed(1) + 'wk cycle × ' + (1 + buffer).toFixed(2) };
+      reasoning: usage.avg_weekly.toFixed(2) + '/wk × ' + cycleWeeks.toFixed(1) + 'wk × ' + (1 + buffer).toFixed(2) };
   },
 
   // ── Entry ───────────────────────────────────────────────────────────
