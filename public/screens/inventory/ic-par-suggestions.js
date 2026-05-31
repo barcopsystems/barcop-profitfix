@@ -187,8 +187,6 @@ S.InventoryParSuggestions = {
     const tableCard = '<div class="card"><div class="card-title">Par Suggestions</div>'
       + filterRow
       + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
-        + '<button class="btn btn-ghost btn-sm" id="ps-sel-actionable">Select All</button>'
-        + '<button class="btn btn-ghost btn-sm" id="ps-sel-clear">Clear</button>'
         + '<button class="btn btn-primary btn-sm" id="ps-apply" style="margin-left:auto;">Apply Dynamic Pars</button>'
         + '<span id="ps-status" style="font-size:11px;color:var(--gold);margin-left:8px;display:none;"></span>'
       + '</div>'
@@ -225,15 +223,6 @@ S.InventoryParSuggestions = {
         else delete this.selected[id];
       });
     });
-    document.getElementById('ps-sel-actionable')?.addEventListener('click', () => {
-      this.selected = {};
-      rows.forEach(r => { if (r.status === 'Increase' || r.status === 'Reduce') this.selected[r.product.id] = true; });
-      this.draw();
-    });
-    document.getElementById('ps-sel-clear')?.addEventListener('click', () => {
-      this.selected = {};
-      this.draw();
-    });
     document.getElementById('ps-apply')?.addEventListener('click', () => this.applySelected(rows));
   },
 
@@ -245,7 +234,7 @@ S.InventoryParSuggestions = {
     }
     const ok = await App.confirm({
       title: 'Apply suggested par to ' + ids.length + ' product' + (ids.length === 1 ? '' : 's') + '?',
-      message: 'Each product\'s par_level field will be updated to the suggested value. You can manually override individual products afterwards on Product Setup.',
+      message: 'This sets the Par number on each selected product to the suggested value. You can still change any product\'s Par by hand on Add Products anytime.',
       confirmText: 'Apply',
       cancelText: 'Cancel'
     });
