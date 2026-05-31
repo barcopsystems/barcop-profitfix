@@ -93,7 +93,7 @@ S.InventoryParSuggestions = {
       status = delta > 0 ? 'Increase' : 'Reduce';
     }
     return { ...usage, suggested, current, delta, status,
-      reasoning: usage.avg_weekly.toFixed(2) + '/wk × ' + cycleWeeks.toFixed(1) + 'wk cycle × ' + (1 + buffer).toFixed(2) + ' buffer' };
+      reasoning: usage.avg_weekly.toFixed(2) + '/wk × ' + cycleWeeks.toFixed(1) + 'wk cycle × ' + (1 + buffer).toFixed(2) };
   },
 
   // ── Entry ───────────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ S.InventoryParSuggestions = {
       { p: ['A par is the amount you want on hand for a product. Set it right and the Order Sheet keeps you stocked without tying up cash in dead inventory. Dynamic Pars reads your real usage from your counts and suggests a par for every product, so you are not guessing.'] },
       { h: 'How The Suggestion Is Built', p: ['Bar Cop averages how fast each product actually moved over your recent counts, covers one delivery cycle of that usage, then adds a safety buffer. The math: average weekly usage times your delivery cycle, plus the buffer.'] },
       { h: 'The Three Settings', p: ['Window is how many weeks of counts to average. Buffer is the safety cushion on top of usage. Delivery Cycle is how often you reorder. Change any of them and every suggestion recomputes on the spot.'] },
-      { h: 'Reading The Table', p: ['Each product shows its current par, average weekly usage, the suggested par, and whether to Increase or Reduce. No data means there are not enough counts yet to suggest. The longer your count history, the sharper the suggestion.'] },
-      { h: 'Applying Them', p: ['Tick the products you want to update, or use Select All, then Apply Dynamic Pars to write the suggested par onto each one. You can always override an individual par by hand on Product Setup.'] }
+      { h: 'Reading The List', p: ['Only products whose par is off from your real usage show up here, so the list is a clean to-do, not your whole catalog. Each row shows the current par, average weekly usage, the suggested par, and whether it should Increase or Reduce. The longer your count history, the sharper the suggestion.'] },
+      { h: 'Updating One At A Time', p: ['Weigh each suggestion on its own before you act on it. A par set too low can run you out two weeks later, so this is a judgment call, not a blanket accept. When you agree with one, click Update Par on that row and Bar Cop sets that product\'s par to the suggested number. It drops off the list once its par matches usage. You can always change a par by hand on Add Products.'] }
     ]);
   },
 
@@ -176,7 +176,7 @@ S.InventoryParSuggestions = {
         + '<td style="color:' + deltaColor + ';font-weight:700;">' + deltaDisp + '</td>'
         + '<td>' + statusText + '</td>'
         + '<td><div style="font-size:10px;color:var(--t3);">' + esc(r.reasoning || '') + '</div></td>'
-        + '<td><div class="row-actions"><button class="btn btn-primary btn-sm ps-update" data-id="' + p.id + '" data-suggested="' + r.suggested + '">Update Par</button></div></td>'
+        + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ps-update" data-id="' + p.id + '" data-suggested="' + r.suggested + '">Update Par</button></div></td>'
         + '</tr>';
     }).join('');
 
