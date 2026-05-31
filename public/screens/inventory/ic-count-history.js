@@ -72,7 +72,9 @@ S.InventoryCountHistory = {
           + '<td class="val">' + App.fmtCurrency(c.total_value || 0) + '</td>'
           + '<td>' + varCell + '</td>'
           + '<td>' + status + '</td>'
-          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ch-view" data-id="' + c.id + '">View</button></div></td></tr>';
+          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ch-view" data-id="' + c.id + '">View</button>'
+          + (App.canEdit('ic-count-history') ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
       }).join('');
       html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Count History</span>'
@@ -86,14 +88,45 @@ S.InventoryCountHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       const how = ev.target.closest('#ch-how');
+      const del = ev.target.closest('.ch-del');
       const view = ev.target.closest('.ch-view');
       const row = ev.target.closest('.ch-row');
       const take = ev.target.closest('#ch-take');
       if (how)  { this.showHowTo(); return; }
+      if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
       if (view) { this.renderDetail(view.dataset.id); return; }
       if (row)  { this.renderDetail(row.dataset.id); return; }
       if (take) App.navigate('ic-take-inventory');
     };
+  },
+
+  // Guarded delete: a count is a finalized record, so removing one is behind
+  // the edit permission and an honest confirm because it moves COGS, usage,
+  // and variance. The correction path matters more than strict immutability.
+  confirmDelete(id) {
+    if (!App.canEdit('ic-count-history')) return;
+    const rec = this.counts().find(c => c.id === id);
+    const label = rec ? (esc((rec.type || 'Inventory') + ' count, ' + this.fmtDate(rec.date))) : 'this count';
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:440px;width:100%;padding:24px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Delete Count</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:20px;">Delete the ' + label + '? This count feeds your COGS, usage, and variance numbers, so deleting it will change those reports. This cannot be undone.</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
+        + '<button type="button" class="btn btn-ghost" id="ch-del-cancel">Cancel</button>'
+        + '<button type="button" class="btn btn-danger" id="ch-del-confirm">Delete Count</button>'
+      + '</div></div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+    document.getElementById('ch-del-cancel').addEventListener('click', close);
+    document.getElementById('ch-del-confirm').addEventListener('click', async () => {
+      close();
+      if (!App.canEdit('ic-count-history') || !App.inventoryData) return;
+      App.inventoryData.ic_counts = this.counts().filter(c => c.id !== id);
+      await App.saveInventory();
+      this.renderList();
+    });
   },
 
   // ── Detail ────────────────────────────────────────────────────────────────
