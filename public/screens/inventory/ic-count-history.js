@@ -8,6 +8,7 @@
 S.InventoryCountHistory = {
   viewId: null,
   compareId: null,
+  countedByFilter: '',
 
   counts() {
     return ((App.inventoryData && App.inventoryData.ic_counts) || []);
@@ -51,19 +52,28 @@ S.InventoryCountHistory = {
         + 'with value, variance, and side-by-side comparison.</div>'
         + '<button class="btn btn-primary" id="ch-take">Take Inventory</button></div>';
     } else {
+      const counters = [...new Set(asc.map(c => c.counted_by).filter(Boolean))].sort();
+      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
+        + '<label>Filter by Counted By</label><select id="ch-filter">'
+        + '<option value="">All staff</option>'
+        + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
+        + '</select></div></div>';
+
       const rows = asc.map((c, i) => {
         const prior = i > 0 ? asc[i - 1] : null;
         const variance = prior ? (c.total_value || 0) - (prior.total_value || 0) : null;
         const isLatest = i === asc.length - 1;
         return { c, variance, isLatest };
-      }).reverse().map(r => {
+      }).reverse()
+        .filter(r => !this.countedByFilter || r.c.counted_by === this.countedByFilter)
+        .map(r => {
         const c = r.c;
         const varCell = r.variance == null
           ? '<span style="color:var(--t4);">-</span>'
           : (r.variance >= 0 ? '+' : '') + App.fmtCurrency(r.variance);
         const status = r.isLatest
-          ? '<span class="badge badge-ok">Latest</span>'
-          : '<span class="badge badge-dim">Past</span>';
+          ? '<span style="color:var(--gold);font-weight:700;">Latest</span>'
+          : '<span style="color:var(--steel);font-weight:600;">Past</span>';
         return '<tr class="ch-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.type || '-') + '</td>'
@@ -79,10 +89,11 @@ S.InventoryCountHistory = {
       html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Count History</span>'
         + '<button class="btn btn-ghost btn-sm" id="ch-how">How This Works</button></div>'
+        + filter
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);">No counts for this staff member.</td></tr>') + '</tbody></table></div></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
@@ -98,6 +109,10 @@ S.InventoryCountHistory = {
       if (row)  { this.renderDetail(row.dataset.id); return; }
       if (take) App.navigate('ic-take-inventory');
     };
+    document.getElementById('ch-filter')?.addEventListener('change', e => {
+      this.countedByFilter = e.target.value || '';
+      this.renderList();
+    });
   },
 
   // Guarded delete: a count is a finalized record, so removing one is behind
