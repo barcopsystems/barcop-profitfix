@@ -1676,10 +1676,10 @@ S.HubSettings = {
     // weekly usage so on-hand (cases) vs par (cases) reads coherently.
     icProducts.forEach((p, i) => {
       if (p.category === 'Bottle Beer' && p.case_size && icTotals[i]) {
+        // Convert the authored-in-bottles totals to CASES (beer's canonical
+        // unit). Pars are set below by the shared par-alignment pass, the same
+        // way as every other category.
         icTotals[i] = [icTotals[i][0] / p.case_size, icTotals[i][1] / p.case_size];
-        const wkCases = Math.max(0.5, icTotals[i][1] - icTotals[i][0]);
-        p.par_level     = Math.max(2, Math.ceil(wkCases * 2));
-        p.reorder_point = Math.max(1, Math.ceil(wkCases));
       }
     });
     // On-hand value = counted quantity x unit_cost, in container units for every
@@ -1820,6 +1820,28 @@ S.HubSettings = {
     icDeliveryPlan.forEach(([d, vn, pre], k) => {
       const del = mkVendorDelivery(d, vn, pre, (k % 5 === 0));
       if (del) App.inventoryData.ic_deliveries.push(del);
+    });
+
+    // ── Align pars to real usage so Dynamic Pars reads like a real operation ──
+    // Bake the engine's OWN suggested par into each product so most products sit
+    // right at par (nothing to change). A deliberate handful is left off: nine
+    // carrying too much (Reduce) and three carrying too little (Increase), spread
+    // across every vendor so the Order Sheet's per-card par nudge shows up on the
+    // first card the operator opens. Uses the live computeSuggestion against the
+    // counts + deliveries just built, so the seed can never drift from the screen.
+    App.inventoryData.par_settings = App.inventoryData.par_settings || { window_weeks: 8, buffer_pct: 30, cycle_days: 7 };
+    const parReduceSet   = new Set([0, 2, 6, 8, 9, 10, 14, 23, 32]); // par too high -> Reduce
+    const parIncreaseSet = new Set([1, 19, 20]);                     // par too low  -> Increase
+    icProducts.forEach((p, i) => {
+      const sug = S.InventoryParSuggestions.computeSuggestion(p, App.inventoryData.par_settings);
+      const suggested = (sug && sug.suggested > 0)
+        ? sug.suggested
+        : Math.max(1, Math.ceil((icWkUsage[i] || 0) * 1.3));
+      let par = suggested;
+      if (parReduceSet.has(i))        par = suggested + Math.max(2, Math.round(suggested * 0.5));
+      else if (parIncreaseSet.has(i)) par = Math.max(1, suggested - Math.max(1, Math.round(suggested * 0.35)));
+      p.par_level     = Math.max(1, par);
+      p.reorder_point = Math.max(1, Math.round(p.par_level * 0.4));
     });
 
     // Spot checks — feed the Theft Risk pour-variance signal.
