@@ -91,13 +91,13 @@ S.InventoryReceiveDelivery = {
     return '<div class="rd-line" data-lid="' + lid + '" data-ext="0" '
       + 'style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:10px;">'
       + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="flex:1.4;min-width:170px;"><label>Product ' + tt('rd-prod') + '</label>'
+      + '<div class="f" style="flex:1.4;min-width:170px;"><label>Product</label>'
       + '<select class="rd-prod">' + this.productOptions() + '</select></div>'
-      + '<div class="f" style="width:132px;flex-shrink:0;"><label>Qty Received <span class="rd-qty-hint" style="color:var(--t4);font-weight:400;"></span> ' + tt('rd-qty') + '</label>'
+      + '<div class="f" style="width:132px;flex-shrink:0;"><label>Qty Received ' + tt('rd-qty') + '</label>'
       + '<input type="number" class="rd-qty" min="0" step="0.01" placeholder="0"/></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Unit Price <span class="rd-price-hint" style="color:var(--t4);font-weight:400;"></span> ' + tt('rd-price') + '</label>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Unit Price ' + tt('rd-price') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre rd-price" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Extended ' + tt('rd-ext') + '</label>'
+      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Extended</label>'
       + '<div class="f-display rd-ext">$0</div></div>'
       + '<button type="button" class="btn btn-ghost btn-sm rd-remove" style="margin-bottom:2px;">Remove</button>'
       + '</div>'
@@ -138,22 +138,22 @@ S.InventoryReceiveDelivery = {
       + '<span>Delivery Details</span>'
       + '<button class="btn btn-ghost btn-sm" id="rd-how">How This Works</button></div>'
       + '<div class="form-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor ' + tt('rd-vendor') + '</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date ' + tt('rd-date') + '</label><input type="date" id="rd-date" value="' + today + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Invoice # ' + tt('rd-invoice') + '</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Driver ' + tt('rd-driver') + '</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1.2;min-width:150px;"><label>Received By ' + tt('rd-by') + '</label>'
+      + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Invoice #</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Driver</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1.2;min-width:150px;"><label>Received By</label>'
       + '<select id="rd-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       // Open Order picker. Hidden until a vendor with at least one open
       // order is selected. Picking an order pre-fills the line items so the
       // operator does not re-enter what they already ordered.
       + '<div class="form-row" style="gap:16px;" id="rd-order-row">'
-        + '<div class="f" style="flex:1;min-width:280px;"><label>Open Order ' + tt('rd-order') + '</label>'
+        + '<div class="f" style="flex:1;min-width:280px;"><label>Open Order</label>'
           + '<select id="rd-order"><option value="">No open orders for this vendor</option></select>'
         + '</div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes ' + tt('rd-notes') + '</label>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="rd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '</div>'
       + '<div class="card"><div class="card-title">Line Items</div>'
@@ -224,13 +224,8 @@ S.InventoryReceiveDelivery = {
 
     const p = this.productById(line.querySelector('.rd-prod').value);
     // For bottle beer with case_size, qty is in cases and unit_cost is
-    // cost-per-case. Annotate the qty + price inputs so the operator sees
-    // they are working in case units.
+    // cost-per-case. The Qty Received and Unit Price tooltips spell that out.
     const isCaseBeer = p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
-    const qtyHint   = line.querySelector('.rd-qty-hint');
-    const priceHint = line.querySelector('.rd-price-hint');
-    if (qtyHint)   qtyHint.textContent   = isCaseBeer ? 'cases (' + p.case_size + ' btl/case)' : '';
-    if (priceHint) priceHint.textContent = isCaseBeer ? 'per case' : '';
 
     const flag = line.querySelector('.rd-flag');
     const flagBtn = line.querySelector('.rd-flag-btn');
