@@ -68,10 +68,7 @@ S.InventoryTransfers = {
 
   renderList() {
     this.editId = null;
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="tr-print-blank" style="margin-left:8px;">Print Blank Sheet</button>';
-    document.getElementById('tr-export')?.addEventListener('click', () => window.print());
-    document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
+    this.actions.innerHTML = '';
 
     if (this.products().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -90,28 +87,16 @@ S.InventoryTransfers = {
       return;
     }
 
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = '+ Log Transfer';
-    addBtn.addEventListener('click', () => this.showForm());
-    this.actions.appendChild(addBtn);
-
     const all = this.transfers();
     const filtered = this.applyFilters(all);
     filtered.sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
 
-    const summary = '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Total Transfers</div><div class="calc-val">' + all.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">In Range</div><div class="calc-val">' + filtered.length + '</div></div>'
-      + '</div>';
-
-    let html;
+    let listHtml = this.filterCard();
     if (all.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No transfers logged yet</div>'
-        + '<div class="empty-sub">Log every movement of inventory between locations — stockroom to front bar, walk-in to kitchen line. Builds an audit trail and accountability record.</div>'
-        + '<button class="btn btn-primary" id="tr-add-first">Log Your First Transfer</button></div>';
+      listHtml += '<div class="empty"><div class="empty-title">No transfers logged yet</div>'
+        + '<div class="empty-sub">Log every movement of inventory between locations, stockroom to front bar, walk-in to kitchen line. It builds an audit trail and accountability record.</div></div>';
     } else if (filtered.length === 0) {
-      html = summary + this.filterCard() + '<div class="empty"><div class="empty-title">No transfers match the filters</div>'
+      listHtml += '<div class="empty"><div class="empty-title">No transfers match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
       const rows = filtered.slice(0, 200).map(t => {
@@ -129,14 +114,96 @@ S.InventoryTransfers = {
           + (App.canEdit('ic-transfers') ? '<button class="btn btn-danger btn-sm tr-del" data-id="' + t.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      html = summary + this.filterCard()
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>When</th><th>From → To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
     this.wireList();
+    this.wireForm();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Transfer Log Works', [
+      { p: ['The Transfer Log records every time product moves from one of your locations to another, like stockroom to the front bar or walk-in to the kitchen line. It is an accountability trail, so you always know who moved what and where it went.'] },
+      { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Add a witness when two people should sign off on a high-value move. Notes are optional.'] },
+      { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations.'] },
+      { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the filters to pull up a date range, a single product, or one location. Edit or delete any entry if you need to fix a mistake.'] },
+      { h: 'Print A Sheet', p: ['Print Sheet gives you a paper grid to carry on the floor during a shift. Jot down moves as they happen, then enter them here after close.'] }
+    ]);
+  },
+
+  // The Log a Transfer form lives at the top of the landing page, always open.
+  logFormCard() {
+    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Log a Transfer</span>'
+      + '<button class="btn btn-ghost btn-sm" id="tr-how">How This Works</button></div>'
+      + this.formRows(null)
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="tr-save">Log Transfer</button>'
+        + '<span id="tr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  // Shared two-row field layout for both the inline log form and the edit page.
+  // Row 1: Date/Time, Product, Quantity, Unit. Row 2: From, To, Performed By,
+  // Witnessed By. Notes below. Pass the record for edit, or null for a new log.
+  formRows(t) {
+    const v = val => (val != null && val !== '') ? val : '';
+    const active = this.activeShift();
+    const defaultManagerId = active ? (active.manager_id || '') : '';
+    let initialProdId = t?.product_id || '';
+    let initialFrom = t?.from_location || '';
+    const initialTo = t?.to_location || '';
+    const initialUnit = t?.unit || '';
+    if (!t && initialProdId) {
+      const p = this.productById(initialProdId);
+      if (p && p.primary_location) initialFrom = p.primary_location;
+    }
+    const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
+
+    return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Date / Time</label>'
+          + '<input type="datetime-local" id="tr-when" value="' + esc((t?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label>'
+          + '<select id="tr-prod">' + this.productOptions(initialProdId) + '</select></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Quantity</label>'
+          + '<input type="number" id="tr-qty" min="0" step="0.5" value="' + v(t?.quantity) + '" placeholder="0"/></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Unit</label>'
+          + '<select id="tr-unit">' + this.unitOptions(initialCat, initialUnit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles')) + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>From Location</label>'
+          + '<select id="tr-from">' + this.locationOptions(initialFrom) + '</select></div>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>To Location</label>'
+          + '<select id="tr-to">' + this.locationOptions(initialTo) + '</select></div>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>Performed By</label>'
+          + '<select id="tr-by">' + App.staffOptions(t?.performed_by_id || defaultManagerId, { placeholder: 'Select staff...' }) + '</select></div>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<select id="tr-witness">' + App.staffOptions(t?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
+      + '</div>'
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
+        + '<textarea id="tr-notes" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>';
+  },
+
+  // Wire the always-open inline log form (How This Works, Save, product change).
+  wireForm() {
+    document.getElementById('tr-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('tr-save')?.addEventListener('click', () => this.save());
+    this.wireProdChange();
+  },
+
+  // Product change: re-pop unit options + default From to the product's primary.
+  wireProdChange() {
+    document.getElementById('tr-prod')?.addEventListener('change', e => {
+      const p = this.productById(e.target.value);
+      if (!p) return;
+      const unitSel = document.getElementById('tr-unit');
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'units'));
+      const fromSel = document.getElementById('tr-from');
+      if (fromSel && !fromSel.value && p.primary_location) fromSel.value = p.primary_location;
+    });
   },
 
   // ── Filter card ─────────────────────────────────────────────────────
@@ -146,7 +213,12 @@ S.InventoryTransfers = {
     const prodOpts = '<option value="">All products</option>'
       + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
-    return '<div class="card"><div class="card-title">Filter</div>'
+    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Filter</span>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Print Sheet</button>'
+      + '</div></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tr-f-to" value="' + esc(this.filterTo) + '"/></div>'
@@ -172,12 +244,12 @@ S.InventoryTransfers = {
       const row  = ev.target.closest('.tr-row');
       const edit = ev.target.closest('.tr-edit');
       const del  = ev.target.closest('.tr-del');
-      const addF = ev.target.closest('#tr-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('ic-transfers')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
     };
+    document.getElementById('tr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('tr-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tr-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     document.getElementById('tr-f-prod')?.addEventListener('change', e => { this.filterProductId = e.target.value || ''; this.renderList(); });
@@ -222,57 +294,18 @@ S.InventoryTransfers = {
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   },
 
+  // Edit page (own screen). Same two-row field layout as the inline log form;
+  // Cancel stays here because the operator navigated away from the list to edit.
   showForm(id) {
-    if (id && !App.canEdit('ic-transfers')) return;
+    if (!App.canEdit('ic-transfers')) return;
     this.editId = id || null;
     const t = id ? this.transfers().find(x => x.id === id) : null;
-    const active = this.activeShift();
-    const defaultManagerId = active ? (active.manager_id || '') : '';
-    const v = val => (val != null && val !== '') ? val : '';
-
-    // Pre-fill From location to picked product's primary_location when adding new
-    let initialProdId = t?.product_id || '';
-    let initialFrom = t?.from_location || '';
-    let initialTo = t?.to_location || '';
-    let initialUnit = t?.unit || '';
-    if (!t && initialProdId) {
-      const p = this.productById(initialProdId);
-      if (p && p.primary_location) initialFrom = p.primary_location;
-    }
-
-    const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit Transfer' : 'Log a Transfer') + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Date / Time</label>'
-          + '<input type="datetime-local" id="tr-when" value="' + esc((t?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label>'
-          + '<select id="tr-prod">' + this.productOptions(initialProdId) + '</select></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Quantity</label>'
-          + '<input type="number" id="tr-qty" min="0" step="0.5" value="' + v(t?.quantity) + '" placeholder="0"/></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="tr-unit">' + this.unitOptions(initialCat, initialUnit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles')) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1;min-width:180px;"><label>From Location</label>'
-          + '<select id="tr-from">' + this.locationOptions(initialFrom) + '</select></div>'
-        + '<div class="f" style="flex:1;min-width:180px;"><label>To Location</label>'
-          + '<select id="tr-to">' + this.locationOptions(initialTo) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Performed By</label>'
-          + '<select id="tr-by">' + App.staffOptions(t?.performed_by_id || defaultManagerId, { placeholder: 'Select staff...' }) + '</select></div>'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-          + '<select id="tr-witness">' + App.staffOptions(t?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
-      + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="tr-notes" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>'
-
+      + '<div class="card-title">Edit Transfer</div>'
+      + this.formRows(t)
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="tr-save">' + (id ? 'Update Transfer' : 'Log Transfer') + '</button>'
+        + '<button class="btn btn-primary" id="tr-save">Update Transfer</button>'
         + '<button class="btn btn-ghost" id="tr-cancel">Cancel</button>'
         + '<span id="tr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
@@ -280,15 +313,7 @@ S.InventoryTransfers = {
     this.container.onclick = null;
     document.getElementById('tr-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('tr-save')?.addEventListener('click', () => this.save());
-    // Product change → re-pop unit options + default From location to product's primary
-    document.getElementById('tr-prod')?.addEventListener('change', e => {
-      const p = this.productById(e.target.value);
-      if (!p) return;
-      const unitSel = document.getElementById('tr-unit');
-      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'units'));
-      const fromSel = document.getElementById('tr-from');
-      if (fromSel && !fromSel.value && p.primary_location) fromSel.value = p.primary_location;
-    });
+    this.wireProdChange();
   },
 
   async save() {
