@@ -73,7 +73,9 @@ S.InventoryDeliveryHistory = {
           + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
           + '<td class="val">' + App.fmtCurrency(d.total || 0) + '</td>'
           + '<td>' + disc + '</td>'
-          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button></div></td></tr>';
+          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button>'
+          + (App.canEdit('ic-delivery-history') ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
       }).join('');
 
       html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -88,16 +90,48 @@ S.InventoryDeliveryHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       const how = ev.target.closest('#dh-how');
+      const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');
       const row = ev.target.closest('.dh-row');
       const rec = ev.target.closest('#dh-receive');
       if (how)  { this.showHowTo(); return; }
+      if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
       if (view) { this.renderDetail(view.dataset.id); return; }
       if (row)  { this.renderDetail(row.dataset.id); return; }
       if (rec) App.navigate('ic-receive-delivery');
     };
     document.getElementById('dh-filter')?.addEventListener('change', e => {
       this.vendorFilter = e.target.value || '';
+      this.renderList();
+    });
+  },
+
+  // Guarded delete: a delivery is a finalized record, so removing one is behind
+  // the edit permission and an honest confirm because it moves your stock,
+  // usage, and variance. The correction path matters more than strict
+  // immutability. Applied price-master changes are not reversed here.
+  confirmDelete(id) {
+    if (!App.canEdit('ic-delivery-history')) return;
+    const rec = this.deliveries().find(d => d.id === id);
+    const label = rec ? (esc((rec.vendor || 'Delivery') + ', ' + this.fmtDate(rec.date))) : 'this delivery';
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:440px;width:100%;padding:24px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Delete Delivery</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:20px;">Delete the ' + label + ' delivery? This feeds your stock, usage, and variance numbers, so deleting it will change those reports. This cannot be undone.</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
+        + '<button type="button" class="btn btn-ghost" id="dh-del-cancel">Cancel</button>'
+        + '<button type="button" class="btn btn-danger" id="dh-del-confirm">Delete Delivery</button>'
+      + '</div></div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener('click', ev => { if (ev.target === m) close(); });
+    document.getElementById('dh-del-cancel').addEventListener('click', close);
+    document.getElementById('dh-del-confirm').addEventListener('click', async () => {
+      close();
+      if (!App.canEdit('ic-delivery-history') || !App.inventoryData) return;
+      App.inventoryData.ic_deliveries = this.deliveries().filter(d => d.id !== id);
+      await App.saveInventory();
       this.renderList();
     });
   },
