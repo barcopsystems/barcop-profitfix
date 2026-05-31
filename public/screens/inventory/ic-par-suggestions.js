@@ -145,12 +145,16 @@ S.InventoryParSuggestions = {
       + '</div></div>';
 
     // Compute suggestions
+    // Only surface pars that actually need a move. Products already matching
+    // their usage (and ones with no usage data yet) are not shown, so the list
+    // is a clean to-do, not a full dump of the catalog.
     const rows = this.products()
       .filter(p => !this.filterCategory || p.category === this.filterCategory)
       .map(p => ({ product: p, ...this.computeSuggestion(p, settings) }))
+      .filter(r => r.status === 'Increase' || r.status === 'Reduce')
       .sort((a, b) => {
-        // Sort: Increase first (most action), Reduce second, No Change last, No Data at bottom
-        const order = { 'Increase': 0, 'Reduce': 1, 'No Change': 2, 'No data': 3 };
+        // Increase first (biggest stock-out risk), then Reduce.
+        const order = { 'Increase': 0, 'Reduce': 1 };
         return (order[a.status] || 9) - (order[b.status] || 9);
       });
 
@@ -181,17 +185,14 @@ S.InventoryParSuggestions = {
         + '</tr>';
     }).join('');
 
-    const filterRow = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:200px;">'
-      + '<label>Filter Category</label><select id="ps-cat">' + catOpts + '</select></div></div>';
-
     const tableCard = '<div class="card"><div class="card-title">Par Suggestions</div>'
-      + filterRow
-      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
-        + '<button class="btn btn-primary btn-sm" id="ps-apply" style="margin-left:auto;">Apply Dynamic Pars</button>'
-        + '<span id="ps-status" style="font-size:11px;color:var(--gold);margin-left:8px;display:none;"></span>'
+      + '<div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:14px;">'
+        + '<div class="f" style="width:220px;"><label>Filter by Category</label><select id="ps-cat">' + catOpts + '</select></div>'
+        + (rows.length > 0 ? '<button class="btn btn-primary btn-sm" id="ps-apply" style="margin-left:auto;">Apply Dynamic Pars</button>' : '')
+        + '<span id="ps-status" style="font-size:11px;color:var(--gold);display:none;"></span>'
       + '</div>'
       + (rows.length === 0
-          ? '<div style="font-size:13px;color:var(--t3);padding:10px 0;">No products match the filter.</div>'
+          ? '<div style="font-size:13px;color:var(--t3);padding:10px 0;">No pars need changing right now.</div>'
           : '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
             + '<th></th><th>Product</th><th>Current Par</th><th>Avg Wkly Usage</th><th>Suggested Par</th><th>Delta</th><th>Status</th><th>Math</th>'
             + '</tr></thead><tbody>' + trs + '</tbody></table></div>')
