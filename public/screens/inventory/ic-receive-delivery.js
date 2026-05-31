@@ -59,6 +59,17 @@ S.InventoryReceiveDelivery = {
     this.renderForm();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Receiving a Delivery Works', [
+      { p: ['Receiving a delivery logs what actually showed up against what you ordered and what you got charged. Match it to your invoice line by line, flag anything that is off, and Bar Cop keeps your costs current and your vendor honest.'] },
+      { h: 'Start With The Vendor', p: ['Pick the vendor up top, then set the date and who took the delivery in. Invoice number and driver are optional, but worth keeping for your records and any credit claim down the road.'] },
+      { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, pick it from Open Order and every line pre-fills with what you ordered. Bar Cop sets the order Received when you save, so it drops off your Order Sheet. No order on file means a walk-in delivery, so add the lines by hand.'] },
+      { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master. Bottle beer is received by the case, so the qty is cases and the price is per case. Everything else is in its own container unit.'] },
+      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop flags the line and gives you a Flag Discrepancy button. Filing it opens a pre-filled claim that lands in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
+      { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases and leave the ones you plan to dispute. Saved deliveries feed your on-hand stock, your usage and variance reports, and Vendor Watch.'] }
+    ]);
+  },
+
   productOptions() {
     const prods = this.products();
     const cats = [...new Set(prods.map(p => p.category || 'Other'))]
@@ -79,20 +90,22 @@ S.InventoryReceiveDelivery = {
   lineHTML(lid) {
     return '<div class="rd-line" data-lid="' + lid + '" data-ext="0" '
       + 'style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:10px;">'
-      + '<div class="form-row" style="gap:12px;margin-bottom:10px;">'
-      + '<div class="f" style="flex:1;min-width:180px;"><label>Product</label>'
-      + '<select class="rd-prod">' + this.productOptions() + '</select></div></div>'
-      + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Qty Received <span class="rd-qty-hint" style="color:var(--t4);font-weight:400;"></span></label>'
+      + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
+      + '<div class="f" style="flex:1.4;min-width:170px;"><label>Product ' + tt('rd-prod') + '</label>'
+      + '<select class="rd-prod">' + this.productOptions() + '</select></div>'
+      + '<div class="f" style="width:132px;flex-shrink:0;"><label>Qty Received <span class="rd-qty-hint" style="color:var(--t4);font-weight:400;"></span> ' + tt('rd-qty') + '</label>'
       + '<input type="number" class="rd-qty" min="0" step="0.01" placeholder="0"/></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Unit Price <span class="rd-price-hint" style="color:var(--t4);font-weight:400;"></span></label>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Unit Price <span class="rd-price-hint" style="color:var(--t4);font-weight:400;"></span> ' + tt('rd-price') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre rd-price" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Extended</label>'
+      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Extended ' + tt('rd-ext') + '</label>'
       + '<div class="f-display rd-ext">$0</div></div>'
-      + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;margin-bottom:2px;border-color:var(--gold);color:var(--gold);">Flag Discrepancy</button>'
-      + '<span class="rd-flag-logged" style="display:none;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);align-self:center;">Discrepancy Logged</span>'
       + '<button type="button" class="btn btn-ghost btn-sm rd-remove" style="margin-bottom:2px;">Remove</button>'
       + '</div>'
+      // Discrepancy controls sit below the data row: the Flag button (or the
+      // Logged badge once filed) shows right above the line that spells out
+      // what is off, so the operator reads the prompt then the reason.
+      + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;margin-top:10px;border-color:var(--gold);color:var(--gold);">Flag Discrepancy</button>'
+      + '<span class="rd-flag-logged" style="display:none;margin-top:10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);">Discrepancy Logged</span>'
       + '<div class="rd-flag" style="display:none;font-size:11px;font-weight:700;margin-top:8px;"></div>'
       + '</div>';
   },
@@ -121,30 +134,29 @@ S.InventoryReceiveDelivery = {
     const today = new Date().toISOString().slice(0, 10);
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title">Delivery Details</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-md"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
-      + '<div class="f w-md"><label>Invoice #</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
-      + '<div class="f w-md"><label>Driver</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
-      + '<div class="f w-md"><label>Received By</label>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Delivery Details</span>'
+      + '<button class="btn btn-ghost btn-sm" id="rd-how">How This Works</button></div>'
+      + '<div class="form-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor ' + tt('rd-vendor') + '</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date ' + tt('rd-date') + '</label><input type="date" id="rd-date" value="' + today + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Invoice # ' + tt('rd-invoice') + '</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Driver ' + tt('rd-driver') + '</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1.2;min-width:150px;"><label>Received By ' + tt('rd-by') + '</label>'
       + '<select id="rd-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       // Open Order picker. Hidden until a vendor with at least one open
       // order is selected. Picking an order pre-fills the line items so the
       // operator does not re-enter what they already ordered.
       + '<div class="form-row" style="gap:16px;" id="rd-order-row">'
-        + '<div class="f" style="flex:1;min-width:280px;"><label>Open Order</label>'
+        + '<div class="f" style="flex:1;min-width:280px;"><label>Open Order ' + tt('rd-order') + '</label>'
           + '<select id="rd-order"><option value="">No open orders for this vendor</option></select>'
         + '</div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes ' + tt('rd-notes') + '</label>'
       + '<textarea id="rd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '</div>'
       + '<div class="card"><div class="card-title">Line Items</div>'
-      + '<div id="rd-line-instructions" style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6;">'
-        + 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order. Compare to your invoice as you go and flag any line that does not match.'
-      + '</div>'
       + '<div id="rd-lines">' + this.lineHTML(++this._seq) + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;">'
         + '<button class="btn btn-ghost btn-sm" id="rd-add">+ Add Line Item</button>'
@@ -164,6 +176,7 @@ S.InventoryReceiveDelivery = {
     const orderRow = document.getElementById('rd-order-row');
     if (orderRow) orderRow.style.display = 'none';
 
+    document.getElementById('rd-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('rd-vendor')?.addEventListener('change', (ev) => this.onVendorChange(ev.target.value));
     document.getElementById('rd-order')?.addEventListener('change', (ev) => this.onOrderPick(ev.target.value));
 
@@ -305,15 +318,12 @@ S.InventoryReceiveDelivery = {
       orderSel.innerHTML = opts.join('');
       orderSel.value = '';
     }
-    this.updateLineItemMode(vendorName, '');
   },
 
   onOrderPick(orderId) {
-    const vendor = document.getElementById('rd-vendor')?.value || '';
     if (!orderId) {
-      // Operator cleared the order pick (walk-in). Update mode but keep
-      // existing form lines so they do not lose typed-in data.
-      this.updateLineItemMode(vendor, '');
+      // Operator cleared the order pick (walk-in). Keep the existing form
+      // lines so they do not lose typed-in data.
       return;
     }
     const order = this.orders().find(o => o.id === orderId);
@@ -342,22 +352,6 @@ S.InventoryReceiveDelivery = {
       this.recalcLine(line);
     });
     this.recalcTotal();
-    this.updateLineItemMode(vendor, orderId);
-  },
-
-  // Update the instructional text based on whether an order is matched.
-  updateLineItemMode(vendorName, orderId) {
-    const inst = document.getElementById('rd-line-instructions');
-    if (!inst) return;
-    if (!vendorName) {
-      inst.textContent = 'Pick a vendor above to get started. If you placed the order through Bar Cop, match it to the delivery and the line items will pre-fill from the order. Compare to your invoice as you go and flag any line that does not match.';
-      return;
-    }
-    if (orderId) {
-      inst.textContent = 'Line items pre-filled from the matched order. Compare each line to your invoice. Adjust the qty or price if it differs, then click Flag Discrepancy on that line to log it for credit recovery. Use "+ Add Line Item" for promos or substitutions the vendor threw in on top.';
-    } else {
-      inst.textContent = 'Walk-in delivery (no order matched). Type the line items manually. If a delivered price differs from your product master, Bar Cop will offer a Flag Discrepancy button so you can log the credit claim.';
-    }
   },
 
   // ── Discrepancy modal — opens from a flagged line ────────────────────────
@@ -712,7 +706,7 @@ S.InventoryReceiveDelivery = {
         + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:10px;">Update Product Master Costs?</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">'
           + 'Bar Cop spotted ' + updates.length + ' price change' + (updates.length === 1 ? '' : 's') + ' on this delivery. '
-          + 'Apply the ones that should become the new cost going forward. Uncheck anything you plan to dispute, and file a discrepancy on those lines after saving.'
+          + 'Apply the ones that should become the new cost from here on. Uncheck anything you plan to dispute, and file a discrepancy on those lines after saving.'
         + '</div>'
         + '<div style="max-height:320px;overflow-y:auto;margin-bottom:18px;">' + rows + '</div>'
         + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
