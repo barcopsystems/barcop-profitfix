@@ -7,6 +7,7 @@
 
 S.InventoryOrderHistory = {
   _pendingDelId: null,
+  vendorFilter: '',
 
   orders() {
     if (!App.inventoryData) App.inventoryData = {};
@@ -22,10 +23,10 @@ S.InventoryOrderHistory = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
-  statusBadge(s) {
-    if (s === 'Received')  return '<span class="badge badge-ok">Received</span>';
-    if (s === 'Submitted') return '<span class="badge badge-dim">Submitted</span>';
-    return '<span class="badge badge-warn">Open</span>';
+  statusText(s) {
+    if (s === 'Received')  return '<span style="color:var(--green);font-weight:600;">Received</span>';
+    if (s === 'Submitted') return '<span style="color:var(--steel);font-weight:600;">Submitted</span>';
+    return '<span style="color:var(--gold);font-weight:700;">Open</span>';
   },
 
   // Find the vendor record matching this order's vendor name. Returns null
@@ -102,6 +103,16 @@ S.InventoryOrderHistory = {
     this.renderList();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Order History Works', [
+      { p: ['Order History is the record of every order you have created. Each row is one order, with its vendor, total, and where it stands, from open to sent to received.'] },
+      { h: 'Reading The List', p: ['Each row shows the date, vendor, item count, total, and status. Open means created but not sent yet, Submitted means you emailed it to the vendor, and Received means the delivery came in and closed it out. Filter by vendor to focus on one distributor.'] },
+      { h: 'The Detail View', p: ['Open any order with View to see every line, then email it to the vendor, mark it received by hand, or jump straight to Receive Delivery to log what showed up.'] },
+      { h: 'Emailing The Vendor', p: ['Email to Vendor opens your email client with the order already written out and addressed to the vendor on file. Send it, and Bar Cop marks the order Submitted. You can edit anything in the email before you send it.'] },
+      { h: 'Closing It Out', p: ['When you receive a delivery against an order, Bar Cop marks the order Received for you. You can also flip the status by hand here, or delete an order you created by mistake.'] }
+    ]);
+  },
+
   renderList() {
     this.actions.innerHTML = '';
     const orders = this.sorted();
@@ -113,47 +124,56 @@ S.InventoryOrderHistory = {
         + 'value, and status.</div>'
         + '<button class="btn btn-primary" id="oh-sheet">Go to Order Sheet</button></div>';
     } else {
-      const open = orders.filter(o => o.status !== 'Received');
-      const totVal = orders.reduce((t, o) => t + (o.total || 0), 0);
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Orders</div><div class="calc-val">' + orders.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val">' + open.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Ordered</div><div class="calc-val">' + App.fmtCurrency(totVal) + '</div></div>'
-        + '</div>';
-      const rows = orders.map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
+      const vendors = [...new Set(orders.map(o => o.vendor).filter(Boolean))].sort();
+      const filtered = this.vendorFilter ? orders.filter(o => o.vendor === this.vendorFilter) : orders;
+      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
+        + '<label>Filter by Vendor</label><select id="oh-filter">'
+        + '<option value="">All vendors</option>'
+        + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
+        + '</select></div></div>';
+      const rows = filtered.map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(o.date) + '</div></td>'
         + '<td>' + esc(o.vendor || '-') + '</td>'
         + '<td>' + (o.item_count || (o.line_items ? o.line_items.length : 0)) + '</td>'
         + '<td class="val">' + App.fmtCurrency(o.total || 0) + '</td>'
-        + '<td>' + this.statusBadge(o.status) + '</td>'
+        + '<td>' + this.statusText(o.status) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm oh-view" data-id="' + o.id + '">View</button>'
         + (App.canEdit('ic-order-history') ? '<button class="btn btn-danger btn-sm oh-del" data-id="' + o.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Order History</span>'
+        + '<button class="btn btn-ghost btn-sm" id="oh-how">How This Works</button></div>'
+        + filter
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--t3);">No orders for this vendor.</td></tr>') + '</tbody></table></div></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
+      const how = ev.target.closest('#oh-how');
       const row = ev.target.closest('.oh-row');
       const view = ev.target.closest('.oh-view');
       const del = ev.target.closest('.oh-del');
       const sheet = ev.target.closest('#oh-sheet');
-      if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (view)  { ev.stopPropagation(); this.renderDetail(view.dataset.id); }
-      else if (row)   this.renderDetail(row.dataset.id);
-      else if (sheet) App.navigate('ic-order-sheet');
+      if (how)        { this.showHowTo(); return; }
+      if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
+      if (view)       { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
+      if (row)        { this.renderDetail(row.dataset.id); return; }
+      if (sheet) App.navigate('ic-order-sheet');
     };
+    document.getElementById('oh-filter')?.addEventListener('change', e => {
+      this.vendorFilter = e.target.value || '';
+      this.renderList();
+    });
   },
 
   renderDetail(id) {
     const o = this.orders().find(x => x.id === id);
     if (!o) { this.renderList(); return; }
 
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="oh-export">Export PDF</button>';
-    document.getElementById('oh-export')?.addEventListener('click', () => window.print());
+    this.actions.innerHTML = '';
 
     const rows = (o.line_items || []).map(li => {
       const isCase = li.display_unit === 'case';
@@ -167,26 +187,12 @@ S.InventoryOrderHistory = {
 
     const received  = o.status === 'Received';
     const submitted = o.status === 'Submitted';
-    const v = this.vendorByName(o.vendor);
     const statusLabel = received ? 'Received' : submitted ? 'Submitted' : 'Open';
 
-    // Build the submit-to-vendor row. Shown when the order is not yet
-    // received. Notes when no email is on file so the operator knows the
-    // mailto will open without a recipient address.
-    const submitRow = !received
-      ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">'
-        + (v?.email
-            ? 'Sends to ' + esc(v.email) + ' from your default email client.'
-            : 'No email on file for ' + esc(o.vendor || 'this vendor') + '. The email will still open in your client so you can type the address. Add the vendor email under Vendors to skip this step next time.')
-        + (submitted && o.submitted_at
-            ? '  &middot;  Last submitted ' + this.fmtDate(o.submitted_at.slice(0, 10))
-            : '')
-        + '</div>'
-      : '';
-
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="oh-back">&#8592; Back to Order History</button></div>'
-      + '<div class="card"><div class="card-title">Order &middot; ' + esc(o.vendor || 'Vendor') + ' &middot; ' + this.fmtDate(o.date) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Order &middot; ' + esc(o.vendor || 'Vendor') + ' &middot; ' + this.fmtDate(o.date) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="oh-export">Export PDF</button></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Vendor</div><div class="calc-val">' + esc(o.vendor || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val">' + (o.item_count || (o.line_items || []).length) + '</div></div>'
@@ -196,7 +202,6 @@ S.InventoryOrderHistory = {
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Qty</th><th>Unit Cost</th><th>Extended</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + submitRow
       + '<div class="card-actions">'
       + (App.canEdit('ic-order-history')
           ? ((received ? '' : '<button class="btn btn-primary" id="oh-submit">' + (submitted ? 'Resend to Vendor' : 'Email to Vendor') + '</button>')
@@ -206,10 +211,10 @@ S.InventoryOrderHistory = {
       + '</div></div></div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#oh-back')) this.renderList();
-      else if (ev.target.closest('#oh-submit')) this.submitToVendor(id);
-      else if (ev.target.closest('#oh-status')) this.toggleStatus(id);
-      else if (ev.target.closest('#oh-receive')) App.navigate('ic-receive-delivery');
+      if (ev.target.closest('#oh-export')) { window.print(); return; }
+      if (ev.target.closest('#oh-submit')) { this.submitToVendor(id); return; }
+      if (ev.target.closest('#oh-status')) { this.toggleStatus(id); return; }
+      if (ev.target.closest('#oh-receive')) { App.navigate('ic-receive-delivery'); return; }
     };
   },
 
