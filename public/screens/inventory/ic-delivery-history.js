@@ -27,6 +27,16 @@ S.InventoryDeliveryHistory = {
     this.renderList();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Delivery History Works', [
+      { p: ['Delivery History is the record of every delivery you have received. Each row is one delivery, with its total, whether anything came in off, and a full line-item breakdown you can open.'] },
+      { h: 'Reading The List', p: ['Each row shows the date, vendor, invoice number, line item count, and total. The Discrepancy column flags any delivery where a price changed or a count came up short, so you can see at a glance which ones need follow-up. Clean means everything matched.'] },
+      { h: 'Filter By Vendor', p: ['Use the vendor filter to pull up just one distributor. Handy when you are reviewing a single vendor\'s pricing or chasing a credit on their account.'] },
+      { h: 'The Detail View', p: ['Open any delivery with View to see every line: product, container, quantity received, unit price, any price change against your old cost, and the extended total. Bottle beer shows in cases.'] },
+      { h: 'Export', p: ['Use Export PDF to print or save a clean copy of any delivery for your records, your accountant, or a credit claim with the vendor.'] }
+    ]);
+  },
+
   renderList() {
     this.actions.innerHTML = '';
     const all = this.sorted();
@@ -40,7 +50,7 @@ S.InventoryDeliveryHistory = {
         + '<button class="btn btn-primary" id="dh-receive">Receive Delivery</button></div>';
     } else {
       const vendors = [...new Set(all.map(d => d.vendor).filter(Boolean))].sort();
-      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:240px;">'
+      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
         + '<label>Filter by Vendor</label><select id="dh-filter">'
         + '<option value="">All vendors</option>'
         + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
@@ -62,20 +72,28 @@ S.InventoryDeliveryHistory = {
           + '<td>' + esc(d.invoice_number || '-') + '</td>'
           + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
           + '<td class="val">' + App.fmtCurrency(d.total || 0) + '</td>'
-          + '<td>' + disc + '</td></tr>';
+          + '<td>' + disc + '</td>'
+          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button></div></td></tr>';
       }).join('');
 
-      html = filter
+      html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Delivery History</span>'
+        + '<button class="btn btn-ghost btn-sm" id="dh-how">How This Works</button></div>'
+        + filter
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--t3);">No deliveries for this vendor.</td></tr>') + '</tbody></table></div>';
+        + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);">No deliveries for this vendor.</td></tr>') + '</tbody></table></div></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
+      const how = ev.target.closest('#dh-how');
+      const view = ev.target.closest('.dh-view');
       const row = ev.target.closest('.dh-row');
       const rec = ev.target.closest('#dh-receive');
-      if (row) this.renderDetail(row.dataset.id);
+      if (how)  { this.showHowTo(); return; }
+      if (view) { this.renderDetail(view.dataset.id); return; }
+      if (row)  { this.renderDetail(row.dataset.id); return; }
       if (rec) App.navigate('ic-receive-delivery');
     };
     document.getElementById('dh-filter')?.addEventListener('change', e => {
@@ -90,8 +108,7 @@ S.InventoryDeliveryHistory = {
     if (!d) { this.renderList(); return; }
     const items = d.line_items || [];
 
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="dh-export">Export PDF</button>';
-    document.getElementById('dh-export')?.addEventListener('click', () => window.print());
+    this.actions.innerHTML = '';
 
     const meta = (label, val) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
@@ -118,8 +135,9 @@ S.InventoryDeliveryHistory = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="dh-back">&#8592; Back to Delivery History</button></div>'
-      + '<div class="card"><div class="card-title">' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="dh-export">Export PDF</button></div>'
       + '<div class="calc" style="margin-bottom:' + (d.notes ? '14px' : '0') + ';">'
       + meta('Invoice #', esc(d.invoice_number || '-'))
       + meta('Driver', esc(d.driver || '-'))
@@ -134,8 +152,7 @@ S.InventoryDeliveryHistory = {
       + '</tr></thead><tbody>' + itemRows + '</tbody></table></div></div>'
       + '</div>';
 
-    this.container.onclick = ev => {
-      if (ev.target.closest('#dh-back')) this.renderList();
-    };
+    this.container.onclick = null;
+    document.getElementById('dh-export')?.addEventListener('click', () => window.print());
   }
 };
