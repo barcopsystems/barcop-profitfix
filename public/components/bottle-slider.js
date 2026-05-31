@@ -14,7 +14,16 @@
 
 const BottleSlider = {
   _inst: {},
-  TOP: 16, BOT: 218,   // viewBox y-range of the fillable interior
+  // Fill range per shape, in viewBox y. value 1 sits at the REALISTIC full level
+  // (a liquor bottle fills to the base of the neck, leaving headspace above; a
+  // keg fills to its top), value 0 at the interior base. Anchoring 1 at the
+  // shoulder instead of the cap is what makes a genuinely full open bottle read
+  // 1.00 instead of ~0.80, so on-hand and variance stay honest.
+  RANGES: {
+    bottle: { top: 56, bot: 214 },
+    keg:    { top: 20, bot: 210 }
+  },
+  _range(shape) { return this.RANGES[shape === 'keg' ? 'keg' : 'bottle']; },
 
   // Fill color per category, from the locked palette (no hardcoded hex).
   COLORS: {
@@ -25,8 +34,8 @@ const BottleSlider = {
 
   _snap(v) { v = Math.round((Number(v) || 0) * 100) / 100; return Math.max(0, Math.min(1, v)); },
   _fmt(n)  { return (Math.round(n * 100) / 100).toFixed(2); },
-  _fillY(v){ return (this.TOP + (1 - v) * (this.BOT - this.TOP)).toFixed(1); },
-  _fillH(v){ return (v * (this.BOT - this.TOP)).toFixed(1); },
+  _fillY(v, r){ return (r.top + (1 - v) * (r.bot - r.top)).toFixed(1); },
+  _fillH(v, r){ return (v * (r.bot - r.top)).toFixed(1); },
 
   html(id, opts) {
     opts = opts || {};
@@ -39,6 +48,7 @@ const BottleSlider = {
     // ("Keg" vs "Bottle") change.
     const shape = opts.shape === 'keg' ? 'keg' : 'bottle';
     const noun  = shape === 'keg' ? 'Keg' : 'Bottle';
+    const rng   = this._range(shape);
     const clipD = shape === 'keg'
       ? 'M21 30 Q21 19 33 19 L57 19 Q69 19 69 30 L69 200 Q69 211 57 211 L33 211 Q21 211 21 200 Z'
       : 'M43 16 L43 53 C43 60 21 66 20 90 L20 208 Q20 218 29 218 L61 218 Q70 218 70 208 L70 90 C69 66 47 60 47 53 L47 16 Z';
@@ -49,7 +59,7 @@ const BottleSlider = {
       : '<rect x="38" y="6" width="14" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
         + '<path d="M40 14 L40 52 C40 58 18 64 16 88 L16 210 Q16 222 28 222 L62 222 Q74 222 74 210 L74 88 C72 64 50 58 50 52 L50 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>';
 
-    return '<div class="bs" data-bs="' + esc(String(id)) + '" tabindex="0" '
+    return '<div class="bs" data-bs="' + esc(String(id)) + '" data-top="' + rng.top + '" data-bot="' + rng.bot + '" tabindex="0" '
       + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;">'
 
       + '<div class="bs-fulls-row" style="display:flex;align-items:center;gap:10px;">'
@@ -67,8 +77,8 @@ const BottleSlider = {
       +   '</clipPath></defs>'
       +   '<rect x="0" y="0" width="90" height="230" fill="rgba(255,255,255,0.04)" clip-path="url(#' + clip + ')"/>'
       +   '<rect class="bs-fill" x="0" width="90" fill="' + col + '" clip-path="url(#' + clip + ')" '
-      +     'y="' + this._fillY(value) + '" height="' + this._fillH(value) + '"/>'
-      +   '<line class="bs-handle" x1="12" x2="78" y1="' + this._fillY(value) + '" y2="' + this._fillY(value) + '" stroke="var(--w)" stroke-width="2.5" stroke-linecap="round"/>'
+      +     'y="' + this._fillY(value, rng) + '" height="' + this._fillH(value, rng) + '"/>'
+      +   '<line class="bs-handle" x1="12" x2="78" y1="' + this._fillY(value, rng) + '" y2="' + this._fillY(value, rng) + '" stroke="var(--w)" stroke-width="2.5" stroke-linecap="round"/>'
       +   outline
       + '</svg>'
 
@@ -90,6 +100,9 @@ const BottleSlider = {
     if (!root) return;
     const svg = root.querySelector('.bs-svg');
     const valInput = root.querySelector('.bs-val');
+    const top = parseFloat(root.dataset.top) || this.RANGES.bottle.top;
+    const bot = parseFloat(root.dataset.bot) || this.RANGES.bottle.bot;
+    const rng = { top, bot };
     const inst = this._inst[id] = {
       value: this._snap(parseFloat(valInput && valInput.value) || 0),
       fulls: parseInt(root.querySelector('.bs-fulls').textContent) || 0,
@@ -111,8 +124,8 @@ const BottleSlider = {
       const valEl = root.querySelector('.bs-val');
       const fullsEl = root.querySelector('.bs-fulls');
       const totalEl = root.querySelector('.bs-total');
-      if (fill)   { fill.setAttribute('y', this._fillY(inst.value)); fill.setAttribute('height', this._fillH(inst.value)); }
-      if (handle) { handle.setAttribute('y1', this._fillY(inst.value)); handle.setAttribute('y2', this._fillY(inst.value)); }
+      if (fill)   { fill.setAttribute('y', this._fillY(inst.value, rng)); fill.setAttribute('height', this._fillH(inst.value, rng)); }
+      if (handle) { handle.setAttribute('y1', this._fillY(inst.value, rng)); handle.setAttribute('y2', this._fillY(inst.value, rng)); }
       if (valEl && !skipInputWrite) { inst._writing = true; valEl.value = inst.value.toFixed(2); inst._writing = false; }
       if (fullsEl) fullsEl.textContent = inst.fulls;
       if (totalEl) totalEl.textContent = this._fmt(inst.fulls + inst.value);
@@ -122,7 +135,7 @@ const BottleSlider = {
     const valueFromY = (clientY) => {
       const r = svg.getBoundingClientRect();
       const vy = (clientY - r.top) / r.height * 230;
-      return Math.max(0, Math.min(1, (this.BOT - vy) / (this.BOT - this.TOP)));
+      return Math.max(0, Math.min(1, (bot - vy) / (bot - top)));
     };
 
     let dragging = false, moved = false, startY = 0;
