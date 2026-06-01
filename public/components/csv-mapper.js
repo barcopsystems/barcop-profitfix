@@ -17,16 +17,22 @@ const CSVMapper = {
 
   mount(container, opts) {
     container.innerHTML =
-      '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Accepted: CSV, XLSX, XLS</div>'
-      + (opts.hint ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + opts.hint + '</div>' : '')
-      + '<div class="form-row" style="gap:16px;"><div class="f"><label>Select File</label>'
-      + '<input type="file" class="csvm-file" accept=".csv,.xlsx,.xls" '
-      + 'style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:8px;font-size:12px;cursor:pointer;"/></div></div>'
+      (opts.hint ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + opts.hint + '</div>' : '')
+      + '<div class="csvm-drop" style="border:1.5px dashed var(--b1);border-radius:8px;padding:40px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--input);">'
+        + '<div style="pointer-events:none;">'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your file here</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
+        + '</div></div>'
+      + '<input type="file" class="csvm-file" accept=".csv,.xlsx,.xls" style="display:none;"/>'
       + '<div class="csvm-area"></div>';
-    container.querySelector('.csvm-file').addEventListener('change', e => {
-      const f = e.target.files[0];
-      if (f) this._readFile(f, container, opts);
-    });
+    const zone = container.querySelector('.csvm-drop');
+    const input = container.querySelector('.csvm-file');
+    const over = on => { zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'var(--gold-bg)' : 'var(--input)'; };
+    zone.addEventListener('click', () => input.click());
+    input.addEventListener('change', e => { const f = e.target.files[0]; if (f) this._readFile(f, container, opts); input.value = ''; });
+    ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); over(true); }));
+    ['dragleave', 'dragend'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); over(false); }));
+    zone.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); over(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) this._readFile(f, container, opts); });
   },
 
   _area(c) { return c.querySelector('.csvm-area'); },
