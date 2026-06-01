@@ -130,7 +130,7 @@ S.InventoryUsageReport = {
       const exp = ev.target.closest('#ur-export');
       const tab = ev.target.closest('.rpt-tab');
       if (how) { this.showHowTo(); return; }
-      if (exp) { window.print(); return; }
+      if (exp) { App.exportPDF({ title: 'Usage Report' }); return; }
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('ur-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.catFilter = ''; this.locFilter = ''; this.draw(); });
