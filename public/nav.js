@@ -301,13 +301,13 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5.5h10l-2.5-2.5M14.5 11.5h-10l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Transfer Log</span>
       </div>
-      <div class="nav-item" data-screen="ic-empties" id="nav-ic-empties">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6L13 6v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6l1.5-3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 9.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Empties Log</span>
-      </div>
       <div class="nav-item" data-screen="ic-adjustments" id="nav-ic-adjustments">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5h7M8.5 5v7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Adjustment Log</span>
+      </div>
+      <div class="nav-item" data-screen="ic-empties" id="nav-ic-empties">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6L13 6v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6l1.5-3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 9.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Empties Log</span>
       </div>
       <div class="nav-section">Reports</div>
       <div class="nav-item" data-screen="ic-report-usage" id="nav-ic-report-usage">
@@ -331,10 +331,6 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Add Products</span>
       </div>
-      <div class="nav-item" data-screen="ic-prep-batches" id="nav-ic-prep-batches">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 4h9v3a4.5 4.5 0 0 1-4.5 4.5A4.5 4.5 0 0 1 4 7V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 14h12M7 11.5v2.5M10 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Prep Batches</span>
-      </div>
       <div class="nav-item" data-screen="ic-locations" id="nav-ic-locations">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 15s5-4.2 5-8a5 5 0 0 0-10 0c0 3.8 5 8 5 8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="7" r="1.8" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Set Locations</span>
@@ -342,6 +338,10 @@ const Inventory = {
       <div class="nav-item" data-screen="ic-vendors" id="nav-ic-vendors">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 4.5v4c0 3.5 5.5 6.5 5.5 6.5s5.5-3 5.5-6.5v-4L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
         <span class="nav-label">List Vendors</span>
+      </div>
+      <div class="nav-item" data-screen="ic-prep-batches" id="nav-ic-prep-batches">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 4h9v3a4.5 4.5 0 0 1-4.5 4.5A4.5 4.5 0 0 1 4 7V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 14h12M7 11.5v2.5M10 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Prep Batches</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="ic-help" id="nav-ic-help">
