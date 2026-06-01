@@ -33,7 +33,7 @@ S.InventoryDeliveryHistory = {
       { h: 'Reading The List', p: ['Each row shows the date, vendor, invoice number, line item count, and total. The Discrepancy column flags any delivery where a price changed or a count came up short, so you can see at a glance which ones need follow-up. Clean means everything matched.'] },
       { h: 'Filter By Vendor', p: ['Use the vendor filter to pull up just one distributor. Handy when you are reviewing a single vendor\'s pricing or chasing a credit on their account.'] },
       { h: 'The Detail View', p: ['Open any delivery with View to see every line: product, container, quantity received, unit price, any price change against your old cost, and the extended total. Bottle beer shows in cases.'] },
-      { h: 'Export', p: ['Use Export PDF to print or save a clean copy of any delivery for your records, your accountant, or a credit claim with the vendor.'] }
+      { h: 'Export', p: ['Use Export PDF to save a clean PDF of any delivery for your records, your accountant, or a credit claim with the vendor.'] }
     ]);
   },
 
@@ -187,6 +187,6 @@ S.InventoryDeliveryHistory = {
       + '</div>';
 
     this.container.onclick = null;
-    document.getElementById('dh-export')?.addEventListener('click', () => window.print());
+    document.getElementById('dh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Delivery History', root: this.container }));
   }
 };

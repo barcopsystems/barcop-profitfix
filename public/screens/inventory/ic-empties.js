@@ -116,7 +116,7 @@ S.InventoryEmpties = {
       { h: 'Logging Empties', p: ['Set the date, pick the product, enter how many containers and the unit, then choose what happened to them: Recycle, Return for Deposit, or Trash. Add the deposit per container when there is money on them, and name who logged it.'] },
       { h: 'Deposits And Compliance', p: ['When you mark containers Return for Deposit and set a deposit amount, Bar Cop tracks the money owed back to you. The log doubles as your compliance record if an inspector ever asks for one.'] },
       { h: 'It Does Not Change Your Counts', p: ['Logging an empty does not touch your inventory totals, usage, or variance. The product was already used. This log is purely about where the empty container went.'] },
-      { h: 'Filtering And History', p: ['Every entry drops into the list below. Filter by date range, product, or disposition, and edit or delete any entry to fix a mistake. Print Sheet gives you a paper grid to fill on the floor and enter after close.'] }
+      { h: 'Filtering And History', p: ['Every entry drops into the list below. Filter by date range, product, or disposition, and edit or delete any entry to fix a mistake. The Worksheet button gives you a clean PDF grid to print and fill on the floor, then enter after close.'] }
     ]);
   },
 
@@ -188,7 +188,7 @@ S.InventoryEmpties = {
       + '<span>Filter</span>'
       + '<div style="display:flex;gap:8px;">'
         + '<button class="btn btn-ghost btn-sm" id="em-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="em-print-blank">Print Sheet</button>'
+        + '<button class="btn btn-ghost btn-sm" id="em-print-blank">Worksheet</button>'
       + '</div></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="em-f-from" value="' + esc(this.filterFrom) + '"/></div>'
@@ -218,7 +218,7 @@ S.InventoryEmpties = {
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('ic-empties')) this.showForm(row.dataset.id);
     };
-    document.getElementById('em-export')?.addEventListener('click', () => window.print());
+    document.getElementById('em-export')?.addEventListener('click', () => App.exportPDF({ title: 'Empties Log', root: this.container }));
     document.getElementById('em-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('em-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('em-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });

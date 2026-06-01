@@ -130,7 +130,7 @@ S.InventoryTransfers = {
       { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Add a witness when two people should sign off on a high-value move. Notes are optional.'] },
       { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations.'] },
       { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the filters to pull up a date range, a single product, or one location. Edit or delete any entry if you need to fix a mistake.'] },
-      { h: 'Print A Sheet', p: ['Print Sheet gives you a paper grid to carry on the floor during a shift. Jot down moves as they happen, then enter them here after close.'] }
+      { h: 'Worksheet', p: ['The Worksheet button gives you a clean PDF grid to print and carry on the floor during a shift. Jot down moves as they happen, then enter them here after close.'] }
     ]);
   },
 
@@ -217,7 +217,7 @@ S.InventoryTransfers = {
       + '<span>Filter</span>'
       + '<div style="display:flex;gap:8px;">'
         + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Print Sheet</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Worksheet</button>'
       + '</div></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
@@ -248,7 +248,7 @@ S.InventoryTransfers = {
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('ic-transfers')) this.showForm(row.dataset.id);
     };
-    document.getElementById('tr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('tr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Transfer Log', root: this.container }));
     document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('tr-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tr-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });

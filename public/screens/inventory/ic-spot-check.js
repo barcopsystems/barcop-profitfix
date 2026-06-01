@@ -474,7 +474,7 @@ S.InventorySpotCheck = {
       + '<th>Variance</th><th>Variance $</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#sp-export')) { window.print(); return; }
+      if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
       const inv = ev.target.closest('.sp-investigate');
       if (inv) {
         ev.stopPropagation();

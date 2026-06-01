@@ -29,7 +29,7 @@ S.InventoryCountHistory = {
       { h: 'Reading The List', p: ['Total Value is what your stock was worth at that count. Variance vs Prior is the change in value from the count before it, so you can watch your inventory rise or fall over time. The newest count is tagged Latest.'] },
       { h: 'The Detail View', p: ['Open any count with View to see every product, what you counted, its unit cost, and its value. Bottle beer shows in cases, liquor and wine in bottles, draft in kegs, and food in its own unit.'] },
       { h: 'Comparing Two Counts', p: ['Inside a count, pick another count from the Side-by-Side Comparison menu and the table switches to show what changed product by product. A drop is product you used, a rise is product you received.'] },
-      { h: 'Export', p: ['Use Export PDF to print or save a clean copy of any count for your accountant, your insurance file, or a new manager.'] }
+      { h: 'Export', p: ['Use Export PDF to save a clean PDF of any count for your accountant, your insurance file, or a new manager.'] }
     ]);
   },
 
@@ -246,7 +246,7 @@ S.InventoryCountHistory = {
       + '</div>';
 
     this.container.onclick = null;
-    document.getElementById('ch-export')?.addEventListener('click', () => window.print());
+    document.getElementById('ch-export')?.addEventListener('click', () => App.exportPDF({ title: 'Count History', root: this.container }));
     document.getElementById('ch-compare')?.addEventListener('change', e => {
       this.compareId = e.target.value || null;
       this.renderDetail(id);

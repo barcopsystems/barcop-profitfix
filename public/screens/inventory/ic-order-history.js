@@ -211,7 +211,7 @@ S.InventoryOrderHistory = {
       + '</div></div></div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#oh-export')) { window.print(); return; }
+      if (ev.target.closest('#oh-export')) { App.exportPDF({ title: 'Order History', root: this.container }); return; }
       if (ev.target.closest('#oh-submit')) { this.submitToVendor(id); return; }
       if (ev.target.closest('#oh-status')) { this.toggleStatus(id); return; }
       if (ev.target.closest('#oh-receive')) { App.navigate('ic-receive-delivery'); return; }

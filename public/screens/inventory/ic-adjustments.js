@@ -231,7 +231,7 @@ S.InventoryAdjustments = {
       + '<span>Filter</span>'
       + '<div style="display:flex;gap:8px;">'
         + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Print Sheet</button>'
+        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Worksheet</button>'
       + '</div></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="adj-f-from" value="' + esc(this.filterFrom) + '"/></div>'
@@ -262,7 +262,7 @@ S.InventoryAdjustments = {
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('ic-adjustments')) this.showForm(row.dataset.id);
     };
-    document.getElementById('adj-export')?.addEventListener('click', () => window.print());
+    document.getElementById('adj-export')?.addEventListener('click', () => App.exportPDF({ title: 'Adjustment Log', root: this.container }));
     document.getElementById('adj-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('adj-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('adj-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
