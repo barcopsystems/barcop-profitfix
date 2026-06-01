@@ -90,7 +90,7 @@ S.InventoryHelp = {
         { q: 'When should I use Adjustment Log vs editing a count?',
           a: 'Always the Adjustment Log. Editing a count destroys the count history and removes attribution: the loss disappears without anyone knowing why. The Adjustment Log keeps counts honest and attributes every documented loss to a real cause. Your bookkeeper, your insurance adjuster, and your future self all benefit when the shrinkage trail has reasons attached.' },
         { q: 'What is the Empties Log?',
-          a: 'Tracks empty container disposition for two reasons: legal compliance in jurisdictions that require it, and deposit redemption tracking where bottle deposits apply. Fields: date, product, quantity and unit, deposit per unit, disposition (Recycle, Return for Deposit, Trash), performed by, notes. Summary tiles at the top show totals and deposit value for the filtered range. Print Blank Sheet prints a take-along sheet to fill during shift.' }
+          a: 'Tracks empty container disposition for two reasons: legal compliance in jurisdictions that require it, and deposit redemption tracking where bottle deposits apply. Fields: date, product, quantity and unit, deposit per unit, disposition (Recycle, Return for Deposit, Trash), performed by, notes. The list shows a Deposit Value per entry so you can tally what is owed back across the filtered range. Print Blank Sheet prints a take-along sheet to fill during shift.' }
       ]},
       { t: 'Reports', qa: [
         { q: 'What is Dynamic Pars?',
