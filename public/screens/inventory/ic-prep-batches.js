@@ -119,24 +119,69 @@ S.PrepBatches = {
     this.renderList();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Prep Batches Work', [
+      { p: ['Prep batches are the things you make in-house from other products: a frozen margarita mix, simple syrup, a marinara base, a demi-glace. Build the recipe once here and any menu item can use the batch as an ingredient.'] },
+      { h: 'Yield And Serving Size', p: ['Batch Yield is how much the whole batch makes, like a 1 gallon mix. Serving Size is how much one drink or plate pulls from it, like 5 oz per margarita. Bar Cop divides the two to get Servings Per Batch, then splits the batch cost across those servings for a Cost Per Serving.'] },
+      { h: 'Ingredients', p: ['Add each product that goes into the batch and how much. The batch category sets which products you can pick: a Cocktail Mix or Syrup pulls bar ingredients, a Sauce or Stock pulls kitchen ingredients. Line costs use each product’s current cost, so when an ingredient price changes the batch cost updates on its own.'] },
+      { h: 'Where It Flows', p: ['A batch’s Cost Per Serving feeds straight into any menu item recipe that uses it, so your recipe and menu costs stay honest without re-entering anything.'] }
+    ]);
+  },
+
+  // Seed this.rows from a batch (or one blank row for the add form).
+  initRows(b) {
+    this.rows = (b?.ingredients || []).map(i => {
+      const p = this.prodById(i.product_id);
+      return { product_id: i.product_id, quantity: i.quantity, cost_per_unit: this.unitCost(p), total_cost: this.unitCost(p) * (i.quantity || 0) };
+    });
+    if (!this.rows.length) this.rows = [{ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }];
+  },
+
+  // The add/edit form card. b = the batch being edited (null for the add form).
+  // All header fields live on one row; the number cells carry tooltips.
+  formCard(b) {
+    const id = this.editId;
+    const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
+    const title = id ? 'Editing ' + esc(b?.name || 'Batch') : 'Add a Prep Batch';
+    return '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>' + title + '</span>'
+        + '<button class="btn btn-ghost btn-sm" id="pb-how">How This Works</button>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Batch Name</label>'
+          + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Category</label>'
+          + '<select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
+        + '<div class="f" style="width:185px;flex-shrink:0;"><label>Batch Yield ' + tt('pb-yield') + '</label>'
+          + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
+        + '<div class="f" style="width:185px;flex-shrink:0;"><label>Serving Size ' + tt('pb-serving') + '</label>'
+          + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Servings Per Batch ' + tt('pb-spb') + '</label>'
+          + '<div class="f-display" id="pb-spb">-</div></div>'
+      + '</div>'
+      + '<div class="sh" style="margin-top:4px;">Ingredients</div>'
+      + '<div id="pb-ings" style="margin-bottom:12px;"></div>'
+      + '<button class="btn btn-ghost btn-sm" id="pb-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
+      + '<div class="calc" style="margin-bottom:0;">'
+        + '<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="pb-tc">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="pb-cps">-</div></div>'
+      + '</div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="pb-save">' + (id ? 'Update Batch' : 'Save Batch') + '</button>'
+        + '<button class="btn btn-ghost" id="pb-cancel">' + (id ? 'Cancel' : 'Clear') + '</button>'
+        + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  // Landing: the add form on top, the batch list below.
   renderList() {
     this.actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = '+ Add Prep Batch';
-    addBtn.addEventListener('click', () => this.showForm(null));
-    this.actions.appendChild(addBtn);
+    this.editId = null;
+    this._editingIncomplete = false;
+    this.initRows(null);
 
     const batches = this.list();
-    if (!batches.length) {
-      this.container.innerHTML = '<div class="screen"><div class="card"><div class="empty">'
-        + '<div class="empty-title">No prep batches yet</div>'
-        + '<div class="empty-sub">Prep batches are made-in-house ingredients — frozen margarita mix, simple syrup, marinara base, demi-glace. Set them up once and your menu item recipes can use them as ingredients.</div>'
-        + '<button class="btn btn-primary" id="pb-empty-add" style="margin-top:14px;">+ Add Your First Batch</button>'
-        + '</div></div></div>';
-      document.getElementById('pb-empty-add')?.addEventListener('click', () => this.showForm(null));
-      return;
-    }
 
     // Keep stored batch costs in sync with current product costs so the list and
     // any menu item that rolls up cost_per_serving never show a stale number when
@@ -159,8 +204,12 @@ S.PrepBatches = {
     });
     if (_batchCostChanged) App.saveInventory();
 
-    const rows = batches.map(b => {
-      return '<tr>'
+    let listSection;
+    if (!batches.length) {
+      listSection = '<div style="margin-top:18px;font-size:12px;color:var(--t3);">No prep batches yet. Build one above and it shows here.</div>';
+    } else {
+      const rows = batches.map(b =>
+        '<tr>'
         + '<td><div class="val">' + esc(b.name) + '</div></td>'
         + '<td>' + esc(b.category || '-') + '</td>'
         + '<td>' + (b.batch_yield || '-') + ' ' + esc(b.batch_yield_unit || '') + '</td>'
@@ -170,89 +219,57 @@ S.PrepBatches = {
         + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm pb-edit" data-id="' + b.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm pb-del" data-id="' + b.id + '">Delete</button>'
-        + '</div></td></tr>';
-    }).join('');
+        + '</div></td></tr>').join('');
+      listSection = '<div class="card" style="margin-top:18px;"><div class="card-title">Prep Batches</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+          + '<th>Batch</th><th>Category</th><th>Yield</th><th>Servings</th><th>Total Cost</th><th>Cost / Serving</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-        + 'Prep batches: large recipes you make in advance, with a yield that breaks into servings. Each batch\'s cost-per-serving feeds into any menu item recipe that uses the batch as an ingredient.'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Batch</th><th>Category</th><th>Yield</th><th>Servings</th><th>Total Cost</th><th>Cost / Serving</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
-
-    this.container.querySelectorAll('.pb-edit').forEach(b => b.addEventListener('click', () => this.showForm(b.dataset.id)));
-    this.container.querySelectorAll('.pb-del').forEach(b => b.addEventListener('click', () => this.deleteBatch(b.dataset.id)));
+    this.container.innerHTML = '<div class="screen">' + this.formCard(null) + listSection + '</div>';
+    this.renderRows();
+    this.calc();
+    this._wire();
   },
 
   // ── Form ─────────────────────────────────────────────────────────────────
+  // Edit opens on its own page (form only, no list, no Back button — the
+  // sidebar handles getting back). The add form lives on the landing.
   showForm(id) {
     this.editId = id || null;
     const b = id ? this.byId(id) : null;
     // Field-missing highlights fire ONLY when editing an incomplete batch.
-    // Add-new and edit-of-complete keep the form clean.
     this._editingIncomplete = !!(b && this.missingFields(b).size > 0);
-    this.rows = (b?.ingredients || []).map(i => {
-      const p = this.prodById(i.product_id);
-      return { product_id: i.product_id, quantity: i.quantity, cost_per_unit: this.unitCost(p), total_cost: this.unitCost(p) * (i.quantity || 0) };
-    });
-    if (this.rows.length === 0) this.rows = [{ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }];
-
-    const catOpts = this.CATEGORIES.map(c =>
-      '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
-
+    this.initRows(b);
     this.actions.innerHTML = '';
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="pb-back">&#8592; Back to Prep Batches</button></div>'
-      + '<div class="card">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:14px;">'
-        + '<div>'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Prep Batch</div>'
-          + '<div style="font-size:18px;font-weight:800;color:var(--t1);margin-top:2px;">' + (id ? esc(b?.name || 'Edit Batch') : 'Add a Prep Batch') + '</div>'
-        + '</div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f w-lg"><label>Batch Name</label><input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
-        + '<div class="f w-md"><label>Category</label><select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Batch Yield</label>'
-          + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Serving Size</label>'
-          + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Servings Per Batch</label><div class="f-display" id="pb-spb">-</div></div>'
-      + '</div>'
-      + '<div class="sh" style="margin-top:4px;">Ingredients</div>'
-      + '<div id="pb-ings" style="margin-bottom:12px;"></div>'
-      + '<button class="btn btn-ghost btn-sm" id="pb-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
-      + '<div class="calc" style="margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="pb-tc">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="pb-cps">-</div></div>'
-      + '</div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="pb-save">' + (id ? 'Update Batch' : 'Save Batch') + '</button>'
-        + '<button class="btn btn-ghost" id="pb-cancel">Cancel</button>'
-        + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
+    this.container.innerHTML = '<div class="screen">' + this.formCard(b) + '</div>';
     this.renderRows();
     this.calc();
+    this._wire();
+    if (this.editId) this.applyMissingFieldHighlights();
+  },
 
+  cancelForm() { this.editId = null; this.renderList(); },
+
+  // Shared wiring for the form (add on landing OR edit page) plus the list's
+  // Edit/Delete buttons. Uses on* assignment so handlers never stack across
+  // re-renders.
+  _wire() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#pb-back') || ev.target.closest('#pb-cancel')) { this.editId = null; this.renderList(); }
-      if (ev.target.closest('#pb-save')) this.saveBatch();
-      if (ev.target.closest('#pb-add-ing')) this.addRow();
-      if (ev.target.closest('.pb-rm-ing')) this.removeRow(parseInt(ev.target.closest('.pb-rm-ing').dataset.i));
+      if (ev.target.closest('#pb-how'))     { this.showHowTo(); return; }
+      if (ev.target.closest('#pb-save'))    { this.saveBatch(); return; }
+      if (ev.target.closest('#pb-cancel'))  { this.cancelForm(); return; }
+      if (ev.target.closest('#pb-add-ing')) { this.addRow(); return; }
+      const rm = ev.target.closest('.pb-rm-ing'); if (rm) { this.removeRow(parseInt(rm.dataset.i)); return; }
+      const ed = ev.target.closest('.pb-edit'); if (ed) { this.showForm(ed.dataset.id); return; }
+      const dl = ev.target.closest('.pb-del'); if (dl) { this.deleteBatch(dl.dataset.id); return; }
     };
-    this.container.addEventListener('change', ev => {
-      if (ev.target.classList.contains('pb-ing-prod')) this.onProdChange(ev.target);
-      if (['pb-yield', 'pb-yield-unit', 'pb-serv', 'pb-serv-unit'].includes(ev.target.id)) this.calc();
+    this.container.onchange = ev => {
+      if (ev.target.classList.contains('pb-ing-prod')) { this.onProdChange(ev.target); return; }
+      if (['pb-yield', 'pb-yield-unit', 'pb-serv', 'pb-serv-unit'].includes(ev.target.id)) { this.calc(); return; }
       if (ev.target.id === 'pb-cat') {
         // Batch category changed — clear any selected ingredient that no longer
-        // belongs in the filter (e.g. switched from Cocktail Mix to Sauce),
-        // then re-render the ingredient picker with the new filter.
+        // belongs in the filter, then re-render the ingredient picker.
         const mode = this.modeForBatchCategory(ev.target.value);
         const allowed = mode === 'bar' ? this.BAR_CATS : mode === 'food' ? this.FOOD_CATS : null;
         if (allowed) {
@@ -265,17 +282,15 @@ S.PrepBatches = {
         this.renderRows();
         this.calc();
         this.refreshFieldMissing();
+        return;
       }
       if (ev.target.id === 'pb-name') this.refreshFieldMissing();
-    });
-    this.container.addEventListener('input', ev => {
+    };
+    this.container.oninput = ev => {
       if (ev.target.classList.contains('pb-ing-qty')) this.calc();
       if (['pb-yield', 'pb-serv'].includes(ev.target.id)) this.calc();
       if (ev.target.id === 'pb-name') this.refreshFieldMissing();
-    });
-
-    // Highlight missing required fields when EDITING an incomplete record.
-    if (this.editId) this.applyMissingFieldHighlights();
+    };
   },
 
   // Required = name + category. Ingredient list is operationally needed but
@@ -323,7 +338,7 @@ S.PrepBatches = {
     const currentCat = document.getElementById('pb-cat')?.value || '';
     const mode = this.modeForBatchCategory(currentCat);
     area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<table class="ing-tbl"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
+      + '<table class="ing-tbl"><thead><tr><th>Ingredient</th><th>Qty ' + tt('pb-ing-qty') + '</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
       + '<tbody>' + this.rows.map((ing, idx) => {
         const prod = ing.product_id ? this.prodById(ing.product_id) : null;
         const unit = this.unitLabel(prod);
@@ -335,7 +350,7 @@ S.PrepBatches = {
           + '<td style="width:80px;color:var(--t2);font-size:12px;">' + unit + '</td>'
           + '<td style="width:100px;font-size:12px;">' + costD + '</td>'
           + '<td style="width:100px;" class="val" id="pb-lc-' + idx + '">' + lineD + '</td>'
-          + '<td style="width:36px;"><button class="btn btn-danger btn-sm pb-rm-ing" data-i="' + idx + '" style="padding:4px 8px;">&times;</button></td></tr>';
+          + '<td><button class="btn btn-danger btn-sm pb-rm-ing" data-i="' + idx + '">Delete</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   },
 
