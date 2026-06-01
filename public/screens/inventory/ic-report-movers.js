@@ -112,7 +112,7 @@ S.InventoryMoversReport = {
       const exp = ev.target.closest('#mv-export');
       const tab = ev.target.closest('.rpt-tab');
       if (how) { this.showHowTo(); return; }
-      if (exp) { App.exportPDF({ title: 'Movement Report' }); return; }
+      if (exp) { App.exportPDF({ title: 'Movement Report', root: this.container }); return; }
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('mv-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
