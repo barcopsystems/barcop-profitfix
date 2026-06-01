@@ -5,9 +5,10 @@
    POS sales CSV). Two views: Sales Variance (dollars) and Usage Variance, which
    reads in each category's natural unit (liquor/wine in ounces + pours +
    bottles, draft in ounces + kegs, bottle beer bottle-to-bottle in bottles +
-   cases, mixers in quarts). A Category picker focuses one category or stacks
-   them all. POS sales are imported with the reusable CSVMapper; the import
-   stays in memory for the session. Food is a focused follow-up. */
+   cases, mixers in quarts, food per ingredient in its own purchase unit). A
+   Category picker focuses one category or stacks them all. POS sales are
+   imported with the reusable CSVMapper; the import stays in memory for the
+   session. */
 
 S.InventoryVarianceReport = {
   tab: 'sales',
@@ -21,9 +22,10 @@ S.InventoryVarianceReport = {
   // Usage Variance reads in each category's NATURAL unit, modeled on the old
   // inventory program: liquor/wine in ounces (with pours + bottles), draft in
   // ounces + kegs, bottle beer bottle-to-bottle in bottles + cases (no ounces,
-  // beer matches the POS directly), mixers in quarts (the unit they are bought
-  // and counted in). Food is a focused follow-up.
-  CAT_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Bottle Beer', 'Misc'],
+  // beer matches the POS directly), mixers in quarts, food per ingredient in
+  // its own purchase unit (lb / each / dozen / case / bag). Every category is
+  // the same engine: what the recipes drew versus what the count says left.
+  CAT_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Bottle Beer', 'Misc', 'Food'],
 
   showImportHelp() {
     App.showHelpModal('How the POS Import Works', [
@@ -41,7 +43,7 @@ S.InventoryVarianceReport = {
       { h: 'Import Your POS Sales', p: ['Pick the count period up top, then upload a product sales report from your POS. Map the product name, quantity, and sales columns once and Bar Cop matches each row to your products and menu items.'] },
       { h: 'Pick A Category', p: ['Use the Category picker to read one category at a time, or leave it on All Categories to see every category stacked. Each category reads in the unit you actually think in, so you are never staring at ounces of beer or ounces of lime juice.'] },
       { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS. So variance is unexplained loss, not legit give-aways you already tracked.'] },
-      { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours made, and bottles used. Draft shows ounces and kegs. Bottle beer matches bottle for bottle, in bottles and cases. Mixers like lime juice and simple syrup read in quarts: what the recipes drew versus what the count says left. Cocktails and plates explode through their recipe so each ingredient gets its share, shown as FROM RECIPE.'] },
+      { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours made, and bottles used. Draft shows ounces and kegs. Bottle beer matches bottle for bottle, in bottles and cases. Mixers like lime juice and simple syrup read in quarts. Food reads per ingredient in its own unit, pounds, each, or dozen: what the dishes that sold should have drawn versus what the count says left. Cocktails and plates explode through their recipe so each ingredient gets its share.'] },
       { h: 'Reading The Status', p: ['Under 5 percent off is OK, 5 to 15 is Watch, over 15 is Flag. A flagged product is where your money is walking out. Start there.'] }
     ]);
   },
@@ -525,7 +527,8 @@ S.InventoryVarianceReport = {
   // Misc mixers: bought and counted by the quart, so variance reads in quarts.
   // Recipe Qt is what the cocktails that sold should have drawn; Counted Qt is
   // what the count says actually left. No ounces — a mixer is not poured by the
-  // ounce on a count sheet.
+  // ounce on a count sheet. Every row is recipe-derived, so the column header
+  // already says "Recipe"; no FROM RECIPE tag needed.
   usageTableMisc(rows) {
     const body = rows.map(r => {
       const recipeQt = r.ouncesSold || 0;   // native qt from the recipe explosion
@@ -533,7 +536,7 @@ S.InventoryVarianceReport = {
       const qtVar = countedQt != null ? countedQt - recipeQt : null;
       const varPct = (qtVar != null && countedQt) ? qtVar / countedQt * 100 : null;
       return '<tr>'
-        + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
+        + '<td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + this.n(recipeQt, 2) + '</td>'
         + '<td>' + this.n(countedQt, 2) + '</td>'
         + '<td>' + this.n(qtVar, 2) + '</td>'
@@ -544,10 +547,38 @@ S.InventoryVarianceReport = {
     return this.usageTbl(['Mixer', 'Recipe Qt', 'Counted Qt', 'Qt Variance', 'Variance %', 'Status'], body);
   },
 
+  // Food: each ingredient in its own purchase unit. One ingredient spans many
+  // dishes, so Recipe Use sums the draw across every dish that sold (Ground Beef
+  // is pulled by the burger, the nachos, the brunch burger). Counted Use is what
+  // the count says left. The unit (lb / each / dozen / case / bag) comes off the
+  // product name so a number is never ambiguous. No ounces — food is weighed and
+  // counted in its own unit, never poured.
+  foodUnit(name) { const m = /\(([^)]+)\)\s*$/.exec(name || ''); return m ? m[1].trim() : 'unit'; },
+  foodName(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim(); },
+  usageTableFood(rows) {
+    const body = rows.map(r => {
+      const recipeUse = r.ouncesSold || 0;   // native units from the recipe explosion
+      const countedUse = r.containersUsed;    // native units from the count
+      const useVar = countedUse != null ? countedUse - recipeUse : null;
+      const varPct = (useVar != null && countedUse) ? useVar / countedUse * 100 : null;
+      return '<tr>'
+        + '<td><div class="val">' + esc(this.foodName(r.name)) + '</div></td>'
+        + '<td>' + esc(this.foodUnit(r.name)) + '</td>'
+        + '<td>' + this.n(recipeUse, 2) + '</td>'
+        + '<td>' + this.n(countedUse, 2) + '</td>'
+        + '<td>' + this.n(useVar, 2) + '</td>'
+        + '<td>' + this.pct(varPct) + '</td>'
+        + '<td>' + (varPct != null ? this.badge(varPct) : '-') + '</td>'
+        + '</tr>';
+    }).join('');
+    return this.usageTbl(['Ingredient', 'Unit', 'Recipe Use', 'Counted Use', 'Use Variance', 'Variance %', 'Status'], body);
+  },
+
   renderUsageCat(cat, rows) {
     if (cat === 'Bottle Beer') return this.usageTableBottleBeer(rows);
     if (cat === 'Draft Beer')  return this.usageTableDraft(rows);
     if (cat === 'Misc')        return this.usageTableMisc(rows);
+    if (cat === 'Food')        return this.usageTableFood(rows);
     return this.usageTableLiquorWine(rows); // Liquor, Wine
   },
 
