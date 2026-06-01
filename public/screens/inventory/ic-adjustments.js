@@ -100,7 +100,7 @@ S.InventoryAdjustments = {
     } else {
       const rows = filtered.slice(0, 200).map(r => {
         const dirText = r.direction === 'in'
-          ? '<span style="color:var(--green);font-weight:600;">Found</span>'
+          ? '<span style="color:var(--gold);font-weight:600;">Found</span>'
           : '<span style="color:var(--red);font-weight:600;">Loss</span>';
         const valStr = r.direction === 'in'
           ? '<span class="pos">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
