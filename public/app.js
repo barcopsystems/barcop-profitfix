@@ -199,6 +199,8 @@ const TT = {
     'sp-pos-btl':     {t:'POS Bottles Sold',b:'Bottles your POS rang in for this beer this shift. Bar Cop compares it to the bottles your counts say left the cooler. A gap is give-aways, walk-offs, or theft.',e:'Counts say 48 bottles left the cooler, POS rang 44, that is 4 bottles unaccounted for'},
     'rd-qty':         {t:'Qty Received',b:'How many you actually counted off the truck, not what the invoice claims. If it comes up short of what you ordered, Bar Cop flags the line so you can claim the credit. Bottle beer is counted in cases.',e:'Ordered 6, only 5 showed up, enter 5'},
     'rd-price':       {t:'Unit Price',b:'What the vendor charged per unit on this invoice. It pre-fills from your master cost. Change it to match the invoice and Bar Cop flags the difference so you can apply the new cost or dispute it. Bottle beer price is per case.',e:'Master cost $14.50, invoice shows $15.75, enter 15.75'},
+    'em-qty':         {t:'Quantity',b:'How many empty containers you are logging in this entry. Count the actual empties you are clearing, in the unit you pick next to it.',e:'18 empty bottles pulled off the bar = 18'},
+    'em-deposit':     {t:'Deposit',b:'The deposit charged per container, if there is one. Bar Cop multiplies it by the quantity to track the money you can claim back when you return them. Leave it blank when there is no deposit.',e:'5 cents a can in a deposit state = 0.05'},
   },
   show(icon) {
     const id = icon.dataset.tt;
