@@ -2914,4 +2914,19 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
     }
   });
+
+  // Every Export to PDF (and Ctrl+P) leaves the browser stamping the page title
+  // at the top of each printed page. Swap in the operator's Bar / Restaurant
+  // Name for the duration of the print, then restore "Bar Cop". One handler
+  // covers every export button across the whole app, including future ones.
+  let _titlePrePrint = null;
+  window.addEventListener('beforeprint', () => {
+    _titlePrePrint = document.title;
+    const name = ((App.data && App.data.settings && App.data.settings.bar_name) || '').trim();
+    document.title = name || 'Bar Cop';
+  });
+  window.addEventListener('afterprint', () => {
+    document.title = _titlePrePrint || 'Bar Cop';
+    _titlePrePrint = null;
+  });
 });
