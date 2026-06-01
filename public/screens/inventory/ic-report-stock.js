@@ -193,9 +193,12 @@ S.InventoryStockReport = {
     const base = App.computeUsagePair(prior, latest, this.deliveries());
     const items = (latest.items || []).map(it => {
       const p = this.productById(it.product_id) || {};
-      const used = base[it.product_id] ? Math.max(0, base[it.product_id].rawUsed) : 0;
+      const b = base[it.product_id];
+      // Only products counted in BOTH periods have measurable usage. A product
+      // absent from the prior count can't be called dead, so leave it out.
+      const used = b ? Math.max(0, b.rawUsed) : null;
       return { product: p, name: it.name, category: it.category, total: it.total, value: this.itemValue(it), used };
-    }).filter(x => x.value > 0 && x.used <= 0.001).sort((a, b) => b.value - a.value);
+    }).filter(x => x.value > 0 && x.used != null && x.used <= 0.001).sort((a, b) => b.value - a.value);
     if (!items.length) {
       return '<div style="font-size:12px;color:var(--gold);padding:20px 0;text-align:center;">'
         + 'No dead stock. Everything you are holding value in moved this period.</div>';
