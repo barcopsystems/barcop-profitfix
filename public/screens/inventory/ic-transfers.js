@@ -136,7 +136,7 @@ S.InventoryTransfers = {
 
   // The Log a Transfer form lives at the top of the landing page, always open.
   logFormCard() {
-    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Log a Transfer</span>'
       + '<button class="btn btn-ghost btn-sm" id="tr-how">How This Works</button></div>'
       + this.formRows(null)
@@ -213,7 +213,7 @@ S.InventoryTransfers = {
     const prodOpts = '<option value="">All products</option>'
       + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
-    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Filter</span>'
       + '<div style="display:flex;gap:8px;">'
         + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
