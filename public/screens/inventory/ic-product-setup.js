@@ -41,6 +41,8 @@ S.InventoryProducts = {
       priceTT:         'ic-liquor-pour-price',
       calc1Label:      'Pours / Bottle',
       calc2Label:      'Cost / Pour',
+      servingPlaceholder:'Double, Happy Hour',
+      servingTT:       'ic-serving-sizes-liquor',
       parUnit:         'btls',
       showMenuPrice:   true,
       showCaseSize:    false,
@@ -65,6 +67,8 @@ S.InventoryProducts = {
       priceTT:         'ic-wine-glass-price',
       calc1Label:      'Glasses / Bottle',
       calc2Label:      'Cost / Glass',
+      servingPlaceholder:'Bottle, Split',
+      servingTT:       'ic-serving-sizes-wine',
       parUnit:         'btls',
       showMenuPrice:   true,
       showCaseSize:    false,
@@ -111,6 +115,8 @@ S.InventoryProducts = {
       priceTT:         'ic-draft-pour-price',
       calc1Label:      'Pours / Keg',
       calc2Label:      'Cost / Pour',
+      servingPlaceholder:'Pitcher, 12 oz',
+      servingTT:       'ic-serving-sizes-draft',
       parUnit:         'kegs',
       showMenuPrice:   true,
       showCaseSize:    false,
@@ -548,10 +554,10 @@ S.InventoryProducts = {
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + ' ' + tt(spec.pourTT || 'std-pour') + '</label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz) + '" step="0.25" placeholder="e.g. ' + spec.defaultPour + '"/><span class="suf">oz</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
+        + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + ' ' + tt(spec.pourTT || 'std-pour') + '</label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz) + '" step="0.25" placeholder="e.g. ' + spec.defaultPour + '"/><span class="suf">oz</span></div></div>'
         + '<div class="f" style="width:120px;flex-shrink:0;"><label>' + esc(spec.priceLabel || 'Menu Price') + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
@@ -838,16 +844,18 @@ S.InventoryProducts = {
     const rows = sizes.map((s, i) => this.servingRowHTML(s, i)).join('');
     return '<div style="margin-top:18px;border-top:1px solid var(--b2);padding-top:14px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
-        + '<label style="margin:0;">Other Sizes Sold ' + tt('ic-serving-sizes') + '</label>'
+        + '<label style="margin:0;">Other Sizes Sold ' + tt(spec.servingTT || 'ic-serving-sizes') + '</label>'
         + '<button type="button" class="btn btn-ghost btn-sm" id="vss-add">+ Add a size</button>'
       + '</div>'
       + '<div id="vss-list">' + rows + '</div></div>';
   },
   servingRowHTML(s, i) {
     s = s || {};
+    const spec = this.FORM_SPEC[this._formCategory] || {};
+    const ph = spec.servingPlaceholder || 'Pitcher, Bottle...';
     return '<div class="vss-row" style="display:flex;gap:10px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;">'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Name</label>'
-      + '<input type="text" class="vss-label" value="' + esc(s.label || '') + '" placeholder="Pitcher, Bottle..."/></div>'
+      + '<input type="text" class="vss-label" value="' + esc(s.label || '') + '" placeholder="' + esc(ph) + '"/></div>'
       + '<div class="f" style="width:90px;flex-shrink:0;"><label>Size</label>'
       + '<div class="fw"><input class="suf vss-size" type="number" step="0.1" min="0" value="' + (s.size_oz != null ? s.size_oz : '') + '"/><span class="suf">oz</span></div></div>'
       + '<div class="f" style="width:100px;flex-shrink:0;"><label>Price</label>'
