@@ -1800,7 +1800,14 @@ const App = {
   async exportPDF(opts) {
     opts = opts || {};
     const title = opts.title || 'Report';
-    const root = opts.root || document.querySelector('.hub-app .content .screen') || document.querySelector('.screen');
+    // Prefer an explicit root. Otherwise pick the LAST .screen that actually holds
+    // report content — the visible one — never the first/empty .screen in the DOM.
+    let root = opts.root;
+    if (!root) {
+      const screens = Array.from(document.querySelectorAll('.screen'));
+      root = screens.reverse().find(s => s.querySelector('table.tbl, .rpt-panel, .calc, .tbl-wrap'))
+        || screens[0] || document.body;
+    }
     if (!root) return;
     try { await this._ensurePDFLib(); }
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
