@@ -324,7 +324,7 @@ const Inventory = {
       </div>
       <div class="nav-item" data-screen="ic-report-movers" id="nav-ic-report-movers">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11l3.5-3.5 2.5 2.5L13 4M10 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Top Movers</span>
+        <span class="nav-label">Movement</span>
       </div>
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-screen="ic-product-setup" id="nav-ic-product-setup">
