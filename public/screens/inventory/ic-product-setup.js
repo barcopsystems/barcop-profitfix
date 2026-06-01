@@ -894,6 +894,11 @@ S.InventoryProducts = {
     const existingProd = this.editId ? this.products().find(x => x.id === this.editId) : null;
     const locSet = new Set(existingProd && Array.isArray(existingProd.locations) ? existingProd.locations : []);
     if (primaryLoc) locSet.add(primaryLoc);
+    const locsArr = [...locSet];
+    // First location placed is the ordering/transfer home. Never leave a product
+    // with locations but no valid primary, or it skips the "Needs a location" flag.
+    let primary = primaryLoc;
+    if (!primary || !locsArr.includes(primary)) primary = locsArr[0] || '';
 
     const prod = {
       id:                  this.editId || App.uid(),
@@ -910,15 +915,14 @@ S.InventoryProducts = {
       menu_price:          price,
       par_level:           num('ip-par'),
       reorder_point:       num('ip-reorder'),
-      locations:           [...locSet],
-      primary_location:    primaryLoc,
+      locations:           locsArr,
+      primary_location:    primary,
       active,
       notes:               document.getElementById('ip-notes')?.value.trim() || '',
       pours_per_container: pours,
       cost_per_pour:       cpp,
       pour_cost_pct:       pct,
-      serving_sizes:       servingSizes,
-      created_at:          this.editId ? undefined : new Date().toISOString()
+      serving_sizes:       servingSizes
     };
 
     const list = this.products();
@@ -926,6 +930,7 @@ S.InventoryProducts = {
       const i = list.findIndex(x => x.id === this.editId);
       if (i > -1) list[i] = { ...list[i], ...prod };
     } else {
+      prod.created_at = new Date().toISOString();
       list.push(prod);
     }
 
