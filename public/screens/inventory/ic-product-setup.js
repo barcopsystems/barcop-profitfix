@@ -177,9 +177,12 @@ S.InventoryProducts = {
   // ── Helpers ───────────────────────────────────────────────────────────────
   isPourable(cat) { return cat !== 'Food' && cat !== 'Misc'; },
 
+  // Location is NOT part of completeness — a product is assigned to locations on
+  // Set Locations, and a missing one is surfaced as a "Needs a location" nudge in
+  // the list rather than blocking the product. Primary location auto-derives from
+  // the first location it's placed in.
   isComplete(p) {
     if (!p.name || p.unit_cost == null || p.unit_cost === '') return false;
-    if (!App.productLocations(p).length) return false;
     if (p.category === 'Bottle Beer') return !!(p.container_size_oz && p.case_size);
     if (this.isPourable(p.category)) return !!(p.container_size_oz && p.pour_size_oz && p.menu_price);
     return true;
@@ -332,7 +335,8 @@ S.InventoryProducts = {
           + '<td><div class="val" style="' + (!complete ? 'color:var(--red);' : '') + '">' + esc(p.name)
           + (p.active === false ? ' <span class="badge badge-dim">Inactive</span>' : '') + '</div>'
           + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
-          + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '') + '</td>'
+          + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
+          + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
           + '<td>' + esc(p.vendor || '-') + '</td>'
           + '<td>' + esc(szL) + '</td>'
           + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : '<span style="color:var(--t4);">-</span>') + '</td>'
@@ -624,7 +628,7 @@ S.InventoryProducts = {
   // require container size, pour size, and menu price. Bottle Beer requires
   // container size + case size. Food/Misc just need the basics.
   _requiredFieldIds(cat) {
-    const ids = ['ip-name', 'ip-cost', 'ip-loc1'];
+    const ids = ['ip-name', 'ip-cost'];
     if (cat === 'Bottle Beer') {
       ids.push('ip-size', 'ip-case-size');
     } else if (this.isPourable(cat)) {
