@@ -2,7 +2,9 @@
 
 /* ── Inventory Control — Usage Report (reads ic_counts + ic_deliveries) ───────
    Usage = Starting Stock + Purchases − Ending Stock, measured between two
-   consecutive inventory counts. Seven views over that computed data. */
+   consecutive inventory counts. Pure consumption: per-product data, category
+   totals, and period-over-period history. Rankings live in the Movement Report,
+   on-hand value in the Stock Report, leaks in the Variance Report. */
 
 S.InventoryUsageReport = {
   tab: 'usage',
@@ -11,8 +13,9 @@ S.InventoryUsageReport = {
   locFilter: '',
 
   TABS: [
-    ['usage','Usage Data'], ['totals','Usage Totals'], ['stock','Stock Values'],
-    ['most','Most Used'], ['least','Least Used'], ['history','Usage History'], ['check','Stock Check']
+    ['usage','Usage Data','rpt-u-usage'],
+    ['totals','Usage Totals','rpt-u-totals'],
+    ['history','Usage History','rpt-u-history']
   ],
 
   countsAsc() {
@@ -27,11 +30,7 @@ S.InventoryUsageReport = {
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
-  // ── Usage computation ─────────────────────────────────────────────────────
-  // Built on App.computeUsagePair (the shared container-unit usage helper).
-  // "Used" here is GROSS consumption, floored at zero — a count that comes back
-  // higher than start + purchases (a restock or recount) can't be negative use.
-  // Servings = bottles per case for beer, pours per container otherwise.
+  // ── Usage computation (shared container-unit helper) ──────────────────────
   computeForPair(startC, endC) {
     const base = App.computeUsagePair(startC, endC, this.deliveries());
     const rows = [];
@@ -69,12 +68,20 @@ S.InventoryUsageReport = {
       (!this.locFilter || r.location === this.locFilter));
   },
 
+  showHowTo() {
+    App.showHelpModal('How the Usage Report Works', [
+      { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you: starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts.'] },
+      { h: 'Pick A Period', p: ['Use Count Period to choose which two counts to measure between. Filter by Category or Location to narrow it down. Everything on the page recomputes for what you pick.'] },
+      { h: 'The Three Views', p: ['Usage Data is the per-product breakdown with the cost and theoretical sales behind each one. Usage Totals rolls the whole period up by category. Usage History shows usage cost and theoretical profit for every period so you can watch the trend.'] },
+      { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling. The Variance Report compares it against your real POS sales to find the leaks.'] }
+    ]);
+  },
+
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>';
-    document.getElementById('ur-export')?.addEventListener('click', () => window.print());
+    actions.innerHTML = '';
     this.draw();
   },
 
@@ -93,7 +100,6 @@ S.InventoryUsageReport = {
     const period = this.currentPeriod();
     const rows = this.filtered(period.rows);
 
-    // controls — period selector + filters
     const periodOpts = asc.slice(1).map((c, i) => {
       const startC = asc[i];
       return '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
@@ -106,43 +112,37 @@ S.InventoryUsageReport = {
     const locOpts = '<option value="">All locations</option>'
       + locs.map(l => '<option' + (this.locFilter === l ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
 
-    const controls = '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
+    const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Usage Report</span>'
+      + '<button class="btn btn-ghost btn-sm" id="ur-how">How This Works</button></div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:230px;"><label>Count Period</label><select id="ur-period">' + periodOpts + '</select></div>'
       + '<div class="f" style="width:180px;"><label>Category</label><select id="ur-cat">' + catOpts + '</select></div>'
       + '<div class="f" style="width:180px;"><label>Location</label><select id="ur-loc">' + locOpts + '</select></div>'
-      + '</div>';
+      + '</div></div>';
 
-    const tabs = '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;flex-wrap:wrap;">'
-      + this.TABS.map(([k, label]) => {
-          const on = k === this.tab;
-          return '<button class="ur-tab" data-tab="' + k + '" style="background:none;border:none;'
-            + 'border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
-            + 'color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-            + 'letter-spacing:0.5px;text-transform:uppercase;padding:9px 13px;cursor:pointer;">' + label + '</button>';
-        }).join('') + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + controls + tabs
-      + '<div id="ur-body">' + this.tabBody(rows, period) + '</div></div>';
+    this.container.innerHTML = '<div class="screen">' + controls
+      + App.reportTabBar(this.TABS, this.tab)
+      + App.reportPanel(this.TABS, this.tab, 'ur-export', this.tabBody(rows, period)) + '</div>';
 
     this.container.onclick = ev => {
-      const tab = ev.target.closest('.ur-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.draw(); }
+      const how = ev.target.closest('#ur-how');
+      const exp = ev.target.closest('#ur-export');
+      const tab = ev.target.closest('.rpt-tab');
+      if (how) { this.showHowTo(); return; }
+      if (exp) { window.print(); return; }
+      if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('ur-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.catFilter = ''; this.locFilter = ''; this.draw(); });
     document.getElementById('ur-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
     document.getElementById('ur-loc')?.addEventListener('change', e => { this.locFilter = e.target.value; this.draw(); });
   },
 
-  // ── Tab bodies ────────────────────────────────────────────────────────────
   tabBody(rows, period) {
     switch (this.tab) {
       case 'usage':   return this.tabUsage(rows);
       case 'totals':  return this.tabTotals(rows);
-      case 'stock':   return this.tabStock(period.endC, rows);
-      case 'most':    return this.tabRank(rows, true);
-      case 'least':   return this.tabRank(rows, false);
       case 'history': return this.tabHistory();
-      case 'check':   return this.tabCheck(period.endC, rows);
       default:        return '';
     }
   },
@@ -164,10 +164,7 @@ S.InventoryUsageReport = {
       + '<td>' + this.cur(r.theoSales) + '</td>'
       + '<td class="' + (r.theoProfit != null ? (r.theoProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.theoProfit) + '</td>'
       + '</tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'Start, Purch, End and Used are in each product\'s stock unit (cases for bottle beer, bottles for liquor and wine, kegs for draft). '
-      + 'Theo Sales is gross of comps and waste.</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Unit</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th>'
       + '<th>Servings</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
@@ -195,50 +192,6 @@ S.InventoryUsageReport = {
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Category</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th></tr></thead><tbody>' + catRows + '</tbody></table></div>';
   },
 
-  tabStock(endC, rows) {
-    const ids = new Set(rows.map(r => r.pid));
-    const items = (endC.items || []).filter(it => ids.has(it.product_id));
-    if (!items.length) return this.emptyRows();
-    let total = 0;
-    const body = items.map(it => {
-      const p = this.productById(it.product_id) || {};
-      const bc = App.unitCostFromCountItem(it);
-      const val = it.value != null ? it.value : (bc != null ? (it.total || 0) * bc : null);
-      total += val || 0;
-      return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td>' + esc(it.category || '-') + '</td>'
-        + '<td>' + esc(App.qtyWithUnit(p, it.total)) + '</td>'
-        + '<td>' + this.cur(it.unit_cost) + '</td>'
-        + '<td class="val">' + this.cur(val) + '</td></tr>';
-    }).join('');
-    return '<div class="calc" style="margin-bottom:14px;"><div class="calc-item">'
-      + '<div class="calc-label">Total Stock Value (' + this.fmtDate(endC.date) + ' count)</div>'
-      + '<div class="calc-val good">' + App.fmtCurrency(total) + '</div></div></div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Category</th><th>On Hand</th><th>Unit Cost</th><th>Value</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  tabRank(rows, most) {
-    const ranked = [...rows].filter(r => r.used != null)
-      .sort((a, b) => most ? b.used - a.used : a.used - b.used).slice(0, 10);
-    if (!ranked.length) return this.emptyRows();
-    const max = Math.max(...ranked.map(r => Math.abs(r.used)), 1);
-    const body = ranked.map(r => {
-      const pct = Math.min(100, Math.abs(r.used) / max * 100);
-      return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
-        + '<td style="width:38%;"><div style="display:flex;align-items:center;gap:8px;">'
-        + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div>'
-        + '<span style="font-size:11px;color:var(--t2);">' + esc(App.qtyWithUnit(r.product, r.used)) + '</span></div></td>'
-        + '<td>' + this.cur(r.usageCost) + '</td></tr>';
-    }).join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + (most ? 'Top 10 products by units used this period.' : 'Bottom 10 products by units used, your slowest movers.')
-      + '</div><div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Units Used</th><th>Usage Cost</th></tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
   tabHistory() {
     const asc = this.countsAsc();
     const pairs = [];
@@ -256,34 +209,8 @@ S.InventoryUsageReport = {
       + '<td>' + p.count + '</td>'
       + '<td>' + App.fmtCurrency(p.cost) + '</td>'
       + '<td class="' + (p.profit >= 0 ? 'pos' : 'neg') + '">' + App.fmtCurrency(p.profit) + '</td></tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Usage across every count period.</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+    return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
       + '<th>Period</th><th>Products</th><th>Usage Cost</th><th>Theo Profit</th></tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  tabCheck(endC, rows) {
-    const ids = new Set(rows.map(r => r.pid));
-    const items = (endC.items || []).filter(it => ids.has(it.product_id)).map(it => {
-      const p = this.productById(it.product_id) || {};
-      return { name: it.name, unit: App.productUnit(p), onHand: it.total || 0, par: p.par_level, reorder: p.reorder_point };
-    });
-    if (!items.length) return this.emptyRows();
-    const body = items.map(it => {
-      let status, cls;
-      if (it.reorder != null && it.onHand <= it.reorder) { status = 'Below Reorder'; cls = 'badge-warn'; }
-      else if (it.par != null && it.onHand < it.par)     { status = 'Below Par'; cls = 'badge-warn'; }
-      else { status = 'OK'; cls = 'badge-ok'; }
-      return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
-        + '<td style="color:var(--t3);font-size:11px;">' + esc(it.unit || '-') + '</td>'
-        + '<td>' + it.onHand.toFixed(1) + '</td>'
-        + '<td>' + (it.par != null ? it.par : '-') + '</td>'
-        + '<td>' + (it.reorder != null ? it.reorder : '-') + '</td>'
-        + '<td><span class="badge ' + cls + '">' + status + '</span></td></tr>';
-    }).join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'On-hand from the latest count vs each product\'s par and reorder point. Quantities are in each product\'s stock unit.</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Unit</th><th>On Hand</th><th>Par</th><th>Reorder</th><th>Status</th></tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
   emptyRows() {
