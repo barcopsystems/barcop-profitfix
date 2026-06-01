@@ -366,6 +366,7 @@ S.InventoryVarianceReport = {
           })).filter(r => r.name);
           // Start from any remembered mappings so prior choices apply on the spot.
           this.manualMap = { ...this.savedPosMap() };
+          this._unmatchedCollapsed = null;
           this.draw();
         }
       });
@@ -389,49 +390,95 @@ S.InventoryVarianceReport = {
       + '<button class="btn btn-ghost btn-sm" id="vr-reimport">Re-import</button></div></div>';
   },
 
+  // Word tokens for best-match scoring of a POS name against products/menu items.
+  _MATCH_STOP: new Set(['the','and','with','of','a','an','oz','for','to']),
+  _tokens(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ')
+      .filter(t => t.length >= 2 && !this._MATCH_STOP.has(t));
+  },
+  // "Best Matches" optgroup for one POS name: candidates that share the most
+  // words float to the top so the right pick is first, without hiding the full
+  // list below (a POS row carries no category, so a hard bar/food filter would
+  // risk hiding the real answer — surfacing is safer than filtering).
+  _bestMatchGroup(posName, cands) {
+    const pt = new Set(this._tokens(posName));
+    if (!pt.size) return '';
+    const scored = cands
+      .map(c => ({ c, score: c.tokens.reduce((n, t) => n + (pt.has(t) ? 1 : 0), 0) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+    if (!scored.length) return '';
+    return '<optgroup label="Best Matches">'
+      + scored.map(x => '<option value="' + esc(x.c.value) + '">' + esc(x.c.label) + '</option>').join('')
+      + '</optgroup>';
+  },
+
   unmatchedCard() {
     const un = this.unmatchedPos();
     if (!un.length) return '';
     const sortedProds = this.allProducts().slice().sort((a, b) => a.name.localeCompare(b.name));
     const sortedMenu  = this.menuItems().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    let opts = '<option value="">Skip: not a tracked item</option>';
+    const sizeTargets = sortedProds.filter(p => Array.isArray(p.serving_sizes) && p.serving_sizes.length);
+    const sizeLabel = (p, s, oz) => p.name + ' — ' + (s.label ? s.label + ' ' : '') + '(' + (oz % 1 === 0 ? oz : oz.toFixed(1)) + ' oz)';
+
+    // Shared full list (every option), shown under the per-row Best Matches group.
+    let full = '';
     if (sortedMenu.length) {
-      opts += '<optgroup label="Menu Items">';
-      sortedMenu.forEach(m => { opts += '<option value="' + m.id + '">' + esc(m.name) + '</option>'; });
-      opts += '</optgroup>';
+      full += '<optgroup label="Menu Items">'
+        + sortedMenu.map(m => '<option value="' + esc(m.id) + '">' + esc(m.name) + '</option>').join('') + '</optgroup>';
     }
     // Other sizes: any product with serving_sizes gets one target per size so a
     // POS line like "Live Oak Pitcher" maps to that size (draws its ounces, adds
-    // its revenue). The plain product option below is the product's standard pour.
-    const sizeTargets = sortedProds.filter(p => Array.isArray(p.serving_sizes) && p.serving_sizes.length);
+    // its revenue). The plain product option is the product's standard pour.
     if (sizeTargets.length) {
-      opts += '<optgroup label="Product Sizes">';
-      sizeTargets.forEach(p => {
-        p.serving_sizes.forEach(s => {
-          const oz = parseFloat(s.size_oz) || 0;
-          if (!oz) return;
-          const lbl = (s.label ? s.label + ' ' : '') + '(' + (oz % 1 === 0 ? oz : oz.toFixed(1)) + ' oz)';
-          opts += '<option value="sv|' + p.id + '|' + oz + '">' + esc(p.name + ' — ' + lbl) + '</option>';
-        });
-      });
-      opts += '</optgroup>';
+      full += '<optgroup label="Product Sizes">';
+      sizeTargets.forEach(p => p.serving_sizes.forEach(s => {
+        const oz = parseFloat(s.size_oz) || 0; if (!oz) return;
+        full += '<option value="sv|' + esc(p.id) + '|' + oz + '">' + esc(sizeLabel(p, s, oz)) + '</option>';
+      }));
+      full += '</optgroup>';
     }
     if (sortedProds.length) {
-      opts += '<optgroup label="Inventory Products">';
-      sortedProds.forEach(p => { opts += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; });
-      opts += '</optgroup>';
+      full += '<optgroup label="Inventory Products">'
+        + sortedProds.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('') + '</optgroup>';
     }
+
+    // Candidate pool for best-match scoring (menu items, product sizes, products).
+    const cands = [];
+    sortedMenu.forEach(m => cands.push({ value: m.id, label: m.name, tokens: this._tokens(m.name) }));
+    sizeTargets.forEach(p => p.serving_sizes.forEach(s => {
+      const oz = parseFloat(s.size_oz) || 0; if (!oz) return;
+      cands.push({ value: 'sv|' + p.id + '|' + oz, label: sizeLabel(p, s, oz), tokens: this._tokens(p.name + ' ' + (s.label || '')) });
+    }));
+    sortedProds.forEach(p => cands.push({ value: p.id, label: p.name, tokens: this._tokens(p.name) }));
+
+    const skip = '<option value="">Skip: not a tracked item</option>';
     const rows = un.map(pr => '<div class="form-row" style="gap:12px;align-items:center;margin-bottom:8px;">'
       + '<div style="width:240px;font-size:13px;color:var(--t1);font-weight:600;flex-shrink:0;">' + esc(pr.name) + '</div>'
       + '<div class="f" style="width:260px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
-      + opts + '</select></div></div>').join('');
-    return '<div class="card no-print"><div class="card-title">Unmatched POS Products ' + tt('vr-unmatched') + '</div>'
-      + rows + '</div>';
+      + skip + this._bestMatchGroup(pr.name, cands) + full + '</select></div></div>').join('');
+
+    // Collapsible: a long unmatched list would push the reports far down, so let
+    // the operator hide it. Auto-collapse when the list is long.
+    if (this._unmatchedCollapsed == null) this._unmatchedCollapsed = un.length > 6;
+    const collapsed = this._unmatchedCollapsed;
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Unmatched POS Products (' + un.length + ') ' + tt('vr-unmatched') + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="vr-unmatched-toggle">' + (collapsed ? 'Show' : 'Hide') + '</button></div>'
+      + '<div id="vr-unmatched-body" style="' + (collapsed ? 'display:none;' : '') + '">' + rows + '</div></div>';
   },
 
   wireBody() {
-    document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = { ...this.savedPosMap() }; this.draw(); });
+    document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = { ...this.savedPosMap() }; this._unmatchedCollapsed = null; this.draw(); });
     document.getElementById('vr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('vr-unmatched-toggle')?.addEventListener('click', () => {
+      this._unmatchedCollapsed = !this._unmatchedCollapsed;
+      const body = document.getElementById('vr-unmatched-body');
+      const btn = document.getElementById('vr-unmatched-toggle');
+      if (body) body.style.display = this._unmatchedCollapsed ? 'none' : '';
+      if (btn) btn.textContent = this._unmatchedCollapsed ? 'Show' : 'Hide';
+    });
     document.getElementById('vr-clearmap')?.addEventListener('click', async () => {
       if (App.inventoryData) App.inventoryData.variance_pos_map = {};
       this.manualMap = {};
