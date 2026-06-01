@@ -328,8 +328,9 @@ S.InventoryProducts = {
           : (sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '-'));
         const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
         const dim = p.active === false ? 'opacity:0.5;' : '';
+        const costUnit = ((this.FORM_SPEC[p.category] || {}).costLabel || 'Cost per Unit').split(' ').pop().toLowerCase();
         const costDisplay = p.unit_cost != null
-          ? App.fmtCurrency(p.unit_cost) + (p.category === 'Bottle Beer' ? ' <span style="font-size:9px;color:var(--t3);">/case</span>' : '')
+          ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + costUnit + '</span>'
           : '<span style="color:var(--t4);">-</span>';
         return '<tr style="' + dim + '">'
           + '<td><div class="val" style="' + (!complete ? 'color:var(--red);' : '') + '">' + esc(p.name)
@@ -356,7 +357,7 @@ S.InventoryProducts = {
         : '';
 
       const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
-      const costCol = (spec && spec.costLabel) || 'Cost';
+      const costCol = 'Cost Per';
 
       body = alertBar
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
