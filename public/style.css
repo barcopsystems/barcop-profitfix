@@ -340,6 +340,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .calc-val{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;color:var(--w);line-height:1;}
 .calc-val.good{color:var(--gold);} .calc-val.warn{color:var(--red);} .calc-val.dim{color:var(--t3);}
 
+/* ══ REPORT TABS (connected folder style) ══ */
+.rpt-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--b1);}
+.rpt-tab{background:transparent;color:var(--t3);border:1px solid transparent;border-bottom:none;border-radius:5px 5px 0 0;padding:9px 16px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;margin-bottom:-1px;white-space:nowrap;}
+.rpt-tab:hover{color:var(--t2);}
+.rpt-tab.on{background:var(--surface);color:var(--t1);border-color:var(--b1);border-top:2px solid var(--gold);border-bottom:1px solid var(--surface);padding-top:8px;}
+.rpt-panel{background:var(--surface);border:1px solid var(--b1);border-top:none;border-radius:0 0 6px 6px;padding:18px;}
+
 /* ══ METRIC CARDS ══ */
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
 .metric-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px;text-align:center;}
