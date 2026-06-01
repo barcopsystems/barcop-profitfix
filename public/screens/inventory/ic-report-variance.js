@@ -12,6 +12,18 @@ S.InventoryVarianceReport = {
   posRows: null,        // [{name, qty, sales}]
   manualMap: {},        // { posName(lowercased): productId }
 
+  TABS: [['sales','Sales Variance','rpt-v-sales'], ['usage','Usage Variance','rpt-v-usage']],
+
+  showHowTo() {
+    App.showHelpModal('How the Variance Report Works', [
+      { p: ['Variance is the leak detector. It takes what your counts say you used and compares it to what your POS actually sold. The gap is product that left the bar without a matching sale: over-pour, theft, give-aways, or a count error.'] },
+      { h: 'Import Your POS Sales', p: ['Pick the count period up top, then upload a product sales report from your POS. Map the product name, quantity, and sales columns once and Bar Cop matches each row to your products and menu items.'] },
+      { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS. So variance is unexplained loss, not legit give-aways you already tracked.'] },
+      { h: 'Two Views', p: ['Sales Variance is in dollars: theoretical sales (what the product should have rung up) versus register sales. Usage Variance is in ounces: what you poured versus what the POS sold. Use ounces for cocktails and food, where the sale belongs to the menu item and Bar Cop explodes the recipe down to each ingredient.'] },
+      { h: 'Reading The Status', p: ['Under 5 percent off is OK, 5 to 15 is Watch, over 15 is Flag. A flagged product is where your money is walking out. Start there.'] }
+    ]);
+  },
+
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
       .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
@@ -186,8 +198,7 @@ S.InventoryVarianceReport = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button>';
-    document.getElementById('vr-export')?.addEventListener('click', () => window.print());
+    actions.innerHTML = '';
     this.draw();
   },
 
@@ -208,19 +219,25 @@ S.InventoryVarianceReport = {
       '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
       + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
 
-    const controls = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:260px;">'
-      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div></div>';
+    const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Variance Report</span>'
+      + '<button class="btn btn-ghost btn-sm" id="vr-how">How This Works</button></div>'
+      + '<div class="form-row" style="margin-bottom:0;"><div class="f" style="width:260px;">'
+      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div></div></div>';
 
     let body;
     if (!this.posRows) {
       body = '<div class="card"><div class="card-title">Import POS Sales</div>'
         + '<div id="vr-import"></div></div>';
     } else {
-      body = this.matchSummary() + this.unmatchedCard() + this.tabsAndBody();
+      body = this.matchSummary() + this.unmatchedCard()
+        + App.reportTabBar(this.TABS, this.tab)
+        + App.reportPanel(this.TABS, this.tab, 'vr-export', this.tab === 'usage' ? this.tabUsage() : this.tabSales());
     }
 
     this.container.innerHTML = '<div class="screen">' + controls + body + '</div>';
 
+    document.getElementById('vr-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
 
     if (!this.posRows) {
@@ -281,18 +298,9 @@ S.InventoryVarianceReport = {
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS rows did not match a product or menu item. Map each to the right one — menu items explode through their recipe so cocktails and food plates contribute correctly to ingredient variance.</div>' + rows + '</div>';
   },
 
-  tabsAndBody() {
-    const tabBtn = (k, label) => '<button class="vr-tab" data-tab="' + k + '" style="background:none;border:none;'
-      + 'border-bottom:2px solid ' + (this.tab === k ? 'var(--gold)' : 'transparent') + ';'
-      + 'color:' + (this.tab === k ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-      + 'letter-spacing:0.5px;text-transform:uppercase;padding:9px 14px;cursor:pointer;">' + label + '</button>';
-    return '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;">'
-      + tabBtn('sales', 'Sales Variance') + tabBtn('usage', 'Usage Variance') + '</div>'
-      + '<div id="vr-body">' + (this.tab === 'usage' ? this.tabUsage() : this.tabSales()) + '</div>';
-  },
-
   wireBody() {
     document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = {}; this.draw(); });
+    document.getElementById('vr-export')?.addEventListener('click', () => window.print());
     this.container.querySelectorAll('.vr-map').forEach(sel =>
       sel.addEventListener('change', e => {
         const pos = e.target.dataset.pos;
@@ -300,7 +308,7 @@ S.InventoryVarianceReport = {
         else delete this.manualMap[pos];
         this.draw();
       }));
-    this.container.querySelectorAll('.vr-tab').forEach(btn =>
+    this.container.querySelectorAll('.rpt-tab').forEach(btn =>
       btn.addEventListener('click', () => { this.tab = btn.dataset.tab; this.draw(); }));
   },
 
@@ -313,8 +321,7 @@ S.InventoryVarianceReport = {
   },
   badge(pct) {
     const s = this.status(pct);
-    return '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:'
-      + s.color + ';border:1px solid ' + s.color + ';border-radius:3px;padding:2px 6px;">' + s.label + '</span>';
+    return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
   pct(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : v.toFixed(1) + '%'; },
@@ -350,10 +357,7 @@ S.InventoryVarianceReport = {
       + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.actualProfit)) + '</td>'
       + '<td>' + (r.viaMenu ? '-' : (r.varPct != null ? this.badge(r.varPct) : '-')) + '</td>'
       + '</tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-      + 'Theoretical sales is what the product poured should have rung up. A large positive variance means product left the bar without a matching sale. Products marked VIA MENU were consumed through menu item recipes (cocktails, food plates); their sales belong to the menu item, not the ingredient — see Usage Variance for the ounce-level analysis on those.'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
       + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th>Status</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
@@ -391,10 +395,7 @@ S.InventoryVarianceReport = {
       + '<td>' + this.pct(r.varPct) + '</td>'
       + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">'
-      + 'Used (Raw) is what your counts say left inventory between the two dates, in each product\'s stock unit (cases for bottle beer, bottles for liquor and wine, kegs for draft). Comps and Waste are subtracted because both are known non-revenue losses already logged. Adjusted Used is the remaining amount that should match POS sales. Positive variance is unexplained loss (over-pour, theft, or a count error). FROM RECIPE products were consumed through menu item recipes, so POS rows for those menu items get exploded through the recipe and each ingredient gets its share.'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
       + '<th>Used (Raw)</th><th>Comps</th><th>Waste</th><th>Adjusted Used</th>'
       + '<th>Oz Variance</th><th>Variance %</th><th>Status</th>'
