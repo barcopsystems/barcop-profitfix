@@ -128,7 +128,9 @@ S.InventoryMoversReport = {
   },
 
   tabRank(rows, desc) {
-    const ranked = [...rows].filter(r => r.usageCost != null)
+    // Only products that actually moved (real dollar usage). A product with
+    // zero usage is dead stock, not a slow mover — see the Stock Report.
+    const ranked = [...rows].filter(r => r.usageCost != null && r.usageCost > 0)
       .sort((a, b) => desc ? b.usageCost - a.usageCost : a.usageCost - b.usageCost).slice(0, 10);
     if (!ranked.length) return this.emptyBody();
     const max = Math.max(...ranked.map(r => Math.abs(r.usageCost)), 1);
