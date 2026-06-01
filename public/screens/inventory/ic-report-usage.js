@@ -44,7 +44,7 @@ S.InventoryUsageReport = {
       const theoProfit = theoSales != null && usageCost != null ? theoSales - usageCost : null;
       rows.push({
         pid, product: p, name: b.name, category: b.category,
-        location: p.primary_location || '',
+        locations: (App.productLocations ? App.productLocations(p) : [p.primary_location].filter(Boolean)),
         starting: b.starting, purchases: b.purchases, ending: b.ending, used,
         poursMade, usageCost, theoSales, theoProfit,
         unitCost: (p.unit_cost != null ? p.unit_cost : (b.unitCost != null ? b.unitCost : null)),
@@ -65,7 +65,7 @@ S.InventoryUsageReport = {
   filtered(rows) {
     return rows.filter(r =>
       (!this.catFilter || r.category === this.catFilter) &&
-      (!this.locFilter || r.location === this.locFilter));
+      (!this.locFilter || (r.locations || []).includes(this.locFilter)));
   },
 
   showHowTo() {
@@ -106,7 +106,7 @@ S.InventoryUsageReport = {
         + this.fmtDate(startC.date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>';
     }).reverse().join('');
     const cats = [...new Set(period.rows.map(r => r.category).filter(Boolean))].sort();
-    const locs = [...new Set(period.rows.map(r => r.location).filter(Boolean))].sort();
+    const locs = [...new Set(period.rows.flatMap(r => r.locations || []).filter(Boolean))].sort();
     const catOpts = '<option value="">All categories</option>'
       + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     const locOpts = '<option value="">All locations</option>'
