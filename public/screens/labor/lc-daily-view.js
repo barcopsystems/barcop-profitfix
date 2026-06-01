@@ -42,7 +42,7 @@ S.LaborDailyView = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button>';
-    document.getElementById('dv-export')?.addEventListener('click', () => window.print());
+    document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily View', root: this.container }));
     if (!this.date) this.date = new Date().toISOString().slice(0, 10);
     this.draw();
   },

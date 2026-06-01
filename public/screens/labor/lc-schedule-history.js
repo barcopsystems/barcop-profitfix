@@ -104,7 +104,7 @@ S.LaborScheduleHistory = {
     if (!s) { this.renderList(); return; }
 
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="lh-export">Export PDF</button>';
-    document.getElementById('lh-export')?.addEventListener('click', () => window.print());
+    document.getElementById('lh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Schedule History', root: this.container }));
 
     const shifts = [...(s.shifts || [])].sort((a, b) => {
       const da = this.DAYS.indexOf(a.day), db = this.DAYS.indexOf(b.day);

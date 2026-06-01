@@ -38,7 +38,7 @@ S.LaborTipHistory = {
 
   renderReport() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="th-export">Export PDF</button>';
-    document.getElementById('th-export')?.addEventListener('click', () => window.print());
+    document.getElementById('th-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip History', root: this.container }));
 
     if (this.tips().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -80,7 +80,7 @@ S.LaborTipHistory = {
     }
 
     this.container.innerHTML = '<div class="screen">' + filterCard + body + '</div>';
-    document.getElementById('th-export')?.addEventListener('click', () => window.print());
+    document.getElementById('th-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip History', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#th-clear')) {
         this.filterFrom = this.filterTo = '';

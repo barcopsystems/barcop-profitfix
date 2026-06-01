@@ -108,7 +108,7 @@ S.LaborStaffRoster = {
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-ghost btn-sm';
     exportBtn.textContent = 'Export PDF';
-    exportBtn.addEventListener('click', () => window.print());
+    exportBtn.addEventListener('click', () => App.exportPDF({ title: 'Staff Roster', root: this.container }));
     this.actions.appendChild(exportBtn);
 
     if (this.positions().length === 0) {
@@ -201,7 +201,7 @@ S.LaborStaffRoster = {
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-ghost btn-sm';
     exportBtn.textContent = 'Export PDF';
-    exportBtn.addEventListener('click', () => window.print());
+    exportBtn.addEventListener('click', () => App.exportPDF({ title: 'Staff Roster', root: this.container }));
     this.actions.appendChild(exportBtn);
 
     const profileCard = (profileMode === 'edit')

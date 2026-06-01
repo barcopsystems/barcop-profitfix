@@ -26,7 +26,7 @@ S.LaborReports = {
 
   renderReport() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="lr-export">Export PDF</button>';
-    document.getElementById('lr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('lr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Labor Reports', root: this.container }));
 
     if (this.actuals().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -69,7 +69,7 @@ S.LaborReports = {
     }
 
     this.container.innerHTML = '<div class="screen">' + filterCard + body + '</div>';
-    document.getElementById('lr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('lr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Labor Reports', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#lr-clear')) {
         this.filterFrom = this.filterTo = '';
@@ -88,7 +88,7 @@ S.LaborReports = {
     const g = {};
     rows.forEach(a => {
       const k = a.staff_id || a.name || '?';
-      if (!g[k]) g[k] = { name: a.name || '—', hours: 0, cost: 0 };
+      if (!g[k]) g[k] = { name: a.name || '-', hours: 0, cost: 0 };
       g[k].hours += (a.hours || 0);
       g[k].cost += (a.cost || 0);
     });
@@ -98,7 +98,7 @@ S.LaborReports = {
         + '<td>' + s.hours.toFixed(1) + '</td>'
         + '<td>' + App.fmtCurrency(s.hours > 0 ? s.cost / s.hours : 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
-        + '<td>' + (totCost > 0 ? App.fmtPct(s.cost / totCost * 100) : '—') + '</td></tr>';
+        + '<td>' + (totCost > 0 ? App.fmtPct(s.cost / totCost * 100) : '-') + '</td></tr>';
     }).join('');
     return '<div class="card"><div class="card-title">By Staff</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -119,7 +119,7 @@ S.LaborReports = {
       '<tr><td><div class="val">' + esc(k) + '</div></td>'
       + '<td>' + g[k].hours.toFixed(1) + '</td>'
       + '<td class="val">' + App.fmtCurrency(g[k].cost) + '</td>'
-      + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '—') + '</td></tr>').join('');
+      + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '-') + '</td></tr>').join('');
     return '<div class="card"><div class="card-title">By Department</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Department</th><th>Hours</th><th>Labor Cost</th><th>% of Labor</th>'

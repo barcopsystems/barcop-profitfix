@@ -41,7 +41,7 @@ S.LaborCalloutLog = {
 
   renderList() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="co-export">Export PDF</button>';
-    document.getElementById('co-export')?.addEventListener('click', () => window.print());
+    document.getElementById('co-export')?.addEventListener('click', () => App.exportPDF({ title: 'Call-Out Log', root: this.container }));
     if (this.staff().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
         + '<div class="empty-title">Add staff first</div>'

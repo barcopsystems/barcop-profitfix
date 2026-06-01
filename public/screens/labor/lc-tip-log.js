@@ -82,8 +82,8 @@ S.LaborTipLog = {
 
   renderList() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="tl-print-blank" style="margin-left:8px;">Print Tip Sheet</button>';
-    document.getElementById('tl-export')?.addEventListener('click', () => window.print());
+      + '<button class="btn btn-ghost btn-sm" id="tl-print-blank" style="margin-left:8px;">Worksheet</button>';
+    document.getElementById('tl-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Log', root: this.container }));
     document.getElementById('tl-print-blank')?.addEventListener('click', () => this.printBlank());
     if (this.staff().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'

@@ -48,7 +48,7 @@ S.LaborWeeklySummary = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button>';
-    document.getElementById('ws-export')?.addEventListener('click', () => window.print());
+    document.getElementById('ws-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly Summary', root: this.container }));
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
   },

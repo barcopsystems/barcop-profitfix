@@ -111,7 +111,7 @@ S.LaborPayPeriods = {
   renderList() {
     this.detailWeekStart = null;
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button>';
-    document.getElementById('pp-export-pdf')?.addEventListener('click', () => window.print());
+    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
 
     // Build the last 12 weeks ending with the current week
     const today = new Date().toISOString().slice(0, 10);
@@ -178,7 +178,7 @@ S.LaborPayPeriods = {
   // ── Detail view ─────────────────────────────────────────────────────
   renderDetail(weekStart) {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button>';
-    document.getElementById('pp-export-pdf')?.addEventListener('click', () => window.print());
+    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
     const agg = this.aggregateWeek(weekStart);
     const saved = this.periods().find(p => p.week_start === weekStart);
     const isClosed = !!saved && saved.status === 'Closed';

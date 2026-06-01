@@ -46,7 +46,7 @@ S.LaborOvertimeWatch = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button>';
-    document.getElementById('ow-export')?.addEventListener('click', () => window.print());
+    document.getElementById('ow-export')?.addEventListener('click', () => App.exportPDF({ title: 'Overtime Watch', root: this.container }));
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
   },

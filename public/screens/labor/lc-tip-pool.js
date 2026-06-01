@@ -324,7 +324,7 @@ S.LaborTipPool = {
     const p = this.pools().find(x => x.id === id);
     if (!p) { this.renderMain(); return; }
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button>';
-    document.getElementById('tp-export')?.addEventListener('click', () => window.print());
+    document.getElementById('tp-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool Calculator', root: this.container }));
 
     const rows = (p.participants || []).map(pt => '<tr>'
       + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
