@@ -70,7 +70,7 @@ S.InventoryLocations = {
     App.showHelpModal('How Locations Work', [
       { p: ['Locations are the places you keep product: your bars, coolers, and storerooms. Set them up here, then assign which products live in each one. Take Inventory walks you through one location at a time, counting the products you put there in the order you arrange them.'] },
       { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. Your checks carry across the tabs and the running count shows how many you have picked. Save and it is ready to count.'] },
-      { h: 'Arrange For Counting', p: ['Open a location to drag its products into the order they sit on the shelf or rail. Counting follows that order, so the count sheet matches the way you actually walk the room. Reorder the locations themselves on the main list to set which one you count first.'] },
+      { h: 'Arrange For Counting', p: ['Open a location to add or pull products and drag them into the order they sit on the shelf or rail. Counting follows that order, so the count sheet matches the way you actually walk the room. Reorder the locations themselves on the main list to set which one you count first.'] },
       { h: 'A Product Can Live In Several Places', p: ['Stock the same product in more than one location and it shows up at each during a count. The first location you put it in becomes its home for ordering, which is the Primary Location the Add Product form fills in. A product not yet placed anywhere is flagged "Needs a location" on the Products screen, because it will not be counted until it has one.'] }
     ]);
   },
@@ -158,8 +158,7 @@ S.InventoryLocations = {
         + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label>'
           + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler"/></div>'
       + '</div>'
-      + '<div class="sh" style="margin-top:4px;">Products Stored Here</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Check the products kept at this location. Use the category tabs to filter the list so you are not hunting through everything.</div>'
+      + '<div class="sh" style="margin-top:4px;margin-bottom:8px;">Products Stored Here</div>'
       + '<div id="il-new-filter">' + this.newFilterHTML() + '</div>'
       + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
         + '<button class="btn btn-primary" id="il-new-save">Save Location</button>'
@@ -281,17 +280,16 @@ S.InventoryLocations = {
       + '<div class="form-row" style="gap:14px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(l.name) + '"/></div>'
         + '<div style="flex:1;min-width:10px;"></div>'
-        + '<button class="btn btn-primary" id="il-save">Update Location</button>'
+        + '<button class="btn btn-primary" id="il-save">Update Name</button>'
         + '<button class="btn btn-ghost" id="il-cancel">Cancel</button>'
         + '<span id="il-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>'
       + '<div class="sh" style="margin-top:4px;">Products In This Location</div>'
       + assignedTbl
       + '<div class="sh" style="margin:18px 0 8px;">Add Products</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Check products to add them to this location. Use the category tabs to filter.</div>'
       + '<div id="il-edit-filter">' + this.editAddFilterHTML(l.name) + '</div>'
       + '<div class="card-actions" style="margin-top:12px;align-items:center;">'
-        + '<button class="btn btn-ghost btn-sm" id="il-add-checked">+ Add checked products</button>'
+        + '<button class="btn btn-primary btn-sm" id="il-add-checked">+ Add checked products</button>'
         + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
       + '</div>'
       + '</div>';
