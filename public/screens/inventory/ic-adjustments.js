@@ -140,7 +140,7 @@ S.InventoryAdjustments = {
 
   // The Log an Adjustment form lives at the top of the landing page, always open.
   logFormCard() {
-    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Log an Adjustment</span>'
       + '<button class="btn btn-ghost btn-sm" id="adj-how">How This Works</button></div>'
       + this.formRows(null)
@@ -227,7 +227,7 @@ S.InventoryAdjustments = {
     const prodOpts = '<option value="">All products</option>'
       + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
-    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Filter</span>'
       + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
