@@ -306,8 +306,8 @@ S.InventoryVarianceReport = {
       + '<div style="width:240px;font-size:13px;color:var(--t1);font-weight:600;flex-shrink:0;">' + esc(pr.name) + '</div>'
       + '<div class="f" style="width:260px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
       + opts + '</select></div></div>').join('');
-    return '<div class="card no-print"><div class="card-title">Unmatched POS Products</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS rows did not match a product or menu item. Map each to the right one, or leave it skipped. Menu items explode through their recipe so cocktails and food plates contribute correctly to ingredient variance.</div>' + rows + '</div>';
+    return '<div class="card no-print"><div class="card-title">Unmatched POS Products ' + tt('vr-unmatched') + '</div>'
+      + rows + '</div>';
   },
 
   wireBody() {
