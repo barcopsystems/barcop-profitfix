@@ -216,7 +216,7 @@ const TT = {
     'rpt-s-lowest':   {t:'Lowest Value',b:'The ten products holding the least value on hand right now.'},
     'rpt-s-dead':     {t:'Dead Stock',b:'Products you are holding value in but barely touched this period. Dead cash and spoilage risk, your cue to stop re-ordering or cut the item.'},
     'rpt-v-sales':    {t:'Sales Variance',b:'What your poured product should have rung up versus what the POS actually rang. A gap is product that left without a matching sale.'},
-    'rpt-v-usage':    {t:'Usage Variance',b:'What your counts say you used versus what the POS sold, after comps and waste, in each category\'s own unit: ounces, pours and bottles for liquor and wine, ounces and kegs for draft, bottles and cases for bottle beer, quarts for mixers. Positive variance is unexplained loss: over-pour, theft, or a count error.'},
+    'rpt-v-usage':    {t:'Usage Variance',b:'What your counts say you used versus what the POS sold, after comps and waste, in each category\'s own unit: ounces, pours and bottles for liquor and wine, ounces and kegs for draft, bottles and cases for bottle beer, quarts for mixers, and the ingredient\'s own unit for food. Positive variance is unexplained loss: over-pour, theft, over-portioning, or a count error.'},
     'vr-unmatched':   {t:'Unmatched POS Products',b:'POS rows that did not line up with a product or a menu item by name. Map each one to the right product or menu item from the dropdown, or leave it skipped if it is not something you track. Menu items like cocktails and plates explode through their recipe, so each ingredient gets its share of the variance.'},
   },
   show(icon) {
