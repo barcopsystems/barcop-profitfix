@@ -54,18 +54,6 @@ S.InventoryEmpties = {
   renderList() {
     this.editId = null;
     this.actions.innerHTML = '';
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'btn btn-ghost btn-sm';
-    exportBtn.textContent = 'Export PDF';
-    exportBtn.addEventListener('click', () => window.print());
-    this.actions.appendChild(exportBtn);
-
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.style.marginLeft = '8px';
-    printBtn.textContent = 'Print Blank Sheet';
-    printBtn.addEventListener('click', () => this.printBlank());
-    this.actions.appendChild(printBtn);
 
     if (this.products().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -76,37 +64,16 @@ S.InventoryEmpties = {
       return;
     }
 
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.style.marginLeft = '8px';
-    addBtn.textContent = '+ Log Empties';
-    addBtn.addEventListener('click', () => this.showForm());
-    this.actions.appendChild(addBtn);
-
     const all = this.empties();
     const filtered = this.applyFilters(all);
     filtered.sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
 
-    // Summary tiles — totals over the filtered range
-    const totalUnits = filtered.reduce((t, e) => t + (parseFloat(e.quantity) || 0), 0);
-    const totalDeposit = filtered.reduce((t, e) => t + ((parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0)), 0);
-    const byDisp = {};
-    filtered.forEach(e => { byDisp[e.disposition || 'Other'] = (byDisp[e.disposition || 'Other'] || 0) + (parseFloat(e.quantity) || 0); });
-    const summary = '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Containers</div><div class="calc-val">' + totalUnits.toFixed(0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Deposit Value</div><div class="calc-val good">' + (totalDeposit > 0 ? App.fmtCurrency(totalDeposit) : '-') + '</div></div>'
-      + this.DISPOSITIONS.map(d => '<div class="calc-item"><div class="calc-label">' + esc(d) + '</div><div class="calc-val">' + (byDisp[d] || 0).toFixed(0) + '</div></div>').join('')
-      + '</div>';
-
-    let html;
+    let listHtml = this.filterCard();
     if (all.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No empties logged yet</div>'
-        + '<div class="empty-sub">Track empty container disposition for compliance reporting and deposit redemption. Required in some states/cities by law.</div>'
-        + '<button class="btn btn-primary" id="em-add-first">Log Your First Empties</button></div>';
+      listHtml += '<div class="empty"><div class="empty-title">No empties logged yet</div>'
+        + '<div class="empty-sub">Track empty container disposition for compliance reporting and deposit redemption. Required in some states and cities by law.</div></div>';
     } else if (filtered.length === 0) {
-      html = summary + this.filterCard()
-        + '<div class="empty"><div class="empty-title">No empties match the filters</div>'
+      listHtml += '<div class="empty"><div class="empty-title">No empties match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
       const rows = filtered.slice(0, 200).map(e => {
@@ -127,14 +94,85 @@ S.InventoryEmpties = {
           + (App.canEdit('ic-empties') ? '<button class="btn btn-danger btn-sm em-del" data-id="' + e.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      html = summary + this.filterCard()
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Product</th><th>Quantity</th><th>Disposition</th><th>Deposit Value</th><th>By</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
     this.wireList();
+    this.wireForm();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Empties Log Works', [
+      { p: ['The Empties Log records empty containers as you clear them, like spent kegs, bottles, and cans. Some states and cities require a container log by law, and it is how you track deposit money you can claim back.'] },
+      { h: 'Logging Empties', p: ['Set the date, pick the product, enter how many containers and the unit, then choose what happened to them: Recycle, Return for Deposit, or Trash. Add the deposit per container when there is money on them, and name who logged it.'] },
+      { h: 'Deposits And Compliance', p: ['When you mark containers Return for Deposit and set a deposit amount, Bar Cop tracks the money owed back to you. The log doubles as your compliance record if an inspector ever asks for one.'] },
+      { h: 'It Does Not Change Your Counts', p: ['Logging an empty does not touch your inventory totals, usage, or variance. The product was already used. This log is purely about where the empty container went.'] },
+      { h: 'Filtering And History', p: ['Every entry drops into the list below. Filter by date range, product, or disposition, and edit or delete any entry to fix a mistake. Print Sheet gives you a paper grid to fill on the floor and enter after close.'] }
+    ]);
+  },
+
+  // The Log Empties form lives at the top of the landing page, always open.
+  logFormCard() {
+    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Log Empties</span>'
+      + '<button class="btn btn-ghost btn-sm" id="em-how">How This Works</button></div>'
+      + this.formRows(null)
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="em-save">Log Empties</button>'
+        + '<span id="em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  // Shared single-row field layout for both the inline log form and the edit
+  // page. All data cells on one row; Notes below. Pass the record for edit, or
+  // null for a new log.
+  formRows(e) {
+    const v = val => (val != null && val !== '') ? val : '';
+    const active = this.activeShift();
+    const defaultMgrId = active ? (active.manager_id || '') : '';
+    const initialProdId = e?.product_id || '';
+    const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
+    const dispOpts = this.DISPOSITIONS.map(d =>
+      '<option' + (e?.disposition === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
+
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label>'
+          + '<input type="date" id="em-date" value="' + esc(e?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:170px;"><label>Product</label>'
+          + '<select id="em-prod">' + this.productOptions(initialProdId) + '</select></div>'
+        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Quantity</label>'
+          + '<input type="number" id="em-qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/></div>'
+        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Unit</label>'
+          + '<select id="em-unit">' + this.unitOptions(initialCat, e?.unit || 'bottles') + '</select></div>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Deposit / Unit <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="em-deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Disposition</label>'
+          + '<select id="em-disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Performed By</label>'
+          + '<select id="em-by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '</div>'
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
+        + '<textarea id="em-notes" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>';
+  },
+
+  // Wire the always-open inline log form (How This Works, Save, product change).
+  wireForm() {
+    document.getElementById('em-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('em-save')?.addEventListener('click', () => this.save());
+    this.wireProdChange();
+  },
+
+  // Product change re-pops the unit options to match the product category.
+  wireProdChange() {
+    document.getElementById('em-prod')?.addEventListener('change', ev => {
+      const p = this.productById(ev.target.value);
+      if (!p) return;
+      const unitSel = document.getElementById('em-unit');
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Draft Beer' ? 'kegs' : 'bottles');
+    });
   },
 
   filterCard() {
@@ -143,7 +181,12 @@ S.InventoryEmpties = {
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
     const dispOpts = '<option value="">All</option>'
       + this.DISPOSITIONS.map(d => '<option value="' + esc(d) + '"' + (this.filterDisposition === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
-    return '<div class="card"><div class="card-title">Filter</div>'
+    return '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Filter</span>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="em-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="em-print-blank">Print Sheet</button>'
+      + '</div></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="em-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="em-f-to" value="' + esc(this.filterTo) + '"/></div>'
@@ -168,12 +211,12 @@ S.InventoryEmpties = {
       const row  = ev.target.closest('.em-row');
       const edit = ev.target.closest('.em-edit');
       const del  = ev.target.closest('.em-del');
-      const addF = ev.target.closest('#em-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('ic-empties')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
     };
+    document.getElementById('em-export')?.addEventListener('click', () => window.print());
+    document.getElementById('em-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('em-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('em-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     document.getElementById('em-f-prod')?.addEventListener('change', e => { this.filterProductId = e.target.value || ''; this.renderList(); });
@@ -209,44 +252,18 @@ S.InventoryEmpties = {
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   },
 
+  // Edit page (own screen). Same single-row field layout as the inline log
+  // form; Cancel stays here because the operator navigated away to edit.
   showForm(id) {
-    if (id && !App.canEdit('ic-empties')) return;
+    if (!App.canEdit('ic-empties')) return;
     this.editId = id || null;
     const e = id ? this.empties().find(x => x.id === id) : null;
-    const active = this.activeShift();
-    const defaultMgrId = active ? (active.manager_id || '') : '';
-    const v = val => (val != null && val !== '') ? val : '';
-    const initialProdId = e?.product_id || '';
-    const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
-    const dispOpts = this.DISPOSITIONS.map(d =>
-      '<option' + (e?.disposition === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit Empties Entry' : 'Log Empties') + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-          + '<input type="date" id="em-date" value="' + esc(e?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:220px;"><label>Product</label>'
-          + '<select id="em-prod">' + this.productOptions(initialProdId) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Quantity</label>'
-          + '<input type="number" id="em-qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="em-unit">' + this.unitOptions(initialCat, e?.unit || 'bottles') + '</select></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Deposit / Unit <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="em-deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
-        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Disposition</label>'
-          + '<select id="em-disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Performed By</label>'
-          + '<select id="em-by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="em-notes" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>'
+      + '<div class="card-title">Edit Empties Entry</div>'
+      + this.formRows(e)
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="em-save">' + (id ? 'Update Entry' : 'Log Empties') + '</button>'
+        + '<button class="btn btn-primary" id="em-save">Update Entry</button>'
         + '<button class="btn btn-ghost" id="em-cancel">Cancel</button>'
         + '<span id="em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
@@ -254,12 +271,7 @@ S.InventoryEmpties = {
     this.container.onclick = null;
     document.getElementById('em-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('em-save')?.addEventListener('click', () => this.save());
-    document.getElementById('em-prod')?.addEventListener('change', e => {
-      const p = this.productById(e.target.value);
-      if (!p) return;
-      const unitSel = document.getElementById('em-unit');
-      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Draft Beer' ? 'kegs' : 'bottles');
-    });
+    this.wireProdChange();
   },
 
   async save() {
