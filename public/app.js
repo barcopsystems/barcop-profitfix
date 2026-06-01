@@ -1741,12 +1741,28 @@ const App = {
     return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
   },
 
+  // jsPDF's built-in fonts only encode Latin-1. A single character above U+00FF
+  // (e.g. the "->" arrow, the trend triangles) corrupts the WHOLE string into
+  // garbage ("&M&a&y&..."), so map the glyphs the app actually uses to ASCII and
+  // drop anything else still outside Latin-1.
+  _pdfSafe(s) {
+    return String(s == null ? '' : s)
+      .replace(/→/g, '->').replace(/←/g, '<-')
+      .replace(/↑/g, 'up').replace(/↓/g, 'down')
+      .replace(/▲/g, '+').replace(/▼/g, '-')
+      .replace(/[–—]/g, '-')
+      .replace(/[‘’′]/g, "'").replace(/[“”]/g, '"')
+      .replace(/•/g, '-').replace(/ /g, ' ').replace(/…/g, '...')
+      .replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/×/g, 'x')
+      .replace(/[^\x00-\xFF]/g, '');
+  },
+
   // Clean text of a node for the PDF: strip buttons, tooltips, and no-print chrome.
   _pdfNodeText(node) {
     if (!node) return '';
     const clone = node.cloneNode(true);
     clone.querySelectorAll('button, .no-print, .tt, .tt-badge, [data-tt]').forEach(el => el.remove());
-    return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+    return this._pdfSafe((clone.textContent || '').replace(/\s+/g, ' ').trim());
   },
 
   _pdfTableData(table) {
@@ -1812,6 +1828,15 @@ const App = {
     try { await this._ensurePDFLib(); }
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
+    // A report with sub-tabs exports one tab at a time; tag the filename with the
+    // active tab so each sub-report saves under its own name instead of clobbering
+    // the last. Auto-read from the active .rpt-tab; opts.subtitle overrides.
+    let subtitle = opts.subtitle || '';
+    if (!subtitle) {
+      const onTab = root.querySelector('.rpt-tab.on');
+      if (onTab) subtitle = (onTab.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
     const blocks = this._collectPDFBlocks(root);
     const maxCols = blocks.reduce((m, b) => b.type === 'table' ? Math.max(m, b.cols || 0) : m, 0);
     const orientation = opts.orientation || (maxCols > 7 ? 'landscape' : 'portrait');
@@ -1827,11 +1852,11 @@ const App = {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
     doc.text('Bar Cop', margin, y);
     doc.setFontSize(12);
-    doc.text(title, pageW - margin, y, { align: 'right' });
+    doc.text(this._pdfSafe(subtitle ? title + ' - ' + subtitle : title), pageW - margin, y, { align: 'right' });
     y += 16;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
     const dstr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    doc.text((venue ? venue + '   |   ' : '') + dstr, margin, y);
+    doc.text(this._pdfSafe((venue ? venue + '   |   ' : '') + dstr), margin, y);
     y += 8;
     doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
     y += 16;
@@ -1869,7 +1894,7 @@ const App = {
       doc.text('Page ' + i + ' of ' + pages, pageW - margin, pageH - 22, { align: 'right' });
     }
 
-    const tag = opts.fileTag || title.replace(/[^A-Za-z0-9]+/g, '');
+    const tag = (opts.fileTag || subtitle || title).replace(/[^A-Za-z0-9]+/g, '');
     await this._savePDF(doc, 'BarCop_' + tag + '_' + this._pdfDateStamp() + '.pdf');
   },
 
