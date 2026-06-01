@@ -80,7 +80,8 @@ S.InventoryVarianceReport = {
       { h: 'The File', p: ['A CSV or Excel file (.csv, .xlsx, .xls). The first row is your column headers, one product per row. This is the standard product or item sales report every POS can export.'] },
       { h: 'The Columns', p: ['Bar Cop needs three things: the Product Name (required), the Quantity Sold, and the Sales Amount. Your headers do not need to match exactly. Common names like item, qty, units, net sales, and revenue are recognized for you.'] },
       { h: 'The Mapping', p: ['After you drop the file, Bar Cop shows the columns it found and auto-matches them to Name, Quantity, and Sales. Fix any that are wrong, then import. It remembers your layout, so next month is one drop and done.'] },
-      { h: 'Names That Do Not Match', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once. Menu items like cocktails and plates explode through their recipe, so each ingredient gets its share of the variance.'] }
+      { h: 'Names That Do Not Match', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once and Bar Cop remembers it for every future upload. Menu items like cocktails and plates explode through their recipe, so each ingredient gets its share of the variance.'] },
+      { h: 'Products Sold In More Than One Size', p: ['If a product sells in more than one size, a pint and a pitcher, a glass and a bottle, each size you set up on the product shows as its own choice in the Unmatched list. Map the pitcher line to the pitcher size and it draws the right ounces and counts the right revenue. A product sold across sizes shows its true blended pour cost on Sales Variance, and its single-price columns read "mixed sizes" because one standard price no longer applies.'] }
     ]);
   },
 
@@ -114,6 +115,13 @@ S.InventoryVarianceReport = {
   productById(id) { return this.allProducts().find(p => p.id === id); },
   menuItems() { return ((App.data && App.data.menu_items) || []); },
   menuItemById(id) { return this.menuItems().find(m => m.id === id); },
+
+  // Remembered POS-name -> target map, persisted so a mapping done once applies
+  // to every future upload (next month is one drop and done). Keyed by the
+  // lowercased POS product name.
+  savedPosMap() {
+    return (App.inventoryData && App.inventoryData.variance_pos_map) || {};
+  },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -225,7 +233,7 @@ S.InventoryVarianceReport = {
     this.menuItems().forEach(m => { if (m && m.name) menuItemByName[m.name.toLowerCase().trim()] = m; });
 
     const addProduct = (productId, ouncesSold, qty, sales, fromMenu) => {
-      if (!result[productId]) result[productId] = { ouncesSold: 0, qty: 0, sales: 0, fromMenu: false };
+      if (!result[productId]) result[productId] = { ouncesSold: 0, qty: 0, sales: 0, fromMenu: false, mixedSizes: false };
       result[productId].ouncesSold += ouncesSold || 0;
       result[productId].qty        += qty        || 0;
       result[productId].sales      += sales      || 0;
@@ -235,14 +243,23 @@ S.InventoryVarianceReport = {
     this.posRows.forEach(pr => {
       const key = pr.name.toLowerCase().trim();
       // Resolve target: direct product, then menu item, then manual map.
-      // Manual map values can point to either a product id or a menu item id.
       let p  = productByName[key];
       let mi = menuItemByName[key];
-      if (!p && !mi && this.manualMap[key]) {
-        const mappedId = this.manualMap[key];
-        p  = this.productById(mappedId);
-        if (!p) mi = this.menuItemById(mappedId);
+      const mapped = (!p && !mi) ? this.manualMap[key] : null;
+      // Serving-size mapping "sv|<productId>|<ozPerUnit>": this POS line is one of
+      // the product's other sizes (a pitcher, a bottle). Draw that many oz per
+      // sold unit and add its revenue, then mark the product mixedSizes so the
+      // Sales tab won't compare a multi-price product against one standard price.
+      if (mapped && String(mapped).indexOf('sv|') === 0) {
+        const parts = String(mapped).split('|');   // ['sv', productId, ozPerUnit]
+        const svPid = parts[1], svOz = parseFloat(parts[2]) || 0;
+        if (svPid && svOz) {
+          addProduct(svPid, svOz * (parseFloat(pr.qty) || 0), 0, pr.sales, false);
+          result[svPid].mixedSizes = true;
+        }
+        return;
       }
+      if (mapped) { p = this.productById(mapped); if (!p) mi = this.menuItemById(mapped); }
       if (p) {
         // Direct product match — qty × oz per sold unit. A beer sold by the bottle
         // has no pour_size_oz, so fall back to the bottle's container_size_oz.
@@ -347,7 +364,8 @@ S.InventoryVarianceReport = {
             qty: parseFloat(String(r.qty || '').replace(/[^0-9.]/g, '')) || 0,
             sales: parseFloat(String(r.sales || '').replace(/[^0-9.-]/g, '')) || 0
           })).filter(r => r.name);
-          this.manualMap = {};
+          // Start from any remembered mappings so prior choices apply on the spot.
+          this.manualMap = { ...this.savedPosMap() };
           this.draw();
         }
       });
@@ -359,11 +377,16 @@ S.InventoryVarianceReport = {
   matchSummary() {
     const unmatched = this.unmatchedPos().length;
     const recognized = this.posRows.length - unmatched;
+    const savedCount = Object.keys(this.savedPosMap()).length;
+    const clearBtn = savedCount
+      ? '<button class="btn btn-ghost btn-sm" id="vr-clearmap">Clear saved mappings</button>' : '';
     return '<div class="alert-bar no-print" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<div class="alert-text">' + this.posRows.length + ' rows imported &middot; '
       + recognized + ' recognized' + (unmatched ? ' &middot; ' + unmatched + ' unmatched' : '')
+      + (savedCount ? ' &middot; ' + savedCount + ' remembered' : '')
       + '. Cocktails and plates break into their recipe ingredients below.</div>'
-      + '<button class="btn btn-ghost btn-sm" id="vr-reimport">Re-import</button></div>';
+      + '<div style="display:flex;gap:8px;flex-shrink:0;">' + clearBtn
+      + '<button class="btn btn-ghost btn-sm" id="vr-reimport">Re-import</button></div></div>';
   },
 
   unmatchedCard() {
@@ -375,6 +398,22 @@ S.InventoryVarianceReport = {
     if (sortedMenu.length) {
       opts += '<optgroup label="Menu Items">';
       sortedMenu.forEach(m => { opts += '<option value="' + m.id + '">' + esc(m.name) + '</option>'; });
+      opts += '</optgroup>';
+    }
+    // Other sizes: any product with serving_sizes gets one target per size so a
+    // POS line like "Live Oak Pitcher" maps to that size (draws its ounces, adds
+    // its revenue). The plain product option below is the product's standard pour.
+    const sizeTargets = sortedProds.filter(p => Array.isArray(p.serving_sizes) && p.serving_sizes.length);
+    if (sizeTargets.length) {
+      opts += '<optgroup label="Product Sizes">';
+      sizeTargets.forEach(p => {
+        p.serving_sizes.forEach(s => {
+          const oz = parseFloat(s.size_oz) || 0;
+          if (!oz) return;
+          const lbl = (s.label ? s.label + ' ' : '') + '(' + (oz % 1 === 0 ? oz : oz.toFixed(1)) + ' oz)';
+          opts += '<option value="sv|' + p.id + '|' + oz + '">' + esc(p.name + ' — ' + lbl) + '</option>';
+        });
+      });
       opts += '</optgroup>';
     }
     if (sortedProds.length) {
@@ -391,13 +430,22 @@ S.InventoryVarianceReport = {
   },
 
   wireBody() {
-    document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = {}; this.draw(); });
+    document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = { ...this.savedPosMap() }; this.draw(); });
     document.getElementById('vr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('vr-clearmap')?.addEventListener('click', async () => {
+      if (App.inventoryData) App.inventoryData.variance_pos_map = {};
+      this.manualMap = {};
+      await App.saveInventory();
+      this.draw();
+    });
     this.container.querySelectorAll('.vr-map').forEach(sel =>
-      sel.addEventListener('change', e => {
+      sel.addEventListener('change', async e => {
         const pos = e.target.dataset.pos;
-        if (e.target.value) this.manualMap[pos] = e.target.value;
-        else delete this.manualMap[pos];
+        if (!App.inventoryData) App.inventoryData = {};
+        if (!App.inventoryData.variance_pos_map) App.inventoryData.variance_pos_map = {};
+        if (e.target.value) { this.manualMap[pos] = e.target.value; App.inventoryData.variance_pos_map[pos] = e.target.value; }
+        else { delete this.manualMap[pos]; delete App.inventoryData.variance_pos_map[pos]; }
+        await App.saveInventory();
         this.draw();
       }));
     this.container.querySelectorAll('.rpt-tab').forEach(btn =>
@@ -502,21 +550,28 @@ S.InventoryVarianceReport = {
       const byBottle = this.isByBottle(p);
       const bottlesSold = byBottle && p.container_size_oz ? (pr.ouncesSold || 0) / p.container_size_oz : (pr.qty || 0);
       const unitVar = (byBottle && u.poursMade != null) ? u.poursMade - bottlesSold : null;
-      return { name: u.name, category: p.category, key: this.stdKey(p), viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit, unitVar };
+      // A product sold at more than one size/price (a draft sold as pints AND
+      // pitchers) can't be measured against a single standard price, so the theo
+      // and sales-variance columns are blanked. The blended Actual Cost % and
+      // Actual Profit below stay honest because they use the real register total.
+      return { name: u.name, category: p.category, key: this.stdKey(p), viaMenu, mixedSizes: pr.mixedSizes,
+        registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit, unitVar };
     }).filter(r => !r.viaMenu && (!this.catFilter || r.category === this.catFilter));
     if (!rows.length) {
       return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
         + 'No direct-pour products matched your POS for this period. Beer, wine, and liquor sold by the glass or bottle show here. Cocktails and plates are in Usage Variance.</div>';
     }
+    const dash = '<span style="color:var(--t4);">-</span>';
+    const mixedNote = '<span style="color:var(--t4);font-size:11px;">mixed sizes</span>';
     const body = rows.map(r => '<tr>'
       + '<td><div class="val">' + esc(r.name) + '</div></td>'
       + '<td>' + this.cur(r.registerSales) + '</td>'
-      + '<td>' + this.cur(r.theoSales) + '</td>'
-      + '<td>' + this.cur(r.salesVar) + '</td>'
-      + '<td>' + this.pct(r.varPct) + '</td>'
+      + '<td>' + (r.mixedSizes ? mixedNote : this.cur(r.theoSales)) + '</td>'
+      + '<td>' + (r.mixedSizes ? dash : this.cur(r.salesVar)) + '</td>'
+      + '<td>' + (r.mixedSizes ? dash : this.pct(r.varPct)) + '</td>'
       + '<td>' + this.pct(r.actualCostPct) + '</td>'
       + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
-      + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar) : '-') + '</td>'
+      + '<td>' + (r.mixedSizes ? dash : ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar) : '-')) + '</td>'
       + '</tr>').join('');
     return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
