@@ -1,28 +1,36 @@
 'use strict';
 
-/* ── Inventory Control — Top Movers (reads ic_counts + ic_deliveries) ─────────
-   Ranks products by how much moved (units used and usage cost) over a count
-   period, and trends each product against the prior period. */
+/* ── Inventory Control — Movement Report (ic_counts + ic_deliveries) ──────────
+   Velocity: fast and slow movers ranked by DOLLARS (so a cheap high-volume item
+   and a pricey low-volume one compare fairly), trend versus the prior period,
+   and usage spend by vendor. The only home for rankings — on-hand value lives in
+   the Stock Report, raw consumption in the Usage Report. */
 
 S.InventoryMoversReport = {
-  tab: 'units',
+  tab: 'fast',
   endCountId: null,
-  TABS: [['units','Top by Units'], ['cost','Top by Cost'], ['slow','Slow Movers'], ['trend','Trend vs Prior']],
+  catFilter: '',
+
+  TABS: [
+    ['fast','Fast Movers','rpt-m-fast'],
+    ['slow','Slow Movers','rpt-m-slow'],
+    ['trend','Trend vs Prior','rpt-m-trend'],
+    ['vendor','Vendor Spend','rpt-m-vendor']
+  ],
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
       .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
   },
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
-  productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
-  // Built on App.computeUsagePair. "Used" is floored at zero (a restock/recount
-  // period can't show negative usage), in each product's container unit.
+  // "Used" floored at zero, in each product's container unit. usageCost drives
+  // every ranking so cross-category comparison is in dollars, not raw units.
   computeForPair(startC, endC) {
     const base = App.computeUsagePair(startC, endC, this.deliveries());
     const rows = [];
@@ -44,12 +52,21 @@ S.InventoryMoversReport = {
     for (let i = 1; i < asc.length; i++) out.push({ startC: asc[i - 1], endC: asc[i] });
     return out;
   },
+  byCat(rows) { return this.catFilter ? rows.filter(r => r.category === this.catFilter) : rows; },
+
+  showHowTo() {
+    App.showHelpModal('How the Movement Report Works', [
+      { p: ['Movement tells you what is flying off the shelf and what is collecting dust. Everything ranks by dollars, not raw units, so a 240-a-week bun does not outrank your scotch. Money is the fair comparison.'] },
+      { h: 'Pick A Period', p: ['Use Count Period to choose which two counts to measure between, and Category to focus on one group, like just liquor. Both apply to every view.'] },
+      { h: 'Fast And Slow', p: ['Fast Movers are your top products by usage dollars: where your money goes, what to never run out of, and what to watch for theft. Slow Movers are the bottom: cash tied up, spoilage risk, candidates to stop over-ordering or cut.'] },
+      { h: 'Trend And Vendor', p: ['Trend vs Prior shows how each product moved this period against the period before, biggest swing first, so you catch an item taking off or falling off early. Vendor Spend groups your usage cost by vendor, which is your leverage when you sit down to negotiate.'] }
+    ]);
+  },
 
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="mv-export">Export PDF</button>';
-    document.getElementById('mv-export')?.addEventListener('click', () => window.print());
+    actions.innerHTML = '';
     this.draw();
   },
 
@@ -58,7 +75,7 @@ S.InventoryMoversReport = {
     if (pairs.length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
         + '<div class="empty-title">Not enough counts yet</div>'
-        + '<div class="empty-sub">Movers are measured between two inventory counts. '
+        + '<div class="empty-sub">Movement is measured between two inventory counts. '
         + 'Submit at least two counts in Take Inventory to see this report.</div>'
         + '<button class="btn btn-primary" id="mv-take">Take Inventory</button></div></div>';
       this.container.onclick = ev => { if (ev.target.closest('#mv-take')) App.navigate('ic-take-inventory'); };
@@ -73,56 +90,89 @@ S.InventoryMoversReport = {
     const periodOpts = pairs.map((p, i) =>
       '<option value="' + p.endC.id + '"' + (i === idx ? ' selected' : '') + '>'
       + this.fmtDate(p.startC.date) + ' &rarr; ' + this.fmtDate(p.endC.date) + '</option>').reverse().join('');
+    const allRows = this.computeForPair(cur.startC, cur.endC);
+    const cats = [...new Set(allRows.map(r => r.category).filter(Boolean))].sort();
+    const catOpts = '<option value="">All categories</option>'
+      + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
 
-    const tabs = '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;flex-wrap:wrap;">'
-      + this.TABS.map(([k, label]) => {
-          const on = k === this.tab;
-          return '<button class="mv-tab" data-tab="' + k + '" style="background:none;border:none;'
-            + 'border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
-            + 'color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-            + 'letter-spacing:0.5px;text-transform:uppercase;padding:9px 13px;cursor:pointer;">' + label + '</button>';
-        }).join('') + '</div>';
+    const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Movement Report</span>'
+      + '<button class="btn btn-ghost btn-sm" id="mv-how">How This Works</button></div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
+      + '<div class="f" style="width:260px;"><label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div>'
+      + '<div class="f" style="width:180px;"><label>Category</label><select id="mv-cat">' + catOpts + '</select></div>'
+      + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:260px;">'
-      + '<label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div></div>'
-      + tabs + '<div id="mv-body">' + this.body(cur, prior) + '</div></div>';
+    this.container.innerHTML = '<div class="screen">' + controls
+      + App.reportTabBar(this.TABS, this.tab)
+      + App.reportPanel(this.TABS, this.tab, 'mv-export', this.body(cur, prior)) + '</div>';
 
     this.container.onclick = ev => {
-      const tab = ev.target.closest('.mv-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.draw(); }
+      const how = ev.target.closest('#mv-how');
+      const exp = ev.target.closest('#mv-export');
+      const tab = ev.target.closest('.rpt-tab');
+      if (how) { this.showHowTo(); return; }
+      if (exp) { window.print(); return; }
+      if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('mv-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
+    document.getElementById('mv-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
   },
 
   body(cur, prior) {
-    const rows = this.computeForPair(cur.startC, cur.endC);
-    if (this.tab === 'trend') return this.tabTrend(rows, prior);
-    if (this.tab === 'cost')  return this.tabRank(rows, 'usageCost', true, 'Top 10 products by usage cost this period.');
-    if (this.tab === 'slow')  return this.tabRank(rows, 'used', false, 'Bottom 10 products by units used, your slowest movers.');
-    return this.tabRank(rows, 'used', true, 'Top 10 products by units used this period.');
+    const rows = this.byCat(this.computeForPair(cur.startC, cur.endC));
+    if (this.tab === 'trend')  return this.tabTrend(rows, prior);
+    if (this.tab === 'vendor') return this.tabVendor(rows);
+    if (this.tab === 'slow')   return this.tabRank(rows, false);
+    return this.tabRank(rows, true);
   },
 
-  tabRank(rows, key, desc, caption) {
-    const ranked = [...rows].sort((a, b) => desc ? b[key] - a[key] : a[key] - b[key]).slice(0, 10);
+  tabRank(rows, desc) {
+    const ranked = [...rows].filter(r => r.usageCost != null)
+      .sort((a, b) => desc ? b.usageCost - a.usageCost : a.usageCost - b.usageCost).slice(0, 10);
     if (!ranked.length) return this.emptyBody();
-    const max = Math.max(...ranked.map(r => Math.abs(r[key])), 1);
-    const isCost = key === 'usageCost';
+    const max = Math.max(...ranked.map(r => Math.abs(r.usageCost)), 1);
     const body = ranked.map(r => {
-      const pct = Math.min(100, Math.abs(r[key]) / max * 100);
-      const val = isCost ? App.fmtCurrency(r[key]) : esc(App.qtyWithUnit(r.product, r[key]));
+      const pct = Math.min(100, Math.abs(r.usageCost) / max * 100);
       return '<tr><td><div class="val">' + esc(r.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
-        + '<td style="width:42%;"><div style="display:flex;align-items:center;gap:8px;">'
+        + '<td style="width:44%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
         + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div>'
-        + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + val + '</span></div></td>'
-        + '<td>' + esc(App.qtyWithUnit(r.product, r.used)) + '</td>'
-        + '<td>' + App.fmtCurrency(r.usageCost || 0) + '</td></tr>';
+        + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + App.fmtCurrency(r.usageCost) + '</span></div></td>'
+        + '<td>' + esc(App.qtyWithUnit(r.product, r.used)) + '</td></tr>';
     }).join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + caption + '</div>'
+    return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th>Product</th><th>Usage Cost</th><th>Units Used</th>'
+      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  },
+
+  tabVendor(rows) {
+    const byVendor = {};
+    rows.forEach(r => {
+      const v = (r.product && r.product.vendor) || 'Unassigned';
+      byVendor[v] = byVendor[v] || { count: 0, cost: 0 };
+      byVendor[v].count++; byVendor[v].cost += r.usageCost || 0;
+    });
+    const list = Object.keys(byVendor).map(v => ({ vendor: v, ...byVendor[v] }))
+      .filter(x => x.cost > 0).sort((a, b) => b.cost - a.cost);
+    if (!list.length) return this.emptyBody();
+    const total = list.reduce((s, x) => s + x.cost, 0);
+    const max = list[0].cost || 1;
+    const body = list.map(x => {
+      const pct = Math.min(100, x.cost / max * 100);
+      return '<tr><td><div class="val">' + esc(x.vendor) + '</div></td>'
+        + '<td>' + x.count + '</td>'
+        + '<td style="width:34%;"><div style="display:flex;align-items:center;gap:8px;">'
+        + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div></td>'
+        + '<td class="val">' + App.fmtCurrency(x.cost) + '</td>'
+        + '<td>' + (total ? (x.cost / total * 100).toFixed(1) : '0.0') + '%</td></tr>';
+    }).join('');
+    return '<div class="calc" style="margin-bottom:14px;"><div class="calc-item">'
+      + '<div class="calc-label">Total Usage Cost</div><div class="calc-val good">' + App.fmtCurrency(total) + '</div></div></div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>' + (isCost ? 'Usage Cost' : 'Units Used') + '</th><th>Units Used</th><th>Usage Cost</th>'
+      + '<th>Vendor</th><th>Products</th><th>Spend</th><th>Usage Cost</th><th>% of Total</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
@@ -131,7 +181,7 @@ S.InventoryMoversReport = {
       return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
         + 'Trend needs a prior count period. Submit a third count to compare two periods.</div>';
     }
-    const priorRows = this.computeForPair(prior.startC, prior.endC);
+    const priorRows = this.byCat(this.computeForPair(prior.startC, prior.endC));
     const priorMap = {};
     priorRows.forEach(r => priorMap[r.pid] = r.used);
     const rows = curRows.map(r => {
@@ -152,15 +202,13 @@ S.InventoryMoversReport = {
         + '<td class="' + cls + '">' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
         + '</tr>';
     }).join('');
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">'
-      + 'Units used this period vs the prior period, biggest movement first.</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+    return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
   emptyBody() {
     return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-      + 'No products were used in this period. Both counts must include the same products.</div>';
+      + 'No products moved in this period and filter. Both counts must include the same products.</div>';
   }
 };
