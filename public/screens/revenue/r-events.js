@@ -69,7 +69,7 @@ S.RevenueEvents = {
     if (this.activeTab === 'pipeline') {
       const printBtn = document.createElement('button');
       printBtn.className = 'btn btn-ghost btn-sm';
-      printBtn.textContent = 'Print Inquiry Pad';
+      printBtn.textContent = 'Worksheet';
       printBtn.addEventListener('click', () => this.printBlank());
       actions.appendChild(printBtn);
     }

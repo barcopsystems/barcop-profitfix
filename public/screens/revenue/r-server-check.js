@@ -162,11 +162,11 @@ S.RevenueServerCheck = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
-    // Print Blank Sheet — paper-to-digital bridge for shift checks captured
+    // Worksheet button: paper-to-digital bridge for shift checks captured
     // on paper at the host stand during service.
     const printBtn = document.createElement('button');
     printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print Blank Sheet';
+    printBtn.textContent = 'Worksheet';
     printBtn.addEventListener('click', () => this.printBlank());
     actions.appendChild(printBtn);
     this._entryId = App.uid();

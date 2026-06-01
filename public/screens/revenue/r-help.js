@@ -74,8 +74,8 @@ S.RevenueHelp = {
           a: 'On Server Check, pick the server (auto-fills date and shift type from the active shift if one is running, otherwise from the clock), enter covers and total sales, hit Submit. Bar Cop computes the check average, compares to target, and flags On Target / Watch / Below Standard. Saving auto-captures staff_id and shift_id so the scorecard joins cleanly.' },
         { q: 'How do I correct a mistyped shift check?',
           a: 'Each row in the Shift Log has an Edit button. Click Edit, the form populates with that entry\'s data, change what you need, hit Update. No need to delete and re-enter.' },
-        { q: 'What is Print Blank Sheet on Server Check?',
-          a: 'Prints a paper grid with server / covers / sales columns. Manager fills it out at the host stand during shift, types into Bar Cop after close. Paper-to-digital bridge for shifts where the laptop isn\'t at hand.' }
+        { q: 'What is the Worksheet button on Server Check?',
+          a: 'Downloads a clean PDF grid with server, covers, and sales columns. The manager prints it, fills it out at the host stand during the shift, and types into Bar Cop after close. Paper-to-digital bridge for shifts where the laptop isn\'t at hand.' }
       ]},
       { t: 'Menu Items and Recipe Library', qa: [
         { q: 'What goes in Menu Items?',
@@ -112,8 +112,8 @@ S.RevenueHelp = {
           a: 'Three tabs. Pipeline tracks every event from Inquiry through Completed, with detail pages, summary tiles (Completed Revenue, Pipeline Value, Projected Wins at your close rate, Total Events). Rate Card stores your saved package definitions (Weeknight Buyout, Private Dining, Catering, etc.) for quick quoting. Catering Calc is a per-head pricing tool with default staff wage pulled from your Labor Control Front of House roster.' },
         { q: 'How does the Event detail page work?',
           a: 'Click View or row-click on any Pipeline event. Profile card up top (name, type, status, covers, F&B minimum, estimated/actual revenue, notes). Linked Shifts card pulls any sc_shift records tagged with this event\'s name (tag the shift on Active Shift or Log a Shift) and rolls up their revenue. Event P&L card pulls revenue from linked shifts (preferred) or actual_revenue field, labor cost from Labor Control actuals on the linked shift dates, food/bar cost from operator-entered fields on the event. Margin and Margin % computed live. Closes the fix-revenue promise that said Run the Event P&L before you confirm.' },
-        { q: 'What is the Print Inquiry Pad button?',
-          a: 'Prints a paper grid clipped to the host stand to capture event inquiries as the phone rings. Date, Caller, Event Name, Type, Date Wanted, Est Covers, F&B Min Quoted, Follow-up. Manager enters into Bar Cop after the day winds down.' },
+        { q: 'What is the Worksheet button?',
+          a: 'The Worksheet button downloads a clean PDF grid to print and clip to the host stand, capturing event inquiries as the phone rings. Date, Caller, Event Name, Type, Date Wanted, Est Covers, F&B Min Quoted, Follow-up. Manager enters into Bar Cop after the day winds down.' },
         { q: 'How does the Catering Calculator work?',
           a: 'Type guest count, food cost per head, bar cost per head, staff hours, average staff wage (auto-pre-filled from your FOH roster wage average), other costs, target food cost %. Bar Cop computes total cost, cost per head, the suggested per-head price at your target margin, total event revenue, and gross margin. Use it on the phone to quote a catering inquiry.' }
       ]},
