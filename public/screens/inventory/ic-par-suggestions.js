@@ -43,8 +43,12 @@ S.InventoryParSuggestions = {
   // Pairs adjacent counts; usage_for_pair = start_total + purchases_between
   // - end_total. Returns { weeks_analyzed, avg_weekly, total_usage } or null
   // if not enough data.
-  weeklyUsageFor(productId, windowWeeks) {
-    const counts = this.countsAsc();
+  weeklyUsageFor(productId, windowWeeks, asOfDate) {
+    let counts = this.countsAsc();
+    // asOfDate limits the window to counts that existed at a past point, so a
+    // historical par-accuracy figure (e.g. the dashboard trend) is honest
+    // instead of reusing today's suggestion. Omitted = use all counts.
+    if (asOfDate) counts = counts.filter(c => c.date <= asOfDate);
     if (counts.length < 2) return null;
     const recent = counts.slice(-Math.max(2, windowWeeks + 1));
     let total_usage = 0;
@@ -76,8 +80,8 @@ S.InventoryParSuggestions = {
     return { weeks_analyzed, total_usage, avg_weekly: total_usage / total_weeks };
   },
 
-  computeSuggestion(product, settings) {
-    const usage = this.weeklyUsageFor(product.id, settings.window_weeks);
+  computeSuggestion(product, settings, asOfDate) {
+    const usage = this.weeklyUsageFor(product.id, settings.window_weeks, asOfDate);
     if (!usage) return { weeks_analyzed: 0, avg_weekly: null, suggested: null, status: 'No data', reasoning: 'Need at least two counts for this product to suggest.' };
     const cycleWeeks = (settings.cycle_days || 7) / 7;
     const buffer = (settings.buffer_pct || 0) / 100;
