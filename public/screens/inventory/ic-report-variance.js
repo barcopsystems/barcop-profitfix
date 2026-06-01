@@ -574,8 +574,23 @@ S.InventoryVarianceReport = {
 
   n(v, d) { return (v == null || isNaN(v)) ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d); },
   recipeTag(r) { return r.fromMenu ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : ''; },
+  // Shared table shell. Every category table is laid out on the SAME fixed
+  // grid so the columns line up vertically section to section as you scroll:
+  // the name column and the trailing three (variance value, variance %, status)
+  // are fixed widths; the in-between metric columns share whatever is left. The
+  // last three headers of every table are always [a variance value, Variance %,
+  // Status], so this aligns them across Liquor, Wine, Draft, Beer, Misc, Food.
   usageTbl(headers, body) {
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    const n = headers.length;
+    const cols = headers.map((h, i) => {
+      if (i === 0)     return '<col style="width:200px;"/>';  // product / ingredient / mixer
+      if (i === n - 3) return '<col style="width:92px;"/>';   // variance value
+      if (i === n - 2) return '<col style="width:78px;"/>';   // variance %
+      if (i === n - 1) return '<col style="width:62px;"/>';   // status
+      return '<col/>';                                        // metric columns share the rest
+    }).join('');
+    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl" style="table-layout:fixed;width:100%;min-width:560px;">'
+      + '<colgroup>' + cols + '</colgroup><thead><tr>'
       + headers.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
@@ -602,7 +617,7 @@ S.InventoryVarianceReport = {
         + '<td>' + statusCell + '</td>'
         + '</tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours Made', 'Bottles Used', 'Oz Variance', 'Variance %', 'Status'], body);
+    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', 'Status'], body);
   },
 
   // Draft Beer: ounces poured, kegs used.
@@ -620,7 +635,7 @@ S.InventoryVarianceReport = {
         + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct) : '-') + '</td>'
         + '</tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Kegs Used', 'Oz Variance', 'Variance %', 'Status'], body);
+    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Kegs', 'Oz Var', 'Var %', 'Status'], body);
   },
 
   // Bottle Beer: bottle-to-bottle, no ounces. The recipe explosion is needless
@@ -646,7 +661,7 @@ S.InventoryVarianceReport = {
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar) : '-') + '</td>'
         + '</tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Bottles Sold', 'Bottles Used', 'Cases Used', 'Case Variance', 'Bottle Variance', 'Variance %', 'Status'], body);
+    return this.usageTbl(['Product', 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', 'Status'], body);
   },
 
   // Misc mixers: bought and counted by the quart, so variance reads in quarts.
@@ -669,7 +684,7 @@ S.InventoryVarianceReport = {
         + '<td>' + (varPct != null ? this.badge('Misc', varPct) : '-') + '</td>'
         + '</tr>';
     }).join('');
-    return this.usageTbl(['Mixer', 'Recipe Qt', 'Counted Qt', 'Qt Variance', 'Variance %', 'Status'], body);
+    return this.usageTbl(['Mixer', 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', 'Status'], body);
   },
 
   // Food: each ingredient in its own purchase unit. One ingredient spans many
@@ -696,7 +711,7 @@ S.InventoryVarianceReport = {
         + '<td>' + (varPct != null ? this.badge('Food', varPct) : '-') + '</td>'
         + '</tr>';
     }).join('');
-    return this.usageTbl(['Ingredient', 'Unit', 'Recipe Use', 'Counted Use', 'Use Variance', 'Variance %', 'Status'], body);
+    return this.usageTbl(['Ingredient', 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', 'Status'], body);
   },
 
   renderUsageCat(cat, rows) {
