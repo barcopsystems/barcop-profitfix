@@ -1717,6 +1717,179 @@ const App = {
       + bodyHtml + '</div>';
   },
 
+  // ── PDF export ─────────────────────────────────────────────────────────────
+  // Excel-style export: click -> native Save dialog (filename pre-filled) -> Save,
+  // no browser print preview. Generates the PDF client-side from the on-screen
+  // report DOM (card titles + .tbl tables + .calc tiles, skipping .no-print
+  // chrome) so one helper serves every Export button. jsPDF + autoTable are
+  // lazy-loaded from CDN the same way the XLSX import lib is.
+  _ensurePDFLib() {
+    if (this._pdfLibPromise) return this._pdfLibPromise;
+    if (window.jspdf && window.jspdf.jsPDF) { this._pdfLibPromise = Promise.resolve(); return this._pdfLibPromise; }
+    const load = src => new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+    this._pdfLibPromise = load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'));
+    return this._pdfLibPromise;
+  },
+
+  _pdfDateStamp() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+  },
+
+  // Clean text of a node for the PDF: strip buttons, tooltips, and no-print chrome.
+  _pdfNodeText(node) {
+    if (!node) return '';
+    const clone = node.cloneNode(true);
+    clone.querySelectorAll('button, .no-print, .tt, .tt-badge, [data-tt]').forEach(el => el.remove());
+    return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+  },
+
+  _pdfTableData(table) {
+    const headRow = table.querySelector('thead tr');
+    const head = headRow ? [Array.from(headRow.children).map(th => this._pdfNodeText(th))] : [];
+    let body = Array.from(table.querySelectorAll('tbody tr'))
+      .filter(tr => !tr.closest('.no-print'))
+      .map(tr => Array.from(tr.children).map(td => this._pdfNodeText(td)));
+    if (!body.length && !head.length) return null;
+    // Drop trailing columns that are empty across every row + header (action cols).
+    const cols = Math.max(head[0] ? head[0].length : 0, ...body.map(r => r.length), 0);
+    for (let c = cols - 1; c >= 0; c--) {
+      const headEmpty = !head[0] || !(head[0][c] || '').trim();
+      const bodyEmpty = body.every(r => !(r[c] || '').trim());
+      if (headEmpty && bodyEmpty) {
+        if (head[0]) head[0].splice(c, 1);
+        body.forEach(r => r.splice(c, 1));
+      } else break;
+    }
+    return { head, body, cols: (head[0] ? head[0].length : (body[0] ? body[0].length : 0)) };
+  },
+
+  // Walk a report container into ordered PDF blocks: headings, key/value tiles,
+  // sub-headers, and tables — in document order, skipping no-print chrome.
+  _collectPDFBlocks(root) {
+    const blocks = [];
+    root.querySelectorAll('.card-title, .sh, .calc-item, table.tbl, .empty-title, .empty-sub, .alert-text').forEach(node => {
+      if (node.closest('.no-print')) return;
+      if (node.matches('table.tbl')) {
+        const t = this._pdfTableData(node);
+        if (t) blocks.push({ type: 'table', head: t.head, body: t.body, cols: t.cols });
+      } else if (node.matches('.calc-item')) {
+        const label = this._pdfNodeText(node.querySelector('.calc-label'));
+        const val = this._pdfNodeText(node.querySelector('.calc-val'));
+        const text = (label ? label + ': ' : '') + val;
+        if (text.trim()) blocks.push({ type: 'kv', text });
+      } else if (node.matches('.card-title')) {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'heading', text });
+      } else if (node.matches('.sh')) {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'subheading', text });
+      } else {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'note', text });
+      }
+    });
+    return blocks;
+  },
+
+  async exportPDF(opts) {
+    opts = opts || {};
+    const title = opts.title || 'Report';
+    const root = opts.root || document.querySelector('.hub-app .content .screen') || document.querySelector('.screen');
+    if (!root) return;
+    try { await this._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    const blocks = this._collectPDFBlocks(root);
+    const maxCols = blocks.reduce((m, b) => b.type === 'table' ? Math.max(m, b.cols || 0) : m, 0);
+    const orientation = opts.orientation || (maxCols > 7 ? 'landscape' : 'portrait');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation, unit: 'pt', format: 'letter' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    let y = margin;
+
+    const venue = (this.data && this.data.settings && this.data.settings.bar_name) || '';
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+    doc.text('Bar Cop', margin, y);
+    doc.setFontSize(12);
+    doc.text(title, pageW - margin, y, { align: 'right' });
+    y += 16;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+    const dstr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    doc.text((venue ? venue + '   |   ' : '') + dstr, margin, y);
+    y += 8;
+    doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
+    y += 16;
+
+    const ensure = h => { if (y > pageH - 60 - h) { doc.addPage(); y = margin; } };
+    blocks.forEach(b => {
+      if (b.type === 'heading') {
+        ensure(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
+        doc.text(b.text, margin, y); y += 16;
+      } else if (b.type === 'subheading') {
+        ensure(16); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
+        doc.text(b.text.toUpperCase(), margin, y); y += 13;
+      } else if (b.type === 'kv' || b.type === 'note') {
+        ensure(15); doc.setFont('helvetica', b.type === 'kv' ? 'bold' : 'normal'); doc.setFontSize(10); doc.setTextColor(45, 45, 45);
+        doc.text(b.text, margin, y); y += 14;
+      } else if (b.type === 'table') {
+        doc.autoTable({
+          startY: y + 2,
+          head: b.head, body: b.body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', lineColor: [225, 225, 225], lineWidth: 0.5 },
+          headStyles: { fillColor: [28, 28, 28], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [246, 246, 246] },
+          theme: 'grid'
+        });
+        y = doc.lastAutoTable.finalY + 16;
+      }
+    });
+
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+      doc.text('Generated by Bar Cop. Figures are derived from your inputs; verify before relying on them.', margin, pageH - 22);
+      doc.text('Page ' + i + ' of ' + pages, pageW - margin, pageH - 22, { align: 'right' });
+    }
+
+    const tag = opts.fileTag || title.replace(/[^A-Za-z0-9]+/g, '');
+    await this._savePDF(doc, 'BarCop_' + tag + '_' + this._pdfDateStamp() + '.pdf');
+  },
+
+  async _savePDF(doc, filename) {
+    const blob = doc.output('blob');
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'PDF document', accept: { 'application/pdf': ['.pdf'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // user cancelled the Save dialog
+        // any other failure (e.g. lost user activation) -> fall back to download
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  },
+
   // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
   // and the average-rating math in t-reports + t-dashboard. Key prefix maps to
   // the per-platform fields in traffic_weeks (dd_active, dd_rating, etc.) and
