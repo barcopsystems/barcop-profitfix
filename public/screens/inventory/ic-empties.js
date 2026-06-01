@@ -157,7 +157,7 @@ S.InventoryEmpties = {
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="em-deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
         + '<div class="f" style="width:125px;flex-shrink:0;"><label>Disposition</label>'
           + '<select id="em-disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
-        + '<div class="f" style="width:145px;flex-shrink:0;"><label>Performed By</label>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Performed By</label>'
           + '<select id="em-by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
