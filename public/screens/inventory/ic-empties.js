@@ -27,6 +27,12 @@ S.InventoryEmpties = {
   products() {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
   },
+  // Empties are bar containers (bottles, cans, kegs). Food and Misc are excluded
+  // from every product picker on this screen.
+  barProducts() {
+    const bar = App.BAR_CATS || ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'];
+    return this.products().filter(p => bar.includes(p.category));
+  },
   productById(id) {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
   },
@@ -87,7 +93,7 @@ S.InventoryEmpties = {
           + (e.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.category) + '</div>' : '') + '</td>'
           + '<td>' + (e.quantity != null ? e.quantity : '-') + ' ' + esc(e.unit || '') + '</td>'
           + '<td>' + dispBadge + '</td>'
-          + '<td>' + (deposit > 0 ? App.fmtCurrency(deposit) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + (deposit > 0 ? '<span style="color:var(--gold);">' + App.fmtCurrency(deposit) + '</span>' : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td>' + esc(e.performed_by || '-') + '</td>'
           + '<td><div class="row-actions">'
           + (App.canEdit('ic-empties') ? '<button class="btn btn-ghost btn-sm em-edit" data-id="' + e.id + '">Edit</button>' : '')
@@ -141,17 +147,17 @@ S.InventoryEmpties = {
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label>'
           + '<input type="date" id="em-date" value="' + esc(e?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:170px;"><label>Product</label>'
+        + '<div class="f" style="flex:1;min-width:150px;"><label>Product</label>'
           + '<select id="em-prod">' + this.productOptions(initialProdId) + '</select></div>'
-        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Quantity</label>'
+        + '<div class="f" style="width:70px;flex-shrink:0;"><label>Qty ' + tt('em-qty') + '</label>'
           + '<input type="number" id="em-qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/></div>'
-        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Unit</label>'
+        + '<div class="f" style="width:80px;flex-shrink:0;"><label>Unit</label>'
           + '<select id="em-unit">' + this.unitOptions(initialCat, e?.unit || 'bottles') + '</select></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Deposit / Unit <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="f" style="width:95px;flex-shrink:0;"><label>Deposit ' + tt('em-deposit') + '</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="em-deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Disposition</label>'
+        + '<div class="f" style="width:145px;flex-shrink:0;"><label>Disposition</label>'
           + '<select id="em-disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Performed By</label>'
+        + '<div class="f" style="width:165px;flex-shrink:0;"><label>Performed By</label>'
           + '<select id="em-by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
@@ -177,7 +183,7 @@ S.InventoryEmpties = {
 
   filterCard() {
     const prodOpts = '<option value="">All products</option>'
-      + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      + this.barProducts().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
     const dispOpts = '<option value="">All</option>'
       + this.DISPOSITIONS.map(d => '<option value="' + esc(d) + '"' + (this.filterDisposition === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
@@ -229,7 +235,7 @@ S.InventoryEmpties = {
 
   // ── Form ────────────────────────────────────────────────────────────
   productOptions(selectedId) {
-    const prods = this.products();
+    const prods = this.barProducts();
     if (!prods.length) return '<option value="">No products set up</option>';
     const cats = (S.InventoryProducts && S.InventoryProducts.CATEGORIES) || ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
     let h = '<option value="">Select product...</option>';
