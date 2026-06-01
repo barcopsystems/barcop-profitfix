@@ -95,7 +95,7 @@ S.InventoryStockReport = {
       const exp = ev.target.closest('#sr-export');
       const tab = ev.target.closest('.rpt-tab');
       if (how) { this.showHowTo(); return; }
-      if (exp) { window.print(); return; }
+      if (exp) { App.exportPDF({ title: 'Stock Report' }); return; }
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('sr-count')?.addEventListener('change', e => { this.countId = e.target.value; this.draw(); });
