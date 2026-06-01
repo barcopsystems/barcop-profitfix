@@ -2067,7 +2067,7 @@ const App = {
         'ic-report-usage':     ['Usage Report', 'Inventory Control'],
         'ic-report-variance':  ['Variance Report', 'Inventory Control'],
         'ic-report-stock':     ['Stock Report', 'Inventory Control'],
-        'ic-report-movers':    ['Top Movers', 'Inventory Control'],
+        'ic-report-movers':    ['Movement Report', 'Inventory Control'],
         'ic-help':             ['Help and FAQ', 'Inventory Control'],
       };
       const icScreens = {
@@ -2276,8 +2276,9 @@ const App = {
      The set is every screen in a module's REPORTS section plus the three
      Recovery Reports and History screens. */
   _REPORT_SCREENS: {
+    // The four Inventory reports carry their own Export PDF inside the report
+    // panel, so they are intentionally NOT here (no duplicate topbar button).
     'reports': 1, 'r-reports': 1, 't-reports': 1,
-    'ic-report-usage': 1, 'ic-report-variance': 1, 'ic-report-stock': 1, 'ic-report-movers': 1,
     'lc-reports': 1, 'lc-overtime-watch': 1, 'lc-callout-log': 1,
     'sc-reports-shift': 1, 'sc-reports-cash': 1, 'sc-reports-ops': 1
   },
