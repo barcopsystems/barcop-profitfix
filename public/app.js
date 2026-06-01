@@ -202,6 +202,21 @@ const TT = {
     'em-qty':         {t:'Quantity',b:'How many empty containers you are logging in this entry. Count the actual empties you are clearing. Bar Cop knows the unit from the product: kegs for draft, bottles for everything else.',e:'18 empty bottles pulled off the bar = 18'},
     'em-deposit':     {t:'Deposit',b:'The deposit charged per container, if there is one. Bar Cop multiplies it by the quantity to track the money you can claim back when you return them. Leave it blank when there is no deposit.',e:'5 cents a can in a deposit state = 0.05'},
     'adj-qty':        {t:'Quantity',b:'How much you are adjusting out or in, in the unit shown next to it. Bar Cop multiplies it by the product cost to estimate the dollar value of the write-off or the find.',e:'3 bottles of well vodka damaged in storage = 3'},
+    'rpt-u-usage':    {t:'Usage Data',b:'Per-product consumption for the period: starting stock, purchases, ending, units used, and the cost and theoretical sales behind it.'},
+    'rpt-u-totals':   {t:'Usage Totals',b:'The period rolled up: total usage cost, theoretical sales and profit, broken out by category.'},
+    'rpt-u-history':  {t:'Usage History',b:'Usage cost and theoretical profit for every count period, so you can watch the trend over time.'},
+    'rpt-m-fast':     {t:'Fast Movers',b:'Your top products by usage dollars this period. Ranked by money so a cheap high-volume item and a pricey low-volume one compare fairly.'},
+    'rpt-m-slow':     {t:'Slow Movers',b:'Your bottom products by usage dollars. Slow movers tie up cash and risk spoiling. Filter by category to compare like with like.'},
+    'rpt-m-trend':    {t:'Trend vs Prior',b:'How each product moved this period versus the period before, biggest swing first. Spot a product taking off or falling off.'},
+    'rpt-m-vendor':   {t:'Vendor Spend',b:'Your usage cost grouped by vendor. Shows who you spend the most with, your leverage when you sit down to negotiate pricing.'},
+    'rpt-s-category': {t:'By Category',b:'Current on-hand value from your latest count, grouped by category, with each category\'s share of your total stock.'},
+    'rpt-s-location': {t:'By Location',b:'Current on-hand value grouped by where it is stored, so you know how much cash sits in each room.'},
+    'rpt-s-prior':    {t:'vs Last Count',b:'How your stock value changed from the last count to this one, by category. Rising value can mean you are over-ordering.'},
+    'rpt-s-highest':  {t:'Highest Value',b:'The ten products holding the most cash on your shelves right now.'},
+    'rpt-s-lowest':   {t:'Lowest Value',b:'The ten products holding the least value on hand right now.'},
+    'rpt-s-dead':     {t:'Dead Stock',b:'Products you are holding value in but barely touched this period. Dead cash and spoilage risk, your cue to stop re-ordering or cut the item.'},
+    'rpt-v-sales':    {t:'Sales Variance',b:'What your poured product should have rung up versus what the POS actually rang. A gap is product that left without a matching sale.'},
+    'rpt-v-usage':    {t:'Usage Variance',b:'Ounces your counts say you used versus ounces the POS sold, after comps and waste. Positive variance is unexplained loss: over-pour, theft, or a count error.'},
   },
   show(icon) {
     const id = icon.dataset.tt;
@@ -1663,6 +1678,22 @@ const App = {
     m.addEventListener('click', e => { if (e.target === m) close(); });
     box.querySelector('[data-help-close]').addEventListener('click', close);
     document.body.appendChild(m);
+  },
+
+  // Shared report chrome: connected "folder" tabs + the panel they open into.
+  // tabs = [[key, label, tooltipKey?], ...]. The active tab visually connects
+  // to the panel, whose header shows the active report name + Export PDF. The
+  // controls/tabs are no-print so Export targets just the report table.
+  reportTabBar(tabs, activeKey) {
+    return '<div class="rpt-tabs no-print">' + (tabs || []).map(t =>
+      '<button class="rpt-tab' + (t[0] === activeKey ? ' on' : '') + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>').join('') + '</div>';
+  },
+  reportPanel(tabs, activeKey, exportId, bodyHtml) {
+    const active = (tabs || []).find(t => t[0] === activeKey) || (tabs || [])[0] || ['', '', ''];
+    return '<div class="rpt-panel"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + esc(active[1]) + (active[2] ? ' ' + tt(active[2]) : '') + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="' + exportId + '">Export PDF</button></div>'
+      + bodyHtml + '</div>';
   },
 
   // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
