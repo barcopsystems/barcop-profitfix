@@ -109,7 +109,7 @@ S.ShiftCashControl = {
   render(container, actions) {
     this.container = container;
     actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="cc-export">Export PDF</button>';
-    document.getElementById('cc-export')?.addEventListener('click', () => window.print());
+    document.getElementById('cc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Cash Control', root: this.container }));
     this.draw();
   },
 

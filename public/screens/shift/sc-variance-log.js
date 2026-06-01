@@ -49,7 +49,7 @@ S.ShiftVarianceLog = {
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-ghost btn-sm';
     exportBtn.textContent = 'Export PDF';
-    exportBtn.addEventListener('click', () => window.print());
+    exportBtn.addEventListener('click', () => App.exportPDF({ title: 'Variance Log', root: this.container }));
     actions.appendChild(exportBtn);
     this.renderList();
   },

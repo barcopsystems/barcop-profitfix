@@ -71,11 +71,11 @@ S.ShiftVoidComp = {
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-ghost btn-sm';
     exportBtn.textContent = 'Export PDF';
-    exportBtn.addEventListener('click', () => window.print());
+    exportBtn.addEventListener('click', () => App.exportPDF({ title: 'Void and Comp Log', root: this.container }));
     actions.appendChild(exportBtn);
     const printBlankBtn = document.createElement('button');
     printBlankBtn.className = 'btn btn-ghost btn-sm';
-    printBlankBtn.textContent = 'Print Blank Sheet';
+    printBlankBtn.textContent = 'Worksheet';
     printBlankBtn.addEventListener('click', () => this.printBlank());
     actions.appendChild(printBlankBtn);
     this.renderList();

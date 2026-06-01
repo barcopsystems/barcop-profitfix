@@ -33,7 +33,7 @@ S.ShiftReportsShift = {
 
   renderReport() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="rs-export">Export PDF</button>';
-    document.getElementById('rs-export')?.addEventListener('click', () => window.print());
+    document.getElementById('rs-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift Reports', root: this.container }));
 
     const all = this.shifts();
     if (all.length === 0) {
@@ -71,7 +71,7 @@ S.ShiftReportsShift = {
         + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + App.fmtCurrency(totRev) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg Revenue / Shift</div><div class="calc-val">' + App.fmtCurrency(avgRev) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Covers</div><div class="calc-val">' + totCov + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '—') + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</div></div>'
         + '</div>';
 
       body = summary
@@ -81,7 +81,7 @@ S.ShiftReportsShift = {
 
     this.container.innerHTML = '<div class="screen">' + filterCard + body + '</div>';
 
-    document.getElementById('rs-export')?.addEventListener('click', () => window.print());
+    document.getElementById('rs-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift Reports', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#rs-clear')) {
         this.filterFrom = this.filterTo = '';
@@ -122,7 +122,7 @@ S.ShiftReportsShift = {
         + '<td>' + App.fmtCurrency(avgRev) + '</td>'
         + '<td>' + g.cov + '</td>'
         + '<td>' + avgCov.toFixed(1) + '</td>'
-        + '<td>' + (avgChk != null ? App.fmtCurrency(avgChk) : '—') + '</td></tr>';
+        + '<td>' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</td></tr>';
     }).join('');
 
     return '<div class="card"><div class="card-title">' + title + '</div>'

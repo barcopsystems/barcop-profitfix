@@ -29,7 +29,7 @@ S.ShiftReportsOps = {
 
   renderReport() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ro-export">Export PDF</button>';
-    document.getElementById('ro-export')?.addEventListener('click', () => window.print());
+    document.getElementById('ro-export')?.addEventListener('click', () => App.exportPDF({ title: 'Operations Reports', root: this.container }));
 
     const anyData = this.voidComps().length || this.list86().length || this.maint().length || this.checklists().length;
     if (!anyData) {
@@ -65,14 +65,14 @@ S.ShiftReportsOps = {
       + '<div class="calc-item"><div class="calc-label">Void/Comp $</div><div class="calc-val warn">' + App.fmtCurrency(vcTotal) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">86\'s Logged</div><div class="calc-val">' + items86.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Open Maint.</div><div class="calc-val ' + (openMaint ? 'warn' : '') + '">' + openMaint + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Checklist Rate</div><div class="calc-val">' + (checkRate != null ? checkRate + '%' : '—') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Checklist Rate</div><div class="calc-val">' + (checkRate != null ? checkRate + '%' : '-') + '</div></div>'
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + filterCard + summary
       + this.vcByServer(vc) + this.vcByReason(vc) + this.most86(items86)
       + this.maintByPriority(maint) + this.checklistCard(checks) + '</div>';
 
-    document.getElementById('ro-export')?.addEventListener('click', () => window.print());
+    document.getElementById('ro-export')?.addEventListener('click', () => App.exportPDF({ title: 'Operations Reports', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#ro-clear')) {
         this.filterFrom = this.filterTo = '';
@@ -148,7 +148,7 @@ S.ShiftReportsOps = {
     items.forEach(i => {
       const key = (i.item || 'Unspecified').trim();
       const lk = key.toLowerCase();
-      if (!g[lk]) g[lk] = { name: key, count: 0, category: i.category || '—' };
+      if (!g[lk]) g[lk] = { name: key, count: 0, category: i.category || '-' };
       g[lk].count++;
     });
     const rows = Object.values(g).sort((a, b) => b.count - a.count).slice(0, 15).map(x =>
@@ -160,7 +160,7 @@ S.ShiftReportsOps = {
       + '<th>Item</th><th>Category</th><th>Times 86\'d</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
-      + 'Repeat 86s point to par levels that are set too low — review them in Inventory Control.</div></div>';
+      + 'Repeat 86s point to par levels that are set too low. Review them in Inventory Control.</div></div>';
   },
 
   maintByPriority(maint) {
@@ -196,7 +196,7 @@ S.ShiftReportsOps = {
       return '<tr><td><div class="val">' + type + '</div></td>'
         + '<td>' + list.length + '</td>'
         + '<td>' + full + '</td>'
-        + '<td>' + (rate != null ? rate + '%' : '—') + '</td></tr>';
+        + '<td>' + (rate != null ? rate + '%' : '-') + '</td></tr>';
     };
     return '<div class="card"><div class="card-title">Checklist Completion</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'

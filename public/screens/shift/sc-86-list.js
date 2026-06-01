@@ -175,8 +175,8 @@ S.Shift86List = {
   render(container, actions) {
     this.container = container;
     actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="el-print-blank" style="margin-left:8px;">Print Blank Sheet</button>';
-    document.getElementById('el-export')?.addEventListener('click', () => window.print());
+      + '<button class="btn btn-ghost btn-sm" id="el-print-blank" style="margin-left:8px;">Worksheet</button>';
+    document.getElementById('el-export')?.addEventListener('click', () => App.exportPDF({ title: '86 List', root: this.container }));
     document.getElementById('el-print-blank')?.addEventListener('click', () => this.printBlank());
     this.editId = null;
     this.customMode = false;

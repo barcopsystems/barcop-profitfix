@@ -30,7 +30,7 @@ S.ShiftReportsCash = {
 
   renderReport() {
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="rc-export">Export PDF</button>';
-    document.getElementById('rc-export')?.addEventListener('click', () => window.print());
+    document.getElementById('rc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Cash Reports', root: this.container }));
 
     if (this.drops().length === 0 && this.variances().length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -70,7 +70,7 @@ S.ShiftReportsCash = {
     this.container.innerHTML = '<div class="screen">' + filterCard + summary
       + this.dropsByDrawer(drops) + this.variancesByCashier(vars) + '</div>';
 
-    document.getElementById('rc-export')?.addEventListener('click', () => window.print());
+    document.getElementById('rc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Cash Reports', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#rc-clear')) {
         this.filterFrom = this.filterTo = '';

@@ -127,7 +127,7 @@ S.ShiftHistory = {
 
     this.container.innerHTML = '<div class="screen">' + summary + filters + table + '</div>';
 
-    document.getElementById('sh-export')?.addEventListener('click', () => window.print());
+    document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-log-missed')?.addEventListener('click', () => App.navigate('sc-log-shift'));
     this.container.onclick = ev => {
       const row = ev.target.closest('.sh-row');
@@ -158,7 +158,7 @@ S.ShiftHistory = {
 
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-handoff">Handoff Report</button>'
       + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:8px;">Export PDF</button>';
-    document.getElementById('sh-export')?.addEventListener('click', () => window.print());
+    document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-handoff')?.addEventListener('click', () => {
       if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id);
     });

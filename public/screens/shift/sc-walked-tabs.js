@@ -44,7 +44,7 @@ S.ShiftWalkedTabs = {
   renderList() {
     this.editId = null;
     this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="wt-export">Export PDF</button>';
-    document.getElementById('wt-export')?.addEventListener('click', () => window.print());
+    document.getElementById('wt-export')?.addEventListener('click', () => App.exportPDF({ title: 'Walked Tabs', root: this.container }));
 
     const addBtn = document.createElement('button');
     addBtn.className = 'btn btn-primary btn-sm';
