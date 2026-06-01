@@ -3,11 +3,15 @@
 /* ── Inventory Control — Vendors (ic_vendors) ─────────────────────────────────
    Distributor / supplier contacts and terms. Products in ic_products reference
    a vendor by name. Vendor pricing auto-feeds Profit Recovery Vendor Watch.
-   Stored in App.inventoryData (ic_data table). */
+   Stored in App.inventoryData (ic_data table).
+
+   Landing-form pattern: the add form (all vendor fields on one row + notes, one
+   Save) lives on the landing above the vendor list. Editing a vendor opens its
+   own page — the same form, plus the Products-from-this-Vendor and Recent Price
+   Changes cards. Cancel exits to landing. */
 
 S.InventoryVendors = {
-  detailId: null,
-  profileMode: 'view',
+  editId: null,
   _pendingDelId: null,
   TERMS: ['', 'COD', 'Net 7', 'Net 15', 'Net 30', 'Net 60'],
 
@@ -20,29 +24,51 @@ S.InventoryVendors = {
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   vendorProducts(name) { return this.products().filter(p => p.vendor === name); },
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Entry ────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Add Vendor';
-    addBtn.addEventListener('click', () => this.renderUnified(null, 'edit'));
-    actions.appendChild(addBtn);
+    this.editId = null;
     this.renderList();
   },
 
-  renderList() {
-    const vendors = this.vendors();
-    let html;
+  showHowTo() {
+    App.showHelpModal('How Vendors Work', [
+      { p: ['Vendors are the distributors and suppliers you order from. Set each one up here with a rep, contact info, and payment terms. Products link to a vendor by name, so once a vendor exists you can set it as the Primary Vendor on the products it delivers.'] },
+      { h: 'Add A Vendor', p: ['Fill in the vendor name and whatever contact details you have. Only the name is required. Payment terms and delivery days help you plan orders and spot a vendor who slips on either. Save and the vendor is ready to attach to products.'] },
+      { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
+      { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds Profit Recovery Vendor Watch and the Vendor Scorecard, so a vendor quietly raising prices shows up before it eats your margin.'] }
+    ]);
+  },
 
+  // ── Shared form: all fields on one row + notes. Used by add and edit. ───────
+  formFieldsHTML(v) {
+    const termOpts = this.TERMS.map(t =>
+      '<option value="' + t + '"' + (v && v.payment_terms === t ? ' selected' : '') + '>' + (t || '-') + '</option>').join('');
+    return '<div class="form-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1.4 1 120px;"><label>Vendor Name</label><input type="text" id="iv-name" value="' + esc(v?.name || '') + '" placeholder="Republic National"/></div>'
+      + '<div class="f" style="flex:1 1 100px;"><label>Rep Name</label><input type="text" id="iv-rep" value="' + esc(v?.rep || '') + '" placeholder="Sales rep"/></div>'
+      + '<div class="f" style="flex:1 1 110px;"><label>Phone</label><input type="text" id="iv-phone" value="' + esc(v?.phone || '') + '" placeholder="(555) 123-4567"/></div>'
+      + '<div class="f" style="flex:1.4 1 140px;"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
+      + '<div class="f" style="flex:1 1 100px;"><label>Delivery Days</label><input type="text" id="iv-days" value="' + esc(v?.delivery_days || '') + '" placeholder="Mon, Thu"/></div>'
+      + '<div class="f" style="flex:0.9 1 95px;"><label>Payment Terms</label><select id="iv-terms">' + termOpts + '</select></div>'
+      + '<div class="f" style="flex:1 1 100px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="margin-top:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="iv-notes" rows="2" placeholder="Optional">' + esc(v?.notes || '') + '</textarea></div></div>';
+  },
+
+  // ── Landing: add form on top, vendor list below ────────────────────────────
+  renderList() {
+    this.actions.innerHTML = '';
+    this.editId = null;
+    const vendors = this.vendors();
+
+    let listSection;
     if (vendors.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No vendors yet</div>'
-        + '<div class="empty-sub">Add the distributors and suppliers you order from. '
-        + 'Products link to a vendor, and vendor pricing feeds Profit Recovery Vendor Watch.</div>'
-        + '<div style="display:flex;gap:10px;justify-content:center;">'
-        + '<button class="btn btn-primary" id="iv-add-first">Add Vendor</button></div></div>';
+      listSection = '<div style="margin-top:18px;font-size:12px;color:var(--t3);">No vendors yet. Add one above. '
+        + 'Products link to a vendor, and vendor pricing feeds Profit Recovery Vendor Watch.</div>';
     } else {
       const rows = vendors.map(v => {
         const n = this.vendorProducts(v.name).length;
@@ -56,12 +82,13 @@ S.InventoryVendors = {
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm iv-edit" data-id="' + v.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm iv-del" data-id="' + v.id + '">Delete</button>'
+          + '<button class="btn btn-ghost btn-sm iv-del" data-id="' + v.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      html = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listSection = '<div class="card" style="margin-top:18px;"><div class="card-title">Your Vendors</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Vendor</th><th>Rep</th><th>Phone</th><th>Terms</th><th>Products</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
     const modal = '<div id="iv-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -72,99 +99,73 @@ S.InventoryVendors = {
       + '<button class="btn btn-danger" id="iv-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>' + modal;
+    this.wireList();
+  },
+
+  addFormCard() {
+    return '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Add a Vendor</span>'
+        + '<button class="btn btn-ghost btn-sm" id="iv-how">How This Works</button>'
+      + '</div>'
+      + this.formFieldsHTML(null)
+      + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
+        + '<button class="btn btn-primary" id="iv-save">Save Vendor</button>'
+        + '<button class="btn btn-ghost" id="iv-clear">Clear</button>'
+        + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  wireList() {
     this.container.onclick = ev => {
+      const how  = ev.target.closest('#iv-how');
+      const save = ev.target.closest('#iv-save');
+      const clr  = ev.target.closest('#iv-clear');
       const open = ev.target.closest('.iv-open');
       const edit = ev.target.closest('.iv-edit');
       const del  = ev.target.closest('.iv-del');
-      const addF = ev.target.closest('#iv-add-first');
-      if (open)      this.renderUnified(open.dataset.id, 'view');
-      else if (edit) this.renderUnified(edit.dataset.id, 'edit');
+      if (how)       this.showHowTo();
+      else if (save) this.saveVendor();
+      else if (clr)  this.renderList();
+      else if (open) this.openEdit(open.dataset.id);
+      else if (edit) this.openEdit(edit.dataset.id);
       else if (del)  this.confirmDel(del.dataset.id);
-      else if (addF) this.renderUnified(null, 'edit');
     };
   },
 
-  // Unified vendor detail page. profileMode 'view' renders Vendor Details as
-  // labeled rows with an Edit button; 'edit' renders inputs with Save/Cancel.
-  // Products + Recent Price Changes cards render on both modes, so the operator
-  // sees every section on first open. For a new vendor (vendorId null) those
-  // cards show empty-state messaging until the profile saves.
-  renderUnified(vendorId, profileMode) {
-    profileMode = profileMode || 'view';
-    const isNew = !vendorId;
-    const v = isNew ? null : this.vendorById(vendorId);
-    if (!isNew && !v) { this.renderList(); return; }
-
-    this.detailId = vendorId || null;
-    this.profileMode = profileMode;
-
-    const detailsCard = (profileMode === 'edit')
-      ? this.renderDetailsEditCard(v, isNew)
-      : this.renderDetailsViewCard(v);
-    const prods = isNew ? [] : this.vendorProducts(v.name);
-    const productsCard = isNew
-      ? '<div class="card"><div class="card-title">Products from this Vendor</div>'
-        + '<div style="font-size:12px;color:var(--t3);">Save the vendor above first. Once the record exists, every product you set this vendor as the Primary Vendor on will appear here.</div></div>'
-      : this.renderProductsCard(prods);
-    const priceCard = isNew
-      ? '<div class="card"><div class="card-title">Recent Price Changes</div>'
-        + '<div style="font-size:12px;color:var(--t3);">Save the vendor above first. Price changes get logged here automatically when you apply cost updates in Receive Delivery.</div></div>'
-      : this.renderPriceHistoryCard(prods);
-
+  // ── Edit page (own page; same form + product/price cards; Cancel → landing) ──
+  openEdit(id) {
+    const v = this.vendorById(id);
+    if (!v) { this.renderList(); return; }
+    this.editId = id;
+    this.actions.innerHTML = '';
+    const prods = this.vendorProducts(v.name);
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="iv-back">&laquo; Back to Vendors</button></div>'
-      + '<div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:14px;">' + esc(isNew ? 'Add Vendor' : v.name) + '</div>'
-      + detailsCard + productsCard + priceCard
+      + this.editCard(v)
+      + this.renderProductsCard(prods)
+      + this.renderPriceHistoryCard(prods)
       + '</div>';
-    this.wireUnified(vendorId, profileMode);
+    this.wireEdit();
   },
 
-  // Backwards-compat aliases — any caller that still references the old
-  // method names routes into the unified page.
-  showDetail(id) { this.renderUnified(id, 'view'); },
-  showForm(id) { this.renderUnified(id || null, 'edit'); },
-
-  renderDetailsViewCard(v) {
-    const info = (label, val) =>
-      '<div style="display:flex;padding:8px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="width:150px;flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding-top:2px;">' + label + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);">' + esc(val || '-') + '</div></div>';
-    return '<div class="card"><div class="card-title">Vendor Details</div>'
-      + info('Rep', v.rep) + info('Phone', v.phone) + info('Email', v.email)
-      + info('Delivery Days', v.delivery_days) + info('Payment Terms', v.payment_terms)
-      + info('Account #', v.account_number) + info('Notes', v.notes)
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary btn-sm iv-edit-profile">Edit Vendor</button>'
+  editCard(v) {
+    return '<div class="card">'
+      + '<div class="card-title">Editing ' + esc(v.name) + '</div>'
+      + this.formFieldsHTML(v)
+      + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
+        + '<button class="btn btn-primary" id="iv-save">Update Vendor</button>'
+        + '<button class="btn btn-ghost" id="iv-cancel">Cancel</button>'
+        + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
   },
 
-  renderDetailsEditCard(v, isNew) {
-    const termOpts = this.TERMS.map(t =>
-      '<option value="' + t + '"' + (v && v.payment_terms === t ? ' selected' : '') + '>' + (t || '-') + '</option>').join('');
-    return '<div class="card"><div class="card-title">' + (isNew ? 'New Vendor' : 'Edit Vendor') + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-lg"><label>Vendor Name</label><input type="text" id="iv-name" value="' + esc(v?.name || '') + '" placeholder="Republic National"/></div>'
-      + '<div class="f w-md"><label>Rep Name</label><input type="text" id="iv-rep" value="' + esc(v?.rep || '') + '" placeholder="Sales rep"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-md"><label>Phone</label><input type="text" id="iv-phone" value="' + esc(v?.phone || '') + '" placeholder="(555) 123-4567"/></div>'
-      + '<div class="f w-lg"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-md"><label>Delivery Days</label><input type="text" id="iv-days" value="' + esc(v?.delivery_days || '') + '" placeholder="Mon, Thu"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Payment Terms</label><select id="iv-terms">' + termOpts + '</select></div>'
-      + '<div class="f w-md"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account number"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="iv-notes" rows="2" placeholder="Optional">' + esc(v?.notes || '') + '</textarea></div>'
-      + '</div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="iv-save">' + (isNew ? 'Save Vendor' : 'Update Vendor') + '</button>'
-      + '<button class="btn btn-ghost" id="iv-cancel">Cancel</button>'
-      + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+  wireEdit() {
+    this.container.onclick = ev => {
+      if (ev.target.closest('#iv-cancel')) { this.editId = null; this.renderList(); return; }
+      if (ev.target.closest('#iv-save'))   { this.saveVendor(); return; }
+    };
+    document.getElementById('iv-name')?.focus();
   },
 
   renderProductsCard(prods) {
@@ -233,19 +234,8 @@ S.InventoryVendors = {
       + '</div>';
   },
 
-  wireUnified(vendorId, profileMode) {
-    this.container.onclick = null;
-    document.getElementById('iv-back')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
-    this.container.querySelector('.iv-edit-profile')?.addEventListener('click', () => this.renderUnified(vendorId, 'edit'));
-    document.getElementById('iv-cancel')?.addEventListener('click', () => {
-      if (vendorId) this.renderUnified(vendorId, 'view');
-      else { this.detailId = null; this.renderList(); }
-    });
-    document.getElementById('iv-save')?.addEventListener('click', () => this.saveVendor(vendorId));
-    if (profileMode === 'edit') document.getElementById('iv-name')?.focus();
-  },
-
-  async saveVendor(vendorId) {
+  async saveVendor() {
+    const vendorId = this.editId;
     const name = document.getElementById('iv-name')?.value.trim();
     const err  = document.getElementById('iv-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
@@ -283,7 +273,8 @@ S.InventoryVendors = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveInventory();
     if (ok) {
-      this.renderUnified(savedId, 'view');
+      if (vendorId) this.openEdit(savedId);
+      else { this.editId = null; this.renderList(); }
     } else {
       if (btn) { btn.disabled = false; btn.textContent = vendorId ? 'Update Vendor' : 'Save Vendor'; }
       fail('Save failed. Try again.');
