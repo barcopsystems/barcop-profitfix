@@ -27,27 +27,30 @@ S.InventoryVarianceReport = {
   // the same engine: what the recipes drew versus what the count says left.
   CAT_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Bottle Beer', 'Misc', 'Food'],
 
-  // Variance status thresholds, per category, because the categories do not leak
-  // the same way. Percent categories use OK/Flag bands (Watch is the gap
-  // between). Bottle Beer is discrete bottle-in / bottle-out, so it is COUNT
-  // based: flagged the moment `bottles` or more are unaccounted (no Watch band,
-  // no pour variance to forgive). Operator-tunable in the Variance Standards
-  // card; overrides persist to App.inventoryData.variance_thresholds.
+  // Variance standards, one number per category, because the categories do not
+  // leak the same way. Percent categories: anything OVER `flag` percent flags to
+  // investigate, below is OK (no middle "watch" tier). "By the Bottle" covers
+  // everything sold whole (bottle beer, wine by the bottle, champagne splits):
+  // bottle-in, bottle-out, so it flags the moment `bottles` or more are
+  // unaccounted. Operator-tunable in the Variance Standards card; overrides
+  // persist to App.inventoryData.variance_thresholds.
   DEFAULT_THRESHOLDS: {
-    'Liquor':      { ok: 2, flag: 5 },
-    'Wine':        { ok: 3, flag: 6 },
-    'Draft Beer':  { ok: 5, flag: 10 },
-    'Bottle Beer': { bottles: 1 },
-    'Misc':        { ok: 8, flag: 15 },
-    'Food':        { ok: 3, flag: 8 }
+    'Liquor':        { flag: 2 },
+    'Wine':          { flag: 3 },
+    'Draft Beer':    { flag: 10 },
+    'Misc':          { flag: 10 },
+    'Food':          { flag: 5 },
+    'By the Bottle': { bottles: 1 }
   },
+  // The order the boxes show in the Variance Standards card.
+  STD_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Misc', 'Food', 'By the Bottle'],
   TT_BY_CAT: {
     'Liquor': 'vr-std-liquor', 'Wine': 'vr-std-wine', 'Draft Beer': 'vr-std-draft',
-    'Bottle Beer': 'vr-std-bottle', 'Misc': 'vr-std-misc', 'Food': 'vr-std-food'
+    'Misc': 'vr-std-misc', 'Food': 'vr-std-food', 'By the Bottle': 'vr-std-bottle'
   },
 
-  // Merge stored overrides over the defaults so a partial override (one field on
-  // one category) still resolves to a full threshold set.
+  // Merge stored overrides over the defaults so a partial override still resolves
+  // to a full standard set.
   thresholds() {
     if (!App.inventoryData) App.inventoryData = {};
     const stored = App.inventoryData.variance_thresholds || {};
@@ -57,6 +60,19 @@ S.InventoryVarianceReport = {
     });
     return out;
   },
+
+  // True when a product is tracked bottle-in / bottle-out: bottle beer, or a wine
+  // sold whole (its pour size is the whole bottle). These use the By the Bottle
+  // count standard, not a pour percent.
+  isByBottle(p) {
+    if (!p) return false;
+    if (p.category === 'Bottle Beer') return true;
+    const c = parseFloat(p.container_size_oz) || 0;
+    const pr = parseFloat(p.pour_size_oz) || 0;
+    return p.category === 'Wine' && c > 0 && pr >= c;
+  },
+  // The standard key a product is judged on.
+  stdKey(p) { return this.isByBottle(p) ? 'By the Bottle' : ((p && p.category) || 'Liquor'); },
 
   showImportHelp() {
     App.showHelpModal('How the POS Import Works', [
@@ -76,14 +92,14 @@ S.InventoryVarianceReport = {
       { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS. So variance is unexplained loss, not legit give-aways you already tracked.'] },
       { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours made, and bottles used. Draft shows ounces and kegs. Bottle beer matches bottle for bottle, in bottles and cases. Mixers like lime juice and simple syrup read in quarts. Food reads per ingredient in its own unit, pounds, each, or dozen: what the dishes that sold should have drawn versus what the count says left. Cocktails and plates explode through their recipe so each ingredient gets its share.'] },
       { h: 'Variance Standards (You Set These)', p: [
-        'Every category gets its own tolerance because they do not leak the same way. Set your own lines in the Variance Standards box up top. These are the starting points:',
-        'Liquor: OK under 2%, Watch 2 to 5%, Flag over 5%.',
-        'Wine: OK under 3%, Watch 3 to 6%, Flag over 6%.',
-        'Draft: OK under 5%, Watch 5 to 10%, Flag over 10%.',
-        'Bottle Beer: flagged the moment a single bottle is unaccounted. Beer is simple bottle-in, bottle-out, so there is no pour variance to forgive.',
-        'Misc mixers: OK under 8%, Watch 8 to 15%, Flag over 15%.',
-        'Food: OK under 3%, Watch 3 to 8%, Flag over 8%.' ] },
-      { h: 'Reading The Status', p: ['OK means the gap is within the normal range for that category. Watch means keep an eye on it. Flag is where your money is walking out, so start there. Each category uses its own standard, which you control in the Variance Standards box.'] }
+        'Each category gets one number: the variance you will accept before it flags to investigate. Below the line is OK, above it flags. Set your own in the Variance Standards box up top. Starting points:',
+        'Liquor: flag over 2%.',
+        'Wine by the glass: flag over 3%.',
+        'Draft: flag over 10%.',
+        'Misc mixers: flag over 10%.',
+        'Food: flag over 5%.',
+        'By the Bottle, which covers bottle beer, wine by the bottle, and champagne splits: flag the moment a single bottle is unaccounted. It is bottle-in, bottle-out, so there is no pour variance to forgive.' ] },
+      { h: 'Reading The Status', p: ['OK means the gap is within your standard for that category. Flag means it is over, so that is where your money is walking out: start there. You control every standard in the Variance Standards box.'] }
     ]);
   },
 
@@ -409,11 +425,11 @@ S.InventoryVarianceReport = {
   },
 
   // ── Status ────────────────────────────────────────────────────────────────
-  // Category-aware status. `unitVar` is the absolute unit count off (bottles) and
-  // is only used by count-based categories (Bottle Beer); percent categories
-  // read `pct`.
-  status(cat, pct, unitVar) {
-    const t = this.thresholds()[cat] || { ok: 5, flag: 15 };
+  // Binary: OK below the standard, Flag above it. `key` is the standard key
+  // (category, or "By the Bottle"). For By the Bottle, `unitVar` is the absolute
+  // bottles off; otherwise `pct` is the variance percent.
+  status(key, pct, unitVar) {
+    const t = this.thresholds()[key] || { flag: 10 };
     if (t.bottles != null) {
       const off = Math.abs(unitVar || 0);
       const lim = parseFloat(t.bottles) || 1;
@@ -422,56 +438,40 @@ S.InventoryVarianceReport = {
         ? { label: 'Flag', color: 'var(--red)' }
         : { label: 'OK', color: 'var(--gold)' };
     }
-    const a = Math.abs(pct || 0);
-    if (a < t.ok)    return { label: 'OK',    color: 'var(--gold)' };
-    if (a <= t.flag) return { label: 'Watch', color: 'var(--steel)' };
-    return { label: 'Flag', color: 'var(--red)' };
+    return Math.abs(pct || 0) > (parseFloat(t.flag) || 0)
+      ? { label: 'Flag', color: 'var(--red)' }
+      : { label: 'OK', color: 'var(--gold)' };
   },
-  badge(cat, pct, unitVar) {
-    const s = this.status(cat, pct, unitVar);
+  badge(key, pct, unitVar) {
+    const s = this.status(key, pct, unitVar);
     return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
   pct(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : v.toFixed(1) + '%'; },
 
-  // ── Variance Standards (operator-tunable thresholds) ───────────────────────
-  // Sits between the Variance Report card and the body so the operator sets the
-  // standard before reading either view. Edits persist to inventoryData and
-  // drive the Status on both tabs. Percent categories get OK/Flag inputs (Watch
-  // is the gap between, shown live); Bottle Beer is count-based (flag at N
-  // bottles unaccounted, no Watch).
+  // ── Variance Standards (operator-tunable, one number per category) ─────────
+  // Built like the Dynamic Pars settings row: a box per category, one number,
+  // tooltip by each label, no explainer text (it all lives in How This Works and
+  // the tooltips). Below the number is OK, above it flags. Edits persist to
+  // inventoryData and drive the Status on both views.
   thNum(v) { return (v == null || isNaN(v)) ? '' : String(+v); },
   varianceStandardsCard() {
     const t = this.thresholds();
-    const inp = (cat, key, val, step) => '<input type="number" class="vr-th" data-cat="' + esc(cat)
-      + '" data-key="' + key + '" min="0" step="' + (step || '0.5') + '" value="' + this.thNum(val)
-      + '" style="width:56px;"/>';
-    const pctRow = cat => {
-      const c = t[cat];
-      return '<tr>'
-        + '<td><div class="val">' + esc(cat) + '</div></td>'
-        + '<td style="white-space:nowrap;">under ' + inp(cat, 'ok', c.ok) + ' %</td>'
-        + '<td style="white-space:nowrap;color:var(--steel);">' + this.thNum(c.ok) + '–' + this.thNum(c.flag) + '%</td>'
-        + '<td style="white-space:nowrap;">over ' + inp(cat, 'flag', c.flag) + ' %</td>'
-        + '<td>' + tt(this.TT_BY_CAT[cat]) + '</td>'
-        + '</tr>';
+    const box = key => {
+      const isBottle = t[key].bottles != null;
+      const field = isBottle ? 'bottles' : 'flag';
+      const suffix = isBottle ? 'btl' : '%';
+      const step = isBottle ? '1' : '0.5';
+      return '<div class="f" style="width:' + (isBottle ? 150 : 120) + 'px;flex-shrink:0;">'
+        + '<label>' + esc(key) + ' ' + tt(this.TT_BY_CAT[key]) + '</label>'
+        + '<div class="fw"><input class="suf vr-th" type="number" data-cat="' + esc(key) + '" data-key="' + field
+        + '" min="0" step="' + step + '" value="' + this.thNum(t[key][field]) + '"/><span class="suf">' + suffix + '</span></div></div>';
     };
-    const beer = t['Bottle Beer'];
-    const beerRow = '<tr>'
-      + '<td><div class="val">Bottle Beer</div></td>'
-      + '<td style="white-space:nowrap;color:var(--t3);">within rounding</td>'
-      + '<td style="color:var(--t4);">—</td>'
-      + '<td style="white-space:nowrap;">' + inp('Bottle Beer', 'bottles', beer.bottles, '1') + '+ bottle(s) off</td>'
-      + '<td>' + tt(this.TT_BY_CAT['Bottle Beer']) + '</td>'
-      + '</tr>';
-    const rows = pctRow('Liquor') + pctRow('Wine') + pctRow('Draft Beer') + beerRow + pctRow('Misc') + pctRow('Food');
     return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Variance Standards</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-th-reset">Reset to Defaults</button></div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">Set the gap that reads as OK, Watch, or Flag for each category. These drive the Status on both views. Variance is measured after logged comps and waste come out, so a flag is product that is truly unaccounted.</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Category</th><th>OK</th><th>Watch</th><th>Flag</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+      + this.STD_ORDER.map(k => box(k)).join('') + '</div></div>';
   },
 
   // ── Sales Variance ────────────────────────────────────────────────────────
@@ -497,12 +497,12 @@ S.InventoryVarianceReport = {
       const varPct = theoSales ? salesVar / theoSales * 100 : null;
       const actualCostPct = (registerSales && u.usageCost != null) ? u.usageCost / registerSales * 100 : null;
       const actualProfit = (u.usageCost != null) ? registerSales - u.usageCost : null;
-      // Bottle beer flags on the unit count, not the dollar percent, so carry the
-      // bottle variance for the status badge (bottles used minus bottles sold).
-      const isBeer = App.isCaseBeer(p);
-      const bottlesSold = isBeer && p.container_size_oz ? (pr.ouncesSold || 0) / p.container_size_oz : (pr.qty || 0);
-      const unitVar = (isBeer && u.poursMade != null) ? u.poursMade - bottlesSold : null;
-      return { name: u.name, category: p.category, viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit, unitVar };
+      // Anything sold by the bottle flags on the unit count, not the dollar
+      // percent, so carry the bottle variance for the status badge.
+      const byBottle = this.isByBottle(p);
+      const bottlesSold = byBottle && p.container_size_oz ? (pr.ouncesSold || 0) / p.container_size_oz : (pr.qty || 0);
+      const unitVar = (byBottle && u.poursMade != null) ? u.poursMade - bottlesSold : null;
+      return { name: u.name, category: p.category, key: this.stdKey(p), viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit, unitVar };
     }).filter(r => !r.viaMenu && (!this.catFilter || r.category === this.catFilter));
     if (!rows.length) {
       return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
@@ -516,7 +516,7 @@ S.InventoryVarianceReport = {
       + '<td>' + this.pct(r.varPct) + '</td>'
       + '<td>' + this.pct(r.actualCostPct) + '</td>'
       + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
-      + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.category, r.varPct, r.unitVar) : '-') + '</td>'
+      + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar) : '-') + '</td>'
       + '</tr>').join('');
     return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
@@ -565,7 +565,8 @@ S.InventoryVarianceReport = {
         ouncesUsed: u.ouncesUsed, ouncesSold: pr.ouncesSold || 0,
         poursMade: u.poursMade, containersUsed: u.used,   // bottles / kegs / cases / qt
         containerSizeOz: parseFloat(p.container_size_oz) || 0,
-        caseSize: parseFloat(p.case_size) || 0
+        caseSize: parseFloat(p.case_size) || 0,
+        byBottle: this.isByBottle(p)
       });
     });
     return rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -583,6 +584,13 @@ S.InventoryVarianceReport = {
     const body = rows.map(r => {
       const ounceVar = r.ouncesUsed != null ? r.ouncesUsed - r.ouncesSold : null;
       const varPct = (ounceVar != null && r.ouncesUsed) ? ounceVar / r.ouncesUsed * 100 : null;
+      // A wine sold whole (pour = bottle) is judged By the Bottle on the bottle
+      // count, not the pour percent; everything else uses its category percent.
+      const bottleVar = (r.byBottle && r.containerSizeOz)
+        ? (r.containersUsed || 0) - (r.ouncesSold / r.containerSizeOz) : null;
+      const statusCell = r.byBottle
+        ? this.badge('By the Bottle', varPct, bottleVar)
+        : (varPct != null ? this.badge(cat, varPct) : '-');
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
         + '<td>' + this.n(r.ouncesSold) + '</td>'
@@ -591,7 +599,7 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.containersUsed) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>'
         + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (varPct != null ? this.badge(cat, varPct) : '-') + '</td>'
+        + '<td>' + statusCell + '</td>'
         + '</tr>';
     }).join('');
     return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours Made', 'Bottles Used', 'Oz Variance', 'Variance %', 'Status'], body);
@@ -635,7 +643,7 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(caseVar) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>'
         + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (bottlesUsed != null ? this.badge('Bottle Beer', varPct, bottleVar) : '-') + '</td>'
+        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar) : '-') + '</td>'
         + '</tr>';
     }).join('');
     return this.usageTbl(['Product', 'Bottles Sold', 'Bottles Used', 'Cases Used', 'Case Variance', 'Bottle Variance', 'Variance %', 'Status'], body);
