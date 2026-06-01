@@ -229,7 +229,10 @@ S.InventoryAdjustments = {
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
     return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Filter</span>'
-      + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button></div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Print Sheet</button>'
+      + '</div></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="adj-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="adj-f-to" value="' + esc(this.filterTo) + '"/></div>'
@@ -260,6 +263,7 @@ S.InventoryAdjustments = {
       else if (row && App.canEdit('ic-adjustments')) this.showForm(row.dataset.id);
     };
     document.getElementById('adj-export')?.addEventListener('click', () => window.print());
+    document.getElementById('adj-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('adj-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('adj-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     document.getElementById('adj-f-prod')?.addEventListener('change',   e => { this.filterProductId = e.target.value || ''; this.renderList(); });
@@ -425,5 +429,24 @@ S.InventoryAdjustments = {
     App.inventoryData.ic_adjustments = this.adjustments().filter(x => x.id !== id);
     await App.saveInventory();
     this.renderList();
+  },
+
+  // ── Print blank sheet — for a damage / expiration / found walk-through ────
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Adjustment Log',
+      subtitle: 'Document stock written off or found outside of normal sale: damage, theft, expiration, or stock you found that was never counted. Manager enters each row into Bar Cop after the walk-through.',
+      columns: [
+        { label: 'Date',         width: '12%' },
+        { label: 'Product',      width: '26%' },
+        { label: 'Qty',          width: '7%' },
+        { label: 'Unit',         width: '8%' },
+        { label: 'Reason',       width: '13%' },
+        { label: 'Loss / Found', width: '12%' },
+        { label: 'By',           width: '12%' },
+        { label: 'Witnessed',    width: '10%' }
+      ],
+      rows: 20
+    });
   }
 };
