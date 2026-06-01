@@ -14,6 +14,16 @@ S.InventoryVarianceReport = {
 
   TABS: [['sales','Sales Variance','rpt-v-sales'], ['usage','Usage Variance','rpt-v-usage']],
 
+  showImportHelp() {
+    App.showHelpModal('How the POS Import Works', [
+      { p: ['Variance compares what you used against what you sold, so it needs your POS sales. Export a product sales report from your POS and drop it on the box. Toast, Square, Aloha, Lightspeed, or any system that exports a spreadsheet works.'] },
+      { h: 'The File', p: ['A CSV or Excel file (.csv, .xlsx, .xls). The first row is your column headers, one product per row. This is the standard product or item sales report every POS can export.'] },
+      { h: 'The Columns', p: ['Bar Cop needs three things: the Product Name (required), the Quantity Sold, and the Sales Amount. Your headers do not need to match exactly. Common names like item, qty, units, net sales, and revenue are recognized for you.'] },
+      { h: 'The Mapping', p: ['After you drop the file, Bar Cop shows the columns it found and auto-matches them to Name, Quantity, and Sales. Fix any that are wrong, then import. It remembers your layout, so next month is one drop and done.'] },
+      { h: 'Names That Do Not Match', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once. Menu items like cocktails and plates explode through their recipe, so each ingredient gets its share of the variance.'] }
+    ]);
+  },
+
   showHowTo() {
     App.showHelpModal('How the Variance Report Works', [
       { p: ['Variance is the leak detector. It takes what your counts say you used and compares it to what your POS actually sold. The gap is product that left the bar without a matching sale: over-pour, theft, give-aways, or a count error.'] },
@@ -227,7 +237,9 @@ S.InventoryVarianceReport = {
 
     let body;
     if (!this.posRows) {
-      body = '<div class="card"><div class="card-title">Import POS Sales</div>'
+      body = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Import POS Sales</span>'
+        + '<button class="btn btn-ghost btn-sm" id="vr-import-how">How This Works</button></div>'
         + '<div id="vr-import"></div></div>';
     } else {
       body = this.matchSummary() + this.unmatchedCard()
@@ -241,9 +253,8 @@ S.InventoryVarianceReport = {
     document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
 
     if (!this.posRows) {
+      document.getElementById('vr-import-how')?.addEventListener('click', () => this.showImportHelp());
       CSVMapper.mount(document.getElementById('vr-import'), {
-        hint: 'Export a product sales report from your POS (Toast, Square, Aloha, Lightspeed, or any system) '
-          + 'and upload it here. Map the product name, quantity sold, and sales amount columns.',
         confirmLabel: 'Import POS Sales',
         fields: [
           { key: 'name',  label: 'Product Name',   required: true,  match: ['product','item','name','description','menu item'] },
