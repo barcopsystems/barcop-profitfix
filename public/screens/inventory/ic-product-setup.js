@@ -31,16 +31,22 @@ S.InventoryProducts = {
       sizeGroup:       'Spirits',
       defaultSize:     25.4,
       showPour:        true,
+      pourLabel:       'Pour Size',
       defaultPour:     1.5,
+      priceLabel:      'Pour Price',
       costLabel:       'Cost per Bottle',
       costTT:          'ic-cost-per-bottle',
       sizeTT:          'ic-bottle-size',
-      pourTT:          'std-pour',
+      pourTT:          'ic-liquor-pour',
+      priceTT:         'ic-liquor-pour-price',
+      calc1Label:      'Pours / Bottle',
+      calc2Label:      'Cost / Pour',
       parUnit:         'btls',
       showMenuPrice:   true,
       showCaseSize:    false,
       showUnitType:    false,
-      showCalcStrip:   true
+      showCalcStrip:   true,
+      showServingSizes:true
     },
     'Wine': {
       title:           'Wine',
@@ -49,16 +55,22 @@ S.InventoryProducts = {
       sizeGroup:       'Wine',
       defaultSize:     25.4,
       showPour:        true,
+      pourLabel:       'Glass Size',
       defaultPour:     5,
+      priceLabel:      'Glass Price',
       costLabel:       'Cost per Bottle',
       costTT:          'ic-cost-per-bottle',
       sizeTT:          'ic-bottle-size',
-      pourTT:          'std-pour',
+      pourTT:          'ic-wine-glass-size',
+      priceTT:         'ic-wine-glass-price',
+      calc1Label:      'Glasses / Bottle',
+      calc2Label:      'Cost / Glass',
       parUnit:         'btls',
       showMenuPrice:   true,
       showCaseSize:    false,
       showUnitType:    false,
-      showCalcStrip:   true
+      showCalcStrip:   true,
+      showServingSizes:true
     },
     'Bottle Beer': {
       title:           'Bottle Beer',
@@ -67,15 +79,20 @@ S.InventoryProducts = {
       sizeGroup:       'Beer',
       defaultSize:     12,
       showPour:        false,
+      priceLabel:      'Price per Bottle',
       costLabel:       'Cost per Case',
       costTT:          'ic-cost-per-case',
       sizeTT:          'ic-bottle-size-beer',
+      priceTT:         'ic-beer-bottle-price',
+      calc1Label:      'Btls / Case',
+      calc2Label:      'Cost / Btl',
       parUnit:         'cases',
       showMenuPrice:   true,
       showCaseSize:    true,
       defaultCaseSize: 24,
       showUnitType:    false,
-      showCalcStrip:   true
+      showCalcStrip:   true,
+      showServingSizes:false
     },
     'Draft Beer': {
       title:           'Draft Beer',
@@ -84,16 +101,22 @@ S.InventoryProducts = {
       sizeGroup:       'Draft Keg',
       defaultSize:     1984,
       showPour:        true,
+      pourLabel:       'Pour Size',
       defaultPour:     16,
+      priceLabel:      'Pour Price',
       costLabel:       'Cost per Keg',
       costTT:          'ic-cost-per-keg',
       sizeTT:          'ic-keg-size',
       pourTT:          'ic-draft-pour',
+      priceTT:         'ic-draft-pour-price',
+      calc1Label:      'Pours / Keg',
+      calc2Label:      'Cost / Pour',
       parUnit:         'kegs',
       showMenuPrice:   true,
       showCaseSize:    false,
       showUnitType:    false,
-      showCalcStrip:   true
+      showCalcStrip:   true,
+      showServingSizes:true
     },
     'Food': {
       title:           'Food Item',
@@ -108,7 +131,8 @@ S.InventoryProducts = {
       showCaseSize:    false,
       showUnitType:    true,
       defaultUnitType: 'lb',
-      showCalcStrip:   false
+      showCalcStrip:   false,
+      showServingSizes:false
     },
     'Misc': {
       title:           'Misc Item',
@@ -123,7 +147,8 @@ S.InventoryProducts = {
       showCaseSize:    false,
       showUnitType:    true,
       defaultUnitType: 'each',
-      showCalcStrip:   false
+      showCalcStrip:   false,
+      showServingSizes:false
     }
   },
 
@@ -523,11 +548,11 @@ S.InventoryProducts = {
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Pour Size ' + tt(spec.pourTT || 'std-pour') + '</label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz != null ? p.pour_size_oz : spec.defaultPour) + '" step="0.25"/><span class="suf">oz</span></div></div>'
+        + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + ' ' + tt(spec.pourTT || 'std-pour') + '</label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz) + '" step="0.25" placeholder="e.g. ' + spec.defaultPour + '"/><span class="suf">oz</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Menu Price ' + tt('menu-price') + '</label>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>' + esc(spec.priceLabel || 'Menu Price') + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
@@ -547,7 +572,7 @@ S.InventoryProducts = {
         + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Menu Price <span style="color:var(--t4);font-weight:400;">(per btl)</span> ' + tt('menu-price') + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.priceLabel || 'Menu Price') + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
@@ -577,9 +602,9 @@ S.InventoryProducts = {
     // For everything else: Pours/Container, Cost/Pour, Pour Cost %.
     let calcStrip = '';
     if (spec.showCalcStrip) {
-      const slot1Label = spec.showCaseSize ? 'Btls / Case'   : 'Pours / Container';
+      const slot1Label = spec.calc1Label || (spec.showCaseSize ? 'Btls / Case' : 'Pours / Container');
       const slot1TT    = spec.showCaseSize ? 'ic-bottles-per-case' : 'ic-pours-container';
-      const slot2Label = spec.showCaseSize ? 'Cost / Btl'    : 'Cost / Pour';
+      const slot2Label = spec.calc2Label || (spec.showCaseSize ? 'Cost / Btl' : 'Cost / Pour');
       const slot2TT    = spec.showCaseSize ? 'ic-cost-per-bottle-calc' : 'cost-pour';
       calcStrip = '<div class="calc" style="margin-top:18px;">'
         + '<div class="calc-item"><div class="calc-label">' + esc(slot1Label) + ' ' + tt(slot1TT) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
@@ -594,11 +619,14 @@ S.InventoryProducts = {
       + '<textarea id="ip-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div>'
     + '</div>';
 
+    const servingBlock = spec.showServingSizes ? this.servingSizesBlockHTML(p, spec) : '';
+
     const formCard = '<div class="card">'
       + header
       + row1
       + row2
       + calcStrip
+      + servingBlock
       + notes
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="ip-save">' + (this.editId ? 'Update' : 'Save') + '</button>'
@@ -607,8 +635,8 @@ S.InventoryProducts = {
       + '</div>'
     + '</div>';
     // Popup over the products list (which stays mounted behind), instead of
-    // swapping the whole page out.
-    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 920 });
+    // swapping the whole page out. noClose drops the corner X; Cancel closes it.
+    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 920, noClose: true });
 
     this._wireForm();
   },
@@ -718,6 +746,19 @@ S.InventoryProducts = {
       document.getElementById('ip-toggle-active').textContent = nowActive ? 'Hide from operations' : 'Make active';
     });
 
+    // Other sizes sold: wire existing rows + the add button.
+    document.querySelectorAll('.vss-row').forEach(r => this._wireServingRow(r));
+    document.getElementById('vss-add')?.addEventListener('click', () => {
+      const list = document.getElementById('vss-list');
+      if (!list) return;
+      const holder = document.createElement('div');
+      holder.innerHTML = this.servingRowHTML({}, list.children.length);
+      const row = holder.firstElementChild;
+      list.appendChild(row);
+      this._wireServingRow(row);
+      row.querySelector('.vss-label')?.focus();
+    });
+
     if (this.editId) this.calcProduct();
 
     // On render: if we're editing an existing product, highlight required-
@@ -783,6 +824,61 @@ S.InventoryProducts = {
     set('ip-pours', pours ? pours.toFixed(1) : '-');
     set('ip-cpp',   cpp   ? App.fmtCurrency(cpp) : '-');
     set('ip-pct',   pct   ? App.fmtPct(pct) : '-', pct ? (pct > target ? 'warn' : 'good') : '');
+    this.recalcAllServing();
+  },
+
+  // ── Other sizes sold (serving sizes) ────────────────────────────────────────
+  // The standard pour/price lives in the row above. These are the OTHER ways the
+  // same bottle/keg sells: a pitcher, a happy hour pour, a whole bottle of wine.
+  // Each carries its own price and shows its own pour cost, because a discounted
+  // size is a thinner margin. The shelf is still one counted pool; this only
+  // captures the extra price points so each size reads an honest pour cost.
+  servingSizesBlockHTML(p, spec) {
+    const sizes = Array.isArray(p?.serving_sizes) ? p.serving_sizes : [];
+    const rows = sizes.map((s, i) => this.servingRowHTML(s, i)).join('');
+    return '<div style="margin-top:18px;border-top:1px solid var(--b2);padding-top:14px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
+        + '<label style="margin:0;">Other Sizes Sold ' + tt('ic-serving-sizes') + '</label>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="vss-add">+ Add a size</button>'
+      + '</div>'
+      + '<div id="vss-list">' + rows + '</div></div>';
+  },
+  servingRowHTML(s, i) {
+    s = s || {};
+    return '<div class="vss-row" style="display:flex;gap:10px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Name</label>'
+      + '<input type="text" class="vss-label" value="' + esc(s.label || '') + '" placeholder="Pitcher, Bottle..."/></div>'
+      + '<div class="f" style="width:90px;flex-shrink:0;"><label>Size</label>'
+      + '<div class="fw"><input class="suf vss-size" type="number" step="0.1" min="0" value="' + (s.size_oz != null ? s.size_oz : '') + '"/><span class="suf">oz</span></div></div>'
+      + '<div class="f" style="width:100px;flex-shrink:0;"><label>Price</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre vss-price" type="number" step="0.25" min="0" value="' + (s.price != null ? s.price : '') + '"/></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);padding-bottom:9px;white-space:nowrap;">Pour cost <span class="vss-pct" style="font-weight:700;color:var(--t1);">-</span></div>'
+      + '<button type="button" class="btn btn-ghost btn-sm vss-del" style="margin-bottom:2px;">Remove</button>'
+      + '</div>';
+  },
+  // Pour cost for one serving-size row: (bottle cost / bottle oz) x this size, over this price.
+  recalcServingRow(row) {
+    if (!row) return;
+    const span = row.querySelector('.vss-pct');
+    if (!span) return;
+    const oz   = this.getOz();
+    const cost = this.effectiveBottleCost();
+    const size  = parseFloat(row.querySelector('.vss-size')?.value) || 0;
+    const price = parseFloat(row.querySelector('.vss-price')?.value) || 0;
+    const costPerOz = oz > 0 ? cost / oz : 0;
+    const pct = (size > 0 && price > 0 && costPerOz > 0) ? (costPerOz * size) / price * 100 : null;
+    const target = App.data?.settings?.targets?.bar_pour_cost_pct || 22;
+    span.textContent = pct != null ? App.fmtPct(pct) : '-';
+    span.style.color = pct == null ? 'var(--t1)' : (pct > target ? 'var(--red)' : '#7dc77d');
+  },
+  recalcAllServing() {
+    document.querySelectorAll('.vss-row').forEach(r => this.recalcServingRow(r));
+  },
+  _wireServingRow(row) {
+    row.querySelectorAll('.vss-size, .vss-price').forEach(inp =>
+      inp.addEventListener('input', () => this.recalcServingRow(row)));
+    row.querySelector('.vss-del')?.addEventListener('click', () => row.remove());
+    this.recalcServingRow(row);
   },
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -817,6 +913,15 @@ S.InventoryProducts = {
       ? (parseInt(document.getElementById('ip-case-size')?.value) || null)
       : null;
     const unitType = spec.showUnitType ? this.getUnitType() : null;
+    // Other sizes sold: each row needs a size and a price to count.
+    const servingSizes = [];
+    if (spec.showServingSizes) {
+      document.querySelectorAll('.vss-row').forEach(r => {
+        const sz = parseFloat(r.querySelector('.vss-size')?.value);
+        const pr = parseFloat(r.querySelector('.vss-price')?.value);
+        if (sz > 0 && pr > 0) servingSizes.push({ label: r.querySelector('.vss-label')?.value.trim() || '', size_oz: sz, price: pr });
+      });
+    }
     // Status: edit mode reads the badge state, new mode defaults to active.
     const stateEl = document.querySelector('.ip-active-state');
     const active = stateEl ? stateEl.dataset.active === 'true' : true;
@@ -851,6 +956,7 @@ S.InventoryProducts = {
       pours_per_container: pours,
       cost_per_pour:       cpp,
       pour_cost_pct:       pct,
+      serving_sizes:       servingSizes,
       created_at:          this.editId ? undefined : new Date().toISOString()
     };
 
