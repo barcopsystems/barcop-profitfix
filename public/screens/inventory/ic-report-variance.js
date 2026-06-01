@@ -299,6 +299,12 @@ S.InventoryVarianceReport = {
   },
 
   draw() {
+    // The shared screen container is reused across reports. Stock/Usage/Movement
+    // set a delegated this.container.onclick for their tabs and never clear it, so
+    // without this reset their stale handler bubbles on OUR tab clicks and renders
+    // the wrong report. Clear it; we wire our own tabs via addEventListener below.
+    this.container.onclick = null;
+    this.container.onchange = null;
     const asc = this.countsAsc();
     if (asc.length < 2) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
