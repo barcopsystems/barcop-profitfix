@@ -2176,6 +2176,14 @@ const App = {
     const actions = document.getElementById('topbar-actions');
     actions.innerHTML = '';
 
+    // The content host is reused across every module screen. Some screens wire
+    // delegated handlers via content.onclick/onchange; others (e.g. the Variance
+    // report) wire tabs with addEventListener and never reset the property. Clear
+    // them on every navigation so a prior screen's handler can't bubble on the
+    // next screen's clicks and render the wrong screen. Each screen re-establishes
+    // whatever delegation it needs inside its own render.
+    if (content) { content.onclick = null; content.onchange = null; content.oninput = null; }
+
     // Revenue module screens
     if (this._activeModule === 'revenue') {
       const revTitles = {
