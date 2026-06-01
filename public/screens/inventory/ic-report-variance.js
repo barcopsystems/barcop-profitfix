@@ -277,11 +277,12 @@ S.InventoryVarianceReport = {
   },
 
   matchSummary() {
-    const matched = Object.keys(this.posByProduct()).length;
     const unmatched = this.unmatchedPos().length;
-    return '<div class="alert-bar" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<div class="alert-text">' + this.posRows.length + ' POS rows imported &middot; '
-      + matched + ' matched to products' + (unmatched ? ' &middot; ' + unmatched + ' unmatched' : '') + '.</div>'
+    const recognized = this.posRows.length - unmatched;
+    return '<div class="alert-bar no-print" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div class="alert-text">' + this.posRows.length + ' rows imported &middot; '
+      + recognized + ' recognized' + (unmatched ? ' &middot; ' + unmatched + ' unmatched' : '')
+      + '. Cocktails and plates break into their recipe ingredients below.</div>'
       + '<button class="btn btn-ghost btn-sm" id="vr-reimport">Re-import</button></div>';
   },
 
@@ -305,8 +306,8 @@ S.InventoryVarianceReport = {
       + '<div style="width:240px;font-size:13px;color:var(--t1);font-weight:600;flex-shrink:0;">' + esc(pr.name) + '</div>'
       + '<div class="f" style="width:260px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
       + opts + '</select></div></div>').join('');
-    return '<div class="card"><div class="card-title">Unmatched POS Products</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS rows did not match a product or menu item. Map each to the right one — menu items explode through their recipe so cocktails and food plates contribute correctly to ingredient variance.</div>' + rows + '</div>';
+    return '<div class="card no-print"><div class="card-title">Unmatched POS Products</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">These POS rows did not match a product or menu item. Map each to the right one, or leave it skipped. Menu items explode through their recipe so cocktails and food plates contribute correctly to ingredient variance.</div>' + rows + '</div>';
   },
 
   wireBody() {
@@ -343,6 +344,11 @@ S.InventoryVarianceReport = {
   // that flow through menu items, the register sale belongs to the menu item,
   // not the ingredient product. Those rows show "via menu" — Sales Variance
   // is null because the dollar attribution can't be reliably split.
+  // Direct-pour products only (beer, wine, liquor sold by the glass or bottle).
+  // A cocktail's or plate's register sale belongs to the menu item, not to an
+  // ounce of an ingredient, so those rows can't show a real dollar variance —
+  // they live in Usage Variance (ounces) instead. Keeping them out keeps this
+  // view a clean dollar leak report.
   tabSales() {
     const usage = this.usageMap();
     const pos = this.posByProduct();
@@ -351,22 +357,25 @@ S.InventoryVarianceReport = {
       const viaMenu = pr.fromMenu && pr.sales === 0;
       const registerSales = pr.sales;
       const theoSales = u.poursMade != null && p.menu_price ? u.poursMade * p.menu_price : null;
-      const salesVar = (!viaMenu && theoSales != null) ? theoSales - registerSales : null;
-      const varPct = (!viaMenu && theoSales) ? salesVar / theoSales * 100 : null;
-      const actualCostPct = (!viaMenu && registerSales && u.usageCost != null) ? u.usageCost / registerSales * 100 : null;
-      const actualProfit = (!viaMenu && u.usageCost != null) ? registerSales - u.usageCost : null;
+      const salesVar = theoSales != null ? theoSales - registerSales : null;
+      const varPct = theoSales ? salesVar / theoSales * 100 : null;
+      const actualCostPct = (registerSales && u.usageCost != null) ? u.usageCost / registerSales * 100 : null;
+      const actualProfit = (u.usageCost != null) ? registerSales - u.usageCost : null;
       return { name: u.name, viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit };
-    });
-    if (!rows.length) return this.emptyMatch();
+    }).filter(r => !r.viaMenu);
+    if (!rows.length) {
+      return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
+        + 'No direct-pour products matched your POS for this period. Beer, wine, and liquor sold by the glass or bottle show here. Cocktails and plates are in Usage Variance.</div>';
+    }
     const body = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.name) + (r.viaMenu ? ' <span style="font-size:9px;color:var(--t3);font-weight:700;letter-spacing:1px;">VIA MENU</span>' : '') + '</div></td>'
-      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.registerSales)) + '</td>'
-      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.theoSales)) + '</td>'
-      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.salesVar)) + '</td>'
-      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.pct(r.varPct)) + '</td>'
-      + '<td>' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.pct(r.actualCostPct)) + '</td>'
-      + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + (r.viaMenu ? '<span style="color:var(--t4);">n/a</span>' : this.cur(r.actualProfit)) + '</td>'
-      + '<td>' + (r.viaMenu ? '-' : (r.varPct != null ? this.badge(r.varPct) : '-')) + '</td>'
+      + '<td><div class="val">' + esc(r.name) + '</div></td>'
+      + '<td>' + this.cur(r.registerSales) + '</td>'
+      + '<td>' + this.cur(r.theoSales) + '</td>'
+      + '<td>' + this.cur(r.salesVar) + '</td>'
+      + '<td>' + this.pct(r.varPct) + '</td>'
+      + '<td>' + this.pct(r.actualCostPct) + '</td>'
+      + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
+      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
@@ -375,41 +384,33 @@ S.InventoryVarianceReport = {
   },
 
   // ── Usage Variance ────────────────────────────────────────────────────────
+  // Trimmed to the six that matter: what your counts say you used (after comps
+  // and waste come out) versus what the POS sold, and the gap. The intermediate
+  // steps (raw used, comps, waste, pours made) are explained in How This Works.
+  // FROM RECIPE rows are ingredients of a cocktail or plate, exploded through
+  // its recipe.
   tabUsage() {
     const usage = this.usageMap();
     const pos = this.posByProduct();
     const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
-      const u = usage[pid], pr = pos[pid], p = u.product;
-      // Phase 7: oz sold comes from posByProduct directly (which already
-      // accounts for direct POS rows AND menu-item explosions).
+      const u = usage[pid], pr = pos[pid];
       const ouncesSold = pr.ouncesSold || 0;
       const ounceVar = u.ouncesUsed != null ? u.ouncesUsed - ouncesSold : null;
       const varPct = ounceVar != null && u.ouncesUsed ? ounceVar / u.ouncesUsed * 100 : null;
-      return { name: u.name, fromMenu: pr.fromMenu,
-        ouncesSold, ouncesUsed: u.ouncesUsed, poursMade: u.poursMade,
-        rawUsed: u.rawUsed, compUnits: u.compUnits, wasteUnits: u.wasteUnits,
-        used: u.used, ounceVar, varPct };
+      return { name: u.name, fromMenu: pr.fromMenu, ouncesSold, ouncesUsed: u.ouncesUsed, ounceVar, varPct };
     });
     if (!rows.length) return this.emptyMatch();
-    const n = (v, d) => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d);
-    const dim = v => !v ? '<span style="color:var(--t4);">0</span>' : Number(v).toFixed(2).replace(/\.?0+$/, '');
+    const n = v => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(1);
     const body = rows.map(r => '<tr>'
       + '<td><div class="val">' + esc(r.name) + (r.fromMenu ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : '') + '</div></td>'
-      + '<td>' + n(r.ouncesSold) + '</td>'
       + '<td>' + n(r.ouncesUsed) + '</td>'
-      + '<td>' + n(r.poursMade, 0) + '</td>'
-      + '<td>' + n(r.rawUsed) + '</td>'
-      + '<td>' + dim(r.compUnits) + '</td>'
-      + '<td>' + dim(r.wasteUnits) + '</td>'
-      + '<td>' + n(r.used) + '</td>'
+      + '<td>' + n(r.ouncesSold) + '</td>'
       + '<td>' + n(r.ounceVar) + '</td>'
       + '<td>' + this.pct(r.varPct) + '</td>'
       + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
       + '</tr>').join('');
     return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Oz Sold</th><th>Oz Used</th><th>Pours Made</th>'
-      + '<th>Used (Raw)</th><th>Comps</th><th>Waste</th><th>Adjusted Used</th>'
-      + '<th>Oz Variance</th><th>Variance %</th><th>Status</th>'
+      + '<th>Product</th><th>Used (oz)</th><th>Sold (oz)</th><th>Variance (oz)</th><th>Variance %</th><th>Status</th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
