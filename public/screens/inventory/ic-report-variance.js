@@ -385,7 +385,7 @@ S.InventoryVarianceReport = {
       + '<div class="alert-text">' + this.posRows.length + ' rows imported &middot; '
       + recognized + ' recognized' + (unmatched ? ' &middot; ' + unmatched + ' unmatched' : '')
       + (savedCount ? ' &middot; ' + savedCount + ' remembered' : '')
-      + '. Cocktails and plates break into their recipe ingredients below.</div>'
+      + '.</div>'
       + '<div style="display:flex;gap:8px;flex-shrink:0;">' + clearBtn
       + '<button class="btn btn-ghost btn-sm" id="vr-reimport">Re-import</button></div></div>';
   },
