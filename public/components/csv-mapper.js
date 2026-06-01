@@ -138,8 +138,13 @@ const CSVMapper = {
     });
     html += '</div><div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
       + '<div class="card-actions"><button class="btn btn-primary csvm-go">'
-      + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button></div></div>';
+      + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button>'
+      + '<button type="button" class="btn btn-ghost csvm-cancel">Cancel</button></div></div>';
     this._area(container).innerHTML = html;
+
+    // Cancel discards this file and returns to the drop zone to pick another.
+    const cancelBtn = this._area(container).querySelector('.csvm-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => this.mount(container, opts));
 
     this._area(container).querySelector('.csvm-go').addEventListener('click', () => {
       const sels = {};
