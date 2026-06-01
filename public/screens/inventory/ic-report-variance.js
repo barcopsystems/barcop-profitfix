@@ -2,17 +2,28 @@
 
 /* ── Inventory Control — Variance Report (ic_counts + ic_deliveries + POS) ────
    Compares what was used (from inventory counts) against what was sold (from a
-   POS sales CSV). Two views: Sales Variance (dollars) and Usage Variance (oz).
-   POS sales are imported with the reusable CSVMapper; the import stays in
-   memory for the session. */
+   POS sales CSV). Two views: Sales Variance (dollars) and Usage Variance, which
+   reads in each bar category's natural unit (liquor/wine in ounces + pours +
+   bottles, draft in ounces + kegs, bottle beer bottle-to-bottle in bottles +
+   cases). A Category picker focuses one category or stacks them all. POS sales
+   are imported with the reusable CSVMapper; the import stays in memory for the
+   session. */
 
 S.InventoryVarianceReport = {
   tab: 'sales',
   endCountId: null,
+  catFilter: '',        // '' = all bar categories, else one of BAR_CAT_ORDER
   posRows: null,        // [{name, qty, sales}]
   manualMap: {},        // { posName(lowercased): productId }
 
   TABS: [['sales','Sales Variance','rpt-v-sales'], ['usage','Usage Variance','rpt-v-usage']],
+
+  // Usage Variance reads in each category's NATURAL unit, modeled on the old
+  // inventory program: liquor/wine in ounces (with pours + bottles), draft in
+  // ounces + kegs, bottle beer bottle-to-bottle in bottles + cases (no ounces,
+  // beer matches the POS directly). Phase 1 is the four bar categories; Food and
+  // Misc come in a follow-up once their seed recipe quantities are corrected.
+  BAR_CAT_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Bottle Beer'],
 
   showImportHelp() {
     App.showHelpModal('How the POS Import Works', [
@@ -28,8 +39,9 @@ S.InventoryVarianceReport = {
     App.showHelpModal('How the Variance Report Works', [
       { p: ['Variance is the leak detector. It takes what your counts say you used and compares it to what your POS actually sold. The gap is product that left the bar without a matching sale: over-pour, theft, give-aways, or a count error.'] },
       { h: 'Import Your POS Sales', p: ['Pick the count period up top, then upload a product sales report from your POS. Map the product name, quantity, and sales columns once and Bar Cop matches each row to your products and menu items.'] },
+      { h: 'Pick A Category', p: ['Use the Category picker to read one category at a time, or leave it on All Bar Categories to see every category stacked. Each category reads in the unit you actually think in, so you are never staring at ounces of beer.'] },
       { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS. So variance is unexplained loss, not legit give-aways you already tracked.'] },
-      { h: 'Two Views', p: ['Sales Variance is in dollars: theoretical sales (what the product should have rung up) versus register sales. Usage Variance is in ounces: what you poured versus what the POS sold. Use ounces for cocktails and food, where the sale belongs to the menu item and Bar Cop explodes the recipe down to each ingredient.'] },
+      { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours made, and bottles used. Draft shows ounces and kegs. Bottle beer matches bottle for bottle, in bottles and cases. Cocktails and plates explode through their recipe so each ingredient gets its share, shown as FROM RECIPE.'] },
       { h: 'Reading The Status', p: ['Under 5 percent off is OK, 5 to 15 is Watch, over 15 is Flag. A flagged product is where your money is walking out. Start there.'] }
     ]);
   },
@@ -229,11 +241,20 @@ S.InventoryVarianceReport = {
       '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
       + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
 
+    let catCtl = '';
+    if (this.posRows) {
+      const avail = this.availableBarCats();
+      if (avail.length) {
+        const catOpts = '<option value="">All Bar Categories</option>'
+          + avail.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+        catCtl = '<div class="f" style="width:200px;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>';
+      }
+    }
     const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Variance Report</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-how">How This Works</button></div>'
-      + '<div class="form-row" style="margin-bottom:0;"><div class="f" style="width:260px;">'
-      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div></div></div>';
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:260px;">'
+      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div>' + catCtl + '</div></div>';
 
     let body;
     if (!this.posRows) {
@@ -251,6 +272,7 @@ S.InventoryVarianceReport = {
 
     document.getElementById('vr-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
+    document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
 
     if (!this.posRows) {
       document.getElementById('vr-import-how')?.addEventListener('click', () => this.showImportHelp());
@@ -361,8 +383,8 @@ S.InventoryVarianceReport = {
       const varPct = theoSales ? salesVar / theoSales * 100 : null;
       const actualCostPct = (registerSales && u.usageCost != null) ? u.usageCost / registerSales * 100 : null;
       const actualProfit = (u.usageCost != null) ? registerSales - u.usageCost : null;
-      return { name: u.name, viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit };
-    }).filter(r => !r.viaMenu);
+      return { name: u.name, category: p.category, viaMenu, registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit };
+    }).filter(r => !r.viaMenu && (!this.catFilter || r.category === this.catFilter));
     if (!rows.length) {
       return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
         + 'No direct-pour products matched your POS for this period. Beer, wine, and liquor sold by the glass or bottle show here. Cocktails and plates are in Usage Variance.</div>';
@@ -383,35 +405,139 @@ S.InventoryVarianceReport = {
       + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
-  // ── Usage Variance ────────────────────────────────────────────────────────
-  // Trimmed to the six that matter: what your counts say you used (after comps
-  // and waste come out) versus what the POS sold, and the gap. The intermediate
-  // steps (raw used, comps, waste, pours made) are explained in How This Works.
-  // FROM RECIPE rows are ingredients of a cocktail or plate, exploded through
-  // its recipe.
-  tabUsage() {
+  // ── Usage Variance (category-aware) ─────────────────────────────────────────
+  // Each bar category reads in its own unit (see BAR_CAT_ORDER note up top).
+  // What your counts say you used (after comps and waste come out) versus what
+  // the POS sold, and the gap. FROM RECIPE rows are cocktail/plate ingredients
+  // exploded through the recipe. The Category picker focuses one category; All
+  // stacks every bar category, each in its own unit.
+
+  // Bar categories that actually have both usage and a matched POS row, in the
+  // canonical display order. Drives the Category dropdown options.
+  availableBarCats() {
     const usage = this.usageMap();
     const pos = this.posByProduct();
-    const rows = Object.keys(usage).filter(pid => pos[pid]).map(pid => {
-      const u = usage[pid], pr = pos[pid];
-      const ouncesSold = pr.ouncesSold || 0;
-      const ounceVar = u.ouncesUsed != null ? u.ouncesUsed - ouncesSold : null;
-      const varPct = ounceVar != null && u.ouncesUsed ? ounceVar / u.ouncesUsed * 100 : null;
-      return { name: u.name, fromMenu: pr.fromMenu, ouncesSold, ouncesUsed: u.ouncesUsed, ounceVar, varPct };
+    const present = new Set();
+    Object.keys(usage).forEach(pid => {
+      if (!pos[pid]) return;
+      const c = (usage[pid].product || {}).category;
+      if (App.BAR_CATS.includes(c)) present.add(c);
     });
-    if (!rows.length) return this.emptyMatch();
-    const n = v => v == null ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(1);
-    const body = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.name) + (r.fromMenu ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : '') + '</div></td>'
-      + '<td>' + n(r.ouncesUsed) + '</td>'
-      + '<td>' + n(r.ouncesSold) + '</td>'
-      + '<td>' + n(r.ounceVar) + '</td>'
-      + '<td>' + this.pct(r.varPct) + '</td>'
-      + '<td>' + (r.varPct != null ? this.badge(r.varPct) : '-') + '</td>'
-      + '</tr>').join('');
+    return this.BAR_CAT_ORDER.filter(c => present.has(c));
+  },
+
+  // Raw per-product variance numbers for one bar category. Every unit conversion
+  // is resolved here off the shared engine output (containers + ouncesUsed +
+  // poursMade from usageMap, ouncesSold from posByProduct); the category
+  // renderers below only lay out columns.
+  usageVarRows(cat) {
+    const usage = this.usageMap();
+    const pos = this.posByProduct();
+    const rows = [];
+    Object.keys(usage).forEach(pid => {
+      if (!pos[pid]) return;
+      const u = usage[pid], pr = pos[pid], p = u.product || {};
+      if (p.category !== cat) return;
+      rows.push({
+        name: u.name, fromMenu: pr.fromMenu,
+        ouncesUsed: u.ouncesUsed, ouncesSold: pr.ouncesSold || 0,
+        poursMade: u.poursMade, containersUsed: u.used,   // bottles / kegs / cases
+        containerSizeOz: parseFloat(p.container_size_oz) || 0,
+        caseSize: parseFloat(p.case_size) || 0
+      });
+    });
+    return rows.sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  n(v, d) { return (v == null || isNaN(v)) ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d); },
+  recipeTag(r) { return r.fromMenu ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : ''; },
+  usageTbl(headers, body) {
     return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Used (oz)</th><th>Sold (oz)</th><th>Variance (oz)</th><th>Variance %</th><th>Status</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+      + headers.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  },
+
+  // Liquor + Wine: ounces, with pours made and bottles used alongside.
+  usageTableLiquorWine(rows) {
+    const body = rows.map(r => {
+      const ounceVar = r.ouncesUsed != null ? r.ouncesUsed - r.ouncesSold : null;
+      const varPct = (ounceVar != null && r.ouncesUsed) ? ounceVar / r.ouncesUsed * 100 : null;
+      return '<tr>'
+        + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
+        + '<td>' + this.n(r.ouncesSold) + '</td>'
+        + '<td>' + this.n(r.ouncesUsed) + '</td>'
+        + '<td>' + this.n(r.poursMade, 0) + '</td>'
+        + '<td>' + this.n(r.containersUsed) + '</td>'
+        + '<td>' + this.n(ounceVar) + '</td>'
+        + '<td>' + this.pct(varPct) + '</td>'
+        + '<td>' + (varPct != null ? this.badge(varPct) : '-') + '</td>'
+        + '</tr>';
+    }).join('');
+    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours Made', 'Bottles Used', 'Oz Variance', 'Variance %', 'Status'], body);
+  },
+
+  // Draft Beer: ounces poured, kegs used.
+  usageTableDraft(rows) {
+    const body = rows.map(r => {
+      const ounceVar = r.ouncesUsed != null ? r.ouncesUsed - r.ouncesSold : null;
+      const varPct = (ounceVar != null && r.ouncesUsed) ? ounceVar / r.ouncesUsed * 100 : null;
+      return '<tr>'
+        + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
+        + '<td>' + this.n(r.ouncesSold) + '</td>'
+        + '<td>' + this.n(r.ouncesUsed) + '</td>'
+        + '<td>' + this.n(r.containersUsed, 2) + '</td>'
+        + '<td>' + this.n(ounceVar) + '</td>'
+        + '<td>' + this.pct(varPct) + '</td>'
+        + '<td>' + (varPct != null ? this.badge(varPct) : '-') + '</td>'
+        + '</tr>';
+    }).join('');
+    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Kegs Used', 'Oz Variance', 'Variance %', 'Status'], body);
+  },
+
+  // Bottle Beer: bottle-to-bottle, no ounces. The recipe explosion is needless
+  // for beer; it matches the POS bottle count directly. Cases shown alongside.
+  usageTableBottleBeer(rows) {
+    const body = rows.map(r => {
+      const cs = r.caseSize || 1;
+      const bottlesSold = r.containerSizeOz ? r.ouncesSold / r.containerSizeOz : 0;
+      const bottlesUsed = r.containersUsed != null ? r.containersUsed * cs : null;
+      const casesUsed = r.containersUsed;
+      const casesSold = bottlesSold / cs;
+      const caseVar = casesUsed != null ? casesUsed - casesSold : null;
+      const bottleVar = bottlesUsed != null ? bottlesUsed - bottlesSold : null;
+      const varPct = (bottleVar != null && bottlesUsed) ? bottleVar / bottlesUsed * 100 : null;
+      return '<tr>'
+        + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
+        + '<td>' + this.n(bottlesSold, 0) + '</td>'
+        + '<td>' + this.n(bottlesUsed, 0) + '</td>'
+        + '<td>' + this.n(casesUsed) + '</td>'
+        + '<td>' + this.n(caseVar) + '</td>'
+        + '<td>' + this.n(bottleVar, 0) + '</td>'
+        + '<td>' + this.pct(varPct) + '</td>'
+        + '<td>' + (varPct != null ? this.badge(varPct) : '-') + '</td>'
+        + '</tr>';
+    }).join('');
+    return this.usageTbl(['Product', 'Bottles Sold', 'Bottles Used', 'Cases Used', 'Case Variance', 'Bottle Variance', 'Variance %', 'Status'], body);
+  },
+
+  renderUsageCat(cat, rows) {
+    if (cat === 'Bottle Beer') return this.usageTableBottleBeer(rows);
+    if (cat === 'Draft Beer')  return this.usageTableDraft(rows);
+    return this.usageTableLiquorWine(rows); // Liquor, Wine
+  },
+
+  tabUsage() {
+    const avail = this.availableBarCats();
+    if (!avail.length) return this.emptyMatch();
+    const cats = (this.catFilter && avail.includes(this.catFilter)) ? [this.catFilter] : avail;
+    const out = cats.map((cat, i) => {
+      const rows = this.usageVarRows(cat);
+      if (!rows.length) return '';
+      const heading = cats.length > 1
+        ? '<div style="font-weight:700;color:var(--gold);font-size:11px;letter-spacing:1.5px;margin:' + (i ? '24px' : '2px') + ' 0 10px;">' + esc(cat.toUpperCase()) + '</div>'
+        : '';
+      return heading + this.renderUsageCat(cat, rows);
+    }).join('');
+    return out || this.emptyMatch();
   },
 
   emptyMatch() {
