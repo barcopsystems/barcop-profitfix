@@ -599,13 +599,6 @@ S.InventoryVarianceReport = {
     const body = rows.map(r => {
       const ounceVar = r.ouncesUsed != null ? r.ouncesUsed - r.ouncesSold : null;
       const varPct = (ounceVar != null && r.ouncesUsed) ? ounceVar / r.ouncesUsed * 100 : null;
-      // A wine sold whole (pour = bottle) is judged By the Bottle on the bottle
-      // count, not the pour percent; everything else uses its category percent.
-      const bottleVar = (r.byBottle && r.containerSizeOz)
-        ? (r.containersUsed || 0) - (r.ouncesSold / r.containerSizeOz) : null;
-      const statusCell = r.byBottle
-        ? this.badge('By the Bottle', varPct, bottleVar)
-        : (varPct != null ? this.badge(cat, varPct) : '-');
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
         + '<td>' + this.n(r.ouncesSold) + '</td>'
@@ -614,10 +607,31 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.containersUsed) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>'
         + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + statusCell + '</td>'
+        + '<td>' + (varPct != null ? this.badge(cat, varPct) : '-') + '</td>'
         + '</tr>';
     }).join('');
     return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', 'Status'], body);
+  },
+
+  // Wine sold by the bottle (and champagne splits): counted bottle-in /
+  // bottle-out, so it reads in whole bottles, not ounces, like bottle beer.
+  // Detected when a wine's pour size is the whole bottle (see isByBottle).
+  usageTableBottleWine(rows) {
+    const body = rows.map(r => {
+      const bottlesSold = r.containerSizeOz ? r.ouncesSold / r.containerSizeOz : 0;
+      const bottlesUsed = r.containersUsed;   // wine is counted in bottles
+      const bottleVar = bottlesUsed != null ? bottlesUsed - bottlesSold : null;
+      const varPct = (bottleVar != null && bottlesUsed) ? bottleVar / bottlesUsed * 100 : null;
+      return '<tr>'
+        + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
+        + '<td>' + this.n(bottlesSold, 0) + '</td>'
+        + '<td>' + this.n(bottlesUsed, 0) + '</td>'
+        + '<td>' + this.n(bottleVar, 0) + '</td>'
+        + '<td>' + this.pct(varPct) + '</td>'
+        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar) : '-') + '</td>'
+        + '</tr>';
+    }).join('');
+    return this.usageTbl(['Product', 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', 'Status'], body);
   },
 
   // Draft Beer: ounces poured, kegs used.
@@ -719,7 +733,19 @@ S.InventoryVarianceReport = {
     if (cat === 'Draft Beer')  return this.usageTableDraft(rows);
     if (cat === 'Misc')        return this.usageTableMisc(rows);
     if (cat === 'Food')        return this.usageTableFood(rows);
-    return this.usageTableLiquorWine(cat, rows); // Liquor, Wine
+    if (cat === 'Wine') {
+      // Split wine into by-the-glass (ounces) and by-the-bottle (whole bottles).
+      const glass  = rows.filter(r => !r.byBottle);
+      const bottle = rows.filter(r => r.byBottle);
+      let out = glass.length ? this.usageTableLiquorWine('Wine', glass) : '';
+      if (bottle.length) {
+        out += '<div style="font-weight:700;color:var(--t3);font-size:10px;letter-spacing:1.5px;margin:'
+          + (glass.length ? '16px' : '2px') + ' 0 8px;">BY THE BOTTLE</div>'
+          + this.usageTableBottleWine(bottle);
+      }
+      return out;
+    }
+    return this.usageTableLiquorWine(cat, rows); // Liquor
   },
 
   tabUsage() {
