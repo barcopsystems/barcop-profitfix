@@ -81,8 +81,8 @@ S.Help = {
           a: 'When a product shows unexplained variance, open an investigation and walk the six steps in order: verify the count, calculate theoretical usage, identify the shifts, talk to the bar manager, run a mid-shift count, document the finding. The product dropdown is bound to your real Inventory Control product list, so the investigation captures a product_id (not a typed-in name). That product_id is what makes the live data on Step 2 and Step 3 work.' },
         { q: 'How does the live data on Step 2 and Step 3 work?',
           a: 'Step 2 (Calculate theoretical usage) auto-shows the actual usage for that product from your last two inventory counts plus deliveries between them, in both containers and pours and dollars. You compare against your POS pours sold for the same window. Step 3 (Identify the shifts) auto-shows the last five spot checks where that product was checked, with the flag status and variance dollars per shift. No more retyping numbers; the math is on the screen.' },
-        { q: 'What is the Print Blank Worksheet button on Variance Investigations?',
-          a: 'Prints a six-row paper worksheet. Walk the back bar with it, write down what you find in pen, then enter the findings into Bar Cop after. Useful when the investigation is happening on the floor and pulling out a laptop is not practical.' },
+        { q: 'What is the Worksheet button on Variance Investigations?',
+          a: 'Downloads a clean six-row PDF worksheet. Print it, walk the back bar with it, write down what you find in pen, then enter the findings into Bar Cop after. Useful when the investigation is happening on the floor and pulling out a laptop is not practical.' },
         { q: 'A flagged Spot Check has an Investigate button. What does it do?',
           a: 'Spins up a Variance Investigation in Theft Risk pre-filled with the flagged product, then jumps you to that screen. Closes the gap where you used to see a flag in Inventory Control and then have to retype the product name in Theft Risk. If an open investigation already exists for that product, it routes you to it instead of opening a second one.' },
         { q: 'What is the Print Theft & Loss Brief PDF?',
@@ -105,8 +105,8 @@ S.Help = {
           a: 'When the menu item has a recipe attached, Yield Test auto-fills the spec from recipe.plate_yield. When it does not, operator types it. Common units are ounces, grams, pounds, pieces, cups.' },
         { q: 'Do these feed Theft Risk?',
           a: 'Pour Test rolls into the existing Pour Variance signal indirectly (the bartender data informs your manual judgment of whether the spot check variance is technique or theft). Yield Test is currently a standalone diagnostic that flags cooks for coaching; it does not score the bar overall (kitchen over-portioning is a food cost issue, not a theft issue).' },
-        { q: 'Should I print blank sheets?',
-          a: 'If the test happens away from a phone or laptop, yes. The Print Blank Sheet button on each screen prints a paper grid that the manager fills out during the test, then enters into Bar Cop after.' }
+        { q: 'Should I use the worksheets?',
+          a: 'If the test happens away from a phone or laptop, yes. The Worksheet button on each screen downloads a clean PDF grid the manager prints and fills out during the test, then enters into Bar Cop after.' }
       ]},
       { t: 'Recipe Cost Analysis', qa: [
         { q: 'What is Recipe Cost Analysis?',
@@ -124,15 +124,15 @@ S.Help = {
         { q: 'What do the Vendor Scorecard status tiers mean?',
           a: 'HIGH = open overcharge over $100, or net drift up over 5 percent of total spend, or more than 2 short counts in the window. WATCH = any open overcharge, any net drift up, or any short count. CLEAN = nothing of note. NO ACTIVITY = no deliveries or discrepancies on file for this vendor in the window. Use HIGH and WATCH rows for your renegotiation conversation, ask for price match or explanation on every drifted line.' },
         { q: 'How do I export Vendor Scorecard?',
-          a: 'The Export PDF button in the topbar opens your browser print dialog. Save as PDF and take it into the vendor meeting.' }
+          a: 'The Export PDF button saves a clean PDF straight to your computer. Take it into the vendor meeting.' }
       ]},
       { t: 'Vendor Discrepancies', qa: [
         { q: 'What is Vendor Discrepancies?',
           a: 'The log of every documented credit you can chase from a vendor. Default landing is the log view: summary tiles (Open count, Open Overcharge total, Recovered total) plus the list. Most entries arrive automatically from Receive Delivery in Inventory Control (any line that came in short or at the wrong price has a Flag Discrepancy button that files straight here). For the cases that did not come from a delivery you just received (a damaged bottle discovered days later, a substitution caught after the fact), the + File Manual Discrepancy button opens a manual form below the log.' },
         { q: 'How does the Product dropdown on the manual form work?',
           a: 'Pick the vendor first, then the Product dropdown rebuilds to show only that vendor\'s products from your Inventory Control product master. Selecting a product pre-fills the Agreed Price from the product master so you only type what is actually new (the invoiced price). The product_id is captured on save so Vendor Scorecard can attribute the discrepancy to a real SKU instead of a typed-in string.' },
-        { q: 'What does Print Delivery Inspection Sheet do?',
-          a: 'Prints a paper grid the receiver fills out at the dock during a delivery: vendor, product, ordered qty, received qty, agreed price, invoiced price, issue, receiver. Manager files each flagged line into Bar Cop after close. The paper-to-digital bridge for operators whose receiving area does not have easy phone access.' },
+        { q: 'What does the Worksheet button do?',
+          a: 'Downloads a clean PDF grid the receiver prints and fills out at the dock during a delivery: vendor, product, ordered qty, received qty, agreed price, invoiced price, issue, receiver. Manager files each flagged line into Bar Cop after close. The paper-to-digital bridge for operators whose receiving area does not have easy phone access.' },
         { q: 'How does Request Credit work?',
           a: 'Opens your default email client with a structured credit request to the vendor: account number, delivery date, invoice reference, type, product, units, agreed and invoiced price, credit requested, your notes, sign-off. You send from your own email address so the vendor\'s reply threads back to your inbox. Status flips to Credit Requested with a timestamp.' },
         { q: 'How does Mark Resolved work?',
@@ -150,7 +150,7 @@ S.Help = {
         { q: 'What is the Weekly P&L Brief?',
           a: 'A clean Excel file of your weekly P&L history. Lives under Hub > Accounting > Weekly P&L Brief. Pick a range (last completed week, last 4, last 13, year-to-date, all, or custom), download. One row per week with revenue, COGS, labor, prime cost, and the cost percentages broken out by bar and food. Hand it to your bookkeeper or open in QuickBooks / Xero / any spreadsheet.' },
         { q: 'Can I export the weekly history to PDF?',
-          a: 'Every Reports screen has an Export PDF button in the topbar that opens your browser print dialog. Save as PDF from there.' },
+          a: 'Every Reports screen has an Export PDF button that saves a clean PDF straight to your computer.' },
         { q: 'What is the Annual Cost Calculator?',
           a: 'On Profit Reports. Enter annual revenue and current vs target cost percentages, see the annual dollar gap and what closing it is worth monthly and weekly. Pre-fills from Hub Settings. Useful when you need the dollar case for an operational change in a conversation with ownership or partners.' }
       ]},

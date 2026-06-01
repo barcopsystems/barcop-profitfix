@@ -53,7 +53,7 @@ S.YieldTest = {
     actions.appendChild(addBtn);
     const printBtn = document.createElement('button');
     printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print Blank Sheet';
+    printBtn.textContent = 'Worksheet';
     printBtn.addEventListener('click', () => this.printBlank());
     actions.appendChild(printBtn);
     this.renderList();

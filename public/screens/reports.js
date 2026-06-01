@@ -6,7 +6,7 @@ S.Reports={
   renderMain(){
     if(this.actions){
       this.actions.innerHTML='<button class="btn btn-ghost btn-sm" id="pr-export">Export PDF</button>';
-      document.getElementById('pr-export')?.addEventListener('click',()=>window.print());
+      document.getElementById('pr-export')?.addEventListener('click',()=>App.exportPDF({ title: 'Reports & History', root: this.container }));
     }
     const weeks=(App.data.weeks||[]).slice().reverse();
     const t=App.data.settings.targets||{};

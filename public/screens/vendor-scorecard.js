@@ -94,7 +94,7 @@ S.VendorScorecard = {
   render(container, actions) {
     this.container = container;
     actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="vs-export">Export PDF</button>';
-    document.getElementById('vs-export')?.addEventListener('click', () => window.print());
+    document.getElementById('vs-export')?.addEventListener('click', () => App.exportPDF({ title: 'Vendor Scorecard', root: this.container }));
     this.draw();
   },
 

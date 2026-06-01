@@ -413,7 +413,7 @@ S.TheftRisk = {
       + '<div class="f" style="width:280px;"><label>Flagged Product</label>'
       + '<select class="vi-product-select" style="' + inputStyle + 'width:100%;height:38px;">' + productOpts + '</select></div>'
       + '<button class="btn btn-primary vi-open-btn">Open Investigation</button>'
-      + '<button class="btn btn-ghost btn-sm vi-print-blank" style="margin-left:auto;">Print Blank Worksheet</button>'
+      + '<button class="btn btn-ghost btn-sm vi-print-blank" style="margin-left:auto;">Worksheet</button>'
       + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:18px;line-height:1.5;">'
       + 'Tip: a flagged Spot Check in Inventory Control can open an investigation pre-filled for you. Look for the Investigate button on the spot check detail.'
