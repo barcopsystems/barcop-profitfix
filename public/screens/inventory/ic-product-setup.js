@@ -370,8 +370,10 @@ S.InventoryProducts = {
       + '</div></div></div>';
 
     // When an upload is active, the lower area becomes the in-place import
-    // panel (drop zone -> column mapper) instead of the product list.
-    const lower = this._import ? this.importPanelHTML() : (tabs + body);
+    // panel (drop zone -> column mapper) instead of the product list. The list
+    // sits in an .rpt-panel so the active category tab connects into it cleanly
+    // (same connected look as the report tabs) and the header row gets padding.
+    const lower = this._import ? this.importPanelHTML() : (tabs + '<div class="rpt-panel">' + body + '</div>');
     this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>' + modal;
     this.wireLanding();
   },
@@ -1092,10 +1094,8 @@ S.InventoryProducts = {
     const spec = this.FORM_SPEC[cat] || {};
     const header = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
       + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
-      + '<div style="display:flex;gap:8px;">'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-cancel">Cancel</button>'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-how">How This Works</button>'
-      + '</div></div>';
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-how">How This Works</button>'
+      + '</div>';
     if (this._import.stage === 'mapper') {
       return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>';
     }
@@ -1105,6 +1105,7 @@ S.InventoryProducts = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
       + '</div>'
       + '<input type="file" id="ip-imp-input" accept=".csv,.xlsx,.xls" style="display:none;"/>'
+      + '<div style="margin-top:14px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'
       + '</div>';
   },
 
@@ -1129,14 +1130,15 @@ S.InventoryProducts = {
     // First rows preview so the operator can confirm they mapped the right columns.
     const previewRows = rows.slice(0, 3);
     if (previewRows.length) {
-      html += '<div style="margin-top:18px;"><div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;margin-bottom:6px;">FIRST ROWS FROM YOUR FILE</div>'
+      html += '<div style="margin-top:18px;"><div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;margin-bottom:6px;">PREVIEW: FIRST ROWS FROM YOUR FILE</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>'
         + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
         + '</tbody></table></div></div>';
     }
     html += '<div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button>'
+      + '<button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
     return html;
   },
 
