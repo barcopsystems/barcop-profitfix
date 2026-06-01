@@ -76,7 +76,7 @@ S.InventoryDashboard = {
       let withPar = 0, tuned = 0;
       this.products().forEach(p => {
         if (p.par_level == null || p.par_level === '') return;
-        const sug = PS.computeSuggestion(p, settings);
+        const sug = PS.computeSuggestion(p, settings, latest.date);
         if (!sug || sug.suggested == null) return;
         withPar++;
         const cur = Math.round(parseFloat(p.par_level) || 0);
