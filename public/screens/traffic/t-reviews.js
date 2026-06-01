@@ -159,7 +159,7 @@ S.TrafficReviews = {
     const form = this.addingReply ? this.replyForm() : '';
     const headerActions = this.addingReply
       ? ''
-      : '<button class="btn btn-ghost btn-sm" id="rrl-print">Print Blank Sheet</button>'
+      : '<button class="btn btn-ghost btn-sm" id="rrl-print">Worksheet</button>'
         + '<button class="btn btn-primary btn-sm" id="rrl-add">+ Log Reply</button>';
 
     return '<div class="card">'

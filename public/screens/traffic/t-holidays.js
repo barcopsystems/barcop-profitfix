@@ -59,7 +59,7 @@ S.TrafficHolidays = {
     this.actions.innerHTML = '';
     const printBtn = document.createElement('button');
     printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print Blank Sheet';
+    printBtn.textContent = 'Worksheet';
     printBtn.addEventListener('click', () => this.printBlankSheet());
     this.actions.appendChild(printBtn);
     const addBtn = document.createElement('button');

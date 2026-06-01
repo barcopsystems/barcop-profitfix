@@ -147,7 +147,7 @@ S.TrafficGBP = {
     const form = this.addingPost ? this.postForm() : '';
     const headerActions = this.addingPost
       ? ''
-      : '<button class="btn btn-ghost btn-sm" id="gpl-print">Print Blank Sheet</button>'
+      : '<button class="btn btn-ghost btn-sm" id="gpl-print">Worksheet</button>'
         + '<button class="btn btn-primary btn-sm" id="gpl-add">+ Log Post</button>';
 
     return '<div class="card">'

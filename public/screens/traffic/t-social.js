@@ -165,7 +165,7 @@ S.TrafficSocial = {
     const form = this.addingPost ? this.postForm() : '';
     const headerActions = this.addingPost
       ? ''
-      : '<button class="btn btn-ghost btn-sm" id="spl-print">Print Blank Sheet</button>'
+      : '<button class="btn btn-ghost btn-sm" id="spl-print">Worksheet</button>'
         + '<button class="btn btn-primary btn-sm" id="spl-add">+ Log Post</button>';
 
     return '<div class="card">'

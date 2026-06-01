@@ -173,7 +173,7 @@ S.TrafficEmail = {
     const form = this.addingCamp ? this.campaignForm() : '';
     const headerActions = this.addingCamp
       ? ''
-      : '<button class="btn btn-ghost btn-sm" id="ecl-print">Print Blank Sheet</button>'
+      : '<button class="btn btn-ghost btn-sm" id="ecl-print">Worksheet</button>'
         + '<button class="btn btn-primary btn-sm" id="ecl-add">+ Log Campaign</button>';
 
     return '<div class="card">'
