@@ -288,12 +288,13 @@ S.InventoryProducts = {
         ? '<div style="font-size:10px;color:var(--t4);margin-top:6px;">' + incomplete + ' incomplete</div>'
         : '';
       return '<div class="ip-card" data-cat="' + esc(c) + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px 20px 24px;text-align:center;">'
-        + '<div style="font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">' + esc(c) + '</div>'
+        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:22px 18px 20px;text-align:center;">'
+        + '<div style="font-size:17px;font-weight:800;color:var(--t1);letter-spacing:0.3px;margin-bottom:4px;">' + esc(c) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + '</div>'
         + incText
-        + '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:20px;">'
+        + '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:18px;">'
           + '<span class="ip-card-add" data-cat="' + esc(c) + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add Single Product</span>'
+          + '<span style="font-size:10px;color:var(--t4);letter-spacing:1px;">or</span>'
           + '<button type="button" class="ip-card-imp" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;cursor:pointer;">Upload Product List</button>'
         + '</div>'
         + '</div>';
@@ -308,14 +309,10 @@ S.InventoryProducts = {
     const incompleteHere = prods.filter(p => !this.isComplete(p));
 
     const tabs = this.catTabs();
-    const syncNote = '<div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);margin:12px 0 14px;">'
-      + 'SYNCED TO PROFIT RECOVERY &#10003;'
-      + '<span style="color:var(--t3);font-weight:600;letter-spacing:0.5px;"> &nbsp; Bar categories feed Bar Products &middot; Food and Misc feed Kitchen Products</span></div>';
 
     let body;
     if (prods.length === 0) {
-      body = syncNote
-        + '<div class="empty"><div class="empty-title">No ' + esc(this.activeCat) + ' products yet</div>'
+      body = '<div class="empty"><div class="empty-title">No ' + esc(this.activeCat) + ' products yet</div>'
         + '<div class="empty-sub">Click the ' + esc(this.activeCat) + ' card above to add your first one.</div></div>';
     } else {
       const spec = this.FORM_SPEC[this.activeCat];
@@ -332,7 +329,6 @@ S.InventoryProducts = {
           ? App.fmtCurrency(p.unit_cost) + (p.category === 'Bottle Beer' ? ' <span style="font-size:9px;color:var(--t3);">/case</span>' : '')
           : '<span style="color:var(--t4);">-</span>';
         return '<tr style="' + dim + '">'
-          + '<td style="width:36px;"><input type="checkbox" class="ip-chk" data-id="' + p.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
           + '<td><div class="val" style="' + (!complete ? 'color:var(--red);' : '') + '">' + esc(p.name)
           + (p.active === false ? ' <span class="badge badge-dim">Inactive</span>' : '') + '</div>'
           + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
@@ -341,7 +337,6 @@ S.InventoryProducts = {
           + '<td>' + esc(szL) + '</td>'
           + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td>' + costDisplay + '</td>'
-          + '<td>' + (pourable && p.cost_per_pour != null ? App.fmtCurrency(p.cost_per_pour) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td><div class="row-actions">'
@@ -359,16 +354,10 @@ S.InventoryProducts = {
       const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
       const costCol = (spec && spec.costLabel) || 'Cost';
 
-      body = syncNote + alertBar
-        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="ip-sel-all">Select All</button>'
-        + '<button class="btn btn-danger btn-sm" id="ip-del-sel" style="display:none;">Delete Selected</button>'
-        + '<span id="ip-sel-count" style="font-size:11px;color:var(--t3);"></span>'
-        + '</div>'
+      body = alertBar
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th style="width:36px;"></th>'
         + '<th>Product</th><th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
-        + '<th>' + esc(costCol) + '</th><th>Cost/Pour</th><th>Pour Cost %</th><th>Par</th><th></th>'
+        + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
@@ -387,16 +376,14 @@ S.InventoryProducts = {
     this.wireLanding();
   },
 
+  // Category filter tabs, styled to match the report tab bar (.rpt-tabs).
   catTabs() {
     const all = this.products();
-    return '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:0;flex-wrap:wrap;">'
+    return '<div class="rpt-tabs">'
       + this.CATEGORIES.map(c => {
           const n = all.filter(p => (p.category || '') === c).length;
           const on = c === this.activeCat;
-          return '<button class="ic-tab" data-cat="' + esc(c) + '" style="background:none;border:none;'
-            + 'border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
-            + 'color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-            + 'letter-spacing:0.5px;text-transform:uppercase;padding:9px 14px;cursor:pointer;">'
+          return '<button class="rpt-tab' + (on ? ' on' : '') + '" data-cat="' + esc(c) + '">'
             + esc(c) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
         }).join('')
       + '</div>';
@@ -406,7 +393,7 @@ S.InventoryProducts = {
     this.container.onclick = ev => {
       const addLink = ev.target.closest('.ip-card-add');
       const impLink = ev.target.closest('.ip-card-imp');
-      const tab     = ev.target.closest('.ic-tab');
+      const tab     = ev.target.closest('.rpt-tab');
       const edit    = ev.target.closest('.ip-edit');
       const del     = ev.target.closest('.ip-del');
 
@@ -435,28 +422,6 @@ S.InventoryProducts = {
         input?.addEventListener('change', ev => { const f = ev.target.files[0]; if (f) { this._formCategory = this._import.cat; this.readImportFile(f); } });
       }
     }
-
-    const updateSel = () => {
-      const checked = this.container.querySelectorAll('.ip-chk:checked');
-      const btn = document.getElementById('ip-del-sel');
-      const cnt = document.getElementById('ip-sel-count');
-      if (btn) btn.style.display = checked.length > 0 ? '' : 'none';
-      if (cnt) cnt.textContent   = checked.length > 0 ? checked.length + ' selected' : '';
-    };
-    this.container.addEventListener('change', ev => {
-      if (ev.target.classList.contains('ip-chk')) updateSel();
-    });
-    document.getElementById('ip-sel-all')?.addEventListener('click', () => {
-      const chks = document.querySelectorAll('.ip-chk');
-      const allChecked = [...chks].every(c => c.checked);
-      chks.forEach(c => { c.checked = !allChecked; });
-      updateSel();
-    });
-    document.getElementById('ip-del-sel')?.addEventListener('click', () => {
-      const ids = [...document.querySelectorAll('.ip-chk:checked')].map(c => c.dataset.id);
-      if (!ids.length) return;
-      this.confirmDel(ids, 'Delete ' + ids.length + ' product' + (ids.length > 1 ? 's' : '') + '?');
-    });
   },
 
   // ── Form ──────────────────────────────────────────────────────────────────
@@ -492,21 +457,13 @@ S.InventoryProducts = {
     const v = (val) => val != null && val !== '' ? val : '';
     const isActive = p ? p.active !== false : true;
 
-    // ── Header: title left (white), Back button right ──────────────────────
-    let titleHTML;
-    if (this.editId) {
-      const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (c === cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-      titleHTML = '<div style="display:flex;align-items:center;gap:10px;text-align:left;">'
-        + '<span style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;">Editing</span>'
-        + '<select id="ip-edit-cat" style="min-width:160px;">' + catOpts + '</select>'
-        + '<span style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;">Product</span>'
-        + '</div>';
-    } else {
-      titleHTML = '<div style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;text-align:left;">New ' + esc(spec.title) + ' Product</div>';
-    }
+    // ── Header: title left (white), Active toggle right (edit mode) ────────
+    const titleHTML = this.editId
+      ? '<div style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;text-align:left;">Editing ' + esc(cat) + ' Product</div>'
+      : '<div style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;text-align:left;">New ' + esc(spec.title) + ' Product</div>';
 
     const statusHTML = this.editId
-      ? '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;">'
+      ? '<div style="display:flex;align-items:center;gap:10px;">'
         + '<span class="ip-active-state" data-active="' + (isActive ? 'true' : 'false') + '" style="'
           + 'display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px;'
           + 'background:' + (isActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)') + ';'
@@ -520,11 +477,9 @@ S.InventoryProducts = {
       + '</div>'
       : '';
 
-    const header = '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:14px;">'
-      + '<div>'
-        + titleHTML
-        + statusHTML
-      + '</div>'
+    const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:14px;">'
+      + titleHTML
+      + statusHTML
     + '</div>';
 
     // ── Row 1: identity fields (Name, Brand, Sub-Cat, Vendor, Location) ────
@@ -728,15 +683,6 @@ S.InventoryProducts = {
     );
     document.getElementById('ip-vendor')?.addEventListener('change', () => this._refreshMissing());
     document.getElementById('ip-loc1')?.addEventListener('change', () => this._refreshMissing());
-
-    // Edit mode: changing the category dropdown re-renders the form for the
-    // new category. Field values that map directly persist via the existing
-    // product record. Operator should verify cost/size fields after a change
-    // since their unit interpretation can shift (per-case vs per-bottle).
-    document.getElementById('ip-edit-cat')?.addEventListener('change', ev => {
-      this._formCategory = ev.target.value;
-      this.renderForm();
-    });
 
     // Edit mode: status toggle. Flips the visual state and updates the
     // button label. Save reads the toggled state via the badge's data-active
@@ -1147,8 +1093,8 @@ S.InventoryProducts = {
     const header = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
       + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
       + '<div style="display:flex;gap:8px;">'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-how">How This Works</button>'
         + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-cancel">Cancel</button>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-how">How This Works</button>'
       + '</div></div>';
     if (this._import.stage === 'mapper') {
       return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>';
@@ -1179,26 +1125,31 @@ S.InventoryProducts = {
         + '<label>' + esc(f.label) + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
         + '<select id="ipm-' + f.key + '">' + optsFor(autoMap[f.key] || '') + '</select></div>';
     });
-    html += '</div><div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
+    html += '</div>';
+    // First rows preview so the operator can confirm they mapped the right columns.
+    const previewRows = rows.slice(0, 3);
+    if (previewRows.length) {
+      html += '<div style="margin-top:18px;"><div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;margin-bottom:6px;">FIRST ROWS FROM YOUR FILE</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>'
+        + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
+        + '</tbody></table></div></div>';
+    }
+    html += '<div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button></div>';
     return html;
   },
 
   showImportHelp(cat) {
     const spec = this.FORM_SPEC[cat] || {};
-    const fields = this.importFieldsForCategory(cat);
-    const rowsH = fields.map(f => '<tr><td style="padding:4px 14px 4px 0;color:var(--t1);white-space:nowrap;vertical-align:top;">'
-        + esc(f.label) + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</td>'
-        + '<td style="padding:4px 0;color:var(--t3);font-size:11px;">' + esc(f.aliases.slice(0, 4).join(', ')) + '</td></tr>').join('');
-    const html = '<div class="card" style="text-align:left;">'
-      + '<div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:var(--w);margin-bottom:12px;">How Importing ' + esc(spec.title || cat) + ' Works</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">'
-        + '<p style="margin:0 0 10px;"><strong style="color:var(--gold);">The file.</strong> A CSV or Excel (.xlsx / .xls) export from your POS, a distributor order guide, or your own spreadsheet. First row must be the column headers; one product per row.</p>'
-        + '<p style="margin:0 0 6px;"><strong style="color:var(--gold);">The columns.</strong> Only <strong>Name</strong> is required. The rest are optional and can be filled in after import. Your headers don\'t need to match exactly; these common names are auto-recognized:</p>'
-        + '<table style="border-collapse:collapse;margin:0 0 10px;"><tbody>' + rowsH + '</tbody></table>'
-        + '<p style="margin:0;"><strong style="color:var(--gold);">The mapping.</strong> After you drop the file, this box turns into a mapping screen with your columns auto-matched to each field. Fix any that are wrong, set ones you want to ignore to (skip), then Import. Every row imports as a ' + esc(spec.title || cat) + ' product; rows missing required data show as Incomplete to finish later.</p>'
-      + '</div></div>';
-    App.openModal(html, { id: 'ip-imp-help', layer: 9100, maxWidth: 560 });
+    const title = spec.title || cat;
+    const fieldLines = this.importFieldsForCategory(cat).map(f =>
+      f.label + (f.required ? ' (required)' : '') + ': ' + f.aliases.slice(0, 4).join(', '));
+    App.showHelpModal('How Importing ' + title + ' Works', [
+      { p: ['Bring in a whole ' + title + ' list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row.'] },
+      { h: 'The Columns', p: ['Only Product Name is required. Everything else is optional and can be filled in after import. Your headers do not need to match exactly; these common names are recognized for you:'].concat(fieldLines) },
+      { h: 'The Mapping', p: ['After you drop the file, this box shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a ' + title + ' product; rows missing required data show as Incomplete to finish later.'] }
+    ]);
   },
 
   async runImport() {
