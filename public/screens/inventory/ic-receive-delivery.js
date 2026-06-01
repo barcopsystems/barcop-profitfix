@@ -187,6 +187,10 @@ S.InventoryReceiveDelivery = {
       if (ev.target.classList.contains('rd-prod')) {
         const p = this.productById(ev.target.value);
         line.querySelector('.rd-price').value = p && p.unit_cost != null ? p.unit_cost : '';
+        // Switching the product detaches this line from the matched order's
+        // quantity, so clear the stashed ordered qty to avoid a phantom short count.
+        line.dataset.orderedQty = '';
+        line.dataset.shortCount = '';
       }
       this.recalcLine(line);
       this.recalcTotal();
@@ -462,7 +466,7 @@ S.InventoryReceiveDelivery = {
       id:             App.uid(),
       date,
       vendor,
-      ref:            document.getElementById('rd-disc-ref')?.value.trim() || '',
+      reference:      document.getElementById('rd-disc-ref')?.value.trim() || '',
       type:           document.getElementById('rd-disc-type')?.value || 'Other',
       sku:            document.getElementById('rd-disc-product')?.value.trim() || '',
       units:          parseFloat(document.getElementById('rd-disc-units')?.value) || 0,
