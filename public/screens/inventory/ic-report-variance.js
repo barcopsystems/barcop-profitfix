@@ -471,7 +471,7 @@ S.InventoryVarianceReport = {
 
   wireBody() {
     document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this.manualMap = { ...this.savedPosMap() }; this._unmatchedCollapsed = null; this.draw(); });
-    document.getElementById('vr-export')?.addEventListener('click', () => window.print());
+    document.getElementById('vr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Variance Report' }));
     document.getElementById('vr-unmatched-toggle')?.addEventListener('click', () => {
       this._unmatchedCollapsed = !this._unmatchedCollapsed;
       const body = document.getElementById('vr-unmatched-body');
