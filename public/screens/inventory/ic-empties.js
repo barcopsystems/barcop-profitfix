@@ -147,17 +147,15 @@ S.InventoryEmpties = {
     return '<div class="form-row" style="gap:10px;flex-wrap:wrap;">'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label>'
           + '<input type="date" id="em-date" value="' + esc(e?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:110px;"><label>Product</label>'
+        + '<div class="f" style="flex:1.4;min-width:150px;"><label>Product</label>'
           + '<select id="em-prod">' + this.productOptions(initialProdId) + '</select></div>'
-        + '<div class="f" style="width:60px;flex-shrink:0;"><label>Qty ' + tt('em-qty') + '</label>'
-          + '<input type="number" id="em-qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/></div>'
-        + '<div class="f" style="width:72px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="em-unit">' + this.unitOptions(initialCat, e?.unit || 'bottles') + '</select></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Qty ' + tt('em-qty') + '</label>'
+          + '<div class="fw"><input class="suf" type="number" id="em-qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/><span class="suf" id="em-qty-unit">' + (initialCat ? this.unitFor(initialCat) : 'bottles') + '</span></div></div>'
         + '<div class="f" style="width:86px;flex-shrink:0;"><label>Deposit ' + tt('em-deposit') + '</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="em-deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
         + '<div class="f" style="width:125px;flex-shrink:0;"><label>Disposition</label>'
           + '<select id="em-disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Performed By</label>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Performed By</label>'
           + '<select id="em-by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
@@ -171,13 +169,12 @@ S.InventoryEmpties = {
     this.wireProdChange();
   },
 
-  // Product change re-pops the unit options to match the product category.
+  // Product change updates the Qty unit suffix to match the product category.
   wireProdChange() {
     document.getElementById('em-prod')?.addEventListener('change', ev => {
       const p = this.productById(ev.target.value);
-      if (!p) return;
-      const unitSel = document.getElementById('em-unit');
-      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Draft Beer' ? 'kegs' : 'bottles');
+      const hint = document.getElementById('em-qty-unit');
+      if (hint) hint.textContent = p ? this.unitFor(p.category) : 'bottles';
     });
   },
 
@@ -251,12 +248,9 @@ S.InventoryEmpties = {
     return h;
   },
 
-  unitOptions(productCategory, selected) {
-    let opts = ['bottles', 'cans'];
-    if (productCategory === 'Draft Beer') opts = ['kegs'];
-    else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each'];
-    return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
-  },
+  // The empties unit is implied by the product: draft is by the keg, everything
+  // else (liquor, wine, bottle beer) is by the bottle. No picker needed.
+  unitFor(category) { return category === 'Draft Beer' ? 'kegs' : 'bottles'; },
 
   // Edit page (own screen). Same single-row field layout as the inline log
   // form; Cancel stays here because the operator navigated away to edit.
@@ -304,7 +298,7 @@ S.InventoryEmpties = {
       product_name:     product.name,
       category:         product.category || '',
       quantity,
-      unit:             document.getElementById('em-unit')?.value || '',
+      unit:             this.unitFor(product.category),
       deposit_amount:   parseFloat(document.getElementById('em-deposit')?.value) || 0,
       disposition,
       performed_by_id:  performedById,
