@@ -130,8 +130,7 @@ S.InventoryDeliveryHistory = {
     document.getElementById('dh-del-confirm').addEventListener('click', async () => {
       close();
       if (!App.canEdit('ic-delivery-history') || !App.inventoryData) return;
-      App.inventoryData.ic_deliveries = this.deliveries().filter(d => d.id !== id);
-      await App.saveInventory();
+      await App.removeRecord('ic', 'delivery', id);
       this.renderList();
     });
   },
