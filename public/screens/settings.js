@@ -300,7 +300,9 @@ S.HubSettings = {
       await App.saveInventory();
       await App.seedEventStores('ic');
       await App.saveLabor();
+      await App.seedEventStores('lc');
       await App.saveShift();
+      await App.seedEventStores('sc');
       this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
@@ -2562,8 +2564,10 @@ S.HubSettings = {
     await App.save();
     await App.saveInventory();           // config only (products, locations, vendors, batches, par/variance settings)
     await App.seedEventStores('ic');     // inventory event logs -> ic_events rows
-    await App.saveLabor();
-    await App.saveShift();
+    await App.saveLabor();               // config only (staff, positions, schedule templates, certs, notes)
+    await App.seedEventStores('lc');     // labor event logs -> lc_events rows
+    await App.saveShift();               // config only (settings, drawers, checklist templates)
+    await App.seedEventStores('sc');     // shift event logs -> sc_events rows
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six systems populated. Go test!'; }
@@ -2598,7 +2602,9 @@ S.HubSettings = {
     await App.saveInventory();
     await DB.clearEvents('ic_events');   // drop the inventory event rows too
     await App.saveLabor();
+    await DB.clearEvents('lc_events');   // drop the labor event rows too
     await App.saveShift();
+    await DB.clearEvents('sc_events');   // drop the shift event rows too
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
