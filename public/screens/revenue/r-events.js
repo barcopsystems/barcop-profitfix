@@ -122,7 +122,7 @@ S.RevenueEvents = {
 
     const statusColor = s => App.EVENT_STATUS_COLOR[s] || 'var(--t2)';
 
-    const rows = events.slice().reverse().map(e =>
+    const rows = events.slice().reverse().slice(0, App.listLimit('core', 'revenue_event')).map(e =>
       '<tr class="rev-row" data-id="' + esc(e.id) + '" style="cursor:pointer;">'
       + '<td>' + (e.date || '').slice(0, 10) + '</td>'
       + '<td style="font-weight:600;">' + esc(e.event_name || '') + '</td>'
@@ -149,6 +149,7 @@ S.RevenueEvents = {
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Event Name</th><th>Type</th><th>Covers ' + tt('r-covers') + '</th><th>F&B Min ' + tt('r-fb-minimum') + '</th><th>Revenue ' + tt('r-event-revenue') + '</th><th>Status</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + App.showOlderBar('core', 'revenue_event', events, false)
       + '</div>';
 
     container.querySelectorAll('.rev-view, .rev-row').forEach(el => {
@@ -166,11 +167,12 @@ S.RevenueEvents = {
         ev.stopPropagation();
         const ok = await App.confirm({ title: 'Delete this event?', confirmText: 'Delete', cancelText: 'Cancel' });
         if (!ok) return;
-        App.data.revenue_events = this.events().filter(e => e.id !== b.dataset.id);
-        await App.saveKey('revenue_events');
+        await App.removeRecord('core', 'revenue_event', b.dataset.id);
         this.render(container, actions);
       });
     });
+    container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.renderPipeline(container, actions)));
   },
 
   // ── Unified Event detail page (Profile + Linked Shifts + Event P&L) ─────
@@ -435,14 +437,14 @@ S.RevenueEvents = {
         notes:             document.getElementById('rev-notes')?.value || ''
       };
       const list = this.events();
+      let saved = rec;
       if (this._editId) {
         const i = list.findIndex(x => x.id === this._editId);
-        if (i > -1) list[i] = { ...list[i], ...rec };
+        if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
       } else {
         rec.saved_at = new Date().toISOString();
-        list.push(rec);
       }
-      await App.saveKey('revenue_events');
+      await App.putRecord('core', 'revenue_event', saved);
       this._editId = null;
       this.render(container, actions);
     });
