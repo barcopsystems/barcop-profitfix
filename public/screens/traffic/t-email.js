@@ -233,8 +233,7 @@ S.TrafficEmail = {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
         if (!(await App.confirm({ title: 'Delete this campaign entry?', confirmText: 'Delete' }))) return;
-        App.data.traffic_email_campaigns = this.campaigns().filter(x => x.id !== btn.dataset.id);
-        await App.saveKey('traffic_email_campaigns');
+        await App.removeRecord('core', 'traffic_email_campaign', btn.dataset.id);
         this.draw();
       });
     });
@@ -278,13 +277,12 @@ S.TrafficEmail = {
       saved_at: new Date().toISOString()
     };
     const list = this.campaigns();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     }
-    const ok = await App.saveKey('traffic_email_campaigns');
+    const ok = await App.putRecord('core', 'traffic_email_campaign', saved);
     if (ok) {
       const afterMonthCount = this.thisMonthCampaigns().length;
       // Crossing 1 sent this month closes the "no emails sent" gap. Above
