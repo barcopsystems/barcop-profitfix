@@ -66,29 +66,22 @@ S.HubBooks = {
   },
 
   // ── PDF executive summary — owner-readable, 1-page snapshot ──────────────
-  // Opens a styled summary in a new tab and triggers the browser print dialog
-  // so the owner can save it as a PDF or print it. Built from the same data
-  // as the XLSX so the numbers always agree.
-  _openPdfSummary() {
+  // Builds a clean, data-driven PDF via the shared App._pdfBuilder so it
+  // matches every other Bar Cop deliverable (no browser print dialog). Built
+  // from the same data as the XLSX so the numbers always agree.
+  async _openPdfSummary() {
     const monthKey = document.getElementById('hb-month')?.value;
     if (!monthKey) return;
     const monthLabel = this._monthLabel(monthKey);
-    const barName    = (App.data?.settings?.bar_name) || 'Bar Cop';
     const M   = this._aggregateMonth(monthKey);
     const YTD = this._aggregateYTD(monthKey);
 
     // Prior month for the "vs last month" line
     const prevKey = this._priorMonthKey(monthKey);
     const PREV    = prevKey ? this._aggregateMonth(prevKey) : null;
-    const delta   = (cur, prev) => (prev != null && prev !== 0) ? ((cur - prev) / prev) : null;
 
     const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtPct = (v) => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
-    const fmtPctDelta = (v) => {
-      if (v == null || isNaN(v)) return '';
-      const sign = v >= 0 ? '+' : '';
-      return ' (' + sign + (v * 100).toFixed(1) + '% vs ' + this._monthLabel(prevKey) + ')';
-    };
 
     // Latest audits for the recommendations section
     const monthEnd = this._monthEndDate(monthKey);
@@ -140,81 +133,60 @@ S.HubBooks = {
     const prevLabor = PREV && PREV.totalRev ? (PREV.totalLabor / PREV.totalRev) : null;
     const prevPrime = PREV && PREV.totalRev ? ((PREV.totalCogs + PREV.totalLabor) / PREV.totalRev) : null;
 
-    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
-      + '<title>' + esc(barName) + ' Books Summary, ' + esc(monthLabel) + '</title>'
-      + '<style>'
-      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
-      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
-      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
-      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
-      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
-      + 'td { padding: 4px 6px; border-bottom: 1px solid #eee; }'
-      + 'td.right { text-align: right; font-variant-numeric: tabular-nums; }'
-      + 'td.bold { font-weight: bold; }'
-      + 'td.muted { color: #666; font-size: 12px; }'
-      + '.delta-pos { color: #1a7a1a; }'
-      + '.delta-neg { color: #a01818; }'
-      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
-      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
-      + '</style></head><body>'
-      + '<h1>' + esc(barName) + ' Books Summary<span class="sub">' + esc(monthLabel) + '</span></h1>'
+    try { await App._ensurePDFLib(); }
+    catch (e) { this._setStatus('Could not load the PDF engine. Check your connection and try again.', 'var(--red)'); return; }
 
-      + '<h2>The Month in Dollars</h2>'
-      + '<table>'
-      + '<tr><td>Total Revenue (net of comps)</td><td class="right bold">' + fmt$(M.totalRev - (M.comps || 0)) + '</td></tr>'
-      + '<tr><td class="muted">  Bar Revenue</td><td class="right muted">' + fmt$(M.barRev) + '</td></tr>'
-      + '<tr><td class="muted">  Food Revenue</td><td class="right muted">' + fmt$(M.foodRev) + '</td></tr>'
-      + '<tr><td>Cost of Goods Sold</td><td class="right">' + fmt$(M.totalCogs) + '</td></tr>'
-      + '<tr><td>Labor</td><td class="right">' + fmt$(M.totalLabor) + '</td></tr>'
-      + '<tr><td>Prime Cost (COGS + Labor)</td><td class="right bold">' + fmt$(M.totalCogs + M.totalLabor) + '</td></tr>'
-      + '</table>'
+    const b = App._pdfBuilder('Books Summary');
+    b.header({ right: 'Books Summary', meta: monthLabel });
 
-      + '<h2>The Month in Percentages</h2>'
-      + '<table>'
-      + '<tr><td>Pour Cost</td><td class="right bold">' + fmtPct(pourCost) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(pourCost, prevPour, prevKey, true)) + '</td></tr>'
-      + '<tr><td>Food Cost</td><td class="right bold">' + fmtPct(foodCost) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(foodCost, prevFood, prevKey, true)) + '</td></tr>'
-      + '<tr><td>Labor %</td><td class="right bold">' + fmtPct(laborPct) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(laborPct, prevLabor, prevKey, true)) + '</td></tr>'
-      + '<tr><td>Prime Cost %</td><td class="right bold">' + fmtPct(primeCost) + '</td><td class="right muted">' + esc(this._pctDeltaLabel(primeCost, prevPrime, prevKey, true)) + '</td></tr>'
-      + '</table>'
+    b.sectionTitle('The Month in Dollars');
+    b.table(null, [
+      ['Total Revenue (net of comps)', fmt$(M.totalRev - (M.comps || 0))],
+      ['  Bar Revenue', fmt$(M.barRev)],
+      ['  Food Revenue', fmt$(M.foodRev)],
+      ['Cost of Goods Sold', fmt$(M.totalCogs)],
+      ['Labor', fmt$(M.totalLabor)],
+      ['Prime Cost (COGS + Labor)', fmt$(M.totalCogs + M.totalLabor)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + '<h2>Year to Date</h2>'
-      + '<table>'
-      + '<tr><td>Revenue (net of comps)</td><td class="right">' + fmt$(YTD.totalRev - (YTD.comps || 0)) + '</td></tr>'
-      + '<tr><td>COGS</td><td class="right">' + fmt$(YTD.totalCogs) + '</td></tr>'
-      + '<tr><td>Labor</td><td class="right">' + fmt$(YTD.totalLabor) + '</td></tr>'
-      + '<tr><td>Prime Cost</td><td class="right bold">' + fmt$(YTD.totalCogs + YTD.totalLabor) + '</td></tr>'
-      + '</table>'
+    b.sectionTitle('The Month in Percentages');
+    b.table(null, [
+      ['Pour Cost', fmtPct(pourCost), this._pctDeltaLabel(pourCost, prevPour, prevKey, true)],
+      ['Food Cost', fmtPct(foodCost), this._pctDeltaLabel(foodCost, prevFood, prevKey, true)],
+      ['Labor %', fmtPct(laborPct), this._pctDeltaLabel(laborPct, prevLabor, prevKey, true)],
+      ['Prime Cost %', fmtPct(primeCost), this._pctDeltaLabel(primeCost, prevPrime, prevKey, true)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + '<h2>Operational Events This Month</h2>'
-      + '<table>'
-      + '<tr><td>Voids and Comps Logged</td><td class="right">' + voidComps.length + '</td></tr>'
-      + '<tr><td>Cash Variances Logged</td><td class="right">' + variances.length + '</td></tr>'
-      + '<tr><td>Tips Logged (total)</td><td class="right">' + fmt$(totalTips) + '</td></tr>'
-      + '<tr><td>Call-Outs Logged</td><td class="right">' + callouts.length + '</td></tr>'
-      + '</table>'
+    b.sectionTitle('Year to Date');
+    b.table(null, [
+      ['Revenue (net of comps)', fmt$(YTD.totalRev - (YTD.comps || 0))],
+      ['COGS', fmt$(YTD.totalCogs)],
+      ['Labor', fmt$(YTD.totalLabor)],
+      ['Prime Cost', fmt$(YTD.totalCogs + YTD.totalLabor)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + '<h2>Top Opportunities From Your Audits</h2>'
-      + (topFive.length === 0
-          ? '<p style="color:#666;font-size:13px;">No open audit action items on file. Run a Profit, Revenue, or Traffic audit to surface opportunities.</p>'
-          : '<p style="color:#444;font-size:13px;margin-bottom:6px;">Total monthly opportunity across all systems: <strong>' + fmt$(totalMonthlyOpp) + '</strong>'
-            + '. Annualized: <strong>' + fmt$(totalMonthlyOpp * 12) + '</strong>.</p>'
-            + '<table>'
-            + topFive.map(it => '<tr><td>' + esc(it.system) + ': ' + esc(it.title) + '</td><td class="right">' + fmt$(it.monthly) + '/mo</td></tr>').join('')
-            + '</table>')
+    b.sectionTitle('Operational Events This Month');
+    b.table(null, [
+      ['Voids and Comps Logged', String(voidComps.length)],
+      ['Cash Variances Logged', String(variances.length)],
+      ['Tips Logged (total)', fmt$(totalTips)],
+      ['Call-Outs Logged', String(callouts.length)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Books. Month-end summary for the operator and their accountant.' })
-
-      + '<script>window.addEventListener("load", function() { setTimeout(function() { window.print(); }, 250); });<\/script>'
-      + '</body></html>';
-
-    const w = window.open('', '_blank');
-    if (!w) {
-      this._setStatus('Your browser blocked the new tab. Allow pop-ups for app.barcop.com and try again.', 'var(--red)');
-      return;
+    b.sectionTitle('Top Opportunities From Your Audits');
+    if (topFive.length === 0) {
+      b.paragraph('No open audit action items on file. Run a Profit, Revenue, or Traffic audit to surface opportunities.', { gray: 100 });
+    } else {
+      b.paragraph('Total monthly opportunity across all systems: ' + fmt$(totalMonthlyOpp)
+        + '. Annualized: ' + fmt$(totalMonthlyOpp * 12) + '.');
+      b.table(null, topFive.map(it => [it.system + ': ' + it.title, fmt$(it.monthly) + '/mo']),
+        { columnStyles: { 1: { halign: 'right' } } });
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+
+    b.disclaimer(App.deliverableFooter().workbookSubject);
+
+    const period = String(monthKey).replace('-', '') || App._pdfDateStamp();
+    await b.save('BarCop_MonthEndBooks_' + period + '.pdf');
   },
 
   // Helper for the PDF summary: format a "(% vs prior month)" label.
