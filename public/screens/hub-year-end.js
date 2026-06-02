@@ -968,10 +968,11 @@ S.HubYearEnd = {
   },
 
   // ── PDF Executive Summary ─────────────────────────────────────────────────
-  _openPdfSummary() {
+  // Builds a clean, data-driven multi-section PDF via the shared App._pdfBuilder
+  // (no browser print dialog). Same data as the XLSX so the numbers agree.
+  async _openPdfSummary() {
     const year = document.getElementById('hy-year')?.value;
     if (!year) return;
-    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
     const Y = this._aggregateYear(year);
     const priorYear = String(parseInt(year, 10) - 1);
     const P = this._aggregateYear(priorYear);
@@ -983,15 +984,13 @@ S.HubYearEnd = {
       if (!hasPrior || prev === 0 || cur == null || prev == null) return '';
       const d = (cur - prev) / Math.abs(prev);
       const sign = d >= 0 ? '+' : '';
-      const cls = d >= 0 ? 'delta-pos' : 'delta-neg';
-      return ' <span class="' + cls + '">(' + sign + (d * 100).toFixed(1) + '% vs ' + priorYear + ')</span>';
+      return ' (' + sign + (d * 100).toFixed(1) + '% vs ' + priorYear + ')';
     };
     const fmtPtsDelta = (cur, prev) => {
       if (!hasPrior || cur == null || prev == null) return '';
       const d = cur - prev;
       const sign = d >= 0 ? '+' : '';
-      const cls = d <= 0 ? 'delta-pos' : 'delta-neg'; // lower is better for cost ratios
-      return ' <span class="' + cls + '">(' + sign + (d * 100).toFixed(1) + ' pts vs ' + priorYear + ')</span>';
+      return ' (' + sign + (d * 100).toFixed(1) + ' pts vs ' + priorYear + ')';
     };
 
     // Cost ratios
@@ -1031,11 +1030,11 @@ S.HubYearEnd = {
       { label: 'Profit',  list: App.data?.audits || [] },
       { label: 'Revenue', list: App.data?.revenue_audits || [] },
       { label: 'Traffic', list: App.data?.traffic_audits || [] }
-    ].forEach(b => {
-      b.list.filter(a => inYear(a.date)).forEach(a => {
+    ].forEach(bk => {
+      bk.list.filter(a => inYear(a.date)).forEach(a => {
         (a.action_items || []).forEach(it => {
           allItems.push({
-            system: b.label,
+            system: bk.label,
             title: it.title || it.name || it.action || '(unnamed)',
             monthly: parseFloat(it.monthly_impact) || 0,
             date: a.date || ''
@@ -1047,125 +1046,80 @@ S.HubYearEnd = {
     const topFive = allItems.slice(0, 5);
     const totalAnnualOpp = allItems.reduce((s, i) => s + i.monthly, 0) * 12;
 
-    // Monthly trend table rows
-    const monthlyRows = Y.months.map((M, i) => {
-      const netRev = M.totalRev - (M.comps || 0);
-      const prime = M.totalCogs + M.totalLabor;
-      const primePct = M.totalRev ? (prime / M.totalRev) : null;
-      return '<tr>'
-        + '<td>' + this.MONTHS_SHORT[i] + '</td>'
-        + '<td class="right">' + fmt$(netRev) + '</td>'
-        + '<td class="right">' + fmt$(M.totalCogs) + '</td>'
-        + '<td class="right">' + fmt$(M.totalLabor) + '</td>'
-        + '<td class="right">' + fmt$(prime) + '</td>'
-        + '<td class="right">' + fmtPct(primePct) + '</td>'
-        + '</tr>';
-    }).join('');
+    try { await App._ensurePDFLib(); }
+    catch (e) { this._setStatus('Could not load the PDF engine. Check your connection and try again.', 'var(--red)'); return; }
 
-    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
-      + '<title>' + esc(barName) + ' Year-End Review, ' + year + '</title>'
-      + '<style>'
-      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
-      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
-      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
-      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
-      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
-      + 'td, th { padding: 4px 6px; border-bottom: 1px solid #eee; text-align: left; }'
-      + 'th { font-family: Arial, Helvetica, sans-serif; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #555; }'
-      + 'td.right, th.right { text-align: right; font-variant-numeric: tabular-nums; }'
-      + 'td.bold { font-weight: bold; }'
-      + 'td.muted { color: #666; font-size: 12px; }'
-      + '.delta-pos { color: #1a7a1a; }'
-      + '.delta-neg { color: #a01818; }'
-      + '.page-break { page-break-before: always; }'
-      + '.notes { background: #f7f4ea; border-left: 3px solid #8a6d00; padding: 12px 16px; font-size: 13px; line-height: 1.6; }'
-      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
-      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
-      + '</style></head><body>'
+    const b = App._pdfBuilder('Year-End Review');
+    b.header({ right: 'Year-End Review', meta: year + (hasPrior ? ' (with ' + priorYear + ' comparison)' : '') });
 
-      // ── Page 1: Headline numbers ──
-      + '<h1>' + esc(barName) + ' Year-End Review<span class="sub">' + year + (hasPrior ? ' (with ' + priorYear + ' comparison)' : '') + '</span></h1>'
+    // ── Headline numbers ──
+    b.sectionTitle('The Year in Dollars');
+    b.table(null, [
+      ['Total Revenue (net of comps)', fmt$(Y.totalRev - (Y.comps || 0)) + fmtDeltaPct(Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0))],
+      ['  Bar Revenue', fmt$(Y.barRev)],
+      ['  Food Revenue', fmt$(Y.foodRev)],
+      ['  Comps', fmt$(Y.comps)],
+      ['Cost of Goods Sold', fmt$(Y.totalCogs) + fmtDeltaPct(Y.totalCogs, P.totalCogs)],
+      ['Labor', fmt$(Y.totalLabor) + fmtDeltaPct(Y.totalLabor, P.totalLabor)],
+      ['Prime Cost (COGS + Labor)', fmt$(Y.totalCogs + Y.totalLabor) + fmtDeltaPct(Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor)],
+      ['Operating Margin', fmt$((Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor))]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + '<h2>The Year in Dollars</h2>'
-      + '<table>'
-      + '<tr><td>Total Revenue (net of comps)</td><td class="right bold">' + fmt$(Y.totalRev - (Y.comps || 0)) + fmtDeltaPct(Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0)) + '</td></tr>'
-      + '<tr><td class="muted">  Bar Revenue</td><td class="right muted">' + fmt$(Y.barRev) + '</td></tr>'
-      + '<tr><td class="muted">  Food Revenue</td><td class="right muted">' + fmt$(Y.foodRev) + '</td></tr>'
-      + '<tr><td class="muted">  Comps</td><td class="right muted">' + fmt$(Y.comps) + '</td></tr>'
-      + '<tr><td>Cost of Goods Sold</td><td class="right">' + fmt$(Y.totalCogs) + fmtDeltaPct(Y.totalCogs, P.totalCogs) + '</td></tr>'
-      + '<tr><td>Labor</td><td class="right">' + fmt$(Y.totalLabor) + fmtDeltaPct(Y.totalLabor, P.totalLabor) + '</td></tr>'
-      + '<tr><td>Prime Cost (COGS + Labor)</td><td class="right bold">' + fmt$(Y.totalCogs + Y.totalLabor) + fmtDeltaPct(Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor) + '</td></tr>'
-      + '<tr><td>Operating Margin</td><td class="right bold">' + fmt$((Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor)) + '</td></tr>'
-      + '</table>'
+    b.sectionTitle('The Year in Percentages');
+    b.table(null, [
+      ['Pour Cost', fmtPct(pourCost) + fmtPtsDelta(pourCost, prevPour)],
+      ['Food Cost', fmtPct(foodCost) + fmtPtsDelta(foodCost, prevFood)],
+      ['Labor %', fmtPct(laborPct) + fmtPtsDelta(laborPct, prevLabor)],
+      ['Prime Cost %', fmtPct(primeCost) + fmtPtsDelta(primeCost, prevPrime)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + '<h2>The Year in Percentages</h2>'
-      + '<table>'
-      + '<tr><td>Pour Cost</td><td class="right bold">' + fmtPct(pourCost) + fmtPtsDelta(pourCost, prevPour) + '</td></tr>'
-      + '<tr><td>Food Cost</td><td class="right bold">' + fmtPct(foodCost) + fmtPtsDelta(foodCost, prevFood) + '</td></tr>'
-      + '<tr><td>Labor %</td><td class="right bold">' + fmtPct(laborPct) + fmtPtsDelta(laborPct, prevLabor) + '</td></tr>'
-      + '<tr><td>Prime Cost %</td><td class="right bold">' + fmtPct(primeCost) + fmtPtsDelta(primeCost, prevPrime) + '</td></tr>'
-      + '</table>'
+    // ── Monthly trend ──
+    b.sectionTitle('Month by Month');
+    b.table(['Month', 'Net Revenue', 'COGS', 'Labor', 'Prime', 'Prime %'],
+      Y.months.map((M, i) => {
+        const netRev = M.totalRev - (M.comps || 0);
+        const prime = M.totalCogs + M.totalLabor;
+        const primePct = M.totalRev ? (prime / M.totalRev) : null;
+        return [this.MONTHS_SHORT[i], fmt$(netRev), fmt$(M.totalCogs), fmt$(M.totalLabor), fmt$(prime), fmtPct(primePct)];
+      }),
+      { columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } } });
 
-      // ── Page 2: Monthly trend ──
-      + '<div class="page-break"></div>'
-      + '<h2>Month by Month</h2>'
-      + '<table>'
-      + '<thead><tr><th>Month</th><th class="right">Net Revenue</th><th class="right">COGS</th><th class="right">Labor</th><th class="right">Prime</th><th class="right">Prime %</th></tr></thead>'
-      + '<tbody>' + monthlyRows + '</tbody>'
-      + '</table>'
+    // ── Operational events + top opportunities ──
+    b.sectionTitle('Operational Events');
+    b.table(null, [
+      ['Voids logged', String(voids.length)],
+      ['Comps logged', comps.length + ' (' + fmt$(comps.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)) + ')'],
+      ['Walked Tabs', walked.length + ' (' + fmt$(walked.reduce((s, w) => s + (parseFloat(w.amount) || 0), 0)) + ')'],
+      ['Incidents logged', String(incidents.length)],
+      ['Cash variances logged', String(variances.length)],
+      ['Call-outs logged', String(callouts.length)],
+      ['Tips logged (total)', fmt$(totalTips)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      // ── Page 3: Operational events + top opportunities ──
-      + '<div class="page-break"></div>'
-      + '<h2>Operational Events</h2>'
-      + '<table>'
-      + '<tr><td>Voids logged</td><td class="right">' + voids.length + '</td></tr>'
-      + '<tr><td>Comps logged</td><td class="right">' + comps.length + ' (' + fmt$(comps.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)) + ')</td></tr>'
-      + '<tr><td>Walked Tabs</td><td class="right">' + walked.length + ' (' + fmt$(walked.reduce((s, w) => s + (parseFloat(w.amount) || 0), 0)) + ')</td></tr>'
-      + '<tr><td>Incidents logged</td><td class="right">' + incidents.length + '</td></tr>'
-      + '<tr><td>Cash variances logged</td><td class="right">' + variances.length + '</td></tr>'
-      + '<tr><td>Call-outs logged</td><td class="right">' + callouts.length + '</td></tr>'
-      + '<tr><td>Tips logged (total)</td><td class="right">' + fmt$(totalTips) + '</td></tr>'
-      + '</table>'
-
-      + '<h2>Top Opportunities Surfaced This Year</h2>'
-      + (topFive.length === 0
-          ? '<p style="color:#666;font-size:13px;">No open audit action items on file for ' + year + '. Run a Profit, Revenue, or Traffic audit to surface opportunities.</p>'
-          : '<p style="color:#444;font-size:13px;margin-bottom:6px;">Total annualized opportunity across every audit run this year: <strong>' + fmt$(totalAnnualOpp) + '</strong>.</p>'
-            + '<table>'
-            + '<thead><tr><th>System</th><th>Opportunity</th><th class="right">Monthly $</th><th class="right">Annual $</th></tr></thead>'
-            + '<tbody>'
-            + topFive.map(it => '<tr><td>' + esc(it.system) + '</td><td>' + esc(it.title) + '</td><td class="right">' + fmt$(it.monthly) + '</td><td class="right">' + fmt$(it.monthly * 12) + '</td></tr>').join('')
-            + '</tbody></table>')
-
-      // ── Page 4: Year-end notes ──
-      + '<div class="page-break"></div>'
-      + '<h2>The Year in a Few Lines</h2>'
-      + '<div class="notes">'
-      + '<p><strong>Strongest revenue month:</strong> '
-      + (strongIdx >= 0 ? (this.MONTHS_FULL[strongIdx] + ', net revenue ' + fmt$(strongVal)) : 'No data')
-      + '.</p>'
-      + '<p><strong>Weakest revenue month (with data):</strong> '
-      + (weakIdx >= 0 ? (this.MONTHS_FULL[weakIdx] + ', net revenue ' + fmt$(weakVal)) : 'No data')
-      + '.</p>'
-      + '<p><strong>Prime cost ran at:</strong> ' + fmtPct(primeCost) + ' for the year. The target for a healthy operation is 60% to 65%. Numbers above that are where money is leaking; numbers below are where the operation is making real margin.</p>'
-      + '<p><strong>Cash control:</strong> ' + variances.length + ' shifts had a cash variance logged. ' + (variances.length === 0 ? 'Either the year ran clean or the shifts did not get fully reconciled. Worth a look either way.' : 'See the Cash Control Summary sheet in the workbook for the worst-offender shifts.') + '</p>'
-      + (topFive.length > 0
-          ? '<p><strong>Biggest opportunity surfaced:</strong> ' + esc(topFive[0].system) + ' audit flagged "' + esc(topFive[0].title) + '" at ' + fmt$(topFive[0].monthly * 12) + ' annual. Worth running the corresponding Fix Process if it is still open.</p>'
-          : '')
-      + '</div>'
-
-      + App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Year-End Review. Executive summary for the operator, the accountant, and the owner conversation.' })
-
-      + '<script>setTimeout(function(){window.print();}, 300);</script>'
-      + '</body></html>';
-
-    const win = window.open('', '_blank');
-    if (!win) {
-      this._setStatus('Pop-up blocked. Allow pop-ups for Bar Cop and try again.', 'var(--red)');
-      return;
+    b.sectionTitle('Top Opportunities Surfaced This Year');
+    if (topFive.length === 0) {
+      b.paragraph('No open audit action items on file for ' + year + '. Run a Profit, Revenue, or Traffic audit to surface opportunities.', { gray: 100 });
+    } else {
+      b.paragraph('Total annualized opportunity across every audit run this year: ' + fmt$(totalAnnualOpp) + '.');
+      b.table(['System', 'Opportunity', 'Monthly $', 'Annual $'],
+        topFive.map(it => [it.system, it.title, fmt$(it.monthly), fmt$(it.monthly * 12)]),
+        { columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } } });
     }
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
+
+    // ── Year-end notes ──
+    b.sectionTitle('The Year in a Few Lines');
+    b.paragraph('Strongest revenue month: '
+      + (strongIdx >= 0 ? (this.MONTHS_FULL[strongIdx] + ', net revenue ' + fmt$(strongVal)) : 'No data') + '.');
+    b.paragraph('Weakest revenue month (with data): '
+      + (weakIdx >= 0 ? (this.MONTHS_FULL[weakIdx] + ', net revenue ' + fmt$(weakVal)) : 'No data') + '.');
+    b.paragraph('Prime cost ran at: ' + fmtPct(primeCost) + ' for the year. The target for a healthy operation is 60% to 65%. Numbers above that are where money is leaking; numbers below are where the operation is making real margin.');
+    b.paragraph('Cash control: ' + variances.length + ' shifts had a cash variance logged. ' + (variances.length === 0 ? 'Either the year ran clean or the shifts did not get fully reconciled. Worth a look either way.' : 'See the Cash Control Summary sheet in the workbook for the worst-offender shifts.'));
+    if (topFive.length > 0) {
+      b.paragraph('Biggest opportunity surfaced: ' + topFive[0].system + ' audit flagged "' + topFive[0].title + '" at ' + fmt$(topFive[0].monthly * 12) + ' annual. Worth running the corresponding Fix Process if it is still open.');
+    }
+
+    b.disclaimer(App.deliverableFooter().workbookSubject);
+
+    await b.save('BarCop_YearEnd_' + year + '.pdf');
   }
 };
