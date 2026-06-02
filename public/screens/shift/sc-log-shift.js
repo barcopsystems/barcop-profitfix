@@ -180,16 +180,17 @@ S.ShiftLogShift = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.shifts();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('ls-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'shift', saved);
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_sc_shift');
@@ -209,8 +210,7 @@ S.ShiftLogShift = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_shifts = this.shifts().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'shift', delId);
       this.renderList();
     };
   }

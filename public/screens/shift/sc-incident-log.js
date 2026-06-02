@@ -76,7 +76,7 @@ S.ShiftIncidentLog = {
       html = summary + this.filterCard() + '<div class="empty"><div class="empty-title">No incidents match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
-      const rows = filtered.slice(0, 200).map(r => {
+      const rows = filtered.slice(0, App.listLimit('sc', 'incident')).map(r => {
         const sevColor = r.severity === 'Critical' ? 'var(--red)'
                       : r.severity === 'High' ? 'var(--red)'
                       : r.severity === 'Medium' ? 'var(--gold)'
@@ -98,6 +98,7 @@ S.ShiftIncidentLog = {
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>When</th><th>Type</th><th>Severity</th><th>Manager</th><th></th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'incident', filtered, !!(this.filterFrom || this.filterTo || this.filterType || this.filterSeverity))
         + '<div style="font-size:10px;color:var(--t3);margin-top:10px;line-height:1.6;">Generated from your input data. Not legal or insurance advice. Coordinate with your broker or attorney on any claim or matter.</div>';
     }
 
@@ -133,6 +134,7 @@ S.ShiftIncidentLog = {
 
   wireList() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.in-row');
       const edit = ev.target.closest('.in-edit');
       const del  = ev.target.closest('.in-del');
@@ -247,16 +249,17 @@ S.ShiftIncidentLog = {
     else rec.updated_at = new Date().toISOString();
 
     const list = this.incidents();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('in-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'incident', saved);
     this.editId = null;
     if (ok) this.renderList();
     else {
@@ -268,8 +271,7 @@ S.ShiftIncidentLog = {
   async confirmDel(id) {
     const ok = await App.confirm({ title: 'Delete this incident entry?', confirmText: 'Delete', cancelText: 'Cancel' });
     if (!ok) return;
-    App.shiftData.sc_incidents = this.incidents().filter(x => x.id !== id);
-    await App.saveShift();
+    await App.removeRecord('sc', 'incident', id);
     this.renderList();
   },
 

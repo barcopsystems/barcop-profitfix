@@ -58,7 +58,7 @@ S.ShiftCashDrop = {
         + '<div class="calc-item"><div class="calc-label">Drops</div><div class="calc-val">' + drops.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Dropped</div><div class="calc-val">' + App.fmtCurrency(total) + '</div></div>'
         + '</div>';
-      const rows = drops.map(d => '<tr class="cd-row" data-id="' + d.id + '" style="cursor:pointer;">'
+      const rows = drops.slice(0, App.listLimit('sc', 'cash_drop')).map(d => '<tr class="cd-row" data-id="' + d.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
         + '<td>' + esc(d.shift_type || '-') + '</td>'
         + '<td>' + esc(d.drawer || '-') + '</td>'
@@ -70,7 +70,8 @@ S.ShiftCashDrop = {
         + '</div></td></tr>').join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'cash_drop', drops, false);
     }
 
     const modal = '<div id="cd-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -83,6 +84,7 @@ S.ShiftCashDrop = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.cd-row');
       const edit = ev.target.closest('.cd-edit');
       const del = ev.target.closest('.cd-del');
@@ -237,9 +239,10 @@ S.ShiftCashDrop = {
     };
     if (!editing) rec.created_at = new Date().toISOString();
 
+    let saved = rec;
     if (editing) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
@@ -248,12 +251,16 @@ S.ShiftCashDrop = {
     // so the safe ledger must reflect it. Without this link the safe running
     // balance is wrong and the safe screen feels orphaned. On edit, update
     // the linked entry in place; on new, create it and store the id back on
-    // the cash drop record.
-    rec.safe_log_id = this._syncSafeLog(rec);
+    // the cash drop record. Both the drop and its safe entry persist as their
+    // own event rows.
+    const safeEntry = this._syncSafeLog(rec);
+    rec.safe_log_id = safeEntry ? safeEntry.id : null;
+    saved.safe_log_id = rec.safe_log_id;
 
     const btn = document.getElementById('cd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'cash_drop', saved);
+    if (safeEntry) await App.putRecord('sc', 'safe_log', safeEntry);
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_sc_cash');
@@ -265,9 +272,10 @@ S.ShiftCashDrop = {
   },
 
   // Mirror this cash drop into sc_safe_log as a Cash Drop entry. Returns the
-  // safe log entry id so the cash drop record can link to it for later
-  // updates and deletes. If a safe entry already exists for this drop
-  // (edit path), update it; otherwise create a new one.
+  // safe log entry (so the caller can link the cash drop to its id and persist
+  // the entry as its own event row) for later updates and deletes. If a safe
+  // entry already exists for this drop (edit path), update it; otherwise create
+  // a new one.
   _syncSafeLog(dropRec) {
     if (!App.shiftData) App.shiftData = {};
     if (!Array.isArray(App.shiftData.sc_safe_log)) App.shiftData.sc_safe_log = [];
@@ -287,11 +295,11 @@ S.ShiftCashDrop = {
     };
     if (dropRec.safe_log_id) {
       const i = log.findIndex(x => x.id === dropRec.safe_log_id);
-      if (i > -1) { log[i] = { ...log[i], ...fields }; return log[i].id; }
+      if (i > -1) { log[i] = { ...log[i], ...fields }; return log[i]; }
     }
     const newEntry = { id: App.uid(), ...fields, created_at: new Date().toISOString() };
     log.push(newEntry);
-    return newEntry.id;
+    return newEntry;
   },
 
   confirmDel(id) {
@@ -305,11 +313,8 @@ S.ShiftCashDrop = {
       this._pendingDelId = null;
       // Remove linked safe log entry so the safe running balance stays honest.
       const drop = this.drops().find(x => x.id === delId);
-      if (drop && drop.safe_log_id && Array.isArray(App.shiftData.sc_safe_log)) {
-        App.shiftData.sc_safe_log = App.shiftData.sc_safe_log.filter(e => e.id !== drop.safe_log_id);
-      }
-      App.shiftData.sc_cash_drops = this.drops().filter(x => x.id !== delId);
-      await App.saveShift();
+      if (drop && drop.safe_log_id) await App.removeRecord('sc', 'safe_log', drop.safe_log_id);
+      await App.removeRecord('sc', 'cash_drop', delId);
       this.renderList();
     };
   }

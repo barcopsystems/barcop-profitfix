@@ -558,13 +558,16 @@ S.Shift86List = {
 
     const list = this.items();
 
+    const toSave = [];
     if (this.editId) {
       // Edit mode — update the one record (no batch saves on edit)
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...recordFromTarget(primary) };
+      if (i > -1) { list[i] = { ...list[i], ...recordFromTarget(primary) }; toSave.push(list[i]); }
     } else {
       // Save primary
-      list.push({ id: App.uid(), ...recordFromTarget(primary), status: '86', date_back: '', created_at: new Date().toISOString() });
+      const primaryRec = { id: App.uid(), ...recordFromTarget(primary), status: '86', date_back: '', created_at: new Date().toISOString() };
+      list.push(primaryRec);
+      toSave.push(primaryRec);
       // Save each checked "also 86" dependent
       const alsoKeys = Object.keys(this.alsoIds);
       alsoKeys.forEach(k => {
@@ -573,13 +576,16 @@ S.Shift86List = {
         // Reason carries forward but flagged as a knock-on
         const sharedWithReason = { ...baseShared, reason: baseShared.reason ? baseShared.reason + ' (knock-on)' : 'Knock-on from ' + primary.name, notes: baseShared.notes };
         const rec = { ...recordFromTarget(target), ...sharedWithReason };
-        list.push({ id: App.uid(), ...rec, status: '86', date_back: '', created_at: new Date().toISOString() });
+        const knockRec = { id: App.uid(), ...rec, status: '86', date_back: '', created_at: new Date().toISOString() };
+        list.push(knockRec);
+        toSave.push(knockRec);
       });
     }
 
     const btn = document.getElementById('qa-go');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    let ok = true;
+    for (const r of toSave) { ok = (await App.putRecord('sc', 'eighty_six', r)) && ok; }
     this.editId = null;
     this.customMode = false;
     this.alsoIds = {};
@@ -596,7 +602,7 @@ S.Shift86List = {
     it.status = 'Back';
     it.date_back = new Date().toISOString().slice(0, 10);
     it.time_back = this.nowTime();
-    await App.saveShift();
+    await App.putRecord('sc', 'eighty_six', it);
     this.renderMain();
   },
 
@@ -608,7 +614,7 @@ S.Shift86List = {
     it.time_86 = this.nowTime();
     it.date_back = '';
     it.time_back = '';
-    await App.saveShift();
+    await App.putRecord('sc', 'eighty_six', it);
     this.renderMain();
   },
 
@@ -621,9 +627,8 @@ S.Shift86List = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_86_list = this.items().filter(x => x.id !== delId);
       if (this.editId === delId) { this.editId = null; this.customMode = false; this.alsoIds = {}; }
-      await App.saveShift();
+      await App.removeRecord('sc', 'eighty_six', delId);
       this.renderMain();
     };
   },

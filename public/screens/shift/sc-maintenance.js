@@ -81,7 +81,7 @@ S.ShiftMaintenance = {
         + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val">' + resolved.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Repair Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div>';
-      const rows = recs.map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
+      const rows = recs.slice(0, App.listLimit('sc', 'maintenance')).map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(r.date_reported) + '</div></td>'
         + '<td><div class="val">' + esc(r.equipment || '-') + '</div>'
         + (r.issue ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.issue) + '</div>' : '') + '</td>'
@@ -97,7 +97,8 @@ S.ShiftMaintenance = {
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th>'
         + '<th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'maintenance', recs, false);
     }
 
     const modal = '<div id="mt-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -110,6 +111,7 @@ S.ShiftMaintenance = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.mt-row');
       const edit = ev.target.closest('.mt-edit');
       const del = ev.target.closest('.mt-del');
@@ -226,16 +228,17 @@ S.ShiftMaintenance = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.records();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('mt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'maintenance', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -254,8 +257,7 @@ S.ShiftMaintenance = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_maintenance = this.records().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'maintenance', delId);
       this.renderList();
     };
   }

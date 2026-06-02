@@ -80,7 +80,7 @@ S.ShiftVarianceLog = {
         + (net >= 0 ? '+' : '') + App.fmtCurrency(net) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val ' + (flagged ? 'warn' : '') + '">' + flagged + '</div></div>'
         + '</div>';
-      const rows = variances.map(v => {
+      const rows = variances.slice(0, App.listLimit('sc', 'variance')).map(v => {
         const vr = v.variance || 0;
         const notCounted = v.status === 'Not Counted';
         const cls = notCounted ? '' : v.status === 'Short' ? 'neg' : v.status === 'Over' ? '' : 'pos';
@@ -102,7 +102,8 @@ S.ShiftVarianceLog = {
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th>'
         + '<th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'variance', variances, false);
     }
 
     const modal = '<div id="vl-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -115,6 +116,7 @@ S.ShiftVarianceLog = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.vl-row');
       const edit = ev.target.closest('.vl-edit');
       const del = ev.target.closest('.vl-del');
@@ -231,16 +233,17 @@ S.ShiftVarianceLog = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.variances();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('vl-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'variance', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -259,8 +262,7 @@ S.ShiftVarianceLog = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_variances = this.variances().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'variance', delId);
       this.renderList();
     };
   }

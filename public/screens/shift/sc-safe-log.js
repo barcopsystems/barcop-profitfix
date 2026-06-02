@@ -83,7 +83,8 @@ S.ShiftSafeLog = {
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + chrono.length + '</div></div>'
         + '</div>';
 
-      const rows = withBal.reverse().map(r => {
+      const ordered = withBal.reverse();
+      const rows = ordered.slice(0, App.listLimit('sc', 'safe_log')).map(r => {
         const e = r.e;
         const amtCell = r.signed < 0
           ? '<span class="neg">' + App.fmtCurrency(r.signed) + '</span>'
@@ -104,7 +105,8 @@ S.ShiftSafeLog = {
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th>'
         + '<th>Amount</th><th>Balance</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'safe_log', ordered, false);
     }
 
     const modal = '<div id="sl-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -117,6 +119,7 @@ S.ShiftSafeLog = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.sl-row');
       const edit = ev.target.closest('.sl-edit');
       const del = ev.target.closest('.sl-del');
@@ -214,16 +217,17 @@ S.ShiftSafeLog = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.entries();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('sl-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'safe_log', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -242,8 +246,7 @@ S.ShiftSafeLog = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_safe_log = this.entries().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'safe_log', delId);
       this.renderList();
     };
   }

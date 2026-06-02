@@ -118,7 +118,7 @@ S.ShiftOpeningChecklist = {
     if (hist.length === 0) {
       histCard = '';
     } else {
-      const rows = hist.map(r => {
+      const rows = hist.slice(0, App.listLimit('sc', 'checklist')).map(r => {
         const full = (r.done_count || 0) >= (r.total_count || 0) && (r.total_count || 0) > 0;
         const badge = full
           ? '<span class="badge badge-ok">Complete</span>'
@@ -136,7 +136,8 @@ S.ShiftOpeningChecklist = {
       histCard = '<div class="card"><div class="card-title">Completed Opening Checklists</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'checklist', hist, true) + '</div>';
     }
 
     const modal = '<div id="oc-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -153,6 +154,7 @@ S.ShiftOpeningChecklist = {
     // checkbox toggle and reset, so addEventListener would stack handlers and
     // history clicks would fire N+1 times after N re-renders.
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.oc-hrow');
       const hview = ev.target.closest('.oc-hview');
       const hdel = ev.target.closest('.oc-hdel');
@@ -215,7 +217,7 @@ S.ShiftOpeningChecklist = {
     const btn = document.getElementById('oc-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     this.runs().push(rec);
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'checklist', rec);
     if (ok) {
       this.startRun(this._run.templateId);
       this.renderMain();
@@ -278,8 +280,7 @@ S.ShiftOpeningChecklist = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_checklists = this.runs().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'checklist', delId);
       this.renderMain();
     };
   }

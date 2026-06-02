@@ -105,7 +105,8 @@ S.ShiftHistory = {
       table = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above to see logged shifts.</div></div>';
     } else {
-      const trs = rows.map(s => {
+      const displayRows = rows.slice(0, App.listLimit('sc', 'shift'));
+      const trs = displayRows.map(s => {
         const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
         const status = (s.status === 'Open')
           ? '<span class="badge badge-ok">Open</span>'
@@ -122,7 +123,8 @@ S.ShiftHistory = {
       table = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
         + '<th>Covers</th><th>Check Avg</th><th>Status</th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterStatus || this.filterFrom || this.filterTo));
     }
 
     this.container.innerHTML = '<div class="screen">' + summary + filters + table + '</div>';
@@ -130,6 +132,7 @@ S.ShiftHistory = {
     document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-log-missed')?.addEventListener('click', () => App.navigate('sc-log-shift'));
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.sh-row');
       if (ev.target.closest('#sh-f-clear')) {
         this.filterType = this.filterStatus = this.filterFrom = this.filterTo = '';

@@ -71,7 +71,7 @@ S.ShiftWalkedTabs = {
       html = summary + this.filterCard() + '<div class="empty"><div class="empty-title">No entries match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
-      const rows = filtered.slice(0, 200).map(r => {
+      const rows = filtered.slice(0, App.listLimit('sc', 'walked_tab')).map(r => {
         return '<tr class="wt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div>'
           + (r.time ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.time) + '</div>' : '') + '</td>'
@@ -88,7 +88,8 @@ S.ShiftWalkedTabs = {
       html = summary + this.filterCard()
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>When</th><th>Server</th><th>Check / Table</th><th>Amount</th><th>Reason</th><th>Manager</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'walked_tab', filtered, !!(this.filterFrom || this.filterTo || this.filterServerId || this.filterReason));
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
@@ -122,6 +123,7 @@ S.ShiftWalkedTabs = {
 
   wireList() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.wt-row');
       const edit = ev.target.closest('.wt-edit');
       const del  = ev.target.closest('.wt-del');
@@ -218,16 +220,17 @@ S.ShiftWalkedTabs = {
     else rec.updated_at = new Date().toISOString();
 
     const list = this.tabs();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('wt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'walked_tab', saved);
     this.editId = null;
     if (ok) this.renderList();
     else {
@@ -239,8 +242,7 @@ S.ShiftWalkedTabs = {
   async confirmDel(id) {
     const ok = await App.confirm({ title: 'Delete this walked tab entry?', confirmText: 'Delete', cancelText: 'Cancel' });
     if (!ok) return;
-    App.shiftData.sc_walked_tabs = this.tabs().filter(x => x.id !== id);
-    await App.saveShift();
+    await App.removeRecord('sc', 'walked_tab', id);
     this.renderList();
   }
 };

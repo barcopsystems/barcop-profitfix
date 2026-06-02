@@ -122,7 +122,7 @@ S.ShiftVoidComp = {
         + '<div class="calc-item"><div class="calc-label">Comps</div><div class="calc-val">' + comps.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Comp Total</div><div class="calc-val warn">' + App.fmtCurrency(compTot) + '</div></div>'
         + '</div>';
-      const rows = recs.map(r => {
+      const rows = recs.slice(0, App.listLimit('sc', 'void_comp')).map(r => {
         const badge = r.type === 'Void'
           ? '<span class="badge badge-warn">Void</span>'
           : '<span class="badge badge-dim">Comp</span>';
@@ -142,7 +142,8 @@ S.ShiftVoidComp = {
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th>'
         + '<th>Authorized By</th><th>Reason</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'void_comp', recs, false);
     }
 
     const modal = '<div id="vc-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -155,6 +156,7 @@ S.ShiftVoidComp = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.vc-row');
       const edit = ev.target.closest('.vc-edit');
       const del = ev.target.closest('.vc-del');
@@ -335,16 +337,17 @@ S.ShiftVoidComp = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.records();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('vc-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'void_comp', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -363,8 +366,7 @@ S.ShiftVoidComp = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_void_comps = this.records().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'void_comp', delId);
       this.renderList();
     };
   }

@@ -120,7 +120,7 @@ S.ShiftWaste = {
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + recs.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Cost</div><div class="calc-val warn">' + App.fmtCurrency(totalCost) + '</div></div>'
         + '</div>';
-      const rows = recs.map(r => {
+      const rows = recs.slice(0, App.listLimit('sc', 'waste')).map(r => {
         const p = this.productById(r.product_id);
         const unit = p ? this.unitLabel(p) : (r.unit || 'units');
         return '<tr class="wl-row" data-id="' + r.id + '" style="cursor:pointer;">'
@@ -139,7 +139,8 @@ S.ShiftWaste = {
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th>'
         + '<th>Reason</th><th>Recorded By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'waste', recs, false);
     }
 
     const modal = '<div id="wl-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -152,6 +153,7 @@ S.ShiftWaste = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.wl-row');
       const edit = ev.target.closest('.wl-edit');
       const del = ev.target.closest('.wl-del');
@@ -272,16 +274,17 @@ S.ShiftWaste = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.records();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('wl-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'waste', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -300,8 +303,7 @@ S.ShiftWaste = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.shiftData.sc_waste = this.records().filter(x => x.id !== delId);
-      await App.saveShift();
+      await App.removeRecord('sc', 'waste', delId);
       this.renderList();
     };
   }

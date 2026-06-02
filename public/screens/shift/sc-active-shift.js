@@ -141,7 +141,7 @@ S.ShiftActiveShift = {
     const btn = document.getElementById('as-start');
     if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
     this.shifts().push(rec);
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'shift', rec);
     if (ok) {
       this.renderActive(rec);
     } else {
@@ -327,7 +327,7 @@ S.ShiftActiveShift = {
       text,
       manager_id: s.manager_id || ''
     });
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'shift', list[i]);
     if (ok) {
       if (textEl) textEl.value = '';
       this.renderActive(list[i]);
@@ -341,7 +341,7 @@ S.ShiftActiveShift = {
     const i = list.findIndex(x => x.id === s.id);
     if (i < 0) return;
     list[i].shift_notes = (list[i].shift_notes || []).filter(n => n.id !== noteId);
-    const saved = await App.saveShift();
+    const saved = await App.putRecord('sc', 'shift', list[i]);
     if (saved) this.renderActive(list[i]);
   },
 
@@ -1043,7 +1043,8 @@ S.ShiftActiveShift = {
 
     const btn = document.getElementById('aw-finalize');
     if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
-    const ok = await App.saveShift();
+    let ok = await App.putRecord('sc', 'shift', list[i]);
+    if (ok && varianceLogged) ok = await App.putRecord('sc', 'variance', varianceLogged);
     if (ok) {
       this._closeDraft = null;
       this.renderClosed(list[i]);
