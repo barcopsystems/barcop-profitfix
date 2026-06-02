@@ -689,11 +689,11 @@ S.Hub = {
       + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
       + '<div class="nav-section">Accounting</div>'
       + navItem('weekly-pnl',         'Weekly P&L Brief',    'report',   [])
-      + navItem('operating-expenses', 'Operating Expenses',  'expense',  [])
       + navItem('books',              'Month-End Books',     'books',    [])
       + navItem('year-end',           'Year-End Review',     'calendar', [])
-      + '<div class="nav-section">Compliance</div>'
+      + '<div class="nav-section">Operations</div>'
       + navItem('permits',            'Permits and Licenses','shield',   [])
+      + navItem('operating-expenses', 'Operating Expenses',  'expense',  [])
       + '<div class="nav-section">Setup</div>'
       // Getting Started hides once every setup step is checked off so the
       // sidebar does not carry permanent clutter for operators past setup.
