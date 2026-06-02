@@ -90,7 +90,11 @@ S.LaborTipPool = {
       + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + this.historyCard() + '</div>'
+    const tipDisclaimer = '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you distribute</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Tip pool eligibility and distribution rules vary by jurisdiction. Verify participation requirements before distributing tips.</div>'
+      + '</div>';
+    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + tipDisclaimer + this.historyCard() + '</div>'
       + this.delModal();
 
     const rowsEl = document.getElementById('tp-rows');

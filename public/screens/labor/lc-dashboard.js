@@ -85,7 +85,7 @@ S.LaborDashboard = {
     if (uncovered) alerts.push({ sev: 'red', text: uncovered + ' uncovered call-out' + (uncovered === 1 ? '' : 's') + ' in the last 7 days', go: 'lc-callout-log' });
     const hasWeekSchedule = this.schedules().some(s => s.week_start === wkStart);
     if (!hasWeekSchedule) alerts.push({ sev: 'amber', text: 'No schedule built for the current week', go: 'lc-build-schedule' });
-    if (expiredCerts.length) alerts.push({ sev: 'red', text: expiredCerts.length + ' certification' + (expiredCerts.length === 1 ? '' : 's') + ' expired on active staff. Fix before next shift to avoid a fine.', go: 'lc-staff-roster' });
+    if (expiredCerts.length) alerts.push({ sev: 'red', text: expiredCerts.length + ' certification' + (expiredCerts.length === 1 ? '' : 's') + ' expired on active staff. Review before the next shift.', go: 'lc-staff-roster' });
     if (expiringCerts.length) alerts.push({ sev: 'amber', text: expiringCerts.length + ' certification' + (expiringCerts.length === 1 ? '' : 's') + ' expiring within 30 days', go: 'lc-staff-roster' });
 
     let alertCard;

@@ -55,8 +55,9 @@ S.LaborPayrollExport = {
           + '</div>'
         + '</div>'
         + '<div id="px-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
-        + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">'
-        + 'Bar Cop assembles these numbers from what you log. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll or timekeeping record. Verify every figure before running payroll.'
+        + '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-top:18px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you run payroll</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll or timekeeping record. Verify every figure before running payroll.</div>'
         + '</div>'
       + '</div>'
       + this._whatsInsideCard()
