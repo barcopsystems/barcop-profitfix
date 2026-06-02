@@ -87,6 +87,15 @@ S.RevenueForecast = {
         this.per_day[d] = saved.per_day && saved.per_day[d] != null ? saved.per_day[d] : 0;
         this.covers_per_day[d] = saved.covers_per_day && saved.covers_per_day[d] != null ? saved.covers_per_day[d] : (this.cover_defaults.per_day[d] || 0);
       });
+      // A quick weekly total set from the schedule has no per-day breakdown.
+      // Seed the days with an even split so the number shows here and saving
+      // preserves it; the operator can then refine any day. This is the day-one
+      // total flowing into the detailed forecast without losing the number.
+      const perSum = this.DAYS.reduce((t, d) => t + (parseFloat(this.per_day[d]) || 0), 0);
+      if (perSum === 0 && Number(saved.total) > 0) {
+        const each = Math.round((Number(saved.total) / this.DAYS.length) * 100) / 100;
+        this.DAYS.forEach(d => { this.per_day[d] = each; });
+      }
       this.notes = saved.notes || '';
     } else {
       this.savedId = null;
