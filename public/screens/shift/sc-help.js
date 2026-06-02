@@ -31,8 +31,8 @@ S.ShiftHelp = {
           a: 'Open Log a Shift, enter the missing shift\'s date and details, save. It lands in Shift History where it belongs. Until it is logged, the weekly revenue total in Profit and Revenue This Week sums only the shifts that exist, so the number is low. Either log the missing shift or override the weekly total manually in This Week (with a flagged note). Logging the shift is the cleaner path because it feeds every downstream system; overrides only patch the one weekly figure.' },
         { q: 'What does Shift History show?',
           a: 'Every saved shift, sorted newest first. Click any shift for the unified detail page: Profile (manager, drawer, opening bank, staff on floor), Revenue (bar/floor/covers/check average), Cash Reconciliation (opening bank, POS cash, drops, expected, counted, variance, status), Tip Reconciliation (logged vs POS vs variance), Exception Review acknowledgments, every timestamped Shift Note from during service, manager Notes, and the closing Handoff Notes. Nothing hidden, no "click here to see more" buried behind a second button. Use the history to spot the shift that ran outside the norm.' },
-        { q: 'How do I print or email a Shift Handoff Report?',
-          a: 'Open the shift in Shift History (or from the Shift Closed confirmation screen right after running the close wizard) and click Handoff Report. A one-page styled report opens in a new tab and auto-fires print. The Email Handoff button on the same screen opens your email client pre-filled with the same content as plain text so you can send it to the opener.' }
+        { q: 'How do I save or email a Shift Handoff Report?',
+          a: 'Open the shift in Shift History (or from the Shift Closed confirmation screen right after running the close wizard). Save Handoff PDF saves a clean one-page handoff straight to your computer. Email Handoff opens your email client pre-filled with the same content as plain text so you can send it to the opener.' }
       ]},
       { t: 'Cash Control', qa: [
         { q: 'What is a cash drop?',
