@@ -2309,7 +2309,11 @@ const App = {
         traffic_review_reply: 'traffic_review_replies', traffic_gbp_post: 'traffic_gbp_posts',
         traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns',
         // Shared Recovery Scoreboard feed — one module-tagged kind.
-        fix_log: 'fix_log'
+        fix_log: 'fix_log',
+        // Hub — executive monthly audit history. operating_expenses +
+        // permits_compliance stay in the blob: financial/compliance data read by
+        // arbitrary period, where the 24-month window would undercount.
+        bar_cop_audit: 'bar_cop_audits'
       }
     }
   },
