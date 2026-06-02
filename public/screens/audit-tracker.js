@@ -1136,7 +1136,11 @@ S.AuditTracker = {
     const actuals = (lab.lc_actuals || []).filter(inWindow);
     if (actuals.length) {
       cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
-      cd.labor_cost  = Math.round(actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0));
+      let laborCost = actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0);
+      // Add fixed salaried (exempt) cost over the span the windowed actuals cover.
+      const dts = actuals.map(a => a.date).filter(Boolean).sort();
+      if (dts.length) laborCost += App.salariedCost(dts[0], dts[dts.length - 1]).total;
+      cd.labor_cost = Math.round(laborCost);
       cd.sources.push('Labor Control actuals');
     }
 
