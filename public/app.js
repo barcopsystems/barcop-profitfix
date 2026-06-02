@@ -1211,14 +1211,19 @@ const App = {
     if (params.get('checkout')) window.history.replaceState({}, '', '/');
   },
 
+  // Both save paths persist config only: the 19 unbounded recovery/hub logs
+  // live row-per-record in core_events now (see EVENT_STORES.core), so the
+  // user_data blob never re-stores them. saveKey's `key` is already mutated on
+  // this.data by the caller; we just write the stripped blob. Every event
+  // write-site goes through putRecord/removeRecord instead.
   async save() {
-    const r = await DB.writeData(this.data);
+    const r = await DB.writeData(this._configBlob('core', this.data));
     if (!r.ok) console.error('Save failed:', r.error);
     return r.ok;
   },
 
   async saveKey(key) {
-    const r = await DB.writeKey(key, this.data[key]);
+    const r = await DB.writeData(this._configBlob('core', this.data));
     if (!r.ok) console.error('saveKey failed:', r.error);
     return r.ok;
   },
