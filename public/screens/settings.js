@@ -298,6 +298,7 @@ S.HubSettings = {
       App.shiftData     = backup.shiftData || {};
       await App.save();
       await App.saveInventory();
+      await App.seedEventStores('ic');
       await App.saveLabor();
       await App.saveShift();
       this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
@@ -2559,7 +2560,8 @@ S.HubSettings = {
 
     // ── Save everything — App.data plus all three Control stores ──
     await App.save();
-    await App.saveInventory();
+    await App.saveInventory();           // config only (products, locations, vendors, batches, par/variance settings)
+    await App.seedEventStores('ic');     // inventory event logs -> ic_events rows
     await App.saveLabor();
     await App.saveShift();
     App.updatePeriod();
@@ -2594,6 +2596,7 @@ S.HubSettings = {
     App.shiftData     = {};
     await App.save();
     await App.saveInventory();
+    await DB.clearEvents('ic_events');   // drop the inventory event rows too
     await App.saveLabor();
     await App.saveShift();
     App.updatePeriod();
