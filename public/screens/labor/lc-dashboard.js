@@ -5,9 +5,6 @@
    the current week, roster size, plus alerts and recent activity. */
 
 S.LaborDashboard = {
-  OT_THRESHOLD: 40,
-  APPROACHING: 35,
-
   actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
   schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
   staff()     { return ((App.laborData && App.laborData.lc_staff) || []); },
@@ -50,8 +47,8 @@ S.LaborDashboard = {
     const curWeek = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
     const byStaff = {};
     curWeek.forEach(a => { byStaff[a.staff_id || a.name] = (byStaff[a.staff_id || a.name] || 0) + (a.hours || 0); });
-    const over = Object.values(byStaff).filter(h => h > this.OT_THRESHOLD).length;
-    const approaching = Object.values(byStaff).filter(h => h >= this.APPROACHING && h <= this.OT_THRESHOLD).length;
+    const over = Object.values(byStaff).filter(h => h > App.OT_THRESHOLD).length;
+    const approaching = Object.values(byStaff).filter(h => h >= App.OT_APPROACHING && h <= App.OT_THRESHOLD).length;
 
     // recent call-outs
     const recentCallouts = this.callouts().filter(c => (c.date || '') >= cutoff);

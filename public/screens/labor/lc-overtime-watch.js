@@ -7,8 +7,6 @@
 
 S.LaborOvertimeWatch = {
   weekStart: null,
-  OT_THRESHOLD: 40,
-  APPROACHING: 35,
 
   actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
   schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
@@ -78,11 +76,11 @@ S.LaborOvertimeWatch = {
       const wage = App.wageForStaffOn ? App.wageForStaffOn(e.id, ws)
         : ((this.staffById(e.id) || {}).wage || (weekActuals.find(a => (a.staff_id || a.name) === e.id) || {}).wage || 0);
       const projected = Math.max(e.actual, e.scheduled);
-      const otHours = Math.max(0, projected - this.OT_THRESHOLD);
+      const otHours = Math.max(0, projected - App.OT_THRESHOLD);
       const otCost = otHours * wage * 0.5; // the OT premium (extra half-time)
       let status = 'OK';
-      if (projected > this.OT_THRESHOLD) status = 'Over';
-      else if (projected >= this.APPROACHING) status = 'Approaching';
+      if (projected > App.OT_THRESHOLD) status = 'Over';
+      else if (projected >= App.OT_APPROACHING) status = 'Approaching';
       // Actionable: how many hours to cut from remaining shifts to clear OT.
       // Only meaningful when projection includes future scheduled hours that
       // can actually be reduced. cutHours = projected - 40 (must cut at least
@@ -122,15 +120,15 @@ S.LaborOvertimeWatch = {
         + 'project who is heading into overtime.</div></div>';
     } else {
       const trs = rows.map(r => {
-        const badge = r.status === 'Over' ? '<span class="badge badge-warn">Over</span>'
-          : r.status === 'Approaching' ? '<span class="badge badge-warn">Approaching</span>'
-          : '<span class="badge badge-ok">OK</span>';
+        const badge = r.status === 'Over' ? '<span style="color:var(--red);font-weight:700;">Over</span>'
+          : r.status === 'Approaching' ? '<span style="color:var(--amber);font-weight:700;">Approaching</span>'
+          : '<span style="color:var(--gold);font-weight:700;">OK</span>';
         // Actionable suggestion: when over OT, tell the operator the exact
         // cut needed to clear the threshold. Saves them doing the math.
         const action = r.status === 'Over'
           ? '<span style="color:var(--red);font-weight:700;">Cut ' + r.cutHours.toFixed(1) + ' hr</span>'
           : r.status === 'Approaching'
-            ? '<span style="color:var(--gold);">Watch, ' + (this.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
+            ? '<span style="color:var(--gold);">Watch, ' + (App.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
             : '<span style="color:var(--t3);">-</span>';
         return '<tr>'
           + '<td><div class="val">' + esc(r.name) + '</div></td>'
@@ -148,7 +146,7 @@ S.LaborOvertimeWatch = {
         + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
-        + 'Projected is the greater of hours logged and hours scheduled. Threshold ' + this.OT_THRESHOLD
+        + 'Projected is the greater of hours logged and hours scheduled. Threshold ' + App.OT_THRESHOLD
         + ' hrs/week; extra OT cost is the half-time premium on projected overtime hours. The Suggested Action column shows the exact cut needed to clear the threshold.</div>'
         + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div></div>';
     }

@@ -150,8 +150,8 @@ S.LaborStaffRoster = {
           + '<td>' + esc(pos ? (pos.department || '-') : '-') + '</td>'
           + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '-') + '</td>'
           + '<td>' + (s.status === 'Inactive'
-              ? '<span class="badge badge-dim">Inactive</span>'
-              : '<span class="badge badge-ok">Active</span>') + '</td>'
+              ? '<span style="color:var(--t3);font-weight:700;">Inactive</span>'
+              : '<span style="color:var(--gold);font-weight:700;">Active</span>') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>'
@@ -328,9 +328,9 @@ S.LaborStaffRoster = {
     } else {
       const rows = list.map(c => {
         const status = this.certStatus(c);
-        const badge = status === 'expired' ? '<span class="badge badge-warn">Expired</span>'
-                   : status === 'expiring' ? '<span class="badge badge-warn">Expiring Soon</span>'
-                   : '<span class="badge badge-ok">Active</span>';
+        const badge = status === 'expired' ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
+                   : status === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring Soon</span>'
+                   : '<span style="color:var(--gold);font-weight:700;">Active</span>';
         return '<tr>'
           + '<td><div class="val">' + esc(c.cert_type || '-') + '</div>'
           + (c.cert_number ? '<div style="font-size:10px;color:var(--t3);">#' + esc(c.cert_number) + '</div>' : '') + '</td>'
@@ -451,12 +451,12 @@ S.LaborStaffRoster = {
       const rows = list.map(n => {
         const catColor = n.category === 'Praise' ? 'var(--gold)'
                        : n.category === 'Coaching' ? 'var(--blue)'
-                       : n.category === 'Concern' ? 'var(--gold)'
+                       : n.category === 'Concern' ? 'var(--amber)'
                        : 'var(--red)';
         return '<div style="padding:14px;border:1px solid var(--b2);border-radius:4px;margin-bottom:8px;">'
           + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px;">'
             + '<div style="display:flex;align-items:center;gap:10px;">'
-              + '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + catColor + ';border:1px solid ' + catColor + ';border-radius:3px;padding:2px 6px;">' + esc(n.category || 'Note') + '</span>'
+              + '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + catColor + ';">' + esc(n.category || 'Note') + '</span>'
               + '<span style="font-size:12px;color:var(--t2);">' + this.fmtDate(n.date) + '</span>'
               + (n.manager_name ? '<span style="font-size:11px;color:var(--t3);">by ' + esc(n.manager_name) + '</span>' : '')
             + '</div>'

@@ -137,7 +137,6 @@ S.LaborTipHistory = {
           shift_id: k,
           date: t.date,
           shift_type: t.shift_type || (s ? s.shift_type : '') || '',
-          manager: s ? (s.manager || '') : '',
           count: 0, cash: 0, card: 0,
           pool_amount: null
         };

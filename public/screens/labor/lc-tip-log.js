@@ -25,12 +25,6 @@ S.LaborTipLog = {
 
   // Hours worked for a given staff member on a given date — pulled from
   // Labor Control's lc_actuals so the operator doesn't have to retype.
-  hoursFor(staffId, date) {
-    if (!staffId || !date) return null;
-    const a = this.actuals().find(x => x.staff_id === staffId && x.date === date);
-    return a ? (a.hours || null) : null;
-  },
-
   // Shift dropdown options. Most-recent first. Includes Open shifts at the
   // top, then closed shifts from the last 14 days, then an "Other / Manual"
   // escape hatch for legacy or off-cycle entries.
@@ -296,7 +290,7 @@ S.LaborTipLog = {
     if (!hoursInp) return;
     // If editing and the hours field already has the saved value, don't overwrite
     if (existingRec && hoursInp.value && parseFloat(hoursInp.value) > 0) return;
-    const hrs = this.hoursFor(staffId, date);
+    const hrs = App.hoursFor(staffId, date);
     if (hrs != null && hrs > 0) hoursInp.value = hrs;
   },
 

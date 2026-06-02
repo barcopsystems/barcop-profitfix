@@ -22,11 +22,6 @@ S.LaborTipPool = {
   tips() { return ((App.laborData && App.laborData.lc_tips) || []); },
   actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
   // Pull hours worked for a staff member on a given date from lc_actuals.
-  hoursFor(staffId, date) {
-    if (!staffId || !date) return null;
-    const a = this.actuals().find(x => x.staff_id === staffId && x.date === date);
-    return a ? (a.hours || null) : null;
-  },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -54,15 +49,11 @@ S.LaborTipPool = {
     }
 
     const equal = this.method === 'equal';
-    const staffOpts = sel => '<option value="">Select staff...</option>'
-      + this.staff().filter(s => s.status !== 'Inactive' || s.id === sel).map(s =>
-          '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-
     const rowHtml = this.rows.map((r, i) =>
       '<div class="tp-row" data-idx="' + i + '" style="display:flex;gap:10px;align-items:flex-end;'
       + 'flex-wrap:wrap;padding:10px;border:1px solid var(--b1);border-radius:6px;margin-bottom:8px;">'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
-      + '<select class="tp-staff">' + staffOpts(r.staff_id) + '</select></div>'
+      + '<select class="tp-staff">' + App.staffOptions(r.staff_id) + '</select></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Hours</label>'
       + '<input type="number" class="tp-hours" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"'
       + (equal ? ' disabled' : '') + '/></div>'
@@ -114,7 +105,7 @@ S.LaborTipPool = {
         const idx = row ? parseInt(row.dataset.idx, 10) : -1;
         const hoursInp = row?.querySelector('.tp-hours');
         if (idx >= 0 && hoursInp && !hoursInp.value && this.date) {
-          const hrs = this.hoursFor(ev.target.value, this.date);
+          const hrs = App.hoursFor(ev.target.value, this.date);
           if (hrs != null && hrs > 0) {
             hoursInp.value = hrs;
             if (this.rows[idx]) this.rows[idx].hours = hrs;
@@ -202,7 +193,7 @@ S.LaborTipPool = {
     dayTips.forEach(t => {
       if (!t.staff_id || seen[t.staff_id]) return;
       seen[t.staff_id] = true;
-      const hrs = (t.hours != null && t.hours > 0) ? t.hours : (this.hoursFor(t.staff_id, date) || '');
+      const hrs = (t.hours != null && t.hours > 0) ? t.hours : (App.hoursFor(t.staff_id, date) || '');
       this.rows.push({ staff_id: t.staff_id, hours: hrs });
     });
     this.renderMain();

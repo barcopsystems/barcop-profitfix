@@ -171,12 +171,8 @@ S.LaborDailyView = {
     document.getElementById('dv-em-save').onclick = async () => {
       const newHours = parseFloat(hoursInp?.value);
       if (isNaN(newHours) || newHours < 0) return;
-      a.hours = newHours;
-      a.cost  = newHours * wage;
-      a.notes = (notesInp?.value || '').trim();
-      a.updated_at = new Date().toISOString();
       modal.style.display = 'none';
-      await App.putRecord('lc', 'actual', a);
+      await App.updateActual(a, { hours: newHours, notes: notesInp?.value || '' });
       this.draw();
     };
   }

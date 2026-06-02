@@ -41,7 +41,7 @@ S.LaborHelp = {
         { q: 'How does the expiry alert work?',
           a: 'Bar Cop flags any certification expiring within 30 days as Expiring Soon, and any already past its date as Expired. Both surface on the Labor Control dashboard with the staff member and the cert type. A bartender working an expired TABC is a regulatory exposure your shift manager should not be guessing at. The 30-day window gives the staff member time to renew before they show up to a shift and cannot legally work.' },
         { q: 'What if my state requires a cert Bar Cop does not list?',
-          a: 'Pick Custom on the cert type dropdown and type the name. Bar Cop tracks it the same way: expiration date, alert at 30 days, expired flag past the date. The common defaults cover most US jurisdictions; the custom path covers the rest without forcing you to map your state\'s exact terminology.' }
+          a: 'Pick Other on the cert type dropdown and put the specific name in the notes field. Bar Cop tracks it the same way: expiration date, alert at 30 days, expired flag past the date. The common defaults cover most US jurisdictions; Other covers the rest without forcing you to map your state\'s exact terminology.' }
       ]},
       { t: 'Coaching Log', qa: [
         { q: 'What is the Coaching Log?',
@@ -53,11 +53,11 @@ S.LaborHelp = {
       ]},
       { t: 'Scheduling', qa: [
         { q: 'How does Build Schedule work?',
-          a: 'Pick the week, confirm the revenue forecast for the week (read-only from Revenue Recovery, with an Edit Forecast button if you need to update it), and start adding shifts. Each shift has a staff member, a day, and start/end times. As you assign hours, Build Schedule shows live labor cost in dollars, labor percentage against your target, projected RPLH against your target, and budgeted versus actual hours by department. Build the schedule to those numbers, not from the gut. Saving sends it to Schedule History.' },
+          a: 'Pick the week, confirm the revenue forecast for the week (read-only from Revenue Recovery, with an Edit Forecast button if you need to update it), and start adding shifts. Each shift has a staff member, a day, and start/end times. As you assign hours, Build Schedule shows live labor cost in dollars, labor percentage against your target, and projected RPLH against your target. Build the schedule to those numbers, not from the gut. Saving sends it to Schedule History.' },
         { q: 'How does conflict detection work?',
           a: 'As you build the schedule, Bar Cop checks every row for two kinds of conflicts. First, inactive staff: assigning a shift to a staff member whose roster status is off flags an inline warning. Second, time overlaps: scheduling the same person twice on the same day with overlapping times flags both rows. The warning shows under the affected row in gold so you see it before you save, not after the staff member shows up confused on Tuesday.' },
         { q: 'Why start from a revenue forecast?',
-          a: 'A schedule built before checking forecast revenue is built on habit. A schedule built from a revenue number is a plan. The difference shows up in labor percentage every week. The forecast at the top of Build Schedule turns into a labor budget in hours and dollars for each department, so the math is done before you write a single name into a slot. The forecast lives in Revenue Recovery; Build Schedule reads it so the number is the same across every screen.' },
+          a: 'A schedule built before checking forecast revenue is built on habit. A schedule built from a revenue number is a plan. The difference shows up in labor percentage every week. The forecast at the top of Build Schedule turns into a labor budget in hours and dollars, so the math is done before you write a single name into a slot. The forecast lives in Revenue Recovery; Build Schedule reads it so the number is the same across every screen.' },
         { q: 'What are schedule templates for?',
           a: 'A typical week of shifts saved as a starting point. Build a template once for a normal week (or for a busy week, or for a slow week), then on the Templates screen, apply the template to next week and Build Schedule pre-fills with those shifts. Adjust as needed. Most bars run two or three templates that cover 90 percent of their weeks.' },
         { q: 'What does Copy to New Week do?',
@@ -77,7 +77,7 @@ S.LaborHelp = {
         { q: 'What does Daily View show?',
           a: 'One day at a time: who worked, their start and end times, total hours, total cost at the wage in effect that day, and actual versus scheduled for that day. Use it to spot the day that went over budget and understand why: who clocked in early, who stayed past their scheduled end, where the overtime came from. Daily View is the diagnosis screen for any single day that ran hot.' },
         { q: 'What does Weekly Summary show?',
-          a: 'A week rolled up by staff and by day, with labor percentage and RPLH against the week\'s forecast. The screen flags any department running more than 2 points over target. Use it on Monday morning before building the next week. A department that ran over needs a tighter build. A department that ran under needs the cause checked: was it a revenue miss, a call-out, or genuinely lean scheduling that worked.' }
+          a: 'A week rolled up by staff and by day, with labor percentage and RPLH against the week\'s forecast. Use it on Monday morning before building the next week. A department that ran over needs a tighter build. A department that ran under needs the cause checked: was it a revenue miss, a call-out, or genuinely lean scheduling that worked.' }
       ]},
       { t: 'Tips', qa: [
         { q: 'What is the Tip Log?',

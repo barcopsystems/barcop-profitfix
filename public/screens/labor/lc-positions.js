@@ -52,8 +52,8 @@ S.LaborPositions = {
         + '<td>' + esc(p.department || '-') + '</td>'
         + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-') + '</td>'
         + '<td>' + (p.tipped
-            ? '<span class="badge badge-ok">Tipped</span>'
-            : '<span class="badge badge-dim">Non-Tipped</span>') + '</td>'
+            ? '<span style="color:var(--gold);font-weight:700;">Tipped</span>'
+            : '<span style="color:var(--t3);font-weight:700;">Non-Tipped</span>') + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>'
         + '<button class="btn btn-danger btn-sm lp-del" data-id="' + p.id + '">Delete</button>'

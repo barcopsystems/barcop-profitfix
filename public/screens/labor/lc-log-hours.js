@@ -118,12 +118,6 @@ S.LaborLogHours = {
     };
   },
 
-  staffOptions(selId) {
-    return '<option value="">Select staff...</option>'
-      + this.staff().filter(s => s.status !== 'Inactive' || s.id === selId).map(s =>
-          '<option value="' + s.id + '"' + (s.id === selId ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-  },
-
   showForm(id) {
     if (id && !App.canEdit('lc-log-hours')) return;
     this.editId = id || null;
@@ -149,7 +143,7 @@ S.LaborLogHours = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="lo-date" value="' + esc(a?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
-      + '<select id="lo-staff">' + this.staffOptions(a ? a.staff_id : '') + '</select></div>'
+      + '<select id="lo-staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Shift</label>'
       + '<select id="lo-shift">' + shiftOpts + '</select></div>'
       + '</div>'

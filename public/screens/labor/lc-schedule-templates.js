@@ -48,7 +48,7 @@ S.LaborScheduleTemplates = {
     let html;
     if (list.length === 0) {
       html = '<div class="empty"><div class="empty-title">No schedule templates yet</div>'
-        + '<div class="empty-sub">Build a template — a typical week of shifts — and apply it in Build '
+        + '<div class="empty-sub">Build a template, a typical week of shifts, and apply it in Build '
         + 'Schedule to save time each week.</div>'
         + '<button class="btn btn-primary" id="lt-add-first">New Template</button></div>';
     } else {
@@ -114,7 +114,7 @@ S.LaborScheduleTemplates = {
     return '<div class="lt-line" data-idx="' + idx + '" style="display:flex;gap:10px;align-items:flex-end;'
       + 'flex-wrap:wrap;padding:10px;border:1px solid var(--b1);border-radius:6px;margin-bottom:8px;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Staff</label>'
-      + '<select class="lt-staff">' + bs.staffOptions(sh.staff_id) + '</select></div>'
+      + '<select class="lt-staff">' + App.staffOptions(sh.staff_id, { placeholder: 'Staff...' }) + '</select></div>'
       + '<div class="f" style="width:90px;flex-shrink:0;"><label>Day</label>'
       + '<select class="lt-day">' + bs.dayOptions(sh.day) + '</select></div>'
       + '<div class="f" style="width:110px;flex-shrink:0;"><label>Start</label>'

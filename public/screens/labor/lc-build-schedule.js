@@ -90,11 +90,6 @@ S.LaborBuildSchedule = {
     this.draw();
   },
 
-  staffOptions(selId) {
-    return '<option value="">Staff...</option>'
-      + this.staff().filter(s => s.status !== 'Inactive' || s.id === selId).map(s =>
-          '<option value="' + s.id + '"' + (s.id === selId ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-  },
   dayOptions(sel) {
     return this.DAYS.map(d => '<option' + (d === sel ? ' selected' : '') + '>' + d + '</option>').join('');
   },
@@ -103,7 +98,7 @@ S.LaborBuildSchedule = {
     return '<div class="bs-row" data-idx="' + idx + '" style="display:flex;gap:10px;align-items:flex-end;'
       + 'flex-wrap:wrap;padding:10px;border:1px solid var(--b1);border-radius:6px;margin-bottom:8px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Staff</label>'
-      + '<select class="bs-staff">' + this.staffOptions(sh.staff_id) + '</select></div>'
+      + '<select class="bs-staff">' + App.staffOptions(sh.staff_id, { placeholder: 'Staff...' }) + '</select></div>'
       + '<div class="f" style="width:84px;flex-shrink:0;"><label>Day</label>'
       + '<select class="bs-day">' + this.dayOptions(sh.day) + '</select></div>'
       + '<div class="f" style="width:104px;flex-shrink:0;"><label>Start</label>'

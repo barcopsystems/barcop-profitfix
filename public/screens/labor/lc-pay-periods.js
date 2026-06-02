@@ -17,7 +17,6 @@
    name, position, regular hours, OT hours, regular wage, OT wage, gross. */
 
 S.LaborPayPeriods = {
-  OT_THRESHOLD: 40,
   detailWeekStart: null,
 
   actuals()  { return ((App.laborData && App.laborData.lc_actuals)     || []); },
@@ -80,8 +79,8 @@ S.LaborPayPeriods = {
       byStaff[key].cost  += a.cost  || 0;
     });
     const rows = Object.values(byStaff).map(r => {
-      const regularHours = Math.min(r.hours, this.OT_THRESHOLD);
-      const otHours      = Math.max(0, r.hours - this.OT_THRESHOLD);
+      const regularHours = Math.min(r.hours, App.OT_THRESHOLD);
+      const otHours      = Math.max(0, r.hours - App.OT_THRESHOLD);
       const wage         = r.wage || 0;
       const regularCost  = regularHours * wage;
       const otCost       = otHours * wage * 1.5;
@@ -126,8 +125,8 @@ S.LaborPayPeriods = {
       const saved = this.periods().find(p => p.week_start === ws);
       const isClosed = !!saved && saved.status === 'Closed';
       const statusBadge = isClosed
-        ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 5px;">CLOSED</span>'
-        : '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;">OPEN</span>';
+        ? '<span style="font-weight:700;letter-spacing:1px;color:var(--gold);">CLOSED</span>'
+        : '<span style="font-weight:700;letter-spacing:1px;color:var(--t3);">OPEN</span>';
       const actions = isClosed
         ? '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
           + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll CSV</button>'
@@ -161,7 +160,7 @@ S.LaborPayPeriods = {
     this.container.innerHTML = '<div class="screen">'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.55;">'
         + 'Weekly pay periods, Monday through Sunday. Closing a period locks every lc_actuals record in the range so Log Hours stops accepting edits. Payroll CSV exports the period as a one-row-per-employee file ready for your payroll provider. OT premium (half-time) is included in gross for hours over '
-        + this.OT_THRESHOLD + '/week.'
+        + App.OT_THRESHOLD + '/week.'
       + '</div>'
       + summary
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -196,9 +195,9 @@ S.LaborPayPeriods = {
       const tipCell = isTipped
         ? (stateMinValid
             ? (below
-                ? '<span class="badge badge-warn" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
-                : '<span class="badge badge-ok">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>')
-            : '<span class="badge badge-dim">Set State Min Wage</span>')
+                ? '<span style="color:var(--red);font-weight:700;" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
+                : '<span style="color:var(--gold);font-weight:700;">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>')
+            : '<span style="color:var(--t3);font-weight:700;">Set State Min Wage</span>')
         : '<span style="color:var(--t4);font-size:11px;">Non-Tipped</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + '</div>'

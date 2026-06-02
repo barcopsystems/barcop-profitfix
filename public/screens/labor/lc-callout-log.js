@@ -80,17 +80,17 @@ S.LaborCalloutLog = {
         + '</div>';
       const rows = list.slice(0, App.listLimit('lc', 'callout')).map(c => {
         const reps = this.repeatCount(c.staff_id);
-        const repTag = reps > 1 ? ' <span class="badge badge-warn">' + reps + '&times; / 60d</span>' : '';
+        const repTag = reps > 1 ? ' <span style="color:var(--red);font-weight:700;">' + reps + '&times; / 60d</span>' : '';
         return '<tr class="co-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.name || '-') + repTag + '</td>'
           + '<td>' + (c.type === 'No-Show'
-              ? '<span class="badge badge-warn">No-Show</span>'
-              : '<span class="badge badge-dim">' + esc(c.type || '-') + '</span>') + '</td>'
+              ? '<span style="color:var(--red);font-weight:700;">No-Show</span>'
+              : '<span style="color:var(--t3);font-weight:700;">' + esc(c.type || '-') + '</span>') + '</td>'
           + '<td>' + esc(c.shift_type || '-') + '</td>'
           + '<td>' + (c.covered
-              ? '<span class="badge badge-ok">Covered</span>'
-              : '<span class="badge badge-warn">Not Covered</span>') + '</td>'
+              ? '<span style="color:var(--gold);font-weight:700;">Covered</span>'
+              : '<span style="color:var(--red);font-weight:700;">Not Covered</span>') + '</td>'
           + '<td><div class="row-actions">'
           + (App.canEdit('lc-callout-log') ? '<button class="btn btn-ghost btn-sm co-edit" data-id="' + c.id + '">Edit</button>' : '')
           + (App.canEdit('lc-callout-log') ? '<button class="btn btn-danger btn-sm co-del" data-id="' + c.id + '">Delete</button>' : '')

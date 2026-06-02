@@ -202,23 +202,13 @@ S.LaborWeeklySummary = {
     ).join('');
     document.getElementById('ws-em-cancel').onclick = () => { modal.style.display = 'none'; };
     document.getElementById('ws-em-save').onclick = async () => {
-      const changed = [];
+      const edits = [];
       body.querySelectorAll('.form-row').forEach(row => {
-        const id = row.dataset.id;
-        const rec = this.actuals().find(a => a.id === id);
-        if (!rec) return;
-        const newH = parseFloat(row.querySelector('.ws-em-hours')?.value);
-        if (!isNaN(newH) && newH >= 0) {
-          rec.hours = newH;
-          const wage = rec.wage != null ? rec.wage : (App.wageForStaffOn ? App.wageForStaffOn(rec.staff_id, rec.date) : 0);
-          rec.cost = newH * wage;
-        }
-        rec.notes = (row.querySelector('.ws-em-notes')?.value || '').trim();
-        rec.updated_at = new Date().toISOString();
-        changed.push(rec);
+        const rec = this.actuals().find(a => a.id === row.dataset.id);
+        if (rec) edits.push({ rec, hours: parseFloat(row.querySelector('.ws-em-hours')?.value), notes: row.querySelector('.ws-em-notes')?.value || '' });
       });
       modal.style.display = 'none';
-      for (const rec of changed) { await App.putRecord('lc', 'actual', rec); }
+      for (const e of edits) { await App.updateActual(e.rec, { hours: e.hours, notes: e.notes }); }
       this.draw();
     };
   }
