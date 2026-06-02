@@ -274,8 +274,7 @@ S.RevenueMenuEngineering = {
       // area. Recovery.js watches check_avg + revenue for the 8 weeks after a
       // fix_date and surfaces the recovered dollars. No more manual "mark
       // implemented" step for a price change that already got logged here.
-      if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
-      App.data.fix_log.push({
+      const fixLogRec = {
         id:        App.uid(),
         module:    'revenue',
         gap_id:    'pricing',
@@ -284,10 +283,10 @@ S.RevenueMenuEngineering = {
         source:    'price-change',
         source_id: entry.id,
         note:      'Price change logged: ' + (item.name || '') + ' ' + App.fmtCurrency(item.price) + ' to ' + App.fmtCurrency(newPrice)
-      });
+      };
       await App.putRecord('core', 'revenue_price_log', entry);
       await App.saveKey('menu_items');
-      await App.saveKey('fix_log');
+      await App.putRecord('core', 'fix_log', fixLogRec);
       // Refresh log table inline
       const tbody = document.getElementById('rps-log-table');
       if (tbody) {
