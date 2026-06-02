@@ -129,7 +129,7 @@ S.LaborStaffRoster = {
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Add Staff Member</span>'
       + '<button class="btn btn-ghost btn-sm" id="sr-how">How This Works</button></div>'
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.profileFormCells(null) + '</div>'
+      + '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">' + this.profileFormCells(null) + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
       + '<label>Notes</label><textarea id="sr-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '<div class="card-actions">'
@@ -223,7 +223,7 @@ S.LaborStaffRoster = {
 
   renderProfileEditCard(s) {
     return '<div class="card"><div class="card-title">Edit ' + esc(s.name || 'Profile') + '</div>'
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.profileFormCells(s) + '</div>'
+      + '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">' + this.profileFormCells(s) + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="sr-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
