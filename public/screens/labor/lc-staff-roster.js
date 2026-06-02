@@ -97,17 +97,17 @@ S.LaborStaffRoster = {
       + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
       + '<div class="f" style="width:175px;flex-shrink:0;"><label>Position</label>'
       + '<select id="sr-pos">' + posOpts + '</select></div>'
-      + '<div class="f" style="width:100px;flex-shrink:0;"><label>Wage</label>'
+      + '<div class="f" style="width:84px;min-width:0;"><label>Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage" min="0" step="0.01" '
       + 'value="' + wv + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Status</label><select id="sr-status">'
+      + '<div class="f" style="width:92px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Hire Date</label>'
       + '<input type="date" id="sr-hire" value="' + esc(s?.hire_date || '') + '"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Phone</label>'
+      + '<div class="f" style="width:100px;min-width:0;"><label>Phone</label>'
       + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="width:155px;flex-shrink:0;"><label>Email</label>'
+      + '<div class="f" style="width:128px;min-width:0;"><label>Email</label>'
       + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>';
   },
 
