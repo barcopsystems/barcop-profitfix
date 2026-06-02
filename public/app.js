@@ -2131,9 +2131,8 @@ const App = {
     'email-loyalty':  'Email and Loyalty'
   },
   emitTrafficFix(gap_id, note) {
-    if (!Array.isArray(this.data.fix_log)) this.data.fix_log = [];
     const today = new Date().toISOString().slice(0, 10);
-    this.data.fix_log.push({
+    const rec = {
       id: this.uid(),
       module: 'traffic',
       gap_id: gap_id,
@@ -2142,8 +2141,8 @@ const App = {
       note: note || '',
       source: 'traffic-auto',
       saved_at: new Date().toISOString()
-    });
-    return this.saveKey('fix_log');
+    };
+    return this.putRecord('core', 'fix_log', rec);
   },
 
   // ── Menu Items ───────────────────────────────────────────────────────────
@@ -2308,7 +2307,9 @@ const App = {
         // 24-month window would wrongly hide. fix_log moves in its own pass.
         traffic_week: 'traffic_weeks', traffic_audit: 'traffic_audits',
         traffic_review_reply: 'traffic_review_replies', traffic_gbp_post: 'traffic_gbp_posts',
-        traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns'
+        traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns',
+        // Shared Recovery Scoreboard feed — one module-tagged kind.
+        fix_log: 'fix_log'
       }
     }
   },
