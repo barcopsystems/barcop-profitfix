@@ -414,9 +414,7 @@ S.TrafficThisWeek = {
       notes:               d.notes
     };
 
-    App.data.traffic_weeks = App.data.traffic_weeks || [];
-    App.data.traffic_weeks.push(entry);
-    const ok = await App.saveKey('traffic_weeks');
+    const ok = await App.putRecord('core', 'traffic_week', entry);
 
     // Auto-emit fix_log on threshold crossings so the Recovery Scoreboard
     // and the dashboard's 8-week chart "Fix Logged" markers credit the work.
