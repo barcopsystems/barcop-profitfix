@@ -385,12 +385,20 @@ S.LaborBuildSchedule = {
     if (!this.draft.week_start) return;
     const rec = this.forecastForWeek(this.draft.week_start);
     const cur = rec && rec.total != null ? rec.total : '';
+    const sug = App.forecastDefaultsFor ? (App.forecastDefaultsFor(this.draft.week_start).total || 0) : 0;
+    const hasDetail = !!(rec && rec.per_day && Object.values(rec.per_day).some(v => Number(v) > 0));
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:440px;width:100%;">'
+    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:460px;width:100%;">'
       + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Revenue Forecast</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Your expected sales for this week. Bar Cop turns it into a labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast) so you can see whether the schedule fits before you post it. For a detailed day-by-day forecast, use Revenue Recovery.</div>'
-      + '<div class="f" style="width:200px;"><label>Expected Revenue ($)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Your expected sales for this week. Bar Cop turns it into a labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast) so you can see if the schedule fits before you post it.</div>'
+      + (sug > 0
+          ? '<div style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+            + '<div style="font-size:12px;color:var(--t2);">From your recent weeks: <span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(sug) + '</span></div>'
+            + '<button class="btn btn-ghost btn-sm" data-act="use-sug">Use this</button></div>'
+          : '<div style="font-size:11px;color:var(--t4);line-height:1.5;margin-bottom:14px;">Not enough shift history yet for a suggestion. Enter your own number to get a labor budget today; Bar Cop starts suggesting once you have a few weeks logged.</div>')
+      + '<div class="f" style="width:200px;"><label>' + (sug > 0 ? 'Or enter your own ($)' : 'Expected Revenue ($)') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div>'
+      + (hasDetail ? '<div style="font-size:10px;color:var(--amber);margin-top:8px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
       + '<div id="bs-fc-err" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>'
       + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">'
       + '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
@@ -401,16 +409,22 @@ S.LaborBuildSchedule = {
       const act = ev.target.closest('[data-act]')?.dataset.act;
       if (!act) { if (ev.target === overlay) close(); return; }
       if (act === 'cancel') { close(); return; }
+      if (act === 'use-sug') { const i = document.getElementById('bs-fc-val'); if (i) i.value = sug; return; }
       const raw = document.getElementById('bs-fc-val')?.value;
       const val = parseFloat(raw);
       const errEl = document.getElementById('bs-fc-err');
       if (isNaN(val) || val < 0) { errEl.textContent = 'Enter the expected revenue for the week.'; errEl.style.display = 'block'; return; }
+      if (hasDetail) {
+        const okOv = await App.confirm({ title: 'Replace day-by-day forecast?', message: 'This week has a detailed day-by-day forecast. Saving a single weekly total replaces it. You can rebuild the detailed version later in Revenue Recovery.', confirmText: 'Replace', cancelText: 'Cancel' });
+        if (!okOv) return;
+      }
       if (!Array.isArray(App.data.revenue_forecasts)) App.data.revenue_forecasts = [];
       const list = App.data.revenue_forecasts;
       const ws = this.draft.week_start;
+      const tv = Math.round(val * 100) / 100;
       const existing = list.find(f => f.week_start === ws);
-      if (existing) { existing.total = Math.round(val * 100) / 100; existing.updated_at = new Date().toISOString(); }
-      else list.push({ id: App.uid(), week_start: ws, total: Math.round(val * 100) / 100, per_day: {}, method: 'manual', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      if (existing) { existing.total = tv; existing.per_day = {}; existing.method = 'total'; existing.updated_at = new Date().toISOString(); }
+      else list.push({ id: App.uid(), week_start: ws, total: tv, per_day: {}, method: 'total', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
       await App.saveKey('revenue_forecasts');
       close(); this.draw();
     });
