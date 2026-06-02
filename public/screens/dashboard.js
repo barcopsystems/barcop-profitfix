@@ -42,7 +42,7 @@ S.Dashboard = {
 
     // Priority Action Items — ranked by dollar impact from the latest Profit audit
     const audits = data.audits || [];
-    const latestAudit = audits.length ? audits[audits.length-1] : null;
+    const latestAudit = App.latestEvent(audits);
     const actionItems = (latestAudit?.action_items || [])
       .filter(it => it && it.action)
       .slice()
