@@ -140,7 +140,7 @@ S.HubPermits = {
       + '</div>'
       + '<div class="calc">'
       +   '<div class="calc-item"><div class="calc-label">Tracked</div><div class="calc-val">' + all.length + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Active</div><div class="calc-val ' + (activeCt > 0 ? 'good' : '') + '">' + activeCt + '</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">On Track</div><div class="calc-val ' + (activeCt > 0 ? 'good' : '') + '">' + activeCt + '</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Due in 30 Days</div><div class="calc-val" style="color:' + (dueSoonCt > 0 ? 'var(--gold)' : '') + ';">' + dueSoonCt + '</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Expired</div><div class="calc-val" style="color:' + (expiredCt > 0 ? 'var(--red)' : '') + ';">' + expiredCt + '</div></div>'
       + '</div>'
@@ -174,7 +174,7 @@ S.HubPermits = {
       ['all',     'All Permits (' + all.length + ')'],
       ['due',     'Due in 30 Days (' + dueSoonCt + ')'],
       ['expired', 'Expired (' + expiredCt + ')'],
-      ['active',  'Active (' + activeCt + ')']
+      ['active',  'On Track (' + activeCt + ')']
     ].map(([v, l]) => '<option value="' + v + '"' + (this._filter === v ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
 
     const recs = this._filtered();
@@ -213,7 +213,12 @@ S.HubPermits = {
       + '</table></div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + summaryCard + alertsCard + listCard + '</div>';
+    const disclaimerCard = '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the renewal dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements, status, and deadlines with your issuing agency.</div>'
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + summaryCard + disclaimerCard + alertsCard + listCard + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     // Wire
