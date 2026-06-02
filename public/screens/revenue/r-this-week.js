@@ -292,17 +292,14 @@ S.RevenueThisWeek = {
       saved_at:          new Date().toISOString()
     };
 
-    if (!App.data.revenue_weeks) App.data.revenue_weeks = [];
-    App.data.revenue_weeks.push(week);
     const btn = document.getElementById('rw-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveKey('revenue_weeks');
+    const ok = await App.putRecord('core', 'revenue_week', week);
     if (ok) {
       this.clearDraft();
       App.markSetupDone('gs_r_week');
       App.navigate('r-dashboard');
     } else {
-      App.data.revenue_weeks.pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Week'; }
       fail('Save failed. Try again.');
     }
