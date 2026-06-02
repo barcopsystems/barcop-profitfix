@@ -853,9 +853,9 @@ S.RevenueMenuItems = {
     // Recovery Scoreboard both pick it up. Closes the orphan where direct
     // menu-items price edits used to bypass the log.
     const priceChanged = existing && existing.price != null && existing.price !== price;
+    let priceLogRec = null;
     if (priceChanged) {
-      if (!Array.isArray(App.data.revenue_price_log)) App.data.revenue_price_log = [];
-      App.data.revenue_price_log.push({
+      priceLogRec = {
         id: App.uid(),
         date: new Date().toISOString().slice(0, 10),
         item_id: entry.id,
@@ -870,7 +870,7 @@ S.RevenueMenuItems = {
         predicted_weekly_impact: null,
         source: 'menu-items-edit',
         saved_at: new Date().toISOString()
-      });
+      };
       if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
       App.data.fix_log.push({
         id: App.uid(),
@@ -888,7 +888,7 @@ S.RevenueMenuItems = {
 
     await App.saveKey('menu_items');
     if (priceChanged) {
-      await App.saveKey('revenue_price_log');
+      await App.putRecord('core', 'revenue_price_log', priceLogRec);
       await App.saveKey('fix_log');
     }
     App.markSetupDone('gs_r_menu');
