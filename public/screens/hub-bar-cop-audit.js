@@ -1198,7 +1198,7 @@ S.HubBarCopAudit = {
     // audit screens put their Print action in topbar-right.
     if (App.setHubTopbarActions) {
       App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="bca-print-top">Print / Save PDF</button>');
-      document.getElementById('bca-print-top')?.addEventListener('click', () => window.print());
+      document.getElementById('bca-print-top')?.addEventListener('click', () => this.exportPDF(audit));
     }
 
     this.container.querySelectorAll('.bca-nav').forEach(btn => {
@@ -1209,5 +1209,114 @@ S.HubBarCopAudit = {
     if (outlookMount && window.AuditOutlook) {
       AuditOutlook.attach(outlookMount, audit, 'bar-cop', { compact: true });
     }
+  },
+
+  // ── Export the Bar Cop Audit as a data-driven PDF ───────────────────────
+  // Rebuilds the same content the detail page renders (overall health, the
+  // six sub-scores with their breakdowns, top exposures, recurring patterns,
+  // recovery activity snapshot, recovery-audit reference) via the shared
+  // App._pdfBuilder. Replaces the old window.print() path. Disclaimer is the
+  // canonical App.deliverableFooter() language so all Bar Cop deliverables
+  // stay in lockstep.
+  async exportPDF(audit) {
+    if (!audit) return;
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    const overall   = audit.overall_score;
+    const overallNA = overall == null;
+    const scoreLabel = overallNA ? 'Not Enough Data Yet' : App.scoreLabel(overall);
+    const venue     = audit.bar_name || (App.data?.settings?.bar_name) || 'Your Operation';
+
+    const b = App._pdfBuilder('Bar Cop Audit');
+    b.header({
+      right: 'Bar Cop Audit',
+      meta: this._fmtDate(audit.date) + '  ·  Operational Health '
+            + (overallNA ? 'N/A' : overall)
+    });
+    b.kv('Operation', venue);
+    b.kv('Operational Health', (overallNA ? 'N/A' : overall) + '  (' + scoreLabel + ')');
+    if (overallNA) {
+      b.paragraph((audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, '
+        + 'Shift, and Labor Control and the overall fills in.', { gray: 90 });
+    }
+
+    // Recovery-audit reference line (mirrors the on-screen refLine).
+    const lastP = (App.data?.audits || []).slice(-1)[0];
+    const lastR = (App.data?.revenue_audits || []).slice(-1)[0];
+    const lastT = (App.data?.traffic_audits || []).slice(-1)[0];
+    b.paragraph('Latest scores from the three recovery audits: '
+      + 'Profit ' + (lastP ? (lastP.overall_score || '-') : '-') + ', '
+      + 'Revenue ' + (lastR ? (lastR.overall_score || '-') : '-') + ', '
+      + 'Traffic ' + (lastT ? (lastT.overall_score || '-') : '-') + '.', { italic: true, gray: 110 });
+
+    // Six sub-scores, each with its score and breakdown (same as subBlock).
+    const SUB_NAMES = [
+      ['operational_discipline',  'Operational Discipline'],
+      ['cash_integrity',          'Cash Integrity'],
+      ['inventory_execution',     'Inventory Execution'],
+      ['labor_hygiene',           'Labor Hygiene'],
+      ['recovery_action',         'Recovery Action'],
+      ['operational_consistency', 'Operational Consistency']
+    ];
+    SUB_NAMES.forEach(([key, name]) => {
+      const raw  = audit.sub_scores && audit.sub_scores[key];
+      const isNA = raw == null;
+      b.sectionTitle(name);
+      b.kv('Sub-Score', isNA ? 'N/A (Not enough data)' : String(raw));
+      const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
+      if (detail.length) {
+        b.table(['Component', 'Detail', 'Score'], detail.map(c => [
+          c.label,
+          c.extra || '',
+          (c.na || c.pct == null) ? 'N/A' : String(c.pct)
+        ]), { columnStyles: { 2: { halign: 'right', cellWidth: 50 } } });
+      }
+    });
+
+    // Top Operational Exposures.
+    b.sectionTitle('Top Operational Exposures');
+    const exposures = audit.exposures || [];
+    if (exposures.length) {
+      b.table(['Severity', 'Exposure', 'Detail'], exposures.map(e => [
+        (e.severity || '').toUpperCase(),
+        e.label || '',
+        e.detail || ''
+      ]), { columnStyles: { 0: { cellWidth: 60 } } });
+    } else {
+      b.paragraph('No operational exposures flagged this month. Operation is clean across the cross-system checks.');
+    }
+
+    // Recurring Patterns.
+    b.sectionTitle('Recurring Patterns');
+    const patterns = audit.patterns || [];
+    if (patterns.length) {
+      b.table(['Pattern', 'Detail'], patterns.map(p => [p.label || '', p.detail || '']));
+    } else {
+      b.paragraph('No recurring patterns surfaced this month. Bar Cop watches for same-staff, same-shift, '
+        + 'same-vendor, and same-day-of-week patterns over rolling 90-day windows.');
+    }
+
+    // Recovery Activity Snapshot.
+    const snap = audit.recovery_snapshot || { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 };
+    b.sectionTitle('Recovery Activity Snapshot');
+    b.table(null, [
+      ['Gaps Surfaced',        String(snap.gaps)],
+      ['Fixes Logged (30d)',   String(snap.fixesLogged)],
+      ['Recovered to date',    App.fmtCurrency(snap.dollarsRecovered, 0)],
+      ['Still Measuring',      String(snap.stillMeasuring)]
+    ], { columnStyles: { 0: { fontStyle: 'bold' } } });
+
+    b.disclaimer(App.deliverableFooter().workbookSubject);
+
+    let ds = App._pdfDateStamp();
+    if (audit.date) {
+      const dt = new Date(audit.date);
+      if (!isNaN(dt.getTime())) {
+        const p = n => String(n).padStart(2, '0');
+        ds = '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate());
+      }
+    }
+    await b.save('BarCop_BarCopAudit_' + ds + '.pdf');
   }
 };
