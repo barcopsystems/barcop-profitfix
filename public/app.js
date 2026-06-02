@@ -238,6 +238,7 @@ const TT = {
     'vr-std-bottle':  {t:'By the Bottle Standard',b:'Covers anything sold by the bottle: bottle beer, wine by the bottle, and champagne splits. It is simple bottle-in, bottle-out, so there is no pour variance to forgive. Bar Cop flags the moment this many bottles are unaccounted, after comps and waste come out. Set it to 1 to catch every missing bottle, higher to allow for honest miscounts.'},
     'vr-std-misc':    {t:'Mixer Standard',b:'Mixers are measured by eye in the quart, so the line sits wider. Set the most you will accept; over it usually means waste or a recipe that has drifted from the pour. Adjust to taste.'},
     'vr-std-food':    {t:'Food Standard',b:'Food carries real yield and trim loss, but over-portioning is a true cost leak. Set the most you will accept; over it flags. Tighten or loosen it to match how tightly your kitchen portions.'},
+    'lws-min-wage':   {t:'State Minimum Wage',b:'The hourly minimum wage in your state. Bar Cop uses it for one thing: the tip-credit check on the payroll worksheet. If a tipped employee\'s base wage plus their tip share comes out below this for the week, Bar Cop flags the row on Pay Periods so you can make up the difference before payroll runs. Leave it blank if your state does not allow a tip credit or you do not run tip-credit math. This value is for planning and payroll review only. Verify the current wage and tip-credit rules for your jurisdiction before processing payroll.'},
   },
   show(icon) {
     const id = icon.dataset.tt;
