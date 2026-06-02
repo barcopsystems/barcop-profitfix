@@ -497,16 +497,17 @@ S.InventorySpotCheck = {
       const steps = (S.TheftRisk && S.TheftRisk.VARIANCE_STEPS)
         ? S.TheftRisk.VARIANCE_STEPS.map(() => ({ done: false, finding: '' }))
         : [];
-      App.data.variance_investigations.push({
+      const inv = {
         id: App.uid(),
         product_id: productId,
         sku: productName,
         opened_date: new Date().toISOString().slice(0, 10),
+        created_at: new Date().toISOString(),
         status: 'open',
         steps,
         resolution: ''
-      });
-      App.saveKey('variance_investigations');
+      };
+      App.putRecord('core', 'variance_investigation', inv);
     }
     App.showApp('profit');
     App.navigate('theft-risk');
