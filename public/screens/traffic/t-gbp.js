@@ -207,8 +207,7 @@ S.TrafficGBP = {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
         if (!(await App.confirm({ title: 'Delete this GBP post entry?', confirmText: 'Delete' }))) return;
-        App.data.traffic_gbp_posts = this.posts().filter(x => x.id !== btn.dataset.id);
-        await App.saveKey('traffic_gbp_posts');
+        await App.removeRecord('core', 'traffic_gbp_post', btn.dataset.id);
         this.draw();
       });
     });
@@ -248,13 +247,12 @@ S.TrafficGBP = {
       saved_at: new Date().toISOString()
     };
     const list = this.posts();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     }
-    const ok = await App.saveKey('traffic_gbp_posts');
+    const ok = await App.putRecord('core', 'traffic_gbp_post', saved);
     if (ok) {
       const afterMonthCount = this.thisMonthPosts().length;
       if (afterMonthCount >= 8 && beforeMonthCount < 8) {
