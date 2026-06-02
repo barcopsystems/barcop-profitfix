@@ -537,14 +537,12 @@ S.InventoryTakeInventory = {
     const btn = document.getElementById('ti-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
 
-    this.counts().push(record);
-    const ok = await App.saveInventory();
+    const ok = await App.putRecord('ic', 'count', record);
     if (ok) {
       App.markSetupDone('gs_ic_count');
       this.clearDraft();
       this.renderDone(record);
     } else {
-      this.counts().pop();
       const err = document.getElementById('ti-sub-err');
       if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Count'; }
