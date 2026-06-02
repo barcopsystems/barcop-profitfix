@@ -1270,6 +1270,9 @@ const App = {
     await this.loadEventStores('ic');
     await this.loadEventStores('sc');
     await this.loadEventStores('lc');
+    // Core / Recovery event logs (Profit pass): weeks, theft scores, variance
+    // investigations, vendor discrepancies, audits -> core_events rows.
+    await this.loadEventStores('core');
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
@@ -2282,6 +2285,19 @@ const App = {
       kinds: {
         actual: 'lc_actuals', schedule: 'lc_schedules', tip: 'lc_tips',
         tip_pool: 'lc_tip_pools', callout: 'lc_callouts', pay_period: 'lc_pay_periods'
+      }
+    },
+    // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
+    // in core_events. Config (settings, products, menu, targets, getting-started,
+    // fix_progress/fix_activity, vestigial shifts/vendor_log/reconciliations) stays
+    // in the user_data blob. fix_log moves in its own shared pass.
+    core: {
+      table: 'core_events',
+      data: () => App.data,
+      kinds: {
+        week: 'weeks', theft_score: 'theft_scores',
+        variance_investigation: 'variance_investigations',
+        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits'
       }
     }
   },
