@@ -808,11 +808,10 @@ S.HubBarCopAudit = {
     const gate = this._canRunAudit();
     if (!gate.ok) return;
     if (!this._hasEnoughData()) return;
+    // Row-per-record in core_events now; full executive-audit history is kept
+    // (the 12-audit blob cap is gone) and paged via "Show older" on the list.
     const snapshot = this._computeAuditSnapshot();
-    const list = this.audits();
-    list.push(snapshot);
-    while (list.length > this.RETENTION_CAP) list.shift();
-    const ok = await App.saveKey('bar_cop_audits');
+    const ok = await App.putRecord('core', 'bar_cop_audit', snapshot);
     if (ok) {
       this._viewingId = snapshot.id;
       this._renderDetail(snapshot);
@@ -934,7 +933,7 @@ S.HubBarCopAudit = {
 
     let historyCard = '';
     if (audits.length > 1) {
-      const rows = audits.map((a, i) => {
+      const rows = audits.slice(0, App.listLimit('core', 'bar_cop_audit')).map((a, i) => {
         const p    = audits[i + 1];
         const naA  = a.overall_score == null;
         const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
@@ -952,10 +951,11 @@ S.HubBarCopAudit = {
       historyCard = '<div class="card">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Full history kept. Print any audit to save as PDF.</div>'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Exposures</th><th>Patterns</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('core', 'bar_cop_audit', audits, false)
         + '</div>';
     }
 
@@ -973,6 +973,8 @@ S.HubBarCopAudit = {
     this.container.querySelectorAll('.bca-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx)));
     });
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
   _viewAuditByIdx(idx) {
