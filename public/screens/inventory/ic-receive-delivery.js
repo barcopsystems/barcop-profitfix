@@ -616,26 +616,30 @@ S.InventoryReceiveDelivery = {
     const btn = document.getElementById('rd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
-    this.deliveries().push(record);
-
     // Auto-mark the matched order as Received so the Order Sheet stops
     // hiding the vendor and the operator gets a clean inventory picture
     // for the next order cycle.
+    let matchedOrder = null;
     if (matchedOrderId) {
       const order = this.orders().find(o => o.id === matchedOrderId);
       if (order && order.status !== 'Received') {
         order.status = 'Received';
         order.received_at = new Date().toISOString();
         order.received_delivery_id = record.id;
+        matchedOrder = order;
       }
     }
 
-    const ok = await App.saveInventory();
+    // Persist: product cost changes (config blob), the delivery (row), and the
+    // matched order's new status (row).
+    const okCfg = appliedUpdates.length ? await App.saveInventory() : true;
+    const okDel = await App.putRecord('ic', 'delivery', record);
+    const okOrd = matchedOrder ? await App.putRecord('ic', 'order', matchedOrder) : true;
+    const ok = okDel && okCfg && okOrd;
     if (ok) {
       App.markSetupDone('gs_ic_delivery');
       this.renderDone(record);
     } else {
-      this.deliveries().pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Delivery'; }
       fail('Save failed. Try again.');
     }
