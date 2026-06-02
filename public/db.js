@@ -883,8 +883,8 @@ const DB = {
       // Edited from r-menu-items (Revenue Recovery) — the single edit
       // surface. Profit Recovery's Recipe Cost Analysis is read-only.
       menu_items: [],
-      weeks: [], shifts: [], reconciliations: [],
-      theft_scores: [], vendor_log: [], last_theft_score_date: null,
+      weeks: [],
+      theft_scores: [], last_theft_score_date: null,
       vendor_discrepancies: [],
       variance_investigations: [],
       audits: [],
