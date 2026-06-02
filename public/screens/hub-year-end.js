@@ -565,8 +565,11 @@ S.HubYearEnd = {
       const byStaffWeek = {};
       monthActuals.forEach(a => {
         const hrs = parseFloat(a.hours) || 0;
-        const wage = parseFloat(a.wage) || (typeof App.wageForStaffOn === 'function' ? (App.wageForStaffOn(a.staff_id, a.date) || 0) : 0);
         mHours += hrs;
+        // Salaried (exempt): hours count as coverage, but pay is the fixed
+        // salary added below, never hours * wage and never overtime.
+        if (App.isSalaried(a.staff_id)) return;
+        const wage = parseFloat(a.wage) || (typeof App.wageForStaffOn === 'function' ? (App.wageForStaffOn(a.staff_id, a.date) || 0) : 0);
         const key = (a.staff_id || a.name || '') + '|' + this._weekKeyFor(a.date);
         if (!byStaffWeek[key]) byStaffWeek[key] = { hours: 0, wage: wage };
         byStaffWeek[key].hours += hrs;
@@ -578,6 +581,10 @@ S.HubYearEnd = {
         mOt += ot;
         mWages += reg * b.wage + ot * b.wage * 1.5;
       });
+      // Salaried (exempt) staff: fixed monthly salary (annual/52 by the weeks
+      // the month spans), no overtime.
+      const mLastDay = new Date(parseInt(year, 10), m, 0).getDate();
+      mWages += App.salariedCost(mk + '-01', mk + '-' + String(mLastDay).padStart(2, '0')).total;
       const mRev = monthShifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
       const laborPct = mRev ? (mWages / mRev) : null;
       const rplh = mHours ? (mRev / mHours) : null;
