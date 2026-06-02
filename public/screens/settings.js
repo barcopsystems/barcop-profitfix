@@ -1058,7 +1058,7 @@ S.HubSettings = {
       raw.INDUSTRY_AVG = 58;
       raw.TARGET_SCORE = 65;
       raw.WEEKLY_GAP_AMT = '$' + Math.round(totalMo/4.345).toLocaleString('en-US');
-      return { date:date, bar_name:raw.BAR_NAME, overall_score:score,
+      return { id:uid(), date:date, bar_name:raw.BAR_NAME, overall_score:score,
         audit_id:audit_id, audit_period:period, grade:tier,
         sections:sections, action_items:items, raw:raw, generated_at:generated_at };
     };
