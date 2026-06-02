@@ -853,7 +853,7 @@ S.RevenueMenuItems = {
     // Recovery Scoreboard both pick it up. Closes the orphan where direct
     // menu-items price edits used to bypass the log.
     const priceChanged = existing && existing.price != null && existing.price !== price;
-    let priceLogRec = null;
+    let priceLogRec = null, fixLogRec = null;
     if (priceChanged) {
       priceLogRec = {
         id: App.uid(),
@@ -871,8 +871,7 @@ S.RevenueMenuItems = {
         source: 'menu-items-edit',
         saved_at: new Date().toISOString()
       };
-      if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
-      App.data.fix_log.push({
+      fixLogRec = {
         id: App.uid(),
         module: 'revenue',
         gap_id: 'pricing',
@@ -880,7 +879,7 @@ S.RevenueMenuItems = {
         date: new Date().toISOString().slice(0, 10),
         source: 'price-change',
         note: 'Price change on ' + entry.name + ': ' + App.fmtCurrency(existing.price) + ' to ' + App.fmtCurrency(price)
-      });
+      };
     }
 
     if (this.editIdx !== null) this.items()[this.editIdx] = entry;
@@ -889,7 +888,7 @@ S.RevenueMenuItems = {
     await App.saveKey('menu_items');
     if (priceChanged) {
       await App.putRecord('core', 'revenue_price_log', priceLogRec);
-      await App.saveKey('fix_log');
+      await App.putRecord('core', 'fix_log', fixLogRec);
     }
     App.markSetupDone('gs_r_menu');
     if (recipe) App.markSetupDone('gs_p_recipes');
