@@ -1262,10 +1262,14 @@ const App = {
     this.inventoryData = await DB.readInventoryData();
     this.laborData     = await DB.readLaborData();
     this.shiftData     = await DB.readShiftData();
-    // Inventory event logs (counts, deliveries, orders, transfers, empties,
-    // adjustments, spot checks) live row-per-record now; fill them from the
-    // rolling window after the config blob loads.
+    // Inventory + Shift event logs live row-per-record now; fill them from the
+    // rolling window after the config blobs load. (Inventory: counts,
+    // deliveries, orders, transfers, empties, adjustments, spot checks. Shift:
+    // shifts, void/comps, cash drops, variances, safe log, 86 list,
+    // maintenance, walked tabs, incidents, waste, checklist runs.)
     await this.loadEventStores('ic');
+    await this.loadEventStores('sc');
+    await this.loadEventStores('lc');
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
@@ -2261,6 +2265,24 @@ const App = {
         transfer: 'ic_transfers', empty: 'ic_empties', adjustment: 'ic_adjustments',
         spot_check: 'ic_spot_checks'
       }
+    },
+    sc: {
+      table: 'sc_events',
+      data: () => App.shiftData,
+      kinds: {
+        shift: 'sc_shifts', void_comp: 'sc_void_comps', cash_drop: 'sc_cash_drops',
+        variance: 'sc_variances', safe_log: 'sc_safe_log', eighty_six: 'sc_86_list',
+        maintenance: 'sc_maintenance', walked_tab: 'sc_walked_tabs',
+        incident: 'sc_incidents', waste: 'sc_waste', checklist: 'sc_checklists'
+      }
+    },
+    lc: {
+      table: 'lc_events',
+      data: () => App.laborData,
+      kinds: {
+        actual: 'lc_actuals', schedule: 'lc_schedules', tip: 'lc_tips',
+        tip_pool: 'lc_tip_pools', callout: 'lc_callouts', pay_period: 'lc_pay_periods'
+      }
     }
   },
 
@@ -2274,6 +2296,7 @@ const App = {
     const kinds = Object.keys(store.kinds);
     const results = await Promise.all(kinds.map(k => DB.loadEvents(store.table, k)));
     kinds.forEach((k, i) => { dataObj[store.kinds[k]] = results[i] || []; });
+    this.resetListState(mod);
   },
 
   // Append an older page of one kind ("Show older"). Returns the fetched rows.
@@ -2341,14 +2364,123 @@ const App = {
     return false;
   },
 
-  // Config-only slice of inventoryData (everything that is NOT an event array).
-  _inventoryConfig() {
-    const d = this.inventoryData || {};
-    const eventKeys = new Set(Object.values(this.EVENT_STORES.ic.kinds));
+  // ── History list pagination ("Show older") ────────────────────────────────
+  // History screens read a rolling 24-month window into memory. They render the
+  // newest LIST_PAGE rows and offer "Show older" to reveal more: first the rest
+  // of the loaded window, then (once that's exhausted, with no filter active)
+  // the next older page pulled from the events table on demand for a rare
+  // multi-year tax / insurance lookback. State is per module+kind, reset on a
+  // fresh window load (login / reseed) by loadEventStores.
+  LIST_PAGE: 200,
+  _listState: {},
+  _listKey(mod, kind) { return mod + '.' + kind; },
+
+  // How many rows a list should currently display.
+  listLimit(mod, kind) {
+    const st = this._listState[this._listKey(mod, kind)];
+    return (st && st.limit) || this.LIST_PAGE;
+  },
+
+  // Drop a module's display limits + paging flags (fresh window load).
+  resetListState(mod) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return;
+    Object.keys(store.kinds).forEach(k => { delete this._listState[this._listKey(mod, k)]; });
+  },
+
+  // Oldest business date currently loaded for a kind (YYYY-MM-DD), or null.
+  // Uses the same date the events index is keyed on, so paging lines up.
+  oldestLoadedDate(mod, kind) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return null;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    const arr = (dataObj && Array.isArray(dataObj[key])) ? dataObj[key] : [];
+    let min = null;
+    arr.forEach(r => { const d = DB._eventDate(r); if (d && (min == null || d < min)) min = d; });
+    return min;
+  },
+
+  // Could older-than-window records plausibly exist on the server? True only
+  // when the oldest loaded record sits within ~5 weeks of the window's old edge
+  // (so the window is saturated and there's likely more beyond it), or we've
+  // already pulled an older page. Keeps the DB fetch off young accounts and the
+  // sample data, whose full history is already in memory.
+  hasServerOlder(mod, kind) {
+    const st = this._listState[this._listKey(mod, kind)];
+    if (st && st.exhausted) return false;
+    if (st && st.paged) return true;
+    const oldest = this.oldestLoadedDate(mod, kind);
+    if (!oldest) return false;
+    const startMs = new Date(DB._windowStartDate() + 'T00:00:00').getTime();
+    const oldestMs = new Date(oldest + 'T00:00:00').getTime();
+    return (oldestMs - startMs) <= 35 * 86400000;
+  },
+
+  // Footer bar HTML for a history list. `list` = the array the screen is about
+  // to slice (already filtered + sorted newest-first). `hasFilter` = whether a
+  // filter is narrowing the view. Returns '' when there's nothing more to show.
+  // The button's mode is baked in at render time so the shared click handler
+  // just executes it: 'reveal' uncaps more loaded rows, 'server' fetches the
+  // next older page (offered only on an unfiltered, fully-revealed list).
+  showOlderBar(mod, kind, list, hasFilter) {
+    const limit = this.listLimit(mod, kind);
+    const fLen = Array.isArray(list) ? list.length : 0;
+    const moreLoaded = fLen > limit;
+    const store = this.EVENT_STORES[mod];
+    const dataObj = store && store.data();
+    const all = (dataObj && Array.isArray(dataObj[store.kinds[kind]])) ? dataObj[store.kinds[kind]] : [];
+    const allShown = all.length <= limit;
+    const wrap = inner => '<div style="text-align:center;padding:14px 0 4px;">' + inner + '</div>';
+    const btn = (mode, label) => '<button class="btn btn-ghost btn-sm" data-show-older="1" data-older-mode="'
+      + mode + '" data-older-mod="' + mod + '" data-older-kind="' + kind + '">' + label + '</button>';
+    if (moreLoaded) return wrap(btn('reveal', 'Show older'));
+    if (!hasFilter && allShown && this.hasServerOlder(mod, kind)) {
+      return wrap(btn('server', 'Load records older than 24 months')
+        + '<div style="font-size:10px;color:var(--t4);margin-top:6px;">Showing the last 24 months. '
+        + 'Load older records for tax or insurance lookback.</div>');
+    }
+    const st = this._listState[this._listKey(mod, kind)];
+    if (st && st.paged && !hasFilter) {
+      return '<div style="text-align:center;padding:12px 0;color:var(--t4);font-size:11px;">All records loaded.</div>';
+    }
+    return '';
+  },
+
+  // Shared click handler for every history list's "Show older" button. Pass the
+  // click target and the screen's list re-render. Fire-and-forget from a sync
+  // onclick: check ev.target.closest('[data-show-older]') first, then call this.
+  async handleShowOlder(target, reRender) {
+    const btn = target && target.closest && target.closest('[data-show-older]');
+    if (!btn) return false;
+    const mod = btn.dataset.olderMod, kind = btn.dataset.olderKind, mode = btn.dataset.olderMode;
+    const key = this._listKey(mod, kind);
+    const st = this._listState[key] || {};
+    if (mode === 'server') {
+      const before = this.oldestLoadedDate(mod, kind);
+      btn.disabled = true; btn.textContent = 'Loading...';
+      const PAGE = 200;
+      const older = before ? await this.loadOlder(mod, kind, before, PAGE) : [];
+      st.paged = true;
+      if (!older || older.length < PAGE) st.exhausted = true;
+    }
+    st.limit = (st.limit || this.LIST_PAGE) + this.LIST_PAGE;
+    this._listState[key] = st;
+    reRender && reRender();
+    return true;
+  },
+
+  // Config-only slice of a module's data blob: everything that is NOT one of
+  // its event arrays (those persist row-per-record in <mod>_events now). Used
+  // so a config save never rewrites the unbounded event logs into the blob.
+  _configBlob(mod, dataObj) {
+    const store = this.EVENT_STORES[mod];
+    const eventKeys = store ? new Set(Object.values(store.kinds)) : new Set();
     const out = {};
-    Object.keys(d).forEach(k => { if (!eventKeys.has(k)) out[k] = d[k]; });
+    Object.keys(dataObj || {}).forEach(k => { if (!eventKeys.has(k)) out[k] = dataObj[k]; });
     return out;
   },
+  _inventoryConfig() { return this._configBlob('ic', this.inventoryData); },
 
   async saveInventory() {
     const r = await DB.writeInventoryData(this._inventoryConfig());
@@ -2357,13 +2489,13 @@ const App = {
   },
 
   async saveLabor() {
-    const r = await DB.writeLaborData(this.laborData);
+    const r = await DB.writeLaborData(this._configBlob('lc', this.laborData));
     if (!r.ok) console.error('saveLabor failed:', r.error);
     return r.ok;
   },
 
   async saveShift() {
-    const r = await DB.writeShiftData(this.shiftData);
+    const r = await DB.writeShiftData(this._configBlob('sc', this.shiftData));
     if (!r.ok) console.error('saveShift failed:', r.error);
     return r.ok;
   },
