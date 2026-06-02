@@ -303,6 +303,7 @@ S.HubSettings = {
       await App.seedEventStores('lc');
       await App.saveShift();
       await App.seedEventStores('sc');
+      await App.seedEventStores('core');   // recovery event logs -> core_events rows
       this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
@@ -2568,6 +2569,7 @@ S.HubSettings = {
     await App.seedEventStores('lc');     // labor event logs -> lc_events rows
     await App.saveShift();               // config only (settings, drawers, checklist templates)
     await App.seedEventStores('sc');     // shift event logs -> sc_events rows
+    await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six systems populated. Go test!'; }
@@ -2605,6 +2607,7 @@ S.HubSettings = {
     await DB.clearEvents('lc_events');   // drop the labor event rows too
     await App.saveShift();
     await DB.clearEvents('sc_events');   // drop the shift event rows too
+    await DB.clearEvents('core_events'); // drop the recovery event rows too
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
