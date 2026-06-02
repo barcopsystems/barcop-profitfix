@@ -26,7 +26,7 @@ S.CashRecon = {
     const exp = document.createElement('button');
     exp.className = 'btn btn-ghost btn-sm';
     exp.textContent = 'Export PDF';
-    exp.addEventListener('click', () => window.print());
+    exp.addEventListener('click', () => App.exportPDF({ title: 'Cash Reconciliation', root: this.container }));
     actions.appendChild(exp);
     this.renderMain();
   },
