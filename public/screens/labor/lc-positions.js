@@ -18,35 +18,56 @@ S.LaborPositions = {
 
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Add Position';
-    addBtn.addEventListener('click', () => this.showForm());
-    actions.appendChild(addBtn);
+    if (actions) actions.innerHTML = '';
+    this.editId = null;
     this.renderList();
   },
 
+  // The four data cells (Name, Department, Default Wage, Type) shared by the
+  // inline add form and the edit form so the two never drift in layout.
+  formCells(p) {
+    const deptOpts = this.DEPARTMENTS.map(d =>
+      '<option' + ((p ? p.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
+    const wageVal = (p && p.default_wage != null && p.default_wage !== '') ? p.default_wage : '';
+    return '<div class="f" style="width:200px;flex-shrink:0;"><label>Position Name</label>'
+      + '<input type="text" id="lp-name" value="' + esc(p?.name || '') + '" placeholder="e.g. Bartender"/></div>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Department</label>'
+      + '<select id="lp-dept">' + deptOpts + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Default Wage</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lp-wage" min="0" step="0.01" '
+      + 'value="' + wageVal + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label>'
+      + '<select id="lp-tipped"><option value="no"' + (p && p.tipped ? '' : ' selected') + '>Non-Tipped</option>'
+      + '<option value="yes"' + (p && p.tipped ? ' selected' : '') + '>Tipped</option></select></div>';
+  },
+
   renderList() {
+    this.editId = null;
     const list = [...this.positions()].sort((a, b) => {
       const da = this.DEPARTMENTS.indexOf(a.department), db = this.DEPARTMENTS.indexOf(b.department);
       if (da !== db) return (da < 0 ? 99 : da) - (db < 0 ? 99 : db);
       return (a.name || '').localeCompare(b.name || '');
     });
 
-    let html;
+    // Inline add form, always at the top of the landing page.
+    const addForm = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Add Position</span>'
+      + '<button class="btn btn-ghost btn-sm" id="lp-how">How This Works</button></div>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.formCells(null) + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
+      + '<label>Notes</label><textarea id="lp-notes" rows="2" placeholder="Optional"></textarea></div></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="lp-add">Add Position</button>'
+      + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+
+    let listCard;
     if (list.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No positions yet</div>'
-        + '<div class="empty-sub">Add the job positions you schedule: bartender, server, line cook, '
-        + 'and so on. Positions drive scheduling, hours, and labor cost.</div>'
-        + '<button class="btn btn-primary" id="lp-add-first">Add Position</button></div>';
+      listCard = '<div class="card"><div class="card-title">Positions</div>'
+        + '<div style="font-size:13px;color:var(--t3);">No positions yet. Add your first one above. Positions drive '
+        + 'scheduling, hours, and labor cost.</div></div>';
     } else {
-      const tipped = list.filter(p => p.tipped).length;
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Positions</div><div class="calc-val">' + list.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Tipped</div><div class="calc-val">' + tipped + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Non-Tipped</div><div class="calc-val">' + (list.length - tipped) + '</div></div>'
-        + '</div>';
       const rows = list.map(p => '<tr class="lp-row" data-id="' + p.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + esc(p.name || '-') + '</div></td>'
         + '<td>' + esc(p.department || '-') + '</td>'
@@ -58,9 +79,10 @@ S.LaborPositions = {
         + '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>'
         + '<button class="btn btn-danger btn-sm lp-del" data-id="' + p.id + '">Delete</button>'
         + '</div></td></tr>').join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listCard = '<div class="card"><div class="card-title">Positions</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Position</th><th>Department</th><th>Default Wage</th><th>Type</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
     const modal = '<div id="lp-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -71,45 +93,29 @@ S.LaborPositions = {
       + '<button class="btn btn-danger" id="lp-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addForm + listCard + '</div>' + modal;
     this.container.onclick = ev => {
-      const row = ev.target.closest('.lp-row');
+      if (ev.target.closest('#lp-how')) { this.showHowTo(); return; }
+      if (ev.target.closest('#lp-add')) { this.editId = null; this.save(); return; }
       const edit = ev.target.closest('.lp-edit');
       const del = ev.target.closest('.lp-del');
-      const addF = ev.target.closest('#lp-add-first');
+      const row = ev.target.closest('.lp-row');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row)  this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
     };
   },
 
+  // Edit form — same one-row layout as the inline add form, minus the How This
+  // Works button. Lives on its own page; Cancel returns to the list.
   showForm(id) {
     this.editId = id || null;
     const p = id ? this.positions().find(x => x.id === id) : null;
-    const deptOpts = this.DEPARTMENTS.map(d =>
-      '<option' + ((p ? p.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
-    const tippedSel = t => '<option value="yes"' + (t ? ' selected' : '') + '>Tipped</option>'
-      + '<option value="no"' + (!t ? ' selected' : '') + '>Non-Tipped</option>';
-    const v = val => (val != null && val !== '') ? val : '';
-
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'Add') + ' Position</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Position Name</label>'
-      + '<input type="text" id="lp-name" value="' + esc(p?.name || '') + '" placeholder="e.g. Bartender"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Department</label>'
-      + '<select id="lp-dept">' + deptOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Default Wage</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lp-wage" min="0" step="0.01" '
-      + 'value="' + v(p?.default_wage) + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label>'
-      + '<select id="lp-tipped">' + tippedSel(p ? p.tipped : false) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="lp-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div></div>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.formCells(p) + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
+      + '<label>Notes</label><textarea id="lp-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lp-save">' + (id ? 'Update' : 'Save Position') + '</button>'
       + '<button class="btn btn-ghost" id="lp-cancel">Cancel</button>'
@@ -146,17 +152,23 @@ S.LaborPositions = {
       list.push(rec);
     }
 
-    const btn = document.getElementById('lp-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveLabor();
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_positions');
       this.renderList();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Position'; }
       fail('Save failed. Try again.');
     }
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Positions Work', [
+      { p: ['Positions are the job roles you schedule and pay: bartender, server, line cook, and so on. Every shift you build and every hour you log is tied to a position, so this is the list that drives your whole labor cost.'] },
+      { h: 'Department and Default Wage', p: ['Each position belongs to a department (Bar, Front of House, Kitchen, Management) and carries a default hourly wage. That wage pre-fills when you add a staff member in the role, so you set the number once here instead of on every hire.'] },
+      { h: 'Tipped or Non-Tipped', p: ['Mark a position Tipped if the role earns tips. Bar Cop uses that on Pay Periods to run the tip-credit check, flagging anyone whose wage plus tips falls under your state minimum.'] },
+      { h: 'Where Positions Show Up', p: ['Add a position once and it is available everywhere: the staff roster, the schedule builder, the hours log, and every labor report. Edit a position any time and the change carries forward without touching past records.'] }
+    ]);
   },
 
   confirmDel(id) {
