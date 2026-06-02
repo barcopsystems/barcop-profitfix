@@ -36,9 +36,8 @@ S.LaborWageSettings = {
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop uses this value for planning and payroll review purposes only. Verify all wage and tip-credit requirements for your jurisdiction before processing payroll.</div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:center;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>State Min Wage (per hour)</label>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>State Min Wage (per hour) ' + tt('lws-min-wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lws-min-wage" min="0" step="0.01" value="' + v(s.state_min_wage != null ? s.state_min_wage : '') + '" placeholder="Per hour"/></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);padding-bottom:10px;">Leave blank if your jurisdiction does not allow tip credit or you do not run tip credit math.</div>'
       + '</div>'
       + '</div>'
 
