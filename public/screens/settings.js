@@ -2217,6 +2217,7 @@ S.HubSettings = {
       { name:'Server',    department:'Front of House', default_wage:ANCHL.wages.floor,   tipped:true  },
       { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
       { name:'Manager',   department:'Management',     default_wage:28,                  tipped:false },
+      { name:'Assistant Manager', department:'Management', default_wage:24,               tipped:false },
     ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
@@ -2225,8 +2226,14 @@ S.HubSettings = {
     // cost reads correctly off the wage in effect on the entry date, not the
     // current wage. Empty on fresh hires (their current wage is the starting wage).
     const mkStaff = (name, posName, wage, hiredDaysAgo) => ({
-      id:uid(), name:name, position_id:lcPos(posName), wage:wage, status:'Active',
-      hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
+      id:uid(), name:name, position_id:lcPos(posName), pay_type:'Hourly', wage:wage, annual_salary:null,
+      status:'Active', hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
+      wage_history:[], created_at:new Date().toISOString()
+    });
+    // Salaried (exempt): fixed annual salary, no hourly wage and no overtime.
+    const mkSalaried = (name, posName, annual, hiredDaysAgo) => ({
+      id:uid(), name:name, position_id:lcPos(posName), pay_type:'Salary', wage:null, annual_salary:annual,
+      status:'Active', hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
       wage_history:[], created_at:new Date().toISOString()
     });
     const lcStaff = [
@@ -2243,7 +2250,8 @@ S.HubSettings = {
       mkStaff('Brianna K.', 'Server',    14,   175),
       mkStaff('Priya N.',   'Server',    14,   110),
       mkStaff('Owen L.',    'Host',      12.5, 80),
-      mkStaff('Carlos P.',  'Manager',   28,   520),
+      mkSalaried('Carlos P.', 'Manager',           68000, 520),
+      mkSalaried('Renee K.',  'Assistant Manager', 52000, 300),
     ];
     App.laborData.lc_staff = lcStaff;
 
@@ -2600,6 +2608,8 @@ S.HubSettings = {
       certRec('Owen L.',    'ServSafe Food Handler', 'ServSafe', 290, 'SS-81330'),
       certRec('Carlos P.',  'TABC (Texas)', 'Texas ABC', 400, 'TX-1099001'),
       certRec('Carlos P.',  'ServSafe Manager', 'ServSafe', 400, 'SS-MGR-4410'),
+      certRec('Renee K.',   'TABC (Texas)', 'Texas ABC', 300, 'TX-1100250'),
+      certRec('Renee K.',   'ServSafe Manager', 'ServSafe', 300, 'SS-MGR-4502'),
     ].filter(Boolean);
 
     // ── Coaching Log — written record of staff conversations, authored by the
