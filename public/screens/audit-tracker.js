@@ -102,7 +102,7 @@ S.AuditTracker = {
 
     let historyCard = '';
     if (audits.length > 1) {
-      const rows = audits.map((a,i) => {
+      const rows = audits.slice(0, App.listLimit('core', 'audit')).map((a,i) => {
         const p    = audits[i+1];
         const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
         const tier = a.grade || '';
@@ -120,10 +120,11 @@ S.AuditTracker = {
       historyCard = '<div class="card">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Full history kept. Print any audit to save as PDF.</div>'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('core', 'audit', audits, false)
         + '</div>';
     }
 
@@ -158,6 +159,8 @@ S.AuditTracker = {
     this.container.querySelectorAll('.at-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
   renderScoreChart(audits, prefix) {
@@ -995,10 +998,9 @@ S.AuditTracker = {
         generated_at:  new Date().toISOString()
       };
 
-      if (!App.data.audits) App.data.audits = [];
-      App.data.audits.push(auditRecord);
-      if (App.data.audits.length > 12) App.data.audits = App.data.audits.slice(-12);
-      await App.saveKey('audits');
+      // Row-per-record in core_events now, so the old 12-audit blob cap is gone:
+      // full audit history is retained and paged via "Show older" on the list.
+      await App.putRecord('core', 'audit', auditRecord);
       App.markSetupDone('gs_p_audit');
 
       document.getElementById('topbar-sub').textContent = '';
