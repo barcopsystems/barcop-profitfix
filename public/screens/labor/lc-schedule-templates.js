@@ -18,6 +18,37 @@ S.LaborScheduleTemplates = {
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   bs() { return S.LaborBuildSchedule; },
 
+  // Per-template rollup so each card is distinguishable at a glance: shift
+  // count, total hours, a rough weekly cost (hourly at current wage + each
+  // distinct salaried person's weekly salary), and headcount per day.
+  templateStats(t) {
+    const bs = this.bs();
+    const days = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const byDay = {}; days.forEach(d => byDay[d] = 0);
+    const today = new Date().toISOString().slice(0, 10);
+    let hours = 0, cost = 0;
+    const salIds = new Set();
+    (t.shifts || []).forEach(s => {
+      const h = bs.hoursOf(s.start, s.end);
+      hours += h;
+      if (byDay[s.day] != null) byDay[s.day] += 1;
+      const staff = bs.staffById(s.staff_id);
+      if (staff && App.isSalaried(staff)) salIds.add(staff.id);
+      else { const wage = App.wageForStaffOn ? App.wageForStaffOn(s.staff_id, today) : ((staff && staff.wage) || 0); cost += h * (wage || 0); }
+    });
+    salIds.forEach(id => { cost += App.staffWeeklySalary ? App.staffWeeklySalary(id) : 0; });
+    return { count: (t.shifts || []).length, hours, cost, byDay };
+  },
+  dayStrip(byDay) {
+    const days = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days.map(d => {
+      const n = byDay[d] || 0;
+      return '<div style="text-align:center;min-width:34px;">'
+        + '<div style="font-size:9px;letter-spacing:1px;color:var(--t4);text-transform:uppercase;">' + d + '</div>'
+        + '<div style="font-size:14px;font-weight:600;color:' + (n > 0 ? 'var(--t1)' : 'var(--t4)') + ';">' + n + '</div></div>';
+    }).join('');
+  },
+
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -52,16 +83,22 @@ S.LaborScheduleTemplates = {
         + 'Schedule to save time each week.</div>'
         + '<button class="btn btn-primary" id="lt-add-first">New Template</button></div>';
     } else {
-      const rows = list.map(t => '<tr class="lt-row" data-id="' + t.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + esc(t.name) + '</div></td>'
-        + '<td>' + ((t.shifts || []).length) + ' shifts</td>'
-        + '<td><div class="row-actions">'
-        + '<button class="btn btn-primary btn-sm lt-use" data-id="' + t.id + '">Use</button>'
-        + '<button class="btn btn-ghost btn-sm lt-edit" data-id="' + t.id + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm lt-del" data-id="' + t.id + '">Delete</button>'
-        + '</div></td></tr>').join('');
-      html = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Template</th><th>Shifts</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      const intro = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">A template is a typical week of shifts you can drop into any week. Apply one from Build Schedule, or build a week there and save it back here as a template.</div>';
+      html = intro + list.map(t => {
+        const st = this.templateStats(t);
+        return '<div class="card lt-card" data-id="' + t.id + '" style="cursor:pointer;margin-bottom:12px;">'
+          + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+          + '<div><div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(t.name) + '</div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + st.count + ' shift' + (st.count === 1 ? '' : 's')
+          + ' &middot; ' + st.hours.toFixed(1) + ' hrs &middot; ~' + App.fmtCurrency(st.cost) + '/wk</div></div>'
+          + '<div class="row-actions" style="flex-shrink:0;">'
+          + '<button class="btn btn-primary btn-sm lt-use" data-id="' + t.id + '">Use</button>'
+          + '<button class="btn btn-ghost btn-sm lt-edit" data-id="' + t.id + '">Edit</button>'
+          + '<button class="btn btn-danger btn-sm lt-del" data-id="' + t.id + '">Delete</button>'
+          + '</div></div>'
+          + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--b2);">'
+          + this.dayStrip(st.byDay) + '</div></div>';
+      }).join('');
     }
 
     const modal = '<div id="lt-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -74,7 +111,7 @@ S.LaborScheduleTemplates = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
-      const row = ev.target.closest('.lt-row');
+      const row = ev.target.closest('.lt-card');
       const use = ev.target.closest('.lt-use');
       const edit = ev.target.closest('.lt-edit');
       const del = ev.target.closest('.lt-del');
@@ -91,8 +128,7 @@ S.LaborScheduleTemplates = {
     const t = this.templates().find(x => x.id === id);
     if (!t || !this.bs()) return;
     const draft = {
-      week_start: '',
-      revenue_forecast: '',
+      week_start: this.bs().mondayOf(new Date().toISOString().slice(0, 10)),
       shifts: (t.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end })),
       notes: ''
     };
