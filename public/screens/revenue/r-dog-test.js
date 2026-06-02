@@ -112,7 +112,7 @@ S.RevenueDogTest = {
 
     let history = '';
     if (decided.length) {
-      const rows = decided.map(t => {
+      const rows = decided.slice(0, App.listLimit('core', 'menu_dog_test')).map(t => {
         const badge = t.status === 'Kept'
           ? '<span class="badge badge-ok">Kept</span>'
           : '<span class="badge badge-warn">Removed</span>';
@@ -132,7 +132,8 @@ S.RevenueDogTest = {
       history = '<div class="sh">Test History</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Item</th><th>Started</th><th>Baseline</th><th>Final Weekly</th><th>Change</th><th>Decision</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('core', 'menu_dog_test', decided, false);
     }
 
     let emptyMsg = '';
@@ -162,6 +163,8 @@ S.RevenueDogTest = {
       b.addEventListener('click', () => this.decide(b.dataset.id, 'Removed')));
     this.container.querySelectorAll('.dt-cancel, .dt-del').forEach(b =>
       b.addEventListener('click', () => this.del(b.dataset.id)));
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.draw()));
   },
 
   start() {
@@ -177,18 +180,19 @@ S.RevenueDogTest = {
     const item = (App.data.menu_items || []).find(m => m.id === itemId);
     if (!item) return fail('Item no longer exists. Pick another.');
 
-    this.list().push({
+    const rec = {
       id: App.uid(),
       item_id: itemId,
       item_name: item.name,
       start_date: date,
+      created_at: new Date().toISOString(),
       baseline_volume: isNaN(base) ? (item.weekly_covers != null ? Math.round(item.weekly_covers) : null) : base,
       change_notes: notes,
       current_volume: null,  // legacy field; reads live from item.weekly_covers via currentFor()
       status: 'Testing',
       decided_at: null
-    });
-    App.saveKey('menu_dog_tests').then(() => this.draw());
+    };
+    App.putRecord('core', 'menu_dog_test', rec).then(() => this.draw());
   },
 
   decide(id, status) {
@@ -200,11 +204,10 @@ S.RevenueDogTest = {
     if (item && item.weekly_covers != null) t.current_volume = item.weekly_covers;
     t.status = status;
     t.decided_at = new Date().toISOString();
-    App.saveKey('menu_dog_tests').then(() => this.draw());
+    App.putRecord('core', 'menu_dog_test', t).then(() => this.draw());
   },
 
   del(id) {
-    App.data.menu_dog_tests = this.list().filter(x => x.id !== id);
-    App.saveKey('menu_dog_tests').then(() => this.draw());
+    App.removeRecord('core', 'menu_dog_test', id).then(() => this.draw());
   }
 };
