@@ -319,8 +319,8 @@ S.RevenueAudit = {
 
     const printBtn = document.createElement('button');
     printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print / Save PDF';
-    printBtn.onclick = () => window.print();
+    printBtn.textContent = 'Save PDF';
+    printBtn.onclick = () => this.exportPDF(audit);
     this.actions.appendChild(printBtn);
 
 
@@ -534,6 +534,148 @@ S.RevenueAudit = {
 
   // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
   // Findings render inline under each section via findingsBlock() in viewAudit().
+
+  // ── Data-driven PDF export ────────────────────────────────────────────────
+  // Rebuilds the on-screen Revenue Audit from data via App._pdfBuilder (no
+  // window.print, no DOM walk). Mirrors viewAudit(): overall score header, the
+  // five scored sections + Operational Risk Signals, each section's metric rows
+  // and inline Findings, ranked action items, ending with the canonical legal
+  // disclaimer (App.deliverableFooter().disclaimerLines, verbatim).
+  async exportPDF(audit) {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    const d = audit.raw || audit;
+    const overall = audit.overall_score || 0;
+
+    // Formatters mirror viewAudit() exactly.
+    const pct = v => v != null ? v + '%' : '';
+    const cur = v => v ? App.fmtCurrency(v) : '';
+    const num = v => v != null ? String(v) : '';
+    const yN  = v => v === true ? 'Yes' : v === false ? 'No' : '';
+
+    const period = [audit.audit_period, audit.audit_id, audit.grade].filter(Boolean).map(x => String(x)).join('  ·  ');
+    const metaBits = [(audit.date || '').slice(0, 10) || App._pdfDateStamp(), 'Score ' + overall + ' (' + App.scoreLabel(overall) + ')'];
+    if (period) metaBits.push(period);
+
+    const b = App._pdfBuilder('Revenue Recovery Audit');
+    b.header({ right: 'Revenue Recovery Audit', meta: metaBits.join('   ·   ') });
+    b.kv('Bar', audit.bar_name || App.data.settings.bar_name || 'Your Bar');
+    b.kv('Revenue Score', overall + ' of 100  (' + App.scoreLabel(overall) + ')');
+    if (d.INDUSTRY_AVG != null) b.kv('Bar Cop Benchmark', String(d.INDUSTRY_AVG));
+    b.kv('Target', String(d.TARGET_SCORE || 65));
+
+    // Ranked action items (same source + ordering as the screen).
+    const actionItems = audit.action_items || [];
+    if (actionItems.length) {
+      b.sectionTitle('Action Items, Ranked by Impact');
+      b.table(['#', 'Action', 'Monthly Opportunity'], actionItems.map((a, i) => [
+        String(i + 1),
+        a.action || a || '',
+        a.monthly_impact ? '+' + App.fmtCurrency(a.monthly_impact) : ''
+      ]), { columnStyles: { 0: { cellWidth: 24 }, 2: { cellWidth: 110 } } });
+      const totalMonthly = actionItems.reduce((s, a) => s + (a.monthly_impact || 0), 0);
+      if (totalMonthly > 0) {
+        b.kv('Total Recoverable Per Month', App.fmtCurrency(totalMonthly));
+        b.kv('Annualized', App.fmtCurrency(totalMonthly * 12));
+      }
+    }
+
+    // Findings text per section (matches findingsBlock in viewAudit).
+    const findingsText = (n) => {
+      if (n === 6) return [];
+      return ['S' + n + '_EVIDENCE', 'S' + n + '_GAP', 'S' + n + '_TOOL', 'S' + n + '_NARRATIVE', 'S' + n + '_FINDING']
+        .map(f => d[f]).filter(v => v && String(v).trim());
+    };
+
+    // One section: title with its score, metric rows, then findings paragraphs.
+    const section = (n, name, score, rows) => {
+      const scoreTxt = score != null ? String(score) : 'N/A (Not enough data)';
+      b.sectionTitle('Section ' + n + '  ·  ' + name + '  ·  Score ' + scoreTxt);
+      const body = rows.filter(([, v]) => v !== undefined && v !== null && v !== '').map(([label, val]) => [label, val]);
+      if (body.length) b.table(null, body, { columnStyles: { 0: { cellWidth: 200, fontStyle: 'bold' } } });
+      const finds = findingsText(n);
+      if (finds.length) { b.heading('Findings', 10); finds.forEach(t => b.paragraph(t)); }
+    };
+
+    section(1, 'Check Average and Revenue', d.S1_SCORE, [
+      ['Blended Check Average',        cur(d.S1_CHECK_AVG)],
+      ['Check Average Target',         cur(d.S1_CHECK_AVG_TARGET)],
+      ['Bar Check Average',            cur(d.S1_BAR_CHECK_AVG)],
+      ['Food Check Average',           cur(d.S1_FOOD_CHECK_AVG)],
+      ['Monthly Cover Count',          num(d.S1_COVER_COUNT)],
+      ['Beverage Attachment',          d.S1_BEV_PER_COVER != null ? d.S1_BEV_PER_COVER + ' drinks per guest' : ''],
+      ['Attachment Benchmark',         d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null ? d.S1_BEV_ATTACH_BENCHMARK + ' drinks per guest' : ''],
+      ['Drinks Sold (period)',         d.S1_BEV_PER_COVER != null ? num(d.S1_BEV_UNITS) : ''],
+      ['Checks With a Drink',          d.S1_BEV_INCIDENCE_PCT != null ? d.S1_BEV_INCIDENCE_PCT + '%' : ''],
+      ['Weakest Daypart',              d.S1_DAYPART_WEAKEST ? d.S1_DAYPART_WEAKEST + ' at ' + cur(d.S1_DAYPART_WEAKEST_CHECK) : ''],
+      ['Daypart Check Spread',         d.S1_DAYPART_SPREAD != null ? cur(d.S1_DAYPART_SPREAD) + ' (weakest to strongest)' : ''],
+      ['Monthly Revenue',              cur(d.S1_MONTHLY_REVENUE)],
+      ['Monthly Gap vs Target',        cur(d.S1_MONTHLY_GAP)],
+      ['Annual Gap',                   cur(d.S1_ANNUAL_GAP)],
+    ]);
+    section(2, 'Labor Efficiency', d.S2_SCORE, [
+      ['Total Labor %',                pct(d.S2_LABOR_PCT)],
+      ['Labor Target %',               pct(d.S2_LABOR_TARGET_PCT)],
+      ['RPLH',                         cur(d.S2_RPLH)],
+      ['RPLH Target',                  cur(d.S2_RPLH_TARGET)],
+      ['Total Labor Period',           cur(d.S2_LABOR_PERIOD)],
+      ['Scheduled vs Actual Hours',    d.S2_SCHED_VS_ACTUAL || ''],
+      ['Overtime Hours',               d.S2_OVERTIME_HRS ? num(d.S2_OVERTIME_HRS) + ' hrs' : ''],
+      ['Monthly Labor Gap',            cur(d.S2_MONTHLY_GAP)],
+    ]);
+    section(3, 'Menu Performance', d.S3_SCORE, [
+      ['Stars on Menu',                num(d.S3_STARS_COUNT)],
+      ['Plowhorses on Menu',           num(d.S3_PLOWHORSES_COUNT)],
+      ['Dogs on Menu',                 num(d.S3_DOGS_COUNT)],
+      ['Puzzles on Menu',              num(d.S3_PUZZLES_COUNT)],
+      ['Top Category by Revenue',      d.S3_TOP_CATEGORY || ''],
+      ['Last Price Increase',          d.S3_LAST_PRICE_INCREASE || ''],
+      ['Menu Mix Gap',                 cur(d.S3_MONTHLY_GAP)],
+      ['Pricing Opportunity',          cur(d.S3_PRICING_OPPORTUNITY)],
+    ]);
+    section(4, 'Server Performance', d.S4_SCORE, [
+      ['Server Count Analyzed',        num(d.S4_SERVER_COUNT)],
+      ['Top Server Check Average',     cur(d.S4_TOP_CHECK_AVG)],
+      ['Bottom Server Check Average',  cur(d.S4_BOTTOM_CHECK_AVG)],
+      ['Performance Spread',           cur(d.S4_PERFORMANCE_SPREAD)],
+      ['Appetizer Attach Rate',        pct(d.S4_APP_ATTACH_RATE)],
+      ['Dessert Attach Rate',          pct(d.S4_DESSERT_ATTACH_RATE)],
+      ['Pre-Shift Briefing',           d.S4_PRESHIFT_BRIEFING || ''],
+      ['Monthly Gap from Spread',      cur(d.S4_MONTHLY_GAP)],
+    ]);
+    section(5, 'Events and Private Dining', d.S5_SCORE, [
+      ['Event Revenue Period',         cur(d.S5_EVENT_REV_PERIOD)],
+      ['Events per Month',             num(d.S5_EVENTS_PER_MONTH)],
+      ['Average Event Revenue',        cur(d.S5_AVG_EVENT_REVENUE)],
+      ['Private Dining Minimum Met',   yN(d.S5_MINIMUM_MET)],
+      ['Catering Revenue Period',      cur(d.S5_CATERING_REV_PERIOD)],
+      ['Annual Event Gap',             cur(d.S5_ANNUAL_EVENT_GAP)],
+      ['Monthly Gap',                  cur(d.S5_MONTHLY_GAP)],
+    ]);
+
+    // Operational Risk Signals (Section 6) — same source as signals6 on screen.
+    const signals6 = [
+      { score: d.S6_SIG1_SCORE, label: d.S6_SIG1_LABEL, evidence: d.S6_SIG1_EVIDENCE, gap: d.S6_SIG1_GAP, tool: d.S6_SIG1_TOOL },
+      { score: d.S6_SIG2_SCORE, label: d.S6_SIG2_LABEL, evidence: d.S6_SIG2_EVIDENCE, gap: d.S6_SIG2_GAP, tool: d.S6_SIG2_TOOL },
+      { score: d.S6_SIG3_SCORE, label: d.S6_SIG3_LABEL, evidence: d.S6_SIG3_EVIDENCE, gap: d.S6_SIG3_GAP, tool: d.S6_SIG3_TOOL },
+      { score: d.S6_SIG4_SCORE, label: d.S6_SIG4_LABEL, evidence: d.S6_SIG4_EVIDENCE, gap: d.S6_SIG4_GAP, tool: d.S6_SIG4_TOOL },
+    ].filter(s => s.label);
+    if (signals6.length) {
+      b.sectionTitle('Section 6  ·  Operational Risk Signals');
+      signals6.forEach(sig => {
+        b.heading((sig.label || '') + (sig.score ? '  [' + String(sig.score).toUpperCase() + ']' : ''), 10);
+        if (sig.evidence) b.paragraph(sig.evidence);
+        if (sig.gap)      b.paragraph(sig.gap);
+        if (sig.tool)     b.paragraph(sig.tool);
+      });
+    }
+
+    b.disclaimer(App.deliverableFooter().disclaimerLines.join(' '));
+
+    const stamp = /^\d{4}-\d{2}-\d{2}/.test(audit.date || '') ? audit.date.slice(0, 10).replace(/-/g, '') : App._pdfDateStamp();
+    await b.save('BarCop_RevenueAudit_' + stamp + '.pdf');
+  },
 
   // ── Stepped intake wizard ─────────────────────────────────────────────────
   _intakeStep: 1,
