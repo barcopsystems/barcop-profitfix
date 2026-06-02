@@ -380,13 +380,11 @@ S.InventoryOrderSheet = {
 
     const btn = panel.querySelector('.os-co-create');
     if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
-    this.orders().push(rec);
-    const ok = await App.saveInventory();
+    const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
       this.closeCustomOrder();
       this.renderMain();
     } else {
-      this.orders().pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
     }
@@ -628,13 +626,11 @@ S.InventoryOrderSheet = {
 
     const btn = card.querySelector('.os-create');
     if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
-    this.orders().push(rec);
-    const ok = await App.saveInventory();
+    const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
       this._created[vendor] = true;
       this.renderMain();
     } else {
-      this.orders().pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
     }
