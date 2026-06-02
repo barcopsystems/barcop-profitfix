@@ -2616,11 +2616,10 @@ const App = {
     }
   },
 
-  /* Report screens carry an Export to PDF button (Rule 10). The print
-     stylesheet in index.html flips the theme light and hides the chrome and
-     all buttons, so window.print() yields a clean PDF of the report content.
-     The set is every screen in a module's REPORTS section plus the three
-     Recovery Reports and History screens. */
+  /* Report screens carry an Export PDF button (Rule 10). _exportBtn wires it to
+     App.exportPDF, which generates a clean PDF of the on-screen report via jsPDF
+     and opens a Save dialog. The set is every screen in a module's REPORTS
+     section plus the three Recovery Reports and History screens. */
   _REPORT_SCREENS: {
     // The four Inventory reports carry their own Export PDF inside the report
     // panel, so they are intentionally NOT here (no duplicate topbar button).
