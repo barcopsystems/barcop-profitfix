@@ -2839,8 +2839,10 @@ const App = {
     // One page, always: fit the body rows to the space between the header block and
     // the footer, stretching each row to fill the page. Operators print as many
     // copies as they need, so a worksheet never spills onto a near-empty 2nd page.
-    const footerReserve = 34;
-    const availH = pageH - y - footerReserve;
+    const footerReserve = 30;
+    // 14pt safety below the table so autoTable (whose own bottom margin we set to
+    // footerReserve) never bumps the last row onto a second page.
+    const availH = pageH - y - footerReserve - 14;
     const headerRowH = 20;
     const minBodyRowH = 26;
     const nRows = Math.max(1, Math.floor((availH - headerRowH) / minBodyRowH));
@@ -2851,7 +2853,7 @@ const App = {
     doc.autoTable({
       startY: y,
       head, body,
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: margin, bottom: footerReserve },
       columnStyles,
       styles: { fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 }, lineColor: [150, 150, 150], lineWidth: 0.5, overflow: 'linebreak', valign: 'middle' },
       bodyStyles: { minCellHeight: bodyRowH },
