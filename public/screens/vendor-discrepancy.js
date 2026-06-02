@@ -116,7 +116,7 @@ S.VendorDiscrepancy = {
       const badge = st => st === 'Resolved' ? '<span class="badge badge-ok">Resolved</span>'
         : st === 'Credit Requested' ? '<span class="badge badge-dim">Credit Requested</span>'
         : '<span class="badge badge-warn">Open</span>';
-      const trs = rows.map(r => {
+      const trs = rows.slice(0, App.listLimit('core', 'vendor_discrepancy')).map(r => {
         const act = r.status === 'Open'
           ? '<button class="btn btn-ghost btn-sm vd-credit" data-id="' + esc(r.id) + '">Request Credit</button>'
           : r.status === 'Credit Requested'
@@ -135,7 +135,8 @@ S.VendorDiscrepancy = {
       }).join('');
       body = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Type</th><th>Product</th><th>Overcharge</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
+        + App.showOlderBar('core', 'vendor_discrepancy', rows, false);
     }
 
     // Order: summary tiles + log first (default landing is the log view).
@@ -185,6 +186,8 @@ S.VendorDiscrepancy = {
       b.addEventListener('click', () => this.markResolved(b.dataset.id)));
     this.container.querySelectorAll('.vd-remove').forEach(b =>
       b.addEventListener('click', () => this.remove(b.dataset.id)));
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.draw()));
   },
 
   rebuildProductOptions() {
@@ -253,7 +256,7 @@ S.VendorDiscrepancy = {
     // client, they can revert via Remove + refile, or just leave it.
     r.status = 'Credit Requested';
     r.credit_requested_at = new Date().toISOString();
-    App.saveKey('vendor_discrepancies').then(() => this.draw());
+    App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
   },
 
   // ── Mark Resolved ────────────────────────────────────────────────────────
@@ -305,7 +308,7 @@ S.VendorDiscrepancy = {
       record.status = 'Resolved';
       record.resolved_at = new Date().toISOString();
       record.recovered_amount = recovered;
-      App.saveKey('vendor_discrepancies').then(() => { close(); this.draw(); });
+      App.putRecord('core', 'vendor_discrepancy', record).then(() => { close(); this.draw(); });
     });
     setTimeout(() => document.getElementById('vd-resolve-amt')?.select(), 50);
   },
@@ -350,7 +353,7 @@ S.VendorDiscrepancy = {
     const product = productId
       ? ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === productId)
       : null;
-    this.list().push({
+    const rec = {
       id: App.uid(), date: date, vendor: vendor,
       reference: val('vd-ref'), type: val('vd-type') || 'Other',
       product_id: productId, sku: (product?.name) || '',
@@ -359,14 +362,13 @@ S.VendorDiscrepancy = {
       overcharge: overcharge, notes: val('vd-notes'),
       status: 'Open', source: 'manual',
       filed_at: new Date().toISOString(), resolved_at: null
-    });
+    };
     // Close the form on successful save so the operator lands back on the
     // log view with the new discrepancy visible at the top.
-    App.saveKey('vendor_discrepancies').then(() => this.draw());
+    App.putRecord('core', 'vendor_discrepancy', rec).then(() => this.draw());
   },
 
   remove(id) {
-    App.data.vendor_discrepancies = this.list().filter(x => x.id !== id);
-    App.saveKey('vendor_discrepancies').then(() => this.draw());
+    App.removeRecord('core', 'vendor_discrepancy', id).then(() => this.draw());
   }
 };
