@@ -126,7 +126,7 @@ S.RevenueAudit = {
     // History card
     let historyCard = '';
     if (audits.length > 1) {
-      const rows = audits.map((a,i) => {
+      const rows = audits.slice(0, App.listLimit('core', 'revenue_audit')).map((a,i) => {
         const p    = audits[i+1];
         const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
         const tier = a.grade || '';
@@ -144,10 +144,11 @@ S.RevenueAudit = {
       historyCard = '<div class="card">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Last 12 months stored. Print any audit to save as PDF.</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Full history kept. Print any audit to save as PDF.</div>'
         + '</div>'
         + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('core', 'revenue_audit', audits, false)
         + '</div>';
     }
 
@@ -157,6 +158,8 @@ S.RevenueAudit = {
     this.container.querySelectorAll('.ra-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
     });
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
   renderScoreChart(audits, prefix) {
@@ -916,10 +919,9 @@ S.RevenueAudit = {
         generated_at:  new Date().toISOString()
       };
 
-      if (!App.data.revenue_audits) App.data.revenue_audits = [];
-      App.data.revenue_audits.push(auditRecord);
-      if (App.data.revenue_audits.length > 12) App.data.revenue_audits = App.data.revenue_audits.slice(-12);
-      await App.saveKey('revenue_audits');
+      // Row-per-record in core_events now; full audit history retained (the old
+      // 12-audit blob cap is gone) and paged via "Show older" on the list.
+      await App.putRecord('core', 'revenue_audit', auditRecord);
       App.markSetupDone('gs_r_audit');
 
       document.getElementById('topbar-sub').textContent = '';
