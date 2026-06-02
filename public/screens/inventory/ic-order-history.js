@@ -93,7 +93,7 @@ S.InventoryOrderHistory = {
     // the Reopen / Mark Received buttons later.
     o.status = 'Submitted';
     o.submitted_at = new Date().toISOString();
-    await App.saveInventory();
+    await App.putRecord('ic', 'order', o);
     this.renderDetail(id);
   },
 
@@ -223,15 +223,14 @@ S.InventoryOrderHistory = {
     if (!o) return;
     o.status = o.status === 'Received' ? 'Open' : 'Received';
     o.received_at = o.status === 'Received' ? new Date().toISOString() : null;
-    await App.saveInventory();
+    await App.putRecord('ic', 'order', o);
     this.renderDetail(id);
   },
 
   async confirmDel(id) {
     const ok = await App.confirm({ title: 'Delete this order?', confirmText: 'Delete', cancelText: 'Cancel' });
     if (!ok) return;
-    App.inventoryData.ic_orders = this.orders().filter(x => x.id !== id);
-    await App.saveInventory();
+    await App.removeRecord('ic', 'order', id);
     this.renderList();
   }
 };
