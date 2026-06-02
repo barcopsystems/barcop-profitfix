@@ -2302,7 +2302,13 @@ const App = {
         // templates / config); fix_log moves in its own shared pass.
         revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
         revenue_server_check: 'revenue_server_checks', menu_dog_test: 'menu_dog_tests',
-        revenue_price_log: 'revenue_price_log', revenue_event: 'revenue_events'
+        revenue_price_log: 'revenue_price_log', revenue_event: 'revenue_events',
+        // Traffic pass — the 4 Guests & Planning lists (regulars, initiatives,
+        // holidays, inquiries) stay in the blob: low-volume CRM/planning the
+        // 24-month window would wrongly hide. fix_log moves in its own pass.
+        traffic_week: 'traffic_weeks', traffic_audit: 'traffic_audits',
+        traffic_review_reply: 'traffic_review_replies', traffic_gbp_post: 'traffic_gbp_posts',
+        traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns'
       }
     }
   },
