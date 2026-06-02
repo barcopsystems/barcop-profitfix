@@ -220,8 +220,7 @@ S.TrafficReviews = {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
         if (!(await App.confirm({ title: 'Delete this reply entry?', confirmText: 'Delete' }))) return;
-        App.data.traffic_review_replies = this.replies().filter(x => x.id !== btn.dataset.id);
-        await App.saveKey('traffic_review_replies');
+        await App.removeRecord('core', 'traffic_review_reply', btn.dataset.id);
         this.draw();
       });
     });
@@ -261,13 +260,12 @@ S.TrafficReviews = {
       saved_at: new Date().toISOString()
     };
     const list = this.replies();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     }
-    const ok = await App.saveKey('traffic_review_replies');
+    const ok = await App.putRecord('core', 'traffic_review_reply', saved);
     if (ok) {
       const tRV = (App.data.traffic_settings?.targets?.review_velocity) || 8;
       const afterMonthCount = this.thisMonthReplies().length;
