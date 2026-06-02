@@ -2370,7 +2370,13 @@ const App = {
     if (!dataObj) return;
     await DB.clearEvents(store.table);
     for (const kind of Object.keys(store.kinds)) {
-      await DB.putEventsBulk(store.table, kind, dataObj[store.kinds[kind]] || []);
+      const recs = dataObj[store.kinds[kind]] || [];
+      // Defensive: an event row with no id is silently dropped by putEventsBulk
+      // (this is what lost the traffic audits on reload). Assign one in place so
+      // the in-memory record and the seeded row stay in sync.
+      recs.forEach(r => { if (r && r.id == null) r.id = this.uid(); });
+      const res = await DB.putEventsBulk(store.table, kind, recs);
+      if (res && res.ok === false) console.error('seedEventStores ' + mod + '/' + kind + ' failed', res.error);
     }
   },
 
@@ -3491,6 +3497,16 @@ const App = {
     const diff = (7 - d.getDay()) % 7 || 7;
     d.setDate(d.getDate() + diff);
     return d.toISOString().slice(0, 10);
+  },
+
+  // Newest event record by date. Event logs load date-desc from the events
+  // tables, so the last array element is no longer the latest — pick by date
+  // (date / period_end / generated_at) instead. Used wherever the Hub and the
+  // recovery dashboards show "the latest audit / week".
+  latestEvent(arr) {
+    if (!Array.isArray(arr) || !arr.length) return null;
+    const dk = r => ((r && (r.date || r.period_end || r.generated_at || r.saved_at || r.created_at)) || '') + '';
+    return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
   },
 
   uid() {
