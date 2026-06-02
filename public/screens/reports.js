@@ -144,6 +144,10 @@ S.Reports={
         +'</div>'
         +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;line-height:1.5;"></div>'
         +'<div id="qbo-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
+        +'<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-top:14px;">'
+          +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you file</div>'
+          +'<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should review and verify before filing anything or closing the books.</div>'
+        +'</div>'
       +'</div>'
     +'</div>';
 
