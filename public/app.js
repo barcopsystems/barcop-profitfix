@@ -2816,6 +2816,7 @@ const App = {
         'lc-daily-view':         ['Daily View', 'Labor Control'],
         'lc-weekly-summary':     ['Weekly Summary', 'Labor Control'],
         'lc-pay-periods':        ['Pay Periods', 'Labor Control'],
+        'lc-payroll-export':     ['Payroll Export', 'Labor Control'],
         'lc-positions':          ['Add Positions', 'Labor Control'],
         'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
         'lc-wage-settings':      ['Wage Policies', 'Labor Control'],
@@ -2839,6 +2840,7 @@ const App = {
         'lc-daily-view': S.LaborDailyView,
         'lc-weekly-summary': S.LaborWeeklySummary,
         'lc-pay-periods':    S.LaborPayPeriods,
+        'lc-payroll-export': S.LaborPayrollExport,
         'lc-tip-log': S.LaborTipLog,
         'lc-tip-pool': S.LaborTipPool,
         'lc-tip-history': S.LaborTipHistory,
@@ -3073,6 +3075,58 @@ const App = {
     // entry is what the staff member earned at that time.
     const oldest = history[history.length - 1];
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
+  },
+
+  // ── Salaried staff ──────────────────────────────────────────────────────
+  // A salaried (exempt) staff member's labor cost is FIXED per period
+  // (annual_salary / 52 per week), not hours * wage. Their per-day lc_actuals
+  // rows still carry hours for coverage and RPLH, but those hours have no
+  // hourly wage, so each row's cost is 0 and the fixed salary is added at the
+  // weekly/period rollups via salariedCost(). Salaried = exempt: no overtime
+  // (a salaried NON-exempt employee should be entered as Hourly so OT computes).
+  isSalaried(staffOrId) {
+    const s = (staffOrId && typeof staffOrId === 'object')
+      ? staffOrId
+      : (this.laborData?.lc_staff || []).find(x => x.id === staffOrId);
+    return !!(s && s.pay_type === 'Salary');
+  },
+  // Fixed salaried labor cost accrued over [startDate, endDate] inclusive. Salary
+  // accrues evenly every day; a full 7-day week equals annual_salary / 52. Only
+  // Active salaried staff with a positive salary count. Returns { total, bar,
+  // food } split by the staff member's position department (Profit's split:
+  // department 'Bar' is bar, everything else is food), so This Week's bar/food
+  // labor stays correct.
+  salariedCost(startDate, endDate) {
+    const out = { total: 0, bar: 0, food: 0 };
+    if (!startDate || !endDate) return out;
+    const sd = new Date(startDate + 'T00:00:00'), ed = new Date(endDate + 'T00:00:00');
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return out;
+    const days = Math.floor((ed.getTime() - sd.getTime()) / 86400000) + 1;
+    if (days <= 0) return out;
+    const weeks = days / 7;
+    const posDept = {};
+    ((this.laborData?.lc_positions) || []).forEach(p => { posDept[p.id] = p.department; });
+    ((this.laborData?.lc_staff) || []).forEach(s => {
+      if (!this.isSalaried(s) || s.status === 'Inactive') return;
+      const annual = parseFloat(s.annual_salary);
+      if (!annual || annual <= 0) return;
+      const cost = (annual / 52) * weeks;
+      out.total += cost;
+      if (posDept[s.position_id] === 'Bar') out.bar += cost;
+      else out.food += cost;
+    });
+    return out;
+  },
+  // Weekly salary cost for ONE staff member (annual_salary / 52), or 0 when the
+  // staff member is not salaried or has no salary on file. Used by per-staff
+  // and per-day rollups (Daily View, Weekly Summary, Pay Periods).
+  staffWeeklySalary(staffOrId) {
+    const s = (staffOrId && typeof staffOrId === 'object')
+      ? staffOrId
+      : (this.laborData?.lc_staff || []).find(x => x.id === staffOrId);
+    if (!this.isSalaried(s) || (s && s.status === 'Inactive')) return 0;
+    const annual = parseFloat(s && s.annual_salary);
+    return annual && annual > 0 ? annual / 52 : 0;
   },
 
   // Canonical lc_actuals hours edit — one owner of the hours->wage->cost math so
