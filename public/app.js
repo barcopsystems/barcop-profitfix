@@ -1478,8 +1478,8 @@ const App = {
   // App.staffById(id) resolves an id back to the staff record at save time.
   staffOptions(selectedId, opts) {
     opts = opts || {};
-    const all = ((this.laborData && this.laborData.lc_staff) || [])
-      .filter(s => s.status !== 'Inactive');
+    const roster = ((this.laborData && this.laborData.lc_staff) || []);
+    const all = roster.filter(s => s.status !== 'Inactive');
     const filtered = opts.filter ? all.filter(opts.filter) : all;
 
     const positions = ((this.laborData && this.laborData.lc_positions) || []);
@@ -1513,10 +1513,15 @@ const App = {
       h += '</optgroup>';
     });
 
-    // Preserve a legacy free-text name that has no matching active staff so
-    // the operator does not lose the record on edit.
+    // Preserve a selected value that isn't in the active/filtered list so the
+    // operator never loses the record's staff link on edit: an inactive (or
+    // otherwise off-list) staff member shows their real name + "(inactive)"; a
+    // true legacy free-text value shows "(not on roster)". A legacy name that
+    // resolves to a real staff member is normalized to that id on the option.
     if (selectedId && !filtered.some(s => s.id === selectedId) && !filtered.some(s => s.name === selectedId)) {
-      h += '<option value="' + esc(selectedId) + '" selected>' + esc(selectedId) + ' (not on roster)</option>';
+      const off = roster.find(s => s.id === selectedId || s.name === selectedId);
+      const label = off ? (off.name + (off.status === 'Inactive' ? ' (inactive)' : '')) : (selectedId + ' (not on roster)');
+      h += '<option value="' + esc(off ? off.id : selectedId) + '" selected>' + esc(label) + '</option>';
     }
 
     return h;
@@ -1588,6 +1593,12 @@ const App = {
   // drifts. Previously this list was duplicated as a fallback in 11
   // different files, which would silently desync the moment one changed.
   SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+
+  // Overtime thresholds — federal 40 hr/week; "approaching" is the UI watch
+  // line. Labor Dashboard, Overtime Watch, and Pay Periods all read from here
+  // so the number can never desync across the three screens that act on it.
+  OT_THRESHOLD: 40,
+  OT_APPROACHING: 35,
 
   // Canonical product category groups. Replaces the duplicated BAR_CATS /
   // KITCHEN_CATS arrays in this-week.js, bar-products.js, kitchen-products.js,
@@ -3056,6 +3067,33 @@ const App = {
     // entry is what the staff member earned at that time.
     const oldest = history[history.length - 1];
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
+  },
+
+  // Canonical lc_actuals hours edit — one owner of the hours->wage->cost math so
+  // Daily View and Weekly Summary can never drift from each other on a payroll
+  // number. Honors a per-record wage override, else the staff member's effective
+  // wage on the shift date; recomputes cost, stamps updated_at, persists one row.
+  // No-op on a locked (closed pay-period) record.
+  async updateActual(rec, fields) {
+    fields = fields || {};
+    if (!rec || rec.locked) return false;
+    if (fields.hours != null && !isNaN(fields.hours) && fields.hours >= 0) {
+      rec.hours = fields.hours;
+      const wage = rec.wage != null ? rec.wage
+        : (this.wageForStaffOn ? this.wageForStaffOn(rec.staff_id, rec.date) : 0);
+      rec.cost = rec.hours * wage;
+    }
+    if (fields.notes != null) rec.notes = String(fields.notes).trim();
+    rec.updated_at = new Date().toISOString();
+    return await this.putRecord('lc', 'actual', rec);
+  },
+
+  // Logged hours for a staff member on a date, read from lc_actuals. Tip Log
+  // and Tip Pool both auto-fill hours from here, so the lookup lives once.
+  hoursFor(staffId, date) {
+    if (!staffId || !date) return null;
+    const a = ((this.laborData && this.laborData.lc_actuals) || []).find(x => x.staff_id === staffId && x.date === date);
+    return a ? (a.hours || null) : null;
   },
 
   // Currently-open shift, if any. The 3rd+ consumer of this pattern, so it
