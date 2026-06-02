@@ -355,9 +355,9 @@ S.HubBarCopAudit = {
 
     // Gaps surfaced: action_items from the latest audit per recovery section.
     const latestAudits = [
-      (App.data?.audits || []).slice(-1)[0],
-      (App.data?.revenue_audits || []).slice(-1)[0],
-      (App.data?.traffic_audits || []).slice(-1)[0]
+      App.latestEvent(App.data?.audits || []),
+      App.latestEvent(App.data?.revenue_audits || []),
+      App.latestEvent(App.data?.traffic_audits || [])
     ].filter(Boolean);
     const gapIds = new Set();
     latestAudits.forEach(a => {
@@ -712,9 +712,9 @@ S.HubBarCopAudit = {
   _recoveryActivitySnapshot() {
     const result = { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 };
     const latestAudits = [
-      (App.data?.audits || []).slice(-1)[0],
-      (App.data?.revenue_audits || []).slice(-1)[0],
-      (App.data?.traffic_audits || []).slice(-1)[0]
+      App.latestEvent(App.data?.audits || []),
+      App.latestEvent(App.data?.revenue_audits || []),
+      App.latestEvent(App.data?.traffic_audits || [])
     ].filter(Boolean);
     const gapIds = new Set();
     latestAudits.forEach(a => {
@@ -1150,9 +1150,9 @@ S.HubBarCopAudit = {
       + '</div>';
 
     // Recovery audit one-liner reference
-    const lastP = (App.data?.audits || []).slice(-1)[0];
-    const lastR = (App.data?.revenue_audits || []).slice(-1)[0];
-    const lastT = (App.data?.traffic_audits || []).slice(-1)[0];
+    const lastP = App.latestEvent(App.data?.audits || []);
+    const lastR = App.latestEvent(App.data?.revenue_audits || []);
+    const lastT = App.latestEvent(App.data?.traffic_audits || []);
     const refLine = '<div style="padding:14px 18px;background:var(--input);border:1px solid var(--b2);border-radius:6px;margin-bottom:14px;font-size:12px;color:var(--t2);line-height:1.6;">'
       + 'Latest scores from the three recovery audits: '
       + 'Profit ' + (lastP ? lastP.overall_score || '-' : '-') + ', '
@@ -1244,9 +1244,9 @@ S.HubBarCopAudit = {
     }
 
     // Recovery-audit reference line (mirrors the on-screen refLine).
-    const lastP = (App.data?.audits || []).slice(-1)[0];
-    const lastR = (App.data?.revenue_audits || []).slice(-1)[0];
-    const lastT = (App.data?.traffic_audits || []).slice(-1)[0];
+    const lastP = App.latestEvent(App.data?.audits || []);
+    const lastR = App.latestEvent(App.data?.revenue_audits || []);
+    const lastT = App.latestEvent(App.data?.traffic_audits || []);
     b.paragraph('Latest scores from the three recovery audits: '
       + 'Profit ' + (lastP ? (lastP.overall_score || '-') : '-') + ', '
       + 'Revenue ' + (lastR ? (lastR.overall_score || '-') : '-') + ', '
