@@ -2471,8 +2471,10 @@ S.HubSettings = {
         notes:'', status:'Posted', created_at:new Date().toISOString() };
     };
     App.laborData.lc_schedules = [
-      buildSchedule(mondayISO(7), 18812),
-      buildSchedule(mondayISO(0), 19150),
+      buildSchedule(mondayISO(21), 17980),
+      buildSchedule(mondayISO(14), 18420),
+      buildSchedule(mondayISO(7),  18812),
+      buildSchedule(mondayISO(0),  19150),
     ];
 
     // ── Tips — recent shifts for every tipped staff member ──
@@ -2482,7 +2484,7 @@ S.HubSettings = {
     // Scorecard (Phase 4) shows tips % per server through it.
     const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server'].includes(posNameOf(st.position_id)));
     const lcTips = [];
-    [3, 5, 8, 10, 12].forEach(d => {
+    [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
       const tipDate = dateStr(d);
       const matchedShift = scShifts.find(s => s.date === tipDate);
       const shiftId = matchedShift ? matchedShift.id : '';
@@ -2520,7 +2522,7 @@ S.HubSettings = {
         participants: parts,
         created_at:  daysAgoISO(d) };
     };
-    App.laborData.lc_tip_pools = [ mkPool(4, 980), mkPool(11, 1120), mkPool(18, 1040) ];
+    App.laborData.lc_tip_pools = [ mkPool(4, 980), mkPool(11, 1120), mkPool(18, 1040), mkPool(25, 1075), mkPool(33, 990), mkPool(46, 1150), mkPool(60, 1020) ];
 
     // ── Call-out log ──
     const lcCO = (st, d, type, covered, by) => ({ id:uid(), date:dateStr(d), staff_id:st.id,
@@ -2532,6 +2534,127 @@ S.HubSettings = {
       lcCO(lcStaff[3],  22, 'Late Arrival',    false, ''),
       lcCO(lcStaff[10], 31, 'Called Out Sick', true,  'Priya N.'),
       lcCO(lcStaff[2],  44, 'Left Early',      true,  'Jake T.'),
+      lcCO(lcStaff[8],  58, 'Called Out Sick', true,  'Marcus T.'),
+      lcCO(lcStaff[11], 71, 'Late Arrival',    false, ''),
+    ];
+
+    // ── Schedule templates — three reusable week patterns the operator applies
+    // in Build Schedule. Shifts are {staff_id, day, start, end}; Build Schedule
+    // computes hours + cost on apply.
+    const tmplShifts = (planMap) => {
+      const out = [];
+      lcStaff.forEach(st => {
+        const plan = planMap[posNameOf(st.position_id)];
+        if (!plan) return;
+        plan.days.forEach(day => out.push({ staff_id:st.id, day:day, start:plan.start, end:plan.end }));
+      });
+      return out;
+    };
+    const BUSY_PLAN = {
+      'Bartender':{days:['Wed','Thu','Fri','Sat','Sun'],start:'15:00',end:'00:00'},
+      'Barback':  {days:['Thu','Fri','Sat','Sun'],      start:'17:00',end:'00:00'},
+      'Line Cook':{days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'14:00',end:'22:00'},
+      'Prep Cook':{days:['Mon','Tue','Wed','Thu','Fri'],start:'09:00',end:'15:00'},
+      'Server':   {days:['Wed','Thu','Fri','Sat','Sun'],start:'16:00',end:'23:00'},
+      'Host':     {days:['Wed','Thu','Fri','Sat','Sun'],start:'17:00',end:'23:00'},
+      'Manager':  {days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'13:00',end:'22:00'},
+    };
+    const SLOW_PLAN = {
+      'Bartender':{days:['Thu','Fri','Sat'],      start:'17:00',end:'23:00'},
+      'Line Cook':{days:['Wed','Thu','Fri','Sat'],start:'16:00',end:'22:00'},
+      'Prep Cook':{days:['Tue','Wed','Thu'],      start:'10:00',end:'15:00'},
+      'Server':   {days:['Thu','Fri','Sat'],      start:'17:00',end:'22:00'},
+      'Host':     {days:['Fri','Sat'],            start:'18:00',end:'22:00'},
+      'Manager':  {days:['Wed','Thu','Fri','Sat'],start:'15:00',end:'22:00'},
+    };
+    App.laborData.lc_schedule_templates = [
+      { id:uid(), name:'Standard Week',       shifts:tmplShifts(SCHED_PLAN), created_at:daysAgoISO(64) },
+      { id:uid(), name:'Busy Weekend Push',   shifts:tmplShifts(BUSY_PLAN),  created_at:daysAgoISO(48) },
+      { id:uid(), name:'Slow Week (Reduced)', shifts:tmplShifts(SLOW_PLAN),  created_at:daysAgoISO(30) },
+    ];
+
+    // ── Certifications — TABC for anyone serving alcohol (Austin TX), food
+    // safety for the kitchen. expDays = days until expiration (negative = already
+    // lapsed); spread so the dashboard alert shows current, expiring-soon, and
+    // expired all at once.
+    const stByName = nm => lcStaff.find(s => s.name === nm);
+    const certRec = (nm, type, issuer, expDays, num) => {
+      const st = stByName(nm); if (!st) return null;
+      return { id:uid(), staff_id:st.id, cert_type:type, cert_number:num || '',
+        issuer:issuer, issue_date:dateStr(700), expiration_date:dateStr(-expDays),
+        notes:'', created_at:daysAgoISO(150), updated_at:new Date().toISOString() };
+    };
+    App.laborData.lc_certs = [
+      certRec('Maria G.',   'TABC (Texas)', 'Texas ABC', 240, 'TX-1184422'),
+      certRec('Jake T.',    'TABC (Texas)', 'Texas ABC',  18, 'TX-1190877'),
+      certRec('Ashley B.',  'TABC (Texas)', 'Texas ABC', 310, 'TX-1205513'),
+      certRec('Devin R.',   'TABC (Texas)', 'Texas ABC', 150, 'TX-1213004'),
+      certRec('Jessica M.', 'TABC (Texas)', 'Texas ABC', 200, 'TX-1166201'),
+      certRec('Marcus T.',  'TABC (Texas)', 'Texas ABC', 275, 'TX-1188190'),
+      certRec('Brianna K.', 'TABC (Texas)', 'Texas ABC', 120, 'TX-1221765'),
+      certRec('Priya N.',   'TABC (Texas)', 'Texas ABC', 330, 'TX-1230918'),
+      certRec('Luis V.',    'ServSafe Food Handler', 'ServSafe', 180, 'SS-77120'),
+      certRec('Sam P.',     'ServSafe Food Handler', 'ServSafe',  60, 'SS-78431'),
+      certRec('Hector M.',  'ServSafe Food Handler', 'ServSafe', -12, 'SS-79002'),
+      certRec('Tonya B.',   'ServSafe Food Handler', 'ServSafe', 220, 'SS-80155'),
+      certRec('Owen L.',    'ServSafe Food Handler', 'ServSafe', 290, 'SS-81330'),
+      certRec('Carlos P.',  'TABC (Texas)', 'Texas ABC', 400, 'TX-1099001'),
+      certRec('Carlos P.',  'ServSafe Manager', 'ServSafe', 400, 'SS-MGR-4410'),
+    ].filter(Boolean);
+
+    // ── Coaching Log — written record of staff conversations, authored by the
+    // GM. Mix of Praise, Coaching, Concern, and Warning across the window.
+    const mgr = stByName('Carlos P.');
+    const coachNote = (nm, daysAgo, category, text) => {
+      const st = stByName(nm); if (!st) return null;
+      return { id:uid(), staff_id:st.id, date:dateStr(daysAgo), category:category,
+        manager_id:mgr ? mgr.id : '', manager_name:'Carlos P.', text:text,
+        created_at:daysAgoISO(daysAgo), updated_at:daysAgoISO(daysAgo) };
+    };
+    App.laborData.lc_staff_notes = [
+      coachNote('Maria G.',   12, 'Praise',   'Covered Jake\'s Friday close on no notice and the bar still ran clean. Called it out in the group thread so the team saw it.'),
+      coachNote('Jake T.',    20, 'Coaching', 'Drawer came up 14 dollars short on the 12th. Walked the void and comp procedure again; he agreed to call a manager for any comp over 20 dollars.'),
+      coachNote('Devin R.',   26, 'Concern',  'Third late arrival in three weeks. Talked through the bus schedule, he is switching to the earlier route. Revisit in two weeks.'),
+      coachNote('Marcus T.',  33, 'Warning',  'Second no-call no-show. Issued a written warning per the handbook. One more is termination. He acknowledged and signed.'),
+      coachNote('Jessica M.', 40, 'Praise',   'Top check average on the floor two months running. Asked her to run a five minute upsell huddle before Friday dinner.'),
+      coachNote('Luis V.',    47, 'Coaching', 'Ticket times creeping past 18 minutes on the Saturday rush. Reorganized the line station with him; watching next weekend.'),
+      coachNote('Priya N.',    9, 'Praise',   'Guest emailed to compliment her wine pairing on the anniversary table. Forwarded the note to her.'),
+      coachNote('Tonya B.',   30, 'Coaching', 'Prep par sheet not getting filled on Mondays. Showed her where it lives and she owns it going forward.'),
+      coachNote('Ashley B.',  18, 'Concern',  'Seemed checked out the last two shifts. Quick private check-in, personal stuff and nothing performance related. Keeping an eye out.'),
+      coachNote('Hector M.',   6, 'Warning',  'Worked a shift on a lapsed Food Handler card. Pulled him off the line until it is renewed and documented per health code.'),
+    ].filter(Boolean);
+
+    // ── Pay periods — two older weeks closed + locked, recent weeks left open
+    // so both states are visible. Stamps locked + pay_period_id on the actuals
+    // in range, mirroring lc-pay-periods closePeriod().
+    const buildClosedPeriod = (weekStart, closedDaysAgo) => {
+      const dd = new Date(weekStart + 'T00:00:00'); dd.setDate(dd.getDate() + 6);
+      const weekEnd = dd.toISOString().slice(0, 10);
+      const periodId = uid();
+      const byStaff = {};
+      lcActuals.filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd).forEach(a => {
+        if (!byStaff[a.staff_id]) byStaff[a.staff_id] = { staff_id:a.staff_id, name:a.name, position_id:a.position_id, wage:a.wage, hours:0 };
+        byStaff[a.staff_id].hours += (a.hours || 0);
+        a.locked = true; a.pay_period_id = periodId;
+      });
+      const rows = Object.values(byStaff).map(r => {
+        const regH = Math.min(r.hours, 40), otH = Math.max(0, r.hours - 40);
+        const regC = +(regH * r.wage).toFixed(2), otC = +(otH * r.wage * 1.5).toFixed(2);
+        return { staff_id:r.staff_id, name:r.name, position_id:r.position_id,
+          regular_hours:+regH.toFixed(2), ot_hours:+otH.toFixed(2), wage:r.wage,
+          regular_cost:regC, ot_cost:otC, gross:+(regC + otC).toFixed(2) };
+      });
+      const sum = k => +rows.reduce((t, r) => t + r[k], 0).toFixed(2);
+      return { id:periodId, week_start:weekStart, week_end:weekEnd, status:'Closed',
+        closed_at:daysAgoISO(closedDaysAgo),
+        total_hours:+(sum('regular_hours') + sum('ot_hours')).toFixed(2),
+        total_cost:+(sum('regular_cost') + sum('ot_cost')).toFixed(2),
+        ot_hours:sum('ot_hours'), ot_cost:sum('ot_cost'), gross:sum('gross'),
+        participants: rows };
+    };
+    App.laborData.lc_pay_periods = [
+      buildClosedPeriod(mondayISO(63), 55),
+      buildClosedPeriod(mondayISO(70), 62),
     ];
 
     // ── Save everything — App.data plus all three Control stores ──
