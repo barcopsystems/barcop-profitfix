@@ -1072,19 +1072,20 @@ S.ShiftActiveShift = {
       + cashLine
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="ac-handoff" data-shift-id="' + esc(s.id) + '">Print Handoff Report</button>'
+      + '<button class="btn btn-primary" id="ac-handoff" data-shift-id="' + esc(s.id) + '">Save Handoff PDF</button>'
+      + '<button class="btn btn-ghost" id="ac-handoff-email" data-shift-id="' + esc(s.id) + '">Email Handoff</button>'
       + '<button class="btn btn-ghost" id="ac-start">Start Another Shift</button>'
       + '<button class="btn btn-ghost" id="ac-history">View Shift History</button>'
       + '</div></div></div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#ac-start')) this.renderStart();
       else if (ev.target.closest('#ac-history')) App.navigate('sc-shift-history');
+      else if (ev.target.closest('#ac-handoff-email')) {
+        if (S.ShiftHandoff && S.ShiftHandoff.emailForShift) S.ShiftHandoff.emailForShift(s.id);
+      }
       else if (ev.target.closest('#ac-handoff')) {
-        // Chunk D wires the actual report screen. For now, navigate to
-        // shift history detail as a placeholder.
-        const target = (S.ShiftHandoff && S.ShiftHandoff.openForShift) ? null : 'sc-shift-history';
-        if (target) App.navigate(target);
-        else S.ShiftHandoff.openForShift(s.id);
+        if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(s.id);
+        else App.navigate('sc-shift-history');
       }
     };
   }
