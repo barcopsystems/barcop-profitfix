@@ -2521,8 +2521,11 @@ const App = {
     if (actions.querySelector('.export-pdf-btn')) return;
     const btn = document.createElement('button');
     btn.className = 'btn btn-ghost btn-sm export-pdf-btn';
-    btn.textContent = 'Export to PDF';
-    btn.addEventListener('click', () => window.print());
+    btn.textContent = 'Export PDF';
+    btn.addEventListener('click', () => {
+      const title = (document.getElementById('topbar-title')?.textContent || 'Report').trim();
+      App.exportPDF({ title, root: document.getElementById('content-area') });
+    });
     actions.appendChild(btn);
   },
 
@@ -2768,60 +2771,84 @@ const App = {
     return { per_day: perDay, total: total };
   },
 
-  // Print a blank log sheet — opens a new tab with a styled HTML form,
-  // ~20 blank rows by default, then auto-fires window.print(). For the
-  // bar/restaurant operator workflow: print before shift, staff fills the
-  // sheet by hand during service, manager enters into the app after close.
+  // Generate a blank worksheet as a clean PDF (header + an empty grid the
+  // operator prints and fills by hand during the shift, then keys into Bar Cop
+  // after close). Same engine + Save flow as exportPDF, so output and filename
+  // are consistent across the app: BarCop_<Name>_Worksheet_<date>.pdf.
   // Usage: App.printBlankSheet({ title, subtitle, columns: [{label, width?}], rows? });
-  printBlankSheet(opts) {
+  async printBlankSheet(opts) {
     opts = opts || {};
-    const title    = opts.title    || 'Log Sheet';
+    const title    = opts.title    || 'Worksheet';
     const subtitle = opts.subtitle || '';
     const cols     = opts.columns  || [];
     const rows     = opts.rows     || 20;
-    const barName  = (this.data?.settings?.bar_name) || '';
-    const when     = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    try { await this._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
-    const headerRow = cols.map(c =>
-      '<th style="border:1px solid #888;padding:6px 8px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;text-align:left;background:#f0f0f0;' + (c.width ? 'width:' + c.width + ';' : '') + '">' + (c.label || '') + '</th>'
-    ).join('');
-    const blankCells = cols.map(c =>
-      '<td style="border:1px solid #888;padding:14px 8px;' + (c.width ? 'width:' + c.width + ';' : '') + '">&nbsp;</td>'
-    ).join('');
-    const blankRows = Array.from({ length: rows }, () => '<tr>' + blankCells + '</tr>').join('');
+    const orientation = cols.length > 7 ? 'landscape' : 'portrait';
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation, unit: 'pt', format: 'letter' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const usableW = pageW - margin * 2;
+    let y = margin;
 
-    const html = '<!DOCTYPE html><html><head><title>' + title + ' — Blank Sheet</title>'
-      + '<style>'
-      + '@page { margin: 0.4in; }'
-      + 'body { font-family: Arial, sans-serif; color:#000; margin:0; padding:0; }'
-      + 'h1 { font-size:18px; margin:0 0 4px 0; letter-spacing:0.5px; }'
-      + '.sub { font-size:11px; color:#444; margin-bottom:12px; }'
-      + '.meta { display:flex; gap:24px; font-size:11px; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid #888; }'
-      + 'table { width:100%; border-collapse:collapse; border:1px solid #888; table-layout:fixed; }'
-      + 'th, td { box-sizing:border-box; }'
-      + '.footer { margin-top:14px; font-size:10px; color:#666; }'
-      + '@media print { .noprint { display:none; } }'
-      + '</style></head><body>'
-      + '<h1>' + esc(title) + '</h1>'
-      + (subtitle ? '<div class="sub">' + esc(subtitle) + '</div>' : '')
-      + '<div class="meta">'
-      + (barName ? '<div><strong>' + esc(barName) + '</strong></div>' : '')
-      + '<div>Date: ' + esc(when) + '</div>'
-      + '<div>Sheet completed by: ____________________</div>'
-      + '</div>'
-      + '<table>'
-      + '<thead><tr>' + headerRow + '</tr></thead>'
-      + '<tbody>' + blankRows + '</tbody>'
-      + '</table>'
-      + '<div class="footer">Enter completed entries into Bar Cop after shift close.</div>'
-      + '<script>setTimeout(function(){ window.print(); }, 100);<\/script>'
-      + '</body></html>';
+    const venue = (this.data && this.data.settings && this.data.settings.bar_name) || '';
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+    doc.text('Bar Cop', margin, y);
+    doc.setFontSize(12);
+    doc.text(this._pdfSafe(title), pageW - margin, y, { align: 'right' });
+    y += 16;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+    const dstr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    doc.text(this._pdfSafe((venue ? venue + '   |   ' : '') + dstr), margin, y);
+    y += 14;
+    if (subtitle) {
+      doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+      const wrapped = doc.splitTextToSize(this._pdfSafe(subtitle), usableW);
+      doc.text(wrapped, margin, y);
+      y += wrapped.length * 11 + 4;
+    }
+    doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+    doc.text(this._pdfSafe('Completed by: ______________________________'), margin, y);
+    y += 6;
+    doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
+    y += 12;
 
-    const w = window.open('', '_blank');
-    if (!w) { alert('Pop-up blocked. Allow pop-ups for this site to print log sheets.'); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+    // Preserve any per-column width hints (% or px) from the call site.
+    const columnStyles = {};
+    cols.forEach((c, i) => {
+      if (!c.width) return;
+      const w = String(c.width);
+      if (/%$/.test(w)) columnStyles[i] = { cellWidth: (parseFloat(w) / 100) * usableW };
+      else if (/px$/.test(w)) columnStyles[i] = { cellWidth: parseFloat(w) * 0.75 };
+    });
+
+    const head = [cols.map(c => this._pdfSafe(c.label || ''))];
+    const body = Array.from({ length: rows }, () => cols.map(() => ''));
+    doc.autoTable({
+      startY: y,
+      head, body,
+      margin: { left: margin, right: margin },
+      columnStyles,
+      styles: { fontSize: 9, cellPadding: 8, minCellHeight: 24, lineColor: [150, 150, 150], lineWidth: 0.5, overflow: 'linebreak' },
+      headStyles: { fillColor: [235, 235, 235], textColor: 30, fontStyle: 'bold', minCellHeight: 16, halign: 'left' },
+      theme: 'grid'
+    });
+
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+      doc.text('Enter completed entries into Bar Cop after shift close.', margin, pageH - 22);
+      doc.text('Page ' + i + ' of ' + pages, pageW - margin, pageH - 22, { align: 'right' });
+    }
+
+    // Filename: strip the trailing noun from the title and append "Worksheet".
+    const base = String(title).replace(/\s*(Log|Sheet|Pad|Book|Calendar|Worksheet|List)\s*$/i, '').trim() || String(title);
+    const tag = base.replace(/[^A-Za-z0-9]+/g, '');
+    await this._savePDF(doc, 'BarCop_' + tag + '_Worksheet_' + this._pdfDateStamp() + '.pdf');
   },
 
   // In-app confirmation modal — replaces window.confirm() so dialogs match
