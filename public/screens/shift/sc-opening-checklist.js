@@ -245,12 +245,28 @@ S.ShiftOpeningChecklist = {
       + itemRows
       + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
       + '<div class="card-actions">'
-        + '<button class="btn btn-ghost btn-sm" id="oc-print">Print This Checklist</button>'
+        + '<button class="btn btn-ghost btn-sm" id="oc-print">Export PDF</button>'
       + '</div></div></div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#oc-back')) this.renderMain();
-      else if (ev.target.closest('#oc-print')) window.print();
+      else if (ev.target.closest('#oc-print')) this.exportPDF(r);
     };
+  },
+
+  async exportPDF(r) {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+    const b = App._pdfBuilder('Opening Checklist');
+    b.header({ right: 'Opening Checklist', meta: this.fmtDate(r.date) });
+    b.kv('Template', r.template_name || 'Opening Checklist');
+    b.kv('Completed By', r.completed_by || '-');
+    b.kv('Items Done', (r.done_count || 0) + ' of ' + (r.total_count || 0));
+    b.spacer(6);
+    b.sectionTitle('Checklist Items');
+    b.table(['Status', 'Item'], (r.items || []).map(it => [it.done ? 'DONE' : '-', it.text]), { columnStyles: { 0: { cellWidth: 60 } } });
+    if (r.notes) { b.sectionTitle('Notes'); b.paragraph(r.notes); }
+    const ds = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date.replace(/-/g, '') : App._pdfDateStamp();
+    await b.save('BarCop_OpeningChecklist_' + ds + '.pdf');
   },
 
   confirmDel(id) {
