@@ -1141,7 +1141,7 @@ S.Hub = {
       if (days < 0) {
         out.push({
           sev: 'bad',
-          text: (p.name || 'Permit') + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Renew before it costs a fine or shutdown.',
+          text: (p.name || 'Permit') + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Review and renew right away.',
           screen: 'permits', mod: 'hub'
         });
       } else if (days <= 14) {
@@ -1174,7 +1174,7 @@ S.Hub = {
       if (days < 0) {
         out.push({
           sev: 'bad',
-          text: certLabel + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Compliance gap until renewed.',
+          text: certLabel + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Not current until renewed.',
           screen: 'lc-staff-roster', mod: 'labor'
         });
       } else if (days <= 14) {
