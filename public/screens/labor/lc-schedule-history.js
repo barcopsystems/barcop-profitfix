@@ -65,7 +65,8 @@ S.LaborScheduleHistory = {
           + '<button class="btn btn-danger btn-sm lh-del" data-id="' + s.id + '">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      const intro = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Every schedule you post in Build Schedule lands here with its labor cost, labor %, and RPLH. Open one to see the shifts, edit it back in the grid, or copy it forward to a new week.</div>';
+      html = intro + summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
