@@ -401,18 +401,15 @@ S.ThisWeek = {
       notes: d.notes || ''
     };
 
-    if (!App.data.weeks) App.data.weeks = [];
-    App.data.weeks.push(week);
     const btn = document.getElementById('tw-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveKey('weeks');
+    const ok = await App.putRecord('core', 'week', week);
     if (ok) {
       this.clearDraft();
       if (App.updatePeriod) App.updatePeriod();
       App.markSetupDone('gs_p_week');
       App.navigate('dashboard');
     } else {
-      App.data.weeks.pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Week'; }
       if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
     }
