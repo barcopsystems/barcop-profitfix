@@ -159,8 +159,8 @@ S.TheftRisk = {
     btn.addEventListener('click', () => this.save());
     actions.appendChild(btn);
     // Quarterly Theft & Loss Brief PDF — single-page summary for owner /
-    // bookkeeper / insurance reviews. Opens a styled HTML page sized for
-    // print, auto-fires window.print() so it saves cleanly as a PDF.
+    // bookkeeper / insurance reviews. Generated from the data via the shared
+    // App._pdfBuilder and saved straight to a file.
     const briefBtn = document.createElement('button');
     briefBtn.className = 'btn btn-ghost btn-sm';
     briefBtn.textContent = 'Print Theft & Loss Brief';
