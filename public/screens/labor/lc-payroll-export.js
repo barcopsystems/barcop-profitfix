@@ -1,0 +1,251 @@
+'use strict';
+
+/* ── Labor Control — Payroll Export ───────────────────────────────────────────
+   A dedicated handoff screen, modeled on Month-End Books: pick a pay period
+   (week), then download a formatted Excel workbook (establishment header,
+   spaced columns, disclaimer) for a human to read, or a clean import CSV for a
+   payroll provider that imports. All numbers come from what is logged in Labor
+   Control via S.LaborPayPeriods.aggregateWeek (the one salary-aware payroll
+   aggregation), so this screen never recomputes pay on its own.
+
+   Salaried (exempt) staff show a fixed weekly salary with no overtime. This is
+   a worksheet to hand to whoever runs payroll, not the official payroll record:
+   the operator and their payroll provider are responsible for wage, hour,
+   overtime, classification, and tax compliance. */
+
+S.LaborPayrollExport = {
+  PP() { return S.LaborPayPeriods; },
+
+  render(container, actions) {
+    this.container = container;
+    if (actions) actions.innerHTML = '';
+    const pp = this.PP();
+    const today = new Date().toISOString().slice(0, 10);
+    const thisMon = pp.mondayOf(today);
+    // Last 12 weeks, newest first.
+    const weeks = [];
+    for (let i = 0; i < 12; i++) weeks.push(pp.addDays(thisMon, -7 * i));
+
+    // Default to a deep-linked week from Pay Periods, else the most recent week
+    // that has logged hours, else last week.
+    let selected = (App._payrollFocusWeek && weeks.indexOf(App._payrollFocusWeek) > -1)
+      ? App._payrollFocusWeek : null;
+    App._payrollFocusWeek = null;
+    if (!selected) {
+      selected = weeks.find(ws => pp.aggregateWeek(ws).totalCount > 0) || weeks[1] || weeks[0];
+    }
+
+    const opts = weeks.map(ws => {
+      const agg = pp.aggregateWeek(ws);
+      const saved = pp.periods().find(p => p.week_start === ws);
+      const closed = saved && saved.status === 'Closed' ? ' (Closed)' : '';
+      const label = pp.fmtDate(ws) + ' to ' + pp.fmtDate(agg.weekEnd) + closed;
+      return '<option value="' + ws + '"' + (ws === selected ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+
+    container.innerHTML = '<div class="screen">'
+      + '<div class="card" style="margin-bottom:18px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Payroll Export</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a pay period. Bar Cop pulls everyone\'s hours, overtime, tip share, and pay into one file you hand to whoever runs payroll. Download the Workbook for a clean, readable file, or the Import CSV for a payroll system that imports. Salaried staff show a fixed weekly salary with no overtime. Everything is built from what you log in Labor Control. Nothing to re-enter.</div>'
+        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
+          + '<div class="f" style="width:300px;"><label>Pay Period</label><select id="px-week">' + opts + '</select></div>'
+          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
+            + '<button class="btn btn-primary" id="px-xlsx">Download Workbook</button>'
+            + '<button class="btn btn-ghost" id="px-csv">Download Import CSV</button>'
+          + '</div>'
+        + '</div>'
+        + '<div id="px-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
+        + '<div style="font-size:10px;color:var(--t3);font-style:italic;line-height:1.6;margin-top:18px;padding-top:12px;border-top:1px solid var(--b2);">'
+        + 'Bar Cop assembles these numbers from what you log. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll or timekeeping record. Verify every figure before running payroll.'
+        + '</div>'
+      + '</div>'
+      + this._whatsInsideCard()
+      + '</div>';
+
+    document.getElementById('px-xlsx')?.addEventListener('click', () => this._downloadWorkbook(document.getElementById('px-week')?.value));
+    document.getElementById('px-csv')?.addEventListener('click', () => this._downloadCSV(document.getElementById('px-week')?.value));
+  },
+
+  _setStatus(msg, color) {
+    const el = document.getElementById('px-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color || 'var(--t3)';
+    el.style.display = 'block';
+  },
+
+  _whatsInsideCard() {
+    const rows = [
+      ['One row per employee', 'Name, position, and pay type, then the week\'s hours and pay.'],
+      ['Hours and overtime', 'Regular hours, overtime hours over 40, and total hours worked.'],
+      ['Pay', 'Wage rate, regular pay, overtime pay, tip share, and gross pay for the week.'],
+      ['Salaried staff', 'Shown as a fixed weekly salary (annual divided by 52) with no overtime. Logged hours appear as coverage only.'],
+      ['Tip credit check', 'For tipped roles, flags anyone whose wage plus tips fell below your state minimum so you can make up the difference before payroll runs.'],
+      ['Totals', 'A bottom row totaling hours, overtime, and gross pay for the period.']
+    ];
+    const listHtml = rows.map(r =>
+      '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:220px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
+      + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
+    ).join('');
+    return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
+      + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
+      + '</div>';
+  },
+
+  // ── Shared row builder (salary-aware via S.LaborPayPeriods) ───────────────
+  // Returns { ws, we, header, rows, totals } where each row is an object with
+  // typed fields so the workbook can write numbers and the CSV can format text.
+  _data(weekStart) {
+    const pp = this.PP();
+    const agg = pp.aggregateWeek(weekStart);
+    const stateMin = parseFloat((App.laborData?.settings || {}).state_min_wage);
+    const stateMinValid = !isNaN(stateMin) && stateMin > 0;
+    const rows = agg.rows.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(r => {
+      const pos = pp.positionById(r.position_id);
+      const tipped = !!(pos && pos.tipped) && !r.salaried;
+      const tipShare = tipped ? pp.tipShareForStaffInWeek(r.staff_id, agg.weekStart, agg.weekEnd) : 0;
+      if (r.salaried) {
+        return {
+          name: r.name, position: pos ? pos.name : '', payType: 'Salary',
+          regHours: null, otHours: null, totalHours: r.hours,
+          rate: null, regPay: r.regular_cost, otPay: 0, tipShare: null, gross: r.gross,
+          status: 'Salaried (exempt)', salaried: true
+        };
+      }
+      const effHourly = r.hours > 0 ? (r.gross + tipShare) / r.hours : 0;
+      let status = '';
+      if (tipped) {
+        if (!stateMinValid) status = 'No state minimum wage set';
+        else if (effHourly < stateMin) status = 'BELOW: $' + (stateMin - effHourly).toFixed(2) + '/hr owed';
+        else status = 'OK';
+      }
+      return {
+        name: r.name, position: pos ? pos.name : '', payType: 'Hourly',
+        regHours: r.regular_hours, otHours: r.ot_hours, totalHours: r.hours,
+        rate: r.wage, regPay: r.regular_cost, otPay: r.ot_cost,
+        tipShare: tipped ? tipShare : null, gross: r.gross, status: status, salaried: false
+      };
+    });
+    return { ws: agg.weekStart, we: agg.weekEnd, rows, totals: agg.totals, totalCount: agg.totalCount };
+  },
+
+  _columns: ['Staff Name', 'Position', 'Pay Type', 'Regular Hours', 'OT Hours', 'Total Hours',
+    'Wage Rate', 'Regular Pay', 'OT Pay', 'Tip Share', 'Gross Pay', 'Status'],
+
+  _fileBase(ws) {
+    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+    return barName + ' - Payroll - ' + ws;
+  },
+
+  // ── Workbook (.xlsx) — formatted like Month-End Books ─────────────────────
+  _downloadWorkbook(weekStart) {
+    if (!weekStart) return;
+    if (typeof XLSX === 'undefined') { this._setStatus('Spreadsheet engine did not load. Refresh and try again.', 'var(--red)'); return; }
+    const d = this._data(weekStart);
+    if (!d.rows.length) { this._setStatus('No hours or salaried staff in this pay period.', 'var(--red)'); return; }
+    try {
+      const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
+      const pp = this.PP();
+      const COLS = this._columns;
+      const N = COLS.length;
+      const blank = () => { const r = []; for (let i = 0; i < N; i++) r.push(''); return r; };
+      const line = (t) => { const r = [t]; for (let i = 1; i < N; i++) r.push(''); return r; };
+      const aoa = [];
+      const merges = [];
+      const fullMerge = (rowIdx) => merges.push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: N - 1 } });
+
+      aoa.push(line(barName + ' - Payroll Worksheet')); fullMerge(aoa.length - 1);
+      aoa.push(line('Pay Period: ' + pp.fmtDate(d.ws) + ' to ' + pp.fmtDate(d.we))); fullMerge(aoa.length - 1);
+      aoa.push(line('Prepared ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' from Bar Cop Labor Control')); fullMerge(aoa.length - 1);
+      aoa.push(blank());
+      aoa.push(COLS.slice());
+      const headerRow = aoa.length - 1;
+
+      const num = (v) => (v == null ? '' : v);
+      d.rows.forEach(r => {
+        aoa.push([
+          r.name, r.position, r.payType,
+          num(r.regHours), num(r.otHours), num(r.totalHours),
+          num(r.rate), num(r.regPay), num(r.otPay), num(r.tipShare), num(r.gross),
+          r.status
+        ]);
+      });
+      const dataStart = headerRow + 1;
+      const dataEnd = aoa.length - 1;
+
+      const t = d.totals;
+      aoa.push(['TOTAL', '', '', t.regular_hours, t.ot_hours, t.hours, '', t.regular_cost, t.ot_cost, '', t.gross, '']);
+      const totalRow = aoa.length - 1;
+
+      this._pushFooter(aoa, merges, line, fullMerge);
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const moneyFmt = '"$"#,##0.00';
+      const hoursFmt = '0.00';
+      const moneyCols = [6, 7, 8, 9, 10];
+      const hoursCols = [3, 4, 5];
+      for (let r = dataStart; r <= totalRow; r++) {
+        moneyCols.forEach(c => { const cell = ws[XLSX.utils.encode_cell({ r, c })]; if (cell && typeof cell.v === 'number') cell.z = moneyFmt; });
+        hoursCols.forEach(c => { const cell = ws[XLSX.utils.encode_cell({ r, c })]; if (cell && typeof cell.v === 'number') cell.z = hoursFmt; });
+      }
+      ws['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 9 }, { wch: 11 },
+        { wch: 11 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }];
+      ws['!merges'] = merges;
+      ws['!rows'] = [{ hpt: 22 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+      wb.Props = {
+        Title: barName + ' - Payroll, ' + d.ws,
+        Subject: App.deliverableFooter().workbookSubject,
+        Author: barName, Company: 'Bar Cop', CreatedDate: new Date()
+      };
+      XLSX.writeFile(wb, this._fileBase(weekStart) + '.xlsx');
+      this._setStatus('Downloaded ' + this._fileBase(weekStart) + '.xlsx', 'var(--gold)');
+    } catch (e) {
+      console.error('Payroll workbook error:', e);
+      this._setStatus('Could not build the file: ' + (e?.message || 'unknown error'), 'var(--red)');
+    }
+  },
+
+  // Footer rows: blank, source note, the payroll-specific line, then the
+  // canonical deliverable disclaimer lines. Each line merged across the row.
+  _pushFooter(aoa, merges, line, fullMerge) {
+    aoa.push(line('')); // spacer
+    aoa.push(line('Source: Labor Control hours and tip pools. Revenue and shifts from Shift Control.')); fullMerge(aoa.length - 1);
+    aoa.push(line('Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll record. Verify every figure before running payroll.')); fullMerge(aoa.length - 1);
+    App.deliverableFooter().disclaimerLines.forEach(l => { aoa.push(line(l)); fullMerge(aoa.length - 1); });
+  },
+
+  // ── Import CSV — clean columns only, no header or disclaimer rows so a
+  // payroll system can import it. The disclaimer lives on the page. ─────────
+  _downloadCSV(weekStart) {
+    if (!weekStart) return;
+    const d = this._data(weekStart);
+    if (!d.rows.length) { this._setStatus('No hours or salaried staff in this pay period.', 'var(--red)'); return; }
+    const f2 = (v) => (v == null ? '' : Number(v).toFixed(2));
+    const dataRows = d.rows.map(r => [
+      r.name, r.position, r.payType,
+      f2(r.regHours), f2(r.otHours), f2(r.totalHours),
+      f2(r.rate), f2(r.regPay), f2(r.otPay), f2(r.tipShare), f2(r.gross), r.status
+    ]);
+    const t = d.totals;
+    dataRows.push(['TOTAL', '', '', f2(t.regular_hours), f2(t.ot_hours), f2(t.hours), '', f2(t.regular_cost), f2(t.ot_cost), '', f2(t.gross), '']);
+    const escapeCell = (v) => {
+      const s = String(v == null ? '' : v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [this._columns, ...dataRows].map(r => r.map(escapeCell).join(','));
+    const csv = '﻿' + lines.join('\r\n') + '\r\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = this._fileBase(weekStart).replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.csv';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this._setStatus('Downloaded import CSV for ' + this.PP().fmtDate(d.ws) + ' to ' + this.PP().fmtDate(d.we), 'var(--gold)');
+  }
+};

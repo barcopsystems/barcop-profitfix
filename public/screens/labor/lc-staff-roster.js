@@ -96,25 +96,33 @@ S.LaborStaffRoster = {
     this.renderList();
   },
 
-  // The seven profile cells shared by the inline add form and the edit profile
-  // form so they never drift. First row (Name, Position, Wage, Status, Hire Date)
-  // grows to span the form; Phone and Email sit on a second row.
+  // The profile cells shared by the inline add form and the edit profile form
+  // so they never drift. First row (Name, Position, Pay Type, Wage/Salary,
+  // Status, Hire Date) grows to span the form; Phone and Email sit on a second
+  // row. Pay Type swaps the pay field between an hourly Wage and an Annual
+  // Salary; salaried = exempt (fixed weekly cost, no overtime).
   profileFormCells(s) {
     const positions = this.positions();
     const posOpts = positions.map(p =>
       '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
       + esc(p.name) + ', ' + esc(p.department || '') + '</option>').join('');
     const defaultPos = s ? this.positionById(s.position_id) : positions[0];
-    const wage = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
-    const wv = (wage != null && wage !== '') ? wage : '';
+    const isSal = !!(s && s.pay_type === 'Salary');
+    const hourly = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
+    const payVal = isSal
+      ? ((s && s.annual_salary != null && s.annual_salary !== '') ? s.annual_salary : '')
+      : ((hourly != null && hourly !== '') ? hourly : '');
     return '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">'
       + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Name</label>'
       + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
-      + '<div class="f" style="flex:1 1 175px;min-width:0;"><label>Position</label>'
+      + '<div class="f" style="flex:1 1 165px;min-width:0;"><label>Position</label>'
       + '<select id="sr-pos">' + posOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 84px;min-width:0;"><label>Wage</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage" min="0" step="0.01" '
-      + 'value="' + wv + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 96px;min-width:0;"><label>Pay Type</label><select id="sr-paytype">'
+      + '<option' + (!isSal ? ' selected' : '') + '>Hourly</option>'
+      + '<option' + (isSal ? ' selected' : '') + '>Salary</option></select></div>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-pay" min="0" step="0.01" '
+      + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
       + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
@@ -127,6 +135,31 @@ S.LaborStaffRoster = {
       + '<div class="f" style="width:128px;min-width:0;"><label>Email</label>'
       + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
       + '</div>';
+  },
+
+  // Wire the Pay Type + pay field for whichever form is mounted (add or edit).
+  // Position change fills the default hourly wage; switching Pay Type swaps the
+  // label and clears the amount so an hourly wage is never stored as a salary.
+  wirePayFields() {
+    const posEl = document.getElementById('sr-pos');
+    const payEl = document.getElementById('sr-pay');
+    const typeEl = document.getElementById('sr-paytype');
+    const labelEl = document.getElementById('sr-pay-label');
+    if (!posEl || !payEl || !typeEl) return;
+    posEl.addEventListener('change', e => {
+      if (typeEl.value === 'Salary') return; // salary is not position-derived
+      const p = this.positionById(e.target.value);
+      if (p && !payEl.value) payEl.value = p.default_wage != null ? p.default_wage : '';
+    });
+    typeEl.addEventListener('change', () => {
+      const sal = typeEl.value === 'Salary';
+      if (labelEl) labelEl.textContent = sal ? 'Annual Salary' : 'Wage';
+      payEl.value = '';
+      if (!sal) {
+        const p = this.positionById(posEl.value);
+        if (p && p.default_wage != null) payEl.value = p.default_wage;
+      }
+    });
   },
 
   renderList() {
@@ -177,7 +210,8 @@ S.LaborStaffRoster = {
           + '<td><div class="val">' + esc(s.name || '-') + '</div></td>'
           + '<td>' + esc(pos ? pos.name : '-') + '</td>'
           + '<td>' + esc(pos ? (pos.department || '-') : '-') + '</td>'
-          + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '-') + '</td>'
+          + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr'
+              : (App.isSalaried(s) ? App.fmtCurrency(s.annual_salary || 0) + '/yr' : '-')) + '</td>'
           + '<td>' + (s.status === 'Inactive'
               ? '<span style="color:var(--t3);font-weight:700;">Inactive</span>'
               : '<span style="color:var(--gold);font-weight:700;">Active</span>') + '</td>'
@@ -212,17 +246,14 @@ S.LaborStaffRoster = {
       else if (edit)  { ev.stopPropagation(); this.renderUnified(edit.dataset.id); }
       else if (row)   this.renderUnified(row.dataset.id);
     };
-    document.getElementById('sr-pos')?.addEventListener('change', e => {
-      const p = this.positionById(e.target.value);
-      const wEl = document.getElementById('sr-wage');
-      if (p && wEl && !wEl.value) wEl.value = p.default_wage != null ? p.default_wage : '';
-    });
+    this.wirePayFields();
   },
 
   showHowTo() {
     App.showHelpModal('How the Staff Roster Works', [
       { p: ['The roster is your team: every staff member, their position, wage, and status. It is the source for scheduling, hours, tips, and the Revenue Recovery server list, so getting it right here means it is right everywhere.'] },
-      { h: 'Adding Someone', p: ['Fill the row at the top and click Add Staff. The position sets the default wage, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate.'] },
+      { h: 'Adding Someone', p: ['Fill the row at the top and click Add Staff. The position sets the default hourly wage, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate.'] },
+      { h: 'Hourly or Salaried', p: ['Set Pay Type to Salary for an exempt manager or any fixed-salary role, then enter the annual salary. Bar Cop spreads that salary evenly across the year (salary divided by 52 each week) as a fixed labor cost, and salaried staff never show overtime. You can still log their hours so they count toward coverage and revenue per labor hour, but those hours never add an hourly cost. If a salaried employee is overtime eligible (non-exempt), set them to Hourly instead so Bar Cop tracks their overtime. How you classify staff under wage and hour law is your call. Bar Cop is a tool, not legal or payroll advice.'] },
       { h: 'Certifications and Coaching', p: ['Click any staff member to open their page. That is where you add certifications (TABC, food handler, ServSafe, and the rest, with expiration dates Bar Cop flags before they lapse) and the coaching log (praise, coaching, concern, and warning notes that protect you if a tough HR moment ever lands).'] },
       { h: 'Active or Inactive', p: ['Set a staff member Inactive when they leave instead of deleting them, so their past hours, tips, and records stay intact. Inactive staff drop off the schedule and tip pickers but keep their history.'] }
     ]);
@@ -259,11 +290,7 @@ S.LaborStaffRoster = {
 
   wireUnified(staffId) {
     this.container.onclick = null;
-    document.getElementById('sr-pos')?.addEventListener('change', e => {
-      const p = this.positionById(e.target.value);
-      const wEl = document.getElementById('sr-wage');
-      if (p && wEl) wEl.value = p.default_wage != null ? p.default_wage : '';
-    });
+    this.wirePayFields();
     document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
     document.getElementById('sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
     // Certifications
@@ -514,12 +541,18 @@ S.LaborStaffRoster = {
     if (!name) { fail('Name is required.'); return; }
     const posId = document.getElementById('sr-pos')?.value;
     if (!posId) { fail('Choose a position.'); return; }
-    const wage = parseFloat(document.getElementById('sr-wage')?.value);
-    const newWage = isNaN(wage) ? null : wage;
+    // Pay Type swaps the single pay field between an hourly wage and an annual
+    // salary. Salaried = exempt: fixed weekly cost, no overtime.
+    const payType = document.getElementById('sr-paytype')?.value === 'Salary' ? 'Salary' : 'Hourly';
+    const payRaw = parseFloat(document.getElementById('sr-pay')?.value);
+    const payVal = isNaN(payRaw) ? null : payRaw;
+    const newWage = payType === 'Salary' ? null : payVal;
+    const annualSalary = payType === 'Salary' ? payVal : null;
 
-    // Maintain wage_history: when the wage changes on an existing staff member,
-    // append a row with the prior wage and the effective date so past-dated
-    // entries cost out at the wage in effect on that date.
+    // Maintain wage_history: when the hourly wage changes on an existing staff
+    // member, append a row with the prior wage and the effective date so past-
+    // dated entries cost out at the wage in effect on that date. (Salaried pay
+    // is a fixed weekly cost, so it carries no hourly wage history.)
     const existing = staffId ? this.staff().find(x => x.id === staffId) : null;
     const today = new Date().toISOString().slice(0, 10);
     let wageHistory = Array.isArray(existing?.wage_history) ? existing.wage_history.slice() : [];
@@ -528,16 +561,18 @@ S.LaborStaffRoster = {
     }
 
     const rec = {
-      id:           staffId || App.uid(),
+      id:            staffId || App.uid(),
       name,
-      position_id:  posId,
-      wage:         newWage,
-      wage_history: wageHistory,
-      status:       document.getElementById('sr-status')?.value || 'Active',
-      hire_date:    document.getElementById('sr-hire')?.value || '',
-      phone:        document.getElementById('sr-phone')?.value.trim() || '',
-      email:        document.getElementById('sr-email')?.value.trim() || '',
-      notes:        document.getElementById('sr-notes')?.value.trim() || ''
+      position_id:   posId,
+      pay_type:      payType,
+      wage:          newWage,
+      annual_salary: annualSalary,
+      wage_history:  wageHistory,
+      status:        document.getElementById('sr-status')?.value || 'Active',
+      hire_date:     document.getElementById('sr-hire')?.value || '',
+      phone:         document.getElementById('sr-phone')?.value.trim() || '',
+      email:         document.getElementById('sr-email')?.value.trim() || '',
+      notes:         document.getElementById('sr-notes')?.value.trim() || ''
     };
     if (!staffId) rec.created_at = new Date().toISOString();
 

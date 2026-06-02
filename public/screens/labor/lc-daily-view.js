@@ -50,7 +50,9 @@ S.LaborDailyView = {
   draw() {
     const dayActuals = this.actuals().filter(a => a.date === this.date);
     const actHours = dayActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0);
+    // Salaried (exempt) staff accrue a fixed daily share of salary (weekly / 7)
+    // so the seven daily costs tie back to Weekly Summary's salaried total.
+    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(this.date, this.date).total;
 
     const sched = this.scheduledForDate(this.date);
     let schedHours = null, schedCost = null;
@@ -90,11 +92,16 @@ S.LaborDailyView = {
         const editBtn = canEdit && !locked
           ? '<button class="btn btn-ghost btn-sm dv-edit" data-id="' + a.id + '">Edit Hours</button>'
           : locked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
+        const sal = App.isSalaried(a.staff_id);
+        const wageCell = sal ? '<span style="color:var(--t3);">Salary</span>'
+          : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
+        const costCell = sal ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7)
+          : App.fmtCurrency(a.cost || 0);
         return '<tr><td><div class="val">' + esc(a.name || '-') + '</div></td>'
         + '<td>' + esc(a.shift_type || '-') + '</td>'
         + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-        + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td>'
+        + '<td>' + wageCell + '</td>'
+        + '<td class="val">' + costCell + '</td>'
         + '<td>' + editBtn + '</td></tr>';
       }).join('');
       actualsCard = '<div class="card"><div class="card-title">Logged Hours</div>'

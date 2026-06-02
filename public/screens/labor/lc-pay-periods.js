@@ -72,13 +72,33 @@ S.LaborPayPeriods = {
           staff_id: a.staff_id || '',
           name: a.name || '(unknown)',
           position_id: a.position_id || '',
-          hours: 0, cost: 0, wage: wageAtStart || a.wage || 0
+          hours: 0, cost: 0, wage: wageAtStart || a.wage || 0,
+          salaried: App.isSalaried(a.staff_id)
         };
       }
       byStaff[key].hours += a.hours || 0;
       byStaff[key].cost  += a.cost  || 0;
     });
+    // Salaried (exempt) staff are paid a fixed weekly salary with no overtime,
+    // and they belong on payroll even if no hours were logged this period.
+    ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
+      if (!App.isSalaried(st) || st.status === 'Inactive' || !App.staffWeeklySalary(st)) return;
+      if (!byStaff[st.id]) {
+        byStaff[st.id] = {
+          staff_id: st.id, name: st.name || '(unknown)',
+          position_id: st.position_id || '', hours: 0, cost: 0, wage: 0, salaried: true
+        };
+      } else {
+        byStaff[st.id].salaried = true;
+      }
+    });
     const rows = Object.values(byStaff).map(r => {
+      if (r.salaried) {
+        // Exempt: fixed weekly salary, no overtime. Logged hours stay as
+        // coverage but do not drive pay.
+        const salary = App.staffWeeklySalary(r.staff_id);
+        return { ...r, cost: salary, regular_hours: r.hours, ot_hours: 0, wage: 0, regular_cost: salary, ot_cost: 0, gross: salary };
+      }
       const regularHours = Math.min(r.hours, App.OT_THRESHOLD);
       const otHours      = Math.max(0, r.hours - App.OT_THRESHOLD);
       const wage         = r.wage || 0;
@@ -129,10 +149,10 @@ S.LaborPayPeriods = {
         : '<span style="font-weight:700;letter-spacing:1px;color:var(--t3);">OPEN</span>';
       const actions = isClosed
         ? '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
-          + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll CSV</button>'
+          + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll Export</button>'
           + '<button class="btn btn-ghost btn-sm pp-reopen" data-ws="' + ws + '">Reopen</button>'
         : '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
-          + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll CSV</button>'
+          + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll Export</button>'
           + (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm pp-close" data-ws="' + ws + '">Close &amp; Lock</button>' : '');
       return '<tr>'
         + '<td><div class="val">' + esc(this.fmtDateShort(ws)) + ' &ndash; ' + esc(this.fmtDateShort(agg.weekEnd)) + '</div></td>'
@@ -159,7 +179,7 @@ S.LaborPayPeriods = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.55;">'
-        + 'Weekly pay periods, Monday through Sunday. Closing a period locks every lc_actuals record in the range so Log Hours stops accepting edits. Payroll CSV exports the period as a one-row-per-employee file ready for your payroll provider. OT premium (half-time) is included in gross for hours over '
+        + 'Weekly pay periods, Monday through Sunday. Closing a period locks every lc_actuals record in the range so Log Hours stops accepting edits. The Payroll Export screen turns any period into a formatted workbook or a clean import file for your payroll provider. OT premium (half-time) is included in gross for hours over '
         + App.OT_THRESHOLD + '/week.'
       + '</div>'
       + summary
@@ -169,7 +189,7 @@ S.LaborPayPeriods = {
       + '</div>';
 
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { this.detailWeekStart = b.dataset.ws; this.renderDetail(b.dataset.ws); }));
-    this.container.querySelectorAll('.pp-csv').forEach(b => b.addEventListener('click', () => this.exportCSV(b.dataset.ws)));
+    this.container.querySelectorAll('.pp-csv').forEach(b => b.addEventListener('click', () => this.openPayrollExport(b.dataset.ws)));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));
   },
@@ -234,7 +254,7 @@ S.LaborPayPeriods = {
         + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Export Payroll CSV</button>'
+        + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Open Payroll Export</button>'
         + (isClosed
             ? '<button class="btn btn-ghost" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
             : (agg.totalCount > 0 ? '<button class="btn btn-primary" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : ''))
@@ -242,7 +262,7 @@ S.LaborPayPeriods = {
       + '</div></div>';
 
     document.getElementById('pp-back')?.addEventListener('click', () => { this.detailWeekStart = null; this.renderList(); });
-    document.getElementById('pp-csv-detail')?.addEventListener('click', () => this.exportCSV(weekStart));
+    document.getElementById('pp-csv-detail')?.addEventListener('click', () => this.openPayrollExport(weekStart));
     document.getElementById('pp-close-detail')?.addEventListener('click', () => this.closePeriod(weekStart));
     document.getElementById('pp-reopen-detail')?.addEventListener('click', () => this.reopenPeriod(weekStart));
   },
@@ -337,69 +357,11 @@ S.LaborPayPeriods = {
     return total;
   },
 
-  // ── Payroll CSV export ──────────────────────────────────────────────
-  exportCSV(weekStart) {
-    const agg = this.aggregateWeek(weekStart);
-    if (!agg.rows.length) {
-      App.confirm({ title: 'No hours to export', message: 'No lc_actuals entries fall within this pay period.', confirmText: 'OK', cancelText: 'Cancel' });
-      return;
-    }
-    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
-    const stateMin = parseFloat((App.laborData?.settings || {}).state_min_wage);
-    const stateMinValid = !isNaN(stateMin) && stateMin > 0;
-    const header = [
-      'Staff Name', 'Position', 'Week Start', 'Week End',
-      'Regular Hours', 'OT Hours', 'Total Hours',
-      'Wage Rate', 'Regular Cost', 'OT Pay', 'Gross Pay',
-      'Tipped Position', 'Tip Share', 'Effective Hourly', 'Tip Credit Status'
-    ];
-    const rows = agg.rows.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(r => {
-      const pos = this.positionById(r.position_id);
-      const isTipped = !!(pos && pos.tipped);
-      const tipShare = isTipped ? this.tipShareForStaffInWeek(r.staff_id, agg.weekStart, agg.weekEnd) : 0;
-      const effectiveHourly = r.hours > 0 ? (r.gross + tipShare) / r.hours : 0;
-      let status = '';
-      if (!isTipped) status = '';
-      else if (!stateMinValid) status = 'No State Min Wage set';
-      else if (effectiveHourly < stateMin) status = 'BELOW: $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed';
-      else status = 'OK';
-      return [
-        r.name,
-        pos ? pos.name : '',
-        agg.weekStart,
-        agg.weekEnd,
-        r.regular_hours.toFixed(2),
-        r.ot_hours.toFixed(2),
-        r.hours.toFixed(2),
-        r.wage.toFixed(2),
-        r.regular_cost.toFixed(2),
-        r.ot_cost.toFixed(2),
-        r.gross.toFixed(2),
-        isTipped ? 'Yes' : 'No',
-        isTipped ? tipShare.toFixed(2) : '',
-        isTipped && r.hours > 0 ? effectiveHourly.toFixed(2) : '',
-        status
-      ];
-    });
-    rows.push([
-      'TOTAL', '', '', '',
-      agg.totals.regular_hours.toFixed(2), agg.totals.ot_hours.toFixed(2), agg.totals.hours.toFixed(2),
-      '', agg.totals.regular_cost.toFixed(2), agg.totals.ot_cost.toFixed(2), agg.totals.gross.toFixed(2),
-      '', '', '', ''
-    ]);
-    const escapeCell = (v) => {
-      const s = String(v == null ? '' : v);
-      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    };
-    const lines = [header, ...rows].map(r => r.map(escapeCell).join(','));
-    // UTF-8 BOM + CRLF for Excel-friendliness
-    const csv = '﻿' + lines.join('\r\n') + '\r\n';
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const filename = barName.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-payroll-' + weekStart + '.csv';
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  // Payroll files (formatted workbook + clean import CSV, with the legal
+  // disclaimer) now live on the dedicated Payroll Export screen. These buttons
+  // deep-link there with this pay period preselected.
+  openPayrollExport(weekStart) {
+    App._payrollFocusWeek = weekStart;
+    App.navigate('lc-payroll-export');
   }
 };

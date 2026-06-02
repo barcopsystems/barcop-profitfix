@@ -230,8 +230,21 @@ S.LaborBuildSchedule = {
     const staff = this.staffById(sh.staff_id);
     const hours = this.hoursOf(sh.start, sh.end);
     const wkDate = this.draft.week_start || new Date().toISOString().slice(0, 10);
+    // Salaried (exempt): fixed weekly salary, not an hourly shift cost. The
+    // week's salary is added once to the schedule total in recalc and save.
+    if (staff && App.isSalaried(staff)) return { staff, hours, wage: 0, cost: 0, salaried: true };
     const wage = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, wkDate) : (staff.wage || 0)) : 0;
     return { staff, hours, wage, cost: hours * wage };
+  },
+
+  // Fixed salaried cost for the schedule's week (annual/52 across active
+  // salaried staff), added once to the projected labor cost.
+  salariedWeekCost(weekStart) {
+    if (!weekStart) return 0;
+    const we = new Date(weekStart + 'T00:00:00');
+    if (isNaN(we.getTime())) return 0;
+    we.setDate(we.getDate() + 6);
+    return App.salariedCost(weekStart, we.toISOString().slice(0, 10)).total;
   },
 
   // Phase 5: detect schedule conflicts for one shift against the others in
@@ -271,9 +284,11 @@ S.LaborBuildSchedule = {
       totalCost += c.cost;
       const calcEl = row.querySelector('.bs-rowcalc');
       if (calcEl) {
-        calcEl.textContent = c.hours > 0
-          ? c.hours.toFixed(1) + ' hrs · ' + App.fmtCurrency(c.cost) + (c.staff ? ' @ ' + App.fmtCurrency(c.wage) + '/hr' : '')
-          : (c.staff ? 'Set start and end times.' : 'Pick a staff member.');
+        calcEl.textContent = c.salaried
+          ? (c.hours > 0 ? c.hours.toFixed(1) + ' hrs · Salaried (no hourly cost)' : 'Salaried (no hourly cost)')
+          : c.hours > 0
+            ? c.hours.toFixed(1) + ' hrs · ' + App.fmtCurrency(c.cost) + (c.staff ? ' @ ' + App.fmtCurrency(c.wage) + '/hr' : '')
+            : (c.staff ? 'Set start and end times.' : 'Pick a staff member.');
       }
       // Conflict warning per row
       const warn = this.shiftConflict(sh, i);
@@ -291,6 +306,7 @@ S.LaborBuildSchedule = {
         warnEl.remove();
       }
     });
+    totalCost += this.salariedWeekCost(this.draft.week_start);
     const forecast = this.forecastTotal(this.draft.week_start);
     const pct = forecast > 0 ? totalCost / forecast * 100 : null;
     const rplh = totalHours > 0 && forecast > 0 ? forecast / totalHours : null;
@@ -325,6 +341,7 @@ S.LaborBuildSchedule = {
         hours: c.hours, wage: c.wage, cost: c.cost
       };
     });
+    totalCost += this.salariedWeekCost(d.week_start);
     const forecast = this.forecastTotal(d.week_start);
 
     const rec = {

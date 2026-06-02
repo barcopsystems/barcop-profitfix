@@ -61,11 +61,13 @@ S.LaborOvertimeWatch = {
       return map[id];
     };
     weekActuals.forEach(a => {
+      if (App.isSalaried(a.staff_id)) return; // salaried = exempt, no overtime
       const e = ensure(a.staff_id || a.name, a.name);
       e.actual += (a.hours || 0);
     });
     if (sched) {
       (sched.shifts || []).forEach(sh => {
+        if (App.isSalaried(sh.staff_id)) return; // salaried = exempt, no overtime
         const e = ensure(sh.staff_id || sh.name, sh.name);
         e.scheduled += (sh.hours || 0);
       });

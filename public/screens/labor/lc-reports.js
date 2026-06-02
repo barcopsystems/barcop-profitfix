@@ -56,7 +56,16 @@ S.LaborReports = {
         + '<div class="empty-sub">Adjust or clear the date range above.</div></div>';
     } else {
       const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
-      const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0);
+      // Salaried (exempt) cost over the report span (explicit range, or the
+      // span of the logged data when the filter is open-ended).
+      const datesInRange = rows.map(a => a.date).filter(Boolean).sort();
+      const rFrom = this.filterFrom || datesInRange[0] || '';
+      const rTo   = this.filterTo   || datesInRange[datesInRange.length - 1] || '';
+      const salWeeks = (rFrom && rTo)
+        ? (Math.floor((new Date(rTo + 'T00:00:00').getTime() - new Date(rFrom + 'T00:00:00').getTime()) / 86400000) + 1) / 7
+        : 0;
+      const salRange = (rFrom && rTo) ? App.salariedCost(rFrom, rTo) : { total: 0, bar: 0, food: 0 };
+      const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total;
       const totTips = tips.reduce((t, x) => t + (x.total_tips || 0), 0);
       const summary = '<div class="calc" style="margin-bottom:16px;">'
         + '<div class="calc-item"><div class="calc-label">Hours Entries</div><div class="calc-val">' + rows.length + '</div></div>'
@@ -65,7 +74,7 @@ S.LaborReports = {
         + '<div class="calc-item"><div class="calc-label">Avg Wage</div><div class="calc-val">' + App.fmtCurrency(totHours > 0 ? totCost / totHours : 0) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Tips Logged</div><div class="calc-val">' + App.fmtCurrency(totTips) + '</div></div>'
         + '</div>';
-      body = summary + this.byStaff(rows, totCost) + this.byDept(rows, totCost);
+      body = summary + this.byStaff(rows, totCost, salWeeks) + this.byDept(rows, totCost, salWeeks);
     }
 
     this.container.innerHTML = '<div class="screen">' + filterCard + body + '</div>';
@@ -84,7 +93,7 @@ S.LaborReports = {
     bind('lr-to', 'filterTo');
   },
 
-  byStaff(rows, totCost) {
+  byStaff(rows, totCost, salWeeks) {
     const g = {};
     rows.forEach(a => {
       const k = a.staff_id || a.name || '?';
@@ -92,6 +101,14 @@ S.LaborReports = {
       g[k].hours += (a.hours || 0);
       g[k].cost += (a.cost || 0);
     });
+    if (salWeeks > 0) {
+      ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
+        const wk = App.staffWeeklySalary(st);
+        if (!wk) return;
+        if (!g[st.id]) g[st.id] = { name: st.name || '-', hours: 0, cost: 0 };
+        g[st.id].cost += wk * salWeeks;
+      });
+    }
     const trs = Object.keys(g).sort((a, b) => g[b].cost - g[a].cost).map(k => {
       const s = g[k];
       return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
@@ -106,7 +123,7 @@ S.LaborReports = {
       + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
   },
 
-  byDept(rows, totCost) {
+  byDept(rows, totCost, salWeeks) {
     const g = {};
     rows.forEach(a => {
       const pos = this.positionById(a.position_id);
@@ -115,6 +132,16 @@ S.LaborReports = {
       g[dept].hours += (a.hours || 0);
       g[dept].cost += (a.cost || 0);
     });
+    if (salWeeks > 0) {
+      ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
+        const wk = App.staffWeeklySalary(st);
+        if (!wk) return;
+        const pos = this.positionById(st.position_id);
+        const dept = pos ? (pos.department || 'Other') : 'Unassigned';
+        if (!g[dept]) g[dept] = { hours: 0, cost: 0 };
+        g[dept].cost += wk * salWeeks;
+      });
+    }
     const trs = Object.keys(g).sort((a, b) => g[b].cost - g[a].cost).map(k =>
       '<tr><td><div class="val">' + esc(k) + '</div></td>'
       + '<td>' + g[k].hours.toFixed(1) + '</td>'

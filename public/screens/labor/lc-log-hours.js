@@ -69,7 +69,9 @@ S.LaborLogHours = {
         + '<button class="btn btn-primary" id="lo-add-first">Log Hours</button></div>';
     } else {
       const totHours = list.reduce((t, a) => t + (a.hours || 0), 0);
-      const totCost = list.reduce((t, a) => t + (a.cost || 0), 0);
+      const loDates = list.map(a => a.date).filter(Boolean).sort();
+      const loSal = loDates.length ? App.salariedCost(loDates[0], loDates[loDates.length - 1]).total : 0;
+      const totCost = list.reduce((t, a) => t + (a.cost || 0), 0) + loSal;
       const summary = '<div class="calc" style="margin-bottom:16px;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + list.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + totHours.toFixed(1) + '</div></div>'
@@ -86,8 +88,8 @@ S.LaborLogHours = {
         + '<td>' + esc(a.name || '-') + '</td>'
         + '<td>' + esc(a.shift_type || '-') + '</td>'
         + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-        + '<td>' + (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td>'
+        + '<td>' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-')) + '</td>'
+        + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td>'
         + '<td><div class="row-actions">' + actions + '</div></td></tr>';
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -175,11 +177,18 @@ S.LaborLogHours = {
   calc() {
     const staff = this.staffById(document.getElementById('lo-staff')?.value);
     const date  = document.getElementById('lo-date')?.value || '';
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    // Salaried (exempt) staff are paid a fixed salary, so logged hours are
+    // coverage only and carry no hourly cost.
+    if (staff && App.isSalaried(staff)) {
+      set('lo-c-wage', 'Salary');
+      set('lo-c-cost', 'Salaried (no hourly cost)');
+      return;
+    }
     // Wage in effect on the entry's date — handles past-dated entries after
     // a raise (uses the wage that was in effect on that day, not today's).
     const wage  = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0)) : null;
     const hours = parseFloat(document.getElementById('lo-hours')?.value) || 0;
-    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('lo-c-wage', wage != null ? App.fmtCurrency(wage) + '/hr' : '-');
     set('lo-c-cost', wage != null ? App.fmtCurrency(hours * wage) : '-');
   },

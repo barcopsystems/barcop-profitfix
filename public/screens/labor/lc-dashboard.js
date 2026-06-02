@@ -37,9 +37,10 @@ S.LaborDashboard = {
     actions.innerHTML = '';
 
     const cutoff = this.weekAgo();
+    const today = new Date().toISOString().slice(0, 10);
     const wkActuals = this.actuals().filter(a => (a.date || '') >= cutoff);
     const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0);
+    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(cutoff, today).total;
     const activeStaff = this.staff().filter(s => s.status !== 'Inactive').length;
 
     // current-week overtime risk
@@ -71,7 +72,7 @@ S.LaborDashboard = {
              this.staff().length + ' on the roster');
 
     // Cert expiration sweep — anything expired or expiring within 30 days
-    const today = new Date().toISOString().slice(0, 10);
+    // (today is declared above for the labor-cost window).
     const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
     const activeStaffIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
     const expiredCerts = this.certs().filter(c => activeStaffIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today);
@@ -111,7 +112,9 @@ S.LaborDashboard = {
       const rows = recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
         + '<td>' + esc(a.name || '-') + '</td>'
         + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(a.cost || 0) + '</td></tr>').join('');
+        + '<td class="val">' + (App.isSalaried(a.staff_id)
+            ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7)
+            : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('');
       recentCard = '<div class="card"><div class="card-title">Recent Hours</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Hours</th><th>Cost</th>'
