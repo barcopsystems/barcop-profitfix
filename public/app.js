@@ -1262,6 +1262,10 @@ const App = {
     this.inventoryData = await DB.readInventoryData();
     this.laborData     = await DB.readLaborData();
     this.shiftData     = await DB.readShiftData();
+    // Inventory event logs (counts, deliveries, orders, transfers, empties,
+    // adjustments, spot checks) live row-per-record now; fill them from the
+    // rolling window after the config blob loads.
+    await this.loadEventStores('ic');
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
@@ -2244,8 +2248,110 @@ const App = {
     return tasks.every(t => !!prog[t.id]);
   },
 
+  // ── Event-log stores (row-per-record; see db.js loadEvents/putEvent) ───────
+  // Maps module + kind to the in-memory array it lives in. Config stays in the
+  // blob; these arrays are filled from the events table on load and written one
+  // row at a time via putRecord/removeRecord.
+  EVENT_STORES: {
+    ic: {
+      table: 'ic_events',
+      data: () => App.inventoryData,
+      kinds: {
+        count: 'ic_counts', delivery: 'ic_deliveries', order: 'ic_orders',
+        transfer: 'ic_transfers', empty: 'ic_empties', adjustment: 'ic_adjustments',
+        spot_check: 'ic_spot_checks'
+      }
+    }
+  },
+
+  // Fill a module's event arrays from the rolling window, in parallel. Overwrites
+  // the arrays so the blob's stale copies are ignored.
+  async loadEventStores(mod) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return;
+    const dataObj = store.data();
+    if (!dataObj) return;
+    const kinds = Object.keys(store.kinds);
+    const results = await Promise.all(kinds.map(k => DB.loadEvents(store.table, k)));
+    kinds.forEach((k, i) => { dataObj[store.kinds[k]] = results[i] || []; });
+  },
+
+  // Append an older page of one kind ("Show older"). Returns the fetched rows.
+  async loadOlder(mod, kind, beforeDate, limit) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return [];
+    const dataObj = store.data();
+    const key = store && store.kinds[kind];
+    if (!dataObj || !key) return [];
+    const older = await DB.loadEvents(store.table, kind, { before: beforeDate, limit: limit || 200 });
+    if (!Array.isArray(dataObj[key])) dataObj[key] = [];
+    const seen = new Set(dataObj[key].map(r => r && r.id));
+    older.forEach(r => { if (r && !seen.has(r.id)) dataObj[key].push(r); });
+    return older;
+  },
+
+  // Seed a module's event rows from the current in-memory arrays (sample data).
+  // Clears existing rows first so a reload replaces rather than accumulates.
+  async seedEventStores(mod) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return;
+    const dataObj = store.data();
+    if (!dataObj) return;
+    await DB.clearEvents(store.table);
+    for (const kind of Object.keys(store.kinds)) {
+      await DB.putEventsBulk(store.table, kind, dataObj[store.kinds[kind]] || []);
+    }
+  },
+
+  // Add or update one event record: updates the in-memory array AND persists one
+  // row. True if saved or safely queued offline; reverts + false on hard failure
+  // (viewer / no account).
+  async putRecord(mod, kind, rec) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return false;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    if (!dataObj || !key || !rec || rec.id == null) return false;
+    if (!Array.isArray(dataObj[key])) dataObj[key] = [];
+    const arr = dataObj[key];
+    const idx = arr.findIndex(x => x && x.id === rec.id);
+    const prev = idx >= 0 ? arr[idx] : null;
+    if (idx >= 0) arr[idx] = rec; else arr.push(rec);
+    const r = await DB.putEvent(store.table, kind, rec);
+    if (r.ok || r.offline) return true;
+    const back = arr.findIndex(x => x && x.id === rec.id);
+    if (prev) { if (back >= 0) arr[back] = prev; }
+    else if (back >= 0) arr.splice(back, 1);
+    return false;
+  },
+
+  async removeRecord(mod, kind, id) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return false;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    if (!dataObj || !key) return false;
+    const arr = Array.isArray(dataObj[key]) ? dataObj[key] : [];
+    const idx = arr.findIndex(x => x && x.id === id);
+    const removed = idx >= 0 ? arr[idx] : null;
+    if (idx >= 0) arr.splice(idx, 1);
+    const r = await DB.removeEvent(store.table, kind, id);
+    if (r.ok || r.offline) return true;
+    if (removed) arr.splice(idx, 0, removed);
+    return false;
+  },
+
+  // Config-only slice of inventoryData (everything that is NOT an event array).
+  _inventoryConfig() {
+    const d = this.inventoryData || {};
+    const eventKeys = new Set(Object.values(this.EVENT_STORES.ic.kinds));
+    const out = {};
+    Object.keys(d).forEach(k => { if (!eventKeys.has(k)) out[k] = d[k]; });
+    return out;
+  },
+
   async saveInventory() {
-    const r = await DB.writeInventoryData(this.inventoryData);
+    const r = await DB.writeInventoryData(this._inventoryConfig());
     if (!r.ok) console.error('saveInventory failed:', r.error);
     return r.ok;
   },
