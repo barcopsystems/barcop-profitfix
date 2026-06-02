@@ -455,8 +455,9 @@ S.TheftRisk = {
     }
 
     if (resolved.length) {
+      const resolvedNewest = resolved.slice().reverse();
       html += '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 8px;">Resolved</div>'
-        + resolved.slice().reverse().map(inv =>
+        + resolvedNewest.slice(0, App.listLimit('core', 'variance_investigation')).map(inv =>
           '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
           + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-top:5px;"></span>'
           + '<div style="flex:1;min-width:0;"><span style="font-weight:700;color:var(--t1);">' + esc(inv.sku) + '</span> '
@@ -464,7 +465,8 @@ S.TheftRisk = {
           + (inv.resolution ? '<div style="color:var(--t2);line-height:1.55;margin-top:2px;">' + esc(inv.resolution) + '</div>' : '')
           + '</div>'
           + '<button class="btn btn-ghost btn-sm vi-remove" data-inv="' + inv.id + '">Remove</button>'
-          + '</div>').join('');
+          + '</div>').join('')
+        + App.showOlderBar('core', 'variance_investigation', resolvedNewest, false);
     }
     return html + '</div>';
   },
@@ -607,35 +609,35 @@ S.TheftRisk = {
       if (!productId) { if (sel) sel.style.borderColor = 'var(--red)'; return; }
       const p = this.productById(productId);
       const sku = (p && p.name) || productId;
-      App.data.variance_investigations = App.data.variance_investigations || [];
-      App.data.variance_investigations.push({
+      const inv = {
         id: App.uid(),
         product_id: productId,
         sku,
         opened_date: new Date().toISOString().slice(0, 10),
+        created_at: new Date().toISOString(),
         status: 'open',
         steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })),
         resolution: ''
-      });
-      App.saveKey('variance_investigations');
+      };
+      App.putRecord('core', 'variance_investigation', inv);
       this.renderMain();
     }));
     this.container.querySelector('.vi-print-blank')?.addEventListener('click', () => this.printBlankInvestigation());
     this.container.querySelectorAll('.vi-step-check').forEach(c => c.addEventListener('change', () => {
       const inv = this._inv(c.dataset.inv); if (!inv) return;
       inv.steps[+c.dataset.step].done = c.checked;
-      App.saveKey('variance_investigations');
+      App.putRecord('core', 'variance_investigation', inv);
       this.renderMain();
     }));
     this.container.querySelectorAll('.vi-finding').forEach(i => i.addEventListener('change', () => {
       const inv = this._inv(i.dataset.inv); if (!inv) return;
       inv.steps[+i.dataset.step].finding = i.value;
-      App.saveKey('variance_investigations');
+      App.putRecord('core', 'variance_investigation', inv);
     }));
     this.container.querySelectorAll('.vi-resolution').forEach(t => t.addEventListener('change', () => {
       const inv = this._inv(t.dataset.inv); if (!inv) return;
       inv.resolution = t.value;
-      App.saveKey('variance_investigations');
+      App.putRecord('core', 'variance_investigation', inv);
     }));
     this.container.querySelectorAll('.vi-resolve-btn').forEach(b => b.addEventListener('click', () => {
       const inv = this._inv(b.dataset.inv); if (!inv) return;
@@ -643,14 +645,15 @@ S.TheftRisk = {
       if (ta) inv.resolution = ta.value;
       inv.status = 'resolved';
       inv.resolved_date = new Date().toISOString().slice(0, 10);
-      App.saveKey('variance_investigations');
+      App.putRecord('core', 'variance_investigation', inv);
       this.renderMain();
     }));
     this.container.querySelectorAll('.vi-remove').forEach(b => b.addEventListener('click', () => {
-      App.data.variance_investigations = (App.data.variance_investigations || []).filter(x => x.id !== b.dataset.inv);
-      App.saveKey('variance_investigations');
+      App.removeRecord('core', 'variance_investigation', b.dataset.inv);
       this.renderMain();
     }));
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
   async save() {
@@ -667,8 +670,7 @@ S.TheftRisk = {
     else overall = null;
 
     App.data.theft_manual = { level: this._manual.level, notes: this._manual.notes };
-    if (!App.data.theft_scores) App.data.theft_scores = [];
-    App.data.theft_scores.push({
+    const scoreRec = {
       id: App.uid(),
       date: new Date().toISOString(),
       auto_score: autoScore,
@@ -678,11 +680,11 @@ S.TheftRisk = {
       notes: this._manual.notes,
       overall,
       rating: this.ratingFor(overall)
-    });
+    };
     App.data.last_theft_score_date = new Date().toISOString();
 
     await App.saveKey('theft_manual');
-    await App.saveKey('theft_scores');
+    await App.putRecord('core', 'theft_score', scoreRec);
     await App.saveKey('last_theft_score_date');
     const m = document.getElementById('tr-msg');
     if (m) { m.style.display = 'block'; setTimeout(() => { if (m) m.style.display = 'none'; }, 2500); }
