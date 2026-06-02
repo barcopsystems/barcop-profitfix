@@ -73,8 +73,8 @@ S.ThisWeek = {
   },
   // sum logged labor cost for the 7-day week ending at periodEnd, split bar vs food
   laborCost(periodEnd) {
+    if (!periodEnd) return null;
     const actuals = (App.laborData && App.laborData.lc_actuals) || [];
-    if (!actuals.length || !periodEnd) return null;
     const startD = new Date(periodEnd + 'T00:00:00');
     if (isNaN(startD.getTime())) return null;
     startD.setDate(startD.getDate() - 6);
@@ -88,6 +88,10 @@ S.ThisWeek = {
       if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
       else food += a.cost || 0;
     });
+    // Salaried (exempt) staff cost a fixed weekly amount regardless of hours.
+    const sal = App.salariedCost(start, periodEnd);
+    bar += sal.bar; food += sal.food;
+    if (sal.total > 0) any = true;
     return any ? { bar, food } : { bar: 0, food: 0 };
   },
 
