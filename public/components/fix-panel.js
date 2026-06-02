@@ -802,8 +802,7 @@ window.FixPanel = {
           if (dateEl) dateEl.style.borderColor = 'var(--red)';
           return;
         }
-        App.data.fix_log = App.data.fix_log || [];
-        App.data.fix_log.push({
+        App.putRecord('core', 'fix_log', {
           id: App.uid(),
           module: implSave.dataset.module,
           gap_id: gapId,
@@ -811,7 +810,6 @@ window.FixPanel = {
           date: date,
           logged_at: new Date().toISOString()
         });
-        App.saveKey('fix_log');
         // Mark Implemented on a Profit gap counts as the Profit Fix
         // Getting Started task. Revenue and Traffic Fix tasks don't exist
         // in the current checklist, but if they're added later, extend here.
@@ -821,8 +819,7 @@ window.FixPanel = {
       }
       if (unlog) {
         const logId = unlog.dataset.log;
-        App.data.fix_log = (App.data.fix_log || []).filter(e => e.id !== logId);
-        App.saveKey('fix_log');
+        App.removeRecord('core', 'fix_log', logId);
         const card = unlog.closest('.fp-gap');
         this.renderInto(el, el.dataset.fixModule, card ? card.dataset.gap : null);
         return;
