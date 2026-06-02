@@ -390,35 +390,8 @@ S.HubSettings = {
     });
     App.data.weeks = weeks;
 
-    // ── Shifts ──
-    const shiftNames = ['Maria G.','Jake T.','Samantha R.','Carlos M.','Ashley B.'];
-    const shifts = [];
-    for (let i = 0; i < 14; i++) {
-      const rev  = 1800 + Math.round(Math.random()*800);
-      const cogs = Math.round(rev * (0.22 + (Math.random()-0.5)*0.06));
-      const pct  = cogs/rev*100;
-      const diff = pct - 22;
-      const status = diff<=0?'ON TARGET':diff<=3?'WATCH: SLIGHTLY OVER':'INVESTIGATE: SIGNIFICANTLY OVER';
-      shifts.push({ id:uid(), date:dateStr(i*2), shift:['AM','PM','Late'][i%3], bartender:shiftNames[i%5], revenue:rev, cogs, pour_cost_pct:pct, variance_dollar:(diff/100)*rev, status, saved_at:new Date().toISOString() });
-    }
-    App.data.shifts = shifts;
-
-    // ── Cash Reconciliations ──
-    const recons = [];
-    for (let i = 0; i < 10; i++) {
-      const exp = 600 + Math.round(Math.random()*400);
-      const cnt = exp + Math.round((Math.random()-0.5)*30);
-      const os  = cnt - exp;
-      recons.push({ id:uid(), date:dateStr(i*3), shift:['AM','PM','Close'][i%3], register:'1', cashier:shiftNames[i%5], opening_bank:200, expected_cash:exp, counted_cash:cnt, credit_debit:Math.round(Math.random()*800)+400, over_short:os, tolerance:10, status:Math.abs(os)<=10?'Within Tolerance':os>0?'Over':'Short', saved_at:new Date().toISOString() });
-    }
-    App.data.reconciliations = recons;
-
-    // ── Vendor Log ──
-    App.data.vendor_log = [
-      { id:uid(), date:dateStr(21), vendor:'Republic National', product_id:bp[0].id, product_name:"Tito's Handmade Vodka", product_type:'bar', old_price:14.99, new_price:15.99, change_dollar:1.00, change_pct:6.7, weekly_usage:4, annual_impact:208, saved_at:new Date().toISOString() },
-      { id:uid(), date:dateStr(14), vendor:'Sysco',             product_id:kp[0].id, product_name:'Chicken Breast',        product_type:'kitchen', old_price:3.20, new_price:3.45, change_dollar:0.25, change_pct:7.8, weekly_usage:20, annual_impact:260, saved_at:new Date().toISOString() },
-      { id:uid(), date:dateStr(7),  vendor:'Glazer\'s',         product_id:bp[6].id, product_name:'Modelo Especial',       product_type:'bar', old_price:1.35, new_price:1.50, change_dollar:0.15, change_pct:11.1, weekly_usage:48, annual_impact:374.4, saved_at:new Date().toISOString() },
-    ];
+    // ── Dead-array seeds removed (shifts / reconciliations / vendor_log):
+    //    cash recon now lives in Shift Control; these were vestigial. ──
 
     // ── Theft Scores ──
     App.data.theft_scores = [
