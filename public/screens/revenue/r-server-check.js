@@ -391,8 +391,7 @@ S.RevenueServerCheck = {
       if (!ids.length) return;
       const ok = await App.confirm({ title: 'Delete ' + ids.length + ' check' + (ids.length > 1 ? 's' : '') + '?', confirmText: 'Delete', cancelText: 'Cancel' });
       if (!ok) return;
-      App.data.revenue_server_checks = (App.data.revenue_server_checks || []).filter(c => !ids.includes(c.id));
-      await App.saveKey('revenue_server_checks');
+      for (const id of ids) await App.removeRecord('core', 'revenue_server_check', id);
       this.render(container, actions);
     });
   },
@@ -450,11 +449,7 @@ S.RevenueServerCheck = {
       sales,
       saved_at:    new Date().toISOString()
     };
-    if (!App.data.revenue_server_checks) App.data.revenue_server_checks = [];
-    const idx = App.data.revenue_server_checks.findIndex(c => c.id === entry.id);
-    if (idx > -1) App.data.revenue_server_checks[idx] = entry;
-    else App.data.revenue_server_checks.push(entry);
-    App.saveKey('revenue_server_checks').then(() => {
+    App.putRecord('core', 'revenue_server_check', entry).then(() => {
       this._entryId = App.uid();
       // Re-render the whole screen so the scorecard reflects the new entry
       this.render(container, actions);
