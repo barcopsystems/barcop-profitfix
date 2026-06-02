@@ -2784,7 +2784,11 @@ const App = {
     try { await this._ensurePDFLib(); }
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
-    const orientation = cols.length > 7 ? 'landscape' : 'portrait';
+    // Portrait is what operators expect for a hand-filled sheet. Only fall back to
+    // landscape if the headers genuinely can't fit a portrait page (estimate widths
+    // here since the doc/getTextWidth doesn't exist yet).
+    const estHeaderW = cols.reduce((s, c) => s + (String(c.label || '').length * 4.7 + 16), 0);
+    const orientation = estHeaderW > (612 - 80) ? 'landscape' : 'portrait';
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation, unit: 'pt', format: 'letter' });
     const pageW = doc.internal.pageSize.getWidth();
