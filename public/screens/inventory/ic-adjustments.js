@@ -404,16 +404,15 @@ S.InventoryAdjustments = {
     else rec.updated_at = new Date().toISOString();
 
     const list = this.adjustments();
+    let saveRec = rec;
     if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
+      const ex = list.find(x => x.id === this.editId);
+      if (ex) saveRec = { ...ex, ...rec };
     }
 
     const btn = document.getElementById('adj-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveInventory();
+    const ok = await App.putRecord('ic', 'adjustment', saveRec);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -426,8 +425,7 @@ S.InventoryAdjustments = {
   async confirmDel(id) {
     const ok = await App.confirm({ title: 'Delete this adjustment entry?', confirmText: 'Delete', cancelText: 'Cancel' });
     if (!ok) return;
-    App.inventoryData.ic_adjustments = this.adjustments().filter(x => x.id !== id);
-    await App.saveInventory();
+    await App.removeRecord('ic', 'adjustment', id);
     this.renderList();
   },
 
