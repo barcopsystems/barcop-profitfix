@@ -2297,7 +2297,12 @@ const App = {
       kinds: {
         week: 'weeks', theft_score: 'theft_scores',
         variance_investigation: 'variance_investigations',
-        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits'
+        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits',
+        // Revenue pass — revenue_rate_cards stays in the blob (reusable pricing
+        // templates / config); fix_log moves in its own shared pass.
+        revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
+        revenue_server_check: 'revenue_server_checks', menu_dog_test: 'menu_dog_tests',
+        revenue_price_log: 'revenue_price_log', revenue_event: 'revenue_events'
       }
     }
   },
