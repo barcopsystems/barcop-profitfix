@@ -23,15 +23,137 @@ S.ShiftHandoff = {
       alert('Could not find that shift.');
       return;
     }
-    const w = window.open('', '_blank');
-    if (!w) {
-      alert('Your browser blocked the new tab. Allow pop-ups for this site and try again.');
-      return;
+    this.exportPDF(shift);
+  },
+
+  // Fire the handoff to the opener/ownership as a pre-filled email. Mailto bodies
+  // render as plain text, so this uses _buildEmailBody (not the PDF/HTML report).
+  emailForShift(shiftId) {
+    const shifts = ((App.shiftData && App.shiftData.sc_shifts) || []);
+    const shift = shifts.find(s => s.id === shiftId);
+    if (!shift) { alert('Could not find that shift.'); return; }
+    const barName = (App.data && App.data.settings && App.data.settings.bar_name) || 'Bar Cop';
+    const subj = 'Shift Handoff: ' + barName + ' / ' + (shift.shift_type || 'Shift') + ' / ' + this.fmtDate(shift.date);
+    window.location.href = 'mailto:?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(this._buildEmailBody(shift));
+  },
+
+  // Data-driven jsPDF handoff. Same sections as the legacy print HTML, built
+  // through the shared App._pdfBuilder so it saves straight to a PDF (no print
+  // preview). The mailto path (_buildEmailBody) is untouched.
+  async exportPDF(shift) {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    const cr = shift.cash_recon || {};
+    const tr = shift.tip_recon  || {};
+    const ex = this._gatherExceptions(shift);
+    const checkAvg = (shift.covers && shift.covers > 0) ? (shift.total_revenue || 0) / shift.covers : null;
+    const tol = App.cashToleranceForShift(shift);
+    const fmt$ = v => v == null ? '-' : '$' + Number(v).toFixed(2);
+    const num  = v => v == null ? '-' : String(v);
+
+    const metaBits = [shift.shift_type || 'Shift', this.fmtDate(shift.date)];
+    if (shift.manager) metaBits.push('Closed by ' + shift.manager + (shift.closed_at ? ' at ' + this.fmtTime(shift.closed_at) : ''));
+
+    const b = App._pdfBuilder('Shift Handoff');
+    b.header({ right: 'Shift Handoff', meta: metaBits.join('   |   ') });
+
+    // ── Revenue ──
+    b.sectionTitle('Revenue');
+    b.table(null, [
+      ['Bar Revenue', fmt$(shift.bar_revenue)],
+      ['Floor Revenue', fmt$(shift.floor_revenue)],
+      ['Total Revenue', fmt$(shift.total_revenue)],
+      ['Covers', num(shift.covers)],
+      ['Check Average', fmt$(checkAvg)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
+
+    // ── Cash Reconciliation ──
+    if (cr.skipped) {
+      b.sectionTitle('Cash Reconciliation (Skipped)');
+      b.paragraph('Drawer was not counted this shift.', { italic: true, gray: 130 });
+    } else if (cr.opening_bank != null || cr.counted_cash != null || cr.sales_cash != null) {
+      const ok = cr.variance == null ? true : Math.abs(cr.variance) <= tol;
+      const status = cr.variance == null ? '' : ok ? 'Within Tolerance' : cr.variance < 0 ? 'Short' : 'Over';
+      b.sectionTitle('Cash Reconciliation' + (status ? ' (' + status + ')' : ''));
+      b.table(null, [
+        ['Opening Bank', fmt$(cr.opening_bank)],
+        ['+ POS Cash Sales', fmt$(cr.sales_cash)],
+        ['- Drops Out', fmt$(cr.drops_total)],
+        ['Expected in Drawer', fmt$(cr.expected)],
+        ['Counted in Drawer', fmt$(cr.counted_cash)],
+        ['Variance', (cr.variance != null && cr.variance >= 0 ? '+' : '') + fmt$(cr.variance)]
+      ], { columnStyles: { 1: { halign: 'right' } } });
     }
-    const html = this._buildReportHTML(shift);
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+
+    // ── Tip Reconciliation ──
+    if (tr.logged_total != null || tr.pos_reported != null) {
+      b.sectionTitle('Tip Reconciliation');
+      const tipRows = [
+        ['Logged in Labor Control', fmt$(tr.logged_total)],
+        ['POS Reported', fmt$(tr.pos_reported)]
+      ];
+      if (tr.variance != null) tipRows.push(['Variance', (tr.variance >= 0 ? '+' : '') + fmt$(tr.variance)]);
+      b.table(null, tipRows, { columnStyles: { 1: { halign: 'right' } } });
+    }
+
+    // ── Open for the Next Shift ──
+    b.sectionTitle('Open for the Next Shift');
+    b.paragraph("86'd items still out", { gray: 90 });
+    if (!ex.eighty6.length) {
+      b.paragraph("No 86'd items. Floor is clean.", { italic: true, gray: 130 });
+    } else {
+      b.table(['Item', 'Reason', 'Since'], ex.eighty6.map(i => [
+        i.item || '(unnamed)', i.reason || '-', i.date_86 || '-'
+      ]));
+    }
+    b.paragraph('Open maintenance issues', { gray: 90 });
+    if (!ex.openMaint.length) {
+      b.paragraph('No open maintenance issues.', { italic: true, gray: 130 });
+    } else {
+      b.table(['Issue', 'Priority', 'Location', 'Notes'], ex.openMaint.map(m => [
+        m.issue || m.item || 'Issue', m.priority || '-', m.location || '-', m.notes || '-'
+      ]));
+    }
+
+    // ── Notable Voids and Comps ──
+    if (ex.vc.length) {
+      const total = ex.vc.reduce((t, r) => t + (parseFloat(r.amount) || 0), 0);
+      b.sectionTitle('Notable Voids and Comps');
+      b.paragraph(ex.vc.length + ' over $30  |  ' + fmt$(total) + ' total', { gray: 90 });
+      b.table(['Type', 'Item', 'Amount', 'Server', 'Reason'], ex.vc.map(v => [
+        v.type || '-', v.item || '-', fmt$(v.amount), v.server || '-', v.reason || '-'
+      ]), { columnStyles: { 2: { halign: 'right' } } });
+    }
+
+    // ── Closing Checklist ──
+    if (ex.closingCheck) {
+      const pct = ex.closingCheck.total_count ? Math.round((ex.closingCheck.done_count || 0) / ex.closingCheck.total_count * 100) : 0;
+      b.sectionTitle('Closing Checklist');
+      b.paragraph(pct + '% complete' + (ex.closingCheck.completed_by ? '  |  ' + ex.closingCheck.completed_by : ''), { gray: 90 });
+    }
+
+    // ── Shift Notes ──
+    const shiftNotesList = Array.isArray(shift.shift_notes) ? shift.shift_notes : [];
+    if (shiftNotesList.length) {
+      b.sectionTitle('Shift Notes');
+      b.table(['Time', 'Note'], shiftNotesList.map(n => [
+        this.fmtTime(n.at), n.text || ''
+      ]));
+    }
+
+    // ── Notes for the Opener ──
+    if (shift.handoff_notes) {
+      b.sectionTitle('Notes for the Opener');
+      b.paragraph(shift.handoff_notes);
+    }
+
+    b.spacer(4);
+    b.paragraph('Numbers and exceptions come from what was logged during the shift. Hand this report to '
+      + 'the opening manager so they walk in knowing what they inherit.', { italic: true, gray: 130, size: 8 });
+
+    const ds = /^\d{4}-\d{2}-\d{2}$/.test(shift.date || '') ? shift.date.replace(/-/g, '') : App._pdfDateStamp();
+    await b.save('BarCop_ShiftHandoff_' + ds + '.pdf');
   },
 
   fmtDate(str) {
