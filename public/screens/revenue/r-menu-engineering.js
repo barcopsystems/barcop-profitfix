@@ -192,7 +192,7 @@ S.RevenueMenuEngineering = {
     const log   = (App.data.revenue_price_log||[]).slice().reverse();
     const itemOpts = items.map((i,idx)=>'<option value="'+idx+'">'+esc(i.name)+'   $'+i.price+'</option>').join('');
 
-    const logRows = log.map(e => S.RevenueMenuEngineering.logRow(e)).join('')
+    const logRows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => S.RevenueMenuEngineering.logRow(e)).join('')
       || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No price changes logged yet.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
@@ -215,8 +215,12 @@ S.RevenueMenuEngineering = {
       + '<div class="sh">Pricing Review Log</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th><th>Reason</th></tr></thead>'
       + '<tbody id="rps-log-table">' + logRows + '</tbody></table></div>'
+      + App.showOlderBar('core', 'revenue_price_log', log, false)
       + '</div>'
       + '</div>';
+
+    container.querySelector('[data-show-older]')?.addEventListener('click', e =>
+      App.handleShowOlder(e.target, () => S.RevenueMenuEngineering.renderPriceSensitivity(container)));
 
     const calc = () => {
       const idx      = parseInt(document.getElementById('rps-item')?.value);
@@ -263,8 +267,6 @@ S.RevenueMenuEngineering = {
         item_id:item.id, item_name:item.name, old_price:item.price, new_price:newPrice, cost:item.cost,
         reason, margin_impact:newPrice-item.price, covers_at_change:covers2,
         predicted_vol_pct:volChg2, predicted_weekly_impact:predWk, saved_at:new Date().toISOString() };
-      if (!App.data.revenue_price_log) App.data.revenue_price_log=[];
-      App.data.revenue_price_log.push(entry);
       const allItems = App.data.menu_items||[];
       const ri = allItems.findIndex(i=>i.id===item.id);
       if(ri>=0) allItems[ri].price=newPrice;
@@ -283,14 +285,14 @@ S.RevenueMenuEngineering = {
         source_id: entry.id,
         note:      'Price change logged: ' + (item.name || '') + ' ' + App.fmtCurrency(item.price) + ' to ' + App.fmtCurrency(newPrice)
       });
-      await App.saveKey('revenue_price_log');
+      await App.putRecord('core', 'revenue_price_log', entry);
       await App.saveKey('menu_items');
       await App.saveKey('fix_log');
       // Refresh log table inline
       const tbody = document.getElementById('rps-log-table');
       if (tbody) {
         const newLog = (App.data.revenue_price_log||[]).slice().reverse();
-        tbody.innerHTML = newLog.map(e=>S.RevenueMenuEngineering.logRow(e)).join('')
+        tbody.innerHTML = newLog.slice(0, App.listLimit('core', 'revenue_price_log')).map(e=>S.RevenueMenuEngineering.logRow(e)).join('')
           || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No price changes logged yet.</td></tr>';
       }
       document.getElementById('rps-reason').value='';
