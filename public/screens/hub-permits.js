@@ -50,7 +50,7 @@ S.HubPermits = {
 
   // ── Entry ───────────────────────────────────────────────────────────────
   open() {
-    App.openHubFullPage('Permits and Compliance', (mount) => {
+    App.openHubFullPage('Permits and Licenses', (mount) => {
       this.container = mount;
       this.renderMain();
     }, 'permits');
@@ -134,8 +134,7 @@ S.HubPermits = {
     // Summary card
     const summaryCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Permits and Compliance</div>'
-      +     '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Track every permit, license, and recurring compliance item. Mark Renewed when you pay — Bar Cop advances the renewal date and logs the cost to your Operating Expenses.</div></div>'
+      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Permits and Licenses</div></div>'
       +   '<button class="btn btn-primary btn-sm" id="hp-add">+ Add Permit</button>'
       + '</div>'
       + '<div class="calc">'
