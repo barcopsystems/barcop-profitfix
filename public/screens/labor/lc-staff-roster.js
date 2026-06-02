@@ -48,6 +48,19 @@ S.LaborStaffRoster = {
     if (cert.expiration_date <= cutoff.toISOString().slice(0, 10)) return 'expiring';
     return 'ok';
   },
+  // Roster-row rollup across all of a staff member's certs: any expired wins,
+  // else any expiring, else current; 'none' when nothing is on file.
+  certRollup(staffId) {
+    const list = this.certsForStaff(staffId);
+    if (list.length === 0) return 'none';
+    let worst = 'ok';
+    for (const c of list) {
+      const st = this.certStatus(c);
+      if (st === 'expired') return 'expired';
+      if (st === 'expiring') worst = 'expiring';
+    }
+    return worst;
+  },
 
   notes() {
     if (!App.laborData) App.laborData = {};
@@ -83,8 +96,9 @@ S.LaborStaffRoster = {
     this.renderList();
   },
 
-  // The seven data cells (Name, Position, Wage, Status, Hire Date, Phone, Email)
-  // shared by the inline add form and the edit profile form so they never drift.
+  // The seven profile cells shared by the inline add form and the edit profile
+  // form so they never drift. First row (Name, Position, Wage, Status, Hire Date)
+  // grows to span the form; Phone and Email sit on a second row.
   profileFormCells(s) {
     const positions = this.positions();
     const posOpts = positions.map(p =>
@@ -93,22 +107,26 @@ S.LaborStaffRoster = {
     const defaultPos = s ? this.positionById(s.position_id) : positions[0];
     const wage = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
     const wv = (wage != null && wage !== '') ? wage : '';
-    return '<div class="f" style="width:150px;flex-shrink:0;"><label>Name</label>'
+    return '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Name</label>'
       + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
-      + '<div class="f" style="width:175px;flex-shrink:0;"><label>Position</label>'
+      + '<div class="f" style="flex:1 1 175px;min-width:0;"><label>Position</label>'
       + '<select id="sr-pos">' + posOpts + '</select></div>'
-      + '<div class="f" style="width:84px;min-width:0;"><label>Wage</label>'
+      + '<div class="f" style="flex:1 1 84px;min-width:0;"><label>Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage" min="0" step="0.01" '
       + 'value="' + wv + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:92px;min-width:0;"><label>Status</label><select id="sr-status">'
+      + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Hire Date</label>'
+      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Hire Date</label>'
       + '<input type="date" id="sr-hire" value="' + esc(s?.hire_date || '') + '"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">'
       + '<div class="f" style="width:100px;min-width:0;"><label>Phone</label>'
       + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="width:128px;min-width:0;"><label>Email</label>'
-      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>';
+      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
+      + '</div>';
   },
 
   renderList() {
@@ -129,7 +147,7 @@ S.LaborStaffRoster = {
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Add Staff Member</span>'
       + '<button class="btn btn-ghost btn-sm" id="sr-how">How This Works</button></div>'
-      + '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">' + this.profileFormCells(null) + '</div>'
+      + this.profileFormCells(null)
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
       + '<label>Notes</label><textarea id="sr-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '<div class="card-actions">'
@@ -150,6 +168,11 @@ S.LaborStaffRoster = {
     } else {
       const rows = list.map(s => {
         const pos = this.positionById(s.position_id);
+        const roll = this.certRollup(s.id);
+        const certCell = roll === 'expired'  ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
+                       : roll === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring</span>'
+                       : roll === 'ok'       ? '<span style="color:var(--blue);font-weight:700;">Current</span>'
+                       : '<span style="color:var(--t3);">&mdash;</span>';
         return '<tr class="sr-row" data-id="' + s.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + esc(s.name || '-') + '</div></td>'
           + '<td>' + esc(pos ? pos.name : '-') + '</td>'
@@ -158,6 +181,7 @@ S.LaborStaffRoster = {
           + '<td>' + (s.status === 'Inactive'
               ? '<span style="color:var(--t3);font-weight:700;">Inactive</span>'
               : '<span style="color:var(--gold);font-weight:700;">Active</span>') + '</td>'
+          + '<td>' + certCell + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>'
@@ -165,7 +189,7 @@ S.LaborStaffRoster = {
       }).join('');
       listCard = '<div class="card"><div class="card-title">Roster</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th></th>'
+        + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -223,7 +247,7 @@ S.LaborStaffRoster = {
 
   renderProfileEditCard(s) {
     return '<div class="card"><div class="card-title">Edit ' + esc(s.name || 'Profile') + '</div>'
-      + '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">' + this.profileFormCells(s) + '</div>'
+      + this.profileFormCells(s)
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="sr-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
@@ -266,8 +290,8 @@ S.LaborStaffRoster = {
       const rows = list.map(c => {
         const status = this.certStatus(c);
         const badge = status === 'expired' ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
-                   : status === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring Soon</span>'
-                   : '<span style="color:var(--gold);font-weight:700;">Active</span>';
+                   : status === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring</span>'
+                   : '<span style="color:var(--blue);font-weight:700;">Current</span>';
         return '<tr>'
           + '<td><div class="val">' + esc(c.cert_type || '-') + '</div>'
           + (c.cert_number ? '<div style="font-size:10px;color:var(--t3);">#' + esc(c.cert_number) + '</div>' : '') + '</td>'
