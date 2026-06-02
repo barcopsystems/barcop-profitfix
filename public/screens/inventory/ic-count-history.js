@@ -138,8 +138,7 @@ S.InventoryCountHistory = {
     document.getElementById('ch-del-confirm').addEventListener('click', async () => {
       close();
       if (!App.canEdit('ic-count-history') || !App.inventoryData) return;
-      App.inventoryData.ic_counts = this.counts().filter(c => c.id !== id);
-      await App.saveInventory();
+      await App.removeRecord('ic', 'count', id);
       this.renderList();
     });
   },
