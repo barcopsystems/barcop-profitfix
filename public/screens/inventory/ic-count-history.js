@@ -59,14 +59,14 @@ S.InventoryCountHistory = {
         + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
         + '</select></div></div>';
 
-      const rows = asc.map((c, i) => {
+      const ordered = asc.map((c, i) => {
         const prior = i > 0 ? asc[i - 1] : null;
         const variance = prior ? (c.total_value || 0) - (prior.total_value || 0) : null;
         const isLatest = i === asc.length - 1;
         return { c, variance, isLatest };
       }).reverse()
-        .filter(r => !this.countedByFilter || r.c.counted_by === this.countedByFilter)
-        .map(r => {
+        .filter(r => !this.countedByFilter || r.c.counted_by === this.countedByFilter);
+      const rows = ordered.slice(0, App.listLimit('ic', 'count')).map(r => {
         const c = r.c;
         const varCell = r.variance == null
           ? '<span style="color:var(--t4);">-</span>'
@@ -93,11 +93,13 @@ S.InventoryCountHistory = {
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);">No counts for this staff member.</td></tr>') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);">No counts for this staff member.</td></tr>') + '</tbody></table></div>'
+        + App.showOlderBar('ic', 'count', ordered, !!this.countedByFilter) + '</div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const how = ev.target.closest('#ch-how');
       const del = ev.target.closest('.ch-del');
       const view = ev.target.closest('.ch-view');

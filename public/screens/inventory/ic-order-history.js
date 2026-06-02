@@ -131,7 +131,7 @@ S.InventoryOrderHistory = {
         + '<option value="">All vendors</option>'
         + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
         + '</select></div></div>';
-      const rows = filtered.map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
+      const rows = filtered.slice(0, App.listLimit('ic', 'order')).map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(o.date) + '</div></td>'
         + '<td>' + esc(o.vendor || '-') + '</td>'
         + '<td>' + (o.item_count || (o.line_items ? o.line_items.length : 0)) + '</td>'
@@ -147,11 +147,13 @@ S.InventoryOrderHistory = {
         + filter
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--t3);">No orders for this vendor.</td></tr>') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--t3);">No orders for this vendor.</td></tr>') + '</tbody></table></div>'
+        + App.showOlderBar('ic', 'order', filtered, !!this.vendorFilter) + '</div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const how = ev.target.closest('#oh-how');
       const row = ev.target.closest('.oh-row');
       const view = ev.target.closest('.oh-view');

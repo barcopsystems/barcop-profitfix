@@ -98,7 +98,7 @@ S.InventoryAdjustments = {
       listHtml += '<div class="empty"><div class="empty-title">No adjustments match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
-      const rows = filtered.slice(0, 200).map(r => {
+      const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
         const dirText = r.direction === 'in'
           ? '<span style="color:var(--gold);font-weight:600;">Found</span>'
           : '<span style="color:var(--red);font-weight:600;">Loss</span>';
@@ -120,7 +120,8 @@ S.InventoryAdjustments = {
       }).join('');
       listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('ic', 'adjustment', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterReason));
     }
 
     this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
@@ -255,6 +256,7 @@ S.InventoryAdjustments = {
 
   wireList() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.adj-row');
       const edit = ev.target.closest('.adj-edit');
       const del  = ev.target.closest('.adj-del');

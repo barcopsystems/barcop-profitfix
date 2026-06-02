@@ -235,6 +235,7 @@ S.InventorySpotCheck = {
     });
     document.getElementById('sp-save')?.addEventListener('click', () => this.save());
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const how = ev.target.closest('#sp-how');
       const hrow = ev.target.closest('.sp-hrow');
       const hview = ev.target.closest('.sp-hview');
@@ -410,7 +411,7 @@ S.InventorySpotCheck = {
     const list = [...this.checks()].sort((a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
     if (list.length === 0) return '';
-    const rows = list.map(c => {
+    const rows = list.slice(0, App.listLimit('ic', 'spot_check')).map(c => {
       const vd = c.total_variance_dollar || 0;
       return '<tr class="sp-hrow" data-id="' + c.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
@@ -427,7 +428,8 @@ S.InventorySpotCheck = {
     return '<div class="card"><div class="card-title">Spot Check History</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + App.showOlderBar('ic', 'spot_check', list, false) + '</div>';
   },
 
   renderDetail(id) {

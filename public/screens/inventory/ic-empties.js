@@ -82,7 +82,7 @@ S.InventoryEmpties = {
       listHtml += '<div class="empty"><div class="empty-title">No empties match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
-      const rows = filtered.slice(0, 200).map(e => {
+      const rows = filtered.slice(0, App.listLimit('ic', 'empty')).map(e => {
         const dispBadge = e.disposition === 'Return for Deposit'
           ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">' + esc(e.disposition) + '</span>'
           : esc(e.disposition || '-');
@@ -102,7 +102,8 @@ S.InventoryEmpties = {
       }).join('');
       listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Product</th><th>Quantity</th><th>Disposition</th><th>Deposit Value</th><th>By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('ic', 'empty', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterDisposition));
     }
 
     this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
@@ -211,6 +212,7 @@ S.InventoryEmpties = {
 
   wireList() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.em-row');
       const edit = ev.target.closest('.em-edit');
       const del  = ev.target.closest('.em-del');

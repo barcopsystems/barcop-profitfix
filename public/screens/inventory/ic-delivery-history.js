@@ -56,7 +56,7 @@ S.InventoryDeliveryHistory = {
         + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
         + '</select></div></div>';
 
-      const rows = filtered.map(d => {
+      const rows = filtered.slice(0, App.listLimit('ic', 'delivery')).map(d => {
         let disc;
         if (d.has_discrepancy) {
           const parts = [];
@@ -84,11 +84,13 @@ S.InventoryDeliveryHistory = {
         + filter
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);">No deliveries for this vendor.</td></tr>') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);">No deliveries for this vendor.</td></tr>') + '</tbody></table></div>'
+        + App.showOlderBar('ic', 'delivery', filtered, !!this.vendorFilter) + '</div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const how = ev.target.closest('#dh-how');
       const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');

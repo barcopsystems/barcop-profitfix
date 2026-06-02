@@ -99,7 +99,7 @@ S.InventoryTransfers = {
       listHtml += '<div class="empty"><div class="empty-title">No transfers match the filters</div>'
         + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
     } else {
-      const rows = filtered.slice(0, 200).map(t => {
+      const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
         const p = this.productById(t.product_id);
         return '<tr class="tr-row" data-id="' + t.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDateTime(t.date_time) + '</div></td>'
@@ -116,7 +116,8 @@ S.InventoryTransfers = {
       }).join('');
       listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>When</th><th>From → To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('ic', 'transfer', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterLocation));
     }
 
     this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
@@ -241,6 +242,7 @@ S.InventoryTransfers = {
 
   wireList() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.tr-row');
       const edit = ev.target.closest('.tr-edit');
       const del  = ev.target.closest('.tr-del');
