@@ -169,7 +169,7 @@ S.TheftRisk = {
     this.renderMain();
   },
 
-  printBrief() {
+  async printBrief() {
     const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
     const confirmed = this.theftConfirmedSignal();
     const unauthComps = this.unauthorizedLargeCompsSignal();
@@ -182,7 +182,6 @@ S.TheftRisk = {
     else if (manScore != null) overall = manScore;
     else overall = null;
 
-    const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -200,68 +199,59 @@ S.TheftRisk = {
     const openInv = investigations.filter(i => i.status !== 'resolved');
     const resolvedInv = investigations.filter(i => i.status === 'resolved' && inWindow(i.resolved_date));
 
-    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
-      + '<title>' + esc(barName) + ' Theft & Loss Brief, ' + today + '</title>'
-      + '<style>'
-      + 'body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 7.5in; margin: 0.5in auto; padding: 0; line-height: 1.5; }'
-      + 'h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 4px; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }'
-      + 'h1 .sub { font-size: 13px; font-weight: normal; text-transform: none; letter-spacing: 0; color: #555; display: block; margin-top: 4px; }'
-      + 'h2 { font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a6d00; margin: 22px 0 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }'
-      + 'table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }'
-      + 'td { padding: 4px 6px; border-bottom: 1px solid #eee; }'
-      + 'td.right { text-align: right; font-variant-numeric: tabular-nums; }'
-      + 'td.bold { font-weight: bold; }'
-      + 'td.muted { color: #666; font-size: 12px; }'
-      + '.score { font-size: 56px; font-weight: 700; line-height: 1; }'
-      + '.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #777; font-style: italic; line-height: 1.6; }'
-      + '@media print { body { margin: 0.4in; } @page { margin: 0.4in; } }'
-      + '</style></head><body>'
-      + '<h1>' + esc(barName) + ' Theft & Loss Brief<span class="sub">90-day review, generated ' + esc(today) + '</span></h1>'
-      + '<h2>Overall Risk Score</h2>'
-      + '<table><tr><td><div class="score">' + (overall != null ? overall : '-') + '</div></td>'
-      + '<td class="right"><strong>' + esc(this.ratingFor(overall)) + '</strong>'
-      + (autoScore != null ? '<br><span style="color:#666;font-size:11px;">Auto-score ' + autoScore + ' from operational data</span>' : '')
-      + (manScore != null ? '<br><span style="color:#666;font-size:11px;">Manual judgment ' + manScore + '</span>' : '')
-      + '</td></tr></table>'
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
-      + '<h2>Signal Summary</h2>'
-      + '<table>'
-      + '<tr><td>Pour Variance (spot checks)</td><td class="right">' + (pour.score != null ? pour.score : '-') + (pour.flagged ? ' &nbsp;<span style="color:#666;">' + pour.flagged + ' of ' + pour.items + ' flagged</span>' : '') + '</td></tr>'
-      + '<tr><td>Voids & Comps (loss-bearing only)</td><td class="right">' + (voids.score != null ? voids.score : '-') + (voids.count ? ' &nbsp;<span style="color:#666;">' + voids.count + ' loss records, ' + fmt$(voids.total) + '</span>' : '') + '</td></tr>'
-      + '<tr><td>Cash Variance</td><td class="right">' + (cash.score != null ? cash.score : '-') + (cash.count ? ' &nbsp;<span style="color:#666;">' + cash.shorts + ' shorts of ' + cash.count + ' counts, ' + fmt$(Math.abs(cash.netShort)) + ' net short</span>' : '') + '</td></tr>'
-      + '<tr><td>Unauthorized Large Comps</td><td class="right">' + (unauthComps.score != null ? unauthComps.score : '-') + (unauthComps.count ? ' &nbsp;<span style="color:#666;">' + unauthComps.count + ' over threshold without auth, ' + fmt$(unauthComps.total) + '</span>' : '') + '</td></tr>'
-      + '<tr><td>Confirmed Theft (adjustment log)</td><td class="right">' + (confirmed.score != null ? confirmed.score : '-') + (confirmed.count ? ' &nbsp;<span style="color:#666;">' + confirmed.count + ' events, ' + fmt$(confirmed.totalValue) + '</span>' : '') + '</td></tr>'
-      + '</table>'
+    const dash = (s) => s != null ? s : '-';
+    const b = App._pdfBuilder('Theft & Loss Brief');
+    b.header({ right: 'Theft & Loss Brief', meta: '90-day review, generated ' + today });
 
-      + '<h2>90-Day Event Counts</h2>'
-      + '<table>'
-      + '<tr><td>Spot checks run</td><td class="right">' + recentSpots.length + '</td></tr>'
-      + '<tr><td>Voids and comps logged (loss-bearing)</td><td class="right">' + recentVCs.length + '</td></tr>'
-      + '<tr><td>Cash variances logged</td><td class="right">' + recentVars.length + '</td></tr>'
-      + '<tr><td>Inventory adjustments logged</td><td class="right">' + recentAdj.length + '</td></tr>'
-      + '</table>'
+    // ── Overall Risk Score ──
+    b.sectionTitle('Overall Risk Score');
+    b.heading((overall != null ? String(overall) : '-') + '   ' + this.ratingFor(overall), 18);
+    if (autoScore != null) b.paragraph('Auto-score ' + autoScore + ' from operational data', { gray: 100, size: 9 });
+    if (manScore != null) b.paragraph('Manual judgment ' + manScore, { gray: 100, size: 9 });
 
-      + '<h2>Variance Investigations</h2>'
-      + '<table>'
-      + '<tr><td>Open investigations</td><td class="right">' + openInv.length + '</td></tr>'
-      + '<tr><td>Resolved in window</td><td class="right">' + resolvedInv.length + '</td></tr>'
-      + '</table>'
-      + (openInv.length > 0
-          ? '<p style="font-size:12px;color:#444;margin-top:6px;">Open: ' + openInv.map(i => esc(i.sku || '(unnamed)')).join(', ') + '</p>'
-          : '')
+    // ── Signal Summary ──
+    b.sectionTitle('Signal Summary');
+    b.table(['Signal', 'Score', 'Detail'], [
+      ['Pour Variance (spot checks)', dash(pour.score),
+        pour.flagged ? pour.flagged + ' of ' + pour.items + ' flagged' : '-'],
+      ['Voids & Comps (loss-bearing only)', dash(voids.score),
+        voids.count ? voids.count + ' loss records, ' + fmt$(voids.total) : '-'],
+      ['Cash Variance', dash(cash.score),
+        cash.count ? cash.shorts + ' shorts of ' + cash.count + ' counts, ' + fmt$(Math.abs(cash.netShort)) + ' net short' : '-'],
+      ['Unauthorized Large Comps', dash(unauthComps.score),
+        unauthComps.count ? unauthComps.count + ' over threshold without auth, ' + fmt$(unauthComps.total) : '-'],
+      ['Confirmed Theft (adjustment log)', dash(confirmed.score),
+        confirmed.count ? confirmed.count + ' events, ' + fmt$(confirmed.totalValue) : '-']
+    ], { columnStyles: { 1: { halign: 'right' } } });
 
-      + '<div class="footer">Generated from your logged Bar Cop data on ' + esc(today) + '. '
+    // ── 90-Day Event Counts ──
+    b.sectionTitle('90-Day Event Counts');
+    b.table(null, [
+      ['Spot checks run', String(recentSpots.length)],
+      ['Voids and comps logged (loss-bearing)', String(recentVCs.length)],
+      ['Cash variances logged', String(recentVars.length)],
+      ['Inventory adjustments logged', String(recentAdj.length)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
+
+    // ── Variance Investigations ──
+    b.sectionTitle('Variance Investigations');
+    b.table(null, [
+      ['Open investigations', String(openInv.length)],
+      ['Resolved in window', String(resolvedInv.length)]
+    ], { columnStyles: { 1: { halign: 'right' } } });
+    if (openInv.length > 0) {
+      b.paragraph('Open: ' + openInv.map(i => i.sku || '(unnamed)').join(', '), { gray: 70, size: 9 });
+    }
+
+    // ── Legal disclaimer (verbatim) ──
+    b.disclaimer('Generated from your logged Bar Cop data on ' + today + '. '
       + 'Bar Cop is a software tool, not a forensic auditor, attorney, or insurance adjuster. '
-      + 'Use this brief as a reference point for your own review; consult the relevant professional before acting on any conclusion.'
-      + '</div>'
-      + '<script>setTimeout(function(){window.print();}, 300);</script>'
-      + '</body></html>';
+      + 'Use this brief as a reference point for your own review; consult the relevant professional before acting on any conclusion.');
 
-    const w = window.open('', '_blank');
-    if (!w) { alert('Pop-up blocked. Allow pop-ups for Bar Cop and try again.'); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+    await b.save('BarCop_VarianceInvestigation_' + App._pdfDateStamp() + '.pdf');
   },
 
   /* Guided Variance Investigation (Section 10) — the Fix System's 6-step
