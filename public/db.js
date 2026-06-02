@@ -461,6 +461,11 @@ const DB = {
     const tableOf = { pf_data: 'user_data', pf_ic_data: 'ic_data', pf_lc_data: 'lc_data', pf_sc_data: 'sc_data' };
     let synced = 0, failed = 0;
     for (const lsKey of this._pendingList()) {
+      if (lsKey === 'events') {
+        const er = await this.syncPendingEvents();
+        synced += er.synced; failed += er.failed;
+        continue; // syncPendingEvents clears 'events' itself once the queue drains
+      }
       const table = tableOf[lsKey];
       if (!table) { this._clearPending(lsKey); continue; }
       const data = lsKey === 'pf_data' ? this._localRead() : this._localReadControl(lsKey);
@@ -641,6 +646,193 @@ const DB = {
   async writeLaborData(data)     { return await this._writeControl('lc_data', 'pf_lc_data', data); },
   async readShiftData()          { return await this._readControl('sc_data', 'pf_sc_data'); },
   async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
+
+  // ── Event-log stores (row per record) ────────────────────────────────────
+  // Unbounded logs (counts, deliveries, shifts, tips, audits…) live one row per
+  // record in <module>_events instead of inside the JSON blob, so login and save
+  // stay flat as history grows. payload = the record object verbatim, so the
+  // app's in-memory arrays are unchanged. The (account_id, kind, date desc)
+  // index keeps "last N of a kind" constant-time. Config stays in the blob.
+  // Offline: a failed write queues the op locally and replays on sync; loads
+  // fall back to a localStorage cache of the last-loaded window.
+  _WINDOW_MONTHS: 24,
+  _EVENTQ_KEY: 'pf_pending_events',
+
+  _windowStartDate() {
+    const d = new Date();
+    d.setMonth(d.getMonth() - this._WINDOW_MONTHS);
+    return d.toISOString().slice(0, 10);
+  },
+  // Business date (YYYY-MM-DD) for the windowing index, pulled from the record.
+  _eventDate(rec) {
+    const v = rec && (rec.date || rec.created_at || rec.date_time || rec.closed_at || rec.filed_at);
+    if (!v) return null;
+    const s = String(v).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+  },
+  _evCacheKey(table, kind) { return 'pfev_' + table + '_' + kind; },
+  _cacheEvents(table, kind, recs) {
+    try { localStorage.setItem(this._evCacheKey(table, kind), JSON.stringify(recs)); } catch (e) {}
+  },
+  _readEventCache(table, kind) {
+    try { const r = localStorage.getItem(this._evCacheKey(table, kind)); return r ? JSON.parse(r) : []; }
+    catch (e) { return []; }
+  },
+
+  // Load one kind, newest first. Default = rolling 24-month window (the hot set
+  // every screen reads). opts.before = an older page ("Show older"). opts.limit
+  // caps the page. Falls back to the local cache when offline / on error.
+  async loadEvents(table, kind, opts) {
+    opts = opts || {};
+    if (this._sb && this._user && !(typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      const accountId = await this._ensureAccountId();
+      if (accountId) {
+        try {
+          let q = this._sb.from(table).select('payload,date')
+            .eq('account_id', accountId).eq('kind', kind)
+            .order('date', { ascending: false, nullsFirst: false });
+          // Default = the rolling window; include null-date rows so a record
+          // missing a business date is never hidden.
+          if (opts.before) q = q.lt('date', opts.before);
+          else q = q.or('date.gte.' + this._windowStartDate() + ',date.is.null');
+          if (opts.limit) q = q.limit(opts.limit);
+          const { data, error } = await q;
+          if (!error && Array.isArray(data)) {
+            const recs = data.map(r => r.payload).filter(Boolean);
+            if (!opts.before) this._cacheEvents(table, kind, recs);
+            return recs;
+          }
+        } catch (e) { /* fall through to cache */ }
+      }
+    }
+    return opts.before ? [] : this._readEventCache(table, kind);
+  },
+
+  async putEvent(table, kind, rec) {
+    if (this._demo || !rec || rec.id == null) return { ok: this._demo === true };
+    if (this._sb && this._user) {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        this._queueEvent(table, kind, 'put', rec); return { ok: false, offline: true };
+      }
+      const accountId = await this._ensureAccountId();
+      if (!accountId) { this._queueEvent(table, kind, 'put', rec); return { ok: false, error: 'no account membership found' }; }
+      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      try {
+        const { error } = await this._sb.from(table).upsert({
+          account_id: accountId, kind: kind, id: String(rec.id),
+          date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
+        }, { onConflict: 'account_id,kind,id' });
+        if (error) { this._queueEvent(table, kind, 'put', rec); return { ok: false, error }; }
+        return { ok: true };
+      } catch (e) { this._queueEvent(table, kind, 'put', rec); return { ok: false, error: e }; }
+    }
+    return { ok: true }; // local-only mode: App keeps the in-memory array
+  },
+
+  async removeEvent(table, kind, id) {
+    if (this._demo || id == null) return { ok: this._demo === true };
+    if (this._sb && this._user) {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        this._queueEvent(table, kind, 'del', { id }); return { ok: false, offline: true };
+      }
+      const accountId = await this._ensureAccountId();
+      if (!accountId) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, error: 'no account membership found' }; }
+      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      try {
+        const { error } = await this._sb.from(table).delete()
+          .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
+        if (error) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, error }; }
+        return { ok: true };
+      } catch (e) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, error: e }; }
+    }
+    return { ok: true };
+  },
+
+  // Seed many rows for a kind in one upsert (sample data / migration).
+  async putEventsBulk(table, kind, recs) {
+    if (this._demo || !this._sb || !this._user) return { ok: true };
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false, error: 'no account membership found' };
+    const rows = (recs || []).filter(r => r && r.id != null).map(rec => ({
+      account_id: accountId, kind: kind, id: String(rec.id),
+      date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
+    }));
+    if (!rows.length) return { ok: true };
+    try {
+      // Chunk to keep each request small.
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await this._sb.from(table).upsert(rows.slice(i, i + 500), { onConflict: 'account_id,kind,id' });
+        if (error) return { ok: false, error };
+      }
+      return { ok: true };
+    } catch (e) { return { ok: false, error: e }; }
+  },
+
+  // Delete every row for this account in an events table (sample reload / clear
+  // all). Also drops the local window caches for that table.
+  async clearEvents(table) {
+    try {
+      Object.keys(localStorage).filter(k => k.indexOf('pfev_' + table + '_') === 0)
+        .forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+    if (this._demo || !this._sb || !this._user) return { ok: true };
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false, error: 'no account membership found' };
+    try {
+      const { error } = await this._sb.from(table).delete().eq('account_id', accountId);
+      return error ? { ok: false, error } : { ok: true };
+    } catch (e) { return { ok: false, error: e }; }
+  },
+
+  // ── Event offline queue ───────────────────────────────────────────────────
+  _eventQueue() {
+    try { return JSON.parse(localStorage.getItem(this._EVENTQ_KEY) || '[]'); }
+    catch (e) { return []; }
+  },
+  _setEventQueue(list) {
+    try {
+      if (list && list.length) localStorage.setItem(this._EVENTQ_KEY, JSON.stringify(list));
+      else localStorage.removeItem(this._EVENTQ_KEY);
+    } catch (e) {}
+  },
+  _queueEvent(table, kind, op, rec) {
+    const list = this._eventQueue();
+    // Collapse to the latest op for a given row so replays stay minimal.
+    const id = String(rec.id);
+    const filtered = list.filter(e => !(e.table === table && e.kind === kind && e.id === id));
+    filtered.push({ table, kind, op, id, payload: op === 'put' ? rec : null });
+    this._setEventQueue(filtered);
+    this._markPending('events');
+  },
+  hasPendingEvents() {
+    return !!(this._sb && this._user && this._eventQueue().length > 0);
+  },
+  // Replay queued record ops. Each op clears only on its own success.
+  async syncPendingEvents() {
+    if (!this._sb || !this._user) return { ok: false, synced: 0, failed: 0 };
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false, synced: 0, failed: 0, error: 'no account' };
+    let synced = 0, failed = 0;
+    const remaining = [];
+    for (const e of this._eventQueue()) {
+      try {
+        let error;
+        if (e.op === 'put') {
+          ({ error } = await this._sb.from(e.table).upsert({
+            account_id: accountId, kind: e.kind, id: e.id,
+            date: this._eventDate(e.payload), payload: e.payload, updated_at: new Date().toISOString()
+          }, { onConflict: 'account_id,kind,id' }));
+        } else {
+          ({ error } = await this._sb.from(e.table).delete()
+            .eq('account_id', accountId).eq('kind', e.kind).eq('id', e.id));
+        }
+        if (error) { failed++; remaining.push(e); } else { synced++; }
+      } catch (err) { failed++; remaining.push(e); }
+    }
+    this._setEventQueue(remaining);
+    if (!remaining.length) this._clearPending('events');
+    return { ok: failed === 0, synced, failed };
+  },
 
   // ── Merge defaults (ensures all keys exist after updates) ─────────────────
   _mergeDefaults(data) {
