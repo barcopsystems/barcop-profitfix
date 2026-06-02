@@ -226,8 +226,7 @@ S.TrafficSocial = {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
         if (!(await App.confirm({ title: 'Delete this social post entry?', confirmText: 'Delete' }))) return;
-        App.data.traffic_social_posts = this.socialPosts().filter(x => x.id !== btn.dataset.id);
-        await App.saveKey('traffic_social_posts');
+        await App.removeRecord('core', 'traffic_social_post', btn.dataset.id);
         this.draw();
       });
     });
@@ -267,13 +266,12 @@ S.TrafficSocial = {
       saved_at: new Date().toISOString()
     };
     const list = this.socialPosts();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     }
-    const ok = await App.saveKey('traffic_social_posts');
+    const ok = await App.putRecord('core', 'traffic_social_post', saved);
     if (ok) {
       const afterMonthCount = this.thisMonthSocialPosts().length;
       if (afterMonthCount >= tSP && beforeMonthCount < tSP) {
