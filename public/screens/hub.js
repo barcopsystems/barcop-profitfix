@@ -32,8 +32,13 @@ S.Hub = {
 
     const barName = s.bar_name || 'Your Operation';
 
-    const last  = a => a.length ? a[a.length-1] : null;
-    const prior = a => a.length >= 2 ? a[a.length-2] : null;
+    // Newest-first by date. Event logs load from the events tables ordered date
+    // desc, so "latest" can no longer be assumed to be the last array element —
+    // pick it by date (period_end for weeks, date for audits) instead.
+    const _rd = r => ((r && (r.date || r.period_end || r.generated_at || r.saved_at || r.created_at)) || '') + '';
+    const _newest = a => a.slice().sort((x, y) => _rd(y).localeCompare(_rd(x)));
+    const last  = a => a.length ? _newest(a)[0] : null;
+    const prior = a => a.length >= 2 ? _newest(a)[1] : null;
     const pW = last(pWeeks), rW = last(rWeeks), tW = last(tWeeks);
     const pA = last(pAudits), rA = last(rAudits), tA = last(tAudits);
 
@@ -933,7 +938,8 @@ S.Hub = {
     // and use the gap's short name as the label, so the readout stays
     // consistent with the noun-phrase labels Profit and Revenue produce
     // (e.g. "Reviews" not "Close the review velocity and response gap").
-    const tA = ((App.data || {}).traffic_audits || []).slice(-1)[0];
+    const tA = ((App.data || {}).traffic_audits || []).slice()
+      .sort((x, y) => ((y.date || y.generated_at || '') + '').localeCompare((x.date || x.generated_at || '') + ''))[0];
     if (tA && Array.isArray(tA.action_items)) {
       const hints = [
         { rx: /google business|gbp/i,           id: 'gbp' },
