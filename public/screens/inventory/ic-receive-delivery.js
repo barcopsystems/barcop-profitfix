@@ -479,11 +479,8 @@ S.InventoryReceiveDelivery = {
       created_at:     new Date().toISOString()
     };
 
-    if (!Array.isArray(App.data.vendor_discrepancies)) App.data.vendor_discrepancies = [];
-    App.data.vendor_discrepancies.push(rec);
-    const ok = await App.saveKey('vendor_discrepancies');
-    if (!ok && ok !== undefined) {
-      App.data.vendor_discrepancies.pop();
+    const ok = await App.putRecord('core', 'vendor_discrepancy', rec);
+    if (!ok) {
       fail('Could not save the discrepancy. Try again.');
       return;
     }
