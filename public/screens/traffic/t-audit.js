@@ -311,8 +311,8 @@ S.TrafficAudit = {
 
     const printBtn = document.createElement('button');
     printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print / Save PDF';
-    printBtn.onclick = () => window.print();
+    printBtn.textContent = 'Save PDF';
+    printBtn.onclick = () => this.exportPDF(audit);
     this.actions.appendChild(printBtn);
 
     const d = audit.raw || audit;
@@ -534,6 +534,160 @@ S.TrafficAudit = {
 
   // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
   // Findings render inline under each section via findingsBlock() in viewAudit().
+
+  // ── Data-driven PDF export ────────────────────────────────────────────────
+  // Rebuilds the on-screen Traffic Audit from data via App._pdfBuilder (no
+  // window.print, no DOM walk). Mirrors viewAudit(): Digital Presence Score
+  // header, the seven scored sections + Operational Risk Signals, each
+  // section's metric rows and inline Findings, ranked action items, ending with
+  // the canonical legal disclaimer (App.deliverableFooter().disclaimerLines).
+  async exportPDF(audit) {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    const d = audit.raw || audit;
+    const overall = audit.overall_score || 0;
+
+    // Formatters mirror viewAudit() exactly.
+    const yN    = v => v ? 'Yes' : 'No';
+    const triNA = v => v === true ? 'Yes' : v === false ? 'No' : '';
+    const pct   = v => v != null ? v + '%' : '';
+    const num   = v => v != null ? String(v) : '';
+    const dol   = v => v ? App.fmtCurrency(v) : '';
+
+    const period = [audit.audit_period, audit.audit_id, audit.grade].filter(Boolean).map(x => String(x)).join('  ·  ');
+    const metaBits = [(audit.date || '').slice(0, 10) || App._pdfDateStamp(), 'Score ' + overall + ' (' + App.scoreLabel(overall) + ')'];
+    if (period) metaBits.push(period);
+
+    const b = App._pdfBuilder('Traffic Recovery Audit');
+    b.header({ right: 'Traffic Recovery Audit', meta: metaBits.join('   ·   ') });
+    b.kv('Bar', audit.bar_name || App.data.settings.bar_name || 'Your Bar');
+    b.kv('Digital Presence Score', overall + ' of 100  (' + App.scoreLabel(overall) + ')');
+    if (d.INDUSTRY_AVG != null) b.kv('Bar Cop Benchmark', String(d.INDUSTRY_AVG));
+    b.kv('Target', String(d.TARGET_SCORE || 65));
+    if (d.WEEKLY_GAP_AMT) b.kv('Estimated Weekly Gap', String(d.WEEKLY_GAP_AMT));
+
+    // Ranked action items (same source + ordering as the screen).
+    const actionItems = audit.action_items || [];
+    if (actionItems.length) {
+      b.sectionTitle('Action Items, Ranked by Impact');
+      b.table(['#', 'Action', 'Monthly Opportunity'], actionItems.map((a, i) => [
+        String(i + 1),
+        a.action || a || '',
+        a.monthly_impact ? '+' + App.fmtCurrency(a.monthly_impact) : ''
+      ]), { columnStyles: { 0: { cellWidth: 24 }, 2: { cellWidth: 110 } } });
+    }
+
+    // Findings text per section (matches findingsBlock in viewAudit; S8 is signals).
+    const findingsText = (n) => {
+      if (n === 8) return [];
+      return ['S' + n + '_EVIDENCE', 'S' + n + '_GAP', 'S' + n + '_TOOL', 'S' + n + '_NARRATIVE', 'S' + n + '_FINDING']
+        .map(f => d[f]).filter(v => v && String(v).trim());
+    };
+
+    const section = (n, name, score, rows) => {
+      const scoreTxt = score != null ? String(score) : 'N/A (Not enough data)';
+      b.sectionTitle('Section ' + n + '  ·  ' + name + '  ·  Score ' + scoreTxt);
+      const body = rows.filter(([, v]) => v !== undefined && v !== null && v !== '').map(([label, val]) => [label, val]);
+      if (body.length) b.table(null, body, { columnStyles: { 0: { cellWidth: 220, fontStyle: 'bold' } } });
+      const finds = findingsText(n);
+      if (finds.length) { b.heading('Findings', 10); finds.forEach(t => b.paragraph(t)); }
+    };
+
+    section(1, 'Google Business Profile', d.S1_SCORE, [
+      ['Listing Claimed and Verified', yN(d.S1_LISTING_CLAIMED)],
+      ['Hours Complete', yN(d.S1_HOURS_COMPLETE)],
+      ['Website Linked', yN(d.S1_WEBSITE_LINKED)],
+      ['Menu Link Active', yN(d.S1_MENU_LINK_ACTIVE)],
+      ['Photo Count', num(d.S1_PHOTO_COUNT) + (d.S1_PHOTO_BENCHMARK ? ' (Benchmark: ' + d.S1_PHOTO_BENCHMARK + ')' : '')],
+      ['Google Posts Last 30 Days', num(d.S1_POSTS_LAST_30_DAYS) + (d.S1_POSTS_BENCHMARK ? ' (Benchmark: ' + d.S1_POSTS_BENCHMARK + ')' : '')],
+      ['Profile Completeness', pct(d.S1_PROFILE_COMPLETENESS_PCT)],
+      ['Monthly Gap', dol(d.S1_MONTHLY_GAP)],
+    ]);
+    section(2, 'Website', d.S2_SCORE, [
+      ['Website Exists and Mobile Optimized', yN(d.S2_MOBILE_OPTIMIZED)],
+      ['Monthly Sessions', num(d.S2_MONTHLY_SESSIONS) + (d.S2_SESSIONS_BENCHMARK ? ' (Benchmark: ' + d.S2_SESSIONS_BENCHMARK + ')' : '')],
+      ['Bounce Rate', pct(d.S2_BOUNCE_RATE) + (d.S2_BOUNCE_BENCHMARK ? ' (Benchmark: under ' + d.S2_BOUNCE_BENCHMARK + '%)' : '')],
+      ['Menu Page in Top 3', yN(d.S2_MENU_PAGE_IN_TOP_3)],
+      ['Menu Is a Web Page (not a PDF)', triNA(d.S2_MENU_IS_WEB_PAGE)],
+      ['Online Ordering Link', triNA(d.S2_ONLINE_ORDERING_PRESENT)],
+      ['Reservation / Booking Link', triNA(d.S2_RESERVATIONS_PRESENT)],
+      ['Click-to-Call on Mobile', triNA(d.S2_CLICK_TO_CALL)],
+      ['Mobile Layout Set', triNA(d.S2_MOBILE_VIEWPORT)],
+      ['Hours on the Homepage', triNA(d.S2_HOURS_ON_PAGE)],
+      ['Conversion Elements Present', d.S2_CONVERSION_ELEMENTS_ASSESSED != null ? d.S2_CONVERSION_ELEMENTS_PRESENT + ' of ' + d.S2_CONVERSION_ELEMENTS_ASSESSED : ''],
+      ['Monthly Gap', dol(d.S2_MONTHLY_GAP)],
+    ]);
+    section(3, 'Reviews', d.S3_SCORE, [
+      ['Google Rating', d.S3_GOOGLE_RATING ? d.S3_GOOGLE_RATING + ' stars' + (d.S3_GOOGLE_RATING_BENCHMARK ? ' (Benchmark: ' + d.S3_GOOGLE_RATING_BENCHMARK + ' stars)' : '') : ''],
+      ['Google Review Count', num(d.S3_GOOGLE_REVIEW_COUNT)],
+      ['Response Rate', pct(d.S3_RESPONSE_RATE) + (d.S3_RESPONSE_BENCHMARK ? ' (Benchmark: ' + d.S3_RESPONSE_BENCHMARK + '%)' : '')],
+      ['Most Recent Review', d.S3_MOST_RECENT_REVIEW_DAYS != null ? d.S3_MOST_RECENT_REVIEW_DAYS + ' days ago' : ''],
+      ['Yelp Rating', d.S3_YELP_RATING ? d.S3_YELP_RATING + ' stars' : ''],
+      ['Unanswered Reviews', num(d.S3_UNANSWERED)],
+      ['Review Generation System', triNA(d.S3_REVIEW_GENERATION)],
+      ['Recurring Theme (operational)', d.S3_NEGATIVE_PATTERN || ''],
+      ['Monthly Gap', dol(d.S3_MONTHLY_GAP)],
+    ]);
+    section(4, 'Search and SEO', d.S4_SCORE, [
+      ['In Google Maps 3-Pack', yN(d.S4_MAPS_PACK_CONFIRMED)],
+      ['NAP Consistent', yN(d.S4_NAP_CONSISTENT)],
+      ['Business Name', d.S4_NAP_BUSINESS_NAME || ''],
+      ['Primary Keyword', d.S4_PRIMARY_KEYWORD || ''],
+    ]);
+    section(5, 'Social Media', d.S5_SCORE, [
+      ['Instagram Followers', num(d.S5_IG_FOLLOWERS)],
+      ['IG Posts Last 30 Days', num(d.S5_IG_POSTS_LAST_30) + (d.S5_IG_POSTS_BENCHMARK ? ' (Benchmark: ' + d.S5_IG_POSTS_BENCHMARK + ')' : '')],
+      ['Facebook Followers', num(d.S5_FB_FOLLOWERS)],
+      ['Content Type', d.S5_CONTENT_TYPE || ''],
+      ['Monthly Gap', dol(d.S5_MONTHLY_GAP)],
+    ]);
+    section(6, 'Delivery Platforms', d.S6_SCORE, [
+      ['DoorDash Active', yN(d.S6_DOORDASH_ACTIVE)],
+      ['Uber Eats Active', yN(d.S6_UBEREATS_ACTIVE)],
+      ['Grubhub Active', yN(d.S6_GRUBHUB_ACTIVE)],
+      ['DoorDash Rating', d.S6_DOORDASH_RATING ? d.S6_DOORDASH_RATING + ' stars' : ''],
+      ['Uber Eats Rating', d.S6_UBEREATS_RATING ? d.S6_UBEREATS_RATING + ' stars' : ''],
+      ['Photo Count', num(d.S6_PHOTO_COUNT_DELIVERY)],
+      ['Menu Complete', yN(d.S6_MENU_COMPLETE)],
+      ['Promotion Active', yN(d.S6_PROMO_ACTIVE)],
+      ['Delivery Prices Marked Up', triNA(d.S6_DELIVERY_MARKUP)],
+      ['Platform Commission', d.S6_DELIVERY_COMMISSION_PCT != null ? d.S6_DELIVERY_COMMISSION_PCT + '%' : ''],
+      ['Monthly Gap', dol(d.S6_MONTHLY_GAP)],
+    ]);
+    section(7, 'Email and Loyalty', d.S7_SCORE, [
+      ['Email List Exists', yN(d.S7_EMAIL_LIST_EXISTS)],
+      ['List Size', d.S7_LIST_SIZE ? num(d.S7_LIST_SIZE) + (d.S7_LIST_BENCHMARK ? ' (Benchmark: ' + d.S7_LIST_BENCHMARK + ')' : '') : ''],
+      ['Last Send', d.S7_LAST_SEND_DAYS_AGO != null ? d.S7_LAST_SEND_DAYS_AGO + ' days ago' : ''],
+      ['Send Frequency', d.S7_SEND_FREQUENCY || ''],
+      ['Open Rate', d.S7_OPEN_RATE ? pct(d.S7_OPEN_RATE) + (d.S7_OPEN_BENCHMARK ? ' (Benchmark: ' + d.S7_OPEN_BENCHMARK + '%)' : '') : ''],
+      ['Growth Mechanism', d.S7_GROWTH_MECHANISM || ''],
+      ['Loyalty Program', yN(d.S7_LOYALTY_PROGRAM)],
+      ['Monthly Gap', dol(d.S7_MONTHLY_GAP)],
+    ]);
+
+    // Operational Risk Signals (Section 8) — same source as signals8 on screen.
+    const signals8 = [
+      { score: d.S8_SIG1_SCORE, label: d.S8_SIG1_LABEL, evidence: d.S8_SIG1_EVIDENCE, gap: d.S8_SIG1_GAP, tool: d.S8_SIG1_TOOL },
+      { score: d.S8_SIG2_SCORE, label: d.S8_SIG2_LABEL, evidence: d.S8_SIG2_EVIDENCE, gap: d.S8_SIG2_GAP, tool: d.S8_SIG2_TOOL },
+      { score: d.S8_SIG3_SCORE, label: d.S8_SIG3_LABEL, evidence: d.S8_SIG3_EVIDENCE, gap: d.S8_SIG3_GAP, tool: d.S8_SIG3_TOOL },
+      { score: d.S8_SIG4_SCORE, label: d.S8_SIG4_LABEL, evidence: d.S8_SIG4_EVIDENCE, gap: d.S8_SIG4_GAP, tool: d.S8_SIG4_TOOL },
+    ].filter(s => s.label);
+    if (signals8.length) {
+      b.sectionTitle('Section 8  ·  Operational Risk Signals');
+      signals8.forEach(sig => {
+        b.heading((sig.label || '') + (sig.score ? '  [' + String(sig.score).toUpperCase() + ']' : ''), 10);
+        if (sig.evidence) b.paragraph(sig.evidence);
+        if (sig.gap)      b.paragraph(sig.gap);
+        if (sig.tool)     b.paragraph(sig.tool);
+      });
+    }
+
+    b.disclaimer(App.deliverableFooter().disclaimerLines.join(' '));
+
+    const stamp = /^\d{4}-\d{2}-\d{2}/.test(audit.date || '') ? audit.date.slice(0, 10).replace(/-/g, '') : App._pdfDateStamp();
+    await b.save('BarCop_TrafficAudit_' + stamp + '.pdf');
+  },
 
   // ── Stepped intake wizard ─────────────────────────────────────────────────
   _intakeStep: 1,
