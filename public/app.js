@@ -1922,6 +1922,118 @@ const App = {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   },
 
+  // ── Data-driven PDF builder ────────────────────────────────────────────────
+  // For documents we generate FROM DATA (audits, books, checklists, handoff)
+  // rather than by walking the DOM. Assumes the PDF lib is already loaded
+  // (caller: await App._ensurePDFLib()). Chainable; mirrors exportPDF's header/
+  // footer so every Bar Cop PDF looks the same. Auto-paginates.
+  _pdfBuilder(title, opts) {
+    opts = opts || {};
+    const App = this;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: opts.orientation || 'portrait', unit: 'pt', format: 'letter' });
+    const margin = 40;
+    const b = {
+      doc, margin, title,
+      pageW: doc.internal.pageSize.getWidth(),
+      pageH: doc.internal.pageSize.getHeight(),
+      y: margin,
+      get usableW() { return this.pageW - margin * 2; },
+      _limit() { return this.pageH - 40; },
+      _need(h) { if (this.y + h > this._limit()) { doc.addPage(); this.y = margin; } return this; },
+      header(o) {
+        o = o || {};
+        const venue = (App.data && App.data.settings && App.data.settings.bar_name) || '';
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+        doc.text('Bar Cop', margin, this.y);
+        doc.setFontSize(12);
+        doc.text(App._pdfSafe(o.right || title), this.pageW - margin, this.y, { align: 'right' });
+        this.y += 16;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+        const meta = o.meta != null ? o.meta : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        doc.text(App._pdfSafe((venue ? venue + '   |   ' : '') + meta), margin, this.y);
+        this.y += 8;
+        doc.setDrawColor(205, 205, 205); doc.line(margin, this.y, this.pageW - margin, this.y);
+        this.y += 16;
+        return this;
+      },
+      sectionTitle(text) {
+        this._need(26);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(150, 140, 90);
+        doc.text(App._pdfSafe(String(text).toUpperCase()), margin, this.y);
+        this.y += 5;
+        doc.setDrawColor(225, 225, 225); doc.line(margin, this.y, this.pageW - margin, this.y);
+        this.y += 13;
+        return this;
+      },
+      heading(text, size) {
+        size = size || 12;
+        this._need(size + 8);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.setTextColor(20, 20, 20);
+        doc.text(App._pdfSafe(text), margin, this.y); this.y += size + 6;
+        return this;
+      },
+      kv(label, value) {
+        this._need(15);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+        const lbl = App._pdfSafe(label + ':');
+        doc.text(lbl, margin, this.y);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
+        doc.text(App._pdfSafe(String(value == null ? '' : value)), margin + doc.getTextWidth(lbl) + 8, this.y);
+        this.y += 15;
+        return this;
+      },
+      paragraph(text, o) {
+        o = o || {};
+        const g = o.gray != null ? o.gray : 55;
+        const sz = o.size || 10;
+        doc.setFont('helvetica', o.italic ? 'italic' : 'normal'); doc.setFontSize(sz); doc.setTextColor(g, g, g);
+        const lines = doc.splitTextToSize(App._pdfSafe(text), this.usableW);
+        const lh = sz + 3;
+        lines.forEach(ln => { this._need(lh); doc.text(ln, margin, this.y); this.y += lh; });
+        this.y += 3;
+        return this;
+      },
+      table(head, body, o) {
+        o = o || {};
+        this._need(44);
+        doc.autoTable({
+          startY: this.y,
+          head: head ? [head.map(h => App._pdfSafe(h))] : undefined,
+          body: (body || []).map(r => r.map(c => App._pdfSafe(c))),
+          margin: { left: margin, right: margin, top: margin, bottom: 40 },
+          columnStyles: o.columnStyles || {},
+          styles: { fontSize: 8, cellPadding: 5, lineColor: [225, 225, 225], lineWidth: 0.5, overflow: 'linebreak', valign: 'middle' },
+          headStyles: { fillColor: [28, 28, 28], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [246, 246, 246] },
+          theme: 'grid'
+        });
+        this.y = doc.lastAutoTable.finalY + 14;
+        return this;
+      },
+      spacer(h) { this.y += (h == null ? 10 : h); return this; },
+      disclaimer(text) {
+        this.y += 6;
+        this._need(20);
+        doc.setDrawColor(225, 225, 225); doc.line(margin, this.y, this.pageW - margin, this.y); this.y += 9;
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(130, 130, 130);
+        doc.splitTextToSize(App._pdfSafe(text), this.usableW).forEach(ln => { this._need(10); doc.text(ln, margin, this.y); this.y += 9.5; });
+        return this;
+      },
+      async save(filename) {
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+          doc.setPage(i);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+          doc.text('Generated by Bar Cop. Figures are derived from your inputs; verify before relying on them.', margin, this.pageH - 22);
+          doc.text('Page ' + i + ' of ' + pages, this.pageW - margin, this.pageH - 22, { align: 'right' });
+        }
+        await App._savePDF(doc, filename);
+      }
+    };
+    return b;
+  },
+
   // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
   // and the average-rating math in t-reports + t-dashboard. Key prefix maps to
   // the per-platform fields in traffic_weeks (dd_active, dd_rating, etc.) and
