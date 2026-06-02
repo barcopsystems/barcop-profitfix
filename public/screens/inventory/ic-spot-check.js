@@ -397,12 +397,10 @@ S.InventorySpotCheck = {
 
     const btn = document.getElementById('sp-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    this.checks().push(rec);
-    const ok = await App.saveInventory();
+    const ok = await App.putRecord('ic', 'spot_check', rec);
     if (ok) {
       this.renderMain();
     } else {
-      this.checks().pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Spot Check'; }
       fail('Save failed. Try again.');
     }
@@ -531,8 +529,7 @@ S.InventorySpotCheck = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.inventoryData.ic_spot_checks = this.checks().filter(x => x.id !== delId);
-      await App.saveInventory();
+      await App.removeRecord('ic', 'spot_check', delId);
       this.renderMain();
     };
   }
