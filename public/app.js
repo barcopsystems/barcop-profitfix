@@ -2781,7 +2781,6 @@ const App = {
     const title    = opts.title    || 'Worksheet';
     const subtitle = opts.subtitle || '';
     const cols     = opts.columns  || [];
-    const rows     = opts.rows     || 20;
     try { await this._ensurePDFLib(); }
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
@@ -2816,24 +2815,47 @@ const App = {
     doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
     y += 12;
 
-    // Preserve any per-column width hints (% or px) from the call site.
+    // Column widths: honor the call-site hint but never let a column fall below
+    // its own header's width, so a long header (e.g. "Witnessed") can't wrap in a
+    // skinny column. Narrow-header columns lock to that minimum; the rest flex to
+    // fill the row exactly.
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    const reqW = cols.map(c => {
+      const w = c.width ? String(c.width) : '';
+      if (/%$/.test(w)) return (parseFloat(w) / 100) * usableW;
+      if (/px$/.test(w)) return parseFloat(w) * 0.75;
+      return usableW / Math.max(1, cols.length);
+    });
+    const minW = cols.map(c => doc.getTextWidth(this._pdfSafe(c.label || '')) + 14);
+    const atMin = cols.map((c, i) => reqW[i] <= minW[i]);
+    const fixedSum = cols.reduce((s, c, i) => s + (atMin[i] ? minW[i] : 0), 0);
+    const flexSum  = cols.reduce((s, c, i) => s + (atMin[i] ? 0 : reqW[i]), 0);
+    const flexAvail = Math.max(0, usableW - fixedSum);
     const columnStyles = {};
     cols.forEach((c, i) => {
-      if (!c.width) return;
-      const w = String(c.width);
-      if (/%$/.test(w)) columnStyles[i] = { cellWidth: (parseFloat(w) / 100) * usableW };
-      else if (/px$/.test(w)) columnStyles[i] = { cellWidth: parseFloat(w) * 0.75 };
+      columnStyles[i] = { cellWidth: atMin[i] ? minW[i] : (flexSum > 0 ? reqW[i] * (flexAvail / flexSum) : minW[i]) };
     });
 
+    // One page, always: fit the body rows to the space between the header block and
+    // the footer, stretching each row to fill the page. Operators print as many
+    // copies as they need, so a worksheet never spills onto a near-empty 2nd page.
+    const footerReserve = 34;
+    const availH = pageH - y - footerReserve;
+    const headerRowH = 20;
+    const minBodyRowH = 26;
+    const nRows = Math.max(1, Math.floor((availH - headerRowH) / minBodyRowH));
+    const bodyRowH = (availH - headerRowH) / nRows;
+
     const head = [cols.map(c => this._pdfSafe(c.label || ''))];
-    const body = Array.from({ length: rows }, () => cols.map(() => ''));
+    const body = Array.from({ length: nRows }, () => cols.map(() => ''));
     doc.autoTable({
       startY: y,
       head, body,
       margin: { left: margin, right: margin },
       columnStyles,
-      styles: { fontSize: 9, cellPadding: 8, minCellHeight: 24, lineColor: [150, 150, 150], lineWidth: 0.5, overflow: 'linebreak' },
-      headStyles: { fillColor: [235, 235, 235], textColor: 30, fontStyle: 'bold', minCellHeight: 16, halign: 'left' },
+      styles: { fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 }, lineColor: [150, 150, 150], lineWidth: 0.5, overflow: 'linebreak', valign: 'middle' },
+      bodyStyles: { minCellHeight: bodyRowH },
+      headStyles: { fillColor: [235, 235, 235], textColor: 30, fontStyle: 'bold', fontSize: 9, minCellHeight: headerRowH, halign: 'left', valign: 'middle' },
       theme: 'grid'
     });
 
