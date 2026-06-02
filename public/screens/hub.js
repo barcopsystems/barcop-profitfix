@@ -1162,12 +1162,15 @@ S.Hub = {
     // 4c. Staff certifications expiring soon — pulled from Labor Control's
     // certifications log. Expired or due within 14 days = critical; within 30 = warn.
     const certs = (App.laborData && App.laborData.lc_certs) || [];
+    const lcStaff = (App.laborData && App.laborData.lc_staff) || [];
     certs.forEach(c => {
       if (!c || !c.expiration_date) return;
       const d = new Date(String(c.expiration_date).length <= 10 ? c.expiration_date + 'T00:00:00' : c.expiration_date);
       if (isNaN(d.getTime())) return;
       const days = Math.floor((d.getTime() - Date.now()) / 86400000);
-      const certLabel = (c.cert_name || c.name || 'Certification') + (c.staff_name ? ' for ' + c.staff_name : '');
+      const certType = c.cert_type || c.cert_name || c.name || 'Certification';
+      const certWho = (lcStaff.find(s => s.id === c.staff_id) || {}).name || c.staff_name || '';
+      const certLabel = certType + (certWho ? ' for ' + certWho : '');
       if (days < 0) {
         out.push({
           sev: 'bad',
