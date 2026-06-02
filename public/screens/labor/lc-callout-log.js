@@ -78,7 +78,7 @@ S.LaborCalloutLog = {
         + '<div class="calc-item"><div class="calc-label">No-Shows</div><div class="calc-val ' + (noShows ? 'warn' : '') + '">' + noShows + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Uncovered</div><div class="calc-val ' + (uncovered ? 'warn' : '') + '">' + uncovered + '</div></div>'
         + '</div>';
-      const rows = list.map(c => {
+      const rows = list.slice(0, App.listLimit('lc', 'callout')).map(c => {
         const reps = this.repeatCount(c.staff_id);
         const repTag = reps > 1 ? ' <span class="badge badge-warn">' + reps + '&times; / 60d</span>' : '';
         return '<tr class="co-row" data-id="' + c.id + '" style="cursor:pointer;">'
@@ -98,7 +98,8 @@ S.LaborCalloutLog = {
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Type</th><th>Shift</th><th>Coverage</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('lc', 'callout', list, false);
     }
 
     const modal = '<div id="co-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -111,6 +112,7 @@ S.LaborCalloutLog = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.co-row');
       const edit = ev.target.closest('.co-edit');
       const del = ev.target.closest('.co-del');
@@ -193,16 +195,17 @@ S.LaborCalloutLog = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.callouts();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('co-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'callout', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -221,8 +224,7 @@ S.LaborCalloutLog = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.laborData.lc_callouts = this.callouts().filter(x => x.id !== delId);
-      await App.saveLabor();
+      await App.removeRecord('lc', 'callout', delId);
       this.renderList();
     };
   }

@@ -75,7 +75,7 @@ S.LaborLogHours = {
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + totHours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Labor Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div>';
-      const rows = list.slice(0, 100).map(a => {
+      const rows = list.slice(0, App.listLimit('lc', 'actual')).map(a => {
         const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
         const actions = a.locked
           ? '<span style="font-size:10px;color:var(--t3);">Pay period closed</span>'
@@ -92,7 +92,8 @@ S.LaborLogHours = {
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('lc', 'actual', list, false);
     }
 
     const modal = '<div id="lo-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -105,6 +106,7 @@ S.LaborLogHours = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.lo-row');
       const edit = ev.target.closest('.lo-edit');
       const del = ev.target.closest('.lo-del');
@@ -215,16 +217,17 @@ S.LaborLogHours = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.actuals();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('lo-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'actual', saved);
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_hours');
@@ -262,7 +265,7 @@ S.LaborLogHours = {
     const staffByName = {};
     this.staff().forEach(s => { staffByName[(s.name || '').trim().toLowerCase()] = s; });
 
-    let imported = 0;
+    const toAdd = [];
     const skipped = [];
     rows.forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
@@ -273,7 +276,7 @@ S.LaborLogHours = {
       }
       const recDate = this.normDate(r.date);
       const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0);
-      this.actuals().push({
+      toAdd.push({
         id:          App.uid(),
         date:        recDate,
         staff_id:    staff.id,
@@ -287,18 +290,20 @@ S.LaborLogHours = {
         imported:    true,
         created_at:  new Date().toISOString()
       });
-      imported++;
     });
 
     const result = document.getElementById('lo-imp-result');
+    const imported = toAdd.length;
     if (imported === 0) {
       if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">'
         + 'No rows imported. No staff names matched the roster, or hours were missing.</div></div>';
       return;
     }
-    const ok = await App.saveLabor();
+    // Each row persists as its own lc_actuals event; putRecord reverts its own
+    // in-memory push on a hard failure, so no manual rollback is needed.
+    let ok = true;
+    for (const rec of toAdd) { ok = (await App.putRecord('lc', 'actual', rec)) && ok; }
     if (!ok) {
-      this.actuals().splice(this.actuals().length - imported, imported);
       if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">'
         + 'Save failed. Try the import again.</div></div>';
       return;
@@ -333,8 +338,7 @@ S.LaborLogHours = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.laborData.lc_actuals = this.actuals().filter(x => x.id !== delId);
-      await App.saveLabor();
+      await App.removeRecord('lc', 'actual', delId);
       this.renderList();
     };
   }

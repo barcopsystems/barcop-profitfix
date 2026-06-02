@@ -259,19 +259,16 @@ S.LaborPayPeriods = {
     });
     if (!ok) return;
     const weekEnd = agg.weekEnd;
-    // Stamp locked + pay_period_id on each lc_actuals in range
-    const periodId = App.uid();
-    this.actuals().forEach(a => {
-      if ((a.date || '') >= weekStart && (a.date || '') <= weekEnd) {
-        a.locked = true;
-        a.pay_period_id = periodId;
-      }
-    });
-    // Save the period record
     const list = this.periods();
     const existing = list.find(p => p.week_start === weekStart);
+    // Resolve the canonical period id first so each locked actual links to it.
+    const periodId = (existing && existing.id) || App.uid();
+    // Stamp locked + pay_period_id on each lc_actuals in range.
+    const affected = this.actuals().filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd);
+    affected.forEach(a => { a.locked = true; a.pay_period_id = periodId; });
+    // Build the period record.
     const rec = {
-      id:          existing?.id || periodId,
+      id:          periodId,
       week_start:  weekStart,
       week_end:    weekEnd,
       status:      'Closed',
@@ -289,10 +286,10 @@ S.LaborPayPeriods = {
     };
     if (existing) Object.assign(existing, rec);
     else list.push(rec);
-    // Re-link actuals to the actual period id (in case existing was used)
-    const actualPeriodId = (existing?.id) || periodId;
-    this.actuals().forEach(a => { if ((a.date || '') >= weekStart && (a.date || '') <= weekEnd) a.pay_period_id = actualPeriodId; });
-    await App.saveLabor();
+    const savedPeriod = existing || rec;
+    // Persist the period row plus every locked actual as its own event row.
+    await App.putRecord('lc', 'pay_period', savedPeriod);
+    for (const a of affected) { await App.putRecord('lc', 'actual', a); }
     this.detailWeekStart = weekStart;
     this.renderDetail(weekStart);
   },
@@ -307,18 +304,17 @@ S.LaborPayPeriods = {
     if (!ok) return;
     const agg = this.aggregateWeek(weekStart);
     const weekEnd = agg.weekEnd;
-    this.actuals().forEach(a => {
-      if ((a.date || '') >= weekStart && (a.date || '') <= weekEnd) {
-        a.locked = false;
-      }
-    });
+    const affected = this.actuals().filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd);
+    affected.forEach(a => { a.locked = false; });
     const list = this.periods();
     const existing = list.find(p => p.week_start === weekStart);
     if (existing) {
       existing.status = 'Open';
       existing.reopened_at = new Date().toISOString();
     }
-    await App.saveLabor();
+    // Persist the reopened period plus every unlocked actual.
+    if (existing) await App.putRecord('lc', 'pay_period', existing);
+    for (const a of affected) { await App.putRecord('lc', 'actual', a); }
     if (this.detailWeekStart) this.renderDetail(weekStart);
     else this.renderList();
   },

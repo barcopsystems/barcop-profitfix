@@ -202,6 +202,7 @@ S.LaborWeeklySummary = {
     ).join('');
     document.getElementById('ws-em-cancel').onclick = () => { modal.style.display = 'none'; };
     document.getElementById('ws-em-save').onclick = async () => {
+      const changed = [];
       body.querySelectorAll('.form-row').forEach(row => {
         const id = row.dataset.id;
         const rec = this.actuals().find(a => a.id === id);
@@ -214,9 +215,10 @@ S.LaborWeeklySummary = {
         }
         rec.notes = (row.querySelector('.ws-em-notes')?.value || '').trim();
         rec.updated_at = new Date().toISOString();
+        changed.push(rec);
       });
       modal.style.display = 'none';
-      await App.saveLabor();
+      for (const rec of changed) { await App.putRecord('lc', 'actual', rec); }
       this.draw();
     };
   }

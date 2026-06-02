@@ -49,7 +49,7 @@ S.LaborScheduleHistory = {
         + '<div class="calc-item"><div class="calc-label">Total Scheduled Labor</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div>';
       const target = this.laborTarget();
-      const rows = list.map(s => {
+      const rows = list.slice(0, App.listLimit('lc', 'schedule')).map(s => {
         const pct = s.labor_pct;
         return '<tr class="lh-row" data-id="' + s.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(s.week_start) + '</div></td>'
@@ -68,7 +68,8 @@ S.LaborScheduleHistory = {
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('lc', 'schedule', list, false);
     }
 
     const modal = '<div id="lh-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -81,6 +82,7 @@ S.LaborScheduleHistory = {
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.lh-row');
       const view = ev.target.closest('.lh-view');
       const edit = ev.target.closest('.lh-edit');
@@ -185,8 +187,7 @@ S.LaborScheduleHistory = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.laborData.lc_schedules = this.schedules().filter(x => x.id !== delId);
-      await App.saveLabor();
+      await App.removeRecord('lc', 'schedule', delId);
       this.renderList();
     };
   }

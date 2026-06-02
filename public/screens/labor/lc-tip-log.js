@@ -118,7 +118,7 @@ S.LaborTipLog = {
         + '<div class="calc-item"><div class="calc-label">Card Tips</div><div class="calc-val">' + App.fmtCurrency(card) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good">' + App.fmtCurrency(cash + card) + '</div></div>'
         + '</div>';
-      const rows = list.slice(0, 100).map(x => {
+      const rows = list.slice(0, App.listLimit('lc', 'tip')).map(x => {
         const shiftLinked = !!x.shift_id;
         const shiftLabel = shiftLinked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">SHIFT LINKED</span>' : '';
         return '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
@@ -135,11 +135,13 @@ S.LaborTipLog = {
       }).join('');
       html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('lc', 'tip', list, false);
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.tl-row');
       const edit = ev.target.closest('.tl-edit');
       const del = ev.target.closest('.tl-del');
@@ -369,16 +371,17 @@ S.LaborTipLog = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.tips();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(t => t.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('tl-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'tip', saved);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -391,8 +394,7 @@ S.LaborTipLog = {
   async confirmDel(id) {
     const ok = await App.confirm({ title: 'Delete this tip entry?', confirmText: 'Delete', cancelText: 'Cancel' });
     if (!ok) return;
-    App.laborData.lc_tips = this.tips().filter(t => t.id !== id);
-    await App.saveLabor();
+    await App.removeRecord('lc', 'tip', id);
     this.renderList();
   },
 

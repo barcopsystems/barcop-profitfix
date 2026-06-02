@@ -150,6 +150,7 @@ S.LaborTipPool = {
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.tp-hrow');
       const hview = ev.target.closest('.tp-hview');
       const hdel = ev.target.closest('.tp-hdel');
@@ -289,13 +290,12 @@ S.LaborTipPool = {
     const btn = document.getElementById('tp-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     this.pools().push(rec);
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'tip_pool', rec);
     if (ok) {
       this.rows = [];
       this.pool = '';
       this.renderMain();
     } else {
-      this.pools().pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Tip Pool'; }
       fail('Save failed. Try again.');
     }
@@ -305,7 +305,7 @@ S.LaborTipPool = {
     const list = [...this.pools()].sort((a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
     if (list.length === 0) return '';
-    const rows = list.map(p => '<tr class="tp-hrow" data-id="' + p.id + '" style="cursor:pointer;">'
+    const rows = list.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr class="tp-hrow" data-id="' + p.id + '" style="cursor:pointer;">'
       + '<td><div class="val">' + this.fmtDate(p.date) + '</div></td>'
       + '<td>' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</td>'
       + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0) + '</td>'
@@ -317,7 +317,8 @@ S.LaborTipPool = {
     return '<div class="card"><div class="card-title">Saved Tip Pools</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + App.showOlderBar('lc', 'tip_pool', list, false) + '</div>';
   },
 
   renderDetail(id) {
@@ -364,8 +365,7 @@ S.LaborTipPool = {
       modal.style.display = 'none';
       const delId = this._pendingDelId;
       this._pendingDelId = null;
-      App.laborData.lc_tip_pools = this.pools().filter(x => x.id !== delId);
-      await App.saveLabor();
+      await App.removeRecord('lc', 'tip_pool', delId);
       this.renderMain();
     };
   }

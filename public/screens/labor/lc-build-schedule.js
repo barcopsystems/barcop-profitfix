@@ -347,24 +347,23 @@ S.LaborBuildSchedule = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.schedules();
+    let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
+      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
     } else {
       list.push(rec);
     }
 
     const btn = document.getElementById('bs-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'schedule', saved);
     if (ok) {
       App.markSetupDone('gs_lc_schedule');
       this.editId = null;
       this.clearDraft();
       App.navigate('lc-schedule-history');
     } else {
-      if (this.editId) { /* list item already replaced; leave for retry */ }
-      else list.pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Schedule'; }
       fail('Save failed. Try again.');
     }

@@ -176,7 +176,7 @@ S.LaborDailyView = {
       a.notes = (notesInp?.value || '').trim();
       a.updated_at = new Date().toISOString();
       modal.style.display = 'none';
-      await App.saveLabor();
+      await App.putRecord('lc', 'actual', a);
       this.draw();
     };
   }
