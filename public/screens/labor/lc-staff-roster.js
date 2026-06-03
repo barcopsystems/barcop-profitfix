@@ -176,6 +176,15 @@ S.LaborStaffRoster = {
       return;
     }
 
+    // Bulk import (drag-drop + column mapping), so a new operator can upload a
+    // staff list instead of adding everyone by hand. Same component as the
+    // Inventory product import and the Log Hours timeclock import.
+    const importBtn = document.createElement('button');
+    importBtn.className = 'btn btn-ghost btn-sm';
+    importBtn.textContent = 'Import from File';
+    importBtn.addEventListener('click', () => this.showImport());
+    this.actions.appendChild(importBtn);
+
     const addForm = '<div class="card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Add Staff Member</span>'
@@ -257,6 +266,115 @@ S.LaborStaffRoster = {
       { h: 'Certifications and Coaching', p: ['Click any staff member to open their page. That is where you add certifications (TABC, food handler, ServSafe, and the rest, with expiration dates Bar Cop flags before they lapse) and the coaching log (praise, coaching, concern, and warning notes that protect you if a tough HR moment ever lands).'] },
       { h: 'Active or Inactive', p: ['Set a staff member Inactive when they leave instead of deleting them, so their past hours, tips, and records stay intact. Inactive staff drop off the schedule and tip pickers but keep their history.'] }
     ]);
+  },
+
+  // ── Bulk import from a file (drag-drop + column mapping) ────────────────────
+  showImport() {
+    this.detailId = null;
+    this.actions.innerHTML = '';
+    this.container.innerHTML = '<div class="screen">'
+      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sr-imp-back">&#8592; Back to Roster</button></div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Import Staff from a File</span>'
+      + '<button class="btn btn-ghost btn-sm" id="sr-imp-how">How This Works</button></div>'
+      + '<div id="sr-csv"></div></div>'
+      + '<div id="sr-imp-result"></div></div>';
+    document.getElementById('sr-imp-back')?.addEventListener('click', () => this.renderList());
+    document.getElementById('sr-imp-how')?.addEventListener('click', () => this.showImportHelp());
+
+    CSVMapper.mount(document.getElementById('sr-csv'), {
+      fields: [
+        { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name'] },
+        { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title'] },
+        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'pay'] },
+        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate'] },
+        { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual'] },
+        { key: 'status',        label: 'Status',        required: false, match: ['status', 'active'] },
+        { key: 'hire_date',     label: 'Hire Date',     required: false, match: ['hire date', 'hired', 'start date', 'hire'] },
+        { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
+        { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address'] }
+      ],
+      hint: 'Upload your staff list (CSV or Excel) and match your columns. Only Name is required; anything left out imports blank and can be filled in on the roster afterward. Position is matched to your existing positions by name.',
+      confirmLabel: 'Import Staff',
+      onComplete: rows => this.importStaffRows(rows)
+    });
+  },
+
+  showImportHelp() {
+    App.showHelpModal('How Importing Staff Works', [
+      { p: ['Upload your staff list as a CSV or Excel file. Bar Cop reads your column headers, matches them to the right fields, and lets you fix anything it guessed wrong before importing. Whatever your file does not include imports blank, and you fill it in on the roster after, so you are not building the whole team from scratch.'] },
+      { h: 'The Columns', p: ['Only Name is required. Your headers do not need to match exactly; these common names are recognized:',
+        'Name: name, employee, staff, full name',
+        'Position: position, role, title, job',
+        'Pay Type: pay type, type (Hourly or Salary)',
+        'Wage: wage, rate, hourly, pay rate',
+        'Annual Salary: salary, annual salary',
+        'Status: status, active (Active or Inactive)',
+        'Hire Date: hire date, hired, start date',
+        'Phone: phone, mobile, cell',
+        'Email: email, e-mail'] },
+      { h: 'Positions', p: ['Each person\'s position is matched to your existing positions by name. If it does not match or is blank, the person still imports, just without a position. Open them on the roster and pick one. Setting up your positions first gives the cleanest import.'] },
+      { h: 'Hourly or Salaried', p: ['If a row\'s Pay Type is Salary, Bar Cop uses the Annual Salary column. Otherwise the person is Hourly and uses the Wage column. You can change any of this per person afterward.'] }
+    ]);
+  },
+
+  _normImportDate(v) {
+    if (!v) return '';
+    const s = String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  },
+
+  async importStaffRows(rows) {
+    const posByName = {};
+    this.positions().forEach(p => { posByName[(p.name || '').trim().toLowerCase()] = p; });
+    const toAdd = [];
+    (rows || []).forEach(r => {
+      const name = (r.name || '').trim();
+      if (!name) return;
+      const pos = posByName[(r.position || '').trim().toLowerCase()] || null;
+      const salaried = /salar|exempt/i.test((r.pay_type || '').trim());
+      const wageNum = parseFloat(r.wage);
+      const salNum = parseFloat(r.annual_salary);
+      const inactive = /inactive|term/i.test((r.status || '').trim());
+      toAdd.push({
+        id:            App.uid(),
+        name,
+        position_id:   pos ? pos.id : '',
+        pay_type:      salaried ? 'Salary' : 'Hourly',
+        wage:          salaried ? null : (isNaN(wageNum) ? null : wageNum),
+        annual_salary: salaried ? (isNaN(salNum) ? null : salNum) : null,
+        wage_history:  [],
+        status:        inactive ? 'Inactive' : 'Active',
+        hire_date:     this._normImportDate(r.hire_date),
+        phone:         (r.phone || '').trim(),
+        email:         (r.email || '').trim(),
+        notes:         '',
+        created_at:    new Date().toISOString()
+      });
+    });
+
+    const result = document.getElementById('sr-imp-result');
+    if (toAdd.length === 0) {
+      if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">No rows imported. Each row needs a Name.</div></div>';
+      return;
+    }
+    this.staff().push(...toAdd);
+    const ok = await App.saveLabor();
+    if (ok) {
+      App.markSetupDone('gs_lc_roster');
+      const noPos = toAdd.filter(s => !s.position_id).length;
+      if (result) result.innerHTML = '<div class="card">'
+        + '<div style="font-size:13px;color:var(--gold);font-weight:700;">Imported ' + toAdd.length + ' staff member' + (toAdd.length === 1 ? '' : 's') + '.</div>'
+        + (noPos > 0 ? '<div style="font-size:12px;color:var(--t3);margin-top:6px;">' + noPos + ' came in without a matched position. Open them on the roster to set one.</div>' : '')
+        + '<div style="margin-top:12px;"><button class="btn btn-primary btn-sm" id="sr-imp-done">Back to Roster</button></div></div>';
+      document.getElementById('sr-imp-done')?.addEventListener('click', () => this.renderList());
+    } else {
+      const ids = new Set(toAdd.map(s => s.id));
+      App.laborData.lc_staff = this.staff().filter(s => !ids.has(s.id));
+      if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">Save failed. Try again.</div></div>';
+    }
   },
 
   // ── Staff page — editable profile + Certifications + Coaching Log ──────────
