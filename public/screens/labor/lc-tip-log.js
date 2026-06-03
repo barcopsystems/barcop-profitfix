@@ -182,6 +182,7 @@ S.LaborTipLog = {
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
     const filtered = this.applyFilters(all);
 
+    let summaryHtml = '';
     let listHtml;
     if (all.length === 0) {
       listHtml = '<div class="card"><div class="card-title">Logged Tips</div>'
@@ -189,15 +190,14 @@ S.LaborTipLog = {
     } else {
       const cash = filtered.reduce((t, x) => t + (x.cash_tips || 0), 0);
       const card = filtered.reduce((t, x) => t + (x.card_tips || 0), 0);
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
+      summaryHtml = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Cash Tips</div><div class="calc-val">' + App.fmtCurrency(cash) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Card Tips</div><div class="calc-val">' + App.fmtCurrency(card) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good">' + App.fmtCurrency(cash + card) + '</div></div>'
         + '</div>';
-      let body;
       if (filtered.length === 0) {
-        body = '<div class="empty"><div class="empty-title">No tips match the filters</div>'
+        listHtml = '<div class="empty"><div class="empty-title">No tips match the filters</div>'
           + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x => {
@@ -213,20 +213,19 @@ S.LaborTipLog = {
           + (App.canEdit('lc-tip-log') ? '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>' : '')
           + '</div></td></tr>';
         }).join('');
-        body = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('lc', 'tip', filtered, !!(this.filterFrom || this.filterTo || this.filterStaff));
       }
-      listHtml = summary + body;
     }
 
-    this.container.innerHTML = '<div class="screen">' + addCard + this.filterCard() + listHtml + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addCard + this.filterCard(summaryHtml) + listHtml + '</div>';
     this.wireForm(null);
     this.wireList();
   },
 
-  filterCard() {
+  filterCard(summaryHtml) {
     const staffOpts = '<option value="">All staff</option>'
       + this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
@@ -241,7 +240,9 @@ S.LaborTipLog = {
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tl-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="tl-f-staff">' + staffOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tl-f-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div></div>';
+      + '</div>'
+      + (summaryHtml || '')
+      + '</div>';
   },
 
   applyFilters(list) {
