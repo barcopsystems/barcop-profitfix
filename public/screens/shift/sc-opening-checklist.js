@@ -10,7 +10,8 @@ S.ShiftOpeningChecklist = {
   DEFAULT_ITEMS: [
     'Unlock doors and disarm alarm',
     'Turn on lights, music, TVs, and signage',
-    'Check walk-in and reach-in cooler temperatures',
+    'Check beer / draft walk-in cooler temp',
+    'Check food walk-in cooler temp',
     'Stock bar: liquor, beer, wine, garnishes',
     'Fill ice wells',
     'Set up POS terminals and count opening cash banks',
