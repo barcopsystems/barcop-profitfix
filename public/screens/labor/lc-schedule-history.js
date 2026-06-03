@@ -43,11 +43,6 @@ S.LaborScheduleHistory = {
         + 'labor %, and RPLH.</div>'
         + '<button class="btn btn-primary" id="lh-build">Build a Schedule</button></div>';
     } else {
-      const totCost = list.reduce((t, s) => t + (s.total_cost || 0), 0);
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Schedules</div><div class="calc-val">' + list.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Scheduled Labor</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
-        + '</div>';
       const target = this.laborTarget();
       const rows = list.slice(0, App.listLimit('lc', 'schedule')).map(s => {
         const pct = s.labor_pct;
@@ -65,12 +60,15 @@ S.LaborScheduleHistory = {
           + '<button class="btn btn-danger btn-sm lh-del" data-id="' + s.id + '">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      const intro = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Every schedule you post in Build Schedule lands here with its labor cost, labor %, and RPLH. Open one to see the shifts, edit it back in the grid, or copy it forward to a new week.</div>';
-      html = intro + summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Schedule History</span>'
+        + '<button class="btn btn-ghost btn-sm" id="lh-how">How This Works</button></div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('lc', 'schedule', list, false);
+        + App.showOlderBar('lc', 'schedule', list, false)
+        + '</div>';
     }
 
     const modal = '<div id="lh-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -84,6 +82,7 @@ S.LaborScheduleHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      if (ev.target.closest('#lh-how')) { this.showHowTo(); return; }
       const row = ev.target.closest('.lh-row');
       const view = ev.target.closest('.lh-view');
       const edit = ev.target.closest('.lh-edit');
@@ -102,12 +101,18 @@ S.LaborScheduleHistory = {
     App.navigate('lc-build-schedule');
   },
 
+  showHowTo() {
+    App.showHelpModal('How Schedule History Works', [
+      { p: ['Every schedule you post in Build Schedule lands here, newest first, with its labor cost, labor percent, and revenue per labor hour, so you can see how each week was staffed and what it cost.'] },
+      { h: 'Open a Week', p: ['Click a row, or View, to see the full shift detail and export it as a PDF. Edit opens that week back in the Build Schedule grid. Copy to New Week, inside a week\'s detail, carries the same shifts forward so you are not rebuilding a typical week from scratch.'] }
+    ]);
+  },
+
   renderDetail(id) {
     const s = this.schedules().find(x => x.id === id);
     if (!s) { this.renderList(); return; }
 
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="lh-export">Export PDF</button>';
-    document.getElementById('lh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Schedule History', root: this.container }));
+    this.actions.innerHTML = '';
 
     const shifts = [...(s.shifts || [])].sort((a, b) => {
       const da = this.DAYS.indexOf(a.day), db = this.DAYS.indexOf(b.day);
@@ -128,8 +133,8 @@ S.LaborScheduleHistory = {
     const pct = s.labor_pct;
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="lh-back">&#8592; Back to Schedule History</button></div>'
-      + '<div class="card"><div class="card-title">Schedule &middot; Week of ' + this.fmtDate(s.week_start) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Schedule &middot; Week of ' + this.fmtDate(s.week_start) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="lh-export">Export PDF</button></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val">' + App.fmtCurrency(s.revenue_forecast || 0) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val">' + (s.total_hours != null ? s.total_hours.toFixed(1) : '-') + '</div></div>'
@@ -148,8 +153,8 @@ S.LaborScheduleHistory = {
       + '</div></div></div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#lh-back')) this.renderList();
-      else if (ev.target.closest('#lh-edit-detail')) this.editSchedule(id);
+      if (ev.target.closest('#lh-export')) { App.exportPDF({ title: 'Schedule History', root: this.container }); return; }
+      if (ev.target.closest('#lh-edit-detail')) this.editSchedule(id);
       else if (ev.target.closest('#lh-copy')) this.copyToNewWeek(s);
     };
   },
