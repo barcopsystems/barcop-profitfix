@@ -329,6 +329,32 @@ S.ShiftActiveShift = {
       + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + tiles + '</div></div>';
   },
 
+  // Discard a just-opened shift (mistake on the opener). Removes the open shift
+  // record and drops back onto Open the Floor with the picks rebuilt, so the
+  // manager fixes the one thing and re-opens instead of logging + deleting.
+  async cancelShift(s) {
+    const ok = await App.confirm({ title: 'Discard this shift and go back? It will not be saved to history.', confirmText: 'Discard', cancelText: 'Keep Running' });
+    if (!ok) return;
+    const srcDrawers = (Array.isArray(s.drawers) && s.drawers.length)
+      ? s.drawers
+      : (s.drawer_id ? [{ drawer_id: s.drawer_id, opening_bank: s.opening_bank }] : []);
+    const drawers = {};
+    srcDrawers.forEach(dr => { drawers[dr.drawer_id] = { on: true, bank: dr.opening_bank != null ? dr.opening_bank : '' }; });
+    this._openDraft = {
+      date: s.date,
+      shift_type: s.shift_type || '',
+      manager_id: s.manager_id || '',
+      drawers,
+      staff_on_floor: s.staff_on_floor != null ? s.staff_on_floor : '',
+      cash_tolerance: s.cash_tolerance != null ? s.cash_tolerance : this._defaultToleranceFor(s.shift_type)
+    };
+    const list = this.shifts();
+    const i = list.findIndex(x => x.id === s.id);
+    if (i > -1) list.splice(i, 1);
+    await App.removeRecord('sc', 'shift', s.id);
+    this.renderStart();
+  },
+
   renderActive(s) {
     this.mode = 'active';
     const drops = this.byDate('sc_cash_drops', s.date);
@@ -385,6 +411,7 @@ S.ShiftActiveShift = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
       + '<span style="width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);"></span>'
       + '<span style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Shift Running</span></div>'
@@ -393,6 +420,9 @@ S.ShiftActiveShift = {
       + (s.manager ? 'Manager: ' + esc(s.manager) + ' &middot; ' : '')
       + (s.started_at ? 'Running ' + this.elapsed(s.started_at) : '')
       + (s.opening_bank != null ? ' &middot; Opening bank ' + App.fmtCurrency(s.opening_bank) : '') + '</div>'
+      + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="as-cancel" style="color:var(--red);flex-shrink:0;">Cancel Shift</button>'
+      + '</div>'
       + '</div>'
 
       + this.registersCard(s)
@@ -428,6 +458,7 @@ S.ShiftActiveShift = {
     this.container.onclick = ev => {
       const go = ev.target.closest('.as-go');
       if (go) App.navigate(go.dataset.go);
+      else if (ev.target.closest('#as-cancel')) this.cancelShift(s);
       else if (ev.target.closest('#as-end')) this.renderEnd(s);
       else if (ev.target.closest('#sn-add')) this.addShiftNote(s);
       else if (ev.target.closest('.sn-del')) this.removeShiftNote(s, ev.target.closest('.sn-del').dataset.id);
