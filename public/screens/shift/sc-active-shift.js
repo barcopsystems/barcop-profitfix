@@ -47,58 +47,175 @@ S.ShiftActiveShift = {
   },
 
   // ── Start a shift ───────────────────────────────────────────────────────────
+  // ── Open the Floor — the visual shift opener ────────────────────────────────
+  // Tap a daypart, tap who's running it, tap the registers live tonight (each
+  // shows its bank), set staff + tolerance, open. The live readout assembles the
+  // shift as you go. State lives in this._openDraft; taps re-render, the bank /
+  // tolerance inputs update the draft in place so focus survives typing.
   renderStart() {
-    const typeOpts = this.shiftTypes().map(t => '<option>' + t + '</option>').join('');
-    const drawerOpts = (App.drawerOptions ? App.drawerOptions('', { placeholder: 'Select drawer...' }) : '<option value="">No drawers set up</option>');
-    // Pick a sensible default drawer: the first active drawer, if any. Its
-    // default_opening_bank pre-fills the Opening Bank field.
-    const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false);
-    const defaultBank = firstDrawer && firstDrawer.default_opening_bank != null ? firstDrawer.default_opening_bank : '';
+    if (!this._openDraft) this._openDraft = this._freshDraft();
+    const d = this._openDraft;
+    const lbl = 'font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;';
+    const types = this.shiftTypes();
+    const activeDrawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(x => x.active !== false);
+    const mods = this.modStaff();
+    const initials = nm => (nm || '').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+
+    const chips = types.map(t =>
+      '<button class="of-chip" data-type="' + esc(t) + '" style="padding:9px 16px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
+      + (d.shift_type === t ? 'background:var(--gold-bg);border:1px solid var(--gold);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+      + '">' + esc(t) + '</button>').join('');
+
+    const modChips = mods.length
+      ? mods.map(st =>
+          '<button class="of-mod" data-mgr="' + esc(st.id) + '" style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
+          + (d.manager_id === st.id ? 'background:var(--gold-bg);border:1px solid var(--gold);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+          + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);font-size:10px;font-weight:800;">'
+          + esc(initials(st.name)) + '</span>' + esc(st.name) + '</button>').join('')
+      : '<div style="font-size:12px;color:var(--t3);">No manager-eligible staff yet. Add staff and positions in Labor Control.</div>';
+
+    let regsHtml;
+    if (activeDrawers.length === 0) {
+      regsHtml = '<div style="border:1px dashed var(--b1);border-radius:8px;padding:18px;text-align:center;color:var(--t3);font-size:13px;">'
+        + 'No registers set up yet. <button class="btn btn-ghost btn-sm" id="of-add-drawers" style="margin-left:6px;">Set Up Registers</button>'
+        + '<div style="margin-top:6px;font-size:11px;">You can still open the floor without one; cash counting just gets skipped.</div></div>';
+    } else {
+      regsHtml = '<div style="display:flex;flex-wrap:wrap;gap:12px;">'
+        + activeDrawers.map(dr => {
+            const st = d.drawers[dr.id] || { on: false, bank: '' };
+            const on = !!st.on;
+            return '<div class="reg-tile" data-drawer="' + esc(dr.id) + '" style="width:150px;min-height:90px;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;'
+              + (on ? 'border:1.5px solid var(--gold);background:var(--gold-bg);' : 'border:1px solid var(--b1);background:var(--input);opacity:0.6;') + '">'
+              + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">'
+              + '<div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(dr.name) + '</div>'
+              + (on ? '<span style="color:var(--gold);font-size:14px;font-weight:800;">&#10003;</span>' : '') + '</div>'
+              + (on
+                  ? '<div style="display:flex;align-items:center;gap:4px;margin-top:8px;"><span style="color:var(--t3);font-size:13px;">$</span>'
+                    + '<input class="reg-bank" type="number" min="0" step="0.01" inputmode="decimal" data-drawer="' + esc(dr.id) + '" value="' + esc(String(st.bank != null ? st.bank : '')) + '" placeholder="0" '
+                    + 'oninput="S.ShiftActiveShift.setBank(\'' + esc(dr.id) + '\', this.value)" '
+                    + 'style="width:100%;background:var(--bg);border:1px solid var(--b1);border-radius:5px;padding:5px 7px;color:var(--t1);font-size:14px;"/></div>'
+                  : '<div style="font-size:11px;color:var(--t3);margin-top:8px;">tap to open</div>')
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">Start a Shift</div>'
-      + '<div style="font-size:13px;color:var(--t3);margin-bottom:16px;">No shift is running. Start one to '
-      + 'track cash drops, voids, and 86s live, then close it out with revenue at the end.</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="as-date" value="' + new Date().toISOString().slice(0, 10) + '" style="height:48px;"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Shift Type</label>'
-      + '<select id="as-type" style="height:48px;">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager on Duty</label>'
-      + '<select id="as-mgr" style="height:48px;">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
+      + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
+
+      + '<div style="margin-top:20px;"><div style="' + lbl + '">Daypart</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + chips + '</div></div>'
+
+      + '<div style="margin-top:18px;"><div style="' + lbl + '">Running It</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + modChips + '</div></div>'
+
+      + '<div style="margin-top:18px;"><div style="' + lbl + '">Registers <span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0;">tap the ones running tonight, set each bank</span></div>'
+      + regsHtml + '</div>'
+
+      + '<div style="margin-top:18px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;">'
+      + '<div><div style="' + lbl + '">Staff on Floor</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="of-staff-minus" style="width:34px;">&minus;</button>'
+      + '<span style="font-size:18px;font-weight:800;color:var(--t1);min-width:24px;text-align:center;">' + (parseInt(d.staff_on_floor) || 0) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="of-staff-plus" style="width:34px;">+</button></div></div>'
+      + '<div><div style="' + lbl + '">Cash Tolerance</div>'
+      + '<div class="fw" style="width:130px;"><span class="pre">$</span><input class="pre" type="number" id="of-tol" min="0" step="0.5" inputmode="decimal" value="' + esc(String(d.cash_tolerance != null ? d.cash_tolerance : '')) + '" oninput="S.ShiftActiveShift.setTol(this.value)"/></div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Drawer / Register</label>'
-      + '<select id="as-drawer" style="height:48px;">' + drawerOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Opening Bank</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="as-bank" min="0" step="0.01" '
-      + 'inputmode="decimal" value="' + esc(String(defaultBank)) + '" style="height:48px;font-size:16px;"/></div></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Staff on Floor</label>'
-      + '<input type="number" id="as-staff" min="0" inputmode="numeric" style="height:48px;font-size:16px;"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Cash Tolerance <span style="color:var(--t4);font-weight:400;">(this shift)</span></label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="as-tol" min="0" step="0.5" '
-      + 'inputmode="decimal" value="' + this._defaultToleranceFor(this.shiftTypes()[0]) + '" style="height:48px;font-size:16px;"/></div></div>'
-      + '</div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary btn-lg" id="as-start">Start Shift</button>'
+
+      + '<div class="card-actions" style="margin-top:24px;">'
+      + '<button class="btn btn-primary btn-lg" id="as-start">Open the Floor</button>'
       + '<span id="as-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
-    this.container.onclick = null;
-    // When operator changes shift type, re-pre-fill the tolerance field
-    // with that shift type's default. Operator can still type a custom one
-    // after to override for tonight.
-    document.getElementById('as-type')?.addEventListener('change', e => {
-      const tolEl = document.getElementById('as-tol');
-      if (tolEl) tolEl.value = this._defaultToleranceFor(e.target.value);
+
+    this.container.onclick = ev => {
+      const chip = ev.target.closest('.of-chip');
+      const mod = ev.target.closest('.of-mod');
+      const tile = ev.target.closest('.reg-tile');
+      if (ev.target.closest('#of-add-drawers')) { App.navigate('sc-drawers'); return; }
+      if (chip) { d.shift_type = chip.dataset.type; d.cash_tolerance = this._defaultToleranceFor(d.shift_type); this.renderStart(); return; }
+      if (mod) { d.manager_id = (d.manager_id === mod.dataset.mgr) ? '' : mod.dataset.mgr; this.renderStart(); return; }
+      if (ev.target.closest('#of-staff-minus')) { d.staff_on_floor = Math.max(0, (parseInt(d.staff_on_floor) || 0) - 1); this.renderStart(); return; }
+      if (ev.target.closest('#of-staff-plus')) { d.staff_on_floor = (parseInt(d.staff_on_floor) || 0) + 1; this.renderStart(); return; }
+      if (tile && !ev.target.closest('.reg-bank')) {
+        const id = tile.dataset.drawer;
+        if (!d.drawers[id]) d.drawers[id] = { on: false, bank: '' };
+        d.drawers[id].on = !d.drawers[id].on;
+        if (d.drawers[id].on && (d.drawers[id].bank === '' || d.drawers[id].bank == null)) {
+          const dr = activeDrawers.find(x => x.id === id);
+          if (dr && dr.default_opening_bank != null) d.drawers[id].bank = dr.default_opening_bank;
+        }
+        this.renderStart();
+        return;
+      }
+      if (ev.target.closest('#as-start')) this.startShift();
+    };
+  },
+
+  _freshDraft() {
+    const types = this.shiftTypes();
+    const defType = this._daypartByTime(types);
+    const drawers = {};
+    ((App.shiftData && App.shiftData.sc_drawers) || []).filter(x => x.active !== false).forEach(dr => {
+      drawers[dr.id] = { on: true, bank: dr.default_opening_bank != null ? dr.default_opening_bank : '' };
     });
-    // When operator changes the drawer, pre-fill Opening Bank with that
-    // drawer's default. Operator can still override the bank for tonight.
-    document.getElementById('as-drawer')?.addEventListener('change', e => {
-      const drawer = App.drawerById ? App.drawerById(e.target.value) : null;
-      const bankEl = document.getElementById('as-bank');
-      if (drawer && drawer.default_opening_bank != null && bankEl) bankEl.value = drawer.default_opening_bank;
-    });
-    document.getElementById('as-start')?.addEventListener('click', () => this.startShift());
+    return { date: new Date().toISOString().slice(0, 10), shift_type: defType, manager_id: '', drawers, staff_on_floor: '', cash_tolerance: this._defaultToleranceFor(defType) };
+  },
+
+  _daypartByTime(types) {
+    const h = new Date().getHours();
+    let want = h < 11 ? 'Brunch' : h < 16 ? 'Lunch' : h < 22 ? 'Dinner' : 'Late Night';
+    if (!types.includes(want)) want = (want === 'Brunch' && types.includes('Lunch')) ? 'Lunch' : types[0];
+    return want;
+  },
+
+  // Manager-on-duty pool: staff in Management positions plus bartenders (who
+  // commonly run a bar shift). Falls back to all active staff if nothing matches
+  // so the picker is never empty. (A per-position "can run a shift" flag is the
+  // planned upgrade.)
+  modStaff() {
+    const positions = (App.laborData && App.laborData.lc_positions) || [];
+    const eligible = new Set(positions.filter(p =>
+      (p.department || '') === 'Management' || /manager|bartender/i.test(p.name || '')
+    ).map(p => p.id));
+    const all = ((App.laborData && App.laborData.lc_staff) || []).filter(st => st.active !== false);
+    const list = all.filter(st => eligible.has(st.position_id));
+    return list.length ? list : all;
+  },
+
+  _openDrawerList() {
+    const d = this._openDraft || {};
+    return ((App.shiftData && App.shiftData.sc_drawers) || [])
+      .filter(x => x.active !== false && d.drawers && d.drawers[x.id] && d.drawers[x.id].on)
+      .map(dr => { const b = parseFloat(d.drawers[dr.id].bank); return { drawer_id: dr.id, name: dr.name, opening_bank: isNaN(b) ? 0 : b }; });
+  },
+
+  _readoutText() {
+    const d = this._openDraft || {};
+    const parts = [];
+    if (d.shift_type) parts.push(d.shift_type);
+    const mgr = d.manager_id ? (App.staffById(d.manager_id) || {}).name : '';
+    if (mgr) parts.push(mgr);
+    const opens = this._openDrawerList();
+    if (opens.length) {
+      parts.push(opens.length + ' register' + (opens.length === 1 ? '' : 's'));
+      parts.push(App.fmtCurrency(opens.reduce((t, x) => t + x.opening_bank, 0)));
+    }
+    const staff = parseInt(d.staff_on_floor) || 0;
+    if (staff) parts.push(staff + ' on floor');
+    return parts.length ? parts.join('  ·  ') : 'Tap to build tonight’s shift';
+  },
+
+  setBank(id, val) {
+    if (!this._openDraft) return;
+    if (!this._openDraft.drawers[id]) this._openDraft.drawers[id] = { on: true, bank: '' };
+    this._openDraft.drawers[id].bank = val;
+    const ro = document.getElementById('of-readout');
+    if (ro) ro.textContent = this._readoutText();
+  },
+
+  setTol(val) {
+    if (this._openDraft) this._openDraft.cash_tolerance = val;
   },
 
   // Pre-fill default tolerance for the picked shift type. Reads from
@@ -110,23 +227,29 @@ S.ShiftActiveShift = {
   async startShift() {
     const err = document.getElementById('as-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('as-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
-    const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
+    const d = this._openDraft || this._freshDraft();
+    if (!d.date) { fail('Date is required.'); return; }
+    const opens = this._openDrawerList();
+    const totalBank = opens.reduce((t, x) => t + x.opening_bank, 0);
+    const numTol = (() => { const n = parseFloat(d.cash_tolerance); return isNaN(n) ? null : n; })();
+    const numStaff = (() => { const n = parseInt(d.staff_on_floor); return isNaN(n) ? null : n; })();
 
-    const drawerId = document.getElementById('as-drawer')?.value || '';
-    const drawer = drawerId && App.drawerById ? App.drawerById(drawerId) : null;
+    // drawers[] is the canonical multi-register list. The single drawer_id /
+    // drawer / opening_bank stay set (primary id, a summary name, the total
+    // bank) so Active Shift, the close wizard, and Shift History keep working
+    // until per-drawer cash recon lands in the close.
     const rec = {
       id:             App.uid(),
-      date,
-      shift_type:     document.getElementById('as-type')?.value || '',
-      manager_id:     document.getElementById('as-mgr')?.value || '',
-      manager:        (App.staffById(document.getElementById('as-mgr')?.value) || {}).name || '',
-      drawer_id:      drawerId,
-      drawer:         drawer ? drawer.name : '',
-      opening_bank:   num('as-bank'),
-      staff_on_floor: num('as-staff'),
-      cash_tolerance: num('as-tol'),
+      date:           d.date,
+      shift_type:     d.shift_type || '',
+      manager_id:     d.manager_id || '',
+      manager:        (App.staffById(d.manager_id) || {}).name || '',
+      drawers:        opens,
+      drawer_id:      opens[0] ? opens[0].drawer_id : '',
+      drawer:         opens.length === 0 ? '' : opens.length === 1 ? opens[0].name : opens.length + ' registers',
+      opening_bank:   opens.length ? totalBank : null,
+      staff_on_floor: numStaff,
+      cash_tolerance: numTol,
       bar_revenue:    0,
       floor_revenue:  0,
       total_revenue:  0,
@@ -139,15 +262,16 @@ S.ShiftActiveShift = {
     };
 
     const btn = document.getElementById('as-start');
-    if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
     this.shifts().push(rec);
     const ok = await App.putRecord('sc', 'shift', rec);
     if (ok) {
+      this._openDraft = null;
       this.renderActive(rec);
     } else {
       this.shifts().pop();
-      if (btn) { btn.disabled = false; btn.textContent = 'Start Shift'; }
-      fail('Could not start the shift. Try again.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Open the Floor'; }
+      fail('Could not open the shift. Try again.');
     }
   },
 
