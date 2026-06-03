@@ -230,7 +230,7 @@ S.LaborDashboard = {
             + recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
                 + '<td>' + esc(a.name || '-') + '</td>'
                 + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-                + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('')
+                + '<td class="val">' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('')
             + '</tbody></table></div>'
           : '<div style="font-size:12px;color:var(--t3);">The hours you log show up here.</div>')
       + '</div>';
