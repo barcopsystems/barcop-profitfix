@@ -79,7 +79,7 @@ S.LaborWeeklySummary = {
     const target = this.laborTarget();
 
     const hoursVar = schedHours != null ? actHours - schedHours : null;
-    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;flex-wrap:nowrap;gap:18px;overflow-x:auto;">'
       + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Labor Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val dim">'
