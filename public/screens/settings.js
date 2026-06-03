@@ -1,2886 +1,3775 @@
 'use strict';
-/* ── Hub Settings — the single platform-wide settings view ────────────────────
-   A Hub-owned view, not a module screen. Opens from the Hub into the Hub
-   container (never the module app shell), with a Back to Hub control. Tab
-   navigation across the seven settings sections; each section saves on its
-   own. Reads and writes the existing settings keys; purely a UI consolidation. */
-S.HubSettings = {
 
-  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "APP SETTINGS | Back to Dashboard".
-  open() {
-    App.openHubFullPage('App Settings', (mount) => this.render(mount), 'settings');
+/* ── Tooltip engine ── */
+const TT = {
+  _cur: null,
+  _box: document.getElementById('tt-box'),
+  defs: {
+    'container-size': {t:'Container Size',b:'The total size of the bottle, can, or keg you purchase. Pick from the list, Bar Cop converts to ounces automatically.',e:'750ml bottle of vodka = 25.4 oz'},
+    'std-pour':       {t:'Standard Pour',b:'How many ounces you pour per drink. Used to calculate Cost Per Pour and track inventory variance.',e:'Spirits: 1.5 oz · Wine: 5 oz · Draft: 16 oz'},
+    'unit-cost':      {t:'Unit Cost',b:'What you pay per bottle, can, or keg. Use your invoice price.',e:'Case of Tito\'s 750ml costs $180 = $15/bottle'},
+    'menu-price':     {t:'Menu Price',b:'What you charge the guest per drink or serving.',e:'$10 for a cocktail · $6 for a draft beer'},
+    'pour-cost-pct':  {t:'Pour Cost %',b:'Cost Per Pour divided by Menu Price. Lower is better. Industry benchmark 18-22%.',e:'$0.35 cost / $8 menu price = 4.4%'},
+    'sh-bar-pour':    {t:'Bar Pour Cost % Target',b:'The pour cost percentage you are trying to hit on bar product. Industry benchmark is 22%. High-volume bars run 18-20%. If you are above 26% you have a cost or theft problem. Adjust this to match your ownership goal.',e:'22% is the standard starting benchmark'},
+    'sh-food-cost':   {t:'Food Cost % Target',b:'Food cost as a percentage of food revenue. Industry benchmark is 28-32% depending on concept. Full-service restaurants typically run 30-32%. Fast casual runs lower. Set this to your target, not your current number.',e:'32% is the standard starting benchmark'},
+    'sh-bar-labor':   {t:'Bar Labor % Target',b:'Bar staff payroll divided by bar revenue. Includes bartenders, barbacks, and bar management. Does not include kitchen or floor staff. Industry benchmark is 25-30%.',e:'28% is the standard starting benchmark'},
+    'sh-food-labor':  {t:'Food Labor % Target',b:'Kitchen and food staff payroll divided by food revenue. Includes cooks, prep, and kitchen management. Full-service kitchen benchmark is 28-32%.',e:'30% is the standard starting benchmark'},
+    'sh-prime-cost':  {t:'Prime Cost % Target',b:'Combined COGS and labor as a percentage of total revenue. The single most important number in your operation. Below 60% is healthy. Above 65% and you have a problem that weekly data will surface fast.',e:'60% is the standard starting benchmark'},
+    'sh-cash-tol':    {t:'Cash Over/Short Tolerance',b:'The maximum dollar amount you treat as acceptable for a drawer to be off before flagging it. Cash Reconciliation uses this threshold to show green or red on each shift count.',e:'$10 is typical. Anything over $10 over or short triggers a flag'},
+    'hs-ann-bar-rev': {t:'Annual Bar Revenue',b:'Your total bar and beverage sales for the last 12 months. This is the base number Bar Cop multiplies against every bar metric to show the real dollar weight of each gap. A 2-point pour cost overage on $480,000 in bar sales is $9,600 a year walking out the door, not an abstract percentage. The audit, the weekly money readout, the recovery scoreboard, and every dashboard dollar figure scale off this number. Estimate is fine. Most operators know their bar number within a few thousand. The closer it is to your real top line, the more honest every weekly and annual figure in the app gets.',e:'$480,000 annual bar revenue scales a 2% pour cost gap to $9,600 per year'},
+    'hs-ann-food-rev':{t:'Annual Food Revenue',b:'Your total food sales for the last 12 months. Bar Cop scales every food cost gap, prime cost gap, and labor figure into annual dollar terms using this number. A 3-point food cost overage on $320,000 in food sales reads as $9,600 a year. Without it, Bar Cop can still calculate percentages but the dollar impact stays abstract. Estimate is fine if you do not have the exact figure on hand. Update it any time you pull a more accurate total off your books or your accountant gives you a year-end number.',e:'$320,000 annual food revenue scales a 3% food cost gap to $9,600 per year'},
+    'pours-bottle':   {t:'Pours Made',b:'Actual pours calculated from your inventory count. Bottles used × pours per bottle. This is what actually left the bar this week.',e:'3.4 bottles used × 16.9 pours per bottle = 57.5 pours made'},
+    'cost-pour':      {t:'Cost Per Pour',b:'Unit Cost ÷ Pours Per Bottle. What one drink costs you. Calculated automatically.',e:'$15 bottle ÷ 16.9 pours = $0.89/pour'},
+    'kitchen-unit':   {t:'Unit of Measure',b:'The unit you order and count this product in.',e:'Chicken: lb · Lime juice: each · Margarita mix: bag'},
+    'kitchen-cost':   {t:'Unit Cost',b:'What you pay per unit of this product.',e:'Chicken: $3.20/lb · Lime carton: $4.50/each'},
+    'recipe-pours':   {t:'Pours',b:'How many standard pours of this spirit go in this drink. 1 = one standard pour.',e:'1 pour rum + 0.5 pour triple sec'},
+    'recipe-bottles': {t:'Bottles',b:'How many full bottles go into the batch. Use decimals for partial bottles.',e:'2 bottles tequila + 0.5 bottle triple sec'},
+    'batch-yield':    {t:'Batch Yield',b:'Total amount this batch makes. Pick the unit, Bar Cop converts to oz to calculate servings.',e:'1 gallon frozen margarita mix = 128 oz'},
+    'serving-size':   {t:'Serving Size',b:'How much goes in one drink. Bar Cop divides yield by serving size to get servings per batch.',e:'5 oz per drink from 128 oz batch = 25.6 drinks'},
+    'servings-batch': {t:'Servings Per Batch',b:'Batch Yield ÷ Serving Size. Calculated automatically. Verify this makes sense.',e:'128 oz ÷ 5 oz = 25.6 drinks'},
+    'recipe-cost-pct':{t:'Recipe Cost %',b:'Total ingredient cost ÷ Menu Price.',e:'$1.20 cost ÷ $8 menu price = 15%'},
+    'plate-yield':    {t:'Plates Per Batch',b:'How many plates this recipe produces. Most single-plate recipes are 1.',e:'A pot of chili serving 10 = plate yield of 10'},
+    'bar-revenue':    {t:'Bar Revenue',b:'Total bar sales for the week from your POS. Include all drink sales.',e:'Your POS end-of-week bar department total'},
+    'bar-cogs':       {t:'COGS',b:'Cost of Goods Sold. What you spent on bar product. Invoices + transfers in − transfers out.',e:'Weekly liquor invoice total: $2,340'},
+    'bar-labor':      {t:'Labor',b:'Bar staff payroll. Bartenders, barbacks, bar manager. Not kitchen or floor staff.',e:'Bartender hours × hourly rate'},
+    'prime-cost':     {t:'Prime Cost %',b:'(Total Bar COGS + Total Food COGS + Total Labor) ÷ Total Revenue. The most important single number in your operation. Target: 60% or below. Above 65% is a warning sign.',e:'($4,200 bar COGS + $3,800 food COGS + $6,200 labor) ÷ $24,000 revenue = 60.0%'},
+    'theoretical':    {t:'Pours Sold (POS)',b:'Number of pours/shots of this product rung in on your POS this week. Pull from your POS sales mix report. Enter as individual shots, not bottles.',e:'POS shows 85 shots of Tito\'s vodka sold this week = enter 85'},
+    'variance-units': {t:'Variance (Pours)',b:'Pours Made minus Pours Sold. Near zero = controlled. Positive = more poured than sold (over-pouring or theft). Negative = more rung in than used (check POS entries).',e:'87 pours made, 85 sold = +2 variance (within normal range)'},
+    'prev-cost':      {t:'Previous Cost',b:'The Unit Cost currently on file. Pulled automatically from product setup.',e:'Tito\'s was $14.50/bottle'},
+    'new-cost':       {t:'New Invoice Cost',b:'The price on your most recent invoice for this product.',e:'New invoice shows $15.75/bottle'},
+    'weekly-usage':   {t:'Weekly Usage',b:'How many units you typically use per week. Used to calculate Annual Impact $.',e:'4 bottles of Tito\'s per week'},
+    'annual-impact':  {t:'Annual Impact $',b:'Cost Change $ × Weekly Usage × 52 weeks.',e:'+$1.25/bottle × 4/week × 52 = +$260/year'},
+    'inv-beg':        {t:'Beginning Inventory',b:'Count of bottles/units on hand at the start of this period. Carried forward from last week\'s ending count.',e:'You had 4.5 bottles of Tito\'s at start of week'},
+    'inv-purchases':  {t:'Purchases',b:'Bottles/units received from deliveries during the week. Count what arrived on invoices, not what was ordered.',e:'Received 6 bottles from your weekly liquor order'},
+    'inv-end':        {t:'Ending Inventory',b:'Physical count of bottles/units on hand right now. Count partial bottles as decimals.',e:'3.5 bottles remaining = 3 full + one half-full'},
+    'inv-used':       {t:'Units Used',b:'Beginning + Purchases − Ending = actual consumption. Calculated automatically. In bottles for bar products.',e:'4.5 + 6 − 3.5 = 7 bottles used this week'},
+    'shift-cogs':     {t:'Shift COGS (Product Only)',b:'Bar product cost for this shift: spirits, beer, wine. Do not include labor. Estimate from your weekly invoices divided by number of shifts, or use your POS cost report if available.',e:'Weekly $2,400 bar COGS ÷ 6 shifts = $400/shift'},
+    'opening-bank':   {t:'Opening Bank',b:'Cash in the drawer at shift start. Your starting float. Not counted as revenue.',e:'Standard opening bank: $200'},
+    'expected-cash':  {t:'Expected Cash from POS',b:'Cash sales total from your POS for this shift.',e:'POS shows $840 in cash sales for the PM shift'},
+    'cash-tolerance': {t:'Over/Short Tolerance',b:'Max dollar amount you treat as acceptable for a drawer to be off.',e:'$10 tolerance: $9 over or short = OK. $11 = flagged'},
+    // Revenue Recovery tooltips
+    'r-bar-revenue':    {t:'Bar Revenue',b:'Total bar sales for the week from your POS. Include all drink and beverage sales from the bar department.',e:'Your POS end-of-week bar department total'},
+    'r-floor-revenue':  {t:'Floor Revenue',b:'Total dining room or floor sales for the week. Food and beverage sold tableside by servers.',e:'Your POS end-of-week dining room or floor department total'},
+    'r-covers':         {t:'Covers',b:'Total guests served during the week. Used to calculate check average. Pull from your POS end-of-week guest count.',e:'POS shows 412 guests served this week'},
+    'r-check-avg':      {t:'Check Average',b:'Total Revenue divided by Covers. What the average guest spent. This is the most controllable revenue number in your operation. Industry benchmark for a full-service bar and restaurant is $35 to $45. If you are below your target, your team is not suggestive selling or your menu mix is pulling low.',e:'$14,800 revenue / 412 covers = $35.92 check average'},
+    'r-bar-labor':      {t:'Bar Labor %',b:'Bar staff payroll divided by bar revenue. Includes bartenders, barbacks, and bar management. Industry benchmark is 25 to 30%. Above 32% means you are over-scheduled relative to volume or not driving enough bar revenue per shift.',e:'$3,200 bar labor / $11,400 bar revenue = 28%'},
+    'r-kitchen-labor':  {t:'Kitchen Labor %',b:'Kitchen and prep staff payroll divided by food revenue. Includes line cooks, prep cooks, dishwashers, and kitchen management. Full-service kitchen benchmark is 28 to 32%. Below 26% can mean understaffing that affects quality and speed.',e:'$3,800 kitchen labor / $12,600 food revenue = 30%'},
+    'r-floor-labor':    {t:'Floor Labor %',b:'Front-of-house service staff payroll divided by floor revenue. Includes servers, food runners, hosts, and floor management. Benchmark is 28 to 34%. High floor labor percentage usually means too many servers on the floor relative to covers or low check averages pulling revenue down.',e:'$2,900 floor labor / $9,200 floor revenue = 31.5%'},
+    'r-lunch-rplh':     {t:'Lunch RPLH Target',b:'Revenue Per Labor Hour target for your lunch daypart. Lunch RPLH is typically lower than dinner because checks are smaller and the meal period is shorter. Set this based on your average lunch check and typical cover counts per server.',e:'$9,400 lunch revenue / 188 hours = $50 RPLH'},
+    'r-dinner-rplh':    {t:'Dinner RPLH Target',b:'Revenue Per Labor Hour target for your dinner daypart. Dinner RPLH should be higher than lunch due to larger checks, more upsell opportunity, and longer seat times with higher beverage attachment. Benchmark for full-service dinner is $65 to $85.',e:'$14,800 dinner revenue / 197 hours = $75 RPLH'},
+    'r-bar-rplh':       {t:'Bar RPLH Target',b:'Revenue Per Labor Hour target for your bar. Bar RPLH can be high when volume is strong because a single bartender handles multiple covers simultaneously. Benchmark is $55 to $75. Low bar RPLH usually means too many bartenders on shift for the volume.',e:'$8,400 bar revenue / 129 hours = $65 RPLH'},
+    'r-event-close':    {t:'Event Close Rate',b:'Percentage of event inquiries that convert to confirmed bookings. This is your sales conversion rate for the events and catering pipeline. Industry benchmark is 35 to 45%. Below 30% means your follow-up process, pricing, or proposal quality needs attention.',e:'18 inquiries, 8 booked = 44% close rate'},
+    // This Week shared tooltips
+    'tw-week-num':      {t:'Week Number',b:'Sequential week number for your records. Week 1 is your first week entering data. Bar Cop carries this forward automatically each week. Only adjust if you are entering a catch-up week out of sequence.',e:'Week 12 means you have 12 weeks of data in Bar Cop'},
+    'tw-period-end':    {t:'Period End Date',b:'The last day of the week you are entering. Most operations close their week on Sunday. Be consistent week over week so your trend data lines up correctly.',e:'Sunday October 13 closes a Monday through Sunday accounting week'},
+    'r-sv-covers':      {t:'Server Covers',b:'Total guests this server personally served during the week. Pull from your POS server sales report. This is the denominator in check average, so it must be guest count, not table count.',e:'Server handled 148 guests this week'},
+    'r-sv-sales':       {t:'Server Total Sales',b:'Total dollar sales this server rang during the week. Pull from your POS server sales report. Food and beverage combined.',e:'Server rang $5,340 in total sales this week = $36.08 check average'},
+    't-ig-followers':   {t:'Instagram Followers',b:'Your current total follower count on Instagram. Log weekly to track growth rate. A consistent upward trend means your content is reaching new people. Flat or declining means posting frequency or content quality needs attention.',e:'1,240 followers this week vs 1,210 last week = 30 new followers'},
+    't-fb-followers':   {t:'Facebook Followers',b:'Your current total follower count on your Facebook business page. Facebook reach is lower than Instagram for most bars but the page matters for the 35-plus demographic, event promotion, and local search signals.',e:'2,100 Facebook page followers'},
+    // Audit intake tooltips
+    'at-ann-bar-rev':   {t:'Annual Bar Revenue',b:'Your total bar and beverage sales for the last 12 months. Used to calculate your annual dollar gap on pour cost and prime cost. Estimate is fine. The audit converts percentage gaps into real dollar figures using this number.',e:'$480,000 annual bar revenue, a 2% pour cost gap = $9,600 per year recoverable'},
+    'at-ann-food-rev':  {t:'Annual Food Revenue',b:'Your total food sales for the last 12 months. Used to calculate your annual dollar gap on food cost. The more accurate the number, the more precise your gap calculations will be.',e:'$320,000 annual food revenue, a 3% food cost gap = $9,600 per year recoverable'},
+    'at-pos-bev':       {t:'POS Sales Report (Beverages)',b:'Your bar department sales from your POS. Daily or weekly beverage revenue by category. Minimum 4 weeks. Export from Toast, Square, Aloha, or any POS as Excel or CSV.',e:'Toast: Reports > Sales > Sales by Category > Bar'},
+    'at-bar-inv':       {t:'Bar Inventory Count Sheets',b:'Physical bar inventory counts with opening count, purchases received, and closing count per product. Minimum 1 week. Best results with 4 weeks.',e:'Opening 12 bottles + 6 purchased - 14 closing = 4 used'},
+    'at-exception':     {t:'POS Exception Report',b:'Voids, comps, and no-sale transactions by employee. Shows which employees are voiding checks, issuing comps without approval, and opening the drawer without a sale.',e:'Toast: Reports > Labor > Exception Report'},
+    'at-cash':          {t:'Cash Drawer Reconciliation',b:'Daily or weekly cash variance records showing how much each drawer was over or short per shift. Used to identify cash handling gaps and shift-level patterns.',e:'Drawer over $12 on Friday close, repeated pattern over 4 weeks'},
+    'at-bev-inv':       {t:'Beverage Invoices',b:'All beverage delivery invoices for the audit period. Used to verify what was delivered versus ordered and to track price changes from your distributors.',e:'Your weekly liquor distributor invoices'},
+    'at-vendor':        {t:'Vendor Price List',b:'Current pricing from your distributors or your most recent invoices. Used to identify price drift and negotiation opportunities. 4 weeks shows recent changes. 12 weeks shows the full drift pattern.',e:'Your distributor price sheet or line items on recent invoices'},
+    'at-pos-food':      {t:'POS Sales Report (Food)',b:'Kitchen department sales from your POS. Daily or weekly food revenue by category. Send the same date range as your beverage POS report.',e:'Toast: Reports > Sales > Sales by Category > Food'},
+    'at-kit-inv':       {t:'Kitchen Inventory Count Sheets',b:'Physical kitchen counts with opening count, purchases, and closing count by product. Used to calculate actual food cost and identify waste and variance.',e:'Opening 10 lbs beef + 5 purchased - 8 closing = 7 lbs used'},
+    'at-food-inv':      {t:'Food Invoices',b:'All food delivery invoices for the audit period. Used to verify delivery accuracy and track food cost against purchases.',e:'Your Sysco, US Foods, or produce vendor invoices'},
+    'at-recipe':        {t:'Recipe Costing Sheet',b:'Your current recipe costs with ingredients, quantities, and cost per dish. The highest-value file in the audit. Without it, food cost analysis is category-level only. With it the audit calculates yield-corrected cost on every dish and ranks every repricing opportunity by annual dollar impact.',e:'Recipe card showing your burger costs $4.20 to make and sells for $14'},
+    'at-prep':          {t:'Daily Prep Sheets',b:'Production logs showing what was prepped versus used by shift. Used to identify production loss, over-prep waste, and yield issues by station.',e:'Prep sheet showing 40 portions prepped, 28 sold, 12 unaccounted'},
+    'at-waste':         {t:'Daily Waste Logs',b:'Waste recorded by category for the audit period. Used to calculate weekly spoilage cost and identify waste patterns by product or station.',e:'Waste log showing $340 in produce waste last week'},
+    'at-payroll':       {t:'Payroll or Time Clock Data',b:'Hours worked by employee and shift for the audit period. Used to calculate verified prime cost, labor percentage by department, and RPLH. Weekly totals accepted if shift-level detail is not available.',e:'Toast: Reports > Labor > Timeclock Detail'},
+    'ra-ann-bar-rev':   {t:'Annual Bar Revenue',b:'Your total bar and beverage sales for the last 12 months. Used to calculate annual revenue gaps and scale check average impact to annual dollar figures. Estimate is fine.',e:'$480,000 annual bar revenue, a $2 check average gap x 15,000 covers = $30,000 per year recoverable'},
+    'ra-ann-food-rev':  {t:'Annual Food Revenue',b:'Your total food and dining room sales for the last 12 months. Used alongside bar revenue to calculate total operation size and scale gap calculations to annual dollar impact.',e:'$320,000 annual food revenue'},
+    'ra-pos-daily':     {t:'POS Daily Sales Summary',b:'Total revenue by day broken down by category: food, beverage, total. The most important file in the revenue audit. Minimum 4 weeks. Export from your POS as Excel or CSV.',e:'Toast: Reports > Sales > Daily Sales Summary'},
+    'ra-menu-mix':      {t:'Menu Sales Mix Report',b:'Items sold and revenue by menu item or category. Item-level detail gives the most complete analysis. Used to identify category concentration and menu engineering opportunities.',e:'Toast: Reports > Menu > Item Selection Report'},
+    'ra-menu-prices':   {t:'Menu Price List',b:'Your current menu with item names and selling prices. Used to identify pricing gaps and contribution margin opportunities.',e:'Your current printed menu or a PDF of your menu'},
+    'ra-server-sales':  {t:'Server Sales Report',b:'Check average, covers served, and total sales by server for the audit period. The highest-value file in the revenue audit. Unlocks two full scored sections on server performance.',e:'Toast: Reports > Labor > Server Sales Report'},
+    'ra-upsell':        {t:'Server Upsell Report',b:'Appetizer captures, dessert captures, and add-on revenue by server per shift. Shows which servers are executing the upsell sequence and which are not.',e:'Toast: Reports > Labor > Product Mix by Server'},
+    'ra-preshift':      {t:'Pre-Shift Briefing Log',b:'Any records showing whether pre-shift briefings are running and what is covered. Used to assess whether a performance standard is being communicated to the team.',e:'A weekly pre-shift agenda document or meeting notes'},
+    'ra-labor-sched':   {t:'Weekly Labor Schedule',b:'Scheduled hours by position and department with labor cost. Used to calculate RPLH, labor percentage, and schedule efficiency against revenue.',e:'Your scheduling software export (7shifts, HotSchedules, Excel)'},
+    'ra-timeclock':     {t:'Time Clock Actuals',b:'Actual hours worked by employee and shift for the audit period. Used to identify clock drift, actual versus scheduled hours, and verified overtime cost.',e:'Toast: Reports > Labor > Timeclock Detail'},
+    'ra-labor-dept':    {t:'Labor by Department',b:'Separate labor cost tracking for bar, kitchen, and floor. Used to identify which department is driving labor overage and to set department-level targets.',e:'Payroll breakdown showing bar $3,200, kitchen $4,100, floor $2,800'},
+    'ra-events':        {t:'Event Revenue Records',b:'One record per event with date, covers, F&B minimum, and actual spend. Minimum 3 months. Used to calculate event frequency, average event revenue, and minimum compliance rate.',e:'Private dining log showing 8 events last month at average $3,400 spend'},
+    'ra-catering':      {t:'Catering Revenue Records',b:'One record per catering booking with date, guests, package type, and total revenue. Used to assess catering program performance and repeat client rate.',e:'Catering log or your booking software export'},
+    'ra-rate-card':     {t:'Private Dining Rate Card',b:'Current pricing for private dining including room fees, F&B minimums, and per-head options. Used to assess pricing position and minimum structure against market benchmarks.',e:'Your private dining or events package PDF'},
+    'ta-gbp-profile':    {t:'GBP Full Profile Screenshot',b:'A screenshot of your Google Business Profile as it appears in Google Maps or Search. Capture the full listing including name, address, phone, hours, website link, category, and the photo and review summary. Phone screenshots are fine.',e:'Search your bar name on Google Maps and screenshot the full listing panel'},
+    'ta-gbp-insights':   {t:'GBP Insights Export',b:'Monthly impressions, search queries, direction requests, and phone calls from your GBP dashboard. Go to your Google Business Profile, click Performance, and screenshot or export the overview. Shows how many people found you and what they did next.',e:'GBP dashboard: Performance > Overview > Screenshot'},
+    'ta-analytics':      {t:'Website Analytics',b:'Monthly sessions, bounce rate, top pages, and menu page performance. Export from Google Analytics, Squarespace, Wix, or any analytics platform. A screenshot of the overview dashboard is accepted. This is the highest-value file in the traffic audit.',e:'Google Analytics: Reports > Overview > Screenshot or Export'},
+    'ta-mobile-site':    {t:'Mobile Homepage Screenshot',b:'A screenshot of your homepage as it appears on a phone. Open your website on your phone and take a screenshot. Shows whether your phone number, address, and call-to-action are visible without scrolling.',e:'Open your website on your phone and screenshot what appears above the fold'},
+    'ta-google-reviews': {t:'Google Review Page Screenshot',b:'Screenshot of your Google listing showing your star rating, total review count, and the most recent 5 to 10 reviews. In Google Maps click your listing and scroll down to Reviews. Capture the rating, review count, and recent review text.',e:'Google Maps > Your Listing > Scroll to Reviews > Screenshot'},
+    'ta-yelp':           {t:'Yelp Listing Screenshot',b:'Screenshot of your Yelp business page showing star rating, review count, and recent reviews. Submit if you have a Yelp listing. Skip this if you do not have one.',e:'yelp.com > Search your bar name > Screenshot your listing'},
+    'ta-search':         {t:'Search Results Screenshots',b:'Open an incognito or private browser window so your personal search history does not affect results. Search for your bar type and city, then your neighborhood and bar. Screenshot the full results page including the Google Maps pack at the top.',e:'Incognito Chrome: search "sports bar Austin" > screenshot full results page'},
+    'ta-instagram':      {t:'Instagram Profile Screenshot',b:'Screenshot of your Instagram profile showing follower count, post count, bio, and the most recent 9 to 12 posts in grid view. Go to your profile page and screenshot. Phone screenshot is fine.',e:'Open Instagram > Your Profile > Screenshot the full profile page'},
+    'ta-facebook':       {t:'Facebook Page Screenshot',b:'Screenshot of your Facebook business page showing follower count and recent posts. Go to your Facebook page and screenshot the overview.',e:'Facebook > Your Business Page > Screenshot'},
+    'ta-ig-analytics':   {t:'Instagram Analytics Screenshot',b:'Screenshot from Instagram Insights showing reach, impressions, and engagement for the last 30 days. Only available on business or creator accounts. In Instagram go to Professional Dashboard and select Insights.',e:'Instagram > Professional Dashboard > Insights > Screenshot'},
+    'ta-delivery':       {t:'Delivery Platform Dashboard Screenshot',b:'Screenshot of your merchant dashboard on DoorDash, Uber Eats, or Grubhub showing your current rating, photo count, and menu status. Log into the merchant portal for each platform and screenshot the overview page. Submit one screenshot per platform.',e:'DoorDash Merchant Portal > Your Restaurant > Overview > Screenshot'},
+    'ta-email':          {t:'Email Platform Screenshot',b:'Screenshot of your email platform dashboard showing list size, last send date, and any campaign performance visible on the overview screen. Works with Mailchimp, Klaviyo, Constant Contact, or any email platform.',e:'Mailchimp > Audience > Overview > Screenshot showing list size and last send'},
+    'ta-email-analytics':{t:'Email Analytics Export',b:'Campaign performance history showing open rate, click rate, and unsubscribe rate for the last 6 to 12 months. Export from your email platform as PDF or CSV.',e:'Mailchimp: Reports > All Campaigns > Export CSV'},
+    'r-labor-hours':    {t:'Labor Hours',b:'Total hours worked by all staff in this department for the week. Pull from your scheduling system or time clock.',e:'8 bartenders × avg 30 hrs = 240 bar labor hours'},
+    'r-labor-cost':     {t:'Labor Cost',b:'Total wages paid to this department for the week. Exclude tips unless you have a tip pool that affects your payroll cost.',e:'240 hours × $15/hr avg = $3,600 bar labor cost'},
+    'r-labor-pct':      {t:'Labor %',b:'Labor Cost ÷ Revenue for this department. Compare to your target. Over target means you are overstaffed or understaffed in productivity.',e:'$3,600 labor ÷ $12,000 bar revenue = 30%'},
+    'r-rplh':           {t:'RPLH',b:'Revenue Per Labor Hour. Revenue ÷ Hours Worked. Measures how efficiently your labor is generating revenue. Low RPLH means overstaffed relative to volume.',e:'$8,400 dinner revenue ÷ 112 hours = $75 RPLH'},
+    'r-rplh-target':    {t:'RPLH Target',b:'Your goal for revenue generated per labor hour by daypart. Set in Settings. Lunch targets are typically lower than dinner due to lower average checks.',e:'Dinner target $75 RPLH · Lunch target $50 RPLH'},
+    'r-spread':         {t:'Performance Spread',b:'Top server check average minus bottom server check average. Under $10 indicates a consistent team. Over $20 means no coaching standard is being enforced.',e:'Top server $52 avg, bottom $24 avg = $28 spread'},
+    'r-contrib-margin': {t:'Contribution Margin',b:'Menu Price minus Food or Pour Cost. What each item actually contributes to covering overhead and profit after product cost.',e:'$14 burger − $4.20 cost = $9.80 contribution margin'},
+    'r-cost-pct':       {t:'Cost %',b:'Item Cost ÷ Menu Price. How much of each sale goes to product. Lower is better. Target varies by category.',e:'$4.20 cost ÷ $14.00 price = 30% food cost'},
+    'r-wkly-covers':    {t:'Weekly Covers',b:'How many times this item is sold in a typical week. Used in Menu Engineering to calculate volume ranking and total weekly contribution.',e:'House burger sells 85 times per week'},
+    'r-fb-minimum':     {t:'F&B Minimum',b:'The minimum food and beverage spend required to book the private dining room or event space for that date and time.',e:'Saturday dinner buyout requires $3,500 F&B minimum'},
+    'r-event-revenue':  {t:'Event Revenue',b:'Actual total spent by the event party including food, beverages, and any room fee. Compare to the F&B minimum to track compliance.',e:'Party spent $4,200 vs $3,500 minimum, 20% above minimum'},
+    'r-daypart-rev':    {t:'Daypart Revenue',b:'Total revenue generated during this specific daypart from your POS. Bar = all bar department sales. Lunch = all dining room sales during lunch service. Dinner = all dining room sales during dinner service.',e:'Dinner POS total for the week: $8,400'},
+    'r-daypart-hrs':    {t:'Daypart Labor Hours',b:'Total hours worked by all staff scheduled to this daypart. Pull from your scheduling system or time clock by job code or shift.',e:'6 servers x 5 hr lunch shift = 30 lunch labor hours'},
+    'r-upsell-calc':    {t:'Upsell Revenue Calculator',b:'Shows the weekly and annual revenue gap between your current team check average and your target. Use this number in pre-shift to make the gap visible to your team.',e:'$33 current avg vs $38 target x 400 covers = $2,000/week gap'},
+    'r-price-new':      {t:'Proposed New Price',b:'The price you are considering for this item. The calculator shows you the margin impact and breakeven before you commit to the change.',e:'Current price $13.00, considering raising to $15.00'},
+    'r-vol-change':     {t:'Estimated Volume Change',b:'How much you expect covers to change as a percentage if you change the price. Negative means fewer covers. Use 0 if you expect no change.',e:'-10% means you expect to sell 10% fewer of this item at the new price'},
+    'r-contrib-margin-eng': {t:'Contribution Margin',b:'Menu price minus item cost. What each sale contributes to covering overhead and profit after product cost is deducted.',e:'$15 price - $4.50 cost = $10.50 contribution margin'},
+    'r-event-covers':   {t:'Event Covers',b:'Total guests at the event. Used with F&B minimum to calculate per-head minimum and track whether events are on pace.',e:'40-guest corporate dinner'},
+    // Traffic Recovery tooltips
+    't-google-rating':  {t:'Google Rating',b:'Your current star rating on Google. The industry benchmark is 4.3 or higher. Below 4.0 is a direct revenue impact. Guests filter by rating before choosing a venue.',e:'4.6 stars from 312 reviews'},
+    't-review-vel':     {t:'Review Velocity',b:'New reviews received per month. Consistent new reviews signal to Google that your business is active and relevant. Target 8 or more per month.',e:'12 new reviews this month'},
+    't-response-rate':  {t:'Response Rate',b:'Percentage of reviews you have responded to. Industry benchmark is 75 percent or higher. Responding to every review, positive and negative, is a direct ranking signal.',e:'Responded to 38 of 50 reviews = 76%'},
+    't-monthly-sessions':{t:'Monthly Website Sessions',b:'Total visits to your website per month. Benchmark is 2,000 or more for a typical bar or restaurant. Under 500 means your digital presence is not driving real discovery traffic.',e:'1,840 sessions last month'},
+    't-bounce-rate':    {t:'Bounce Rate',b:'Percentage of visitors who leave without viewing a second page. Above 70 percent means your homepage is not converting visitors to menu, reservations, or contact.',e:'62% bounce rate'},
+    't-social-posts':   {t:'Monthly Posts',b:'Total posts across Instagram and Facebook combined for the month. Benchmark is 12 or more. Consistency matters more than volume. Posting 3 times per week beats a burst of daily posts followed by silence.',e:'14 posts last month (10 IG, 4 FB)'},
+    't-digital-score':  {t:'Digital Presence Score',b:'Composite score across all 7 traffic categories: Google Business Profile, website, reviews, search and SEO, social media, delivery platforms, and email. Industry average is 58. Target is 65 or higher.',e:'Score of 71 puts you in the top 30% of operators in your market'},
+    't-google-total':   {t:'Google Reviews',b:'Your all-time total review count on Google. A high total builds trust before a guest reads a single review. New reviews each month matter more for ranking, but the running total is the first number guests see.',e:'312 total reviews at 4.6 stars'},
+    't-yelp-rating':    {t:'Yelp Rating',b:'Your current star rating on Yelp. Yelp ratings run lower than Google because the platform filters reviews aggressively, but anything under 4.0 costs you bookings. Many guests still check Yelp first.',e:'4.1 stars on Yelp from 88 reviews'},
+    't-yelp-total':     {t:'Yelp Reviews',b:'Your all-time total review count on Yelp. A thin Yelp listing signals a business that is not engaged. Even when Google is your main channel, keep the Yelp count growing.',e:'88 total Yelp reviews'},
+    't-delivery-active':{t:'Delivery Platform Active',b:'Whether you currently have a live, order-taking listing on this delivery platform. Each platform is its own discovery channel where guests browse and order from whoever shows up. Being absent means missed orders.',e:'Set Yes once your menu is live and accepting orders'},
+    't-delivery-rating':{t:'Delivery Platform Rating',b:'Your current star rating on this delivery platform. Delivery ratings drive feed placement. A low rating pushes your listing down where fewer guests see it. Benchmark is 4.5 stars or higher.',e:'4.6 stars on DoorDash'},
+    't-delivery-photos':{t:'Photo Count',b:'Number of photos on this delivery platform listing. Platforms favor listings with strong food photography in search and feed placement. Aim for 20 or more clear, well-lit shots.',e:'24 photos on the DoorDash menu'},
+    't-email-list':     {t:'Email List Size',b:'Total contacts on your email marketing list. An owned email list is the one marketing channel no algorithm controls. Benchmark is 500 or more for an established bar or restaurant.',e:'740 contacts on the list'},
+    't-emails-sent':    {t:'Emails Sent Per Month',b:'How many marketing emails or campaigns you sent in the last month. A list you never email is a dead asset. Send at least once a month, and weekly when you have offers or events.',e:'4 emails sent this month, one per week'},
+    't-email-open':     {t:'Email Open Rate',b:'Percentage of recipients who opened your most recent email. Industry benchmark is 20% or higher. A low open rate usually means weak subject lines or sending at the wrong time.',e:'28 of 100 recipients opened = 28% open rate'},
+    't-loyalty-active': {t:'Loyalty Program',b:'Whether you run a loyalty or rewards program for repeat guests. A simple loyalty program turns one-time delivery and walk-in guests into regulars and gives you a reason to collect contact info.',e:'Set Yes if you run points, punch cards, or a rewards app'},
+    't-loyalty-members':{t:'Loyalty Members',b:'How many guests are enrolled in your loyalty program. Track this weekly. A growing membership means your sign-up process is working at the table and at checkout.',e:'420 enrolled loyalty members'},
+    't-gbp-photos':     {t:'Photo Count',b:'Total photos on your Google Business Profile. Listings with more photos get more clicks and direction requests. Benchmark is 100 or more across food, drinks, the room, and the exterior.',e:'GBP shows 134 photos across all categories'},
+    't-gbp-posts':      {t:'GBP Posts Per Month',b:'How many Google Business Profile posts you published in the last month. Posts such as offers, events, and updates signal to Google that the listing is active. Benchmark is 8 or more per month.',e:'10 GBP posts this month: 4 events, 6 offers'},
+    't-review-age':     {t:'Most Recent Review Age',b:'How many days ago your newest review was posted, on any platform. If the most recent review is more than 14 days old, your review flow has gone quiet. Prompt guests this week.',e:'Newest review posted 6 days ago'},
+    't-review-patterns':{t:'Negative Patterns Noted',b:'Recurring complaints or themes you see across recent reviews, such as slow service, noise, or a specific dish. Logging the pattern is the first step. Fix the root cause in the operation, not just the public reply.',e:'"Slow service on weekends" appears in 4 of the last 10 reviews'},
+    't-search-keyword': {t:'Primary Local Keyword',b:'The exact phrase a guest would type into Google to find a bar like yours. Pick one phrase that names your city and concept, then use it in your Google Business Profile, page titles, and posts.',e:'"austin sports bar" or "downtown nashville cocktail bar"'},
+    't-search-citations':{t:'Citation Count',b:'Roughly how many online directories list your business, including Google, Yelp, Apple Maps, TripAdvisor, and local sites. More consistent citations build local search authority. Benchmark is 40 or more.',e:'Listed on about 35 directories'},
+    't-web-duration':   {t:'Avg Session Duration',b:'The average number of seconds a visitor spends on your website per visit. Short sessions mean visitors are not finding what they came for. Benchmark is 90 seconds or more.',e:'Google Analytics shows a 105 second average session'},
+    't-web-source':     {t:'Top Traffic Source',b:'Where most of your website visitors come from. Strong local SEO should make Organic Search your leading source. If Direct or Social leads, you are relying on people who already know you rather than new discovery.',e:'Analytics shows Organic Search drives 52% of sessions'},
+    't-social-engagement':{t:'IG Engagement Rate',b:'Likes, comments, saves, and shares as a percentage of your follower count, averaged across recent posts. Benchmark is 2% or higher. Low engagement means followers see your posts but do not interact.',e:'31 average interactions on 1,200 followers = 2.6%'},
+    't-social-fbposts': {t:'Facebook Posts Per Month',b:'How many posts you published on your Facebook page in the last month. Facebook reach is lower than Instagram, but the page still matters for events and the 35-plus crowd. Cross-post to keep it warm.',e:'8 Facebook posts this month'},
+    't-social-mix':     {t:'Content Mix',b:'An honest read on what your recent posts mostly show. A balanced mix of food, people, and the room outperforms a feed that is all promotions or all reposts. Pick the option that best describes your last 10 posts.',e:'Mostly food close-ups with a few event flyers = Balanced'},
+    't-email-lastsend': {t:'Last Send Date',b:'The date you last sent a marketing email to your list. If it has been more than a month, the list is going cold, recipients forget who you are, and open rates fall.',e:'Last campaign sent October 8'},
+    't-email-frequency':{t:'Send Frequency',b:'How often you typically email your list. Weekly or every two weeks keeps the list warm and engaged. Rarely or Never means the list is a dead asset, so move to at least monthly.',e:'A weekly Thursday email announcing the weekend lineup'},
+    't-email-growth':   {t:'List Growth Mechanism',b:'How new contacts get added to your email list. A passive list shrinks over time. A website signup form, an in-store capture point, or WiFi login capture all keep it growing.',e:'WiFi login capture adds about 30 contacts a week'},
+    't-gbp-views':      {t:'GBP Views/Mo',b:'Total monthly views of your Google Business Profile from your GBP Insights dashboard. The number of people who saw your listing in Google Search or Maps. This is the discovery metric Bar Cop multiplies against your conversion rate and check average to calculate Traffic recovery dollars from GBP work.',e:'GBP Insights shows 2,400 profile views this month'},
+    't-social-profile-visits':{t:'Profile Visits/Mo',b:'Total monthly visits to your social profile pages, combined across Instagram and Facebook. Pull from Instagram Insights (Professional Dashboard) and Facebook Page Insights. A profile visit is a stronger signal than a like or a follow because it shows someone clicked through from a post to learn more about the bar.',e:'IG Insights 380 profile visits + FB 120 = 500 total profile visits'},
+    't-delivery-orders':{t:'Total Orders/Mo',b:'Total monthly delivery orders across all active platforms (DoorDash, Uber Eats, Grubhub). Pull from each merchant dashboard and sum. This is the volume metric the Recovery Scoreboard uses to dollarize delivery fixes.',e:'120 DoorDash + 80 Uber Eats + 30 Grubhub = 230 total monthly orders'},
+    't-delivery-avg-order':{t:'Avg Order Value',b:'Average dollar value per delivery order, blended across all your active platforms. Pull from each platform\'s merchant dashboard. The Recovery Scoreboard multiplies your order volume by this value when calculating dollarized recovery from delivery improvements.',e:'$34 avg order across DoorDash, Uber Eats, and Grubhub'},
+    'hs-conv-web':      {t:'Website Session to Visit %',b:'Of all visitors who land on your website, how many show up at the bar within a reasonable window. Industry default is 3% for bar and restaurant sites. The Recovery Scoreboard uses this to dollarize website traffic improvements: weekly session lift × this rate × your check average × 52 = annual recovered dollars. Override once you have your own data.',e:'3% default. A strong site with clear call-to-action buttons runs higher.'},
+    'hs-conv-gbp':      {t:'GBP View to Visit %',b:'Of all guests who view your Google Business Profile listing, how many actually visit the bar. Industry default is 2%. The Recovery Scoreboard uses this to dollarize GBP improvements: monthly view lift × this rate × your check average × 12 = annual recovered dollars.',e:'2% default. A complete profile with strong photos converts higher.'},
+    'hs-conv-social':   {t:'Social Profile to Visit %',b:'Of guests who click through from a social post to your IG or FB profile, how many actually visit. Industry default is 1%. Social-to-visit conversion is lower than search-based channels because the intent is weaker. The Recovery Scoreboard uses this to dollarize social growth.',e:'1% default. Local-content-heavy accounts run higher.'},
+    'hs-conv-email':    {t:'Email Open to Visit %',b:'Of subscribers who open your marketing email, how many visit the bar within a reasonable window. Industry default is 1%. The Recovery Scoreboard uses this with list size and open rate to dollarize email work.',e:'1% default. Lists with strong personal-tone content and consistent monthly sends run higher.'},
+    // Inventory Control tooltips
+    'ic-par-level':     {t:'Par Level',b:'The target quantity to keep on hand for this product. When a count drops below par, the Order Sheet flags it for reordering. Set it to cover normal usage between deliveries plus a small safety buffer.',e:'You use 6 bottles of well vodka a week and order weekly, so par is 8'},
+    'ic-reorder-point': {t:'Reorder Point',b:'The on-hand quantity that should trigger a reorder. Set it a little above zero so you never run out before the next delivery arrives. The Order Sheet flags any product at or below this point.',e:'A reorder point of 2 bottles means you reorder once only 2 are left'},
+    'ic-par-window':    {t:'Window (weeks)',b:'How many recent weeks of counts Bar Cop averages to read your usage. A wider window smooths out one busy or slow week; a tighter window reacts faster to a real change in how fast something moves.',e:'8 weeks averages roughly two months of real draw'},
+    'ic-par-buffer':    {t:'Buffer (%)',b:'Extra cushion added on top of expected usage so a busy stretch does not run you dry before the next delivery. Higher buffer means fewer stock-outs but more cash tied up in stock.',e:'A 30% buffer on 10 units of usage suggests a par of 13'},
+    'ic-par-cycle':     {t:'Delivery Cycle (days)',b:'How often you reorder this kind of product. Bar Cop covers one full cycle of usage plus the buffer, so a par holds you until the next delivery lands.',e:'Order weekly = 7 days. Order twice a week = 3 or 4 days'},
+    'ic-pours-container':{t:'Pours Per Container',b:'Container Size divided by Pour Size. How many standard pours one full container yields. Calculated automatically.',e:'A 750ml bottle of 25.4 oz at a 1.5 oz pour = 16.9 pours'},
+    'ic-product-name':  {t:'Product Name',b:'How this product shows up everywhere in Bar Cop: Take Inventory, Order Sheet, Receive Delivery, Profit Recovery reports. Use the name your bar staff would say at a glance, not the distributor SKU.',e:'Use "Tito\'s Handmade Vodka 750ml" rather than "TITOS-VOD-750-USA"'},
+    'ic-brand':         {t:'Brand',b:'The producer or label, kept separate from product name so reports can group by brand. Optional, leave blank if it does not apply.',e:'Tito\'s · Republic National · Austin Beerworks'},
+    'ic-subcategory':   {t:'Sub-Category',b:'How you organize products within a category. Lets you slice reports by style without polluting the main category list. Free text, pick what makes sense for your bar.',e:'Liquor: Vodka, Bourbon, Tequila · Wine: Red, White, Sparkling · Bottle Beer: Domestic, Import, Craft'},
+    'ic-primary-vendor':{t:'Primary Vendor',b:'The vendor you order this product from. Set up vendors on the Vendors screen first. The Order Sheet groups reorder suggestions by vendor, and Email to Vendor pulls the right contact info from this field.',e:'Republic National for spirits, Glazer\'s for beer, Sysco for food'},
+    'ic-primary-location':{t:'Primary Location',b:'The physical spot in your bar or kitchen where this product lives. Set up locations on the Locations screen. Take Inventory walks you through one location at a time so counting matches the way you move through the room.',e:'Front Bar · Back Bar · Walk-In Cooler · Dry Storage'},
+    'ic-bottle-size':   {t:'Bottle Size',b:'The size of one bottle in ounces. For spirits and wine this drives how many pours you get per bottle and the cost per pour. Pick from the list, Bar Cop converts ml to oz automatically.',e:'750ml = 25.4 oz · 1L = 33.8 oz · 1.75L = 59.2 oz'},
+    'ic-bottle-size-beer':{t:'Bottle Size',b:'How big each individual bottle is. The cost-per-pour math for bottle beer uses Cost per Case divided by Case Size, not this field, but it is here so reports can show what is in the bottle.',e:'12 oz domestic · 16 oz tall boy · 22 oz bomber'},
+    'ic-keg-size':      {t:'Keg Size',b:'The total volume of one full keg. 1/2 BBL is the standard size (1984 oz, about 124 pints). 1/4 BBL is half that. 1/6 BBL is one-third. Pick from the list, Bar Cop converts to ounces.',e:'1/2 BBL = 1984 oz · 1/4 BBL = 992 oz · 1/6 BBL = 661 oz'},
+    'ic-case-size':     {t:'Case Size',b:'How many bottles come in one case. Bottle beer is ordered, received, and counted in cases, so this is the number Bar Cop divides your cost-per-case by to get the per-bottle cost the math needs.',e:'Common case sizes: 6, 12, 18, 24, 30'},
+    'ic-unit-type':     {t:'Unit Type',b:'The unit you buy and count this item in. Picking the right unit keeps par levels and cost-per-unit consistent across vendors and reports.',e:'lb for items by weight · each for items counted individually · case or bag for bulk · gallon or quart for liquids'},
+    'ic-cost-per-bottle':{t:'Cost per Bottle',b:'What you pay your vendor for one bottle, taken straight off the invoice. Bar Cop divides by pours per bottle to get the cost per pour the menu math needs. When a delivery comes in at a new price and you confirm it on Receive Delivery, Bar Cop updates this cost for you, so you never have to remember to.',e:'Case of Tito\'s 750ml at $180 = $15 per bottle'},
+    'ic-cost-per-case': {t:'Cost per Case',b:'What you pay for one full case. Bar Cop divides by Case Size to get the per-bottle cost, so pour cost percentage stays accurate. Enter per-case, not per-bottle. When a delivery comes in at a new price and you confirm it on Receive Delivery, Bar Cop updates this cost for you, so you never have to remember to.',e:'A case of 24 Modelo Especial at $32.40 = $32.40 per case (Bar Cop figures the $1.35 per bottle)'},
+    'ic-cost-per-keg':  {t:'Cost per Keg',b:'What you pay your distributor for one full keg. Bar Cop divides by pours per keg (keg size divided by pour size) to get the cost-per-pour the menu math needs. When a delivery comes in at a new price and you confirm it on Receive Delivery, Bar Cop updates this cost for you, so you never have to remember to.',e:'1/2 BBL of Pearl Snap at $165 with a 16 oz pour: 1984 oz / 16 = 124 pours, $165 / 124 = $1.33 per pint'},
+    'ic-cost-per-unit': {t:'Cost per Unit',b:'What you pay per unit you set in Unit Type. Pull from your most recent invoice for that item. When a delivery comes in at a new price and you confirm it on Receive Delivery, Bar Cop updates this cost for you, so you never have to remember to.',e:'Ground beef at $4.20 per pound, romaine at $22 per case, simple syrup at $3.50 per quart'},
+    'ic-draft-pour':    {t:'Standard Pour',b:'Your standard glass size for this draft, usually 16 oz for a pint. Cost per Pour uses this number. If you also serve pitchers, growlers, or half-pours, each one is a separate menu item in Revenue Recovery with its own recipe that draws the right ounces from this keg (a 60 oz pitcher recipe pulls 60 oz). Variance against your POS adds them all up correctly.',e:'16 oz pint is standard. 12 oz "small" and 60 oz pitcher live as separate menu items in Revenue Recovery'},
+    'ic-notes':         {t:'Notes',b:'Free-form notes for your own reference. Anything that helps you or a new manager understand this product. Does not show up on operational screens.',e:'Substitute for Espolon when out, vendor only delivers Tuesday, holiday seasonal item'},
+    'ic-cost-per-bottle-calc':{t:'Cost per Bottle',b:'Cost per Case divided by Case Size. Per-bottle cost Bar Cop uses for pour cost math.',e:'$32.40 case / 24 bottles = $1.35 per bottle'},
+    'ic-bottles-per-case':{t:'Bottles per Case',b:'Echo of the Case Size you set above, shown alongside the per-bottle cost for quick sanity check.',e:'24 bottles in a case of standard domestic beer'},
+    'pb-yield':       {t:'Batch Yield',b:'How much the entire batch makes when you finish it. Set the amount and the unit. Bar Cop divides this by the serving size to figure out how many servings one batch yields.',e:'A frozen margarita mix that makes 1 gallon = 1 + gallons'},
+    'pb-serving':     {t:'Serving Size',b:'How much one drink or plate pulls from the batch. Bar Cop divides the batch yield by this to get servings per batch, then splits the batch cost across them.',e:'5 oz of mix per frozen margarita'},
+    'pb-spb':         {t:'Servings Per Batch',b:'Batch Yield divided by Serving Size. How many servings one finished batch makes. Calculated for you from the two fields to its left.',e:'1 gallon (128 oz) at 5 oz a serving = 25.6 servings'},
+    'pb-ing-qty':     {t:'Quantity',b:'How much of this ingredient the whole batch uses, in the product\'s own unit: bottles for spirits and wine, units for everything else. The line cost is this times the product\'s current cost.',e:'2 bottles of tequila in the margarita mix'},
+    'ic-liquor-pour':   {t:'Pour Size',b:'Your standard pour for this liquor, the amount that goes into a single well drink or shot. Cost per Pour is built off this. Leave it on your house standard; if you also sell doubles or happy hour pours, add them under Other Sizes Sold.',e:'A 1.5 oz pour out of a 25.4 oz bottle yields about 16.9 pours'},
+    'ic-liquor-pour-price':{t:'Pour Price',b:'What a single standard pour of this liquor rings up for on its own, a well drink or a shot. This sets the pour cost percent for the standard pour. Other prices like doubles or happy hour go under Other Sizes Sold.',e:'A $7 well pour on a $1.10 cost pour is a 16% pour cost'},
+    'ic-wine-glass-size':{t:'Glass Size',b:'The size of one pour by the glass, in ounces. This drives how many glasses you get out of a bottle and the cost per glass. Selling this wine only by the bottle? Set the glass size equal to the bottle size so one pour is the whole bottle.',e:'A 6 oz glass out of a 25.4 oz bottle is about 4.2 glasses'},
+    'ic-wine-glass-price':{t:'Glass Price',b:'What one glass of this wine sells for. This sets the pour cost percent for the by-the-glass pour. If you also sell the whole bottle at a different price, add it under Other Sizes Sold.',e:'An $8 glass on a $1.65 cost glass is a 21% pour cost'},
+    'ic-draft-pour-price':{t:'Pour Price',b:'What your standard draft pour sells for, usually the pint price. This sets the pour cost percent for the standard pour. Pitchers, half-pours, and happy hour go under Other Sizes Sold, each with its own price.',e:'A $6 pint on a $1.33 cost pour is a 22% pour cost'},
+    'ic-beer-bottle-price':{t:'Price per Bottle',b:'What one bottle of this beer rings up for. Bottle beer is sold by the bottle, so this is the per-bottle menu price. Cost per Case divided by Case Size gives the per-bottle cost behind your pour cost percent.',e:'A $6 bottle on a $1.35 per-bottle cost is a 22% pour cost'},
+    'ic-serving-sizes': {t:'Other Sizes Sold',b:'The other ways this same bottle or keg sells, beyond your standard pour above. Each size carries its own price and shows its own pour cost, because a bigger or discounted size is a different margin. Your shelf is still counted as one pool; this just captures the extra price points so each size reads honest.',e:'A 60 oz pitcher at $18 added alongside your standard pour'},
+    'ic-serving-sizes-liquor':{t:'Other Pours Sold',b:'Other pours of this liquor beyond your standard pour above. A double at twice the ounces, a happy hour pour at a lower price, a tall well. Each carries its own price and reads its own pour cost, because a discounted or larger pour is a different margin. The bottle is still one counted pool.',e:'Standard 1.5 oz at $7, plus a Double at 3 oz / $12 added here'},
+    'ic-serving-sizes-wine':{t:'Other Sizes Sold',b:'Other ways this wine sells beyond the glass above. The common one is by the bottle: add a size set to the bottle ounces, priced at your bottle price. A split or half-bottle is the same idea at its own size. Each reads its own pour cost. The shelf is still one counted pool.',e:'Glass 6 oz at $8, plus a Bottle at 25.4 oz / $21 added here'},
+    'ic-serving-sizes-draft':{t:'Other Sizes Sold',b:'Other sizes this draft sells beyond your standard pour above. A 12 oz short, a 60 oz pitcher, a happy hour pint. Each carries its own price and reads its own pour cost, because a pitcher and a pint are different margins. The keg is still one counted pool.',e:'Pint 16 oz at $7, plus a Pitcher at 60 oz / $18 added here'},
+    'sp-restock':     {t:'Restocked Mid-Shift',b:'Full bottles you brought up from storage and added to the bar after the pre-shift count. Bar Cop adds these to what you started with, so the amount used comes out honest.',e:'Pre-shift 3 bottles, restocked 6 mid-shift, post-shift 4 means you used 5, not 1'},
+    'sp-restock-keg': {t:'Restocked Mid-Shift',b:'Fresh kegs you tapped after the pre-shift count. Bar Cop adds them to the keg you started with so the pour count stays honest across a keg change.',e:'Started near empty, blew the keg and tapped a fresh one, count the fresh keg here'},
+    'dr-bank':        {t:'Default Opening Bank',b:'The starting cash this drawer normally opens with. Bar Cop pre-fills the opening bank when you start a shift on this drawer, so you are not retyping it every day. Leave it blank if the bank varies.',e:'Main bar opens with $300 every night'},
+    'sp-pos-pours':   {t:'POS Pours Sold',b:'Pours your POS rang in for this product this shift. Bar Cop compares it to what your pre and post counts say you poured. A large gap points to overpouring, give-aways, or theft.',e:'Counts say 40 pours left the bottle, POS rang 33, that is 7 pours unaccounted for'},
+    'sp-pos-btl':     {t:'POS Bottles Sold',b:'Bottles your POS rang in for this beer this shift. Bar Cop compares it to the bottles your counts say left the cooler. A gap is give-aways, walk-offs, or theft.',e:'Counts say 48 bottles left the cooler, POS rang 44, that is 4 bottles unaccounted for'},
+    'rd-qty':         {t:'Qty Received',b:'How many you actually counted off the truck, not what the invoice claims. If it comes up short of what you ordered, Bar Cop flags the line so you can claim the credit. Bottle beer is counted in cases.',e:'Ordered 6, only 5 showed up, enter 5'},
+    'rd-price':       {t:'Unit Price',b:'What the vendor charged per unit on this invoice. It pre-fills from your master cost. Change it to match the invoice and Bar Cop flags the difference so you can apply the new cost or dispute it. Bottle beer price is per case.',e:'Master cost $14.50, invoice shows $15.75, enter 15.75'},
+    'em-qty':         {t:'Quantity',b:'How many empty containers you are logging in this entry. Count the actual empties you are clearing. Bar Cop knows the unit from the product: kegs for draft, bottles for everything else.',e:'18 empty bottles pulled off the bar = 18'},
+    'em-deposit':     {t:'Deposit',b:'The deposit charged per container, if there is one. Bar Cop multiplies it by the quantity to track the money you can claim back when you return them. Leave it blank when there is no deposit.',e:'5 cents a can in a deposit state = 0.05'},
+    'adj-qty':        {t:'Quantity',b:'How much you are adjusting out or in, in the unit shown next to it. Bar Cop multiplies it by the product cost to estimate the dollar value of the write-off or the find.',e:'3 bottles of well vodka damaged in storage = 3'},
+    'rpt-u-usage':    {t:'Usage Data',b:'Per-product consumption for the period: starting stock, purchases, ending, units used, and the cost and theoretical sales behind it.'},
+    'rpt-u-totals':   {t:'Usage Totals',b:'The period rolled up: total usage cost, theoretical sales and profit, broken out by category.'},
+    'rpt-u-history':  {t:'Usage History',b:'Usage cost and theoretical profit for every count period, so you can watch the trend over time.'},
+    'rpt-m-fast':     {t:'Fast Movers',b:'Your top products by usage dollars this period. Ranked by money so a cheap high-volume item and a pricey low-volume one compare fairly.'},
+    'rpt-m-slow':     {t:'Slow Movers',b:'Your bottom products by usage dollars. Slow movers tie up cash and risk spoiling. Filter by category to compare like with like.'},
+    'rpt-m-trend':    {t:'Trend vs Prior',b:'How each product moved this period versus the period before, biggest swing first. Spot a product taking off or falling off.'},
+    'rpt-m-vendor':   {t:'Vendor Spend',b:'Your usage cost grouped by vendor. Shows who you spend the most with, your leverage when you sit down to negotiate pricing.'},
+    'rpt-s-category': {t:'By Category',b:'Current on-hand value from your latest count, grouped by category, with each category\'s share of your total stock.'},
+    'rpt-s-location': {t:'By Location',b:'Current on-hand value grouped by where it is stored, so you know how much cash sits in each room.'},
+    'rpt-s-prior':    {t:'vs Last Count',b:'How your stock value changed from the last count to this one, by category. Rising value can mean you are over-ordering.'},
+    'rpt-s-highest':  {t:'Highest Value',b:'The ten products holding the most cash on your shelves right now.'},
+    'rpt-s-lowest':   {t:'Lowest Value',b:'The ten products holding the least value on hand right now.'},
+    'rpt-s-dead':     {t:'Dead Stock',b:'Products you are holding value in but barely touched this period. Dead cash and spoilage risk, your cue to stop re-ordering or cut the item.'},
+    'rpt-v-sales':    {t:'Sales Variance',b:'What your poured product should have rung up versus what the POS actually rang. A gap is product that left without a matching sale.'},
+    'rpt-v-usage':    {t:'Usage Variance',b:'What your counts say you used versus what the POS sold, after comps and waste, in each category\'s own unit: ounces, pours and bottles for liquor and wine, ounces and kegs for draft, bottles and cases for bottle beer, quarts for mixers, and the ingredient\'s own unit for food. Positive variance is unexplained loss: over-pour, theft, over-portioning, or a count error.'},
+    'vr-unmatched':   {t:'Unmatched POS Products',b:'POS rows that did not line up with a product or a menu item by name. Map each one to the right product or menu item from the dropdown, or leave it skipped if it is not something you track. Menu items like cocktails and plates explode through their recipe, so each ingredient gets its share of the variance.'},
+    'vr-std-liquor':  {t:'Liquor Standard',b:'Liquor is poured by the ounce, so a little variance is normal from over-pour and spillage. Set the most you will accept; anything over this percent flags to investigate, below it is OK. Keep it tight to catch heavy free-pouring and theft. Change it to your own pour discipline.'},
+    'vr-std-wine':    {t:'Wine Standard',b:'Wine by the glass carries a touch more variance than liquor because of the last glass in the bottle. Set the most you will accept; over it flags. Wine sold by the bottle is judged under By the Bottle instead, not here.'},
+    'vr-std-draft':   {t:'Draft Standard',b:'Draft runs the widest because foam, line cleaning, and keg ends all cost ounces. Set the most you will accept; over it flags. Loosen or tighten it to match your tap system.'},
+    'vr-std-bottle':  {t:'By the Bottle Standard',b:'Covers anything sold by the bottle: bottle beer, wine by the bottle, and champagne splits. It is simple bottle-in, bottle-out, so there is no pour variance to forgive. Bar Cop flags the moment this many bottles are unaccounted, after comps and waste come out. Set it to 1 to catch every missing bottle, higher to allow for honest miscounts.'},
+    'vr-std-misc':    {t:'Mixer Standard',b:'Mixers are measured by eye in the quart, so the line sits wider. Set the most you will accept; over it usually means waste or a recipe that has drifted from the pour. Adjust to taste.'},
+    'vr-std-food':    {t:'Food Standard',b:'Food carries real yield and trim loss, but over-portioning is a true cost leak. Set the most you will accept; over it flags. Tighten or loosen it to match how tightly your kitchen portions.'},
+    'lws-min-wage':   {t:'State Minimum Wage',b:'The hourly minimum wage in your state. Bar Cop uses it for one thing: the tip-credit check on the payroll worksheet. If a tipped employee\'s base wage plus their tip share comes out below this for the week, Bar Cop flags the row on Pay Periods so you can make up the difference before payroll runs. Leave it blank if your state does not allow a tip credit or you do not run tip-credit math. This value is for planning and payroll review only. Verify the current wage and tip-credit rules for your jurisdiction before processing payroll.'},
+    'bs-tmpl-name':   {t:'Template Name',b:'Name this week to also save it as a reusable template when you save the schedule. Leave it blank to just post the schedule with no template. If you loaded a template, its name is already here: keep it to update that template, or change it to save a new one under the new name.'},
   },
-
-  render(container) {
-    const secs = [
-      { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
-      { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
-      { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true },
-      { id:'traffic', title:'Traffic Targets',           body:this.secTraffic(),       save:true },
-      { id:'links',   title:'Operation Links',           body:this.secLinks(),         save:true },
-      { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true }
-    ];
-    container.scrollTop = 0;
-
-    const cards = secs.map(s =>
-      '<div class="hs-card" data-section="' + s.id + '" '
-      + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
-      + this.sectionHead(s.id, s.title, s.save)
-      + s.body
-      + '</div>'
-    ).join('');
-
-    container.innerHTML =
-      '<div class="screen">'
-      + cards
-      + '</div>';
-    if (App.setHubTopbarActions) App.setHubTopbarActions('');
-    this.wire(container);
+  show(icon) {
+    const id = icon.dataset.tt;
+    const def = this.defs[id];
+    if (!def) return;
+    if (this._cur === icon) { this.hide(); return; }
+    this._cur = icon;
+    document.getElementById('tt-title').textContent = def.t;
+    document.getElementById('tt-body').textContent  = def.b;
+    const eg = document.getElementById('tt-eg');
+    if (def.e) { eg.textContent = 'Example: ' + def.e; eg.style.display = ''; }
+    else eg.style.display = 'none';
+    this._box.style.display = 'block';
+    this._box.classList.remove('on');
+    const rect = icon.getBoundingClientRect();
+    const bw = 260, bh = this._box.offsetHeight || 100;
+    let left = rect.right + 8, top = rect.top - 4;
+    if (left + bw > window.innerWidth - 12) left = rect.left - bw - 8;
+    if (top + bh > window.innerHeight - 12) top = window.innerHeight - bh - 12;
+    if (top < 8) top = 8;
+    this._box.style.left = left + 'px';
+    this._box.style.top = top + 'px';
+    requestAnimationFrame(() => this._box.classList.add('on'));
   },
-
-  // Card header: title left, Saved indicator + Save Data button right.
-  // Save button styled like the "Go" buttons in Getting Started (ghost, small).
-  sectionHead(id, title, hasSave) {
-    return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-      + '<div style="flex:1;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
-      + (hasSave
-          ? '<span class="hs-msg" data-msg="' + id + '" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
-            + '<button class="btn btn-ghost btn-sm hs-save" data-save="' + id + '" style="flex-shrink:0;font-size:10px;padding:4px 10px;">Save Data</button>'
-          : '')
-      + '</div>';
-  },
-
-  // ── Section bodies ──────────────────────────────────────────────────────────
-  secProfile() {
-    const s = App.data.settings || {};
-    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:195px;"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
-      + '<div class="f" style="width:100px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
-      + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
-      + '<div class="f" style="width:145px;"><label>Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Revenue"/></div></div>'
-      + '<div class="f" style="width:145px;"><label>Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Revenue"/></div></div>'
-      + '</div>';
-  },
-
-  secProfit() {
-    const t = (App.data.settings||{}).targets || {};
-    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '</div>';
-  },
-
-  secRevenue() {
-    const rt = ((App.data.revenue_settings||{}).targets) || {};
-    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('r-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-bl" value="' + (rt.bar_labor_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Kitchen Labor % ' + tt('r-kitchen-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-kl" value="' + (rt.kitchen_labor_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Floor Labor % ' + tt('r-floor-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-fl" value="' + (rt.floor_labor_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rl" value="' + (rt.rplh_lunch ?? 50) + '"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
-      + '</div>';
-  },
-
-  secTraffic() {
-    const tg = ((App.data.traffic_settings||{}).targets) || {};
-    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:140px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5"/><span class="suf">&#9733;</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>New Reviews / Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
-      + '</div>';
-  },
-
-  // Operation Links — operator's public URLs for each digital platform. The
-  // Traffic Audit fetches public data from these (where possible) and Recovery
-  // screens use them for "Open Live" click-throughs to the operator's actual
-  // listings. One-time setup.
-  secLinks() {
-    const u = ((App.data.traffic_settings || {}).urls) || {};
-    const field = (id, label, val, ph) =>
-      '<div class="f" style="width:100%;"><label>' + label + '</label>'
-      + '<input type="url" id="' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(ph) + '"/></div>';
-    const rows = App.TRAFFIC_PLATFORMS.map(p =>
-      field('hs-url-' + p.urlKey, p.label, u[p.urlKey], p.placeholder)
-    ).join('');
-    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
-      + 'Paste the public URL for each platform. Bar Cop uses these for one-click access to your live listings and pulls public data from them into the Traffic Audit.'
-      + '</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;">' + rows + '</div>';
-  },
-
-  // Traffic Recovery Scoreboard conversion rates. Each rate maps a Traffic
-  // metric improvement to a dollar figure via check_avg × this rate. Defaults
-  // are industry benchmarks; operator can override per channel based on their
-  // own data once they have it.
-  secTrafficConv() {
-    const c = ((App.data.traffic_settings || {}).conversion_rates) || {};
-    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
-      + 'How often each digital signal turns into an actual guest visit. These rates power dollar figures on the Recovery Scoreboard for Traffic fixes. Defaults are industry benchmarks for bar and restaurant operations. Override if your own data shows a different conversion.'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;"><label>Website Session to Visit ' + tt('hs-conv-web') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-web" value="' + (c.web_session_to_visit ?? 3) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>GBP View to Visit ' + tt('hs-conv-gbp') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-gbp" value="' + (c.gbp_view_to_visit ?? 2) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>Social Profile to Visit ' + tt('hs-conv-social') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-social" value="' + (c.social_profile_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>Email Open to Visit ' + tt('hs-conv-email') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-email" value="' + (c.email_open_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '</div>';
-  },
-
-  // secShift removed. Cash variance tolerance now lives in Shift Control's
-  // own Setup section (Cash Tolerances) so all Control setup stays with the
-  // module it controls. Hub Settings keeps only genuinely cross-system fields.
-
-  // ── Wiring ──────────────────────────────────────────────────────────────────
-  wire(container) {
-    container.querySelectorAll('.hs-save').forEach(btn => {
-      btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
-    });
-  },
-
-  _flashSaved(id) {
-    const m = document.querySelector('.hs-msg[data-msg="' + id + '"]');
-    if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 2500); }
-  },
-
-  // ── Per-section save — writes only that section's existing keys ─────────────
-  saveSection(which) {
-    const numOr = (id, d) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? d : v; };
-    const keys = [];
-
-    if (which === 'profile') {
-      const s = App.data.settings;
-      const city  = document.getElementById('hs-city')?.value.trim() || '';
-      const state = document.getElementById('hs-state')?.value.trim() || '';
-      s.bar_name            = document.getElementById('hs-name')?.value.trim() || '';
-      s.city_state          = city && state ? city + ', ' + state : city || state || '';
-      s.annual_bar_revenue  = numOr('hs-abr', 0);
-      s.annual_food_revenue = numOr('hs-afr', 0);
-      keys.push('settings');
-    } else if (which === 'profit') {
-      const s = App.data.settings;
-      s.targets = Object.assign({}, s.targets, {
-        bar_pour_cost_pct:  numOr('hs-bpc', 22),
-        food_cost_pct:      numOr('hs-fc', 32),
-        bar_labor_cost_pct: numOr('hs-bl', 28),
-        food_labor_cost_pct:numOr('hs-fl', 30),
-        prime_cost_pct:     numOr('hs-pc', 60)
-      });
-      keys.push('settings');
-    } else if (which === 'revenue') {
-      const rs = App.data.revenue_settings = App.data.revenue_settings || {};
-      rs.targets = Object.assign({}, rs.targets, {
-        check_avg:         numOr('hs-r-ca', 35),
-        bar_labor_pct:     numOr('hs-r-bl', 28),
-        kitchen_labor_pct: numOr('hs-r-kl', 30),
-        floor_labor_pct:   numOr('hs-r-fl', 32),
-        rplh_lunch:        numOr('hs-r-rl', 50),
-        rplh_dinner:       numOr('hs-r-rd', 75),
-        rplh_bar:          numOr('hs-r-rb', 65),
-        event_close_rate:  numOr('hs-r-ec', 40)
-      });
-      keys.push('revenue_settings');
-    } else if (which === 'traffic') {
-      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-      ts.targets = Object.assign({}, ts.targets, {
-        google_rating:      numOr('hs-t-gr', 4.3),
-        review_velocity:    numOr('hs-t-rv', 8),
-        response_rate:      numOr('hs-t-rr', 75),
-        monthly_sessions:   numOr('hs-t-ms', 2000),
-        social_posts_month: numOr('hs-t-sp', 12)
-      });
-      keys.push('traffic_settings');
-    } else if (which === 'links') {
-      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-      const strOr = (id) => (document.getElementById(id)?.value || '').trim();
-      const next = Object.assign({}, ts.urls);
-      App.TRAFFIC_PLATFORMS.forEach(p => { next[p.urlKey] = strOr('hs-url-' + p.urlKey); });
-      ts.urls = next;
-      keys.push('traffic_settings');
-    } else if (which === 'tconv') {
-      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-      ts.conversion_rates = Object.assign({}, ts.conversion_rates, {
-        web_session_to_visit:    numOr('hs-conv-web',    3),
-        gbp_view_to_visit:       numOr('hs-conv-gbp',    2),
-        social_profile_to_visit: numOr('hs-conv-social', 1),
-        email_open_to_visit:     numOr('hs-conv-email',  1)
-      });
-      keys.push('traffic_settings');
-    } else {
-      return;
-    }
-
-    Promise.all(keys.map(k => App.saveKey(k))).then(() => {
-      this._flashSaved(which);
-      App.updatePeriod();
-      // Saving any target group counts as completing the Hub Getting Started
-      // targets task — Profit, Revenue, or Traffic. Profile is auto-completed
-      // by the onboarding wizard, so this is the second Foundation task.
-      if (which === 'profit' || which === 'revenue' || which === 'traffic') {
-        App.markSetupDone('gs_targets');
-      }
-    });
-  },
-
-  // ── Data backup (Section 15) ───────────────────────────────────────────────
-  // A full, self-contained backup: the Recovery data blob plus all three
-  // Control stores. Plain JSON the operator keeps offsite.
-  _backupMsg(text, color) {
-    const m = document.getElementById('ua-backup-msg');
-    if (m) { m.style.color = color || 'var(--gold)'; m.textContent = text; m.style.display = 'block'; }
-  },
-
-  exportBackup() {
-    const backup = {
-      _backup: 'barcop',
-      version: 1,
-      exported_at: new Date().toISOString(),
-      bar_name: (App.data.settings && App.data.settings.bar_name) || '',
-      data:          App.data || {},
-      inventoryData: App.inventoryData || {},
-      laborData:     App.laborData || {},
-      shiftData:     App.shiftData || {}
-    };
-    try {
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url  = URL.createObjectURL(blob);
-      const safe = (backup.bar_name || 'bar-cop').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'bar-cop';
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'barcop-backup-' + safe + '-' + new Date().toISOString().slice(0, 10) + '.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      this._backupMsg('Backup downloaded. Keep it somewhere safe.', 'var(--gold)');
-    } catch (e) {
-      this._backupMsg('Could not create the backup file: ' + (e.message || 'unknown error'), 'var(--red)');
-    }
-  },
-
-  async importBackup(ev) {
-    const file = ev.target.files && ev.target.files[0];
-    ev.target.value = '';
-    if (!file) return;
-    let backup;
-    try {
-      backup = JSON.parse(await file.text());
-    } catch (e) {
-      this._backupMsg('That file is not readable. Pick a Bar Cop backup file.', 'var(--red)');
-      return;
-    }
-    if (!backup || backup._backup !== 'barcop' || !backup.data) {
-      this._backupMsg('That is not a Bar Cop backup file.', 'var(--red)');
-      return;
-    }
-    const when = backup.exported_at
-      ? new Date(backup.exported_at).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
-      : 'an unknown date';
-    const ok = await App.confirm({
-      title: 'Restore the backup from ' + when + '?',
-      message: 'This replaces every record currently in your account: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.',
-      confirmText: 'Restore',
-      cancelText: 'Cancel'
-    });
-    if (!ok) return;
-    this._backupMsg('Restoring backup...', 'var(--t3)');
-    try {
-      App.data          = backup.data;
-      App.inventoryData = backup.inventoryData || {};
-      App.laborData     = backup.laborData || {};
-      App.shiftData     = backup.shiftData || {};
-      await App.save();
-      await App.saveInventory();
-      await App.seedEventStores('ic');
-      await App.saveLabor();
-      await App.seedEventStores('lc');
-      await App.saveShift();
-      await App.seedEventStores('sc');
-      await App.seedEventStores('core');   // recovery event logs -> core_events rows
-      this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (e) {
-      this._backupMsg('Restore failed: ' + (e.message || 'unknown error'), 'var(--red)');
-    }
-  },
-
-  async loadSample() {
-    const msg = document.getElementById('ua-test-msg');
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
-
-    const uid = () => App.uid();
-    const today = new Date();
-    const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return d.toISOString().slice(0,10); };
-
-    // ── Settings ──
-    App.data.settings.bar_name           = 'The Anchor Bar & Kitchen';
-    App.data.settings.city_state         = 'Austin, TX';
-    App.data.settings.annual_bar_revenue = 624000;
-    App.data.settings.annual_food_revenue= 374400;
-    App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, bar_labor_cost_pct:28, food_labor_cost_pct:30, prime_cost_pct:60 };
-    App.data.settings.onboarding_complete= true;
-
-    // ── Bar Products ──
-    const bp = [
-      { id:uid(), name:"Tito's Handmade Vodka",    category:'Spirits',      vendor:'Republic National', bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:14.99, menu_price:9.00  },
-      { id:uid(), name:"Espolòn Tequila Blanco",   category:'Spirits',      vendor:'Republic National', bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:17.49, menu_price:10.00 },
-      { id:uid(), name:"Hendrick's Gin",            category:'Spirits',      vendor:'RNDC',              bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:24.99, menu_price:12.00 },
-      { id:uid(), name:"Jack Daniel's Old No. 7",   category:'Spirits',      vendor:'Republic National', bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:16.99, menu_price:9.00  },
-      { id:uid(), name:"Bacardi Superior Rum",      category:'Spirits',      vendor:'RNDC',              bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:11.99, menu_price:8.00  },
-      { id:uid(), name:"Bud Light",                 category:'Beer - Bottle',vendor:'Glazer\'s',         bottle_size_oz:12,   std_pour_oz:12,  cost_per_unit:1.10,  menu_price:4.00  },
-      { id:uid(), name:"Modelo Especial",           category:'Beer - Bottle',vendor:'Glazer\'s',         bottle_size_oz:12,   std_pour_oz:12,  cost_per_unit:1.35,  menu_price:5.00  },
-      { id:uid(), name:"Austin Beerworks IPA",      category:'Beer - Draft', vendor:'Austin Beerworks',  bottle_size_oz:661,  std_pour_oz:16,  cost_per_unit:85.00, menu_price:6.00  },
-      { id:uid(), name:"Kim Crawford Sauvignon Blanc",category:'Wine',       vendor:'RNDC',              bottle_size_oz:25.4, std_pour_oz:5,   cost_per_unit:12.99, menu_price:9.00  },
-      { id:uid(), name:"Well Whiskey",              category:'Spirits',      vendor:'Republic National', bottle_size_oz:33.8, std_pour_oz:1.5, cost_per_unit:9.99,  menu_price:7.00  },
-    ].map(p => {
-      const pours = p.bottle_size_oz / p.std_pour_oz;
-      const cpp   = p.cost_per_unit / pours;
-      const pct   = cpp / p.menu_price * 100;
-      return { ...p, pours_per_bottle: pours, cost_per_pour: cpp, pour_cost_pct: pct, created_at: new Date().toISOString() };
-    });
-    App.data.bar_products = bp;
-
-    // ── Kitchen Products ──
-    const kp = [
-      { id:uid(), name:'Chicken Breast',      category:'Protein',    vendor:'Sysco',  unit:'lb',   cost_per_unit:3.20 },
-      { id:uid(), name:'Beef Brisket',        category:'Protein',    vendor:'Sysco',  unit:'lb',   cost_per_unit:5.80 },
-      { id:uid(), name:'Romaine Lettuce',     category:'Produce',    vendor:'Sysco',  unit:'head', cost_per_unit:1.50 },
-      { id:uid(), name:'Lime Juice',          category:'Mixer/Supply',vendor:'Sysco', unit:'qt',   cost_per_unit:4.50 },
-      { id:uid(), name:'Triple Sec',          category:'Mixer/Supply',vendor:'RNDC',  unit:'bottle',cost_per_unit:8.99 },
-      { id:uid(), name:'Simple Syrup',        category:'Mixer/Supply',vendor:'Sysco', unit:'qt',   cost_per_unit:3.25 },
-      { id:uid(), name:'Burger Patties 8oz',  category:'Protein',    vendor:'Sysco',  unit:'each', cost_per_unit:2.80 },
-      { id:uid(), name:'Cheddar Cheese',      category:'Dairy',      vendor:'Sysco',  unit:'lb',   cost_per_unit:4.20 },
-      { id:uid(), name:'Nacho Chips',         category:'Dry Goods',  vendor:'Sysco',  unit:'bag',  cost_per_unit:3.50 },
-      { id:uid(), name:'Queso Sauce',         category:'Dairy',      vendor:'Sysco',  unit:'qt',   cost_per_unit:5.00 },
-    ].map(p => ({ ...p, created_at: new Date().toISOString() }));
-    App.data.kitchen_products = kp;
-
-    // Recipes are built further down, once ic_products exists — see
-    // "── Recipes" after the Inventory Control block.
-
-    // ── 12 Weeks of Data — derived from the locked Anchor profile ──
-    // Every figure traces to window.ANCHOR so Profit, Revenue and the Control
-    // modules all describe one operation. Week 1 is oldest, week 12 most recent.
-    const weeks = window.ANCHOR.weeks.map(a => {
-      const endDate = dateStr((12 - a.wk) * 7);
-      const bar_count = bp.map(p => {
-        const used = +(Math.random()*3+0.5).toFixed(2);
-        return { product_id:p.id, beg_inv:+(Math.random()*2+0.5).toFixed(1), purchases:+(Math.random()*4+1).toFixed(0), end_inv:+(Math.random()*1.5).toFixed(1), units_used:used, total_cost:+(used*p.cost_per_unit).toFixed(2) };
-      });
-      const bar_variance = bp.map(p => {
-        const cnt = bar_count.find(c=>c.product_id===p.id);
-        const actualPours = (cnt?.units_used||0) * p.pours_per_bottle;
-        const theo = Math.round(actualPours * (0.95 + Math.random()*0.08));
-        const varU = +(actualPours - theo).toFixed(1);
-        return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':'Over: Investigate' };
-      });
-      return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:new Date().toISOString(),
-        bar:{ revenue:a.bar_rev, cogs:a.bar_cogs, labor:a.bar_labor, cost_pct:a.bar_pour_pct,
-              labor_pct:a.bar_labor/a.bar_rev*100, vs_target_pct:a.bar_pour_pct-22, vs_target_dollar:((a.bar_pour_pct-22)/100)*a.bar_rev },
-        food:{ revenue:a.food_rev, cogs:a.food_cogs, labor:a.food_labor, cost_pct:a.food_cost_pct,
-               labor_pct:a.food_labor/a.food_rev*100, vs_target_pct:a.food_cost_pct-32, vs_target_dollar:((a.food_cost_pct-32)/100)*a.food_rev },
-        prime_cost_pct:a.prime_cost_pct, bar_count, bar_variance, food_count:[], notes:'' };
-    });
-    App.data.weeks = weeks;
-
-    // ── Dead-array seeds removed (shifts / reconciliations / vendor_log):
-    //    cash recon now lives in Shift Control; these were vestigial. ──
-
-    // ── Theft Scores ──
-    App.data.theft_scores = [
-      { id:uid(), date:dateStr(60), scores:{0:3,1:4,2:3,3:4,4:3,5:4,6:3,7:4,8:3,9:3,10:4,11:4}, total:42, rating:'High Risk: Immediate Action' },
-      { id:uid(), date:dateStr(30), scores:{0:2,1:3,2:2,3:3,4:2,5:3,6:2,7:3,8:2,9:2,10:3,11:3}, total:30, rating:'Moderate Risk: Tighten Controls' },
-      { id:uid(), date:new Date().toISOString(),  scores:{0:1,1:2,2:1,3:2,4:1,5:2,6:1,7:2,8:1,9:2,10:2,11:2}, total:19, rating:'Low Risk: Strong Controls' },
-    ];
-    App.data.last_theft_score_date = new Date().toISOString();
-
-    // ── Sample Audit Records (Profit + Revenue) ──
-    // Three months of audits each, telling The Anchor Bar's recovery story.
-    const daysAgoISO = (n) => new Date(Date.now() - n*24*60*60*1000).toISOString();
-    const mkAudit = (mod, p) => {
-      const d = p.raw;
-      const sections = {};
-      const items = [];
-      if (mod === 'profit') {
-        if (d.S1_SCORE != null) sections['Bar Cost and Pour Control'] = d.S1_SCORE;
-        if (d.S2_SCORE != null) sections['Theft and Loss Prevention'] = d.S2_SCORE;
-        if (d.S3_SCORE != null) sections['Food Cost Control']         = d.S3_SCORE;
-        if (d.S4_SCORE != null) sections['Vendor Control']            = d.S4_SCORE;
-        if (d.S5_SCORE != null) sections['Prime Cost']                = d.S5_SCORE;
-        if (d.S1_MONTHLY_GAP    > 0) items.push({ action:'Reduce bar pour cost. $'+Math.round(d.S1_MONTHLY_GAP)+'/month gap vs target.', monthly_impact:d.S1_MONTHLY_GAP, gap_id:'pour-cost' });
-        if (d.S3_MONTHLY_GAP    > 0) items.push({ action:'Reduce food cost. $'+Math.round(d.S3_MONTHLY_GAP)+'/month gap vs target.', monthly_impact:d.S3_MONTHLY_GAP, gap_id:'food-cost' });
-        if (d.S2_MONTHLY_GAP    > 0) items.push({ action:'Address void and comp rate. $'+Math.round(d.S2_MONTHLY_GAP)+'/month in excess.', monthly_impact:d.S2_MONTHLY_GAP, gap_id:'theft-loss' });
-        if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action:'Improve vendor verification. $'+Math.round(d.S4_EXPOSURE_MONTHLY)+'/month exposure.', monthly_impact:d.S4_EXPOSURE_MONTHLY, gap_id:'vendor-control' });
-        if (d.S5_COMBINED_COGS_GAP > 0) items.push({ action:'Close prime cost gap. $'+Math.round(d.S5_COMBINED_COGS_GAP)+'/month combined COGS overage.', monthly_impact:d.S5_COMBINED_COGS_GAP, gap_id:'prime-cost' });
-      } else {
-        if (d.S1_SCORE != null) sections['Check Average and Revenue'] = d.S1_SCORE;
-        if (d.S2_SCORE != null) sections['Labor Efficiency']          = d.S2_SCORE;
-        if (d.S3_SCORE != null) sections['Menu Performance']          = d.S3_SCORE;
-        if (d.S4_SCORE != null) sections['Server Performance']        = d.S4_SCORE;
-        if (d.S5_SCORE != null) sections['Events and Private Dining'] = d.S5_SCORE;
-        if (d.S1_MONTHLY_GAP > 0) items.push({ action:'Close check average gap. $'+Math.round(d.S1_MONTHLY_GAP)+'/month at current cover count.', monthly_impact:d.S1_MONTHLY_GAP, gap_id:'check-average' });
-        if (d.S2_MONTHLY_GAP > 0) items.push({ action:'Reduce labor cost. $'+Math.round(d.S2_MONTHLY_GAP)+'/month over target.', monthly_impact:d.S2_MONTHLY_GAP, gap_id:'labor-scheduling' });
-        if (d.S3_MONTHLY_GAP > 0) items.push({ action:'Improve menu mix. $'+Math.round(d.S3_MONTHLY_GAP)+'/month opportunity from repricing Dogs.', monthly_impact:d.S3_MONTHLY_GAP, gap_id:'menu-engineering' });
-        if (d.S4_MONTHLY_GAP > 0) items.push({ action:'Close server performance spread. $'+Math.round(d.S4_MONTHLY_GAP)+'/month from bottom third to team average.', monthly_impact:d.S4_MONTHLY_GAP, gap_id:'server-performance' });
-        if (d.S5_MONTHLY_GAP > 0) items.push({ action:'Grow event revenue. $'+Math.round(d.S5_MONTHLY_GAP)+'/month gap to target.', monthly_impact:d.S5_MONTHLY_GAP, gap_id:'events-catering' });
-      }
-      items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
-      const totalMo = items.reduce((s,i) => s + (i.monthly_impact||0), 0);
-      d.WEEKLY_GAP_AMT = '$' + Math.round(totalMo/4.345).toLocaleString('en-US');
-      return {
-        id: uid(), date: p.date, bar_name: d.BAR_NAME, overall_score: d.OVERALL_SCORE,
-        grade: d.DATA_TIER_LABEL, audit_period: d.AUDIT_PERIOD, audit_id: d.AUDIT_ID,
-        sections, action_items: items, raw: d, generated_at: p.generated_at
-      };
-    };
-
-    // ── Profit Audits ──
-    App.data.audits = [
-      mkAudit('profit', { date: dateStr(74), generated_at: daysAgoISO(74), raw: {
-        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 21,
-        DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
-        AUDIT_PERIOD: 'February 2026, 4 weeks ending Feb 27', AUDIT_ID: 'PFA-2026-0031',
-        INDUSTRY_AVG: 63, TARGET_SCORE: 65,
-        S1_SCORE: 16, S1_BAR_COST_PCT: 29.4, S1_TARGET_PCT: 22, S1_BAR_REV_MONTHLY: 51200,
-        S1_BEV_COGS_PERIOD: 15053, S1_INV_VARIANCE_PCT: 6.8, S1_INV_VARIANCE_AMT: 1024,
-        S1_POUR_METHOD: 'Free pour, no jiggers in use', S1_RECIPE_COVERAGE: '0 of 18 cocktails costed',
-        S1_MONTHLY_GAP: 3789, S1_ANNUAL_GAP: 45468,
-        S1_NARRATIVE: 'Bar pour cost ran 29.4% against a 22% target. That is the single largest profit leak in this audit. Free pouring with no jiggers and no costed recipes means every drink is a guess.',
-        S1_FINDING: 'A 6.8% inventory variance confirms the overage is pour discipline, not menu pricing. A 7.4-point cost overage on $51,200 of monthly bar sales is $3,789 walking out every month.',
-        S1_TOOL: 'Start with the Measured Pour Standards policy and jigger every well and call drink.',
-        S2_SCORE: 9, S2_VOID_COMP_PCT: 4.6, S2_VOID_COMP_AMT: 3827, S2_VOIDS_NO_APPROVAL_PCT: 71,
-        S2_DRAWER_RECON: 'Not performed', S2_CASH_POLICY: 'No', S2_VOID_APPROVAL: 'No', S2_SPILLAGE_LOG: 'No',
-        S2_MONTHLY_GAP: 2995,
-        S2_NARRATIVE: 'Voids and comps reached 4.6% of sales, more than four times the 1% benchmark. 71% of voids were rung with no manager approval at all.',
-        S2_FINDING: 'Two bartenders account for roughly 80% of unapproved voids. With no drawer reconciliation and no cash policy on file, there is no control gate anywhere in the cash path.',
-        S2_TOOL: 'Require a manager PIN on all post-send voids and adopt the Closing Bar Checklist.',
-        S3_SCORE: 14, S3_FOOD_COST_PCT: 39.8, S3_TARGET_PCT: 32, S3_FOOD_REV_MONTHLY: 30800,
-        S3_FOOD_VAR_PCT: 7.1, S3_FOOD_VAR_AMT: 2187, S3_RECIPE_COVERAGE: '0 of 24 plates costed',
-        S3_INV_FREQ: 'Never', S3_WASTE_LOG: 'No', S3_MONTHLY_GAP: 2402, S3_ANNUAL_GAP: 28829,
-        S3_NARRATIVE: 'Food cost landed at 39.8% against a 32% target. No plates are costed, inventory is never counted, and there is no waste log.',
-        S3_FINDING: 'A 7.1% food variance with zero recipe coverage means portioning is uncontrolled across the line. The 7.8-point overage costs $2,402 per month.',
-        S3_TOOL: 'Cost the top 10 plates by volume first and run the Portion Control Audit weekly.',
-        S4_SCORE: 12, S4_BEV_INVOICE_COUNT: 9, S4_FOOD_INVOICE_COUNT: 14, S4_VENDOR_SPEND_MONTHLY: 29400,
-        S4_INVOICE_VS_PO: 'Never matched', S4_PRICE_VERIFY: 'No', S4_ANNUAL_BIDS: 'No', S4_BACKUP_VENDORS: 'None on file',
-        S4_EXPOSURE_MONTHLY: 1140, S4_EXPOSURE_ANNUAL: 13680,
-        S4_NARRATIVE: 'Invoices are never matched against orders and prices are never verified against quoted sheets.',
-        S4_FINDING: 'Sampled invoices show price drift and at least two short deliveries that were paid in full. That works out to roughly $1,140 of monthly exposure, with no backup vendor to put pressure on prices.',
-        S4_TOOL: 'Match every invoice to its delivery using the Vendor Delivery Inspection sheet.',
-        S5_SCORE: 18, S5_TOTAL_REV_PERIOD: 82000, S5_TOTAL_COGS_PERIOD: 27311, S5_LABOR_PERIOD: 30340,
-        S5_LABOR_PCT: 37.0, S5_BAR_COST_PCT: 29.4, S5_FOOD_COST_PCT: 39.8, S5_PRIME_COST_PCT: 70.3,
-        S5_TARGET_PCT: 60, S5_PRIME_COST_AMT: 57651, S5_RPLH_TRACKED: 'No', S5_LABOR_BY_DEPT: 'No',
-        S5_COMBINED_COGS_GAP: 6191,
-        S5_NARRATIVE: 'Prime cost hit 70.3% against a 60% target. That is 10 points of margin gone before a single fixed cost is paid.',
-        S5_FINDING: 'Both COGS and labor are out of range. Combined COGS alone is $6,191 over target for the period. Labor is not tracked by department and RPLH is not measured.',
-        S5_TOOL: 'Fixing pour cost and food cost first pulls prime cost down fastest; revisit labor once COGS is in range.',
-        S6_SIG1_SCORE: 'HIGH', S6_SIG1_LABEL: 'Premium spirit variance',
-        S6_SIG1_EVIDENCE: 'Three top-shelf bottles show 11–14% negative variance against POS sales.',
-        S6_SIG1_GAP: 'Roughly $640/month in unaccounted premium pours.',
-        S6_SIG1_TOOL: 'Run the Shift Pour Check on every close for two weeks.',
-        S6_SIG2_SCORE: 'HIGH', S6_SIG2_LABEL: 'Void concentration',
-        S6_SIG2_EVIDENCE: '71% of voids were rung without a manager code; two bartenders account for 80% of them.',
-        S6_SIG2_GAP: 'Pattern is consistent with comped-drink theft, not training error.',
-        S6_SIG2_TOOL: 'Require a manager PIN on all post-send voids.',
-        S6_SIG3_SCORE: 'MEDIUM', S6_SIG3_LABEL: 'No closing inventory counts',
-        S6_SIG3_EVIDENCE: 'No end-of-night liquor counts were recorded in the audit period.',
-        S6_SIG3_GAP: 'Variance cannot be isolated to a shift or a person.',
-        S6_SIG3_TOOL: 'Adopt the Closing Bar Checklist nightly.',
-        S6_SIG4_SCORE: 'MEDIUM', S6_SIG4_LABEL: 'Unrestricted comp authority',
-        S6_SIG4_EVIDENCE: 'Every server can comp without a limit or a reason code.',
-        S6_SIG4_GAP: 'Comp dollars are untracked and untrainable.',
-        S6_SIG4_TOOL: 'Set a per-shift comp ceiling in the POS.'
-      }}),
-      mkAudit('profit', { date: dateStr(42), generated_at: daysAgoISO(42), raw: {
-        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 39,
-        DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
-        AUDIT_PERIOD: 'March 2026, 4 weeks ending Mar 27', AUDIT_ID: 'PFA-2026-0036',
-        INDUSTRY_AVG: 63, TARGET_SCORE: 65,
-        S1_SCORE: 38, S1_BAR_COST_PCT: 26.1, S1_TARGET_PCT: 22, S1_BAR_REV_MONTHLY: 52400,
-        S1_BEV_COGS_PERIOD: 13676, S1_INV_VARIANCE_PCT: 4.2, S1_INV_VARIANCE_AMT: 612,
-        S1_POUR_METHOD: 'Jiggers on wells, free pour still used on call drinks',
-        S1_RECIPE_COVERAGE: '11 of 18 cocktails costed', S1_MONTHLY_GAP: 2148, S1_ANNUAL_GAP: 25780,
-        S1_NARRATIVE: 'Bar pour cost dropped from 29.4% to 26.1% after jiggers went onto every well. Inventory variance is nearly halved.',
-        S1_FINDING: 'Call drinks are still free poured and seven cocktails remain uncosted. The remaining 4.1-point gap is concentrated there, worth $2,148 per month.',
-        S1_TOOL: 'Extend measured pours to call liquor and finish costing the last seven cocktails.',
-        S2_SCORE: 41, S2_VOID_COMP_PCT: 2.7, S2_VOID_COMP_AMT: 2268, S2_VOIDS_NO_APPROVAL_PCT: 34,
-        S2_DRAWER_RECON: 'Performed at close', S2_CASH_POLICY: 'Draft', S2_VOID_APPROVAL: 'Manager PIN required', S2_SPILLAGE_LOG: 'No',
-        S2_MONTHLY_GAP: 1428,
-        S2_NARRATIVE: 'The manager-PIN requirement cut unapproved voids from 71% to 34% and pulled the void rate down to 2.7%.',
-        S2_FINDING: 'Drawer reconciliation now happens at close. The cash policy is still only a draft and there is no spillage log, so breakage is still indistinguishable from theft.',
-        S2_TOOL: 'Finalize the Cash Handling policy and start a daily spillage log.',
-        S3_SCORE: 35, S3_FOOD_COST_PCT: 36.4, S3_TARGET_PCT: 32, S3_FOOD_REV_MONTHLY: 31600,
-        S3_FOOD_VAR_PCT: 4.8, S3_FOOD_VAR_AMT: 1517, S3_RECIPE_COVERAGE: '16 of 24 plates costed',
-        S3_INV_FREQ: 'Monthly', S3_WASTE_LOG: 'Started', S3_MONTHLY_GAP: 1390, S3_ANNUAL_GAP: 16685,
-        S3_NARRATIVE: 'Food cost improved to 36.4% as recipe costing reached two-thirds of the menu.',
-        S3_FINDING: 'Monthly counts replaced never-counting and a waste log is now in place. The remaining 4.4-point gap is $1,390 per month, mostly on the eight uncosted plates.',
-        S3_TOOL: 'Finish the last eight plate cards and move counts from monthly to weekly.',
-        S4_SCORE: 44, S4_BEV_INVOICE_COUNT: 10, S4_FOOD_INVOICE_COUNT: 15, S4_VENDOR_SPEND_MONTHLY: 28900,
-        S4_INVOICE_VS_PO: 'Spot checked', S4_PRICE_VERIFY: 'Started', S4_ANNUAL_BIDS: 'No', S4_BACKUP_VENDORS: 'One identified',
-        S4_EXPOSURE_MONTHLY: 610, S4_EXPOSURE_ANNUAL: 7320,
-        S4_NARRATIVE: 'Invoice spot-checking caught two billing errors this period and price verification has begun.',
-        S4_FINDING: 'Exposure fell to about $610 per month. One backup vendor has been identified but no annual bid process exists yet.',
-        S4_TOOL: 'Match every delivery, not a sample, and schedule an annual bid for the top three categories.',
-        S5_SCORE: 40, S5_TOTAL_REV_PERIOD: 84000, S5_TOTAL_COGS_PERIOD: 25178, S5_LABOR_PERIOD: 28560,
-        S5_LABOR_PCT: 34.0, S5_BAR_COST_PCT: 26.1, S5_FOOD_COST_PCT: 36.4, S5_PRIME_COST_PCT: 64.0,
-        S5_TARGET_PCT: 60, S5_PRIME_COST_AMT: 53738, S5_RPLH_TRACKED: 'Started', S5_LABOR_BY_DEPT: 'Yes',
-        S5_COMBINED_COGS_GAP: 3538,
-        S5_NARRATIVE: 'Prime cost came down from 70.3% to 64.0% as COGS controls took hold.',
-        S5_FINDING: 'Labor is now tracked by department and RPLH measurement has started. Combined COGS is still $3,538 over target for the period.',
-        S5_TOOL: 'Hold the COGS course; the last four points of prime cost will close as recipe coverage completes.',
-        S6_SIG1_SCORE: 'MEDIUM', S6_SIG1_LABEL: 'Call-liquor free pour',
-        S6_SIG1_EVIDENCE: 'Wells are jiggered but call and premium drinks are still free poured.',
-        S6_SIG1_GAP: 'Most of the remaining pour-cost gap sits in this category.',
-        S6_SIG1_TOOL: 'Extend measured pours to call liquor.',
-        S6_SIG2_SCORE: 'LOW', S6_SIG2_LABEL: 'Void rate trending down',
-        S6_SIG2_EVIDENCE: 'Void rate fell from 4.6% to 2.7% after the manager-PIN rule.',
-        S6_SIG2_GAP: 'On track. Keep monitoring the two flagged bartenders.',
-        S6_SIG2_TOOL: 'Review the weekly void report at the manager meeting.',
-        S6_SIG3_SCORE: 'MEDIUM', S6_SIG3_LABEL: 'No spillage log',
-        S6_SIG3_EVIDENCE: 'Breakage and spillage are still not recorded anywhere.',
-        S6_SIG3_GAP: 'Legitimate loss cannot be separated from variance.',
-        S6_SIG3_TOOL: 'Start the daily spillage log this week.'
-      }}),
-      mkAudit('profit', { date: dateStr(8), generated_at: daysAgoISO(8), raw: {
-        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 57,
-        DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
-        AUDIT_PERIOD: 'April 2026, 4 weeks ending Apr 24', AUDIT_ID: 'PFA-2026-0042',
-        INDUSTRY_AVG: 63, TARGET_SCORE: 65,
-        S1_SCORE: 62, S1_BAR_COST_PCT: 23.4, S1_TARGET_PCT: 22, S1_BAR_REV_MONTHLY: 53100,
-        S1_BEV_COGS_PERIOD: 12425, S1_INV_VARIANCE_PCT: 2.1, S1_INV_VARIANCE_AMT: 312,
-        S1_POUR_METHOD: 'Measured pours on all spirits', S1_RECIPE_COVERAGE: '18 of 18 cocktails costed',
-        S1_MONTHLY_GAP: 743, S1_ANNUAL_GAP: 8920,
-        S1_NARRATIVE: 'Bar pour cost is now 23.4%, just 1.4 points off target, with every cocktail costed and measured pours across the board.',
-        S1_FINDING: 'Inventory variance of 2.1% is within a healthy range. The small residual gap is normal menu-mix drift, not a control failure.',
-        S1_TOOL: 'Maintain the current discipline; review pour cost monthly rather than chasing it weekly.',
-        S2_SCORE: 58, S2_VOID_COMP_PCT: 1.6, S2_VOID_COMP_AMT: 1351, S2_VOIDS_NO_APPROVAL_PCT: 8,
-        S2_DRAWER_RECON: 'Performed at close', S2_CASH_POLICY: 'Yes', S2_VOID_APPROVAL: 'Manager PIN required', S2_SPILLAGE_LOG: 'Yes',
-        S2_MONTHLY_GAP: 506,
-        S2_NARRATIVE: 'Void and comp rate is down to 1.6%, near the 1% benchmark, with only 8% of voids unapproved.',
-        S2_FINDING: 'The cash policy is finalized, drawers are reconciled at close, and a spillage log is running. Loss prevention is now a functioning system.',
-        S2_TOOL: 'Audit the void report monthly and refresh staff training each quarter.',
-        S3_SCORE: 54, S3_FOOD_COST_PCT: 33.8, S3_TARGET_PCT: 32, S3_FOOD_REV_MONTHLY: 31300,
-        S3_FOOD_VAR_PCT: 2.9, S3_FOOD_VAR_AMT: 908, S3_RECIPE_COVERAGE: '24 of 24 plates costed',
-        S3_INV_FREQ: 'Weekly', S3_WASTE_LOG: 'Yes', S3_MONTHLY_GAP: 563, S3_ANNUAL_GAP: 6761,
-        S3_NARRATIVE: 'Food cost is 33.8%, within two points of target, with the full menu costed and weekly counts in place.',
-        S3_FINDING: 'Food variance of 2.9% is acceptable. The remaining gap is small enough to close with targeted repricing on two plowhorse plates.',
-        S3_TOOL: 'Use the Menu Engineering Audit to reprice the two lowest-margin plates.',
-        S4_SCORE: 56, S4_BEV_INVOICE_COUNT: 11, S4_FOOD_INVOICE_COUNT: 16, S4_VENDOR_SPEND_MONTHLY: 27600,
-        S4_INVOICE_VS_PO: 'Matched on every delivery', S4_PRICE_VERIFY: 'Yes', S4_ANNUAL_BIDS: 'Scheduled', S4_BACKUP_VENDORS: 'Two per category',
-        S4_EXPOSURE_MONTHLY: 210, S4_EXPOSURE_ANNUAL: 2520,
-        S4_NARRATIVE: 'Every delivery is now matched to its order and prices are verified against quoted sheets.',
-        S4_FINDING: 'Exposure has fallen to about $210 per month. Two backup vendors per category give you real negotiating room. The annual bid is scheduled but not yet run.',
-        S4_TOOL: 'Run the scheduled annual bid to lock in pricing for the next cycle.',
-        S5_SCORE: 57, S5_TOTAL_REV_PERIOD: 84400, S5_TOTAL_COGS_PERIOD: 23004, S5_LABOR_PERIOD: 26964,
-        S5_LABOR_PCT: 32.0, S5_BAR_COST_PCT: 23.4, S5_FOOD_COST_PCT: 33.8, S5_PRIME_COST_PCT: 59.2,
-        S5_TARGET_PCT: 60, S5_PRIME_COST_AMT: 49968, S5_RPLH_TRACKED: 'Yes', S5_LABOR_BY_DEPT: 'Yes',
-        S5_COMBINED_COGS_GAP: 1306,
-        S5_NARRATIVE: 'Prime cost is 59.2%, under the 60% target for the first time in this audit series.',
-        S5_FINDING: 'Labor is tracked by department and RPLH is in use. Combined COGS is a modest $1,306 over the period target, the last increment of margin to recover.',
-        S5_TOOL: 'Hold prime cost here and shift focus to revenue growth to widen the margin further.',
-        S6_SIG1_SCORE: 'LOW', S6_SIG1_LABEL: 'Pour discipline holding',
-        S6_SIG1_EVIDENCE: 'Inventory variance has stayed under 3% for two consecutive periods.',
-        S6_SIG1_GAP: 'No action required. This is the target state.',
-        S6_SIG1_TOOL: 'Spot-check measured pours during pre-shift once a week.',
-        S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Annual vendor bid not yet run',
-        S6_SIG2_EVIDENCE: 'Backup vendors are identified but the annual competitive bid is still pending.',
-        S6_SIG2_GAP: 'Leaving roughly $1,800/year of negotiating room unused.',
-        S6_SIG2_TOOL: 'Complete the annual bid before the next supplier contract renews.'
-      }})
-    ];
-
-    // ── Revenue Audits ──
-    App.data.revenue_audits = [
-      mkAudit('revenue', { date: dateStr(74), generated_at: daysAgoISO(74), raw: {
-        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 26,
-        DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
-        AUDIT_PERIOD: 'February 2026, 4 weeks ending Feb 27', AUDIT_ID: 'RVA-2026-0014',
-        INDUSTRY_AVG: 61, TARGET_SCORE: 65,
-        S1_SCORE: 22, S1_CHECK_AVG: 28.40, S1_CHECK_AVG_TARGET: 32.00, S1_BAR_CHECK_AVG: 22.10,
-        S1_FOOD_CHECK_AVG: 34.80, S1_COVER_COUNT: 2890, S1_MONTHLY_REVENUE: 82100,
-        S1_MONTHLY_GAP: 4910, S1_ANNUAL_GAP: 58920,
-        S1_NARRATIVE: 'Blended check average of $28.40 sits $3.60 below a conservative $32.00 target. Bar checks at $22.10 are dragging the blend down hard.',
-        S1_FINDING: 'There is no upsell standard and no add-on prompts. Capturing even half of the gap is worth $4,910 per month at the current cover count.',
-        S1_TOOL: 'Roll out the Server Upsell Standards and Scripts and track check average weekly.',
-        S2_SCORE: 28, S2_LABOR_PCT: 37.5, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 58, S2_RPLH_TARGET: 75,
-        S2_LABOR_PERIOD: 30788, S2_SCHED_VS_ACTUAL: '214 scheduled / 247 actual hrs', S2_OVERTIME_HRS: 41,
-        S2_MONTHLY_GAP: 6158,
-        S2_NARRATIVE: 'Total labor ran 37.5% against a 30% target. Actual hours overran the schedule by 33 hours and 41 of those were overtime.',
-        S2_FINDING: 'RPLH of $58 is well short of the $75 target. The floor is overstaffed on slow shifts and clock-out discipline is loose.',
-        S2_TOOL: 'Build the schedule against the Labor Budget tool and enforce clock-out times.',
-        S3_SCORE: 24, S3_STARS_COUNT: 3, S3_PLOWHORSES_COUNT: 9, S3_DOGS_COUNT: 7, S3_PUZZLES_COUNT: 5,
-        S3_TOP_CATEGORY: 'Draft Beer', S3_MONTHLY_GAP: 1820, S3_PRICING_OPPORTUNITY: 2640,
-        S3_NARRATIVE: 'The menu carries seven Dogs, which are low-margin and low-popularity items, against only three Stars.',
-        S3_FINDING: 'Revenue leans on low-margin draft beer. Repricing or cutting Dogs and promoting Stars is a $1,820/month mix opportunity, with $2,640 more available from pricing.',
-        S3_TOOL: 'Run the Menu Engineering Audit and rework the seven Dog items.',
-        S4_SCORE: 30, S4_SERVER_COUNT: 9, S4_TOP_CHECK_AVG: 38.60, S4_BOTTOM_CHECK_AVG: 21.40,
-        S4_PERFORMANCE_SPREAD: 17.20, S4_APP_ATTACH_RATE: 19, S4_DESSERT_ATTACH_RATE: 6,
-        S4_PRESHIFT_BRIEFING: 'Not held', S4_MONTHLY_GAP: 3960,
-        S4_NARRATIVE: 'The spread between the top and bottom server check average is $17.20. That is a coaching gap, not a talent gap.',
-        S4_FINDING: 'Appetizer attach sits at 19% and dessert at 6%. With no pre-shift briefing, the bottom third is never coached. Lifting them to the team average is worth $3,960/month.',
-        S4_TOOL: 'Start a daily pre-shift briefing using the Pre-Shift Upsell Briefing sheet.',
-        S5_SCORE: 18, S5_EVENT_REV_PERIOD: 2400, S5_EVENTS_PER_MONTH: 1, S5_AVG_EVENT_REVENUE: 2400,
-        S5_MINIMUM_MET: false, S5_CATERING_REV_PERIOD: 0, S5_ANNUAL_EVENT_GAP: 64800, S5_MONTHLY_GAP: 5400,
-        S5_NARRATIVE: 'Events brought in $2,400 from a single booking. There is no private dining minimum and no catering revenue at all.',
-        S5_FINDING: 'For a venue this size, three to four events a month is realistic. The unbuilt event channel is the largest single opportunity in this audit at $5,400/month.',
-        S5_TOOL: 'Build a private dining package with a spend minimum and a rate card.',
-        S6_SIG1_SCORE: 'HIGH', S6_SIG1_LABEL: 'Server comp concentration',
-        S6_SIG1_EVIDENCE: 'One server accounts for 54% of comped checks over the audit period.',
-        S6_SIG1_GAP: 'Pattern is consistent with discount abuse, not service recovery.',
-        S6_SIG1_TOOL: 'Pull the comp report by employee and require manager approval on comps over $10.',
-        S6_SIG2_SCORE: 'HIGH', S6_SIG2_LABEL: 'Saturday floor overstaffed',
-        S6_SIG2_EVIDENCE: 'Saturday floor RPLH ran $48 against a $75 target while weeknight RPLH hit $72.',
-        S6_SIG2_GAP: 'About $720 per Saturday in excess labor.',
-        S6_SIG2_TOOL: 'Drop one server from the Saturday floor for two weeks and measure check times.',
-        S6_SIG3_SCORE: 'MEDIUM', S6_SIG3_LABEL: 'One menu item drives complaints',
-        S6_SIG3_EVIDENCE: 'House Burger appears in 41% of negative comments and 18% of comps.',
-        S6_SIG3_GAP: 'Build, portion, or price is off.',
-        S6_SIG3_TOOL: 'Spec-check the burger every shift for a week and review the build.',
-        S6_SIG4_SCORE: 'MEDIUM', S6_SIG4_LABEL: 'No pre-shift briefings',
-        S6_SIG4_EVIDENCE: 'No briefings logged in the audit period.',
-        S6_SIG4_GAP: 'Bottom-third servers get no daily coaching, which is where check average leaks.',
-        S6_SIG4_TOOL: 'Run a 5-minute pre-shift on every dinner shift, even when short-staffed.'
-      }}),
-      mkAudit('revenue', { date: dateStr(42), generated_at: daysAgoISO(42), raw: {
-        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 42,
-        DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
-        AUDIT_PERIOD: 'March 2026, 4 weeks ending Mar 27', AUDIT_ID: 'RVA-2026-0019',
-        INDUSTRY_AVG: 61, TARGET_SCORE: 65,
-        S1_SCORE: 40, S1_CHECK_AVG: 30.20, S1_CHECK_AVG_TARGET: 32.00, S1_BAR_CHECK_AVG: 24.60,
-        S1_FOOD_CHECK_AVG: 36.10, S1_COVER_COUNT: 2960, S1_MONTHLY_REVENUE: 84300,
-        S1_MONTHLY_GAP: 3256, S1_ANNUAL_GAP: 39072,
-        S1_NARRATIVE: 'Check average climbed to $30.20 after upsell scripts went live. Bar checks improved most, up $2.50.',
-        S1_FINDING: 'The blend is now $1.80 short of target. Add-on prompts are landing but dessert and after-dinner drinks are still rarely offered.',
-        S1_TOOL: 'Add a dessert and digestif prompt to the close-out step of the server script.',
-        S2_SCORE: 44, S2_LABOR_PCT: 34.0, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 66, S2_RPLH_TARGET: 75,
-        S2_LABOR_PERIOD: 28662, S2_SCHED_VS_ACTUAL: '221 scheduled / 233 actual hrs', S2_OVERTIME_HRS: 18,
-        S2_MONTHLY_GAP: 3372,
-        S2_NARRATIVE: 'Labor came down to 34.0% as scheduling tightened. Overtime more than halved, from 41 hours to 18.',
-        S2_FINDING: 'RPLH improved to $66. The remaining gap is slow-shift overstaffing on weeknights.',
-        S2_TOOL: 'Trim one floor position on Monday through Wednesday and cross-train the bar.',
-        S3_SCORE: 43, S3_STARS_COUNT: 5, S3_PLOWHORSES_COUNT: 8, S3_DOGS_COUNT: 4, S3_PUZZLES_COUNT: 6,
-        S3_TOP_CATEGORY: 'Craft Cocktails', S3_MONTHLY_GAP: 1080, S3_PRICING_OPPORTUNITY: 1880,
-        S3_NARRATIVE: 'Three Dogs were cut and two repriced; Stars rose from three to five. Craft cocktails are now the top revenue category.',
-        S3_FINDING: 'Four Dogs remain. Continuing to convert Plowhorses into Stars is a $1,080/month opportunity.',
-        S3_TOOL: 'Reprint the menu to give the five Stars premium placement.',
-        S4_SCORE: 42, S4_SERVER_COUNT: 9, S4_TOP_CHECK_AVG: 39.80, S4_BOTTOM_CHECK_AVG: 26.10,
-        S4_PERFORMANCE_SPREAD: 13.70, S4_APP_ATTACH_RATE: 28, S4_DESSERT_ATTACH_RATE: 11,
-        S4_PRESHIFT_BRIEFING: 'Held 3 nights a week', S4_MONTHLY_GAP: 2480,
-        S4_NARRATIVE: 'The server spread narrowed to $13.70 as pre-shift briefings began. Appetizer attach improved nine points.',
-        S4_FINDING: 'Briefings only run three nights a week, so the weekend crew misses coaching. Dessert attach is still low at 11%.',
-        S4_TOOL: 'Extend the pre-shift briefing to all seven shifts.',
-        S5_SCORE: 38, S5_EVENT_REV_PERIOD: 6800, S5_EVENTS_PER_MONTH: 3, S5_AVG_EVENT_REVENUE: 2267,
-        S5_MINIMUM_MET: true, S5_CATERING_REV_PERIOD: 1500, S5_ANNUAL_EVENT_GAP: 38400, S5_MONTHLY_GAP: 3200,
-        S5_NARRATIVE: 'Events grew to three bookings and $6,800, and a private dining minimum is now enforced.',
-        S5_FINDING: 'Catering opened with $1,500. The channel is working but is still well below the venue’s realistic ceiling.',
-        S5_TOOL: 'List the private dining package on the website and the Google Business Profile.',
-        S6_SIG1_SCORE: 'MEDIUM', S6_SIG1_LABEL: 'Weekend pre-shift gap',
-        S6_SIG1_EVIDENCE: 'Briefings now run 3 of 7 nights, weekends still missed.',
-        S6_SIG1_GAP: 'Weekend covers are the highest-revenue shifts and get no coaching.',
-        S6_SIG1_TOOL: 'Extend the briefing to Friday and Saturday close-out crews.',
-        S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Weeknight floor still loose',
-        S6_SIG2_EVIDENCE: 'Tuesday and Wednesday floor RPLH still under $60.',
-        S6_SIG2_GAP: 'Cross-training to cover the bar would tighten this.',
-        S6_SIG2_TOOL: 'Cross-train two servers to barback on slow nights.',
-        S6_SIG3_SCORE: 'LOW', S6_SIG3_LABEL: 'Bottom server gap closing',
-        S6_SIG3_EVIDENCE: 'Bottom-third check average up $4.70, spread now $13.70.',
-        S6_SIG3_GAP: 'On track. Spread under $10 is the target.',
-        S6_SIG3_TOOL: 'Keep the daily briefings going and add a monthly server-by-server review.'
-      }}),
-      mkAudit('revenue', { date: dateStr(8), generated_at: daysAgoISO(8), raw: {
-        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 60,
-        DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
-        AUDIT_PERIOD: 'April 2026, 4 weeks ending Apr 24', AUDIT_ID: 'RVA-2026-0024',
-        INDUSTRY_AVG: 61, TARGET_SCORE: 65,
-        S1_SCORE: 61, S1_CHECK_AVG: 33.10, S1_CHECK_AVG_TARGET: 32.00, S1_BAR_CHECK_AVG: 27.40,
-        S1_FOOD_CHECK_AVG: 38.90, S1_COVER_COUNT: 3010, S1_MONTHLY_REVENUE: 86700,
-        S1_MONTHLY_GAP: 0, S1_ANNUAL_GAP: 0,
-        S1_NARRATIVE: 'Blended check average reached $33.10, clearing the $32.00 target for the first time in the series.',
-        S1_FINDING: 'Bar checks are up $5.30 from the February baseline. The upsell program is now self-sustaining.',
-        S1_TOOL: 'Hold the standard; raise the internal target to $35 for the next quarter.',
-        S2_SCORE: 58, S2_LABOR_PCT: 31.5, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 72, S2_RPLH_TARGET: 75,
-        S2_LABOR_PERIOD: 27311, S2_SCHED_VS_ACTUAL: '228 scheduled / 231 actual hrs', S2_OVERTIME_HRS: 6,
-        S2_MONTHLY_GAP: 1301,
-        S2_NARRATIVE: 'Labor is 31.5%, within 1.5 points of target, and overtime is down to 6 hours.',
-        S2_FINDING: 'RPLH of $72 is close to the $75 target. Schedule and actual hours are nearly aligned.',
-        S2_TOOL: 'Fine-tune weekend bar coverage to close the last point and a half.',
-        S3_SCORE: 60, S3_STARS_COUNT: 7, S3_PLOWHORSES_COUNT: 7, S3_DOGS_COUNT: 2, S3_PUZZLES_COUNT: 6,
-        S3_TOP_CATEGORY: 'Craft Cocktails', S3_MONTHLY_GAP: 420, S3_PRICING_OPPORTUNITY: 980,
-        S3_NARRATIVE: 'The menu now carries seven Stars and only two Dogs. Craft cocktails hold the top revenue spot.',
-        S3_FINDING: 'Menu mix is healthy. The small remaining gap is routine quarterly pricing maintenance.',
-        S3_TOOL: 'Schedule a quarterly Menu Engineering review to keep the mix tuned.',
-        S4_SCORE: 59, S4_SERVER_COUNT: 10, S4_TOP_CHECK_AVG: 41.20, S4_BOTTOM_CHECK_AVG: 31.80,
-        S4_PERFORMANCE_SPREAD: 9.40, S4_APP_ATTACH_RATE: 37, S4_DESSERT_ATTACH_RATE: 18,
-        S4_PRESHIFT_BRIEFING: 'Held every shift', S4_MONTHLY_GAP: 1180,
-        S4_NARRATIVE: 'The server spread tightened to $9.40 with briefings held every shift. Appetizer attach reached 37%.',
-        S4_FINDING: 'The bottom server is now within $9.40 of the top. Dessert attach at 18% is the next coaching target.',
-        S4_TOOL: 'Set a dessert-attach contest for the next month to push past 25%.',
-        S5_SCORE: 55, S5_EVENT_REV_PERIOD: 11200, S5_EVENTS_PER_MONTH: 5, S5_AVG_EVENT_REVENUE: 2240,
-        S5_MINIMUM_MET: true, S5_CATERING_REV_PERIOD: 3400, S5_ANNUAL_EVENT_GAP: 18000, S5_MONTHLY_GAP: 1500,
-        S5_NARRATIVE: 'Events reached five bookings and $11,200, with catering adding $3,400.',
-        S5_FINDING: 'The event channel is now a real revenue line. The remaining gap is peak-season capacity, not demand.',
-        S5_TOOL: 'Add a second private dining time slot on Fridays and Saturdays.',
-        S6_SIG1_SCORE: 'LOW', S6_SIG1_LABEL: 'Server spread tightened',
-        S6_SIG1_EVIDENCE: 'Top to bottom spread is $9.40, under the $10 benchmark.',
-        S6_SIG1_GAP: 'No action required.',
-        S6_SIG1_TOOL: 'Continue the daily pre-shift briefings.',
-        S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Dessert attach lagging',
-        S6_SIG2_EVIDENCE: 'Dessert attach at 18% against a 25% target.',
-        S6_SIG2_GAP: 'Smallest remaining lift in the upsell program.',
-        S6_SIG2_TOOL: 'Run a one-month dessert-attach contest with a server prize.',
-        S6_SIG3_SCORE: 'LOW', S6_SIG3_LABEL: 'Events at venue ceiling',
-        S6_SIG3_EVIDENCE: 'Five events per month is near peak-season capacity.',
-        S6_SIG3_GAP: 'Growing further requires a second Saturday slot or off-site catering.',
-        S6_SIG3_TOOL: 'Add a Friday and Saturday early-dining slot and price it.'
-      }})
-    ];
-
-    // ════════════════════════════════════════════════════════════════════
-    //  REVENUE RECOVERY — the Anchor's revenue side, all traced to
-    //  window.ANCHOR: twelve weekly records, the menu, server checks,
-    //  events, dog tests and the price-change log.
-    // ════════════════════════════════════════════════════════════════════
-    App.data.revenue_settings = App.data.revenue_settings || {};
-    App.data.revenue_settings.targets = { check_avg:35, bar_labor_pct:28, kitchen_labor_pct:30,
-      floor_labor_pct:32, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
-
-    // Four servers carry the floor. Each week's covers split by these weights,
-    // with the top server running a higher check average than the bottom.
-    const rServers     = ['Jessica M.','Marcus T.','Brianna K.','Priya N.'];
-    const rSrvWeight   = [0.30, 0.26, 0.24, 0.20];
-    const rSrvCheckMul = [1.14, 1.04, 0.96, 0.86];
-
-    App.data.revenue_weeks = window.ANCHOR.weeks.map(a => {
-      const dep   = window.ANCHOR.laborDepts(a);
-      const hours = a.bar_labor/16 + dep.kitchen/15 + dep.floor/14;
-      return {
-        id:uid(), week_num:a.wk, period_end:dateStr((12 - a.wk) * 7),
-        bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
-        total_labor_cost:a.bar_labor + a.food_labor, total_hours:+hours.toFixed(1),
-        labor_pct_blended:a.labor_pct_blended, rplh_blended:+(a.total_rev / hours).toFixed(2),
-        notes:'', saved_at:new Date().toISOString()
-      };
-    });
-
-    // ── Revenue Forecasts — one record per Monday for the last 6 weeks plus
-    // the coming week. Each weekly forecast is built from the same actuals
-    // we just generated, with a small ±4% nudge so the operator-facing
-    // "vs Forecast" tile shows a realistic variance rather than a zero.
-    // Per-day split uses the same weekday-weight curve other sample data uses
-    // (heavier Fri/Sat, lighter Mon/Tue).
-    const fcDayWeights = { Mon:0.10, Tue:0.10, Wed:0.12, Thu:0.13, Fri:0.18, Sat:0.22, Sun:0.15 };
-    const fcDays       = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const monStartFor  = (dStr) => {
-      const d = new Date(dStr + 'T00:00:00');
-      const wd = (d.getDay() + 6) % 7;
-      d.setDate(d.getDate() - wd);
-      return d.toISOString().slice(0,10);
-    };
-    const lastSix = App.data.revenue_weeks.slice(-6);
-    App.data.revenue_forecasts = lastSix.map((wk, i) => {
-      // Forecast was set the Saturday BEFORE the week, so it's a forward
-      // projection that landed close to but not exactly on actuals.
-      const total = (wk.bar_revenue + wk.floor_revenue) * (i % 2 === 0 ? 0.96 : 1.04);
-      const per_day = {};
-      fcDays.forEach(d => { per_day[d] = Math.round(total * fcDayWeights[d]); });
-      const week_start = monStartFor(wk.period_end);
-      return {
-        id: uid(),
-        week_start,
-        per_day,
-        total: +total.toFixed(2),
-        method: 'manual',
-        notes: '',
-        created_at: new Date(week_start + 'T18:00:00').toISOString(),
-        updated_at: new Date(week_start + 'T18:00:00').toISOString()
-      };
-    });
-    // Plus a coming-week forecast so the schedule builder has something to read
-    // when the operator opens it on the demo data.
-    (() => {
-      const last = App.data.revenue_weeks[App.data.revenue_weeks.length - 1];
-      const ref  = (last.bar_revenue + last.floor_revenue) * 1.02;
-      const nextMon = (() => {
-        const d = new Date();
-        const wd = (d.getDay() + 6) % 7;
-        d.setDate(d.getDate() + (7 - wd));
-        return d.toISOString().slice(0,10);
-      })();
-      const per_day = {};
-      fcDays.forEach(d => { per_day[d] = Math.round(ref * fcDayWeights[d]); });
-      App.data.revenue_forecasts.push({
-        id: uid(),
-        week_start: nextMon,
-        per_day,
-        total: +ref.toFixed(2),
-        method: 'manual',
-        notes: 'Coming week. Adjust per event or weather.',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    })();
-
-    // ── Menu — the Anchor's full card, costed for Menu Engineering ──
-    const rMenu = [
-      // Plate Items tab — food only (valid plate categories: Appetizers,
-      // Entrees, Desserts, Specials). Beer + wine are NOT plate items; they are
-      // added below as linked Inventory menu items once ic_products exists.
-      ['Loaded Nachos',        'Appetizers', 12, 3.60,  95],
-      ['Smoked Wings',         'Appetizers', 13, 4.20, 110],
-      ['Fried Pickles',        'Appetizers',  8, 1.80,  58],
-      ['Pretzel Bites',        'Appetizers',  9, 2.10,  40],
-      ['Deviled Eggs',         'Appetizers',  9, 2.10,  64],
-      ['Charcuterie Board',    'Appetizers', 18, 7.20,  48],
-      ['Crispy Brussels',      'Appetizers', 11, 2.80,  72],
-      ['Hummus and Flatbread', 'Appetizers', 10, 2.40,  50],
-      ['Calamari',             'Appetizers', 14, 4.60,  66],
-      ['Street Corn Ribs',     'Appetizers', 10, 2.30,  54],
-      ['Tuna Poke',            'Appetizers', 16, 6.40,  44],
-      ['Truffle Fries',        'Appetizers',  8, 1.90, 120],
-      ['House Salad',          'Appetizers',  7, 1.60,  70],
-      ['Mac and Cheese',       'Appetizers',  9, 2.40,  64],
-      ['Avocado Toast',        'Appetizers', 12, 3.00,  78],
-      ['Breakfast Tacos',      'Appetizers', 11, 2.80, 110],
-      ['Anchor Burger',        'Entrees',    16, 4.80, 140],
-      ['Brisket Sandwich',     'Entrees',    15, 5.20,  88],
-      ['Fish and Chips',       'Entrees',    17, 5.60,  52],
-      ['Chicken Caesar',       'Entrees',    14, 3.90,  70],
-      ['Steak Frites',         'Entrees',    26, 9.10,  38],
-      ['Veggie Grain Bowl',    'Entrees',    13, 3.20,  30],
-      ['Shrimp Tacos',         'Entrees',    16, 5.40,  84],
-      ['Grilled Pork Chop',    'Entrees',    27, 8.80,  36],
-      ['Pan-Seared Salmon',    'Entrees',    25, 8.20,  58],
-      ['Braised Short Rib',    'Entrees',    29, 9.60,  42],
-      ['Mushroom Risotto',     'Entrees',    19, 5.10,  34],
-      ['Chicken and Waffles',  'Entrees',    16, 4.80,  92],
-      ['Brunch Burger',        'Entrees',    15, 4.60,  70],
-      ['Shakshuka',            'Entrees',    14, 3.90,  46],
-      ['Skillet Cookie',       'Desserts',    8, 1.90,  48],
-      ['Key Lime Pie',         'Desserts',    7, 1.70,  30],
-      ['Creme Brulee',         'Desserts',    9, 2.10,  44],
-      ['Chocolate Torte',      'Desserts',    9, 2.30,  38],
-      // Cocktail Items tab — composed drinks (category 'Cocktails').
-      ['Old Fashioned',        'Cocktails',  12, 2.40, 130],
-      ['House Margarita',      'Cocktails',  11, 2.10, 145],
-      ['Espresso Martini',     'Cocktails',  13, 2.90,  78],
-      ['Paloma',               'Cocktails',  11, 2.20,  62],
-      ['Negroni',              'Cocktails',  13, 2.60,  74],
-      ['Whiskey Sour',         'Cocktails',  12, 2.30,  88],
-      ['Manhattan',            'Cocktails',  14, 2.80,  66],
-      ['Mezcal Mule',          'Cocktails',  13, 2.70,  58],
-      ['Spicy Margarita',      'Cocktails',  12, 2.30, 112],
-      ['French 75',            'Cocktails',  13, 2.60,  48],
-      ['Mojito',               'Cocktails',  11, 2.10,  70],
-      ['Boulevardier',         'Cocktails',  14, 2.90,  40],
-      ['Aviation',             'Cocktails',  13, 2.70,  36],
-      ['Cosmopolitan',         'Cocktails',  12, 2.40,  52],
-    ].map(m => ({ id:uid(), name:m[0], category:m[1], price:m[2], cost:m[3], weekly_covers:m[4], notes:'', recipe:null, created_at:new Date().toISOString(), updated_at:new Date().toISOString() }));
-    App.data.menu_items = rMenu;
-    const rItem = nm => rMenu.find(x => x.name === nm);
-
-    // ── Price-change log ──
-    const rPrice = (nm, oldP, newP, daysBack, reason, volPct) => {
-      const it = rItem(nm);
-      return { id:uid(), date:dateStr(daysBack), item_id:it.id, item_name:it.name,
-        old_price:oldP, new_price:newP, cost:it.cost, reason:reason,
-        margin_impact:+(newP - oldP).toFixed(2), covers_at_change:it.weekly_covers,
-        predicted_vol_pct:volPct,
-        predicted_weekly_impact:+((newP - oldP) * it.weekly_covers * (1 + volPct/100)).toFixed(2),
-        saved_at:daysAgoISO(daysBack) };
-    };
-    App.data.revenue_price_log = [
-      rPrice('Anchor Burger', 15.00, 16.00, 40, 'Beef cost rose on the Sysco invoice.', -4),
-      rPrice('Old Fashioned', 11.00, 12.00, 26, 'Brought well bourbon pricing in line with the call list.', -2),
-      rPrice('Fish and Chips', 16.00, 17.00, 12, 'Cod cost up; repriced to hold the plate margin.', -5),
-    ];
-
-    // ── Dog tests ──
-    App.data.menu_dog_tests = [
-      { id:uid(), item_name:'Veggie Grain Bowl', start_date:dateStr(40), baseline_volume:28,
-        change_notes:'Rewrote the menu description and moved it up under Entrees.',
-        current_volume:41, status:'Kept', decided_at:daysAgoISO(12) },
-      { id:uid(), item_name:'Key Lime Pie', start_date:dateStr(34), baseline_volume:30,
-        change_notes:'Added a dessert mention to the server close-out script.',
-        current_volume:33, status:'Testing', decided_at:null },
-      { id:uid(), item_name:'Pretzel Bites', start_date:dateStr(78), baseline_volume:38,
-        change_notes:'Ran it as a featured app for two weeks to see if volume held.',
-        current_volume:19, status:'Removed', decided_at:daysAgoISO(58) },
-    ];
-
-    // ── Server checks — standalone per-server log ──
-    const rSC = [];
-    [7, 9, 12, 14, 16, 19, 21].forEach((d, i) => {
-      rServers.forEach((nm, j) => {
-        const cv = 18 + Math.round(Math.random() * 14);
-        rSC.push({ id:uid(), date:dateStr(d), shift:['Dinner','Lunch','Bar'][i % 3],
-          server_name:nm, covers:cv,
-          sales:+(cv * (31 + j * 1.5 + Math.random() * 7)).toFixed(2),
-          saved_at:daysAgoISO(d) });
-      });
-    });
-    App.data.revenue_server_checks = rSC;
-
-    // ── Events and catering pipeline ──
-    App.data.revenue_events = [
-      { id:uid(), event_name:'Reyes Rehearsal Dinner', event_type:'Private Dining', status:'Completed',
-        date:dateStr(38), covers:34, fb_minimum:2200, actual_revenue:2840, estimated_revenue:2500,
-        notes:'', saved_at:daysAgoISO(40) },
-      { id:uid(), event_name:'Downtown Tech Mixer', event_type:'Corporate', status:'Completed',
-        date:dateStr(17), covers:60, fb_minimum:3000, actual_revenue:3620, estimated_revenue:3400,
-        notes:'', saved_at:daysAgoISO(19) },
-      { id:uid(), event_name:'Hargrove 40th Birthday', event_type:'Social', status:'Confirmed',
-        date:dateStr(-9), covers:28, fb_minimum:1800, actual_revenue:0, estimated_revenue:2100,
-        notes:'', saved_at:daysAgoISO(6) },
-      { id:uid(), event_name:'Keller Group Saturday Buyout', event_type:'Buyout', status:'Proposal Sent',
-        date:dateStr(-21), covers:90, fb_minimum:6000, actual_revenue:0, estimated_revenue:6800,
-        notes:'', saved_at:daysAgoISO(3) },
-      { id:uid(), event_name:'Westlake Realty Lunch Catering', event_type:'Catering', status:'Inquiry',
-        date:dateStr(-32), covers:45, fb_minimum:0, actual_revenue:0, estimated_revenue:1500,
-        notes:'', saved_at:daysAgoISO(1) },
-    ];
-
-    // ════════════════════════════════════════════════════════════════════
-    //  TRAFFIC RECOVERY — the Anchor's digital presence over 12 weeks plus
-    //  a three-audit recovery arc and a complete scorecard profile.
-    // ════════════════════════════════════════════════════════════════════
-    App.data.traffic_settings = App.data.traffic_settings || {};
-    App.data.traffic_settings.targets = { google_rating:4.3, review_velocity:8,
-      response_rate:75, monthly_sessions:2000, social_posts_month:12 };
-    App.data.traffic_settings.profile = {
-      // GBP scorecard
-      gbp_claimed:true, gbp_hours:true, gbp_phone:true, gbp_website:true,
-      gbp_menu:true, gbp_category:true, gbp_attributes:true, gbp_qa:false,
-      gbp_photos:138, gbp_posts:10, gbp_reviewed_at:daysAgoISO(4),
-      // Review tracker
-      rev_age:4, rev_patterns:'No recurring complaint pattern in the last 30 days. Earlier weekend-service mentions have dropped off.',
-      rev_reviewed_at:daysAgoISO(3),
-      // Search and SEO
-      search_maps_pack:true, search_nap:true, search_name:true, search_address:true,
-      search_phone:true, search_titles:true, search_keyword:'austin sports bar',
-      search_citations:42, search_reviewed_at:daysAgoISO(6),
-      // Website scorecard
-      web_exists:true, web_mobile:true, web_menu:true, web_online_order:true, web_reservations:true,
-      web_avg_duration:96, web_top_source:'Organic Search', web_reviewed_at:daysAgoISO(7),
-      // Social
-      social_stories:true, social_reels:true, social_ig_engagement:2.4, social_fb_posts:6,
-      social_content_mix:'Balanced', social_reviewed_at:daysAgoISO(5),
-      // Delivery
-      dd_photos:26, dd_menu:true, dd_promo:true,
-      ue_photos:22, ue_menu:true, ue_promo:false,
-      gh_photos:null, gh_menu:false, gh_promo:false,
-      delivery_reviewed_at:daysAgoISO(8),
-      // Email and loyalty
-      email_last_send:dateStr(5), email_frequency:'Weekly', email_growth:'WiFi login capture',
-      email_reviewed_at:daysAgoISO(5)
-    };
-
-    // ── Traffic weeks — recovery arc, oldest to newest ──
-    // Five tracked-metric series (monthly_sessions, gbp_views, social_profile_visits,
-    // email_list_size+open_rate, delivery_orders+avg_order_value) hold flat through
-    // the first ~5-7 weeks then climb after the matching fix dates seeded below in
-    // fix_log. That gives the Traffic Recovery Scoreboard real before/after data so
-    // every tracked gap dollarizes on demo. Reviews and SEO stay untracked (Rule
-    // 14a — too indirect to defend) and ride along as context.
-    const tw = {
-      google_rating:        [3.9,3.9,4.0,4.0,4.1,4.1,4.2,4.3,4.3,4.4,4.5,4.5],
-      google_total:         [240,246,253,261,268,275,284,293,302,310,318,326],
-      new_reviews:          [3,4,4,5,5,6,8,9,9,10,11,11],
-      response_rate:        [38,42,48,54,60,68,74,78,82,84,86,88],
-      yelp_rating:          [3.7,3.7,3.8,3.8,3.8,3.9,3.9,4.0,4.0,4.0,4.1,4.1],
-      yelp_total:           [80,81,83,84,86,88,90,92,95,98,101,104],
-      monthly_sessions:     [1180,1240,1300,1380,1480,1620,1780,1940,2080,2200,2320,2420],
-      bounce_rate:          [74,73,72,70,68,66,64,62,60,58,57,56],
-      gbp_views:            [1500,1520,1540,1560,1580,1680,1820,1980,2120,2240,2340,2400],
-      ig_followers:         [1880,1920,1965,2010,2060,2120,2200,2280,2360,2440,2520,2600],
-      ig_posts_month:       [5,6,6,7,8,9,10,11,12,13,14,14],
-      fb_followers:         [1050,1060,1075,1085,1100,1115,1135,1155,1175,1195,1215,1240],
-      social_profile_visits:[260,265,270,280,290,300,340,400,460,510,560,600],
-      dd_rating:            [4.2,4.2,4.3,4.3,4.3,4.4,4.4,4.5,4.5,4.5,4.6,4.6],
-      ue_rating:            [4.0,4.0,4.1,4.1,4.1,4.2,4.2,4.3,4.3,4.3,4.4,4.4],
-      delivery_orders:      [120,122,125,128,130,132,135,148,162,178,190,200],
-      delivery_avg_order_value:[28,28,29,29,29,30,30,31,32,33,34,36],
-      email_list_size:      [380,410,445,480,520,560,605,650,690,720,745,760],
-      emails_sent:          [1,1,2,2,2,3,3,3,4,4,4,4],
-      email_open_rate:      [18,19,20,21,22,24,25,26,27,27,28,28],
-      loyalty_members:      [0,0,0,0,0,0,60,140,220,300,370,420],
-    };
-    App.data.traffic_weeks = window.ANCHOR.weeks.map((a, i) => ({
-      id: Date.now() + i, week_num: a.wk, period_end: dateStr((12 - a.wk) * 7),
-      saved_at: new Date().toISOString(),
-      google_rating: tw.google_rating[i], google_total: tw.google_total[i],
-      new_reviews: tw.new_reviews[i], response_rate: tw.response_rate[i],
-      yelp_rating: tw.yelp_rating[i], yelp_total: tw.yelp_total[i],
-      monthly_sessions: tw.monthly_sessions[i], bounce_rate: tw.bounce_rate[i],
-      gbp_views: tw.gbp_views[i],
-      ig_followers: tw.ig_followers[i], ig_posts_month: tw.ig_posts_month[i],
-      fb_followers: tw.fb_followers[i],
-      social_profile_visits: tw.social_profile_visits[i],
-      dd_active: 'yes', dd_rating: tw.dd_rating[i],
-      ue_active: 'yes', ue_rating: tw.ue_rating[i],
-      gh_active: 'no',  gh_rating: null,
-      delivery_orders: tw.delivery_orders[i],
-      delivery_avg_order_value: tw.delivery_avg_order_value[i],
-      email_list_size: tw.email_list_size[i], emails_sent: tw.emails_sent[i],
-      email_open_rate: tw.email_open_rate[i],
-      loyalty_active: i >= 6 ? 'yes' : 'no', loyalty_members: tw.loyalty_members[i],
-      notes: ''
-    }));
-
-    // ── Traffic audits — three-audit recovery arc, Feb / Mar / Apr ──
-    const mkTrafficAudit = (date, generated_at, audit_id, period, score, tier, raw) => {
-      const sections = {
-        'Google Business Profile': raw.S1_SCORE, 'Website': raw.S2_SCORE,
-        'Reviews': raw.S3_SCORE, 'Search and SEO': raw.S4_SCORE,
-        'Social Media': raw.S5_SCORE, 'Delivery Platforms': raw.S6_SCORE,
-        'Email and Loyalty': raw.S7_SCORE
-      };
-      const items = [];
-      const push = (gap, label, gid) => { if (gap > 0) items.push({ action:label + ' $' + Math.round(gap) + '/month opportunity.', monthly_impact:gap, gap_id:gid }); };
-      push(raw.S1_MONTHLY_GAP, 'Complete the Google Business Profile setup.', 'gbp');
-      push(raw.S2_MONTHLY_GAP, 'Lift website conversion and reduce bounce.', 'website');
-      push(raw.S3_MONTHLY_GAP, 'Close the review velocity and response gap.', 'reviews');
-      push(raw.S5_MONTHLY_GAP, 'Tighten posting schedule and content mix.', 'social');
-      push(raw.S6_MONTHLY_GAP, 'Tighten delivery platform listings.', 'delivery');
-      push(raw.S7_MONTHLY_GAP, 'Activate the email list and loyalty program.', 'email-loyalty');
-      items.sort((a, b) => (b.monthly_impact||0) - (a.monthly_impact||0));
-      const totalMo = items.reduce((s, it) => s + (it.monthly_impact||0), 0);
-      raw.OVERALL_SCORE = score;
-      raw.BAR_NAME = 'The Anchor Bar & Kitchen';
-      raw.AUDIT_ID = audit_id;
-      raw.AUDIT_PERIOD = period;
-      raw.DATA_TIER_LABEL = tier;
-      raw.INDUSTRY_AVG = 58;
-      raw.TARGET_SCORE = 65;
-      raw.WEEKLY_GAP_AMT = '$' + Math.round(totalMo/4.345).toLocaleString('en-US');
-      return { id:uid(), date:date, bar_name:raw.BAR_NAME, overall_score:score,
-        audit_id:audit_id, audit_period:period, grade:tier,
-        sections:sections, action_items:items, raw:raw, generated_at:generated_at };
-    };
-
-    App.data.traffic_audits = [
-      mkTrafficAudit(dateStr(74), daysAgoISO(74), 'TFA-2026-0008',
-        'February 2026, 4 weeks ending Feb 27', 31,
-        'Tier 2 Analysis, Standard Data Submitted', {
-        S1_SCORE:28, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Partial',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'No', S1_PHOTO_COUNT:41,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:2, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:52, S1_MONTHLY_GAP:480,
-        S1_NARRATIVE:'The Google Business Profile is claimed but only half complete. Two posts in 30 days against an 8-post benchmark.',
-        S1_FINDING:'Photos are well below 100, the menu link is missing, and posts barely run. Listings this thin lose discovery clicks to nearby competitors.',
-        S1_TOOL:'Add the menu link, post weekly offers, and load 60 more photos this month.',
-        S2_SCORE:30, S2_MOBILE_OPTIMIZED:'No', S2_MONTHLY_SESSIONS:1180,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:74, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'No', S2_ONLINE_ORDERING_PRESENT:'No', S2_MONTHLY_GAP:720,
-        S2_NARRATIVE:'Site traffic of 1,180 monthly sessions is roughly 40% below benchmark, and the homepage is not mobile-optimized.',
-        S2_FINDING:'A 74% bounce rate means visitors leave from the homepage. No online ordering means delivery traffic flows entirely to third-party platforms.',
-        S2_TOOL:'Rebuild the homepage above-the-fold for mobile and add a menu page that loads fast.',
-        S3_SCORE:22, S3_GOOGLE_RATING:3.9, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:240, S3_RESPONSE_RATE:38, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:19, S3_YELP_RATING:3.7,
-        S3_UNANSWERED:148, S3_NEGATIVE_PATTERN:'Slow weekend service mentioned in 4 of the last 10 reviews.',
-        S3_MONTHLY_GAP:1280,
-        S3_NARRATIVE:'Google rating is 3.9 against a 4.3 benchmark, and the response rate is just 38%.',
-        S3_FINDING:'148 reviews sit unanswered. A pattern of slow weekend service appears in recent reviews and is now visible to every searching guest.',
-        S3_TOOL:'Respond to every unanswered review this week and address the weekend pacing issue on the floor.',
-        S4_SCORE:32, S4_MAPS_PACK_CONFIRMED:'No', S4_NAP_CONSISTENT:'No',
-        S4_NAP_BUSINESS_NAME:'Inconsistent across Yelp and Apple Maps',
-        S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'The business does not appear in the Google Maps pack for its primary keyword.',
-        S4_FINDING:'Name, address and phone vary across Yelp, Apple Maps and the website footer. Inconsistent NAP signals depress local ranking.',
-        S4_TOOL:'Pick the canonical NAP and fix every directory listing to match it exactly.',
-        S5_SCORE:35, S5_IG_FOLLOWERS:1880, S5_IG_POSTS_LAST_30:5, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1050, S5_CONTENT_TYPE:'Mostly promotional', S5_MONTHLY_GAP:380,
-        S5_NARRATIVE:'Instagram posting runs 5 per 30 days against a 12 benchmark.',
-        S5_FINDING:'Content is mostly promotional graphics. Food and people content drives the engagement that grows followers.',
-        S5_TOOL:'Move to a balanced mix of food, people and the room. Post three times a week.',
-        S6_SCORE:38, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.2, S6_UBEREATS_RATING:4.0,
-        S6_PHOTO_COUNT_DELIVERY:11, S6_MENU_COMPLETE:'Partial', S6_PROMO_ACTIVE:'No',
-        S6_MONTHLY_GAP:540,
-        S6_NARRATIVE:'Both delivery platforms are live but ratings sit below the 4.5 benchmark and photos are sparse.',
-        S6_FINDING:'No promo is active on either platform, so listings sit low in the feed against competitors running offers.',
-        S6_TOOL:'Add 15 more food photos per platform and run a first-order promo on DoorDash.',
-        S7_SCORE:30, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:380, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:42, S7_SEND_FREQUENCY:'Rarely', S7_OPEN_RATE:18, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'No active mechanism', S7_LOYALTY_PROGRAM:'None', S7_MONTHLY_GAP:420,
-        S7_NARRATIVE:'A 380-contact list has not been emailed in over six weeks. No loyalty program is in place.',
-        S7_FINDING:'The list is going cold, opens are below benchmark, and there is no way for new guests to opt in.',
-        S7_TOOL:'Send a monthly email starting this week and add a WiFi sign-up capture.',
-        S8_SIG1_SCORE:'HIGH', S8_SIG1_LABEL:'Review velocity dead',
-        S8_SIG1_EVIDENCE:'Most recent review is 19 days old.',
-        S8_SIG1_GAP:'Listings without recent reviews lose discovery weight quickly.',
-        S8_SIG1_TOOL:'Drop QR table cards asking for a Google review at every check.',
-        S8_SIG2_SCORE:'HIGH', S8_SIG2_LABEL:'Unanswered reviews piling up',
-        S8_SIG2_EVIDENCE:'148 Google reviews sit with no response.',
-        S8_SIG2_GAP:'Response rate is a direct local-ranking signal and a trust signal to searching guests.',
-        S8_SIG2_TOOL:'Clear the backlog this week, then 10 minutes a day to stay current.',
-        S8_SIG3_SCORE:'MEDIUM', S8_SIG3_LABEL:'Email list going cold',
-        S8_SIG3_EVIDENCE:'Last email send was 42 days ago.',
-        S8_SIG3_GAP:'Open rates fall fast after 30 days dark, assets are bleeding.',
-        S8_SIG3_TOOL:'Send a monthly email this week, even a simple one.',
-        S8_SIG4_SCORE:'MEDIUM', S8_SIG4_LABEL:'No delivery promos',
-        S8_SIG4_EVIDENCE:'No promo active on DoorDash or UberEats.',
-        S8_SIG4_GAP:'Listings without promos sit lower in the feed against competitors who run them.',
-        S8_SIG4_TOOL:'Launch a first-order promo on DoorDash this week.'
-      }),
-      mkTrafficAudit(dateStr(42), daysAgoISO(42), 'TFA-2026-0012',
-        'March 2026, 4 weeks ending Mar 27', 48,
-        'Tier 2 Analysis, Standard Data Submitted', {
-        S1_SCORE:48, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:84,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:6, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:80, S1_MONTHLY_GAP:280,
-        S1_NARRATIVE:'GBP is now 80% complete with the menu link live and weekly posts running.',
-        S1_FINDING:'Photo count has doubled to 84 and weekly posts are landing. Two more posts a month and 16 more photos close the gap to benchmark.',
-        S1_TOOL:'Add two posts a week and finish loading the food photo library.',
-        S2_SCORE:46, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:1620,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:66, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'Yes', S2_MONTHLY_GAP:380,
-        S2_NARRATIVE:'Mobile rebuild lifted sessions to 1,620 and bounce rate dropped to 66%.',
-        S2_FINDING:'Online ordering is now live and the menu page is in the top three viewed. Sessions and bounce still trail benchmark, but the trend is solid.',
-        S2_TOOL:'Add a reservations link in the header and run a quick Lighthouse pass on page speed.',
-        S3_SCORE:44, S3_GOOGLE_RATING:4.1, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:275, S3_RESPONSE_RATE:68, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:8, S3_YELP_RATING:3.9,
-        S3_UNANSWERED:88, S3_NEGATIVE_PATTERN:'Weekend service mentions have dropped.',
-        S3_MONTHLY_GAP:640,
-        S3_NARRATIVE:'Google rating climbed to 4.1 and response rate is up to 68% as the reply routine took hold.',
-        S3_FINDING:'88 reviews remain unanswered. Hitting the 75% response benchmark closes the rest of this gap.',
-        S3_TOOL:'Clear the unanswered backlog and set a daily 10-minute response slot.',
-        S4_SCORE:50, S4_MAPS_PACK_CONFIRMED:'Sometimes', S4_NAP_CONSISTENT:'Yes',
-        S4_NAP_BUSINESS_NAME:'Consistent', S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'NAP is now consistent across the major directories.',
-        S4_FINDING:'The business appears in the Maps pack on most keyword variations. Citation count is climbing.',
-        S4_TOOL:'Add the bar to ten more local-bar directories.',
-        S5_SCORE:52, S5_IG_FOLLOWERS:2120, S5_IG_POSTS_LAST_30:9, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1115, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:200,
-        S5_NARRATIVE:'Posting is up to 9 per 30 days and content shifted to a balanced mix.',
-        S5_FINDING:'Follower growth followed the schedule change. Three more posts per month hits the benchmark.',
-        S5_TOOL:'Set a Tuesday and Friday content slot and stick to it.',
-        S6_SCORE:54, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.4, S6_UBEREATS_RATING:4.2,
-        S6_PHOTO_COUNT_DELIVERY:18, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'DoorDash',
-        S6_MONTHLY_GAP:280,
-        S6_NARRATIVE:'DoorDash promo is live and ratings are up. UberEats lags by two-tenths.',
-        S6_FINDING:'More photos and a UberEats promo would close the remaining gap.',
-        S6_TOOL:'Mirror the DoorDash promo on UberEats and add 8 more food photos to each.',
-        S7_SCORE:46, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:560, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:9, S7_SEND_FREQUENCY:'Monthly', S7_OPEN_RATE:24, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Started', S7_MONTHLY_GAP:220,
-        S7_NARRATIVE:'List grew past 500 and a loyalty program launched. Open rate of 24% beats the 20% benchmark.',
-        S7_FINDING:'Sending monthly works. Moving to weekly during event months grows revenue per send.',
-        S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.',
-        S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Posting schedule inconsistent',
-        S8_SIG1_EVIDENCE:'IG posts at 9 per 30 days, but clustered in two bursts.',
-        S8_SIG1_GAP:'Algorithms reward regular posting more than total volume.',
-        S8_SIG1_TOOL:'Lock a Tuesday and Friday content slot.',
-        S8_SIG2_SCORE:'MEDIUM', S8_SIG2_LABEL:'UberEats trails DoorDash',
-        S8_SIG2_EVIDENCE:'UberEats rating 4.2 vs DoorDash 4.4.',
-        S8_SIG2_GAP:'Lower rating means lower feed placement and fewer orders.',
-        S8_SIG2_TOOL:'Mirror the DoorDash photo and promo plan on UberEats.',
-        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Loyalty slow start',
-        S8_SIG3_EVIDENCE:'60 members in the first month.',
-        S8_SIG3_GAP:'Sign-up conversion needs a small incentive to accelerate.',
-        S8_SIG3_TOOL:'Offer a free appetizer for the first 100 sign-ups.'
-      }),
-      mkTrafficAudit(dateStr(8), daysAgoISO(8), 'TFA-2026-0017',
-        'April 2026, 4 weeks ending Apr 24', 64,
-        'Tier 3 Analysis, Full Data Submitted', {
-        S1_SCORE:66, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:138,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:10, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:95, S1_MONTHLY_GAP:0,
-        S1_NARRATIVE:'GBP is at 95% complete with 138 photos and 10 posts in the last 30 days, both above benchmark.',
-        S1_FINDING:'Only the Q and A section remains thin. The profile is now a strong discovery asset.',
-        S1_TOOL:'Seed the Q and A with the 8 questions guests ask most.',
-        S2_SCORE:60, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:2420,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:56, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'Yes', S2_MONTHLY_GAP:0,
-        S2_NARRATIVE:'Sessions cleared 2,400 and bounce rate is within a point of benchmark.',
-        S2_FINDING:'Online ordering and reservations are both live and visible above the fold on mobile.',
-        S2_TOOL:'Add a quarterly content refresh to the events page.',
-        S3_SCORE:64, S3_GOOGLE_RATING:4.5, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:326, S3_RESPONSE_RATE:88, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:4, S3_YELP_RATING:4.1,
-        S3_UNANSWERED:39, S3_NEGATIVE_PATTERN:'No recurring theme in the last 30 days.',
-        S3_MONTHLY_GAP:180,
-        S3_NARRATIVE:'Google rating sits at 4.5 with 88% response rate, both ahead of benchmark.',
-        S3_FINDING:'39 older reviews remain unanswered but no recurring complaint pattern surfaces in recent ones.',
-        S3_TOOL:'Sweep the older unanswered reviews and keep the daily response slot.',
-        S4_SCORE:66, S4_MAPS_PACK_CONFIRMED:'Yes', S4_NAP_CONSISTENT:'Yes',
-        S4_NAP_BUSINESS_NAME:'Consistent', S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'The bar appears in the Maps pack for every tracked keyword.',
-        S4_FINDING:'NAP and citation count are above the local benchmark. Search is performing.',
-        S4_TOOL:'Audit citations quarterly and add new ones as new directories appear.',
-        S5_SCORE:66, S5_IG_FOLLOWERS:2600, S5_IG_POSTS_LAST_30:14, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1240, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:0,
-        S5_NARRATIVE:'Follower growth has accelerated. Posting frequency is above benchmark with a balanced mix.',
-        S5_FINDING:'IG engagement rate is up to 2.4%. Reels are now in rotation.',
-        S5_TOOL:'Add one staff-introduction post a month to deepen the human side.',
-        S6_SCORE:68, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.6, S6_UBEREATS_RATING:4.4,
-        S6_PHOTO_COUNT_DELIVERY:48, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'Both platforms',
-        S6_MONTHLY_GAP:0,
-        S6_NARRATIVE:'Both delivery platforms run promos and DoorDash hit the 4.6 benchmark.',
-        S6_FINDING:'Photo and menu coverage are strong. Grubhub is still off, which is a deliberate choice given local mix.',
-        S6_TOOL:'Add a third promo type, free-delivery threshold, on DoorDash next month.',
-        S7_SCORE:62, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:760, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:5, S7_SEND_FREQUENCY:'Weekly', S7_OPEN_RATE:28, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Active, 420 members',
-        S7_MONTHLY_GAP:80,
-        S7_NARRATIVE:'List grew to 760, weekly sends with 28% opens, and 420 loyalty members enrolled.',
-        S7_FINDING:'The email channel is now a real revenue line. Loyalty redemption rate is the next thing to track.',
-        S7_TOOL:'Add a redemption-rate report to the monthly review and run a member-only event quarterly.',
-        S8_SIG1_SCORE:'LOW', S8_SIG1_LABEL:'Photo library steady',
-        S8_SIG1_EVIDENCE:'138 photos current, with 54 added in the last 30 days.',
-        S8_SIG1_GAP:'On track. Refresh photos seasonally.',
-        S8_SIG1_TOOL:'Replace the menu cover shots quarterly with current plating.',
-        S8_SIG2_SCORE:'LOW', S8_SIG2_LABEL:'Grubhub still inactive',
-        S8_SIG2_EVIDENCE:'Grubhub listing remains off.',
-        S8_SIG2_GAP:'Confirm this is intentional given local order mix.',
-        S8_SIG2_TOOL:'Review Grubhub local order share annually before deciding.',
-        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Loyalty trajectory strong',
-        S8_SIG3_EVIDENCE:'420 members in 90 days, redemption rate not yet measured.',
-        S8_SIG3_GAP:'Redemption rate is the next leading indicator to watch.',
-        S8_SIG3_TOOL:'Add a monthly redemption report and run a member-only event quarterly.'
-      })
-    ];
-
-    // ════════════════════════════════════════════════════════════════════
-    //  INVENTORY CONTROL — The Anchor's stockroom. The last two counts feed
-    //  the Profit This Week COGS, so the Capture-to-Diagnose chain computes.
-    // ════════════════════════════════════════════════════════════════════
-    App.inventoryData = App.inventoryData || {};
-
-    App.inventoryData.ic_vendors = [
-      { id:uid(), name:'Republic National',   rep:'Dana Ortiz',  phone:'512-555-0142', email:'dortiz@rndc.example',   delivery_days:'Tue, Fri', payment_terms:'Net 30', account_number:'RNDC-4471',  notes:'', created_at:new Date().toISOString() },
-      { id:uid(), name:"Glazer's Beer & Bev", rep:'Marcus Hill', phone:'512-555-0188', email:'mhill@glazers.example', delivery_days:'Wed',      payment_terms:'Net 15', account_number:'GLZ-2210',   notes:'', created_at:new Date().toISOString() },
-      { id:uid(), name:'Austin Beerworks',    rep:'Priya Shah',  phone:'512-555-0119', email:'priya@abw.example',     delivery_days:'Thu',      payment_terms:'COD',    account_number:'ABW-0093',   notes:'Local draft', created_at:new Date().toISOString() },
-      { id:uid(), name:'Sysco Foods',         rep:'Tom Becker',  phone:'512-555-0203', email:'tbecker@sysco.example', delivery_days:'Mon, Thu', payment_terms:'Net 30', account_number:'SYS-88120',  notes:'', created_at:new Date().toISOString() },
-      { id:uid(), name:'Restaurant Depot',    rep:'Walk-in',     phone:'512-555-0250', email:'',                      delivery_days:'Pickup',   payment_terms:'COD',    account_number:'',           notes:'Supplies and paper', created_at:new Date().toISOString() },
-      { id:uid(), name:'Local Produce Co.',   rep:'Gabe Flores', phone:'512-555-0177', email:'orders@localproduce.example', delivery_days:'Tue, Fri', payment_terms:'Net 15', account_number:'LPC-3050',  notes:'Produce and dairy', created_at:new Date().toISOString() },
-    ];
-
-    App.inventoryData.ic_locations = [
-      ['Main Bar','bar'], ['Back Bar','bar'], ['Liquor Room','bar'],
-      ['Walk-in Cooler','both'], ['Kitchen Line','kitchen'], ['Dry Storage','both']
-    ].map(([n, type]) => ({ id:uid(), name:n, type, archived:false }));
-
-    // Categories must match Profit's BAR_CATS / KITCHEN_CATS for the COGS feed.
-    const icProducts = [
-      { name:"Tito's Handmade Vodka",    category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:22.40, menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Liquor Room' },
-      { name:'Espolòn Tequila Blanco',   category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:24.50, menu_price:10, par_level:20,  reorder_point:9,   primary_location:'Liquor Room' },
-      { name:'Bulleit Bourbon',          category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:27.90, menu_price:11, par_level:16,  reorder_point:7,   primary_location:'Liquor Room' },
-      { name:"Hendrick's Gin",           category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:31.00, menu_price:12, par_level:10,  reorder_point:5,   primary_location:'Liquor Room' },
-      { name:'House Cabernet',           category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:9.50,  menu_price:10, par_level:24,  reorder_point:10,  primary_location:'Back Bar', serving_sizes:[{ label:'Bottle', size_oz:25.4, price:34 }] },
-      { name:'House Chardonnay',         category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:5,   unit_cost:8.75,  menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Walk-in Cooler' },
-      { name:'Modelo Especial',          category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:32.40, menu_price:6,  case_size:24, par_level:20,  reorder_point:6, primary_location:'Walk-in Cooler' },
-      { name:'Lone Star',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12,   pour_size_oz:12,  unit_cost:22.80, menu_price:5,  case_size:24, par_level:15,  reorder_point:5, primary_location:'Walk-in Cooler' },
-      { name:'ABW Pearl Snap (1/2 bbl)', category:'Draft Beer',  vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16,  unit_cost:165.00,menu_price:6,  par_level:6,   reorder_point:2,   primary_location:'Walk-in Cooler' },
-      { name:'Ground Beef 80/20 (lb)',   category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:4.20,  par_level:240, reorder_point:80,  primary_location:'Walk-in Cooler' },
-      { name:'Chicken Thigh (lb)',       category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:2.95,  par_level:200, reorder_point:60,  primary_location:'Walk-in Cooler' },
-      { name:'Cheddar Cheese (lb)',      category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:4.60,  par_level:90,  reorder_point:30,  primary_location:'Walk-in Cooler' },
-      { name:'Romaine (case)',           category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:22.00, par_level:16,  reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Flour Tortilla (case)',    category:'Food',        vendor:'Sysco Foods',                                                   unit_cost:16.00, par_level:20,  reorder_point:8,   primary_location:'Kitchen Line' },
-      { name:'Fryer Oil (jug)',          category:'Misc',        vendor:'Restaurant Depot',                                              unit_cost:28.00, par_level:10,  reorder_point:4,   primary_location:'Kitchen Line' },
-      { name:'To-Go Boxes (case)',       category:'Misc',        vendor:'Restaurant Depot',                                              unit_cost:42.00, par_level:8,   reorder_point:3,   primary_location:'Kitchen Line' },
-      { name:'Triple Sec',               category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.75, unit_cost:9.00,  menu_price:7, par_level:12,  reorder_point:5,   primary_location:'Back Bar' },
-      { name:'Lime Juice (qt)',          category:'Misc',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Simple Syrup (qt)',        category:'Misc',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
-      // Kitchen ingredients (appended so existing index-based recipes stay valid).
-      { name:'Brioche Bun (each)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:0.55,  par_level:240, reorder_point:80,  primary_location:'Dry Storage' },
-      { name:'Beefsteak Tomato (lb)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:2.40,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
-      { name:'Mixed Greens (case)',      category:'Food',        vendor:'Local Produce Co.',   unit_cost:24.00, par_level:14,  reorder_point:5,   primary_location:'Walk-in Cooler' },
-      { name:'Applewood Bacon (lb)',     category:'Food',        vendor:'Sysco Foods',         unit_cost:6.50,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
-      { name:'Russet Potato (lb)',       category:'Food',        vendor:'Local Produce Co.',   unit_cost:1.10,  par_level:200, reorder_point:60,  primary_location:'Dry Storage' },
-      { name:'Atlantic Cod (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:9.20,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
-      { name:'Salmon Fillet (lb)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:12.40, par_level:50,  reorder_point:18,  primary_location:'Walk-in Cooler' },
-      { name:'Gulf Shrimp (lb)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:11.80, par_level:50,  reorder_point:18,  primary_location:'Walk-in Cooler' },
-      { name:'Pork Chop (each)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:4.60,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
-      { name:'Hass Avocado (each)',      category:'Food',        vendor:'Local Produce Co.',   unit_cost:1.20,  par_level:90,  reorder_point:30,  primary_location:'Walk-in Cooler' },
-      { name:'Large Eggs (dozen)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:3.40,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
-      { name:'Arborio Rice (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:3.10,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
-      { name:'Parmesan (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:8.90,  par_level:30,  reorder_point:10,  primary_location:'Walk-in Cooler' },
-      { name:'Beef Brisket (lb)',        category:'Food',        vendor:'Sysco Foods',         unit_cost:6.80,  par_level:80,  reorder_point:24,  primary_location:'Walk-in Cooler' },
-      // Ingredients added for the full recipe-costed menu (C reseed 2026-05-30).
-      // Every menu recipe ingredient must exist here as a product.
-      { name:'Tortilla Chips (bag)',     category:'Food',        vendor:'Sysco Foods',         unit_cost:3.00,  par_level:24,  reorder_point:8,   primary_location:'Dry Storage' },
-      { name:'Chicken Wings (lb)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:2.40,  par_level:120, reorder_point:40,  primary_location:'Walk-in Cooler' },
-      { name:'Brussels Sprouts (lb)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:2.20,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
-      { name:'Chickpeas (lb)',           category:'Food',        vendor:'Sysco Foods',         unit_cost:1.50,  par_level:30,  reorder_point:10,  primary_location:'Dry Storage' },
-      { name:'Flatbread (each)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:0.60,  par_level:120, reorder_point:40,  primary_location:'Dry Storage' },
-      { name:'Calamari (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:6.00,  par_level:30,  reorder_point:10,  primary_location:'Walk-in Cooler' },
-      { name:'Sweet Corn (each)',        category:'Food',        vendor:'Local Produce Co.',   unit_cost:0.55,  par_level:120, reorder_point:40,  primary_location:'Walk-in Cooler' },
-      { name:'Ahi Tuna (lb)',            category:'Food',        vendor:'Sysco Foods',         unit_cost:14.00, par_level:24,  reorder_point:8,   primary_location:'Walk-in Cooler' },
-      { name:'Elbow Pasta (lb)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:1.40,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
-      { name:'Sourdough Loaf (each)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:3.50,  par_level:30,  reorder_point:10,  primary_location:'Dry Storage' },
-      { name:'Quinoa (lb)',              category:'Food',        vendor:'Sysco Foods',         unit_cost:3.20,  par_level:30,  reorder_point:10,  primary_location:'Dry Storage' },
-      { name:'Beef Short Rib (lb)',      category:'Food',        vendor:'Sysco Foods',         unit_cost:7.50,  par_level:60,  reorder_point:20,  primary_location:'Walk-in Cooler' },
-      { name:'Waffle Mix (lb)',          category:'Food',        vendor:'Sysco Foods',         unit_cost:1.80,  par_level:40,  reorder_point:14,  primary_location:'Dry Storage' },
-      { name:'Mayonnaise (qt)',          category:'Misc',        vendor:'Sysco Foods',         unit_cost:4.00,  par_level:12,  reorder_point:4,   primary_location:'Walk-in Cooler' },
-      { name:'Heavy Cream (qt)',         category:'Food',        vendor:'Sysco Foods',         unit_cost:4.50,  par_level:16,  reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Charcuterie Selection (lb)',category:'Food',       vendor:'Local Produce Co.',   unit_cost:12.00, par_level:20,  reorder_point:7,   primary_location:'Walk-in Cooler' },
-      { name:'Dark Chocolate (lb)',      category:'Food',        vendor:'Sysco Foods',         unit_cost:6.50,  par_level:20,  reorder_point:7,   primary_location:'Dry Storage' },
-      { name:'Coffee Liqueur',           category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.0, unit_cost:19.00, menu_price:9, par_level:8,  reorder_point:3, primary_location:'Back Bar' },
-      { name:'Campari',                  category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.0, unit_cost:26.00, menu_price:9, par_level:6,  reorder_point:2, primary_location:'Back Bar' },
-      { name:'Sweet Vermouth',           category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.0, unit_cost:11.00, menu_price:8, par_level:6,  reorder_point:2, primary_location:'Back Bar' },
-      { name:'Mezcal',                   category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:33.00, menu_price:12, par_level:6,  reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Prosecco',                 category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:2.0, unit_cost:12.00, menu_price:10, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
-      { name:'White Rum',                category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:14.00, menu_price:8, par_level:8,  reorder_point:3, primary_location:'Liquor Room' },
-      { name:'Maraschino Liqueur',       category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.5, unit_cost:24.00, menu_price:9, par_level:4,  reorder_point:2, primary_location:'Back Bar' },
-      { name:'Cold Brew Concentrate (qt)',category:'Misc',       vendor:'Sysco Foods',         unit_cost:9.00,  par_level:8,  reorder_point:3,   primary_location:'Walk-in Cooler' },
-      { name:'Ginger Beer (qt)',         category:'Misc',        vendor:"Glazer's Beer & Bev", unit_cost:3.00,  par_level:18, reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Cranberry Juice (qt)',     category:'Misc',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12, reorder_point:4,   primary_location:'Back Bar' },
-      // ── Expanded bar stock (full lineup for a craft cocktail bar) ──────────
-      { name:'Ketel One',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:28.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
-      { name:'Grey Goose',               category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:34.00, menu_price:13, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Tanqueray',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:26.00, menu_price:11, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Roku Gin',                 category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:30.00, menu_price:12, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Don Julio Blanco',         category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:45.00, menu_price:14, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Casamigos Reposado',       category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:48.00, menu_price:15, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:"Maker's Mark",             category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:27.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
-      { name:'Woodford Reserve',         category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:35.00, menu_price:13, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Buffalo Trace',            category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:26.00, menu_price:11, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Rittenhouse Rye',          category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:24.00, menu_price:10, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Jameson',                  category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:28.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
-      { name:'Macallan 12',              category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:65.00, menu_price:18, par_level:3, reorder_point:1, primary_location:'Liquor Room' },
-      { name:"Dewar's",                  category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:26.00, menu_price:10, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Mount Gay Eclipse',        category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:22.00, menu_price:10, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Sailor Jerry Spiced',      category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:21.00, menu_price:9,  par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Hennessy VS',              category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:38.00, menu_price:14, par_level:4, reorder_point:2, primary_location:'Liquor Room' },
-      { name:'Aperol',                   category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.0, unit_cost:24.00, menu_price:9,  par_level:4, reorder_point:2, primary_location:'Back Bar' },
-      { name:'St-Germain',               category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:0.75, unit_cost:32.00, menu_price:10, par_level:3, reorder_point:1, primary_location:'Back Bar' },
-      { name:'Cointreau',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:0.75, unit_cost:33.00, menu_price:10, par_level:3, reorder_point:1, primary_location:'Back Bar' },
-      { name:'Disaronno Amaretto',       category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.0, unit_cost:25.00, menu_price:9,  par_level:3, reorder_point:1, primary_location:'Back Bar' },
-      { name:'Green Chartreuse',         category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:0.75, unit_cost:60.00, menu_price:12, par_level:2, reorder_point:1, primary_location:'Back Bar' },
-      { name:'Pinot Noir',               category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:13.00, menu_price:12, par_level:18, reorder_point:6, primary_location:'Back Bar' },
-      { name:'Malbec',                   category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:12.00, menu_price:11, par_level:18, reorder_point:6, primary_location:'Back Bar' },
-      { name:'Red Blend',                category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:11.00, menu_price:10, par_level:18, reorder_point:6, primary_location:'Back Bar' },
-      { name:'Sauvignon Blanc',          category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:12.00, menu_price:11, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
-      { name:'Pinot Grigio',             category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:11.00, menu_price:10, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
-      { name:'Rosé',                     category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:12.00, menu_price:11, par_level:14, reorder_point:5, primary_location:'Walk-in Cooler' },
-      { name:'Champagne',                category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:2, unit_cost:30.00, menu_price:14, par_level:12, reorder_point:4, primary_location:'Walk-in Cooler', serving_sizes:[{ label:'Bottle', size_oz:25.4, price:65 }] },
-      { name:'Dry Vermouth',             category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.0, unit_cost:11.00, menu_price:8, par_level:4, reorder_point:2, primary_location:'Back Bar' },
-      { name:'Cabernet Reserve',         category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:22.00, menu_price:16, par_level:8, reorder_point:3, primary_location:'Back Bar' },
-      { name:'Chardonnay Reserve',       category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:5, unit_cost:20.00, menu_price:15, par_level:8, reorder_point:3, primary_location:'Walk-in Cooler' },
-      { name:'Bud Light',                category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:28.80, menu_price:5, case_size:24, par_level:12, reorder_point:4, primary_location:'Walk-in Cooler' },
-      { name:'Corona',                   category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:33.60, menu_price:6, case_size:24, par_level:10, reorder_point:4, primary_location:'Walk-in Cooler' },
-      { name:'Stella Artois',            category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:38.40, menu_price:7, case_size:24, par_level:8,  reorder_point:3, primary_location:'Walk-in Cooler' },
-      { name:'Athletic NA',              category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:33.60, menu_price:6, case_size:24, par_level:6,  reorder_point:2, primary_location:'Walk-in Cooler' },
-      { name:'White Claw',               category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:38.40, menu_price:6, case_size:24, par_level:10, reorder_point:4, primary_location:'Walk-in Cooler' },
-      { name:'Austin Eastciders',        category:'Bottle Beer', vendor:"Glazer's Beer & Bev", container_size_oz:12, pour_size_oz:12, unit_cost:43.20, menu_price:7, case_size:24, par_level:8,  reorder_point:3, primary_location:'Walk-in Cooler' },
-      { name:'Live Oak Hefeweizen',      category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:180.00, menu_price:6, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler', serving_sizes:[{ label:'12 oz', size_oz:12, price:5 },{ label:'Pitcher', size_oz:60, price:18 }] },
-      { name:"Real Ale Fireman's 4",     category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:165.00, menu_price:6, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler' },
-      { name:'ABW Fire Eagle IPA',       category:'Draft Beer', vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16, unit_cost:190.00, menu_price:7, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler' },
-      { name:'Independence Stout',       category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:175.00, menu_price:6, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
-      { name:'Seasonal Rotating Tap',    category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:185.00, menu_price:7, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
-    ].map(p => {
-      const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
-      // Bottle Beer unit_cost is per CASE; convert to per-bottle before costing
-      // the pour, mirroring the product form's effectiveBottleCost().
-      const effCost = (p.category === 'Bottle Beer' && p.case_size) ? p.unit_cost / p.case_size : p.unit_cost;
-      const cpp   = pours ? effCost / pours : null;
-      // Names carry no unit suffix; the unit lives in unit_type and is shown in
-      // the Par / Order Qty / On-Hand columns. Derive unit_type from the legacy
-      // "(lb)"-style suffix and strip it from the display name.
-      const um = (p.name || '').match(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i);
-      const cleanName = um ? p.name.replace(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i, '') : p.name;
-      const unitType  = p.unit_type || (um ? um[1].toLowerCase() : null);
-      return { id:uid(), brand:'', sub_category:'', secondary_location:'', notes:'', active:true,
-        container_size_oz:null, pour_size_oz:null, menu_price:null,
-        pours_per_container:pours, cost_per_pour:cpp,
-        pour_cost_pct:(cpp != null && p.menu_price) ? cpp/p.menu_price*100 : null,
-        // Phase 0: cost_history captures every auto-update from Receive Delivery
-        // price changes. Empty on fresh data; populated as deliveries log price moves.
-        cost_history:[],
-        ...p, name: cleanName, unit_type: unitType };
-    });
-    // Multi-location stocking: bar products live in storage AND at the service
-    // bars, the way a real bar runs. locations[0] is the primary (ordering home).
-    icProducts.forEach(p => {
-      let locs = null;
-      if (p.category === 'Liquor')           locs = ['Liquor Room', 'Main Bar'];
-      else if (p.category === 'Wine')        locs = ['Back Bar', 'Main Bar', 'Walk-in Cooler'];
-      else if (p.category === 'Bottle Beer') locs = ['Walk-in Cooler', 'Main Bar', 'Back Bar'];
-      else if (p.category === 'Draft Beer')  locs = ['Walk-in Cooler', 'Main Bar'];
-      if (locs) { p.locations = locs.slice(); p.primary_location = locs[0]; }
-    });
-    App.inventoryData.ic_products = icProducts;
-
-    // ── Beer + Wine as linked Menu Inventory Items ──────────────────────────
-    // Direct-pour beverages live in the menu's Inventory Items tab, LINKED to
-    // the Inventory Control product (the screen classifies on linked_product_id,
-    // not category, so a free-floating 'Beer'/'Wine' row would wrongly show as a
-    // Plate Item). Cost flows from the product's cost-per-pour. These are the
-    // bar's actual stocked beer/wine — the menu only offers what Inventory
-    // carries. rMenu is the same array as App.data.menu_items, so pushing here
-    // adds them to the live menu.
-    const IC_TO_MENU = App.MENU_IC_TO_CAT || { 'Bottle Beer':'Beer', 'Draft Beer':'Beer', 'Wine':'Wine', 'Misc':'NA Beverages' };
-    const invMenuItem = (p, price, covers) => ({
-      id:uid(), name:p.name, category:(IC_TO_MENU[p.category] || 'Beer'),
-      price:price, cost:+((p.cost_per_pour || 0)).toFixed(2), weekly_covers:covers,
-      prev_weekly_covers:null, weekly_covers_updated_at:null, notes:'', recipe:null,
-      linked_product_id:p.id, pour_size_oz:null, target_cost_pct:null,
-      created_at:new Date().toISOString(), updated_at:new Date().toISOString()
-    });
-    const icByName = nm => icProducts.find(p => p.name === nm);
-    [ ['ABW Pearl Snap (1/2 bbl)', 6, 320], ['Modelo Especial', 6, 180],
-      ['Lone Star', 5, 150], ['House Cabernet', 10, 64], ['House Chardonnay', 9, 70],
-      // Expanded beer + wine list — the menu offers what Inventory now carries.
-      ['Bud Light', 5, 210], ['Corona', 6, 160], ['Stella Artois', 7, 90],
-      ['Athletic NA', 6, 40], ['White Claw', 6, 120], ['Austin Eastciders', 7, 70],
-      ['Live Oak Hefeweizen', 6, 240], ["Real Ale Fireman's 4", 6, 200], ['ABW Fire Eagle IPA', 7, 220],
-      ['Independence Stout', 6, 110], ['Seasonal Rotating Tap', 7, 130],
-      ['Pinot Noir', 12, 80], ['Malbec', 11, 70], ['Red Blend', 10, 90],
-      ['Sauvignon Blanc', 11, 85], ['Pinot Grigio', 10, 75], ['Rosé', 11, 60], ['Champagne', 14, 30],
-      ['Cabernet Reserve', 16, 24], ['Chardonnay Reserve', 15, 22]
-    ].forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(invMenuItem(p, row[1], row[2])); });
-
-    // ── Recipes attached to menu items + standalone batches ─────────────────
-    // Recipes now live EMBEDDED in App.data.menu_items as the optional
-    // `recipe` field. When attached, cost auto-computes from current product
-    // prices via App.menuItemCost. We attach 3 recipes to existing rMenu
-    // items here so the demo shows both menu items with recipes (cost
-    // auto-flows) and menu items without (manual cost stays as-is).
-    const attachRecipe = (itemName, recipe) => {
-      const item = rMenu.find(m => m.name === itemName);
-      if (item) item.recipe = recipe;
-    };
-    // Look an ingredient id up by product name (robust against index shifts).
-    // Tolerant lookup: recipe ingredient names may still carry the legacy
-    // "(lb)" suffix, but product names were stripped of it — match either way.
-    const icp = nm => {
-      const clean = (nm || '').replace(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i, '');
-      return (icProducts.find(p => p.name === clean) || {}).id;
-    };
-    const ing = (nm, quantity) => ({ source: 'product', id: icp(nm), quantity: quantity });
-    attachRecipe('House Margarita', {
-      mode: 'single',
-      ingredients: [
-        { source: 'product', id: icProducts[1].id,  quantity: 1 },     // Espolòn Tequila (1 pour)
-        { source: 'product', id: icProducts[16].id, quantity: 0.5 },   // Triple Sec
-        { source: 'product', id: icProducts[17].id, quantity: 0.04 }   // Lime Juice (fraction of qt)
-      ],
-      plate_yield: null
-    });
-    attachRecipe('Anchor Burger', {
-      mode: 'food',
-      ingredients: [
-        ing('Ground Beef 80/20 (lb)', 0.33),
-        ing('Brioche Bun (each)',     1),
-        ing('Cheddar Cheese (lb)',    0.12),
-        ing('Applewood Bacon (lb)',   0.10),
-        ing('Beefsteak Tomato (lb)',  0.08),
-        ing('Mixed Greens (case)',    0.03)
-      ],
-      plate_yield: 1
-    });
-    attachRecipe('Old Fashioned', {
-      mode: 'single',
-      // Spirit quantity = pours; mixer quantity = fraction of the qt container
-      // (the seed costs Misc mixers off unit_cost, so keep these small/realistic).
-      ingredients: [ ing('Bulleit Bourbon', 1.3), ing('Simple Syrup (qt)', 0.02) ],
-      plate_yield: null
-    });
-    // More plate + cocktail recipes, all built from real Inventory products.
-    // Not every item carries a recipe (by design) — these cover the headline
-    // dishes so Recipe Cost Analysis and Menu Engineering have real coverage.
-    attachRecipe('Brisket Sandwich', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Beef Brisket (lb)', 0.35), ing('Brioche Bun (each)', 1), ing('Mixed Greens (case)', 0.02) ] });
-    attachRecipe('Fish and Chips', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Atlantic Cod (lb)', 0.40), ing('Russet Potato (lb)', 0.50) ] });
-    attachRecipe('Chicken Caesar', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Chicken Thigh (lb)', 0.30), ing('Romaine (case)', 0.05), ing('Parmesan (lb)', 0.05) ] });
-    attachRecipe('Steak Frites', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Beef Brisket (lb)', 0.50), ing('Russet Potato (lb)', 0.45) ] });
-    attachRecipe('Shrimp Tacos', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Gulf Shrimp (lb)', 0.30), ing('Flour Tortilla (case)', 0.02), ing('Hass Avocado (each)', 0.5) ] });
-    attachRecipe('Pan-Seared Salmon', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Salmon Fillet (lb)', 0.40), ing('Arborio Rice (lb)', 0.15), ing('Mixed Greens (case)', 0.03) ] });
-    attachRecipe('Grilled Pork Chop', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Pork Chop (each)', 1), ing('Russet Potato (lb)', 0.40) ] });
-    attachRecipe('Mushroom Risotto', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Arborio Rice (lb)', 0.25), ing('Parmesan (lb)', 0.06) ] });
-    attachRecipe('Breakfast Tacos', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Large Eggs (dozen)', 0.25), ing('Flour Tortilla (case)', 0.02), ing('Cheddar Cheese (lb)', 0.06), ing('Applewood Bacon (lb)', 0.08) ] });
-    attachRecipe('Paloma', { mode: 'single', plate_yield: null, ingredients: [
-      ing('Espolòn Tequila Blanco', 1), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02) ] });
-    attachRecipe('Whiskey Sour', { mode: 'single', plate_yield: null, ingredients: [
-      ing('Bulleit Bourbon', 1.3), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
-
-    // ── C reseed (2026-05-30): recipe-cost the rest of the menu off real
-    // Inventory products so nearly every item is recipe-driven and costs auto-
-    // flow. Five simple/prepared items stay manual-cost by design (Fried
-    // Pickles, Pretzel Bites, Truffle Fries, Skillet Cookie, Key Lime Pie).
-    attachRecipe('Loaded Nachos', { mode:'food', plate_yield:1, ingredients:[
-      ing('Tortilla Chips (bag)', 0.5), ing('Cheddar Cheese (lb)', 0.15), ing('Ground Beef 80/20 (lb)', 0.20) ] });
-    attachRecipe('Smoked Wings', { mode:'food', plate_yield:1, ingredients:[
-      ing('Chicken Wings (lb)', 1.2) ] });
-    attachRecipe('Deviled Eggs', { mode:'food', plate_yield:1, ingredients:[
-      ing('Large Eggs (dozen)', 0.5), ing('Mayonnaise (qt)', 0.05) ] });
-    attachRecipe('Charcuterie Board', { mode:'food', plate_yield:1, ingredients:[
-      ing('Charcuterie Selection (lb)', 0.4), ing('Cheddar Cheese (lb)', 0.15), ing('Flatbread (each)', 1) ] });
-    attachRecipe('Crispy Brussels', { mode:'food', plate_yield:1, ingredients:[
-      ing('Brussels Sprouts (lb)', 0.6), ing('Applewood Bacon (lb)', 0.12) ] });
-    attachRecipe('Hummus and Flatbread', { mode:'food', plate_yield:1, ingredients:[
-      ing('Chickpeas (lb)', 0.5), ing('Flatbread (each)', 2) ] });
-    attachRecipe('Calamari', { mode:'food', plate_yield:1, ingredients:[
-      ing('Calamari (lb)', 0.5), ing('Lime Juice (qt)', 0.02) ] });
-    attachRecipe('Street Corn Ribs', { mode:'food', plate_yield:1, ingredients:[
-      ing('Sweet Corn (each)', 3), ing('Parmesan (lb)', 0.05) ] });
-    attachRecipe('Tuna Poke', { mode:'food', plate_yield:1, ingredients:[
-      ing('Ahi Tuna (lb)', 0.30), ing('Hass Avocado (each)', 0.5), ing('Arborio Rice (lb)', 0.10) ] });
-    attachRecipe('House Salad', { mode:'food', plate_yield:1, ingredients:[
-      ing('Mixed Greens (case)', 0.05), ing('Beefsteak Tomato (lb)', 0.10) ] });
-    attachRecipe('Mac and Cheese', { mode:'food', plate_yield:1, ingredients:[
-      ing('Elbow Pasta (lb)', 0.30), ing('Cheddar Cheese (lb)', 0.30), ing('Heavy Cream (qt)', 0.06) ] });
-    attachRecipe('Avocado Toast', { mode:'food', plate_yield:1, ingredients:[
-      ing('Hass Avocado (each)', 1.5), ing('Sourdough Loaf (each)', 0.2), ing('Large Eggs (dozen)', 0.17) ] });
-    attachRecipe('Veggie Grain Bowl', { mode:'food', plate_yield:1, ingredients:[
-      ing('Quinoa (lb)', 0.30), ing('Mixed Greens (case)', 0.05), ing('Hass Avocado (each)', 0.5) ] });
-    attachRecipe('Braised Short Rib', { mode:'food', plate_yield:1, ingredients:[
-      ing('Beef Short Rib (lb)', 1.0), ing('Russet Potato (lb)', 0.40) ] });
-    attachRecipe('Chicken and Waffles', { mode:'food', plate_yield:1, ingredients:[
-      ing('Chicken Thigh (lb)', 0.6), ing('Waffle Mix (lb)', 0.5) ] });
-    attachRecipe('Brunch Burger', { mode:'food', plate_yield:1, ingredients:[
-      ing('Ground Beef 80/20 (lb)', 0.33), ing('Brioche Bun (each)', 1), ing('Applewood Bacon (lb)', 0.10), ing('Large Eggs (dozen)', 0.08), ing('Cheddar Cheese (lb)', 0.08) ] });
-    attachRecipe('Shakshuka', { mode:'food', plate_yield:1, ingredients:[
-      ing('Large Eggs (dozen)', 0.33), ing('Beefsteak Tomato (lb)', 0.40), ing('Chickpeas (lb)', 0.15) ] });
-    attachRecipe('Creme Brulee', { mode:'food', plate_yield:1, ingredients:[
-      ing('Heavy Cream (qt)', 0.25), ing('Large Eggs (dozen)', 0.17) ] });
-    attachRecipe('Chocolate Torte', { mode:'food', plate_yield:1, ingredients:[
-      ing('Dark Chocolate (lb)', 0.20), ing('Large Eggs (dozen)', 0.10), ing('Heavy Cream (qt)', 0.05) ] });
-    attachRecipe('Espresso Martini', { mode:'single', plate_yield:null, ingredients:[
-      ing("Tito's Handmade Vodka", 1.0), ing('Coffee Liqueur', 0.75), ing('Cold Brew Concentrate (qt)', 0.05) ] });
-    attachRecipe('Negroni', { mode:'single', plate_yield:null, ingredients:[
-      ing("Hendrick's Gin", 0.8), ing('Campari', 0.8), ing('Sweet Vermouth', 0.8) ] });
-    attachRecipe('Manhattan', { mode:'single', plate_yield:null, ingredients:[
-      ing('Bulleit Bourbon', 1.3), ing('Sweet Vermouth', 0.5) ] });
-    attachRecipe('Mezcal Mule', { mode:'single', plate_yield:null, ingredients:[
-      ing('Mezcal', 1.0), ing('Lime Juice (qt)', 0.04), ing('Ginger Beer (qt)', 0.13) ] });
-    attachRecipe('Spicy Margarita', { mode:'single', plate_yield:null, ingredients:[
-      ing('Espolòn Tequila Blanco', 1.0), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.04) ] });
-    attachRecipe('French 75', { mode:'single', plate_yield:null, ingredients:[
-      ing("Hendrick's Gin", 0.8), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02), ing('Prosecco', 1) ] });
-    attachRecipe('Mojito', { mode:'single', plate_yield:null, ingredients:[
-      ing('White Rum', 1.5), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
-    attachRecipe('Boulevardier', { mode:'single', plate_yield:null, ingredients:[
-      ing('Bulleit Bourbon', 1.0), ing('Campari', 0.8), ing('Sweet Vermouth', 0.8) ] });
-    attachRecipe('Aviation', { mode:'single', plate_yield:null, ingredients:[
-      ing("Hendrick's Gin", 1.0), ing('Maraschino Liqueur', 0.5), ing('Lime Juice (qt)', 0.03) ] });
-    attachRecipe('Cosmopolitan', { mode:'single', plate_yield:null, ingredients:[
-      ing("Tito's Handmade Vodka", 1.0), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.03), ing('Cranberry Juice (qt)', 0.1) ] });
-    // Re-compute cost on items that just got a recipe so the menu engineering
-    // numbers stay consistent on first render (before any save fires).
-    rMenu.forEach(m => {
-      if (m.recipe && m.recipe.ingredients && m.recipe.ingredients.length) {
-        const tc = m.recipe.ingredients.reduce((s, ing) => {
-          if (ing.source === 'batch') return s; // batches not seeded in cost pre-compute
-          const id = ing.id || ing.product_id;
-          const p = icProducts.find(x => x.id === id);
-          if (!p) return s;
-          const isBar = ['Liquor','Wine','Bottle Beer','Draft Beer'].includes(p.category);
-          const unitCost = isBar
-            ? (m.recipe.mode === 'single' ? (p.cost_per_pour || 0) : (p.unit_cost || 0))
-            : (p.unit_cost || 0);
-          return s + unitCost * (ing.quantity || 0);
-        }, 0);
-        m.cost = m.recipe.mode === 'food' && m.recipe.plate_yield > 0 ? tc / m.recipe.plate_yield : tc;
-      }
-    });
-
-    // Prep batches: made-in-house ingredients. Frozen Margarita Mix is the
-    // classic example. Lives in App.inventoryData.ic_prep_batches alongside
-    // Products, Locations, Vendors as IC Setup reference data (Rule 21).
-    const fmIngredients = [
-      { product_id: icProducts[1].id, quantity: 2 },   // Espolòn Tequila
-      { product_id: icProducts[16].id, quantity: 1 },  // Triple Sec
-      { product_id: icProducts[17].id, quantity: 2 },  // Lime Juice
-      { product_id: icProducts[18].id, quantity: 1 }   // Simple Syrup
-    ];
-    const fmTotalCost = fmIngredients.reduce((s, ing) => {
-      const p = icProducts.find(x => x.id === ing.product_id);
-      return s + (p?.unit_cost || 0) * ing.quantity;
-    }, 0);
-    App.inventoryData.ic_prep_batches = [
-      {
-        id: uid(), name: 'Frozen Margarita Mix', category: 'Cocktail Mix',
-        ingredients: fmIngredients,
-        batch_yield: 1, batch_yield_unit: 'gallons',
-        serving_size: 5, serving_size_unit: 'oz',
-        servings_per_batch: 25.6,
-        total_cost: fmTotalCost, cost_per_serving: fmTotalCost / 25.6,
-        updated_at: new Date().toISOString(), created_at: new Date().toISOString()
-      }
-    ];
-
-    // Count totals per product index: [current (today), one week ago].
-    // Usage = week-ago minus today; no deliveries land in the last 7 days, so
-    // the icCOGS feed reads cleanly as (start - end) x unit cost. Realistic
-    // weekly turnover is spread across EVERY product (not concentrated in a
-    // few), so the usage/variance reports read like a real operating week and
-    // the count-derived COGS sums to ~$2,758 bar / ~$2,362 food — in line with
-    // the booked weekly P&L for this volume. Regenerated for the full bar stock.
-    const icTotals = {
-      0:[1.6,4.3], 1:[1.4,3.8], 2:[1.3,3.4], 3:[0.9,2.4], 4:[2.2,5.8], 5:[2.2,5.8],
-      6:[34,91], 7:[27,72], 8:[0.5,1.3], 9:[17,45], 10:[11,30], 11:[8,22],
-      12:[1.1,3], 13:[0.8,2.2], 14:[1.1,3], 15:[1.4,3.7], 16:[0.4,1], 17:[2.2,5.9],
-      18:[1.7,4.5], 19:[50,134], 20:[7,19], 21:[1.7,4.5], 22:[8,22], 23:[34,90],
-      24:[8,22], 25:[8,21], 26:[7,19], 27:[10,27], 28:[25,67], 29:[8,22],
-      30:[4,11], 31:[4,11], 32:[11,30], 33:[4,11], 34:[31,82], 35:[7,18],
-      36:[4,11], 37:[22,59], 38:[6,16], 39:[34,90], 40:[5,13], 41:[5,13],
-      42:[5,14], 43:[4,11], 44:[8,22], 45:[4,11], 46:[1.7,4.5], 47:[2.8,7.5],
-      48:[4,11], 49:[2.2,5.9], 50:[0.3,0.8], 51:[0.2,0.6], 52:[0.3,0.8], 53:[0.3,0.8],
-      54:[0.9,2.4], 55:[0.5,1.4], 56:[0.1,0.3], 57:[1.4,3.7], 58:[2.2,5.9], 59:[1.7,4.5],
-      60:[1.6,4.3], 61:[0.9,2.4], 62:[1.3,3.4], 63:[0.7,1.9], 64:[0.9,2.4], 65:[0.7,1.9],
-      66:[1.6,4.3], 67:[0.9,2.4], 68:[1.3,3.4], 69:[0.7,1.9], 70:[1.4,3.8], 71:[0.4,1],
-      72:[0.9,2.4], 73:[0.7,1.9], 74:[0.7,1.9], 75:[0.7,1.9], 76:[0.5,1.4], 77:[0.4,1],
-      78:[0.5,1.4], 79:[0.4,1], 80:[0.3,0.8], 81:[2.5,6.7], 82:[2.2,5.8], 83:[2.9,7.7],
-      84:[2.7,7.2], 85:[2.3,6.2], 86:[1.8,4.8], 87:[0.9,2.4], 88:[0.4,1], 89:[0.7,1.9],
-      90:[0.7,1.9], 91:[34,91], 92:[27,72], 93:[14,38], 94:[7,19], 95:[22,58],
-      96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8]
-    };
-    // Bottle beer is counted, ordered and valued by the CASE (the one canonical
-    // unit). icTotals above were authored in bottles, so convert every beer index
-    // to cases (divide by case_size). The dollar value is unchanged (cases x
-    // per-case == bottles x per-bottle). Then set realistic case pars tied to
-    // weekly usage so on-hand (cases) vs par (cases) reads coherently.
-    icProducts.forEach((p, i) => {
-      if (p.category === 'Bottle Beer' && p.case_size && icTotals[i]) {
-        // Convert the authored-in-bottles totals to CASES (beer's canonical
-        // unit). Pars are set below by the shared par-alignment pass, the same
-        // way as every other category.
-        icTotals[i] = [icTotals[i][0] / p.case_size, icTotals[i][1] / p.case_size];
-      }
-    });
-    // On-hand value = counted quantity x unit_cost, in container units for every
-    // category (cases for beer, bottles for liquor/wine, kegs for draft, stock
-    // unit for food). unit_cost is stored per container, so this is a straight
-    // multiply with no per-category special case.
-    const icCountItem = (p, qty) => {
-      // Bottle beer is counted as full cases + loose bottles, stored as a decimal
-      // number of cases — identical to what the Take Inventory form writes, so a
-      // seeded count round-trips through the form and Count History detects it as
-      // case beer (carries cases / loose / case_size_at_count).
-      if (p.category === 'Bottle Beer' && p.case_size) {
-        const whole = Math.floor(qty);
-        const loose = Math.round((qty - whole) * p.case_size);
-        const total = whole + loose / p.case_size;
-        return { product_id:p.id, name:p.name, category:p.category,
-          cases:whole, loose, case_size_at_count:p.case_size,
-          fulls:whole, partial:0, total,
-          unit_cost:p.unit_cost, value:+(total * (p.unit_cost || 0)).toFixed(2), notes:'' };
-      }
-      return { product_id:p.id, name:p.name, category:p.category,
-        fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
-        unit_cost:p.unit_cost, value:+(qty * (p.unit_cost || 0)).toFixed(2), notes:'' };
-    };
-    const mkCount = (daysAgo, pick, countedBy) => {
-      const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
-      return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:countedBy || 'Maria G.',
-        locations:['Liquor Room','Back Bar','Walk-in Cooler','Kitchen Line'],
-        items:items, item_count:items.length,
-        total_value:+items.reduce((s, it) => s + it.value, 0).toFixed(2),
-        created_at:daysAgoISO(daysAgo) };
-    };
-    // The recent three counts drive the live weekly COGS + variance window and
-    // must stay exactly as-is. The older weekly counts (back ~12 weeks) oscillate
-    // around the well-stocked day-7 level so inventory reads flat across the
-    // quarter (beginning ~= ending), with a couple of busy-week draw-downs — the
-    // sawtooth a real bar shows. Deterministic multipliers keep it reproducible.
-    const icOlderCounters = ['Carlos P.', 'Maria G.', 'Jake T.'];
-    const icOlderWeeks = [
-      [21, 1.05], [28, 0.92], [35, 1.10], [42, 0.86], [49, 1.03],
-      [56, 0.95], [63, 1.09], [70, 0.90], [77, 1.04], [84, 0.98]
-    ];
-    App.inventoryData.ic_counts = [
-      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
-      mkCount(7,  i => icTotals[i][1]),
-      mkCount(0,  i => icTotals[i][0]),
-      ...icOlderWeeks.map(([d, m], k) =>
-        mkCount(d, i => +(icTotals[i][1] * m).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
-    ];
-
-    // Deliveries — all dated 8+ days back so none fall inside the last count
-    // period. Two carry price increases, which Vendor Watch surfaces.
-    const icDLine = (p, qty, price, prev) => {
-      const isCaseBeer = p.category === 'Bottle Beer' && p.case_size;
-      return {
-        product_id:p.id, name:p.name,
-        container_size_oz:p.container_size_oz != null ? p.container_size_oz : null,
-        qty:qty, price_per_unit:price, prev_price:prev,
-        price_changed:(prev != null && Math.abs(price - prev) > 0.001),
-        extended:+(qty * price).toFixed(2),
-        // Bottle beer is received by the CASE: qty is in cases, price is per case.
-        display_unit: isCaseBeer ? 'case' : 'unit',
-        case_size_at_receive: isCaseBeer ? p.case_size : null
-      };
-    };
-    const mkDelivery = (daysAgo, vendor, inv, lines) => ({
-      id:uid(), vendor:vendor, date:dateStr(daysAgo), invoice_number:inv, driver:'', notes:'',
-      line_items:lines, item_count:lines.length,
-      total:+lines.reduce((s, l) => s + l.extended, 0).toFixed(2),
-      price_change_count:lines.filter(l => l.price_changed).length,
-      has_discrepancy:lines.some(l => l.price_changed), created_at:daysAgoISO(daysAgo)
-    });
-    App.inventoryData.ic_deliveries = [
-      mkDelivery(31, 'Republic National', 'RN-55021', [
-        icDLine(icProducts[0], 24, 21.40, 21.40),
-        icDLine(icProducts[1], 18, 23.60, 23.60),
-        icDLine(icProducts[2], 12, 27.90, 27.90),
-      ]),
-      mkDelivery(24, "Glazer's Beer & Bev", 'GLZ-3318', [
-        icDLine(icProducts[6], 20, 32.40, 30.72),
-        icDLine(icProducts[7], 15, 22.80, 22.80),
-      ]),
-      mkDelivery(17, 'Sysco Foods', 'SY-90455', [
-        icDLine(icProducts[9],  200, 4.20, 3.95),
-        icDLine(icProducts[10], 160, 2.95, 2.95),
-        icDLine(icProducts[11], 80,  4.60, 4.60),
-      ]),
-      mkDelivery(10, 'Republic National', 'RN-55190', [
-        icDLine(icProducts[0], 24, 22.40, 21.40),
-        icDLine(icProducts[3], 12, 31.00, 31.00),
-      ]),
-    ];
-
-    // ── Full quarter of delivery history (ties to COGS) ───────────────────────
-    // Each SKU is reordered on its own cadence based on how fast it moves in
-    // dollars: big movers weekly, mid every 2-3 weeks, slow movers monthly. A SKU
-    // only lands on an invoice the week it's due, so each invoice reads like a
-    // real reorder (the items that dropped to par) at ~8-15 lines, and the qty
-    // refills the gap since the last drop. Summed over the quarter this
-    // auto-ties to ~12 weeks of usage. The most recent ~14 days are left light on
-    // purpose: the inventory draw-down those weeks is what the seeded Open /
-    // Submitted orders in the pipeline will refill. The whole chain reconciles —
-    // beginning count + purchases - ending count lands within 2% of the booked
-    // 12-week COGS.
-    const icWkUsage = {}; Object.keys(icTotals).forEach(i => { icWkUsage[i] = icTotals[i][1] - icTotals[i][0]; });
-    const icOrderInterval = uv => uv >= 60 ? 1 : uv >= 25 ? 2 : uv >= 10 ? 3 : 4;
-    let icInvSeq = 1000;
-    const mkVendorDelivery = (daysAgo, vendor, prefix, allowBump) => {
-      const weekIndex = Math.round(daysAgo / 7);
-      const lines = [];
-      icProducts.forEach((p, i) => {
-        if (p.vendor !== vendor) return;
-        const usage = icWkUsage[i] || 0;                        // container units (cases for beer)
-        const base  = (p.unit_cost != null) ? p.unit_cost : 0;  // per container (per case for beer)
-        const uv    = usage * base;
-        if (uv < 3) return;                                  // negligible mover, not reordered in-window
-        const interval = icOrderInterval(uv);
-        if (weekIndex % interval !== (i % interval)) return; // not due this week
-        const qty = Math.max(1, Math.round(usage * interval)); // whole containers (cases for beer)
-        const price = (allowBump && (i % 7 === 0)) ? +(base * 1.06).toFixed(2) : base;
-        lines.push(icDLine(p, qty, price, base));
-      });
-      if (lines.length === 0) return null;
-      icInvSeq += 1;
-      return mkDelivery(daysAgo, vendor, prefix + '-' + icInvSeq, lines);
-    };
-    // Vendor truck days across the quarter. Skips the most recent ~14 days (to
-    // preserve the draw-down + the live variance window) and the existing
-    // invoices' days above.
-    const icDeliveryPlan = [
-      ...[17, 24, 38, 45, 52, 59, 66, 73, 80].map(d => [d, 'Republic National', 'RN']),
-      ...[20, 27, 34, 41, 48, 55, 62, 69, 76, 83].map(d => [d, 'Sysco Foods', 'SY']),
-      ...[21, 28, 35, 42, 49, 56, 63, 70, 77, 84].map(d => [d, "Glazer's Beer & Bev", 'GLZ']),
-      ...[22, 36, 50, 64, 78].map(d => [d, 'Austin Beerworks', 'ABW']),
-      ...[19, 26, 33, 40, 47, 54, 61, 68, 75, 82].map(d => [d, 'Local Produce Co.', 'LPC']),
-      ...[30, 58].map(d => [d, 'Restaurant Depot', 'RD']),
-    ];
-    icDeliveryPlan.forEach(([d, vn, pre], k) => {
-      const del = mkVendorDelivery(d, vn, pre, (k % 5 === 0));
-      if (del) App.inventoryData.ic_deliveries.push(del);
-    });
-
-    // ── Align pars to real usage so Dynamic Pars reads like a real operation ──
-    // Bake the engine's OWN suggested par into each product so most products sit
-    // right at par (nothing to change). A deliberate handful is left off: nine
-    // carrying too much (Reduce) and three carrying too little (Increase), spread
-    // across every vendor so the Order Sheet's per-card par nudge shows up on the
-    // first card the operator opens. Uses the live computeSuggestion against the
-    // counts + deliveries just built, so the seed can never drift from the screen.
-    App.inventoryData.par_settings = App.inventoryData.par_settings || { window_weeks: 8, buffer_pct: 30, cycle_days: 7 };
-    const parReduceSet   = new Set([0, 2, 6, 8, 9, 10, 14, 23, 32]); // par too high -> Reduce
-    const parIncreaseSet = new Set([1, 19, 20]);                     // par too low  -> Increase
-    icProducts.forEach((p, i) => {
-      const sug = S.InventoryParSuggestions.computeSuggestion(p, App.inventoryData.par_settings);
-      const suggested = (sug && sug.suggested > 0)
-        ? sug.suggested
-        : Math.max(1, Math.ceil((icWkUsage[i] || 0) * 1.3));
-      let par = suggested;
-      if (parReduceSet.has(i))        par = suggested + Math.max(2, Math.round(suggested * 0.5));
-      else if (parIncreaseSet.has(i)) par = Math.max(1, suggested - Math.max(1, Math.round(suggested * 0.35)));
-      p.par_level     = Math.max(1, par);
-      p.reorder_point = Math.max(1, Math.round(p.par_level * 0.4));
-    });
-
-    // Spot checks — feed the Theft Risk pour-variance signal.
-    const icSpotItem = (p, pre, post, sold, flagged) => {
-      const ppc = p.pours_per_container || 1, cpp = p.cost_per_pour || 0;
-      const used = +(pre - post).toFixed(2);
-      const poured = +(used * ppc).toFixed(1);
-      const varP = +(poured - sold).toFixed(1);
-      return { product_id:p.id, name:p.name, category:p.category,
-        pours_per_container:ppc, cost_per_pour:cpp, pre:pre, post:post,
-        pos_sold:sold, used_containers:used, poured:poured,
-        variance_pours:varP, variance_dollar:+(varP * cpp).toFixed(2), flagged:flagged };
-    };
-    const mkSpot = (daysAgo, items) => ({
-      id:uid(), date:dateStr(daysAgo), shift:'PM', checked_by:'Maria G.',
-      items:items, product_count:items.length,
-      flagged_count:items.filter(i => i.flagged).length,
-      total_variance_dollar:+items.reduce((t, i) => t + (i.variance_dollar || 0), 0).toFixed(2),
-      created_at:daysAgoISO(daysAgo)
-    });
-    App.inventoryData.ic_spot_checks = [
-      mkSpot(26, [
-        icSpotItem(icProducts[0], 4,   1.0, 44, true),
-        icSpotItem(icProducts[2], 3,   0.7, 33, true),
-        icSpotItem(icProducts[1], 3,   1.1, 40, false),
-      ]),
-      mkSpot(19, [
-        icSpotItem(icProducts[0], 4,   1.2, 48, false),
-        icSpotItem(icProducts[4], 3,   0.9, 32, false),
-      ]),
-      mkSpot(12, [
-        icSpotItem(icProducts[0], 4,   1.3, 52, false),
-        icSpotItem(icProducts[2], 3,   1.0, 39, false),
-      ]),
-      mkSpot(4, [
-        icSpotItem(icProducts[0], 4,   1.4, 56, false),
-        icSpotItem(icProducts[3], 2.5, 0.8, 38, false),
-      ]),
-    ];
-
-    // ── Vendor Discrepancies ─────────────────────────────────────────────
-    // A disciplined operator catches overcharges and chases most of them down.
-    // Three caught and recovered, one still in Credit Requested (the filed-but-
-    // uncollected credit the Profit Audit surfaces under Vendor Control). All
-    // recent, none aging past 60 days. Feeds Inventory Execution + the BCA.
-    App.data.vendor_discrepancies = [
-      { id:uid(), date:dateStr(52), vendor:'Republic National', reference:'RN-54880', type:'Overcharge',
-        product_id:icProducts[0].id, sku:icProducts[0].name, units:24, agreed_price:21.40, invoiced_price:22.65,
-        overcharge:30, notes:'Billed above agreed case price', status:'Resolved', source:'manual',
-        filed_at:daysAgoISO(52), resolved_at:daysAgoISO(40), recovered_amount:30 },
-      { id:uid(), date:dateStr(33), vendor:'Sysco Foods', reference:'SY-90201', type:'Short Delivery',
-        product_id:icProducts[9].id, sku:icProducts[9].name, units:8, agreed_price:4.20, invoiced_price:4.20,
-        overcharge:34, notes:'Two cases short, caught at receiving', status:'Resolved', source:'manual',
-        filed_at:daysAgoISO(33), resolved_at:daysAgoISO(22), recovered_amount:34 },
-      { id:uid(), date:dateStr(21), vendor:'Republic National', reference:'RN-55021', type:'Overcharge',
-        product_id:icProducts[2].id, sku:icProducts[2].name, units:12, agreed_price:27.90, invoiced_price:28.90,
-        overcharge:12, notes:'Price drift on a single line', status:'Resolved', source:'manual',
-        filed_at:daysAgoISO(21), resolved_at:daysAgoISO(12), recovered_amount:12 },
-      { id:uid(), date:dateStr(11), vendor:"Glazer's Beer & Bev", reference:'GLZ-3402', type:'Overcharge',
-        product_id:icProducts[6].id, sku:icProducts[6].name, units:48, agreed_price:1.35, invoiced_price:1.50,
-        overcharge:72, notes:'Unagreed price increase, credit requested', status:'Credit Requested', source:'manual',
-        filed_at:daysAgoISO(11), resolved_at:null },
-    ];
-
-    // ── Inventory Adjustment Log ─────────────────────────────────────────
-    // A few documented adjustments across the trailing 8 weeks: a couple of
-    // bottles broken behind the bar, one expiration write-off, one confirmed
-    // theft event (feeds Theft Risk), and a found-stock entry. Gives the
-    // operator a realistic view of how the log accumulates without making the
-    // numbers ugly.
-    const adjAt = (daysAgo, hour, min) => {
-      const d = new Date();
-      d.setDate(d.getDate() - daysAgo);
-      d.setHours(hour, min, 0, 0);
-      return d.toISOString().slice(0, 16);
-    };
-    const adjValue = (product, qty, unit) => {
-      let bottles = qty;
-      if (product.category === 'Bottle Beer' && unit === 'cases' && product.case_size) bottles = qty * product.case_size;
-      const perBottleCost = product.unit_cost != null
-        ? (product.category === 'Bottle Beer' && product.case_size ? product.unit_cost / product.case_size : product.unit_cost)
-        : 0;
-      return { bottles, perBottleCost, value: bottles * perBottleCost };
-    };
-    const mkAdj = (daysAgo, hour, min, productIdx, qty, unit, direction, reason, performed, notes) => {
-      const p = icProducts[productIdx];
-      const v = adjValue(p, qty, unit);
-      return {
-        id: uid(),
-        date_time: adjAt(daysAgo, hour, min),
-        product_id: p.id, product_name: p.name, category: p.category || '',
-        quantity: qty, unit,
-        direction, reason,
-        unit_cost_at_adjustment: v.perBottleCost,
-        value: v.value,
-        performed_by_id: '', performed_by: performed,
-        witnessed_by_id: '', witnessed_by: '',
-        notes,
-        created_at: new Date().toISOString()
-      };
-    };
-    App.inventoryData.ic_adjustments = [
-      mkAdj(48, 22, 10, 0, 1, 'bottles', 'out', 'Damage', 'Maria G.',
-        'Bartender knocked it off the back bar mid-shift. No injuries.'),
-      mkAdj(32, 14, 30, 3, 2, 'units', 'out', 'Expiration', 'Carlos P.',
-        'Past expiration on the back shelf. Pulled and trashed.'),
-      mkAdj(18, 9, 45, 1, 1, 'bottles', 'out', 'Theft', 'Jake T.',
-        'Found empty in the dumpster, never on a check. Reviewing camera footage.'),
-      mkAdj(6, 11, 20, 2, 0.5, 'bottles', 'out', 'Damage', 'Maria G.',
-        'Cracked bottle during a transfer from storage.'),
-      mkAdj(3, 16, 0, 0, 1, 'bottles', 'in', 'Found', 'Carlos P.',
-        'Found a bottle behind a stack in the liquor room. Adding it back.')
-    ];
-
-    // ════════════════════════════════════════════════════════════════════
-    //  SHIFT CONTROL — derived from the Anchor profile. Each week's sc_shifts
-    //  revenue and covers sum to that week's bar_rev, food_rev and covers, so
-    //  the weekly revenue feed for Profit and Revenue computes back to it.
-    // ════════════════════════════════════════════════════════════════════
-    App.shiftData = App.shiftData || {};
-    const ANCHS = window.ANCHOR;
-    const dayW  = [0.10, 0.10, 0.12, 0.14, 0.20, 0.22, 0.12]; // Mon..Sun
-    const mgrs  = ['Maria G.', 'Jake T.', 'Carlos P.'];
-
-    // ── Cash settings + Drawers (Phase 0.5) ────────────────────────────────
-    if (!App.shiftData.settings) App.shiftData.settings = {};
-    App.shiftData.settings.cash_tolerance = 10;
-    App.shiftData.settings.tolerances_by_type = {
-      'Brunch':     10,
-      'Lunch':      10,
-      'Dinner':     15,
-      'Late Night': 20,
-      'Full Day':   15
-    };
-    // Comp over this dollar amount should carry a manager in Authorized By.
-    App.shiftData.settings.comp_auth_threshold = 25;
-
-    // Drawers reference table. Seeded with realistic registers so the
-    // dropdowns on Cash Drop and Variance Log render with options out of
-    // the box. Default opening bank pre-fills the Start a Shift bank field
-    // when the matching drawer is the one tonight runs on.
-    App.shiftData.sc_drawers = [
-      { id: App.uid(), name: 'Main Bar Register',     location: 'Main Bar',       default_opening_bank: 300, notes: '', active: true, created_at: new Date().toISOString() },
-      { id: App.uid(), name: 'Service Bar Register',  location: 'Back Bar',       default_opening_bank: 200, notes: 'Server-only well', active: true, created_at: new Date().toISOString() },
-      { id: App.uid(), name: 'Floor Register 1',      location: 'Front of House', default_opening_bank: 250, notes: '', active: true, created_at: new Date().toISOString() },
-      { id: App.uid(), name: 'Floor Register 2',      location: 'Front of House', default_opening_bank: 250, notes: '', active: true, created_at: new Date().toISOString() }
-    ];
-    const scDrawers = App.shiftData.sc_drawers;
-
-    // Each operating day runs multiple typed services that sum to the day's
-    // bar_rev / food_rev / covers, so the weekly revenue feed is unchanged but
-    // Shift Reports (by type) and the per-type cash tolerances demo realistically.
-    // Weekends open with Brunch, weekdays with Lunch, and Dinner anchors the day.
-    const scShifts = [];
-    const scDays   = [];   // one entry per operating day, drives the checklists
-    ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      let barLeft = a.bar_rev, foodLeft = a.food_rev, covLeft = a.covers;
-      dayW.forEach((w, di) => {
-        const last     = di === dayW.length - 1;
-        const dayBar   = last ? barLeft  : Math.round(a.bar_rev  * w);
-        const dayFloor = last ? foodLeft : Math.round(a.food_rev * w);
-        const dayCov   = last ? covLeft  : Math.round(a.covers   * w);
-        barLeft -= dayBar; foodLeft -= dayFloor; covLeft -= dayCov;
-        const date    = dateStr(baseAgo + 6 - di);
-        const weekend = di >= 5;
-        const isLastWeek = a.wk === 12;
-        // daypart: [type, revenue share, staff on floor]. Dinner is the anchor.
-        const parts = weekend
-          ? [['Brunch', 0.35, 7], ['Dinner', 0.45, 9], ['Late Night', 0.20, 5]]
-          : [['Lunch', 0.30, 5], ['Dinner', 0.50, 8], ['Late Night', 0.20, 4]];
-        let bLeft = dayBar, fLeft = dayFloor, cLeft = dayCov;
-        parts.forEach((p, pi) => {
-          const lastPart = pi === parts.length - 1;
-          const bar   = lastPart ? bLeft : Math.round(dayBar   * p[1]);
-          const floor = lastPart ? fLeft : Math.round(dayFloor * p[1]);
-          const cov   = lastPart ? cLeft : Math.round(dayCov   * p[1]);
-          bLeft -= bar; fLeft -= floor; cLeft -= cov;
-          // Phase 0: event_tag + weather_tag give the audits real context so a
-          // low-revenue Friday during a thunderstorm reads as bad luck, not bad
-          // ops. Salted onto the Dinner service of a couple of days.
-          const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'live music' : '';
-          const weatherTag = (a.wk === 10 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
-          scShifts.push({
-            id:uid(), date:date, shift_type:p[0],
-            manager:mgrs[(di + pi) % 3], bar_revenue:bar, floor_revenue:floor,
-            total_revenue:bar + floor, covers:cov, opening_bank:300,
-            staff_on_floor:p[2], status:'Closed', notes:'',
-            event_tag:eventTag, weather_tag:weatherTag,
-            created_at:new Date().toISOString()
-          });
-        });
-        scDays.push({ date:date, manager:mgrs[di % 3] });
-      });
-    });
-    App.shiftData.sc_shifts = scShifts;
-
-    // ── Checklist Templates + Opening / Closing runs ──
-    // Templates mirror the built-in defaults so the Templates library is not
-    // empty and the runs reference a real template. One run of each per operating
-    // DAY (not per service). A disciplined, recovered operation runs at near-100%
-    // completion with the rare item missed. Records match what the run screens
-    // save: the full items array plus done_count / total_count.
-    const scOpenItems  = (window.S && S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || [];
-    const scCloseItems = (window.S && S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || [];
-    const scOpenTplId  = uid();
-    const scCloseTplId = uid();
-    App.shiftData.sc_checklist_templates = [
-      { id:scOpenTplId,  name:'Standard Open',  type:'Opening', items:scOpenItems.slice(),  created_at:new Date().toISOString() },
-      { id:scCloseTplId, name:'Standard Close', type:'Closing', items:scCloseItems.slice(), created_at:new Date().toISOString() },
-    ];
-    const mkChkItems = (arr, doneN) => arr.map((text, idx) => ({ text:text, done:idx < doneN }));
-    const scChecklists = [];
-    scDays.forEach((d, i) => {
-      const mgr = d.manager;
-      const openDone  = (i % 9 === 0) ? scOpenItems.length  - 1 : scOpenItems.length;   // ~89% fully complete
-      const closeDone = (i % 7 === 0) ? scCloseItems.length - 1 : scCloseItems.length;  // ~86% fully complete
-      scChecklists.push({ id:uid(), type:'Opening', template_id:scOpenTplId, template_name:'Standard Open',
-        date:d.date, completed_by:mgr, completed_by_id:'', items:mkChkItems(scOpenItems, openDone),
-        done_count:openDone, total_count:scOpenItems.length, notes:'',
-        completed_at:new Date().toISOString(), created_at:new Date().toISOString() });
-      scChecklists.push({ id:uid(), type:'Closing', template_id:scCloseTplId, template_name:'Standard Close',
-        date:d.date, completed_by:mgr, completed_by_id:'', items:mkChkItems(scCloseItems, closeDone),
-        done_count:closeDone, total_count:scCloseItems.length, notes:'',
-        completed_at:new Date().toISOString(), created_at:new Date().toISOString() });
-    });
-    App.shiftData.sc_checklists = scChecklists;
-
-    // Drawer reconciliations — variance tightens after the fix week.
-    const scVariances = [];
-    ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const improving = a.wk >= ANCHS.fix_week;
-      [1, 4].forEach((dayOff, vi) => {
-        const exp = 600 + Math.round(Math.random() * 350);
-        const variance = improving
-          ? Math.round((Math.random() - 0.55) * 12)
-          : Math.round((Math.random() - 0.75) * 30);
-        scVariances.push({
-          id:uid(), date:dateStr(baseAgo + dayOff), shift_type:'Close',
-          drawer_id: scDrawers[vi % scDrawers.length].id,
-          drawer:    scDrawers[vi % scDrawers.length].name,
-          cashier:mgrs[(a.wk + vi) % 3],
-          expected_cash:exp, counted_cash:exp + variance, variance:variance,
-          tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
-          reason:'', notes:'', created_at:new Date().toISOString()
-        });
-      });
-    });
-    App.shiftData.sc_variances = scVariances;
-
-    // Voids and comps — fewer events and all manager-authorized after the fix.
-    // Phase 0: comp records carry product_id + units so the Inventory Variance
-    // Report can subtract comp pours from "used." Voids stay product-less
-    // (assumed pre-pour, not subtracted from variance). staff_id gets patched
-    // in after lcStaff is built (below).
-    const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Devin R.', 'Carlos P.'];
-    const compProductNames = ['Tito\'s Handmade Vodka', 'House Cabernet', "Hendrick's Gin", 'Bulleit Bourbon'];
-    const findProdId = (name) => (icProducts.find(p => p.name === name) || {}).id || '';
-    const scVoidComps = [];
-    ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const improving = a.wk >= ANCHS.fix_week;
-      const n = improving ? 2 : 4;
-      for (let k = 0; k < n; k++) {
-        const isComp = k % 2 === 1;
-        const compProdName = isComp ? compProductNames[(a.wk + k) % compProductNames.length] : '';
-        scVoidComps.push({
-          id:uid(), date:dateStr(baseAgo + (k + 1)), type:isComp ? 'Comp' : 'Void',
-          shift_type:'Dinner', item:isComp ? compProdName + ' (guest recovery)' : 'Wrong item rung',
-          amount:isComp ? 8 + Math.round(Math.random() * 22) : 6 + Math.round(Math.random() * 16),
-          product_id:isComp ? findProdId(compProdName) : '',
-          product_name:isComp ? compProdName : '',
-          units:isComp ? 1 : null,
-          server:vcServers[(a.wk + k) % 5],
-          staff_id:'',  // patched below after lcStaff is built
-          authorized_by:improving ? mgrs[(a.wk + k) % 3] : (k === 0 ? '' : mgrs[k % 3]),
-          check_number:'', reason:isComp ? 'Service recovery' : 'Order error',
-          notes:'', created_at:new Date().toISOString()
-        });
-      }
-    });
-    App.shiftData.sc_void_comps = scVoidComps;
-
-    // One Saturday cash drop per week. Each drop also seeds a mirrored
-    // sc_safe_log entry so the Cash Control safe balance is honest from
-    // load (Phase 2 Chunk A auto-mirror only fires for NEW drops; sample
-    // drops have to seed both stores by hand).
-    const scCashDrops = [];
-    const scSafeLog = [];
-    ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const dropId = uid();
-      const safeId = uid();
-      const dropDate = dateStr(baseAgo + 1);
-      const dropAmount = 900 + Math.round(Math.random() * 500);
-      const performed = mgrs[a.wk % 3];
-      const witness   = mgrs[(a.wk + 1) % 3];
-      scCashDrops.push({
-        id:dropId, date:dropDate, shift_type:'Close', drop_time:'23:30',
-        drawer_id: scDrawers[0].id, drawer: scDrawers[0].name,
-        performed_by:performed, witness:witness,
-        amount:dropAmount, denominations:{}, notes:'',
-        safe_log_id: safeId,
-        created_at:new Date().toISOString()
-      });
-      scSafeLog.push({
-        id:safeId, date:dropDate, time:'23:30',
-        txn_type:'Cash Drop', direction:'in', amount:dropAmount,
-        reference:'Drawer: ' + scDrawers[0].name + ' / Close',
-        performed_by:performed, witness:witness, notes:'',
-        source:'cash-drop', source_id:dropId,
-        created_at:new Date().toISOString()
-      });
-    });
-    // Seed a couple of bank deposit out entries so Net In Window can swing
-    // negative on some windows — gives the operator a realistic demo.
-    scSafeLog.push({
-      id:uid(), date:dateStr(10), time:'09:30',
-      txn_type:'Bank Deposit', direction:'out', amount:6500,
-      reference:'Tuesday deposit run', performed_by:mgrs[0], witness:'', notes:'',
-      source:'safe-log', created_at:new Date().toISOString()
-    });
-    scSafeLog.push({
-      id:uid(), date:dateStr(38), time:'09:15',
-      txn_type:'Bank Deposit', direction:'out', amount:5200,
-      reference:'Tuesday deposit run', performed_by:mgrs[1], witness:'', notes:'',
-      source:'safe-log', created_at:new Date().toISOString()
-    });
-    App.shiftData.sc_cash_drops = scCashDrops;
-    App.shiftData.sc_safe_log = scSafeLog;
-
-    // Currently-out items (status '86') are recent; older ones are Back In Stock
-    // (status 'Back' + date_back). Ribeye, Hazy IPA, and the Espresso Martini
-    // repeat across the window so the repeat-86 -> Inventory par alert has signal.
-    App.shiftData.sc_86_list = [
-      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Out of product, delivery Thursday',
-        date_86:dateStr(2),  time_86:'19:40', reported_by:'Luis V.',   status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Espresso Martini',    category:'Cocktails',  reason:'Espresso machine down',
-        date_86:dateStr(1),  time_86:'18:10', reported_by:'Maria G.',  status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'House Chardonnay',    category:'Wine',       reason:'Ran the case, reorder placed',
-        date_86:dateStr(4),  time_86:'21:30', reported_by:'Jake T.',   status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Burrata',             category:'Food',       reason:'Out until morning prep',
-        date_86:dateStr(9),  time_86:'12:30', reported_by:'Hector M.', status:'Back', date_back:dateStr(9),  notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Hazy IPA',            category:'Draft Beer', reason:'Keg blew, tapping new in the morning',
-        date_86:dateStr(12), time_86:'22:15', reported_by:'Maria G.',  status:'Back', date_back:dateStr(11), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Short on the delivery again',
-        date_86:dateStr(16), time_86:'20:05', reported_by:'Sam P.',    status:'Back', date_back:dateStr(15), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Oysters',             category:'Food',       reason:'Daily count sold out',
-        date_86:dateStr(18), time_86:'21:00', reported_by:'Luis V.',   status:'Back', date_back:dateStr(18), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Branzino',            category:'Food',       reason:'Sold out at dinner',
-        date_86:dateStr(24), time_86:'20:30', reported_by:'Sam P.',    status:'Back', date_back:dateStr(24), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Hazy IPA',            category:'Draft Beer', reason:'Keg kicked mid-service',
-        date_86:dateStr(27), time_86:'21:45', reported_by:'Jake T.',   status:'Back', date_back:dateStr(26), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Weekend rush sold out',
-        date_86:dateStr(33), time_86:'20:50', reported_by:'Hector M.', status:'Back', date_back:dateStr(33), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Espresso Martini',    category:'Cocktails',  reason:'Out of espresso beans',
-        date_86:dateStr(31), time_86:'19:00', reported_by:'Ashley B.', status:'Back', date_back:dateStr(30), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Barrel Old Fashioned',category:'Cocktails',  reason:'Barrel batch empty, re-batching',
-        date_86:dateStr(38), time_86:'18:40', reported_by:'Maria G.',  status:'Back', date_back:dateStr(37), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'House Margarita',     category:'Cocktails',  reason:'Out of fresh lime',
-        date_86:dateStr(45), time_86:'18:20', reported_by:'Jake T.',   status:'Back', date_back:dateStr(44), notes:'', created_at:new Date().toISOString() },
-    ];
-
-    // A real mix of Open / In Progress / Resolved across the window. Resolved
-    // rows carry a resolution date and the repair cost so the cost rollup is
-    // honest. The open Walk-in Cooler ties to the same equipment as the temp
-    // checklist item and the cooler running warm.
-    App.shiftData.sc_maintenance = [
-      { id:uid(), date_reported:dateStr(3),  equipment:'Walk-in Cooler', location:'Kitchen',
-        issue:'Temperature running 4 degrees high', priority:'High', status:'Open',
-        reported_by:'Luis V.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(6),  equipment:'Beer Tap 3', location:'Main Bar',
-        issue:'Foaming, needs line cleaning and FOB check', priority:'Normal', status:'Open',
-        reported_by:'Jake T.', assigned_to:'', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(8),  equipment:'Ice Machine', location:'Main Bar',
-        issue:'Slow ice production', priority:'Normal', status:'In Progress',
-        reported_by:'Maria G.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'Tech scheduled', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(11), equipment:'Dish Machine', location:'Kitchen',
-        issue:'Not reaching sanitizing temp', priority:'Urgent', status:'Resolved',
-        reported_by:'Luis V.', assigned_to:'Ecolab', date_resolved:dateStr(10), cost:310, notes:'', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(14), equipment:'Walk-in Cooler', location:'Kitchen',
-        issue:'Door gasket torn, not sealing', priority:'High', status:'Resolved',
-        reported_by:'Hector M.', assigned_to:'CoolTech Repair', date_resolved:dateStr(10), cost:220, notes:'', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(18), equipment:'Glass Washer', location:'Main Bar',
-        issue:'Leaving spots, rinse aid line', priority:'Low', status:'Resolved',
-        reported_by:'Ashley B.', assigned_to:'', date_resolved:dateStr(17), cost:null, notes:'Adjusted rinse aid in-house', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(20), equipment:'POS Terminal 2', location:'Front of House',
-        issue:'Card reader intermittent', priority:'Normal', status:'Resolved',
-        reported_by:'Jessica M.', assigned_to:'POS Vendor', date_resolved:dateStr(16), cost:140, notes:'', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(25), equipment:'Mens Restroom', location:'Front of House',
-        issue:'Faucet leaking at the base', priority:'Low', status:'Resolved',
-        reported_by:'Owen L.', assigned_to:'Handyman', date_resolved:dateStr(21), cost:85, notes:'', created_at:new Date().toISOString() },
-      { id:uid(), date_reported:dateStr(30), equipment:'HVAC', location:'Dining Room',
-        issue:'Dining room runs warm on busy Saturdays', priority:'Normal', status:'Open',
-        reported_by:'Carlos P.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
-    ];
-
-    // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
-    // Profit and Revenue fixes landed around weeks 5-7, which is where those
-    // trends break in the right direction. Traffic fixes follow the same arc
-    // so all five tracked Traffic metrics (website, gbp, social, email-loyalty,
-    // delivery) produce dollar figures on the Scoreboard. The Reviews fix is
-    // intentionally kept untracked (Reviews is absent from Recovery.METRICS by
-    // design — Rule 14a, too indirect to dollarize cleanly) so the demo also
-    // shows operators how an untracked fix renders.
-    App.data.fix_log = (App.data.fix_log || [])
-      .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
-      .concat([
-      { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'profit', gap_id:'prime-cost', gap_name:'Prime Cost',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',
-        date:dateStr(24), logged_at:daysAgoISO(24) },
-      { id:uid(), module:'revenue', gap_id:'check-average', gap_name:'Check Average and Upsell',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'revenue', gap_id:'rplh', gap_name:'Labor Productivity (RPLH)',
-        date:dateStr(31), logged_at:daysAgoISO(31) },
-      { id:uid(), module:'traffic', gap_id:'gbp', gap_name:'Google Business Profile',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'traffic', gap_id:'website', gap_name:'Website',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'traffic', gap_id:'social', gap_name:'Social Media',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email and Loyalty',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'traffic', gap_id:'delivery', gap_name:'Delivery Platforms',
-        date:dateStr(31), logged_at:daysAgoISO(31) },
-      { id:uid(), module:'traffic', gap_id:'reviews', gap_name:'Reviews',
-        date:dateStr(30), logged_at:daysAgoISO(30) },
-    ]);
-
-    // ── Variance Investigations ──
-    App.data.variance_investigations = [
-      { id:uid(), sku:"Tito's Handmade Vodka", opened_date:dateStr(38),
-        status:'resolved', resolved_date:dateStr(24),
-        steps:[
-          { done:true, finding:'Count sheets pulled. One 1L bottle was missed in the back well on the period-open count.' },
-          { done:true, finding:'Theoretical usage recalculated. The gap closed to under 2% once the missed bottle was added back.' },
-          { done:true, finding:'Variance traced to two consecutive Friday late shifts.' },
-          { done:true, finding:'Bar manager confirmed a keg-line spill on one of those shifts that was never logged.' },
-          { done:true, finding:'Mid-shift count run the following Friday came back clean.' },
-          { done:true, finding:'Closed as a counting error plus one unlogged spill. No theft indicated.' },
-        ],
-        resolution:'Counting error plus an unlogged spill. Added a spill line to the closing checklist so breakage gets recorded from here on.' },
-      { id:uid(), sku:'Espolòn Tequila Blanco', opened_date:dateStr(9),
-        status:'open',
-        steps:[
-          { done:true, finding:'Count sheets pulled. No obvious missed bottles this time.' },
-          { done:true, finding:'Theoretical usage still runs about 9% above POS sales after a recheck.' },
-          { done:true, finding:'Variance concentrated on Thursday and Saturday PM shifts.' },
-          { done:false, finding:'' },
-          { done:false, finding:'' },
-          { done:false, finding:'' },
-        ],
-        resolution:'' },
-    ];
-
-    // ════════════════════════════════════════════════════════════════════
-    //  LABOR CONTROL — derived from the Anchor profile. Each week's logged
-    //  hours by department reconcile to ANCHOR bar_labor and food_labor.
-    // ════════════════════════════════════════════════════════════════════
-    App.laborData = App.laborData || {};
-    const ANCHL = window.ANCHOR;
-
-    const lcPositions = [
-      { name:'Bartender', department:'Bar',            default_wage:ANCHL.wages.bar,     tipped:true  },
-      { name:'Barback',   department:'Bar',            default_wage:12,                  tipped:true  },
-      { name:'Line Cook', department:'Kitchen',        default_wage:ANCHL.wages.kitchen, tipped:false },
-      { name:'Prep Cook', department:'Kitchen',        default_wage:13.5,                tipped:false },
-      { name:'Server',    department:'Front of House', default_wage:ANCHL.wages.floor,   tipped:true  },
-      { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
-      { name:'Manager',   department:'Management',     default_wage:28,                  tipped:false },
-      { name:'Assistant Manager', department:'Management', default_wage:24,               tipped:false },
-    ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
-    App.laborData.lc_positions = lcPositions;
-    const lcPos = n => lcPositions.find(p => p.name === n).id;
-
-    // Phase 0: wage_history captures every wage change so historical labor
-    // cost reads correctly off the wage in effect on the entry date, not the
-    // current wage. Empty on fresh hires (their current wage is the starting wage).
-    const mkStaff = (name, posName, wage, hiredDaysAgo) => ({
-      id:uid(), name:name, position_id:lcPos(posName), pay_type:'Hourly', wage:wage, annual_salary:null,
-      status:'Active', hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
-      wage_history:[], created_at:new Date().toISOString()
-    });
-    // Salaried (exempt): fixed annual salary, no hourly wage and no overtime.
-    const mkSalaried = (name, posName, annual, hiredDaysAgo) => ({
-      id:uid(), name:name, position_id:lcPos(posName), pay_type:'Salary', wage:null, annual_salary:annual,
-      status:'Active', hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
-      wage_history:[], created_at:new Date().toISOString()
-    });
-    const lcStaff = [
-      mkStaff('Maria G.',   'Bartender', 16,   320),
-      mkStaff('Jake T.',    'Bartender', 16,   210),
-      mkStaff('Ashley B.',  'Bartender', 16,   150),
-      mkStaff('Devin R.',   'Barback',   12,   135),
-      mkStaff('Luis V.',    'Line Cook', 15,   400),
-      mkStaff('Sam P.',     'Line Cook', 15,   240),
-      mkStaff('Hector M.',  'Line Cook', 15,   165),
-      mkStaff('Tonya B.',   'Prep Cook', 13.5, 95),
-      mkStaff('Jessica M.', 'Server',    14,   360),
-      mkStaff('Marcus T.',  'Server',    14,   250),
-      mkStaff('Brianna K.', 'Server',    14,   175),
-      mkStaff('Priya N.',   'Server',    14,   110),
-      mkStaff('Owen L.',    'Host',      12.5, 80),
-      mkSalaried('Carlos P.', 'Manager',           68000, 520),
-      mkSalaried('Renee K.',  'Assistant Manager', 52000, 300),
-    ];
-    App.laborData.lc_staff = lcStaff;
-
-    // ════════════════════════════════════════════════════════════════════
-    //  INVENTORY OPERATIONS LOGS — Empties, Transfers, Order History, and the
-    //  staff link for Adjustments. Seeded here (not up in the inventory block)
-    //  because every one of these forms requires a real staff member for
-    //  Performed By / Witnessed By — a record seeded with an empty staff id
-    //  would fail the form's own open->save round trip. icProducts, icByName,
-    //  dateStr, daysAgoISO and adjAt are all still in loadSample scope.
-    // ════════════════════════════════════════════════════════════════════
-    const staffIdByName = nm => (lcStaff.find(s => s.name === nm) || {}).id || '';
-
-    // Link the Adjustment records (seeded earlier, before the roster existed)
-    // to real staff so each one round-trips through the form's required
-    // "Performed By" instead of failing validation on Update.
-    (App.inventoryData.ic_adjustments || []).forEach(a => {
-      if (!a.performed_by_id && a.performed_by) a.performed_by_id = staffIdByName(a.performed_by);
-    });
-
-    // ── Empties Log ──────────────────────────────────────────────────────
-    // The real back-door routine over the trailing ~12 weeks. Austin has no
-    // bottle-deposit law, so empty glass/cans are Recycle at $0 (honest — the
-    // Deposit Value tile stays empty for those). Empty kegs carry a real
-    // distributor deposit, logged Return for Deposit so the deposit credit is
-    // tracked. One Trash line for glass that broke in the bin.
-    const mkEmpty = (daysAgo, prodName, qty, unit, disposition, by, deposit, notes) => {
-      const p = icByName(prodName) || {};
-      return { id:uid(), date:dateStr(daysAgo), product_id:p.id || '', product_name:p.name || prodName,
-        category:p.category || '', quantity:qty, unit, deposit_amount:deposit || 0,
-        disposition, performed_by_id:staffIdByName(by), performed_by:by, notes:notes || '',
-        created_at:daysAgoISO(daysAgo) };
-    };
-    App.inventoryData.ic_empties = [
-      mkEmpty(82, "Tito's Handmade Vodka", 9, 'bottles', 'Recycle', 'Devin R.', 0, 'Weekly well-liquor empties to recycling.'),
-      mkEmpty(82, 'House Cabernet', 14, 'bottles', 'Recycle', 'Devin R.', 0, ''),
-      mkEmpty(78, 'ABW Pearl Snap (1/2 bbl)', 2, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Empty kegs back to Austin Beerworks, deposit credited.'),
-      mkEmpty(71, 'Modelo Especial', 96, 'bottles', 'Recycle', 'Devin R.', 0, 'Weekend beer empties.'),
-      mkEmpty(64, 'Bulleit Bourbon', 6, 'bottles', 'Recycle', 'Maria G.', 0, ''),
-      mkEmpty(64, 'House Chardonnay', 11, 'bottles', 'Recycle', 'Maria G.', 0, ''),
-      mkEmpty(57, 'Live Oak Hefeweizen', 1, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Single empty keg return.'),
-      mkEmpty(50, 'Lone Star', 72, 'bottles', 'Recycle', 'Devin R.', 0, ''),
-      mkEmpty(43, "Tito's Handmade Vodka", 8, 'bottles', 'Recycle', 'Ashley B.', 0, ''),
-      mkEmpty(43, 'House Cabernet', 3, 'bottles', 'Trash', 'Ashley B.', 0, 'Broke in the bin, not recyclable.'),
-      mkEmpty(36, 'ABW Pearl Snap (1/2 bbl)', 3, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Three empties back on the Tuesday delivery.'),
-      mkEmpty(29, 'Corona', 60, 'bottles', 'Recycle', 'Devin R.', 0, ''),
-      mkEmpty(22, 'Espolòn Tequila Blanco', 7, 'bottles', 'Recycle', 'Maria G.', 0, ''),
-      mkEmpty(15, 'House Chardonnay', 12, 'bottles', 'Recycle', 'Devin R.', 0, ''),
-      mkEmpty(8,  "Real Ale Fireman's 4", 2, 'kegs', 'Return for Deposit', 'Carlos P.', 30, 'Empty kegs staged for pickup.'),
-      mkEmpty(3,  'Modelo Especial', 84, 'bottles', 'Recycle', 'Devin R.', 0, 'Weekend beer empties.'),
-    ];
-
-    // ── Transfer Log ─────────────────────────────────────────────────────
-    // The daily restock routine now that stock lives in multiple locations:
-    // Liquor Room -> Main Bar wells, Walk-in -> Back Bar (wine), Walk-in ->
-    // Main Bar (beer + keg swaps), Walk-in / Dry Storage -> Kitchen Line. Real
-    // products, real cadence, a couple counted out and witnessed at shift change.
-    const mkXfer = (daysAgo, hour, min, prodName, qty, unit, from, to, by, witness, notes) => {
-      const p = icByName(prodName) || {};
-      return { id:uid(), date_time:adjAt(daysAgo, hour, min),
-        from_location:from, to_location:to, product_id:p.id || '', product_name:p.name || prodName,
-        category:p.category || '', quantity:qty, unit,
-        performed_by_id:staffIdByName(by), performed_by:by,
-        witnessed_by_id:witness ? staffIdByName(witness) : '', witnessed_by:witness || '',
-        notes:notes || '', created_at:daysAgoISO(daysAgo) };
-    };
-    App.inventoryData.ic_transfers = [
-      mkXfer(80, 16, 30, "Tito's Handmade Vodka", 3, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', 'Pre-shift well restock.'),
-      mkXfer(80, 16, 35, 'House Cabernet', 8, 'bottles', 'Walk-in Cooler', 'Back Bar', 'Maria G.', '', ''),
-      mkXfer(73, 15, 0,  'ABW Pearl Snap (1/2 bbl)', 1, 'kegs', 'Walk-in Cooler', 'Main Bar', 'Jake T.', 'Carlos P.', 'Keg swap, tapped fresh.'),
-      mkXfer(73, 17, 10, 'Modelo Especial', 48, 'bottles', 'Walk-in Cooler', 'Main Bar', 'Devin R.', '', 'Two cases to the bar cooler.'),
-      mkXfer(66, 16, 20, 'Bulleit Bourbon', 2, 'bottles', 'Liquor Room', 'Main Bar', 'Ashley B.', '', ''),
-      mkXfer(66, 11, 45, 'Ground Beef 80/20', 40, 'lbs', 'Walk-in Cooler', 'Kitchen Line', 'Luis V.', '', 'Lunch prep pull.'),
-      mkXfer(59, 16, 15, 'House Chardonnay', 10, 'bottles', 'Walk-in Cooler', 'Back Bar', 'Maria G.', '', ''),
-      mkXfer(59, 10, 30, 'Russet Potato', 50, 'lbs', 'Dry Storage', 'Kitchen Line', 'Sam P.', '', 'Fry station par.'),
-      mkXfer(52, 15, 50, 'Live Oak Hefeweizen', 1, 'kegs', 'Walk-in Cooler', 'Main Bar', 'Jake T.', '', 'Keg swap.'),
-      mkXfer(45, 16, 40, "Tito's Handmade Vodka", 4, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', ''),
-      mkXfer(45, 12, 5,  'Chicken Thigh', 30, 'lbs', 'Walk-in Cooler', 'Kitchen Line', 'Hector M.', '', ''),
-      mkXfer(38, 17, 0,  'Corona', 48, 'bottles', 'Walk-in Cooler', 'Main Bar', 'Devin R.', '', 'Weekend stock up.'),
-      mkXfer(31, 16, 25, 'Bulleit Bourbon', 3, 'bottles', 'Liquor Room', 'Main Bar', 'Ashley B.', 'Carlos P.', 'Counted out together at shift change.'),
-      mkXfer(24, 15, 30, 'ABW Pearl Snap (1/2 bbl)', 1, 'kegs', 'Walk-in Cooler', 'Main Bar', 'Jake T.', '', 'Keg swap.'),
-      mkXfer(17, 16, 10, 'House Cabernet', 12, 'bottles', 'Walk-in Cooler', 'Back Bar', 'Maria G.', '', 'Heavy reservation night, extra red on hand.'),
-      mkXfer(17, 11, 20, 'Flour Tortilla', 4, 'units', 'Dry Storage', 'Kitchen Line', 'Luis V.', '', ''),
-      mkXfer(9,  16, 45, 'Modelo Especial', 24, 'bottles', 'Walk-in Cooler', 'Main Bar', 'Devin R.', '', ''),
-      mkXfer(2,  15, 40, "Maker's Mark", 2, 'bottles', 'Liquor Room', 'Main Bar', 'Maria G.', '', ''),
-    ];
-
-    // ── Order History (mirrors Delivery History one-to-one) ───────────────
-    // Every delivery was placed as an order first, so Order History mirrors
-    // Delivery History: each Received order carries the same vendor, the same
-    // line items and the same dollars as its delivery, dated a vendor-specific
-    // lead time earlier. Bottle beer is in CASES on both (the canonical unit).
-    // Two recent orders are still in the pipeline (Submitted / Open): the
-    // reorders that refill the current draw-down, not yet delivered, which is why
-    // the most recent days have no matching delivery.
-    const orderLeadDays = { 'Republic National':3, "Glazer's Beer & Bev":2, 'Sysco Foods':1,
-      'Austin Beerworks':4, 'Local Produce Co.':1, 'Restaurant Depot':5 };
-    const deliveryToOrder = (del) => {
-      const lead = orderLeadDays[del.vendor] != null ? orderLeadDays[del.vendor] : 2;
-      const lineItems = del.line_items.map(li => ({
-        product_id:li.product_id, name:li.name, qty:li.qty,
-        unit_cost:li.price_per_unit, extended:li.extended,
-        display_unit:li.display_unit || 'unit', case_size:li.case_size_at_receive || null
-      }));
-      const delDate = new Date(del.date + 'T00:00:00');
-      const ordDate = new Date(delDate); ordDate.setDate(ordDate.getDate() - lead);
-      return { id:uid(), vendor:del.vendor, date:ordDate.toISOString().slice(0, 10), status:'Received',
-        line_items:lineItems, item_count:lineItems.length, total:del.total, custom:true,
-        created_at:ordDate.toISOString(), received_at:delDate.toISOString() };
-    };
-    const mkPendingOrder = (daysAgo, vendor, status, pairs) => {
-      const lineItems = pairs.map(([nm, qty]) => {
-        const p = icByName(nm) || {};
-        const isCaseBeer = p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
-        const cost = p.unit_cost != null ? p.unit_cost : 0;
-        return { product_id:p.id || '', name:p.name || nm, qty, unit_cost:cost,
-          extended:+(qty * cost).toFixed(2), display_unit:isCaseBeer ? 'case' : 'unit',
-          case_size:isCaseBeer ? p.case_size : null };
-      });
-      const rec = { id:uid(), vendor, date:dateStr(daysAgo), status,
-        line_items:lineItems, item_count:lineItems.length,
-        total:+lineItems.reduce((t, i) => t + i.extended, 0).toFixed(2),
-        custom:true, created_at:daysAgoISO(daysAgo) };
-      if (status === 'Submitted') rec.submitted_at = daysAgoISO(daysAgo);
-      return rec;
-    };
-    App.inventoryData.ic_orders = [
-      ...(App.inventoryData.ic_deliveries || []).map(deliveryToOrder),
-      mkPendingOrder(5, 'Sysco Foods', 'Submitted', [
-        ['Ground Beef 80/20', 200], ['Salmon Fillet', 40], ['Gulf Shrimp', 40]]),
-      mkPendingOrder(2, "Glazer's Beer & Bev", 'Open', [
-        ['Modelo Especial', 16], ['White Claw', 10], ['Stella Artois', 8]]),
-    ];
-
-    // Phase 0: now that lcStaff exists, patch staff_id onto every sc_void_comps
-    // record so the Server Scorecard (Phase 4) can show comps per server with
-    // a real foreign-key link. Same patch lets Theft Risk run by-employee math.
-    scVoidComps.forEach(vc => {
-      if (!vc.server) return;
-      const match = lcStaff.find(s => s.name === vc.server);
-      if (match) vc.staff_id = match.id;
-    });
-    App.shiftData.sc_void_comps = scVoidComps;
-
-    // ── Shift Control staff-linked logs (Walked Tabs, Incidents, Waste) ──
-    // Seeded here, after the roster exists, because each form requires a real
-    // staff member (server / manager / recorded_by) for its open->save round
-    // trip. icProducts is in scope for the waste cost, which mirrors the
-    // costFor()/unitLabel() logic in sc-waste.js so the Total Cost is honest.
-    const wtServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Priya N.'];
-    const wtReasons = ['Walked', 'Mis-bill', 'Lost Check', 'Refused to Pay', 'Other'];
-    const scWalkedTabs = [];
-    ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const improving = a.wk >= ANCHS.fix_week;
-      const n = improving ? 1 : 2;   // walked tabs taper after the fix lands
-      for (let k = 0; k < n; k++) {
-        const server = wtServers[(a.wk + k) % wtServers.length];
-        const mgr    = mgrs[(a.wk + k) % 3];
-        const reason = wtReasons[(a.wk + k) % wtReasons.length];
-        const amount = 20 + Math.round(Math.random() * (improving ? 55 : 100));
-        scWalkedTabs.push({
-          id:uid(), date:dateStr(baseAgo + (k === 0 ? 5 : 6)), time:(k === 0 ? '21:50' : '23:10'),
-          server_id:staffIdByName(server), server:server,
-          check_ref:'#' + (4000 + a.wk * 7 + k), amount:amount, reason:reason,
-          manager_id:staffIdByName(mgr), manager:mgr, notes:'',
-          created_at:new Date().toISOString()
-        });
-      }
-    });
-    App.shiftData.sc_walked_tabs = scWalkedTabs;
-
-    // Incident Log — the manager's insurance / legal logbook. A realistic spread
-    // over the quarter; nothing routine, each one is a real event.
-    const scIncidentSeed = [
-      { type:'Slip / Fall',            severity:'Medium', daysAgo:33, time:'20:15', mgr:'Carlos P.', location:'Dining room near the server station', people:'One guest (declined medical care)', desc:'Guest slipped on a wet patch by the server station. Sat with ice, declined an ambulance, left under their own power.', witnesses:'Jessica M., Marcus T.', action:'Cleaned the spill, put out a wet-floor sign, logged a maintenance note on the ice-well drip.', notes:'Followed up by phone the next day, guest was fine.', follow:false },
-      { type:'Customer Altercation',   severity:'High',   daysAgo:26, time:'23:40', mgr:'Maria G.',  location:'Main Bar', people:'Two guests', desc:'Verbal argument between two guests at the bar escalated to shoving. Staff separated them, both asked to leave. No injuries, no property damage.', witnesses:'Jake T.', action:'Cut both off, walked them out separately, comped the surrounding tables a round.', notes:'', follow:false },
-      { type:'Refusal of Service',     severity:'Low',    daysAgo:19, time:'22:10', mgr:'Jake T.',   location:'Main Bar', people:'One guest', desc:'Guest showing clear signs of intoxication. Refused further service and helped arrange a rideshare.', witnesses:'Ashley B.', action:'Refused service, got the guest water, confirmed the rideshare pickup.', notes:'', follow:false },
-      { type:'Employee Injury',        severity:'Medium', daysAgo:12, time:'18:30', mgr:'Renee K.',  location:'Kitchen line', people:'One line cook', desc:'Line cook caught a finger on the slicer guard, minor laceration. First aid on site, did not need stitches.', witnesses:'Luis V.', action:'First aid, bandaged, sent home early. Filed the injury note for workers comp records.', notes:'Re-trained the line on slicer-guard use.', follow:true },
-      { type:'Health Inspector Visit', severity:'Low',    daysAgo:40, time:'14:00', mgr:'Carlos P.', location:'Whole house', people:'County health inspector', desc:'Routine inspection. Passed with two minor notes: date-label the walk-in containers and recaulk one prep sink.', witnesses:'', action:'Corrected the labeling the same day, scheduled the caulk repair.', notes:'Copy of the report is in the office binder.', follow:true },
-      { type:'Property Damage',        severity:'Low',    daysAgo:54, time:'21:00', mgr:'Maria G.',  location:'Patio', people:'', desc:'Wind knocked over a patio umbrella and cracked one tabletop. No one was hurt.', witnesses:'Owen L.', action:'Removed the broken table, secured the remaining umbrellas.', notes:'', follow:false },
-    ];
-    App.shiftData.sc_incidents = scIncidentSeed.map(x => ({
-      id:uid(), date:dateStr(x.daysAgo), time:x.time, type:x.type, severity:x.severity,
-      manager_id:staffIdByName(x.mgr), manager:x.mgr, location:x.location,
-      people_involved:x.people, description:x.desc, witnesses:x.witnesses,
-      action_taken:x.action, notes:x.notes, follow_up_needed:x.follow,
-      created_at:new Date().toISOString()
-    }));
-
-    // Waste / Spill Log — products pulled from the real inventory; cost mirrors
-    // sc-waste.js costFor()/unitLabel() exactly so the Total Cost is honest.
-    const wasteUnitOf = p => !p ? 'units'
-      : p.category === 'Bottle Beer' ? 'btls'
-      : p.category === 'Draft Beer'  ? 'oz'
-      : (p.category === 'Food' || p.category === 'Misc') ? (p.unit_type || 'units')
-      : 'btls';
-    const wasteCostOf = (p, units) => {
-      if (!p || !units) return 0;
-      if (p.category === 'Draft Beer') return (!p.container_size_oz || p.unit_cost == null) ? 0 : (units / p.container_size_oz) * p.unit_cost;
-      if (p.category === 'Food' || p.category === 'Misc') return (p.unit_cost != null) ? units * p.unit_cost : 0;
-      const bc = App.bottleCost ? App.bottleCost(p) : null;
-      return bc != null ? units * bc : 0;
-    };
-    const wByCat = cat => icProducts.filter(p => p.category === cat);
-    const wFood = wByCat('Food'), wLiquor = wByCat('Liquor'), wDraft = wByCat('Draft Beer');
-    const wPick = (arr, i) => (arr.length ? arr[i % arr.length] : null);
-    const scWaste = [];
-    ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const slots = [
-        { p:wPick(wFood, a.wk),   units:1 + (a.wk % 3), reason:'Dumped / Tasted Bad', day:2, who:'Luis V.',  shift:'Dinner' },
-        { p:wPick(wLiquor, a.wk), units:1,              reason:'Broken',             day:5, who:'Maria G.', shift:'Dinner' },
-        { p:wPick(wDraft, a.wk),  units:12,             reason:'Spill',              day:4, who:'Jake T.',  shift:'Late Night' },
-      ];
-      slots.forEach(s => {
-        if (!s.p) return;
-        scWaste.push({
-          id:uid(), date:dateStr(baseAgo + s.day), shift_type:s.shift,
-          product_id:s.p.id, product_name:s.p.name, product_category:s.p.category,
-          unit:wasteUnitOf(s.p), units:s.units, cost:+wasteCostOf(s.p, s.units).toFixed(2),
-          reason:s.reason, recorded_by_id:staffIdByName(s.who), recorded_by:s.who, notes:'',
-          created_at:new Date().toISOString()
-        });
-      });
-    });
-    App.shiftData.sc_waste = scWaste;
-
-    // Phase 4: patch staff_id + shift_id onto every revenue_server_checks
-    // record so the Server Scorecard joins cleanly to lc_staff and sc_shifts.
-    (App.data.revenue_server_checks || []).forEach(c => {
-      if (!c.staff_id && c.server_name) {
-        const match = lcStaff.find(s => s.name === c.server_name);
-        if (match) c.staff_id = match.id;
-      }
-      if (!c.shift_id && c.date) {
-        const matchShift = scShifts.find(s => s.date === c.date && (!c.shift || s.shift_type === c.shift));
-        if (matchShift) c.shift_id = matchShift.id;
-      }
-    });
-
-    const lcByPos = (...names) => {
-      const ids = names.map(lcPos);
-      return lcStaff.filter(st => ids.includes(st.position_id));
-    };
-    const lcBar     = lcByPos('Bartender', 'Barback');
-    const lcKitchen = lcByPos('Line Cook', 'Prep Cook');
-    const lcFloor   = lcByPos('Server', 'Host');
-
-    // Per week, split each department's labor dollars across its staff, then
-    // log five daily hour entries per person. cost sums back to ANCHOR labor.
-    const lcActuals = [];
-    const lcAllocate = (staff, weights, deptDollars, baseAgo) => {
-      staff.forEach((st, i) => {
-        const weekHours = (deptDollars * (weights[i] || 0)) / st.wage;
-        for (let d = 0; d < 5; d++) {
-          const h = +(weekHours / 5).toFixed(1);
-          if (h <= 0) continue;
-          lcActuals.push({
-            id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name,
-            position_id:st.position_id, shift_type:'', hours:h, wage:st.wage,
-            cost:+(h * st.wage).toFixed(2), notes:''
-          });
-        }
-      });
-    };
-    ANCHL.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo);
-      lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo);
-    });
-    App.laborData.lc_actuals   = lcActuals;
-
-    // ── Schedules — the two most recent weeks, built from the roster ──
-    const SCHED_PLAN = {
-      'Bartender': { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'23:00', hours:7 },
-      'Barback':   { days:['Thu','Fri','Sat','Sun'],       start:'18:00', end:'23:00', hours:5 },
-      'Line Cook': { days:['Tue','Wed','Thu','Fri','Sat'], start:'15:00', end:'22:00', hours:7 },
-      'Prep Cook': { days:['Mon','Tue','Wed','Thu'],       start:'09:00', end:'15:00', hours:6 },
-      'Server':    { days:['Wed','Thu','Fri','Sat','Sun'], start:'17:00', end:'22:00', hours:5 },
-      'Host':      { days:['Thu','Fri','Sat','Sun'],       start:'18:00', end:'22:00', hours:4 },
-      'Manager':   { days:['Tue','Wed','Thu','Fri','Sat'], start:'14:00', end:'22:00', hours:8 },
-    };
-    const posNameOf = id => (lcPositions.find(p => p.id === id) || {}).name;
-    const mondayISO = (daysBack) => {
-      const d = new Date(today); d.setDate(d.getDate() - daysBack);
-      const day = d.getDay();
-      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-      return d.toISOString().slice(0, 10);
-    };
-    const buildSchedule = (weekStart, forecast) => {
-      const shifts = [];
-      lcStaff.forEach(st => {
-        const plan = SCHED_PLAN[posNameOf(st.position_id)];
-        if (!plan) return;
-        plan.days.forEach(day => {
-          shifts.push({ staff_id:st.id, name:st.name, position_id:st.position_id, day:day,
-            start:plan.start, end:plan.end, hours:plan.hours, wage:st.wage,
-            cost:+(plan.hours * st.wage).toFixed(2) });
-        });
-      });
-      const total_hours = shifts.reduce((s, x) => s + x.hours, 0);
-      const total_cost  = +shifts.reduce((s, x) => s + x.cost, 0).toFixed(2);
-      return { id:uid(), week_start:weekStart, revenue_forecast:forecast, shifts:shifts,
-        total_hours:total_hours, total_cost:total_cost,
-        labor_pct:+(total_cost / forecast * 100).toFixed(2),
-        rplh:+(forecast / total_hours).toFixed(2),
-        notes:'', status:'Posted', created_at:new Date().toISOString() };
-    };
-    App.laborData.lc_schedules = [
-      buildSchedule(mondayISO(21), 17980),
-      buildSchedule(mondayISO(14), 18420),
-      buildSchedule(mondayISO(7),  18812),
-      buildSchedule(mondayISO(0),  19150),
-    ];
-
-    // ── Tips — recent shifts for every tipped staff member ──
-    // Phase 0: every tip carries shift_id linked to the sc_shifts record on
-    // the same date. Shift Close (Phase 2-3) reconciles tips against this link;
-    // Books Form 8027 pulls per-employee allocations through it; Server
-    // Scorecard (Phase 4) shows tips % per server through it.
-    const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server'].includes(posNameOf(st.position_id)));
-    const lcTips = [];
-    [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
-      const tipDate = dateStr(d);
-      const matchedShift = scShifts.find(s => s.date === tipDate && s.shift_type === 'Dinner') || scShifts.find(s => s.date === tipDate);
-      const shiftId = matchedShift ? matchedShift.id : '';
-      lcTipped.forEach(st => {
-        const role = posNameOf(st.position_id);
-        const base = role === 'Bartender' ? 135 : role === 'Server' ? 100 : 55;
-        const cash = Math.round(base * (0.30 + Math.random() * 0.22));
-        const card = Math.round(base * (0.92 + Math.random() * 0.40));
-        lcTips.push({ id:uid(), date:tipDate, shift_id:shiftId, staff_id:st.id, name:st.name,
-          position_id:st.position_id, shift_type:'Dinner',
-          cash_tips:cash, card_tips:card, total_tips:cash + card,
-          hours:role === 'Server' ? 5 : 7, notes:'', created_at:daysAgoISO(d) });
-      });
-    });
-    App.laborData.lc_tips = lcTips;
-
-    // ── Tip pools — three recent close-outs, split by hours, linked to shifts.
-    // Phase 3: shift_id ties each pool to the closing shift so Books Form 8027
-    // pulls per-employee taxable allocations from the pool split (not the raw
-    // tip log), and Tip History can group by shift.
-    const mkPool = (d, amount) => {
-      const poolDate = dateStr(d);
-      const matched = scShifts.find(s => s.date === poolDate);
-      const parts = lcTipped.map(st => ({ staff_id:st.id, name:st.name,
-        hours:posNameOf(st.position_id) === 'Server' ? 5 : 7 }));
-      const totH = parts.reduce((s, p) => s + p.hours, 0);
-      parts.forEach(p => p.share = +(amount * p.hours / totH).toFixed(2));
-      return { id:uid(),
-        shift_id:    matched ? matched.id : '',
-        date:        poolDate,
-        shift_type:  matched ? (matched.shift_type || '') : 'Dinner',
-        method:      'hours',
-        pool_amount: amount,
-        total_hours: totH,
-        participants: parts,
-        created_at:  daysAgoISO(d) };
-    };
-    App.laborData.lc_tip_pools = [ mkPool(4, 980), mkPool(11, 1120), mkPool(18, 1040), mkPool(25, 1075), mkPool(33, 990), mkPool(46, 1150), mkPool(60, 1020) ];
-
-    // ── Call-out log ──
-    const lcCO = (st, d, type, covered, by) => ({ id:uid(), date:dateStr(d), staff_id:st.id,
-      name:st.name, type:type, shift_type:'Dinner', covered:covered, covered_by:by,
-      reason:'', notes:'', created_at:daysAgoISO(d) });
-    App.laborData.lc_callouts = [
-      lcCO(lcStaff[1],  6,  'Called Out Sick', true,  'Maria G.'),
-      lcCO(lcStaff[9],  13, 'No-Show',         true,  'Jessica M.'),
-      lcCO(lcStaff[3],  22, 'Late Arrival',    false, ''),
-      lcCO(lcStaff[10], 31, 'Called Out Sick', true,  'Priya N.'),
-      lcCO(lcStaff[2],  44, 'Left Early',      true,  'Jake T.'),
-      lcCO(lcStaff[8],  58, 'Called Out Sick', true,  'Marcus T.'),
-      lcCO(lcStaff[11], 71, 'Late Arrival',    false, ''),
-    ];
-
-    // ── Schedule templates — three reusable week patterns the operator applies
-    // in Build Schedule. Shifts are {staff_id, day, start, end}; Build Schedule
-    // computes hours + cost on apply.
-    const tmplShifts = (planMap) => {
-      const out = [];
-      lcStaff.forEach(st => {
-        const plan = planMap[posNameOf(st.position_id)];
-        if (!plan) return;
-        plan.days.forEach(day => out.push({ staff_id:st.id, day:day, start:plan.start, end:plan.end }));
-      });
-      return out;
-    };
-    const BUSY_PLAN = {
-      'Bartender':{days:['Wed','Thu','Fri','Sat','Sun'],start:'15:00',end:'00:00'},
-      'Barback':  {days:['Thu','Fri','Sat','Sun'],      start:'17:00',end:'00:00'},
-      'Line Cook':{days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'14:00',end:'22:00'},
-      'Prep Cook':{days:['Mon','Tue','Wed','Thu','Fri'],start:'09:00',end:'15:00'},
-      'Server':   {days:['Wed','Thu','Fri','Sat','Sun'],start:'16:00',end:'23:00'},
-      'Host':     {days:['Wed','Thu','Fri','Sat','Sun'],start:'17:00',end:'23:00'},
-      'Manager':  {days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'13:00',end:'22:00'},
-    };
-    const SLOW_PLAN = {
-      'Bartender':{days:['Thu','Fri','Sat'],      start:'17:00',end:'23:00'},
-      'Line Cook':{days:['Wed','Thu','Fri','Sat'],start:'16:00',end:'22:00'},
-      'Prep Cook':{days:['Tue','Wed','Thu'],      start:'10:00',end:'15:00'},
-      'Server':   {days:['Thu','Fri','Sat'],      start:'17:00',end:'22:00'},
-      'Host':     {days:['Fri','Sat'],            start:'18:00',end:'22:00'},
-      'Manager':  {days:['Wed','Thu','Fri','Sat'],start:'15:00',end:'22:00'},
-    };
-    App.laborData.lc_schedule_templates = [
-      { id:uid(), name:'Standard Week',       shifts:tmplShifts(SCHED_PLAN), created_at:daysAgoISO(64) },
-      { id:uid(), name:'Busy Weekend Push',   shifts:tmplShifts(BUSY_PLAN),  created_at:daysAgoISO(48) },
-      { id:uid(), name:'Slow Week (Reduced)', shifts:tmplShifts(SLOW_PLAN),  created_at:daysAgoISO(30) },
-    ];
-
-    // ── Certifications — TABC for anyone serving alcohol (Austin TX), food
-    // safety for the kitchen. expDays = days until expiration (negative = already
-    // lapsed); spread so the dashboard alert shows current, expiring-soon, and
-    // expired all at once.
-    const stByName = nm => lcStaff.find(s => s.name === nm);
-    const certRec = (nm, type, issuer, expDays, num) => {
-      const st = stByName(nm); if (!st) return null;
-      return { id:uid(), staff_id:st.id, cert_type:type, cert_number:num || '',
-        issuer:issuer, issue_date:dateStr(700), expiration_date:dateStr(-expDays),
-        notes:'', created_at:daysAgoISO(150), updated_at:new Date().toISOString() };
-    };
-    App.laborData.lc_certs = [
-      certRec('Maria G.',   'TABC (Texas)', 'Texas ABC', 240, 'TX-1184422'),
-      certRec('Jake T.',    'TABC (Texas)', 'Texas ABC',  18, 'TX-1190877'),
-      certRec('Ashley B.',  'TABC (Texas)', 'Texas ABC', 310, 'TX-1205513'),
-      certRec('Devin R.',   'TABC (Texas)', 'Texas ABC', 150, 'TX-1213004'),
-      certRec('Jessica M.', 'TABC (Texas)', 'Texas ABC', 200, 'TX-1166201'),
-      certRec('Marcus T.',  'TABC (Texas)', 'Texas ABC', 275, 'TX-1188190'),
-      certRec('Brianna K.', 'TABC (Texas)', 'Texas ABC', 120, 'TX-1221765'),
-      certRec('Priya N.',   'TABC (Texas)', 'Texas ABC', 330, 'TX-1230918'),
-      certRec('Luis V.',    'ServSafe Food Handler', 'ServSafe', 180, 'SS-77120'),
-      certRec('Sam P.',     'ServSafe Food Handler', 'ServSafe',  60, 'SS-78431'),
-      certRec('Hector M.',  'ServSafe Food Handler', 'ServSafe', -12, 'SS-79002'),
-      certRec('Tonya B.',   'ServSafe Food Handler', 'ServSafe', 220, 'SS-80155'),
-      certRec('Owen L.',    'ServSafe Food Handler', 'ServSafe', 290, 'SS-81330'),
-      certRec('Carlos P.',  'TABC (Texas)', 'Texas ABC', 400, 'TX-1099001'),
-      certRec('Carlos P.',  'ServSafe Manager', 'ServSafe', 400, 'SS-MGR-4410'),
-      certRec('Renee K.',   'TABC (Texas)', 'Texas ABC', 300, 'TX-1100250'),
-      certRec('Renee K.',   'ServSafe Manager', 'ServSafe', 300, 'SS-MGR-4502'),
-    ].filter(Boolean);
-
-    // ── Coaching Log — written record of staff conversations, authored by the
-    // GM. Mix of Praise, Coaching, Concern, and Warning across the window.
-    const mgr = stByName('Carlos P.');
-    const coachNote = (nm, daysAgo, category, text) => {
-      const st = stByName(nm); if (!st) return null;
-      return { id:uid(), staff_id:st.id, date:dateStr(daysAgo), category:category,
-        manager_id:mgr ? mgr.id : '', manager_name:'Carlos P.', text:text,
-        created_at:daysAgoISO(daysAgo), updated_at:daysAgoISO(daysAgo) };
-    };
-    App.laborData.lc_staff_notes = [
-      coachNote('Maria G.',   12, 'Praise',   'Covered Jake\'s Friday close on no notice and the bar still ran clean. Called it out in the group thread so the team saw it.'),
-      coachNote('Jake T.',    20, 'Coaching', 'Drawer came up 14 dollars short on the 12th. Walked the void and comp procedure again; he agreed to call a manager for any comp over 20 dollars.'),
-      coachNote('Devin R.',   26, 'Concern',  'Third late arrival in three weeks. Talked through the bus schedule, he is switching to the earlier route. Revisit in two weeks.'),
-      coachNote('Marcus T.',  33, 'Warning',  'Second no-call no-show. Issued a written warning per the handbook. One more is termination. He acknowledged and signed.'),
-      coachNote('Jessica M.', 40, 'Praise',   'Top check average on the floor two months running. Asked her to run a five minute upsell huddle before Friday dinner.'),
-      coachNote('Luis V.',    47, 'Coaching', 'Ticket times creeping past 18 minutes on the Saturday rush. Reorganized the line station with him; watching next weekend.'),
-      coachNote('Priya N.',    9, 'Praise',   'Guest emailed to compliment her wine pairing on the anniversary table. Forwarded the note to her.'),
-      coachNote('Tonya B.',   30, 'Coaching', 'Prep par sheet not getting filled on Mondays. Showed her where it lives and she owns it going forward.'),
-      coachNote('Ashley B.',  18, 'Concern',  'Seemed checked out the last two shifts. Quick private check-in, personal stuff and nothing performance related. Keeping an eye out.'),
-      coachNote('Hector M.',   6, 'Warning',  'Worked a shift on a lapsed Food Handler card. Pulled him off the line until it is renewed and documented per health code.'),
-    ].filter(Boolean);
-
-    // ── Pay periods — two older weeks closed + locked, recent weeks left open
-    // so both states are visible. Stamps locked + pay_period_id on the actuals
-    // in range, mirroring lc-pay-periods closePeriod().
-    const buildClosedPeriod = (weekStart, closedDaysAgo) => {
-      const dd = new Date(weekStart + 'T00:00:00'); dd.setDate(dd.getDate() + 6);
-      const weekEnd = dd.toISOString().slice(0, 10);
-      const periodId = uid();
-      const byStaff = {};
-      lcActuals.filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd).forEach(a => {
-        if (!byStaff[a.staff_id]) byStaff[a.staff_id] = { staff_id:a.staff_id, name:a.name, position_id:a.position_id, wage:a.wage, hours:0 };
-        byStaff[a.staff_id].hours += (a.hours || 0);
-        a.locked = true; a.pay_period_id = periodId;
-      });
-      const rows = Object.values(byStaff).map(r => {
-        const regH = Math.min(r.hours, 40), otH = Math.max(0, r.hours - 40);
-        const regC = +(regH * r.wage).toFixed(2), otC = +(otH * r.wage * 1.5).toFixed(2);
-        return { staff_id:r.staff_id, name:r.name, position_id:r.position_id,
-          regular_hours:+regH.toFixed(2), ot_hours:+otH.toFixed(2), wage:r.wage,
-          regular_cost:regC, ot_cost:otC, gross:+(regC + otC).toFixed(2) };
-      });
-      const sum = k => +rows.reduce((t, r) => t + r[k], 0).toFixed(2);
-      return { id:periodId, week_start:weekStart, week_end:weekEnd, status:'Closed',
-        closed_at:daysAgoISO(closedDaysAgo),
-        total_hours:+(sum('regular_hours') + sum('ot_hours')).toFixed(2),
-        total_cost:+(sum('regular_cost') + sum('ot_cost')).toFixed(2),
-        ot_hours:sum('ot_hours'), ot_cost:sum('ot_cost'), gross:sum('gross'),
-        participants: rows };
-    };
-    App.laborData.lc_pay_periods = [
-      buildClosedPeriod(mondayISO(63), 55),
-      buildClosedPeriod(mondayISO(70), 62),
-    ];
-
-    // ── Save everything — App.data plus all three Control stores ──
-    await App.save();
-    await App.saveInventory();           // config only (products, locations, vendors, batches, par/variance settings)
-    await App.seedEventStores('ic');     // inventory event logs -> ic_events rows
-    await App.saveLabor();               // config only (staff, positions, schedule templates, certs, notes)
-    await App.seedEventStores('lc');     // labor event logs -> lc_events rows
-    await App.saveShift();               // config only (settings, drawers, checklist templates)
-    await App.seedEventStores('sc');     // shift event logs -> sc_events rows
-    await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
-    App.updatePeriod();
-
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six systems populated. Go test!'; }
-  },
-
-  async clearAll() {
-    const ok = await App.confirm({
-      title: 'Clear all data?',
-      message: 'This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.',
-      confirmText: 'Clear all data',
-      cancelText: 'Cancel'
-    });
-    if (!ok) return;
-    const msg = document.getElementById('ua-test-msg');
-    if (msg) { msg.style.color = 'var(--t3)'; msg.textContent = 'Clearing...'; msg.style.display = 'block'; }
-
-    // Reset every data key to its default. App.data.settings (bar name,
-    // targets, etc.) is preserved — that is "user settings" the dialog says
-    // it keeps. Everything else — Profit, Revenue, Traffic, fix log —
-    // goes back to its empty default.
-    const s = App.data.settings;
-    const defaults = DB._defaultData();
-    App.data = {
-      ...defaults,
-      settings: { ...s, onboarding_complete:true }
-    };
-    // Clear the three Control stores too — Inventory, Labor, and Shift.
-    App.inventoryData = {};
-    App.laborData     = {};
-    App.shiftData     = {};
-    await App.save();
-    await App.saveInventory();
-    await DB.clearEvents('ic_events');   // drop the inventory event rows too
-    await App.saveLabor();
-    await DB.clearEvents('lc_events');   // drop the labor event rows too
-    await App.saveShift();
-    await DB.clearEvents('sc_events');   // drop the shift event rows too
-    await DB.clearEvents('core_events'); // drop the recovery event rows too
-    App.updatePeriod();
-
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
-    setTimeout(() => window.location.reload(), 800);
+  hide() {
+    this._cur = null;
+    this._box.classList.remove('on');
+    setTimeout(() => { if (!this._box.classList.contains('on')) this._box.style.display = 'none'; }, 150);
   }
 };
+
+document.addEventListener('click', ev => {
+  const icon = ev.target.closest('.tt');
+  if (icon) { ev.stopPropagation(); TT.show(icon); }
+  else TT.hide();
+});
+document.addEventListener('scroll', () => TT.hide(), true);
+
+/* ── App ── */
+const App = {
+  data: null,
+  inventoryData: null,   // ic_ keys — ic_data table (see Rule 21)
+  laborData: null,       // lc_ keys — lc_data table
+  shiftData: null,       // sc_ keys — sc_data table
+  subscription: { status: 'inactive', plan: null, active_modules: [], period_end: null },
+
+  async init() {
+    await DB.init();
+    window.onerror = (msg, src, line, col, err) => {
+      const el = document.getElementById('content-area');
+      if (el) el.innerHTML = '<div class="screen" style="color:var(--red);font-family:monospace;font-size:12px;white-space:pre-wrap;">ERROR: ' + msg + '\nLine: ' + line + '\n' + (err ? err.stack : '') + '</div>';
+    };
+
+    // Browser back/forward walks the in-app history stack instead of leaving
+    // the site. _navigationLock suppresses re-pushing while popstate handles
+    // the navigation so we don't grow the history stack on every back-step.
+    window.addEventListener('popstate', (e) => {
+      if (!e.state) return;
+      this._navigationLock = true;
+      try {
+        if (e.state.mode === 'hub') {
+          this.showHub();
+        } else if (e.state.screen) {
+          if (e.state.module && e.state.module !== this._activeModule) this.showApp(e.state.module);
+          this.navigate(e.state.screen);
+        }
+      } finally {
+        this._navigationLock = false;
+      }
+    });
+    this._wireSyncLifecycle();
+    if (new URLSearchParams(window.location.search).get('demo') === '1') {
+      await this.startDemo();
+      return;
+    }
+    if (!window.SUPABASE_URL) {
+      await this.loadAllData();
+      this.boot();
+      return;
+    }
+    // Check if this is a password recovery OR invite link before checking session.
+    // Recovery: Supabase fires PASSWORD_RECOVERY. Invite: Supabase fires SIGNED_IN
+    // (but the user has no password yet, so we still show the set-password panel
+    // so they can sign in normally next time).
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const linkType = hashParams.get('type');
+    const needsPasswordSetup = linkType === 'recovery' || linkType === 'invite';
+    if (needsPasswordSetup) {
+      this.showAuth();
+      let inviteSetupArmed = linkType === 'invite';
+      DB.onAuthChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && inviteSetupArmed)) {
+          // Show the set-password panel (used by both recovery and first-invite flows)
+          ['auth-login','auth-reset','auth-set-password'].forEach(x => {
+            const el = document.getElementById(x);
+            if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
+          });
+          inviteSetupArmed = false;  // consume the one invite SIGNED_IN event
+        } else if (event === 'SIGNED_IN' && session) {
+          // Same visibility-change guard as the main handler below: Supabase v2
+          // re-fires SIGNED_IN on tab focus, don't re-boot if already booted.
+          if (this._bootedUserId === session.user?.id) return;
+          this._bootedUserId = session.user?.id || null;
+          await this.loadAllData();
+          this.subscription = await DB.getSubscription();
+          this.boot();
+        } else if (event === 'SIGNED_OUT') {
+          this._bootedUserId = null;
+          this.data = null;
+          this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
+          this.showAuth();
+        }
+      });
+      return;
+    }
+    const session = await DB.getSession();
+    if (session) {
+      this._bootedUserId = session.user?.id || null;
+      await this.loadAllData();
+      this.subscription = await DB.getSubscription();
+      this.boot();
+    } else {
+      this.showAuth();
+    }
+    DB.onAuthChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Show password reset screen instead of booting into the app
+        document.getElementById('auth-screen').style.display = 'flex';
+        document.getElementById('app').classList.add('hidden');
+        document.getElementById('ob-overlay').classList.add('hidden');
+        const hw = document.getElementById('hub-wrapper');
+        if (hw) hw.style.display = 'none';
+        // Switch to the set-new-password panel
+        ['auth-login','auth-reset','auth-set-password'].forEach(x => {
+          const el = document.getElementById(x);
+          if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
+        });
+      } else if (event === 'SIGNED_IN' && session) {
+        // Supabase v2 re-emits SIGNED_IN whenever the tab regains visibility
+        // (e.g., closing a print pop-up). Without this guard, the handler
+        // re-runs boot() and bounces the operator back to Hub Dashboard,
+        // losing whatever module/screen they were on.
+        if (this._bootedUserId === session.user?.id) return;
+        this._bootedUserId = session.user?.id || null;
+        await this.loadAllData();
+        this.subscription = await DB.getSubscription();
+        this.boot();
+      } else if (event === 'SIGNED_OUT') {
+        this._bootedUserId = null;
+        this.data = null;
+        this.subscription = { status: 'inactive', plan: null, active_modules: [], period_end: null };
+        this.showAuth();
+      }
+    });
+  },
+
+  /* ── Demo mode ────────────────────────────────────────────────────────────
+     ?demo=1 boots a sandboxed, fully populated demo: no auth, no persistence,
+     resets on every load. Paid-value actions (running audits, PDF export, AI
+     insights) are gated behind sign-up via demoBlock(). */
+  demoMode: false,
+
+  async startDemo() {
+    this.demoMode = true;
+    DB._demo = true;
+    this.data          = DB._defaultData();
+    this.inventoryData = {};
+    this.laborData     = {};
+    this.shiftData     = {};
+    this.subscription  = { status:'demo', plan:'demo', active_modules:['profit','revenue','traffic'], period_end:null };
+    await S.HubSettings.loadSample();
+    window.print = function () { App.demoBlock('Exporting to PDF'); };
+    this._mountDemoBanner();
+    this.showHub();
+  },
+
+  _mountDemoBanner() {
+    if (document.getElementById('demo-banner')) return;
+    document.body.classList.add('demo');
+    const style = document.createElement('style');
+    style.id = 'demo-css';
+    style.textContent =
+      'body.demo #app{margin-top:40px;height:calc(100vh - 40px);}'
+      + 'body.demo #hub-wrapper{top:40px !important;}'
+      + '#demo-banner{position:fixed;top:0;left:0;right:0;height:40px;z-index:200;'
+      + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--gold);'
+      + 'color:#000;box-shadow:0 2px 8px rgba(0,0,0,0.45);}';
+    document.head.appendChild(style);
+    const bar = document.createElement('div');
+    bar.id = 'demo-banner';
+    bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
+      + 'Bar Cop demo. Explore every screen freely. Running audits, exporting PDFs, and AI insights are sign-up only.</span>'
+      + '<button id="demo-signup-btn" style="background:#000;color:var(--gold);border:none;border-radius:3px;'
+      + 'font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:7px 16px;cursor:pointer;flex-shrink:0;">Sign Up Now</button>';
+    document.body.appendChild(bar);
+    document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
+  },
+
+  // Gate a paid-value action in demo mode. Returns true (and shows a sign-up
+  // prompt) when blocked, false when the action may proceed.
+  demoBlock(actionLabel) {
+    if (!this.demoMode) return false;
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
+      + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">Sign Up to Continue</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(actionLabel)
+      + ' is part of the full Bar Cop platform. The demo lets you explore every screen freely, with sample data, before you sign up.</div>'
+      + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Sign Up Now</button>'
+      + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
+      + '</div>';
+    document.body.appendChild(m);
+    m.querySelector('#demo-go').addEventListener('click', () => { window.location.href = '/'; });
+    m.querySelector('#demo-stay').addEventListener('click', () => m.remove());
+    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+    return true;
+  },
+
+  boot() {
+    document.getElementById('auth-screen').style.display = 'none';
+    this.updatePeriod();
+    // Sidebar toggle — assign (not addEventListener) so repeated boot() calls
+    // don't stack handlers and cancel each other out
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    if (toggleBtn) toggleBtn.onclick = () => {
+      document.getElementById('app').classList.toggle('sidebar-collapsed');
+    };
+    // Mobile sidebar: hamburger button in the topbar opens the off-canvas
+    // sidebar below the 768px breakpoint. Backdrop click closes it. Module
+    // nav clicks also close it (wired in _renderNav). No-op on desktop where
+    // the sidebar-open class is never set.
+    const hbBtn = document.getElementById('topbar-hamburger');
+    if (hbBtn) hbBtn.onclick = () => {
+      document.getElementById('app').classList.toggle('sidebar-open');
+    };
+    const bdrop = document.getElementById('sidebar-backdrop');
+    if (bdrop) bdrop.onclick = () => {
+      document.getElementById('app').classList.remove('sidebar-open');
+    };
+    const closeBtn = document.getElementById('sidebar-mobile-close');
+    if (closeBtn) closeBtn.onclick = () => {
+      document.getElementById('app').classList.remove('sidebar-open');
+    };
+    // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
+    // (a simplified tile view of their accessible tasks across all modules).
+    // Admin and viewer get the normal flow.
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role === 'staff') {
+      this.showStaffHub();
+      this._promptSync();
+      return;
+    }
+    if (!this.data.settings.onboarding_complete) {
+      Onboarding.start();
+    } else if (!this.setupMeetsThreshold() && window.S && S.HubGettingStarted) {
+      // Returning user, onboarding done, but setup hasn't crossed the
+      // Foundation + 1 audit threshold yet. Default-land on Getting Started
+      // so the next action is one click away. They can still navigate to
+      // the Hub Dashboard manually via the sidebar.
+      S.HubGettingStarted.open();
+      this._promptSync();
+    } else {
+      this.showHub();
+      this._promptSync();
+    }
+    this._renderViewerBanner();
+    this.renderAccountSwitcher();
+  },
+
+  // Persistent banner shown to viewer role so they know writes are blocked.
+  _renderViewerBanner() {
+    const existing = document.getElementById('viewer-banner');
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role !== 'viewer') { if (existing) existing.remove(); return; }
+    if (existing) return;
+    const bar = document.createElement('div');
+    bar.id = 'viewer-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9400;background:rgba(20,20,20,0.92);color:var(--gold);border-bottom:1px solid var(--gold);text-align:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 10px;';
+    bar.textContent = 'Viewer access — read-only';
+    document.body.appendChild(bar);
+  },
+
+  // Offline sync prompt (Section 14). If a write failed while offline, the
+  // local copy was kept and the store marked pending. On load, offer to push
+  // those changes to the server. The local data is already loaded, so nothing
+  // is lost if the operator defers.
+  async _promptSync() {
+    if (!DB.hasPendingSync() || document.getElementById('sync-banner')) return;
+    const bar = document.createElement('div');
+    bar.id = 'sync-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9500;background:var(--gold);'
+      + 'color:#000;display:flex;align-items:center;gap:14px;padding:9px 18px;'
+      + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
+    const btnDark = 'background:#000;color:var(--gold);border:none;';
+    const btnGhost = 'background:transparent;border:1px solid rgba(0,0,0,0.45);color:#000;';
+    const btnBase = 'border-radius:3px;font-size:11px;font-weight:800;letter-spacing:1px;'
+      + 'text-transform:uppercase;padding:6px 14px;cursor:pointer;flex-shrink:0;';
+    bar.innerHTML = '<span style="flex:1;">Changes you saved on this device while offline have not reached the server yet.</span>'
+      + '<button id="sync-now" style="' + btnDark + btnBase + '">Sync Now</button>'
+      + '<button id="sync-later" style="' + btnGhost + btnBase + '">Later</button>';
+    document.body.appendChild(bar);
+    document.getElementById('sync-later').onclick = () => bar.remove();
+    document.getElementById('sync-now').onclick = async () => {
+      const btn = document.getElementById('sync-now');
+      btn.disabled = true; btn.textContent = 'Syncing...';
+      const r = await DB.syncPending();
+      if (r.ok) {
+        bar.innerHTML = '<span style="flex:1;">All offline changes are synced.</span>';
+        setTimeout(() => bar.remove(), 2500);
+      } else {
+        btn.disabled = false; btn.textContent = 'Retry';
+        const span = bar.querySelector('span');
+        if (span) span.textContent = 'Still cannot reach the server. Your changes are safe on this device. '
+          + 'Try again once you have a connection.';
+      }
+    };
+  },
+
+  // ── Offline sync lifecycle ──────────────────────────────────────────────────
+  // Three pieces wired once at init time:
+  //   Fix A — offline indicator pill while navigator.onLine is false
+  //   Fix B — auto-fire syncPending() on the online event
+  //   Fix C — surface the sync banner the moment a write lands in the pending
+  //           queue (rather than waiting for next page reload)
+  _wireSyncLifecycle() {
+    window.addEventListener('offline', () => this._showOfflinePill());
+    window.addEventListener('online', () => {
+      this._hideOfflinePill();
+      this._autoSync();
+    });
+    window.addEventListener('bcop:pending-write', () => {
+      if (this.data) this._promptSync();
+    });
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this._showOfflinePill();
+    }
+  },
+
+  _showOfflinePill() {
+    if (document.getElementById('offline-pill')) return;
+    const pill = document.createElement('div');
+    pill.id = 'offline-pill';
+    pill.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
+      + 'background:rgba(20,20,20,0.92);color:var(--gold);border:1px solid var(--gold);'
+      + 'border-radius:14px;padding:5px 14px;font-size:11px;font-weight:700;letter-spacing:1px;'
+      + 'text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
+    pill.textContent = 'Offline. Saves staying on this device.';
+    document.body.appendChild(pill);
+  },
+
+  _hideOfflinePill() {
+    const pill = document.getElementById('offline-pill');
+    if (pill) pill.remove();
+  },
+
+  async _autoSync() {
+    if (!DB.hasPendingSync()) return;
+    const r = await DB.syncPending();
+    if (r.ok && r.synced > 0) {
+      const existing = document.getElementById('sync-banner');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
+        + 'background:var(--gold);color:#000;border-radius:3px;padding:7px 16px;'
+        + 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
+        + 'box-shadow:0 2px 10px rgba(0,0,0,0.5);';
+      toast.textContent = 'Synced ' + r.synced + ' offline ' + (r.synced === 1 ? 'change.' : 'changes.');
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2800);
+    } else if (!r.ok) {
+      // Auto-sync failed even though we are online. Surface the manual banner
+      // so the operator can retry on their own time.
+      this._promptSync();
+    }
+  },
+
+  showHub(opts) {
+    opts = opts || {};
+    // If a Hub overlay modal is currently open, close it (returns user to
+    // the dashboard already rendered underneath). Skip when called via
+    // {fromOverlayClose: true} so we don't recurse.
+    if (!opts.fromOverlayClose) {
+      const modal = document.getElementById('hub-modal');
+      if (modal && modal.style.display === 'flex') {
+        this.closeHubOverlay();
+        return;
+      }
+    }
+    // Staff role: real Hub shows financial data they shouldn't see. Redirect
+    // to the Staff Hub (tile view of their accessible tasks).
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role === 'staff') {
+      this.showStaffHub();
+      return;
+    }
+    // Full screen hub - hide the app shell, show a standalone container
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('ob-overlay').classList.add('hidden');
+    // Hide the sidebar/topbar shell, render hub directly into body
+    document.getElementById('app').classList.add('hidden');
+    let hubWrap = document.getElementById('hub-wrapper');
+    if (!hubWrap) {
+      hubWrap = document.createElement('div');
+      hubWrap.id = 'hub-wrapper';
+      hubWrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
+      document.body.appendChild(hubWrap);
+    }
+    hubWrap.style.display = 'block';
+    // Clear any blur from a prior overlay open
+    hubWrap.style.filter = '';
+    hubWrap.style.pointerEvents = '';
+    S.Hub.render(hubWrap);
+    this.renderAccountSwitcher();
+    this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
+  },
+
+  // ── Hub overlay modal (Phase 2 polish) ──────────────────────────────────────
+  // Open a Hub-owned screen (Settings, Help, Getting Started, etc.) as a modal
+  // overlay on top of the Hub Dashboard instead of replacing the dashboard
+  // entirely. The dashboard stays visible underneath with a blur filter so the
+  // operator never loses their context.
+  openHubOverlay(renderFn) {
+    // Ensure Hub Dashboard is rendered first (showing the user the layout
+    // behind the modal). If we're in a module view or auth, call showHub first.
+    const wrap = document.getElementById('hub-wrapper');
+    const wrapVisible = wrap && wrap.style.display !== 'none';
+    if (!wrapVisible) this.showHub();
+    const hubWrap = document.getElementById('hub-wrapper');
+    // Apply blur to dashboard behind
+    if (hubWrap) {
+      hubWrap.style.filter = 'blur(5px)';
+      hubWrap.style.pointerEvents = 'none';
+    }
+    // Create or reuse modal
+    let modal = document.getElementById('hub-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'hub-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.55);';
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (ev) => {
+        if (ev.target === modal) this.closeHubOverlay();
+      });
+    }
+    // Build a fresh panel each open so prior content is cleared
+    modal.innerHTML = '<div class="hub-modal-panel" style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:920px;width:100%;max-height:calc(100vh - 80px);overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.55);"></div>';
+    const panel = modal.querySelector('.hub-modal-panel');
+    modal.style.display = 'flex';
+    // Install Esc-to-close once
+    if (!this._hubOverlayEscWired) {
+      document.addEventListener('keydown', (ev) => {
+        const m = document.getElementById('hub-modal');
+        if (ev.key === 'Escape' && m && m.style.display === 'flex') {
+          this.closeHubOverlay();
+        }
+      });
+      this._hubOverlayEscWired = true;
+    }
+    // Render the screen content into the panel
+    if (typeof renderFn === 'function') renderFn(panel);
+  },
+
+  closeHubOverlay() {
+    const modal = document.getElementById('hub-modal');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.innerHTML = '';
+    }
+    const wrap = document.getElementById('hub-wrapper');
+    if (wrap) {
+      wrap.style.filter = '';
+      wrap.style.pointerEvents = '';
+    }
+  },
+
+  // ── Full-page Hub screen (sidebar stays mounted, content area swaps) ──
+  // Hub-level screens render into the Hub content area, replacing the
+  // dashboard tiles. The Hub sidebar stays mounted and interactive on the
+  // left so the operator can navigate to other Hub items. The Hub topbar
+  // gets rewritten to show "TITLE | Back to Dashboard" mirroring the module
+  // shell pattern (e.g., "PROFIT AUDIT | Back to Dashboard" inside the
+  // Profit Recovery system).
+  //
+  // Call signature:
+  //   App.openHubFullPage('Bar Cop Audit', mount => renderFn(mount), 'bar-cop-audit');
+  //
+  // The third arg is the sidebar action key (data-hub-action) so we can
+  // light up the matching nav item. Back to Dashboard re-renders the Hub
+  // via App.showHub(), restoring the default topbar (bar name + date) and
+  // putting the active state back on "The Hub".
+  openHubFullPage(title, renderFn, activeAction) {
+    // Backward-compat: caller can pass just renderFn if title is unused.
+    if (typeof title === 'function') { renderFn = title; title = ''; }
+    const wrap = document.getElementById('hub-wrapper');
+    const wrapVisible = wrap && wrap.style.display !== 'none';
+    if (!wrapVisible) this.showHub();
+    const content = document.querySelector('.hub-app .content');
+    if (!content) {
+      this.openHubOverlay(renderFn);
+      return;
+    }
+    // The Hub Dashboard overrides .content to padding:24px. Module screens
+    // render into a .content with no padding (.screen adds its own).
+    // Reset padding to 0 for full-page screens so the .screen wrapper inside
+    // them controls spacing the same way module screens do.
+    content.style.padding = '0';
+    // Update the Hub topbar to show the page title. We preserve the existing
+    // hamburger button that hub.js rendered into topbar-left (so the operator
+    // can open the sidebar from any Hub-level screen on mobile) and only swap
+    // the title text + clear the date subtitle. If the hamburger is missing
+    // for any reason, we inject one and wire its click handler.
+    const topbarLeft = document.querySelector('.hub-app .topbar .topbar-left');
+    if (topbarLeft && title) {
+      let hamburger = topbarLeft.querySelector('.topbar-hamburger');
+      if (!hamburger) {
+        hamburger = document.createElement('button');
+        hamburger.className = 'topbar-hamburger';
+        hamburger.id = 'hub-topbar-hamburger';
+        hamburger.setAttribute('aria-label', 'Open sidebar');
+        hamburger.type = 'button';
+        hamburger.innerHTML = '<svg viewBox="0 0 17 17" fill="none"><rect x="2" y="4" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="8" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="12" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>';
+        hamburger.addEventListener('click', () => {
+          document.querySelector('.hub-app')?.classList.toggle('sidebar-open');
+        });
+        topbarLeft.insertBefore(hamburger, topbarLeft.firstChild);
+      }
+      // Update the title element (the <h1 class="topbar-title"> rendered by
+      // hub.js) and clear the date subtitle so it does not flash old content
+      // while the operator is on a Hub-level page.
+      let titleEl = topbarLeft.querySelector('.topbar-title');
+      if (titleEl) {
+        titleEl.textContent = title;
+      } else {
+        titleEl = document.createElement('div');
+        titleEl.className = 'topbar-title';
+        titleEl.textContent = title;
+        topbarLeft.appendChild(titleEl);
+      }
+      const subEl = topbarLeft.querySelector('.topbar-sub');
+      if (subEl) subEl.textContent = '';
+    }
+    // Clear topbar-right so prior screen actions don't bleed across.
+    const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
+    if (topbarRight) topbarRight.innerHTML = '';
+    // Light up the matching sidebar entry so the operator can see at a
+    // glance which Hub section they are in.
+    if (activeAction) this.setActiveHubNav(activeAction);
+    // Hand the screen the content element directly so .screen wrapper
+    // padding behaves identically to module screens.
+    content.innerHTML = '';
+    if (typeof renderFn === 'function') renderFn(content);
+  },
+
+  // Inject screen-specific action buttons into the Hub topbar-right area
+  // (mirrors how module screens set this.actions.innerHTML during render).
+  // Pass HTML for the buttons; wire click handlers from the screen after.
+  setHubTopbarActions(actionsHtml) {
+    const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
+    if (topbarRight) topbarRight.innerHTML = actionsHtml || '';
+  },
+
+  // Toggle the .active class on the Hub sidebar nav item whose data-hub-action
+  // matches the given key. Pass null to clear all. CSS at .nav-item.active
+  // paints the gold icon and white label that signals "you are here."
+  setActiveHubNav(action) {
+    document.querySelectorAll('.hub-app .nav-item').forEach(el => el.classList.remove('active'));
+    if (!action) return;
+    const el = document.querySelector('.hub-app .nav-item[data-hub-action="' + action + '"]');
+    if (el) el.classList.add('active');
+  },
+
+  // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
+  // Renders a dropdown in the topbar showing all bars the user belongs to.
+  // Hidden when the user has only one account. Switching reloads the page so
+  // every cached data structure starts fresh under the new account context.
+  // Called from boot(), showApp(), and the Hub render.
+  async renderAccountSwitcher() {
+    if (!window.DB || !DB.listMyAccounts) return;
+    const accounts = await DB.listMyAccounts();
+    const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
+    const isMulti  = !!(accounts && accounts.length > 1);
+    // Both topbars (module + hub) have their own switcher slot -- populate both
+    ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
+      const slot = document.getElementById(slotId);
+      if (!slot) return;
+      if (!isMulti) {
+        slot.style.display = 'none';
+        slot.innerHTML = '';
+        return;
+      }
+      const active = accounts.find(a => a.id === activeId) || accounts[0];
+      const options = accounts.map(a => {
+        const sel = a.id === active.id ? ' selected' : '';
+        return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
+      }).join('');
+      slot.style.display = 'flex';
+      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:14px;';
+      slot.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Viewing</span>'
+        + '<select class="acct-switcher" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--w);font-family:inherit;font-size:12px;font-weight:600;padding:6px 10px;cursor:pointer;outline:none;">' + options + '</select>';
+      const sel = slot.querySelector('.acct-switcher');
+      sel.addEventListener('change', (ev) => {
+        const newId = ev.target.value;
+        if (newId && newId !== active.id) DB.setActiveAccount(newId);
+      });
+    });
+    // Group Dashboard button -- multi-loc only. Mounts in both topbars so the
+    // operator can pop the cross-bar comparison from any screen without losing
+    // their current context. Opens as a modal overlay, not a full-page route.
+    ['topbar-group-dashboard', 'hub-topbar-group-dashboard'].forEach(slotId => {
+      const slot = document.getElementById(slotId);
+      if (!slot) return;
+      if (!isMulti) {
+        slot.style.display = 'none';
+        slot.innerHTML = '';
+        return;
+      }
+      slot.style.cssText = 'display:flex;align-items:center;margin-right:14px;';
+      slot.innerHTML = '<button class="btn btn-ghost btn-sm" id="' + slotId + '-btn" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Group Dashboard</button>';
+      slot.querySelector('button')?.addEventListener('click', () => {
+        if (window.S && S.HubGroupDashboard) S.HubGroupDashboard.open();
+      });
+    });
+    // Sidebar multi-loc slots (mobile-only via CSS). Location switcher only
+    // -- Group Dashboard is intentionally not exposed on mobile because the
+    // 8-column comparison table does not fit on a phone screen. Multi-loc
+    // operators on a phone can still switch bars from here; comparison view
+    // stays a desktop tool.
+    ['sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
+      const slot = document.getElementById(slotId);
+      if (!slot) return;
+      if (!isMulti) { slot.innerHTML = ''; return; }
+      const active = accounts.find(a => a.id === activeId) || accounts[0];
+      const options = accounts.map(a => {
+        const sel = a.id === active.id ? ' selected' : '';
+        return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
+      }).join('');
+      slot.innerHTML = '<div class="sidebar-multi-loc-label">Viewing</div>'
+        + '<select class="smm-switcher">' + options + '</select>';
+      const sel = slot.querySelector('.smm-switcher');
+      sel?.addEventListener('change', (ev) => {
+        const newId = ev.target.value;
+        if (newId && newId !== active.id) DB.setActiveAccount(newId);
+      });
+    });
+  },
+
+  // ── Role-based access (Phase 2 Items 25 + 25b) ─────────────────────────────
+  // Per-screen access goes through DB's granular permission system. Each
+  // screen maps to a permission group (DB.SCREEN_GROUPS). Each non-admin user
+  // has a permissions object stored on their membership: { groupKey: 'add' |
+  // 'edit' }. Helpers here just delegate to DB. Admin sees all; Viewer sees
+  // all read-only; Staff sees only what their permissions grant.
+  // Hub-level always-accessible screens (settings, getting-started, etc.) are
+  // listed separately because they're not in SCREEN_GROUPS.
+  HUB_ALWAYS: new Set(['hub-help', 'hub-support', 'hub-report-bug']),
+
+  canAccess(screenId) {
+    if (this.HUB_ALWAYS.has(screenId)) return true;
+    return (window.DB && DB.screenAllowed) ? DB.screenAllowed(screenId) : true;
+  },
+
+  canSeeModule(module) {
+    // A module is visible if the user has access to at least one screen in it.
+    if (!window.DB || !DB.SCREEN_GROUPS) return true;
+    for (const [screen, group] of Object.entries(DB.SCREEN_GROUPS)) {
+      const prefix = screen.split('-')[0];
+      const moduleOfScreen = (prefix === 'ic') ? 'inventory'
+        : (prefix === 'lc') ? 'labor'
+        : (prefix === 'sc') ? 'shift'
+        : (prefix === 'r') ? 'revenue'
+        : (prefix === 't') ? 'traffic'
+        : 'profit';
+      if (moduleOfScreen === module && DB.screenAllowed(screen)) return true;
+    }
+    return false;
+  },
+
+  canWrite() {
+    return !(window.DB && DB.role && DB.role() === 'viewer');
+  },
+
+  canEdit(screen) {
+    return (window.DB && DB.screenCanEdit) ? DB.screenCanEdit(screen) : true;
+  },
+
+  canAdd(screen) {
+    return (window.DB && DB.screenCanAdd) ? DB.screenCanAdd(screen) : true;
+  },
+
+  // Staff Hub tiles: one per permission group, in display order.
+  // Used by showStaffHub() to render the staff landing page.
+  STAFF_TILES: [
+    // Inventory Control
+    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-dashboard',         moduleName:'Inventory Control' },
+    { group:'take-inventory',      label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
+    { group:'receive-delivery',    label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
+    { group:'place-orders',        label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
+    { group:'spot-check',          label:'Spot Check',               module:'inventory', screen:'ic-spot-check',        moduleName:'Inventory Control' },
+    { group:'manage-products',     label:'Manage Products & Vendors',module:'inventory', screen:'ic-product-setup',     moduleName:'Inventory Control' },
+    { group:'inventory-reports',   label:'Inventory Reports',        module:'inventory', screen:'ic-report-stock',      moduleName:'Inventory Control' },
+    // Labor Control
+    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-dashboard',         moduleName:'Labor Control' },
+    { group:'log-hours',           label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
+    { group:'log-tips',            label:'Log Tips',                 module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
+    { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
+    { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
+    { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster',      moduleName:'Labor Control' },
+    { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
+    { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
+    // Shift Control
+    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
+    { group:'log-shift',           label:'Log Shift',                module:'shift',     screen:'sc-log-shift',         moduleName:'Shift Control' },
+    { group:'active-shift',        label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
+    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-drop',         moduleName:'Shift Control' },
+    { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-opening-checklist', moduleName:'Shift Control' },
+    { group:'86-list',             label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
+    { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
+    { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
+    { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
+    { group:'shift-reports',       label:'Shift Reports',            module:'shift',     screen:'sc-reports-shift',     moduleName:'Shift Control' },
+    // Recovery
+    { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
+    { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
+    { group:'traffic-recovery',    label:'Traffic Recovery',         module:'traffic',   screen:'t-dashboard',          moduleName:'Traffic Recovery' }
+  ],
+
+  // Pick the first accessible screen as a non-admin user's landing.
+  // Falls back to ic-take-inventory if nothing matches (shouldn't happen for
+  // a properly-permissioned staff user).
+  staffLanding() {
+    for (const t of this.STAFF_TILES) {
+      if (this.canAccess(t.screen)) return { module: t.module, screen: t.screen };
+    }
+    return { module: 'inventory', screen: 'ic-take-inventory' };
+  },
+
+  // Staff Hub: simplified landing page with one tile per accessible screen.
+  // Replaces the real Hub (financial overview) for staff role since they
+  // shouldn't see financial data, AND gives them a way to move between the
+  // operational modules (without it they'd be stuck in one module's sidebar).
+  showStaffHub() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('ob-overlay').classList.add('hidden');
+    document.getElementById('app').classList.add('hidden');
+    let wrap = document.getElementById('hub-wrapper');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'hub-wrapper';
+      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
+      document.body.appendChild(wrap);
+    }
+    wrap.style.display = 'block';
+    wrap.style.overflowY = 'auto';
+
+    const userEmail = DB._user?.email || '';
+    const accessibleTiles = this.STAFF_TILES.filter(t => this.canAccess(t.screen));
+
+    const tiles = accessibleTiles.map(t => {
+      return '<div class="staff-tile" data-screen="' + t.screen + '" data-module="' + t.module + '" '
+        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;cursor:pointer;transition:border-color 0.15s, background 0.15s;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;">' + t.label + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:6px;letter-spacing:0.5px;">' + t.moduleName + '</div>'
+        + '</div>';
+    }).join('');
+
+    const empty = accessibleTiles.length === 0
+      ? '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;font-size:13px;color:var(--t2);line-height:1.6;">You do not have access to any sections yet. Ask the account admin to grant you access from the User Accounts page.</div>'
+      : '';
+
+    wrap.innerHTML = '<div style="max-width:880px;margin:0 auto;padding:40px 24px;">'
+      + '<div style="font-size:18px;font-weight:800;color:var(--w);letter-spacing:0.5px;margin-bottom:6px;">Welcome back</div>'
+      + (userEmail ? '<div style="font-size:12px;color:var(--t3);margin-bottom:30px;">Signed in as ' + userEmail + '</div>' : '<div style="margin-bottom:30px;"></div>')
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Your Tasks</div>'
+      + (tiles ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">' + tiles + '</div>' : empty)
+      + '<div style="margin-top:40px;padding-top:20px;border-top:1px solid var(--b2);display:flex;justify-content:flex-end;">'
+      +   '<button class="btn btn-ghost" id="staff-signout">Sign Out</button>'
+      + '</div>'
+      + '</div>';
+
+    wrap.querySelectorAll('.staff-tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const mod = tile.dataset.module;
+        const screen = tile.dataset.screen;
+        this.showApp(mod);
+        this.navigate(screen);
+      });
+      tile.addEventListener('mouseenter', () => { tile.style.borderColor = 'var(--gold)'; });
+      tile.addEventListener('mouseleave', () => { tile.style.borderColor = 'var(--b1)'; });
+    });
+    document.getElementById('staff-signout')?.addEventListener('click', async () => {
+      await DB.signOut();
+      this.showAuth();
+    });
+  },
+
+  showApp(module) {
+    // Close any open Hub overlay modal before entering a module view
+    this.closeHubOverlay && this.closeHubOverlay();
+    if (!this.canSeeModule(module)) {
+      // Staff trying to enter a non-operational module — bounce to their landing
+      const land = this.staffLanding();
+      module = land.module;
+      this._pendingStaffRedirect = land.screen;
+    }
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('ob-overlay').classList.add('hidden');
+    document.getElementById('auth-screen').style.display = 'none';
+    const hw = document.getElementById('hub-wrapper');
+    if (hw) hw.style.display = 'none';
+    // Swap sidebar nav based on module
+    this._activeModule = module || this._activeModule || 'profit';
+    this._renderNav(this._activeModule);
+    this.renderAccountSwitcher();
+    if (this._pendingStaffRedirect) {
+      const target = this._pendingStaffRedirect;
+      this._pendingStaffRedirect = null;
+      setTimeout(() => this.navigate(target), 0);
+    }
+  },
+
+  _activeModule: 'profit',
+
+  _renderNav(module) {
+    const nav = document.getElementById('sidebar-nav');
+    if (!nav) return;
+    if (module === 'revenue') {
+      nav.innerHTML = Revenue.navHTML();
+    } else if (module === 'traffic') {
+      nav.innerHTML = Traffic.navHTML();
+    } else if (module === 'inventory') {
+      nav.innerHTML = Inventory.navHTML();
+    } else if (module === 'shift') {
+      nav.innerHTML = Shift.navHTML();
+    } else if (module === 'labor') {
+      nav.innerHTML = Labor.navHTML();
+    } else {
+      nav.innerHTML = ProfitNav.html();
+    }
+    // Rewire nav click handlers, filtering out items the current role can't access
+    nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
+      if (!App.canAccess(el.dataset.screen)) {
+        el.style.display = 'none';
+      } else {
+        el.addEventListener('click', () => {
+          // Close the mobile sidebar after the click so the navigated screen
+          // gets full width on phones. No-op on desktop where the class is
+          // never set.
+          document.getElementById('app')?.classList.remove('sidebar-open');
+          App.navigate(el.dataset.screen);
+        });
+      }
+    });
+    nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
+      el.addEventListener('click', () => App.showHub());
+    });
+    // Report a Bug opens the shared bug-report flow (same as the Hub sidebar).
+    nav.querySelectorAll('.nav-item[data-nav="report-bug"]').forEach(el => {
+      el.addEventListener('click', () => {
+        document.getElementById('app')?.classList.remove('sidebar-open');
+        if (window.S && S.HubReportBug && S.HubReportBug.open) S.HubReportBug.open();
+      });
+    });
+    // Hide section headers with no visible items below them
+    nav.querySelectorAll('.nav-section').forEach(sec => {
+      let hasVisible = false;
+      let sib = sec.nextElementSibling;
+      while (sib && !sib.classList.contains('nav-section')) {
+        if (sib.classList.contains('nav-item') && sib.style.display !== 'none') {
+          hasVisible = true; break;
+        }
+        sib = sib.nextElementSibling;
+      }
+      if (!hasVisible) sec.style.display = 'none';
+    });
+  },
+
+  // Which module a screen id belongs to (by prefix; profit screens have none)
+  _moduleOf(id) {
+    if (/^ic-/.test(id)) return 'inventory';
+    if (/^lc-/.test(id)) return 'labor';
+    if (/^sc-/.test(id)) return 'shift';
+    if (/^r-/.test(id))  return 'revenue';
+    if (/^t-/.test(id))  return 'traffic';
+    return 'profit';
+  },
+
+  // Navigate to any screen, switching the active module first if needed.
+  // The deep-link target of every Fix Layer step and every Getting Started Go button.
+  openScreen(id) {
+    if (!id) return;
+    // Hub-owned screens open as modal overlays, not as module screens.
+    // navigate() already handles these but we still need to short-circuit so
+    // showApp isn't called (which would briefly flash a module shell).
+    if (id === 'settings') { S.HubSettings.open(); return; }
+    if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
+    const mod = this._moduleOf(id);
+    // Show the app shell if we're not already in it (e.g., coming from a Hub
+    // overlay modal, where the app shell is hidden). showApp also closes any
+    // open overlay so the user actually sees the navigated screen.
+    const appHidden = document.getElementById('app')?.classList.contains('hidden');
+    if (mod !== this._activeModule || appHidden) this.showApp(mod);
+    this.navigate(id);
+  },
+
+  // ── Breadcrumb back-link state ───────────────────────────────────────────
+  // The topbar shows "[Page Title] | Back to [last page]" so the operator can
+  // jump back to the last location with a single click, no matter how deep
+  // the cross-module deep-link took them. Browser back also walks the
+  // history stack pushed below.
+  _currentLocation: null,
+  _previousLocation: null,
+  _navigationLock: false,
+
+  _pushHistory(loc) {
+    if (this._navigationLock) return;
+    try { history.pushState({ screen: loc.screen, module: loc.module, mode: loc.mode }, ''); }
+    catch (e) { /* ignore history failures */ }
+  },
+
+  _updateBackLink() {
+    // Inline back link removed. Sidebar nav (including The Hub entry) handles
+    // navigation; the topbar carries the page title only. _previousLocation
+    // is still tracked because other systems read it (bug report context,
+    // forward-alerts deep-link target labels, etc.).
+    const sub = document.getElementById('topbar-sub');
+    if (sub) sub.innerHTML = '';
+  },
+
+  _goBackOne() {
+    if (!this._previousLocation) return;
+    const t = this._previousLocation;
+    if (t.mode === 'hub') {
+      this.showHub();
+    } else {
+      if (t.module && t.module !== this._activeModule) this.showApp(t.module);
+      this.navigate(t.screen);
+    }
+  },
+
+  _recordLocation(newLoc) {
+    // Same location as before — just refresh the back link (label may have
+    // changed) without rotating previous/current.
+    const cur = this._currentLocation;
+    if (cur && cur.mode === newLoc.mode && cur.module === newLoc.module && cur.screen === newLoc.screen) {
+      this._currentLocation = newLoc;
+      this._updateBackLink();
+      return;
+    }
+    this._previousLocation = this._currentLocation;
+    this._currentLocation = newLoc;
+    this._updateBackLink();
+    this._pushHistory(newLoc);
+  },
+
+  _afterNavigate(id) {
+    const title = document.getElementById('topbar-title')?.textContent || id;
+    this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
+  },
+
+  showAuth() {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('ob-overlay').classList.add('hidden');
+    const hw = document.getElementById('hub-wrapper');
+    if (hw) hw.style.display = 'none';
+    // Show success banner if landing from Stripe checkout
+    const params = new URLSearchParams(window.location.search);
+    const banner = document.getElementById('checkout-success-msg');
+    if (banner) banner.style.display = params.get('checkout') === 'success' ? 'block' : 'none';
+    // Clean up the URL
+    if (params.get('checkout')) window.history.replaceState({}, '', '/');
+  },
+
+  // Both save paths persist config only: the 19 unbounded recovery/hub logs
+  // live row-per-record in core_events now (see EVENT_STORES.core), so the
+  // user_data blob never re-stores them. saveKey's `key` is already mutated on
+  // this.data by the caller; we just write the stripped blob. Every event
+  // write-site goes through putRecord/removeRecord instead.
+  async save() {
+    const r = await DB.writeData(this._configBlob('core', this.data));
+    if (!r.ok) console.error('Save failed:', r.error);
+    return r.ok;
+  },
+
+  async saveKey(key) {
+    const r = await DB.writeData(this._configBlob('core', this.data));
+    if (!r.ok) console.error('saveKey failed:', r.error);
+    return r.ok;
+  },
+
+  // Mark a Hub Getting Started task as complete. Called from every save
+  // handler that corresponds to a setup task — saving targets, generating
+  // an audit, logging a shift, etc. Idempotent: re-calling on an already-
+  // done task is a no-op so callers can be liberal.
+  markSetupDone(taskId) {
+    if (!taskId || !this.data) return;
+    this.data.hub_setup_progress = this.data.hub_setup_progress || {};
+    if (this.data.hub_setup_progress[taskId]) return;
+    this.data.hub_setup_progress[taskId] = new Date().toISOString();
+    this.saveKey('hub_setup_progress');
+  },
+
+  // Is setup "meaningful enough" to default-land on the Hub Dashboard? Yes
+  // once Foundation is complete (profile + targets) AND at least one audit
+  // has run. Below that threshold, returning users default-land on Hub
+  // Getting Started so they have a clear next action. Catch-up banner on
+  // the Hub Dashboard handles the manual-navigation case for partial setups.
+  setupMeetsThreshold() {
+    if (!this.data) return false;
+    // Operator explicitly dismissed the Getting Started auto-redirect.
+    if (this.data.settings && this.data.settings.gs_dismissed) return true;
+    const p = this.data.hub_setup_progress || {};
+    // Count how many setup items the operator has actually checked off.
+    const checkedCount = Object.keys(p).filter(k => k.indexOf('gs_') === 0 && p[k]).length;
+    // Lenient path: 3+ items checked = operator is engaged, stop forcing them
+    // back to Getting Started on every signin. (Onboarding auto-checks one
+    // item on landing, so this is really "2 more clicks" to dismiss.)
+    if (checkedCount >= 3) return true;
+    // Strict path: Profile + Targets + at least one Audit (the original rule).
+    if (!p.gs_profile || !p.gs_targets) return false;
+    return !!(p.gs_p_audit || p.gs_r_audit || p.gs_t_audit);
+  },
+
+  // Load Recovery data plus the three Control data stores (Rule 21)
+  async loadAllData() {
+    this.data          = await DB.readData();
+    this.inventoryData = await DB.readInventoryData();
+    this.laborData     = await DB.readLaborData();
+    this.shiftData     = await DB.readShiftData();
+    // Inventory + Shift event logs live row-per-record now; fill them from the
+    // rolling window after the config blobs load. (Inventory: counts,
+    // deliveries, orders, transfers, empties, adjustments, spot checks. Shift:
+    // shifts, void/comps, cash drops, variances, safe log, 86 list,
+    // maintenance, walked tabs, incidents, waste, checklist runs.)
+    await this.loadEventStores('ic');
+    await this.loadEventStores('sc');
+    await this.loadEventStores('lc');
+    // Core / Recovery event logs (Profit pass): weeks, theft scores, variance
+    // investigations, vendor discrepancies, audits -> core_events rows.
+    await this.loadEventStores('core');
+    // Pre-fetch the accounts list so the Hub sidebar can render the
+    // Locations section synchronously (multi-account users only).
+    if (DB.listMyAccounts) { await DB.listMyAccounts(); }
+  },
+
+  // Convert a delivery line_items[i] entry to total bottles. Used wherever
+  // Container-unit quantity from a delivery line. The canonical inventory unit
+  // for every category is the container it is ordered, received and counted in:
+  // a CASE for bottle beer, a bottle for liquor/wine, a keg for draft, the stock
+  // unit for food. Delivery line qty is always stored in that container unit, so
+  // this is a straight read (bottle beer qty is in cases, not bottles).
+  unitsFromDeliveryLine(li) {
+    if (!li) return 0;
+    return parseFloat(li.qty) || 0;
+  },
+
+  // Every location a product is stocked in. Products carry a locations[]
+  // array (a SKU can live in many spots — walk-in, main bar, back bar, tubs).
+  // Back-compat: products created before multi-location only have a single
+  // primary_location, so fall back to that. Returns [] if neither is set.
+  // Used by counting (a product appears under each of its locations) and by
+  // every on-hand reader (which sums the product's per-location count lines).
+  productLocations(p) {
+    if (!p) return [];
+    if (Array.isArray(p.locations) && p.locations.length) return p.locations.slice();
+    return p.primary_location ? [p.primary_location] : [];
+  },
+
+  // Shared modal/popup host. Renders `html` into a fixed full-screen overlay so
+  // a form can pop OVER the current page instead of swapping it out. `layer`
+  // sets z-index: 9000 for a base popup, 9100 for one opened from inside
+  // another popup (keeps nested modals stacking correctly). Returns the overlay.
+  openModal(html, opts) {
+    opts = opts || {};
+    const id = opts.id || 'app-modal';
+    const layer = opts.layer || 9000;
+    let host = document.getElementById('app-modal-host');
+    if (!host) { host = document.createElement('div'); host.id = 'app-modal-host'; document.body.appendChild(host); }
+    const old = document.getElementById(id);
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(0,0,0,0.7);'
+      + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 16px;';
+    // Always-visible corner X so the popup closes without scrolling to a button.
+    const closeX = opts.noClose ? '' : '<button type="button" class="app-modal-x" aria-label="Close" '
+      + 'style="position:absolute;top:-4px;right:0;width:32px;height:32px;border:1px solid var(--b1);border-radius:6px;'
+      + 'background:var(--surface);color:var(--t2);font-size:20px;line-height:1;cursor:pointer;z-index:2;">&times;</button>';
+    overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;position:relative;">' + closeX + html + '</div>';
+    host.appendChild(overlay);
+    const x = overlay.querySelector('.app-modal-x');
+    if (x) x.addEventListener('click', () => App.closeModal(id));
+    return overlay;
+  },
+  closeModal(id) {
+    const el = document.getElementById(id || 'app-modal');
+    if (el) el.remove();
+  },
+
+  // Display unit for a product's Par / Order Qty / On-Hand columns. Bottle beer
+  // pars/orders in cases, draft in kegs, liquor/wine in bottles; Food/Misc use
+  // the product's unit_type (lb, each, case, qt…). Keeps every category's
+  // quantity columns labeled the same way instead of baking the unit into the
+  // product name.
+  productUnit(p) {
+    if (!p) return '';
+    if (p.category === 'Bottle Beer') return 'cases';
+    if (p.category === 'Draft Beer')  return 'kegs';
+    if (p.category === 'Liquor' || p.category === 'Wine') return 'btls';
+    return p.unit_type || '';
+  },
+
+  // Per-bottle cost for any product. For case-tracked Bottle Beer (case_size
+  // > 0), unit_cost is stored as cost-per-case; divide by case_size to get
+  // per-bottle. For everything else unit_cost is already per single
+  // container, so pass through. Used everywhere inventory math multiplies
+  // bottle counts by a cost (usage cost, COGS, stock value, variance dollars,
+  // spot check, books inventory valuation).
+  bottleCost(p) {
+    if (!p || p.unit_cost == null) return null;
+    const cost = parseFloat(p.unit_cost);
+    if (isNaN(cost)) return null;
+    if (p.category === 'Bottle Beer' && p.case_size && p.case_size > 0) {
+      return cost / p.case_size;
+    }
+    return cost;
+  },
+
+  // Per-CONTAINER cost for inventory math (on-hand value, usage cost, COGS,
+  // variance dollars, stock value, vendor watch, top movers, books valuation).
+  // unit_cost is stored per container for EVERY category — per case for bottle
+  // beer, per bottle for liquor/wine, per keg for draft, per stock unit for food
+  // — so this is a straight read. The ONLY place a per-bottle cost is used is the
+  // menu, because a beer is sold by the bottle: see bottleCost (menuItemCost,
+  // recipes, spot-check pour variance, waste).
+  unitCost(p) {
+    if (!p || p.unit_cost == null) return null;
+    const c = parseFloat(p.unit_cost);
+    return isNaN(c) ? null : c;
+  },
+  // Per-container cost resolved from a count-item snapshot. Used when the source
+  // product was deleted/disabled and we fall back to the unit_cost saved on the
+  // count item (already per container).
+  unitCostFromCountItem(it) {
+    if (!it || it.unit_cost == null) return null;
+    const c = parseFloat(it.unit_cost);
+    return isNaN(c) ? null : c;
+  },
+
+  // True when a product is case-tracked bottle beer. The single predicate every
+  // inventory screen should use instead of re-checking category + case_size.
+  isCaseBeer(p) {
+    return !!(p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0);
+  },
+
+  // Format a quantity with the product's container unit, e.g. "3.3 cases",
+  // "12 btls", "2 kegs", "40 lb". Keeps every quantity column labeled so a
+  // number is never ambiguous about which unit it is in. decimals defaults to a
+  // tidy 1 place for fractional values, whole numbers print without a decimal.
+  qtyWithUnit(p, n, decimals) {
+    if (n == null || isNaN(n)) return '-';
+    const num = Number(n);
+    const txt = (num % 1 === 0) ? String(num) : num.toFixed(decimals == null ? 1 : decimals);
+    const u = this.productUnit(p);
+    return u ? (txt + ' ' + u) : txt;
+  },
+
+  // Shared usage builder for the count-pair reports (Usage, Variance, Top
+  // Movers, Dynamic Pars, Dashboard). Returns a per-product map of the raw
+  // building blocks in CONTAINER units (cases for bottle beer, bottles for
+  // liquor/wine, kegs for draft, stock unit for food). Each report layers its
+  // own policy on top: floor at zero, subtract comps/waste (Variance only),
+  // derive theoretical sales, etc. Centralizing this kills the unit drift that
+  // came from five separate copies of the same math.
+  //   start/end : ic_counts records (start older, end newer)
+  //   deliveries: ic_deliveries (purchases dated in (start.date, end.date])
+  // Per product: { product, name, category, starting, ending, purchases,
+  //   rawUsed (= starting + purchases - ending, NOT floored), unitCost (per
+  //   container, null if unknown), isCaseBeer, servingsPerUnit (bottles per case
+  //   for beer, pours_per_container otherwise), ozPerUnit }.
+  computeUsagePair(start, end, deliveries) {
+    const out = {};
+    const sMap = {}, eMap = {};
+    ((start && start.items) || []).forEach(it => {
+      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
+      else sMap[it.product_id] = { ...it };
+    });
+    ((end && end.items) || []).forEach(it => {
+      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
+      else eMap[it.product_id] = { ...it };
+    });
+    const purch = {};
+    (deliveries || [])
+      .filter(d => d.date && start && end && d.date > start.date && d.date <= end.date)
+      .forEach(d => (d.line_items || []).forEach(li => {
+        purch[li.product_id] = (purch[li.product_id] || 0) + this.unitsFromDeliveryLine(li);
+      }));
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    Object.keys(eMap).forEach(pid => {
+      if (!sMap[pid]) return;
+      const ei = eMap[pid], si = sMap[pid];
+      const p = prods.find(x => x.id === pid) || {};
+      const starting  = parseFloat(si.total) || 0;
+      const ending    = parseFloat(ei.total) || 0;
+      const purchases = purch[pid] || 0;
+      const isCaseBeer = this.isCaseBeer(p);
+      const unitCost = (p.unit_cost != null) ? this.unitCost(p) : this.unitCostFromCountItem(ei);
+      const servingsPerUnit = isCaseBeer ? p.case_size : (p.pours_per_container || null);
+      const ozPerUnit = isCaseBeer
+        ? (p.container_size_oz != null ? p.case_size * p.container_size_oz : null)
+        : (p.container_size_oz != null ? p.container_size_oz : null);
+      out[pid] = {
+        product: p, name: ei.name || p.name || '(unnamed)', category: ei.category || p.category || '',
+        starting, ending, purchases, rawUsed: starting + purchases - ending,
+        unitCost: unitCost != null ? unitCost : null,
+        isCaseBeer, servingsPerUnit, ozPerUnit
+      };
+    });
+    return out;
+  },
+
+  // Staff picker <option> markup. Used by every form that asks for a person
+  // (manager, cashier, server, witness, recorded-by, etc.) so the operator
+  // picks from the roster instead of free-typing a name that might not
+  // match anyone. Returns option HTML; caller wraps in <select id=...>.
+  //
+  // selectedId can be either a staff_id (preferred, post-Phase-0) or a
+  // legacy name string from records that pre-date the staff_id field. The
+  // helper resolves a legacy name to its staff_id automatically and selects
+  // that option, so edit-mode forms preselect the right person.
+  //
+  // opts:
+  //   placeholder   First-option label. Default: "Select staff..."
+  //   optional      If true, placeholder reads as the empty pick.
+  //   filter        Function(staff) returning bool. Limit to a subset
+  //                 (e.g., only managers, only tipped staff).
+  //
+  // App.staffById(id) resolves an id back to the staff record at save time.
+  staffOptions(selectedId, opts) {
+    opts = opts || {};
+    const roster = ((this.laborData && this.laborData.lc_staff) || []);
+    const all = roster.filter(s => s.status !== 'Inactive');
+    const filtered = opts.filter ? all.filter(opts.filter) : all;
+
+    const positions = ((this.laborData && this.laborData.lc_positions) || []);
+    const posNameOf = pid => (positions.find(p => p.id === pid) || {}).name || 'Other';
+
+    // Resolve legacy name → id so old records preselect correctly.
+    let resolvedId = selectedId || '';
+    if (resolvedId && !filtered.some(s => s.id === resolvedId)) {
+      const byName = filtered.find(s => s.name === resolvedId);
+      if (byName) resolvedId = byName.id;
+    }
+
+    const groups = {};
+    filtered.forEach(s => {
+      const p = posNameOf(s.position_id);
+      if (!groups[p]) groups[p] = [];
+      groups[p].push(s);
+    });
+    const order = ['Manager', 'Bartender', 'Barback', 'Server', 'Host', 'Line Cook', 'Prep Cook'];
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const ai = order.indexOf(a), bi = order.indexOf(b);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    });
+
+    let h = '<option value="">' + esc(opts.placeholder || 'Select staff...') + '</option>';
+    groupKeys.forEach(g => {
+      h += '<optgroup label="' + esc(g) + '">';
+      groups[g].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
+        h += '<option value="' + esc(s.id) + '"' + (resolvedId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+      });
+      h += '</optgroup>';
+    });
+
+    // Preserve a selected value that isn't in the active/filtered list so the
+    // operator never loses the record's staff link on edit: an inactive (or
+    // otherwise off-list) staff member shows their real name + "(inactive)"; a
+    // true legacy free-text value shows "(not on roster)". A legacy name that
+    // resolves to a real staff member is normalized to that id on the option.
+    if (selectedId && !filtered.some(s => s.id === selectedId) && !filtered.some(s => s.name === selectedId)) {
+      const off = roster.find(s => s.id === selectedId || s.name === selectedId);
+      const label = off ? (off.name + (off.status === 'Inactive' ? ' (inactive)' : '')) : (selectedId + ' (not on roster)');
+      h += '<option value="' + esc(off ? off.id : selectedId) + '" selected>' + esc(label) + '</option>';
+    }
+
+    return h;
+  },
+
+  // Resolve a staff_id (or legacy name) to the staff record. Save handlers
+  // call this to denormalize the picked staff into a name field for display
+  // alongside the id for joins.
+  staffById(id) {
+    if (!id) return null;
+    const list = ((this.laborData && this.laborData.lc_staff) || []);
+    return list.find(s => s.id === id) || list.find(s => s.name === id) || null;
+  },
+
+  // Resolve cash variance tolerance for a given shift record. Looks up in
+  // priority order: per-shift override → per-shift-type default → overall
+  // default → legacy 10. Every cash-related screen calls this so changes to
+  // the lookup logic land in one place.
+  cashToleranceForShift(shift) {
+    if (shift && shift.cash_tolerance != null && shift.cash_tolerance !== '') {
+      const n = parseFloat(shift.cash_tolerance);
+      if (!isNaN(n)) return n;
+    }
+    const ss = (this.shiftData && this.shiftData.settings) || {};
+    if (shift && shift.shift_type && ss.tolerances_by_type && ss.tolerances_by_type[shift.shift_type] != null) {
+      const n = parseFloat(ss.tolerances_by_type[shift.shift_type]);
+      if (!isNaN(n)) return n;
+    }
+    if (ss.cash_tolerance != null) {
+      const n = parseFloat(ss.cash_tolerance);
+      if (!isNaN(n)) return n;
+    }
+    return 10;
+  },
+
+  // Drawer / register <option> markup for cash forms. Same pattern as
+  // staffOptions: handles legacy free-text values, sorts alphabetical,
+  // appends "(unsaved)" for any value not on the saved list so historical
+  // records do not lose their drawer association on edit.
+  drawerOptions(selectedId, opts) {
+    opts = opts || {};
+    const all = ((this.shiftData && this.shiftData.sc_drawers) || [])
+      .filter(d => d.active !== false);
+
+    let resolvedId = selectedId || '';
+    if (resolvedId && !all.some(d => d.id === resolvedId)) {
+      const byName = all.find(d => d.name === resolvedId);
+      if (byName) resolvedId = byName.id;
+    }
+
+    let h = '<option value="">' + esc(opts.placeholder || 'Select drawer...') + '</option>';
+    all.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(d => {
+      h += '<option value="' + esc(d.id) + '"' + (resolvedId === d.id ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+    });
+
+    if (selectedId && !all.some(d => d.id === selectedId) && !all.some(d => d.name === selectedId)) {
+      h += '<option value="' + esc(selectedId) + '" selected>' + esc(selectedId) + ' (unsaved)</option>';
+    }
+    return h;
+  },
+
+  drawerById(id) {
+    if (!id) return null;
+    const list = ((this.shiftData && this.shiftData.sc_drawers) || []);
+    return list.find(d => d.id === id) || list.find(d => d.name === id) || null;
+  },
+
+  // Canonical shift types. Every consumer reads from here so the list never
+  // drifts. Previously this list was duplicated as a fallback in 11
+  // different files, which would silently desync the moment one changed.
+  SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+
+  // Overtime thresholds — federal 40 hr/week; "approaching" is the UI watch
+  // line. Labor Dashboard, Overtime Watch, and Pay Periods all read from here
+  // so the number can never desync across the three screens that act on it.
+  OT_THRESHOLD: 40,
+  OT_APPROACHING: 35,
+
+  // Canonical product category groups. Replaces the duplicated BAR_CATS /
+  // KITCHEN_CATS arrays in this-week.js, bar-products.js, kitchen-products.js,
+  // and the inline isBar() check below.
+  BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
+  KITCHEN_CATS: ['Food', 'Misc'],
+
+  // Full Inventory Control product category list (the product form picker) and
+  // the Food/Misc stock-unit list. Single source so take-inventory,
+  // product-setup and the log forms never drift from each other.
+  IC_CATEGORIES: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
+  IC_FOOD_UNIT_TYPES: ['lb', 'oz', 'each', 'case', 'bag', 'gallon', 'quart', 'pint', 'dozen'],
+
+  // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
+  // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
+  VENDOR_DISCREPANCY_TYPES: ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'],
+
+  // Canonical Profit Audit section names. Used by audit-tracker.js in
+  // extractSections, viewAudit sections array, and renderNarrative sections
+  // array so the list never drifts across the three call sites.
+  AUDIT_PROFIT_SECTION_NAMES: [
+    'Bar Cost and Pour Control',
+    'Theft and Loss Prevention',
+    'Food Cost Control',
+    'Vendor Control',
+    'Prime Cost'
+  ],
+
+  // Categories on sc_void_comps records. A 30-year operator separates loss
+  // (a comp given for service recovery, a void rung in error) from policy
+  // expense (a staff meal eaten, a shift drink poured under house rules).
+  // Conflating them inflates the Theft Risk score and lies to the P&L.
+  // Loss categories feed Theft Risk; expense categories are tracked as a
+  // separate cost line in Books and Year-End.
+  VOID_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
+
+  // Menu category groupings used across Revenue Recovery (r-menu-items,
+  // r-menu-engineering, r-pricing, r-dog-test, recipe-cost-analysis).
+  // Promoted from per-file local arrays so the lists never drift.
+  // Plate-side menu categories — what the operator picks on the Plate form.
+  MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
+  // Inventory Control product categories shown as available recipe ingredients.
+  // Cocktail recipes draw from spirits, wine, beer, and the catch-all Misc bin.
+  MENU_COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
+  // Plate recipes draw from the Food category and Misc.
+  MENU_PLATE_ING_CATS: ['Food', 'Misc'],
+  // Direct-pour mapping: what IC categories show on the Inventory form,
+  // grouped by their MENU category for the picker.
+  MENU_INVENTORY_GROUPS: [
+    { menuCat: 'Beer',         icCats: ['Bottle Beer', 'Draft Beer'] },
+    { menuCat: 'Wine',         icCats: ['Wine'] },
+    { menuCat: 'NA Beverages', icCats: ['Misc'] }
+  ],
+  // Reverse map: IC product category → menu category (auto-derived on save).
+  MENU_IC_TO_CAT: {
+    'Bottle Beer': 'Beer',
+    'Draft Beer':  'Beer',
+    'Wine':        'Wine',
+    'Misc':        'NA Beverages'
+  },
+
+  // Target cost % defaults per menu category. Plate dishes target 32%,
+  // single-drink cocktails target 22%, catering targets 28%. Operators
+  // override per item; this is the default applied when a new item is created.
+  MENU_TARGET_COST_PCT: { plate: 32, cocktail: 22, catering: 28 },
+
+  // Revenue Events canonical enums.
+  EVENT_TYPES: ['Private Dining', 'Buyout', 'Catering', 'Corporate', 'Social'],
+  EVENT_STATUSES: ['Inquiry', 'Proposal Sent', 'Confirmed', 'Completed', 'Lost'],
+  // Per-status color tokens. Confirmed = blue (committed), Proposal Sent =
+  // amber (pending, watch state), Completed = gold (won), Lost = red,
+  // Inquiry = neutral. All read from the CSS palette so the colors stay
+  // consistent with the rest of Bar Cop's status system.
+  EVENT_STATUS_COLOR: {
+    'Completed':      'var(--gold)',
+    'Confirmed':      'var(--blue)',
+    'Proposal Sent':  'var(--amber)',
+    'Inquiry':        'var(--t3)',
+    'Lost':           'var(--red)'
+  },
+
+  // ── Traffic Recovery canonical enums ────────────────────────────────────
+  // Single source for every list shared across Traffic screens (t-dashboard,
+  // t-this-week, t-gbp, t-reviews, t-search, t-website, t-social, t-delivery,
+  // t-email, t-reports, t-audit), Hub Settings → Operation Links, and the
+  // Recovery Scoreboard. Promoted from per-file local arrays so the lists
+  // never drift. Mirrors the MENU_* / EVENT_* migration pattern from Revenue.
+  //
+  // Public digital platforms the operator owns or maintains a listing on.
+  // urlKey: name of the field under traffic_settings.urls (set in Hub
+  //         Settings → Operation Links).
+  TRAFFIC_PLATFORMS: [
+    { key: 'website',        label: 'Website',         urlKey: 'website',        placeholder: 'https://yourbar.com' },
+    { key: 'gbp',            label: 'Google Business Profile', urlKey: 'gbp',    placeholder: 'https://g.page/your-bar' },
+    { key: 'yelp',           label: 'Yelp',            urlKey: 'yelp',           placeholder: 'https://yelp.com/biz/your-bar' },
+    { key: 'instagram',      label: 'Instagram',       urlKey: 'instagram',      placeholder: 'https://instagram.com/yourbar' },
+    { key: 'facebook',       label: 'Facebook',        urlKey: 'facebook',       placeholder: 'https://facebook.com/yourbar' },
+    { key: 'doordash',       label: 'DoorDash',        urlKey: 'doordash',       placeholder: 'https://doordash.com/store/...' },
+    { key: 'ubereats',       label: 'Uber Eats',       urlKey: 'ubereats',       placeholder: 'https://ubereats.com/store/...' },
+    { key: 'grubhub',        label: 'Grubhub',         urlKey: 'grubhub',        placeholder: 'https://grubhub.com/restaurant/...' },
+    { key: 'ezcater',        label: 'ezCater',         urlKey: 'ezcater',        placeholder: 'https://ezcater.com/catering/...' },
+    { key: 'opentable',      label: 'OpenTable',       urlKey: 'opentable',      placeholder: 'https://opentable.com/...' },
+    { key: 'resy',           label: 'Resy',            urlKey: 'resy',           placeholder: 'https://resy.com/cities/...' },
+    { key: 'email_platform', label: 'Email Platform',  urlKey: 'email_platform', placeholder: 'https://mailchimp.com or your tool' }
+  ],
+
+  // Reusable "How this works" modal. sections = [{ h:'Header', p:['para', ...] }].
+  // A section with no h is intro paragraphs. Keeps step/explainer text off the
+  // page itself (see memory: how-this-works-pattern).
+  showHelpModal(title, sections) {
+    const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
+    const pp = t => '<p style="margin:0 0 10px;">' + t + '</p>';
+    let body = '';
+    (sections || []).forEach(s => { if (s.h) body += sh(s.h); (s.p || []).forEach(t => { body += pp(t); }); });
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
+    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
+      + '<button class="btn btn-ghost btn-sm" data-help-close>Close</button></div>'
+      + '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">' + body + '</div>';
+    m.appendChild(box);
+    const close = () => m.remove();
+    m.addEventListener('click', e => { if (e.target === m) close(); });
+    box.querySelector('[data-help-close]').addEventListener('click', close);
+    document.body.appendChild(m);
+  },
+
+  // Shared report chrome: connected "folder" tabs + the panel they open into.
+  // tabs = [[key, label, tooltipKey?], ...]. The active tab visually connects
+  // to the panel, whose header shows the active report name + Export PDF. The
+  // controls/tabs are no-print so Export targets just the report table.
+  reportTabBar(tabs, activeKey) {
+    return '<div class="rpt-tabs no-print">' + (tabs || []).map(t =>
+      '<button class="rpt-tab' + (t[0] === activeKey ? ' on' : '') + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>').join('') + '</div>';
+  },
+  reportPanel(tabs, activeKey, exportId, bodyHtml) {
+    const active = (tabs || []).find(t => t[0] === activeKey) || (tabs || [])[0] || ['', '', ''];
+    return '<div class="rpt-panel"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + esc(active[1]) + (active[2] ? ' ' + tt(active[2]) : '') + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="' + exportId + '">Export PDF</button></div>'
+      + bodyHtml + '</div>';
+  },
+
+  // Reusable empty / prerequisite state. Renders a centered card (real card
+  // styling) with one or more numbered steps: gold badge + step title + a one
+  // line description + an action button. A completed step flips its badge to a
+  // gold check and swaps the button for a Done tag, so a half-set-up operator
+  // sees exactly what is left. Renders into container and wires the buttons.
+  // opts = { title, lead, steps:[{ title, desc, btn, screen, done }] }.
+  setupCard(container, opts) {
+    opts = opts || {};
+    const steps = opts.steps || [];
+    const rows = steps.map((s, i) => {
+      const done = !!s.done;
+      const badge = '<div class="setup-num' + (done ? ' done' : '') + '">' + (done ? '&#10003;' : (i + 1)) + '</div>';
+      const action = done
+        ? '<div class="setup-done-tag">Done</div>'
+        : (s.btn && s.screen ? '<button class="btn btn-primary setup-go" data-go="' + esc(s.screen) + '">' + esc(s.btn) + '</button>' : '');
+      return '<div class="setup-step">' + badge
+        + '<div class="setup-step-body"><div class="setup-step-title">' + esc(s.title) + '</div>'
+        + (s.desc ? '<div class="setup-step-desc">' + esc(s.desc) + '</div>' : '')
+        + action + '</div></div>';
+    }).join('');
+    container.innerHTML = '<div class="screen"><div class="card setup-card">'
+      + '<div class="card-title">' + esc(opts.title || 'Get Started') + '</div>'
+      + (opts.lead ? '<div class="setup-lead">' + esc(opts.lead) + '</div>' : '')
+      + rows + '</div></div>';
+    container.onclick = ev => {
+      const go = ev.target.closest('.setup-go');
+      if (go && go.dataset.go) App.navigate(go.dataset.go);
+    };
+  },
+
+  // Collapsible form cards. The add/import forms on a landing page stay open by
+  // default; this lets the operator tuck one away once they are past setup so the
+  // list below rises up. State is a per-device view preference (localStorage),
+  // not business data, so it is never written to the account. Collapsing hides
+  // the body via CSS — the form stays mounted, so in-progress entries and the CSV
+  // importer are preserved. Usage: put collapseToggle(key) just left of How This
+  // Works in the title, wrap the card body in <div class="collapse-body">, route
+  // the page's click delegation through toggleCollapse, and call applyCollapsed
+  // after setting innerHTML.
+  _collapseKey(key) { return 'barcop_collapse_' + key; },
+  collapsed(key) {
+    try { return localStorage.getItem(this._collapseKey(key)) === '1'; } catch (e) { return false; }
+  },
+  // Standard help button. Centralized so the label and style are a one-place
+  // edit, not a per-page change. Ghost-button border kept on purpose — operators
+  // want an obvious target, not a faint link.
+  helpButton(id, label) {
+    return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
+  },
+
+  // A collapsible card header. The WHOLE header toggles the card open/closed; the
+  // chevron is just a rotating visual indicator, so the operator does not have to
+  // hit the tiny target. The help button on the right is excluded by the page's
+  // click delegation (it is checked first). One header governs a group: its own
+  // card body (wrapped in .collapse-body) plus any element tagged
+  // data-collapse-group="<key>" — e.g. the drag/drop import card below the form.
+  collapsibleCardTitle(key, titleText, rightHtml) {
+    return '<div class="card-title card-collapse-head" data-collapse-key="' + esc(key) + '" '
+      + 'style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + esc(titleText) + '</span>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      + (rightHtml || '')
+      + '</div></div>';
+  },
+  _applyCollapseState(key, isCollapsed, root) {
+    root = root || document;
+    const head = root.querySelector('.card-collapse-head[data-collapse-key="' + key + '"]');
+    const card = head ? head.closest('.card') : null;
+    if (card) card.classList.toggle('collapsed', isCollapsed);
+    root.querySelectorAll('[data-collapse-group="' + key + '"]').forEach(el => el.classList.toggle('collapse-off', isCollapsed));
+  },
+  applyCollapsed(root) {
+    root = root || document;
+    root.querySelectorAll('.card-collapse-head').forEach(head =>
+      this._applyCollapseState(head.dataset.collapseKey, this.collapsed(head.dataset.collapseKey), root));
+  },
+  toggleCollapse(head) {
+    if (!head) return;
+    const key = head.dataset.collapseKey;
+    const isCollapsed = !this.collapsed(key);
+    try {
+      if (isCollapsed) localStorage.setItem(this._collapseKey(key), '1');
+      else localStorage.removeItem(this._collapseKey(key));
+    } catch (e) { /* storage unavailable — toggle still works for this view */ }
+    this._applyCollapseState(key, isCollapsed, head.closest('.screen') || document);
+  },
+
+  // ── PDF export ─────────────────────────────────────────────────────────────
+  // Excel-style export: click -> native Save dialog (filename pre-filled) -> Save,
+  // no browser print preview. Generates the PDF client-side from the on-screen
+  // report DOM (card titles + .tbl tables + .calc tiles, skipping .no-print
+  // chrome) so one helper serves every Export button. jsPDF + autoTable are
+  // lazy-loaded from CDN the same way the XLSX import lib is.
+  _ensurePDFLib() {
+    if (this._pdfLibPromise) return this._pdfLibPromise;
+    if (window.jspdf && window.jspdf.jsPDF) { this._pdfLibPromise = Promise.resolve(); return this._pdfLibPromise; }
+    const load = src => new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+    this._pdfLibPromise = load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'));
+    return this._pdfLibPromise;
+  },
+
+  _pdfDateStamp() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+  },
+
+  // jsPDF's built-in fonts only encode Latin-1. A single character above U+00FF
+  // (e.g. the "->" arrow, the trend triangles) corrupts the WHOLE string into
+  // garbage ("&M&a&y&..."), so map the glyphs the app actually uses to ASCII and
+  // drop anything else still outside Latin-1.
+  _pdfSafe(s) {
+    return String(s == null ? '' : s)
+      .replace(/→/g, '->').replace(/←/g, '<-')
+      .replace(/↑/g, 'up').replace(/↓/g, 'down')
+      .replace(/▲/g, '+').replace(/▼/g, '-')
+      .replace(/[–—]/g, '-')
+      .replace(/[‘’′]/g, "'").replace(/[“”]/g, '"')
+      .replace(/•/g, '-').replace(/ /g, ' ').replace(/…/g, '...')
+      .replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/×/g, 'x')
+      .replace(/[^\x00-\xFF]/g, '');
+  },
+
+  // Clean text of a node for the PDF: strip buttons, tooltips, and no-print chrome.
+  _pdfNodeText(node) {
+    if (!node) return '';
+    const clone = node.cloneNode(true);
+    clone.querySelectorAll('button, .no-print, .tt, .tt-badge, [data-tt]').forEach(el => el.remove());
+    return this._pdfSafe((clone.textContent || '').replace(/\s+/g, ' ').trim());
+  },
+
+  _pdfTableData(table) {
+    const headRow = table.querySelector('thead tr');
+    const head = headRow ? [Array.from(headRow.children).map(th => this._pdfNodeText(th))] : [];
+    let body = Array.from(table.querySelectorAll('tbody tr'))
+      .filter(tr => !tr.closest('.no-print'))
+      .map(tr => Array.from(tr.children).map(td => this._pdfNodeText(td)));
+    if (!body.length && !head.length) return null;
+    // Drop trailing columns that are empty across every row + header (action cols).
+    const cols = Math.max(head[0] ? head[0].length : 0, ...body.map(r => r.length), 0);
+    for (let c = cols - 1; c >= 0; c--) {
+      const headEmpty = !head[0] || !(head[0][c] || '').trim();
+      const bodyEmpty = body.every(r => !(r[c] || '').trim());
+      if (headEmpty && bodyEmpty) {
+        if (head[0]) head[0].splice(c, 1);
+        body.forEach(r => r.splice(c, 1));
+      } else break;
+    }
+    return { head, body, cols: (head[0] ? head[0].length : (body[0] ? body[0].length : 0)) };
+  },
+
+  // Walk a report container into ordered PDF blocks: headings, key/value tiles,
+  // sub-headers, and tables — in document order, skipping no-print chrome.
+  _collectPDFBlocks(root) {
+    const blocks = [];
+    root.querySelectorAll('.card-title, .sh, .calc-item, table.tbl, .empty-title, .empty-sub, .alert-text').forEach(node => {
+      if (node.closest('.no-print')) return;
+      if (node.matches('table.tbl')) {
+        const t = this._pdfTableData(node);
+        if (t) blocks.push({ type: 'table', head: t.head, body: t.body, cols: t.cols });
+      } else if (node.matches('.calc-item')) {
+        const label = this._pdfNodeText(node.querySelector('.calc-label'));
+        const val = this._pdfNodeText(node.querySelector('.calc-val'));
+        const text = (label ? label + ': ' : '') + val;
+        if (text.trim()) blocks.push({ type: 'kv', text });
+      } else if (node.matches('.card-title')) {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'heading', text });
+      } else if (node.matches('.sh')) {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'subheading', text });
+      } else {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'note', text });
+      }
+    });
+    return blocks;
+  },
+
+  async exportPDF(opts) {
+    opts = opts || {};
+    const title = opts.title || 'Report';
+    // Prefer an explicit root. Otherwise pick the LAST .screen that actually holds
+    // report content — the visible one — never the first/empty .screen in the DOM.
+    let root = opts.root;
+    if (!root) {
+      const screens = Array.from(document.querySelectorAll('.screen'));
+      root = screens.reverse().find(s => s.querySelector('table.tbl, .rpt-panel, .calc, .tbl-wrap'))
+        || screens[0] || document.body;
+    }
+    if (!root) return;
+    try { await this._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    // A report with sub-tabs exports one tab at a time; tag the filename with the
+    // active tab so each sub-report saves under its own name instead of clobbering
+    // the last. Auto-read from the active .rpt-tab; opts.subtitle overrides.
+    let subtitle = opts.subtitle || '';
+    if (!subtitle) {
+      const onTab = root.querySelector('.rpt-tab.on');
+      if (onTab) subtitle = (onTab.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    const blocks = this._collectPDFBlocks(root);
+    const maxCols = blocks.reduce((m, b) => b.type === 'table' ? Math.max(m, b.cols || 0) : m, 0);
+    const orientation = opts.orientation || (maxCols > 7 ? 'landscape' : 'portrait');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation, unit: 'pt', format: 'letter' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    let y = margin;
+
+    const venue = (this.data && this.data.settings && this.data.settings.bar_name) || '';
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+    doc.text('Bar Cop', margin, y);
+    doc.setFontSize(12);
+    doc.text(this._pdfSafe(subtitle ? title + ' - ' + subtitle : title), pageW - margin, y, { align: 'right' });
+    y += 16;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+    const dstr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    doc.text(this._pdfSafe((venue ? venue + '   |   ' : '') + dstr), margin, y);
+    y += 8;
+    doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
+    y += 16;
+
+    const ensure = h => { if (y > pageH - 60 - h) { doc.addPage(); y = margin; } };
+    blocks.forEach(b => {
+      if (b.type === 'heading') {
+        ensure(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
+        doc.text(b.text, margin, y); y += 16;
+      } else if (b.type === 'subheading') {
+        ensure(16); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
+        doc.text(b.text.toUpperCase(), margin, y); y += 13;
+      } else if (b.type === 'kv' || b.type === 'note') {
+        ensure(15); doc.setFont('helvetica', b.type === 'kv' ? 'bold' : 'normal'); doc.setFontSize(10); doc.setTextColor(45, 45, 45);
+        doc.text(b.text, margin, y); y += 14;
+      } else if (b.type === 'table') {
+        doc.autoTable({
+          startY: y + 2,
+          head: b.head, body: b.body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', lineColor: [225, 225, 225], lineWidth: 0.5 },
+          headStyles: { fillColor: [28, 28, 28], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [246, 246, 246] },
+          theme: 'grid'
+        });
+        y = doc.lastAutoTable.finalY + 16;
+      }
+    });
+
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+      doc.text('Generated by Bar Cop. Figures are derived from your inputs; verify before relying on them.', margin, pageH - 22);
+      doc.text('Page ' + i + ' of ' + pages, pageW - margin, pageH - 22, { align: 'right' });
+    }
+
+    const tag = (opts.fileTag || subtitle || title).replace(/[^A-Za-z0-9]+/g, '');
+    await this._savePDF(doc, 'BarCop_' + tag + '_' + this._pdfDateStamp() + '.pdf');
+  },
+
+  async _savePDF(doc, filename) {
+    const blob = doc.output('blob');
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'PDF document', accept: { 'application/pdf': ['.pdf'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // user cancelled the Save dialog
+        // any other failure (e.g. lost user activation) -> fall back to download
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  },
+
+  // ── Data-driven PDF builder ────────────────────────────────────────────────
+  // For documents we generate FROM DATA (audits, books, checklists, handoff)
+  // rather than by walking the DOM. Assumes the PDF lib is already loaded
+  // (caller: await App._ensurePDFLib()). Chainable; mirrors exportPDF's header/
+  // footer so every Bar Cop PDF looks the same. Auto-paginates.
+  _pdfBuilder(title, opts) {
+    opts = opts || {};
+    const App = this;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: opts.orientation || 'portrait', unit: 'pt', format: 'letter' });
+    const margin = 40;
+    const b = {
+      doc, margin, title,
+      pageW: doc.internal.pageSize.getWidth(),
+      pageH: doc.internal.pageSize.getHeight(),
+      y: margin,
+      get usableW() { return this.pageW - margin * 2; },
+      _limit() { return this.pageH - 40; },
+      _need(h) { if (this.y + h > this._limit()) { doc.addPage(); this.y = margin; } return this; },
+      header(o) {
+        o = o || {};
+        const venue = (App.data && App.data.settings && App.data.settings.bar_name) || '';
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+        doc.text('Bar Cop', margin, this.y);
+        doc.setFontSize(12);
+        doc.text(App._pdfSafe(o.right || title), this.pageW - margin, this.y, { align: 'right' });
+        this.y += 16;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+        const meta = o.meta != null ? o.meta : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        doc.text(App._pdfSafe((venue ? venue + '   |   ' : '') + meta), margin, this.y);
+        this.y += 8;
+        doc.setDrawColor(205, 205, 205); doc.line(margin, this.y, this.pageW - margin, this.y);
+        this.y += 16;
+        return this;
+      },
+      sectionTitle(text) {
+        this._need(26);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(150, 140, 90);
+        doc.text(App._pdfSafe(String(text).toUpperCase()), margin, this.y);
+        this.y += 5;
+        doc.setDrawColor(225, 225, 225); doc.line(margin, this.y, this.pageW - margin, this.y);
+        this.y += 13;
+        return this;
+      },
+      heading(text, size) {
+        size = size || 12;
+        this._need(size + 8);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.setTextColor(20, 20, 20);
+        doc.text(App._pdfSafe(text), margin, this.y); this.y += size + 6;
+        return this;
+      },
+      kv(label, value) {
+        this._need(15);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+        const lbl = App._pdfSafe(label + ':');
+        doc.text(lbl, margin, this.y);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
+        doc.text(App._pdfSafe(String(value == null ? '' : value)), margin + doc.getTextWidth(lbl) + 8, this.y);
+        this.y += 15;
+        return this;
+      },
+      paragraph(text, o) {
+        o = o || {};
+        const g = o.gray != null ? o.gray : 55;
+        const sz = o.size || 10;
+        doc.setFont('helvetica', o.italic ? 'italic' : 'normal'); doc.setFontSize(sz); doc.setTextColor(g, g, g);
+        const lines = doc.splitTextToSize(App._pdfSafe(text), this.usableW);
+        const lh = sz + 3;
+        lines.forEach(ln => { this._need(lh); doc.text(ln, margin, this.y); this.y += lh; });
+        this.y += 3;
+        return this;
+      },
+      table(head, body, o) {
+        o = o || {};
+        this._need(44);
+        doc.autoTable({
+          startY: this.y,
+          head: head ? [head.map(h => App._pdfSafe(h))] : undefined,
+          body: (body || []).map(r => r.map(c => App._pdfSafe(c))),
+          margin: { left: margin, right: margin, top: margin, bottom: 40 },
+          columnStyles: o.columnStyles || {},
+          styles: { fontSize: 8, cellPadding: 5, lineColor: [225, 225, 225], lineWidth: 0.5, overflow: 'linebreak', valign: 'middle' },
+          headStyles: { fillColor: [28, 28, 28], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [246, 246, 246] },
+          theme: 'grid'
+        });
+        this.y = doc.lastAutoTable.finalY + 14;
+        return this;
+      },
+      spacer(h) { this.y += (h == null ? 10 : h); return this; },
+      disclaimer(text) {
+        this.y += 6;
+        this._need(20);
+        doc.setDrawColor(225, 225, 225); doc.line(margin, this.y, this.pageW - margin, this.y); this.y += 9;
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(130, 130, 130);
+        doc.splitTextToSize(App._pdfSafe(text), this.usableW).forEach(ln => { this._need(10); doc.text(ln, margin, this.y); this.y += 9.5; });
+        return this;
+      },
+      async save(filename) {
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+          doc.setPage(i);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+          doc.text('Generated by Bar Cop. Figures are derived from your inputs; verify before relying on them.', margin, this.pageH - 22);
+          doc.text('Page ' + i + ' of ' + pages, this.pageW - margin, this.pageH - 22, { align: 'right' });
+        }
+        await App._savePDF(doc, filename);
+      }
+    };
+    return b;
+  },
+
+  // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
+  // and the average-rating math in t-reports + t-dashboard. Key prefix maps to
+  // the per-platform fields in traffic_weeks (dd_active, dd_rating, etc.) and
+  // traffic_settings.profile (dd_photos, dd_menu, dd_promo, dd_menu_synced_at).
+  // Independent operators in catering-heavy markets need ezCater; held the rest
+  // of the long tail out per [[value-bar]] — every added platform multiplies
+  // the operator's weekly typing burden.
+  TRAFFIC_DELIVERY_PLATFORMS: [
+    { key: 'dd', name: 'DoorDash' },
+    { key: 'ue', name: 'Uber Eats' },
+    { key: 'gh', name: 'Grubhub' },
+    { key: 'ez', name: 'ezCater' }
+  ],
+
+  // Benchmarks read by tip-generators, action-item math, and trend chart
+  // targets. Operator-tunable targets that move per operation (rating,
+  // review velocity, response rate, monthly sessions, social posts/mo) live
+  // under traffic_settings.targets and are set in Hub Settings → Traffic
+  // Targets. The values here are fixed industry benchmarks that don't vary.
+  TRAFFIC_BENCHMARKS: {
+    yelp_rating:       4.0,
+    delivery_rating:   4.5,
+    open_rate:         20,
+    list_size:         500,
+    citations:         40,
+    engagement_rate:   2,
+    gbp_photos:        100
+  },
+
+  // Profile-completeness checklist on t-gbp. Each entry is [key, label].
+  // The key is stored as a boolean on traffic_settings.profile.
+  TRAFFIC_GBP_TOGGLES: [
+    ['gbp_claimed',    'Listing claimed'],
+    ['gbp_hours',      'Hours complete'],
+    ['gbp_phone',      'Phone number present'],
+    ['gbp_website',    'Website linked'],
+    ['gbp_menu',       'Menu link active'],
+    ['gbp_category',   'Primary category set'],
+    ['gbp_attributes', 'Attributes complete'],
+    ['gbp_qa',         'Q and A populated']
+  ],
+
+  // Local SEO assessment on t-search.
+  TRAFFIC_SEARCH_TOGGLES: [
+    ['search_maps_pack', 'Confirmed in the Google Maps 3-pack'],
+    ['search_nap',       'Name, address, phone consistent everywhere'],
+    ['search_name',      'Business name correct on Google'],
+    ['search_address',   'Address correct on Google'],
+    ['search_phone',     'Phone number correct on Google'],
+    ['search_titles',    'Website page titles assessed for keywords']
+  ],
+
+  // Website setup checklist on t-website.
+  TRAFFIC_WEB_TOGGLES: [
+    ['web_exists',       'Website is live'],
+    ['web_mobile',       'Mobile optimized'],
+    ['web_menu',         'Menu linked from the homepage'],
+    ['web_online_order', 'Online ordering available'],
+    ['web_reservations', 'Reservation system in place']
+  ],
+
+  // Email program enums on t-email.
+  TRAFFIC_EMAIL_FREQUENCY:      ['Weekly', 'Every two weeks', 'Monthly', 'Rarely', 'Never'],
+  TRAFFIC_EMAIL_GROWTH_SOURCES: ['Website signup form', 'In-store signup', 'WiFi login capture', 'Online order checkout', 'No active mechanism'],
+
+  // Social content mix on t-social.
+  TRAFFIC_SOCIAL_CONTENT_MIX: ['Balanced', 'Mostly promotional', 'Mostly reposts', 'Too few food photos'],
+
+  // ── Traffic fix_log auto-emit helper (Recovery Scoreboard wiring) ───────
+  // Every operator action that closes a Traffic gap writes a fix_log row so
+  // the Recovery Scoreboard, the 8-week dashboard chart's "Fix Logged"
+  // markers, and the Fix Areas card progress tally all credit the work.
+  // gap_id matches the FIX.traffic entry id (gbp, website, reviews,
+  // search-seo, social, delivery, email-loyalty). Writes `date` (the field
+  // recovery.js + fix-panel.js both read for cutoff + chart markers) along
+  // with the human-readable `gap_name` so chart tooltips render cleanly.
+  TRAFFIC_GAP_NAMES: {
+    'gbp':            'Google Business Profile',
+    'website':        'Website',
+    'reviews':        'Reviews',
+    'search-seo':     'Search and SEO',
+    'social':         'Social Media',
+    'delivery':       'Delivery Platforms',
+    'email-loyalty':  'Email and Loyalty'
+  },
+  emitTrafficFix(gap_id, note) {
+    const today = new Date().toISOString().slice(0, 10);
+    const rec = {
+      id: this.uid(),
+      module: 'traffic',
+      gap_id: gap_id,
+      gap_name: this.TRAFFIC_GAP_NAMES[gap_id] || gap_id,
+      date: today,
+      note: note || '',
+      source: 'traffic-auto',
+      saved_at: new Date().toISOString()
+    };
+    return this.putRecord('core', 'fix_log', rec);
+  },
+
+  // ── Menu Items ───────────────────────────────────────────────────────────
+  // Single canonical store for every sellable thing on the menu. Each item
+  // can OPTIONALLY have a recipe attached (ingredient breakdown). When a
+  // recipe is present, the item's cost auto-computes from current product
+  // prices; otherwise the manually-entered cost field is used.
+  //
+  // App.data.menu_items is the canonical store for everything sellable on the
+  // menu. Each item has an OPTIONAL embedded `recipe` field (ingredients +
+  // plate_yield). Edited from ONE screen: r-menu-items (Revenue Recovery).
+  // Profit Recovery's Recipe Cost Analysis is a read-only ranked view that
+  // bounces back to r-menu-items for any edits.
+  //
+  // Prep batches (frozen margarita mix, simple syrup, marinara base) are
+  // reference data under Inventory Control per Rule 21 — App.inventoryData.
+  // ic_prep_batches. Recipes can use them as ingredients alongside products.
+  menuItems() {
+    if (!this.data) return [];
+    if (!Array.isArray(this.data.menu_items)) this.data.menu_items = [];
+    return this.data.menu_items;
+  },
+  menuItemById(id) {
+    return this.menuItems().find(m => m.id === id) || null;
+  },
+  prepBatches() {
+    if (!this.inventoryData) return [];
+    if (!Array.isArray(this.inventoryData.ic_prep_batches)) this.inventoryData.ic_prep_batches = [];
+    return this.inventoryData.ic_prep_batches;
+  },
+  prepBatchById(id) {
+    return this.prepBatches().find(b => b.id === id) || null;
+  },
+  // Backward-compat alias for sc-86-list and any other consumer still
+  // referencing the old top-level batches array. Resolves to the new
+  // ic_prep_batches home.
+  batches() { return this.prepBatches(); },
+
+  // Compute effective cost for a menu item. Priority order:
+  //   1. linked_product_id  → bottle/unit cost from the linked IC product
+  //                            (used for Beer/Wine/NA — direct-pour items)
+  //   2. recipe.ingredients → sum of ingredient costs at current prices
+  //                            (used for cocktails / food plates)
+  //   3. manual item.cost   → operator-typed fallback (Other category)
+  //
+  // Ingredient row shape: { source: 'product'|'batch', id, quantity }.
+  // Legacy shape { product_id, quantity } is still recognized.
+  menuItemCost(item) {
+    if (!item) return null;
+
+    // Linked product takes priority. For Bottle Beer with case_size,
+    // bottleCost handles the per-case → per-bottle conversion.
+    if (item.linked_product_id) {
+      const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+      const p = prods.find(x => x.id === item.linked_product_id);
+      if (p) {
+        const bc = this.bottleCost ? this.bottleCost(p) : null;
+        if (bc != null) return bc;
+        return p.unit_cost || 0;
+      }
+    }
+
+    if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
+      const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+      const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
+      const isBar = p => p && App.BAR_CATS.includes(p.category);
+
+      const ingCost = ing => {
+        const qty = parseFloat(ing.quantity) || 0;
+        const src = ing.source || (ing.product_id ? 'product' : null);
+        const id  = ing.id || ing.product_id;
+        if (!src || !id) return (parseFloat(ing.cost_per_unit) || 0) * qty;
+
+        if (src === 'batch') {
+          const b = batches.find(x => x.id === id);
+          if (!b) return 0;
+          return (b.cost_per_serving || 0) * qty;
+        }
+        // product
+        const p = prods.find(x => x.id === id);
+        if (!p) return (parseFloat(ing.cost_per_unit) || 0) * qty;
+        const unitCost = isBar(p)
+          ? (item.recipe.mode === 'single'
+              ? (p.cost_per_pour != null ? p.cost_per_pour : (this.bottleCost(p) || 0))
+              : (this.bottleCost(p) != null ? this.bottleCost(p) : (p.unit_cost || 0)))
+          : (p.unit_cost || 0);
+        return unitCost * qty;
+      };
+
+      const tc = item.recipe.ingredients.reduce((s, ing) => s + ingCost(ing), 0);
+      if (item.recipe.mode === 'food' && item.recipe.plate_yield > 0) {
+        return tc / item.recipe.plate_yield;
+      }
+      return tc;
+    }
+    return parseFloat(item.cost) || 0;
+  },
+
+  // True when every Getting Started step is checked off. The Hub sidebar uses
+  // this to hide the Getting Started nav item once setup is fully complete,
+  // so it does not clutter the sidebar for operators who have already worked
+  // through the entire setup. Help and FAQ still deep-links to the screen for
+  // anyone who wants to revisit. Auto-resurfaces if a new step is ever added.
+  isSetupComplete() {
+    if (!this.data) return false;
+    const tasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
+    if (!tasks.length) return false;
+    const prog = this.data.hub_setup_progress || {};
+    return tasks.every(t => !!prog[t.id]);
+  },
+
+  // ── Event-log stores (row-per-record; see db.js loadEvents/putEvent) ───────
+  // Maps module + kind to the in-memory array it lives in. Config stays in the
+  // blob; these arrays are filled from the events table on load and written one
+  // row at a time via putRecord/removeRecord.
+  EVENT_STORES: {
+    ic: {
+      table: 'ic_events',
+      data: () => App.inventoryData,
+      kinds: {
+        count: 'ic_counts', delivery: 'ic_deliveries', order: 'ic_orders',
+        transfer: 'ic_transfers', empty: 'ic_empties', adjustment: 'ic_adjustments',
+        spot_check: 'ic_spot_checks'
+      }
+    },
+    sc: {
+      table: 'sc_events',
+      data: () => App.shiftData,
+      kinds: {
+        shift: 'sc_shifts', void_comp: 'sc_void_comps', cash_drop: 'sc_cash_drops',
+        variance: 'sc_variances', safe_log: 'sc_safe_log', eighty_six: 'sc_86_list',
+        maintenance: 'sc_maintenance', walked_tab: 'sc_walked_tabs',
+        incident: 'sc_incidents', waste: 'sc_waste', checklist: 'sc_checklists'
+      }
+    },
+    lc: {
+      table: 'lc_events',
+      data: () => App.laborData,
+      kinds: {
+        actual: 'lc_actuals', schedule: 'lc_schedules', tip: 'lc_tips',
+        tip_pool: 'lc_tip_pools', callout: 'lc_callouts', pay_period: 'lc_pay_periods'
+      }
+    },
+    // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
+    // in core_events. Config (settings, products, menu, targets, getting-started,
+    // fix_progress/fix_activity, vestigial shifts/vendor_log/reconciliations) stays
+    // in the user_data blob. fix_log moves in its own shared pass.
+    core: {
+      table: 'core_events',
+      data: () => App.data,
+      kinds: {
+        week: 'weeks', theft_score: 'theft_scores',
+        variance_investigation: 'variance_investigations',
+        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits',
+        // Revenue pass — revenue_rate_cards stays in the blob (reusable pricing
+        // templates / config); fix_log moves in its own shared pass.
+        revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
+        revenue_server_check: 'revenue_server_checks', menu_dog_test: 'menu_dog_tests',
+        revenue_price_log: 'revenue_price_log', revenue_event: 'revenue_events',
+        // Traffic pass — the 4 Guests & Planning lists (regulars, initiatives,
+        // holidays, inquiries) stay in the blob: low-volume CRM/planning the
+        // 24-month window would wrongly hide. fix_log moves in its own pass.
+        traffic_week: 'traffic_weeks', traffic_audit: 'traffic_audits',
+        traffic_review_reply: 'traffic_review_replies', traffic_gbp_post: 'traffic_gbp_posts',
+        traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns',
+        // Shared Recovery Scoreboard feed — one module-tagged kind.
+        fix_log: 'fix_log',
+        // Hub — executive monthly audit history. operating_expenses +
+        // permits_compliance stay in the blob: financial/compliance data read by
+        // arbitrary period, where the 24-month window would undercount.
+        bar_cop_audit: 'bar_cop_audits'
+      }
+    }
+  },
+
+  // Fill a module's event arrays from the rolling window, in parallel. Overwrites
+  // the arrays so the blob's stale copies are ignored.
+  async loadEventStores(mod) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return;
+    const dataObj = store.data();
+    if (!dataObj) return;
+    const kinds = Object.keys(store.kinds);
+    const results = await Promise.all(kinds.map(k => DB.loadEvents(store.table, k)));
+    kinds.forEach((k, i) => { dataObj[store.kinds[k]] = results[i] || []; });
+    this.resetListState(mod);
+  },
+
+  // Append an older page of one kind ("Show older"). Returns the fetched rows.
+  async loadOlder(mod, kind, beforeDate, limit) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return [];
+    const dataObj = store.data();
+    const key = store && store.kinds[kind];
+    if (!dataObj || !key) return [];
+    const older = await DB.loadEvents(store.table, kind, { before: beforeDate, limit: limit || 200 });
+    if (!Array.isArray(dataObj[key])) dataObj[key] = [];
+    const seen = new Set(dataObj[key].map(r => r && r.id));
+    older.forEach(r => { if (r && !seen.has(r.id)) dataObj[key].push(r); });
+    return older;
+  },
+
+  // Seed a module's event rows from the current in-memory arrays (sample data).
+  // Clears existing rows first so a reload replaces rather than accumulates.
+  async seedEventStores(mod) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return;
+    const dataObj = store.data();
+    if (!dataObj) return;
+    await DB.clearEvents(store.table);
+    for (const kind of Object.keys(store.kinds)) {
+      const recs = dataObj[store.kinds[kind]] || [];
+      // Defensive: an event row with no id is silently dropped by putEventsBulk
+      // (this is what lost the traffic audits on reload). Assign one in place so
+      // the in-memory record and the seeded row stay in sync.
+      recs.forEach(r => { if (r && r.id == null) r.id = this.uid(); });
+      const res = await DB.putEventsBulk(store.table, kind, recs);
+      if (res && res.ok === false) console.error('seedEventStores ' + mod + '/' + kind + ' failed', res.error);
+    }
+  },
+
+  // Add or update one event record: updates the in-memory array AND persists one
+  // row. True if saved or safely queued offline; reverts + false on hard failure
+  // (viewer / no account).
+  async putRecord(mod, kind, rec) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return false;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    if (!dataObj || !key || !rec || rec.id == null) return false;
+    if (!Array.isArray(dataObj[key])) dataObj[key] = [];
+    const arr = dataObj[key];
+    const idx = arr.findIndex(x => x && x.id === rec.id);
+    const prev = idx >= 0 ? arr[idx] : null;
+    if (idx >= 0) arr[idx] = rec; else arr.push(rec);
+    const r = await DB.putEvent(store.table, kind, rec);
+    if (r.ok || r.offline) return true;
+    const back = arr.findIndex(x => x && x.id === rec.id);
+    if (prev) { if (back >= 0) arr[back] = prev; }
+    else if (back >= 0) arr.splice(back, 1);
+    return false;
+  },
+
+  async removeRecord(mod, kind, id) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return false;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    if (!dataObj || !key) return false;
+    const arr = Array.isArray(dataObj[key]) ? dataObj[key] : [];
+    const idx = arr.findIndex(x => x && x.id === id);
+    const removed = idx >= 0 ? arr[idx] : null;
+    if (idx >= 0) arr.splice(idx, 1);
+    const r = await DB.removeEvent(store.table, kind, id);
+    if (r.ok || r.offline) return true;
+    if (removed) arr.splice(idx, 0, removed);
+    return false;
+  },
+
+  // ── History list pagination ("Show older") ────────────────────────────────
+  // History screens read a rolling 24-month window into memory. They render the
+  // newest LIST_PAGE rows and offer "Show older" to reveal more: first the rest
+  // of the loaded window, then (once that's exhausted, with no filter active)
+  // the next older page pulled from the events table on demand for a rare
+  // multi-year tax / insurance lookback. State is per module+kind, reset on a
+  // fresh window load (login / reseed) by loadEventStores.
+  LIST_PAGE: 200,
+  _listState: {},
+  _listKey(mod, kind) { return mod + '.' + kind; },
+
+  // How many rows a list should currently display.
+  listLimit(mod, kind) {
+    const st = this._listState[this._listKey(mod, kind)];
+    return (st && st.limit) || this.LIST_PAGE;
+  },
+
+  // Drop a module's display limits + paging flags (fresh window load).
+  resetListState(mod) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return;
+    Object.keys(store.kinds).forEach(k => { delete this._listState[this._listKey(mod, k)]; });
+  },
+
+  // Oldest business date currently loaded for a kind (YYYY-MM-DD), or null.
+  // Uses the same date the events index is keyed on, so paging lines up.
+  oldestLoadedDate(mod, kind) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return null;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    const arr = (dataObj && Array.isArray(dataObj[key])) ? dataObj[key] : [];
+    let min = null;
+    arr.forEach(r => { const d = DB._eventDate(r); if (d && (min == null || d < min)) min = d; });
+    return min;
+  },
+
+  // Could older-than-window records plausibly exist on the server? True only
+  // when the oldest loaded record sits within ~5 weeks of the window's old edge
+  // (so the window is saturated and there's likely more beyond it), or we've
+  // already pulled an older page. Keeps the DB fetch off young accounts and the
+  // sample data, whose full history is already in memory.
+  hasServerOlder(mod, kind) {
+    const st = this._listState[this._listKey(mod, kind)];
+    if (st && st.exhausted) return false;
+    if (st && st.paged) return true;
+    const oldest = this.oldestLoadedDate(mod, kind);
+    if (!oldest) return false;
+    const startMs = new Date(DB._windowStartDate() + 'T00:00:00').getTime();
+    const oldestMs = new Date(oldest + 'T00:00:00').getTime();
+    return (oldestMs - startMs) <= 35 * 86400000;
+  },
+
+  // Footer bar HTML for a history list. `list` = the array the screen is about
+  // to slice (already filtered + sorted newest-first). `hasFilter` = whether a
+  // filter is narrowing the view. Returns '' when there's nothing more to show.
+  // The button's mode is baked in at render time so the shared click handler
+  // just executes it: 'reveal' uncaps more loaded rows, 'server' fetches the
+  // next older page (offered only on an unfiltered, fully-revealed list).
+  showOlderBar(mod, kind, list, hasFilter) {
+    const limit = this.listLimit(mod, kind);
+    const fLen = Array.isArray(list) ? list.length : 0;
+    const moreLoaded = fLen > limit;
+    const store = this.EVENT_STORES[mod];
+    const dataObj = store && store.data();
+    const all = (dataObj && Array.isArray(dataObj[store.kinds[kind]])) ? dataObj[store.kinds[kind]] : [];
+    const allShown = all.length <= limit;
+    const wrap = inner => '<div style="text-align:center;padding:14px 0 4px;">' + inner + '</div>';
+    const btn = (mode, label) => '<button class="btn btn-ghost btn-sm" data-show-older="1" data-older-mode="'
+      + mode + '" data-older-mod="' + mod + '" data-older-kind="' + kind + '">' + label + '</button>';
+    if (moreLoaded) return wrap(btn('reveal', 'Show older'));
+    if (!hasFilter && allShown && this.hasServerOlder(mod, kind)) {
+      return wrap(btn('server', 'Load records older than 24 months')
+        + '<div style="font-size:10px;color:var(--t4);margin-top:6px;">Showing the last 24 months. '
+        + 'Load older records for tax or insurance lookback.</div>');
+    }
+    const st = this._listState[this._listKey(mod, kind)];
+    if (st && st.paged && !hasFilter) {
+      return '<div style="text-align:center;padding:12px 0;color:var(--t4);font-size:11px;">All records loaded.</div>';
+    }
+    return '';
+  },
+
+  // Shared click handler for every history list's "Show older" button. Pass the
+  // click target and the screen's list re-render. Fire-and-forget from a sync
+  // onclick: check ev.target.closest('[data-show-older]') first, then call this.
+  async handleShowOlder(target, reRender) {
+    const btn = target && target.closest && target.closest('[data-show-older]');
+    if (!btn) return false;
+    const mod = btn.dataset.olderMod, kind = btn.dataset.olderKind, mode = btn.dataset.olderMode;
+    const key = this._listKey(mod, kind);
+    const st = this._listState[key] || {};
+    if (mode === 'server') {
+      const before = this.oldestLoadedDate(mod, kind);
+      btn.disabled = true; btn.textContent = 'Loading...';
+      const PAGE = 200;
+      const older = before ? await this.loadOlder(mod, kind, before, PAGE) : [];
+      st.paged = true;
+      if (!older || older.length < PAGE) st.exhausted = true;
+    }
+    st.limit = (st.limit || this.LIST_PAGE) + this.LIST_PAGE;
+    this._listState[key] = st;
+    reRender && reRender();
+    return true;
+  },
+
+  // Config-only slice of a module's data blob: everything that is NOT one of
+  // its event arrays (those persist row-per-record in <mod>_events now). Used
+  // so a config save never rewrites the unbounded event logs into the blob.
+  _configBlob(mod, dataObj) {
+    const store = this.EVENT_STORES[mod];
+    const eventKeys = store ? new Set(Object.values(store.kinds)) : new Set();
+    const out = {};
+    Object.keys(dataObj || {}).forEach(k => { if (!eventKeys.has(k)) out[k] = dataObj[k]; });
+    return out;
+  },
+  _inventoryConfig() { return this._configBlob('ic', this.inventoryData); },
+
+  async saveInventory() {
+    const r = await DB.writeInventoryData(this._inventoryConfig());
+    if (!r.ok) console.error('saveInventory failed:', r.error);
+    return r.ok;
+  },
+
+  async saveLabor() {
+    const r = await DB.writeLaborData(this._configBlob('lc', this.laborData));
+    if (!r.ok) console.error('saveLabor failed:', r.error);
+    return r.ok;
+  },
+
+  async saveShift() {
+    const r = await DB.writeShiftData(this._configBlob('sc', this.shiftData));
+    if (!r.ok) console.error('saveShift failed:', r.error);
+    return r.ok;
+  },
+
+  navigate(id) {
+    // Role-based block: staff can't navigate to disallowed screens.
+    // Bounce them to the Staff Hub so they can pick something they CAN do.
+    if (!this.canAccess(id)) {
+      const role = (window.DB && DB.role && DB.role()) || null;
+      if (role === 'staff') { this.showStaffHub(); return; }
+      const land = this.staffLanding();
+      if (this._activeModule !== land.module) {
+        this.showApp(land.module);
+        return;
+      }
+      id = land.screen;
+    }
+    // Settings and Getting Started are Hub-owned views, never module screens —
+    // open them in the Hub container regardless of where the call came from.
+    if (id === 'settings') { S.HubSettings.open(); return; }
+    if (id === 'getting-started') {
+      S.HubGettingStarted.open();
+      return;
+    }
+    try {
+    this.updateNav(id);
+    const content = document.getElementById('content-area');
+    const actions = document.getElementById('topbar-actions');
+    actions.innerHTML = '';
+
+    // The content host is reused across every module screen. Some screens wire
+    // delegated handlers via content.onclick/onchange; others (e.g. the Variance
+    // report) wire tabs with addEventListener and never reset the property. Clear
+    // them on every navigation so a prior screen's handler can't bubble on the
+    // next screen's clicks and render the wrong screen. Each screen re-establishes
+    // whatever delegation it needs inside its own render.
+    if (content) { content.onclick = null; content.onchange = null; content.oninput = null; }
+
+    // Revenue module screens
+    if (this._activeModule === 'revenue') {
+      const revTitles = {
+        'hub':                    ['Recovery Hub', ''],
+        'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
+        'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
+        'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
+        'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
+        'r-this-week':            ['This Week', 'Weekly Entry'],
+        'r-server-check':         ['Server Check', ''],
+        'r-menu-items':           ['Menu Items', ''],
+        'r-menu-engineering':     ['Menu Engineering', ''],
+        'r-pricing':              ['Price Calculator', ''],
+        'r-dog-test':             ['Dog Test Tracker', ''],
+        'r-rplh':                 ['RPLH Tracker', ''],
+        'r-events':               ['Events and Catering', ''],
+        'r-reports':              ['Reports and History', ''],
+        'r-help':                 ['Help and FAQ', ''],
+      };
+      const revScreens = {
+        'r-audit':            S.RevenueAudit,
+        'r-fix':              S.RevenueFix,
+        'r-dashboard':        S.RevenueDashboard,
+        'r-forecast':         S.RevenueForecast,
+        'r-this-week':        S.RevenueThisWeek,
+        'r-server-check':     S.RevenueServerCheck,
+        'r-menu-items':       S.RevenueMenuItems,
+        'r-menu-engineering': S.RevenueMenuEngineering,
+        'r-pricing':          S.RevenuePricing,
+        'r-dog-test':         S.RevenueDogTest,
+        'r-rplh':             S.RevenueRPLH,
+        'r-events':           S.RevenueEvents,
+        'r-reports':          S.RevenueReports,
+        'r-help':             S.RevenueHelp,
+      };
+      const [title, sub] = revTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = title;
+      document.getElementById('topbar-sub').textContent = sub;
+      const screen = revScreens[id];
+      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Traffic module screens
+    if (this._activeModule === 'traffic') {
+      const trafficTitles = {
+        'hub':              ['Recovery Hub', ''],
+        't-dashboard':      ['Dashboard', 'Traffic Recovery'],
+        't-audit':          ['Traffic Audit', 'Monthly Score and Progress'],
+        't-fix':            ['Traffic Fix', 'Fix Process and Guidance'],
+        't-this-week':      ['This Week', 'Weekly Entry'],
+        't-gbp':            ['Google Business Profile', ''],
+        't-reviews':        ['Review Tracker', ''],
+        't-search':         ['Search and SEO', ''],
+        't-website':        ['Website Scorecard', ''],
+        't-social':         ['Social Media', ''],
+        't-delivery':       ['Delivery Platforms', ''],
+        't-email':          ['Email and Loyalty', ''],
+        't-regulars':       ['VIP Regulars', ''],
+        't-initiatives':    ['Slow-Night Initiatives', ''],
+        't-holidays':       ['Holiday and Events', ''],
+        't-inquiries':      ['Group Inquiries', ''],
+        't-reports':        ['Reports and History', ''],
+        't-help':           ['Help and FAQ', ''],
+      };
+      const trafficScreens = {
+        't-dashboard':      S.TrafficDashboard,
+        't-audit':          S.TrafficAudit,
+        't-fix':            S.TrafficFix,
+        't-this-week':      S.TrafficThisWeek,
+        't-gbp':            S.TrafficGBP,
+        't-reviews':        S.TrafficReviews,
+        't-search':         S.TrafficSearch,
+        't-website':        S.TrafficWebsite,
+        't-social':         S.TrafficSocial,
+        't-delivery':       S.TrafficDelivery,
+        't-email':          S.TrafficEmail,
+        't-regulars':       S.TrafficRegulars,
+        't-initiatives':    S.TrafficInitiatives,
+        't-holidays':       S.TrafficHolidays,
+        't-inquiries':      S.TrafficInquiries,
+        't-reports':        S.TrafficReports,
+        't-help':           S.TrafficHelp,
+      };
+      const [title, sub] = trafficTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = title;
+      document.getElementById('topbar-sub').textContent = sub;
+      const screen = trafficScreens[id];
+      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Inventory Control module screens
+    if (this._activeModule === 'inventory') {
+      const icTitles = {
+        'hub':                 ['Recovery Hub', ''],
+        'ic-dashboard':        ['Dashboard', 'Inventory Control'],
+        'ic-product-setup':    ['Add Products', 'Inventory Control'],
+        'ic-prep-batches':     ['Prep Batches', 'Inventory Control'],
+        'ic-locations':        ['Set Locations', 'Inventory Control'],
+        'ic-vendors':          ['List Vendors', 'Inventory Control'],
+        'ic-take-inventory':   ['Take Inventory', 'Inventory Control'],
+        'ic-count-history':    ['Count History', 'Inventory Control'],
+        'ic-spot-check':       ['Spot Check', 'Inventory Control'],
+        'ic-transfers':        ['Transfer Log', 'Inventory Control'],
+        'ic-empties':          ['Empties Log', 'Inventory Control'],
+        'ic-adjustments':      ['Adjustment Log', 'Inventory Control'],
+        'ic-par-suggestions':  ['Dynamic Pars', 'Inventory Control'],
+        'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
+        'ic-delivery-history': ['Delivery History', 'Inventory Control'],
+        'ic-order-sheet':      ['Order Sheet', 'Inventory Control'],
+        'ic-order-history':    ['Order History', 'Inventory Control'],
+        'ic-report-usage':     ['Usage Report', 'Inventory Control'],
+        'ic-report-variance':  ['Variance Report', 'Inventory Control'],
+        'ic-report-stock':     ['Stock Report', 'Inventory Control'],
+        'ic-report-movers':    ['Movement Report', 'Inventory Control'],
+        'ic-help':             ['Help and FAQ', 'Inventory Control'],
+      };
+      const icScreens = {
+        'ic-dashboard':      S.InventoryDashboard,
+        'ic-product-setup':  S.InventoryProducts,
+        'ic-prep-batches':   S.PrepBatches,
+        'ic-locations':      S.InventoryLocations,
+        'ic-vendors':        S.InventoryVendors,
+        'ic-take-inventory': S.InventoryTakeInventory,
+        'ic-count-history':  S.InventoryCountHistory,
+        'ic-spot-check':     S.InventorySpotCheck,
+        'ic-transfers':      S.InventoryTransfers,
+        'ic-empties':        S.InventoryEmpties,
+        'ic-adjustments':    S.InventoryAdjustments,
+        'ic-par-suggestions': S.InventoryParSuggestions,
+        'ic-receive-delivery': S.InventoryReceiveDelivery,
+        'ic-delivery-history': S.InventoryDeliveryHistory,
+        'ic-order-sheet':     S.InventoryOrderSheet,
+        'ic-order-history':   S.InventoryOrderHistory,
+        'ic-report-usage':    S.InventoryUsageReport,
+        'ic-report-variance': S.InventoryVarianceReport,
+        'ic-report-stock':    S.InventoryStockReport,
+        'ic-report-movers':   S.InventoryMoversReport,
+        'ic-help':            S.InventoryHelp,
+      };
+      const [icTitle, icSub] = icTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = icTitle;
+      document.getElementById('topbar-sub').textContent = icSub;
+      const icScreen = icScreens[id];
+      if (icScreen) { icScreen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Shift Control module screens
+    if (this._activeModule === 'shift') {
+      const scTitles = {
+        'hub':                   ['Recovery Hub', ''],
+        'sc-dashboard':          ['Dashboard', 'Shift Control'],
+        'sc-active-shift':       ['Active Shift', 'Shift Control'],
+        'sc-log-shift':          ['Log a Shift', 'Shift Control'],
+        'sc-shift-history':      ['Shift History', 'Shift Control'],
+        'sc-cash-control':       ['Cash Control', 'Shift Control'],
+        'sc-cash-drop':          ['Cash Drop', 'Shift Control'],
+        'sc-safe-log':           ['Safe Log', 'Shift Control'],
+        'sc-variance-log':       ['Variance Log', 'Shift Control'],
+        'sc-86-list':            ['86 List', 'Shift Control'],
+        'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
+        'sc-waste':              ['Waste / Spill Log', 'Shift Control'],
+        'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
+        'sc-walked-tabs':        ['Walked Tabs', 'Shift Control'],
+        'sc-incident-log':       ['Incident Log', 'Shift Control'],
+        'sc-opening-checklist':  ['Opening Checklist', 'Shift Control'],
+        'sc-closing-checklist':  ['Closing Checklist', 'Shift Control'],
+        'sc-checklist-templates':['Checklist Templates', 'Shift Control'],
+        'sc-drawers':            ['Drawers / Registers', 'Shift Control'],
+        'sc-cash-settings':      ['Cash Tolerances', 'Shift Control'],
+        'sc-comp-settings':      ['Comp Authorization', 'Shift Control'],
+        'sc-reports-shift':      ['Shift Reports', 'Shift Control'],
+        'sc-reports-cash':       ['Cash Reports', 'Shift Control'],
+        'sc-reports-ops':        ['Operations Reports', 'Shift Control'],
+        'sc-help':               ['Help and FAQ', 'Shift Control'],
+      };
+      const scScreens = {
+        'sc-dashboard': S.ShiftDashboard,
+        'sc-active-shift': S.ShiftActiveShift,
+        'sc-log-shift': S.ShiftLogShift,
+        'sc-shift-history': S.ShiftHistory,
+        'sc-cash-control': S.ShiftCashControl,
+        'sc-cash-drop': S.ShiftCashDrop,
+        'sc-safe-log': S.ShiftSafeLog,
+        'sc-variance-log': S.ShiftVarianceLog,
+        'sc-86-list': S.Shift86List,
+        'sc-void-comp': S.ShiftVoidComp,
+        'sc-waste': S.ShiftWaste,
+        'sc-maintenance': S.ShiftMaintenance,
+        'sc-walked-tabs': S.ShiftWalkedTabs,
+        'sc-incident-log': S.ShiftIncidentLog,
+        'sc-opening-checklist': S.ShiftOpeningChecklist,
+        'sc-closing-checklist': S.ShiftClosingChecklist,
+        'sc-checklist-templates': S.ShiftChecklistTemplates,
+        'sc-drawers': S.ShiftDrawers,
+        'sc-cash-settings': S.ShiftCashSettings,
+        'sc-comp-settings': S.ShiftCompSettings,
+        'sc-reports-shift': S.ShiftReportsShift,
+        'sc-reports-cash': S.ShiftReportsCash,
+        'sc-reports-ops': S.ShiftReportsOps,
+        'sc-help': S.ShiftHelp,
+      };
+      const [scTitle, scSub] = scTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = scTitle;
+      document.getElementById('topbar-sub').textContent = scSub;
+      const scScreen = scScreens[id];
+      if (scScreen) { scScreen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Labor Control module screens
+    if (this._activeModule === 'labor') {
+      const lcTitles = {
+        'hub':                   ['Recovery Hub', ''],
+        'lc-dashboard':          ['Dashboard', 'Labor Control'],
+        'lc-build-schedule':     ['Build Schedule', 'Labor Control'],
+        'lc-schedule-templates': ['Saved Templates', 'Labor Control'],
+        'lc-schedule-history':   ['Schedule History', 'Labor Control'],
+        'lc-log-hours':          ['Log Hours', 'Labor Control'],
+        'lc-daily-view':         ['Daily Snapshot', 'Labor Control'],
+        'lc-weekly-summary':     ['Weekly Summary', 'Labor Control'],
+        'lc-pay-periods':        ['Pay Periods', 'Labor Control'],
+        'lc-payroll-export':     ['Payroll Export', 'Labor Control'],
+        'lc-positions':          ['Add Positions', 'Labor Control'],
+        'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
+        'lc-wage-settings':      ['Wage Policies', 'Labor Control'],
+        'lc-tip-log':            ['Tip Log', 'Labor Control'],
+        'lc-tip-pool':           ['Pool Calculator', 'Labor Control'],
+        'lc-tip-history':        ['Tip History', 'Labor Control'],
+        'lc-reports':            ['Labor Reports', 'Labor Control'],
+        'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
+        'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
+        'lc-help':               ['Help and FAQ', 'Labor Control'],
+      };
+      const lcScreens = {
+        'lc-dashboard': S.LaborDashboard,
+        'lc-positions': S.LaborPositions,
+        'lc-staff-roster': S.LaborStaffRoster,
+        'lc-wage-settings': S.LaborWageSettings,
+        'lc-build-schedule': S.LaborBuildSchedule,
+        'lc-schedule-history': S.LaborScheduleHistory,
+        'lc-schedule-templates': S.LaborScheduleTemplates,
+        'lc-log-hours': S.LaborLogHours,
+        'lc-daily-view': S.LaborDailyView,
+        'lc-weekly-summary': S.LaborWeeklySummary,
+        'lc-pay-periods':    S.LaborPayPeriods,
+        'lc-payroll-export': S.LaborPayrollExport,
+        'lc-tip-log': S.LaborTipLog,
+        'lc-tip-pool': S.LaborTipPool,
+        'lc-tip-history': S.LaborTipHistory,
+        'lc-overtime-watch': S.LaborOvertimeWatch,
+        'lc-callout-log': S.LaborCalloutLog,
+        'lc-reports': S.LaborReports,
+        'lc-help': S.LaborHelp,
+      };
+      const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = lcTitle;
+      document.getElementById('topbar-sub').textContent = lcSub;
+      const lcScreen = lcScreens[id];
+      if (lcScreen) { lcScreen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    const titles = {
+      'hub':           ['Recovery Hub', ''],
+      'dashboard':     ['Dashboard', 'Profit Recovery'],
+      'this-week':     ['This Week', 'Weekly Entry'],
+      'bar-products':  ['Bar Products', ''],
+      'kitchen-products': ['Kitchen Products', ''],
+      'recipe-cost-analysis':['Recipe Cost Analysis', ''],
+      'vendor-watch':  ['Vendor Watch', ''],
+      'vendor-scorecard': ['Vendor Scorecard', ''],
+      'vendor-discrepancy': ['Vendor Discrepancies', ''],
+      'theft-risk':    ['Theft Risk Scorecard', ''],
+      'pour-test':     ['Pour Test', 'Per-Bartender Pour Accuracy'],
+      'yield-test':    ['Yield Test', 'Per-Cook Portion Accuracy'],
+      'cash-recon':    ['Cash Reconciliation', ''],
+      'reports':       ['Reports & History', ''],
+      'help':          ['Help and FAQ', ''],
+      'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
+      'profit-fix':    ['Profit Fix', 'Fix Process and Guidance']
+    };
+
+    const screens = {
+      'hub':           S.Hub,
+      'dashboard':     S.Dashboard,
+      'this-week':     S.ThisWeek,
+      'bar-products':  S.BarProducts,
+      'kitchen-products': S.KitchenProducts,
+      'recipe-cost-analysis':S.RecipeCostAnalysis,
+      'vendor-watch':  S.VendorWatch,
+      'vendor-scorecard': S.VendorScorecard,
+      'vendor-discrepancy': S.VendorDiscrepancy,
+      'theft-risk':    S.TheftRisk,
+      'pour-test':     S.PourTest,
+      'yield-test':    S.YieldTest,
+      'cash-recon':    S.CashRecon,
+      'reports':       S.Reports,
+      'help':          S.Help,
+      'audit-tracker': S.AuditTracker,
+      'profit-fix':    S.ProfitFix
+    };
+
+    const [title, sub] = titles[id] || [id, ''];
+    document.getElementById('topbar-title').textContent = title;
+    document.getElementById('topbar-sub').textContent = sub;
+
+    const screen = screens[id];
+    if (screen) screen.render(content, actions);
+    else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+    } finally {
+      this._afterNavigate(id);
+    }
+  },
+
+  /* Report screens carry an Export PDF button (Rule 10). _exportBtn wires it to
+     App.exportPDF, which generates a clean PDF of the on-screen report via jsPDF
+     and opens a Save dialog. The set is every screen in a module's REPORTS
+     section plus the three Recovery Reports and History screens. */
+  _REPORT_SCREENS: {
+    // Screens that carry their own in-content Export PDF are intentionally NOT
+    // here (no duplicate topbar button): the four Inventory reports, plus the
+    // swept Labor reports (lc-reports / lc-overtime-watch export from the card;
+    // lc-callout-log needs no export).
+    'reports': 1, 'r-reports': 1, 't-reports': 1,
+    'sc-reports-shift': 1, 'sc-reports-cash': 1, 'sc-reports-ops': 1
+  },
+  _exportBtn(id, actions) {
+    if (!this._REPORT_SCREENS[id] || !actions) return;
+    if (actions.querySelector('.export-pdf-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-ghost btn-sm export-pdf-btn';
+    btn.textContent = 'Export PDF';
+    btn.addEventListener('click', () => {
+      const title = (document.getElementById('topbar-title')?.textContent || 'Report').trim();
+      App.exportPDF({ title, root: document.getElementById('content-area') });
+    });
+    actions.appendChild(btn);
+  },
+
+  updateNav(id) {
+    document.querySelectorAll('.nav-item, .sidebar-btn').forEach(el => el.classList.remove('active'));
+    const el = document.getElementById('nav-' + id);
+    if (el) el.classList.add('active');
+  },
+
+  updatePeriod() {
+    const el = document.getElementById('sidebar-period');
+    if (!el) return;
+    const weeks = this.data?.weeks || [];
+    if (weeks.length > 0) {
+      const w = weeks[weeks.length - 1];
+      el.textContent = 'Week ' + w.week_num + '   ' + (w.period_end || '');
+    } else {
+      el.textContent = 'No data yet';
+    }
+  },
+
+  fmtCurrency(n, decimals) {
+    if (isNaN(n) || n == null) return ' ';
+    const d = decimals !== undefined ? decimals : (Math.abs(n) < 10 ? 2 : 0);
+    return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+  },
+
+  // Phase 7: explode a menu item into per-product ounces consumed.
+  // For 1 unit of the menu item sold, returns { product_id: oz } showing
+  // exactly how much of each tracked inventory product was drawn down.
+  //
+  // Handles three menu item shapes:
+  //   - Linked direct-pour (Beer/Wine/NA): uses menu_item.pour_size_oz if set,
+  //     else the linked product's pour_size_oz, else container_size_oz (whole
+  //     bottle). Returns { linked_id: oz }.
+  //   - Recipe with product ingredients: for single-drink recipes, quantity is
+  //     in pours so oz = qty × pour_size_oz. For food recipes, quantity is in
+  //     product units (bottles, units) — oz = qty × container_size_oz for
+  //     bar items, qty (as-is) for kitchen items measured in their own unit.
+  //   - Recipe with prep batch ingredients: recursively explode the batch.
+  //     batch contributes (qty / servings_per_batch) × each batch ingredient.
+  //
+  // Total result is then multiplied by sold_qty in the caller.
+  explodeMenuItem(item, soldQty) {
+    const result = {};
+    if (!item) return result;
+    soldQty = parseFloat(soldQty) || 0;
+    if (soldQty <= 0) return result;
+    const prods = (this.inventoryData?.ic_products) || [];
+    const batches = (this.inventoryData?.ic_prep_batches) || [];
+    const prodById  = (id) => prods.find(p => p.id === id);
+    const batchById = (id) => batches.find(b => b.id === id);
+
+    // Direct-pour linked item — one menu item sale draws one pour from the linked product
+    if (item.linked_product_id) {
+      const p = prodById(item.linked_product_id);
+      if (p) {
+        const oz = parseFloat(item.pour_size_oz) || parseFloat(p.pour_size_oz) || parseFloat(p.container_size_oz) || 0;
+        if (oz > 0) result[p.id] = (result[p.id] || 0) + (oz * soldQty);
+      }
+      return result;
+    }
+
+    // Recipe with ingredients
+    if (item.recipe && Array.isArray(item.recipe.ingredients)) {
+      const isSingleDrink = item.recipe.mode === 'single';
+      const plateYield = (item.recipe.mode === 'food' && item.recipe.plate_yield > 0) ? item.recipe.plate_yield : 1;
+      const perUnit = soldQty / plateYield; // for food, plate_yield converts recipe into per-plate
+
+      item.recipe.ingredients.forEach(ing => {
+        const src = ing.source || (ing.product_id ? 'product' : null);
+        const id  = ing.id || ing.product_id;
+        const qty = parseFloat(ing.quantity) || 0;
+        if (!src || !id || qty <= 0) return;
+
+        if (src === 'batch') {
+          const b = batchById(id);
+          if (!b || !Array.isArray(b.ingredients)) return;
+          // qty here is in "servings" — the batch yields servings_per_batch servings total.
+          const spb = parseFloat(b.servings_per_batch) || 1;
+          // Per batch serving, each batch ingredient contributes its quantity / spb.
+          b.ingredients.forEach(bi => {
+            const bp = prodById(bi.product_id || bi.id);
+            if (!bp) return;
+            const biQty = parseFloat(bi.quantity) || 0;
+            if (biQty <= 0) return;
+            // Batch ingredients are typically in product units (bottles/units).
+            // Convert to oz when the underlying product has container_size_oz.
+            const sizeOz = parseFloat(bp.container_size_oz) || 0;
+            const unitsPerBatchServing = biQty / spb;
+            const ozPerBatchServing = sizeOz > 0 ? unitsPerBatchServing * sizeOz : unitsPerBatchServing;
+            result[bp.id] = (result[bp.id] || 0) + (ozPerBatchServing * qty * perUnit);
+          });
+          return;
+        }
+
+        // source === 'product'
+        const p = prodById(id);
+        if (!p) return;
+        const isBar = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
+        let oz = 0;
+        if (isBar && isSingleDrink) {
+          // qty is in "pours" — multiply by pour_size_oz
+          oz = qty * (parseFloat(p.pour_size_oz) || 0);
+        } else if (isBar) {
+          // Food / non-single use of bar product — qty is in bottles
+          oz = qty * (parseFloat(p.container_size_oz) || 0);
+        } else {
+          // Kitchen + Misc mixers — quantity is already in the product's native
+          // purchase unit (lb / each / dozen / qt of mixer), the same convention
+          // menuItemCost uses with unit_cost, so the count (also native units)
+          // and the recipe draw compare apples to apples. Previously a Misc
+          // mixer in a cocktail was multiplied by a token pour_size_oz, charging
+          // ~0 oz and producing a false ~99% variance.
+          oz = qty;
+        }
+        result[p.id] = (result[p.id] || 0) + (oz * perUnit);
+      });
+    }
+
+    return result;
+  },
+
+  // Phase 5: resolve the wage in effect for a staff member on a given date.
+  // Walks wage_history newest-first: any entry with effective_date <= the
+  // queried date means the new_wage applied from then onward. Falls back to
+  // the staff member's current wage when no history is on file or every
+  // entry's effective_date is after the queried date (meaning the wage was
+  // the prior wage from the oldest entry — or the current wage if no history).
+  wageForStaffOn(staffId, dateStr) {
+    const staff = (this.laborData?.lc_staff || []).find(s => s.id === staffId);
+    if (!staff) return 0;
+    if (!dateStr) return staff.wage || 0;
+    const history = Array.isArray(staff.wage_history) ? staff.wage_history.slice() : [];
+    if (!history.length) return staff.wage || 0;
+    // Sort newest effective_date first
+    history.sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''));
+    // Find the most recent change that took effect on or before the queried date
+    const applies = history.find(h => (h.effective_date || '') <= dateStr);
+    if (applies) return applies.new_wage != null ? applies.new_wage : (staff.wage || 0);
+    // The queried date is BEFORE all changes — the prior_wage on the oldest
+    // entry is what the staff member earned at that time.
+    const oldest = history[history.length - 1];
+    return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
+  },
+
+  // ── Salaried staff ──────────────────────────────────────────────────────
+  // A salaried (exempt) staff member's labor cost is FIXED per period
+  // (annual_salary / 52 per week), not hours * wage. Their per-day lc_actuals
+  // rows still carry hours for coverage and RPLH, but those hours have no
+  // hourly wage, so each row's cost is 0 and the fixed salary is added at the
+  // weekly/period rollups via salariedCost(). Salaried = exempt: no overtime
+  // (a salaried NON-exempt employee should be entered as Hourly so OT computes).
+  isSalaried(staffOrId) {
+    const s = (staffOrId && typeof staffOrId === 'object')
+      ? staffOrId
+      : (this.laborData?.lc_staff || []).find(x => x.id === staffOrId);
+    return !!(s && s.pay_type === 'Salary');
+  },
+  // Fixed salaried labor cost accrued over [startDate, endDate] inclusive. Salary
+  // accrues evenly every day; a full 7-day week equals annual_salary / 52. Only
+  // Active salaried staff with a positive salary count. Returns { total, bar,
+  // food } split by the staff member's position department (Profit's split:
+  // department 'Bar' is bar, everything else is food), so This Week's bar/food
+  // labor stays correct.
+  salariedCost(startDate, endDate) {
+    const out = { total: 0, bar: 0, food: 0 };
+    if (!startDate || !endDate) return out;
+    const sd = new Date(startDate + 'T00:00:00'), ed = new Date(endDate + 'T00:00:00');
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return out;
+    const days = Math.floor((ed.getTime() - sd.getTime()) / 86400000) + 1;
+    if (days <= 0) return out;
+    const weeks = days / 7;
+    const posDept = {};
+    ((this.laborData?.lc_positions) || []).forEach(p => { posDept[p.id] = p.department; });
+    ((this.laborData?.lc_staff) || []).forEach(s => {
+      if (!this.isSalaried(s) || s.status === 'Inactive') return;
+      const annual = parseFloat(s.annual_salary);
+      if (!annual || annual <= 0) return;
+      const cost = (annual / 52) * weeks;
+      out.total += cost;
+      if (posDept[s.position_id] === 'Bar') out.bar += cost;
+      else out.food += cost;
+    });
+    return out;
+  },
+  // Weekly salary cost for ONE staff member (annual_salary / 52), or 0 when the
+  // staff member is not salaried or has no salary on file. Used by per-staff
+  // and per-day rollups (Daily View, Weekly Summary, Pay Periods).
+  staffWeeklySalary(staffOrId) {
+    const s = (staffOrId && typeof staffOrId === 'object')
+      ? staffOrId
+      : (this.laborData?.lc_staff || []).find(x => x.id === staffOrId);
+    if (!this.isSalaried(s) || (s && s.status === 'Inactive')) return 0;
+    const annual = parseFloat(s && s.annual_salary);
+    return annual && annual > 0 ? annual / 52 : 0;
+  },
+
+  // Canonical lc_actuals hours edit — one owner of the hours->wage->cost math so
+  // Daily View and Weekly Summary can never drift from each other on a payroll
+  // number. Honors a per-record wage override, else the staff member's effective
+  // wage on the shift date; recomputes cost, stamps updated_at, persists one row.
+  // No-op on a locked (closed pay-period) record.
+  async updateActual(rec, fields) {
+    fields = fields || {};
+    if (!rec || rec.locked) return false;
+    if (fields.hours != null && !isNaN(fields.hours) && fields.hours >= 0) {
+      rec.hours = fields.hours;
+      const wage = rec.wage != null ? rec.wage
+        : (this.wageForStaffOn ? this.wageForStaffOn(rec.staff_id, rec.date) : 0);
+      rec.cost = rec.hours * wage;
+    }
+    if (fields.notes != null) rec.notes = String(fields.notes).trim();
+    rec.updated_at = new Date().toISOString();
+    return await this.putRecord('lc', 'actual', rec);
+  },
+
+  // Logged hours for a staff member on a date, read from lc_actuals. Tip Log
+  // and Tip Pool both auto-fill hours from here, so the lookup lives once.
+  hoursFor(staffId, date) {
+    if (!staffId || !date) return null;
+    const a = ((this.laborData && this.laborData.lc_actuals) || []).find(x => x.staff_id === staffId && x.date === date);
+    return a ? (a.hours || null) : null;
+  },
+
+  // Currently-open shift, if any. The 3rd+ consumer of this pattern, so it
+  // lives in App so dropdowns can auto-fill manager / reported-by / counted-by
+  // from one source of truth. Returns the most recently-started Open shift,
+  // or null.
+  activeShift() {
+    const list = (this.shiftData && this.shiftData.sc_shifts) || [];
+    const open = list.filter(s => s.status === 'Open');
+    if (!open.length) return null;
+    return open.slice().sort((a, b) =>
+      new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime()
+    )[0];
+  },
+  activeManagerId() {
+    const s = this.activeShift();
+    return s ? (s.manager_id || '') : '';
+  },
+
+  // Day-of-week labels used by Revenue Forecast and the schedule builder.
+  // Monday-first because most independent operators set their week that way.
+  DAYS_MON_FIRST: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+
+  // Resolve the Monday of the week containing a given date string. Forecast
+  // records are keyed by week_start (Monday) so every screen converts a
+  // period_end (Sunday) or any in-week date to the canonical Monday key.
+  weekStartFor(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(String(dateStr).length <= 10 ? dateStr + 'T00:00:00' : dateStr);
+    if (isNaN(d.getTime())) return '';
+    const wd = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - wd);
+    return d.toISOString().slice(0, 10);
+  },
+
+  // Convert a Monday week_start to the Sunday period_end of the same week.
+  periodEndFor(weekStart) {
+    if (!weekStart) return '';
+    const d = new Date(weekStart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().slice(0, 10);
+  },
+
+  // Return the saved revenue_forecasts record for a given week_start (Monday),
+  // or null. Accepts either a week_start or any in-week date.
+  forecastForWeek(dateStr) {
+    const ws = this.weekStartFor(dateStr);
+    if (!ws) return null;
+    const list = (this.data && Array.isArray(this.data.revenue_forecasts)) ? this.data.revenue_forecasts : [];
+    return list.find(f => f.week_start === ws) || null;
+  },
+
+  // Auto-defaults for a coming week's forecast. Looks at the same weekday in
+  // the last 8 weeks worth of shift revenue (sc_shifts), weighted toward the
+  // newer weeks (linear 1..8). Returns per-day numbers plus the total. Used
+  // when the operator opens the forecast screen for a week with no record yet.
+  forecastDefaultsFor(weekStart) {
+    const ws = this.weekStartFor(weekStart);
+    if (!ws) return { per_day: {}, total: 0 };
+    const shifts = (this.shiftData && this.shiftData.sc_shifts) || [];
+    // Group revenue by date, summing bar + floor
+    const revByDate = {};
+    shifts.forEach(s => {
+      if (!s.date) return;
+      const r = (parseFloat(s.bar_revenue) || 0) + (parseFloat(s.floor_revenue) || 0);
+      if (r <= 0) return;
+      revByDate[s.date] = (revByDate[s.date] || 0) + r;
+    });
+
+    const start = new Date(ws + 'T00:00:00');
+    const perDay = {};
+    let total = 0;
+    this.DAYS_MON_FIRST.forEach((day, idx) => {
+      const target = new Date(start.getTime());
+      target.setDate(target.getDate() + idx);
+      const samples = [];
+      // Look back up to 8 same-weekday occurrences before this week's day
+      for (let back = 1; back <= 8; back++) {
+        const probe = new Date(target.getTime());
+        probe.setDate(probe.getDate() - back * 7);
+        const key = probe.toISOString().slice(0, 10);
+        if (revByDate[key] != null) samples.push(revByDate[key]);
+      }
+      let avg = 0;
+      if (samples.length) {
+        // Newest sample is samples[0]. Weight newer higher: weights = N..1.
+        let wsum = 0, vsum = 0;
+        samples.forEach((v, i) => {
+          const w = samples.length - i;
+          vsum += v * w;
+          wsum += w;
+        });
+        avg = wsum > 0 ? Math.round(vsum / wsum) : 0;
+      }
+      perDay[day] = avg;
+      total += avg;
+    });
+    return { per_day: perDay, total: total };
+  },
+
+  // Generate a blank worksheet as a clean PDF (header + an empty grid the
+  // operator prints and fills by hand during the shift, then keys into Bar Cop
+  // after close). Same engine + Save flow as exportPDF, so output and filename
+  // are consistent across the app: BarCop_<Name>_Worksheet_<date>.pdf.
+  // Usage: App.printBlankSheet({ title, subtitle, columns: [{label, width?}], rows? });
+  async printBlankSheet(opts) {
+    opts = opts || {};
+    const title    = opts.title    || 'Worksheet';
+    const subtitle = opts.subtitle || '';
+    const cols     = opts.columns  || [];
+    try { await this._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
+    // Portrait is what operators expect for a hand-filled sheet. Only fall back to
+    // landscape if the headers genuinely can't fit a portrait page (estimate widths
+    // here since the doc/getTextWidth doesn't exist yet).
+    const estHeaderW = cols.reduce((s, c) => s + (String(c.label || '').length * 4.7 + 16), 0);
+    const orientation = estHeaderW > (612 - 80) ? 'landscape' : 'portrait';
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation, unit: 'pt', format: 'letter' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const usableW = pageW - margin * 2;
+    let y = margin;
+
+    const venue = (this.data && this.data.settings && this.data.settings.bar_name) || '';
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+    doc.text('Bar Cop', margin, y);
+    doc.setFontSize(12);
+    doc.text(this._pdfSafe(title), pageW - margin, y, { align: 'right' });
+    y += 16;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+    const dstr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    doc.text(this._pdfSafe((venue ? venue + '   |   ' : '') + dstr), margin, y);
+    y += 14;
+    if (subtitle) {
+      doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+      const wrapped = doc.splitTextToSize(this._pdfSafe(subtitle), usableW);
+      doc.text(wrapped, margin, y);
+      y += wrapped.length * 11 + 4;
+    }
+    doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+    doc.text(this._pdfSafe('Completed by: ______________________________'), margin, y);
+    y += 6;
+    doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
+    y += 12;
+
+    // Column widths: honor the call-site hint but never let a column fall below
+    // its own header's width, so a long header (e.g. "Witnessed") can't wrap in a
+    // skinny column. Narrow-header columns lock to that minimum; the rest flex to
+    // fill the row exactly.
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    const reqW = cols.map(c => {
+      const w = c.width ? String(c.width) : '';
+      if (/%$/.test(w)) return (parseFloat(w) / 100) * usableW;
+      if (/px$/.test(w)) return parseFloat(w) * 0.75;
+      return usableW / Math.max(1, cols.length);
+    });
+    const minW = cols.map(c => doc.getTextWidth(this._pdfSafe(c.label || '')) + 14);
+    const atMin = cols.map((c, i) => reqW[i] <= minW[i]);
+    const fixedSum = cols.reduce((s, c, i) => s + (atMin[i] ? minW[i] : 0), 0);
+    const flexSum  = cols.reduce((s, c, i) => s + (atMin[i] ? 0 : reqW[i]), 0);
+    const flexAvail = Math.max(0, usableW - fixedSum);
+    const columnStyles = {};
+    cols.forEach((c, i) => {
+      columnStyles[i] = { cellWidth: atMin[i] ? minW[i] : (flexSum > 0 ? reqW[i] * (flexAvail / flexSum) : minW[i]) };
+    });
+
+    // One page, always: fit the body rows to the space between the header block and
+    // the footer, stretching each row to fill the page. Operators print as many
+    // copies as they need, so a worksheet never spills onto a near-empty 2nd page.
+    const footerReserve = 30;
+    // 14pt safety below the table so autoTable (whose own bottom margin we set to
+    // footerReserve) never bumps the last row onto a second page.
+    const availH = pageH - y - footerReserve - 14;
+    const headerRowH = 20;
+    const minBodyRowH = 26;
+    const nRows = Math.max(1, Math.floor((availH - headerRowH) / minBodyRowH));
+    const bodyRowH = (availH - headerRowH) / nRows;
+
+    const head = [cols.map(c => this._pdfSafe(c.label || ''))];
+    const body = Array.from({ length: nRows }, () => cols.map(() => ''));
+    doc.autoTable({
+      startY: y,
+      head, body,
+      margin: { left: margin, right: margin, top: margin, bottom: footerReserve },
+      columnStyles,
+      styles: { fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 }, lineColor: [150, 150, 150], lineWidth: 0.5, overflow: 'linebreak', valign: 'middle' },
+      bodyStyles: { minCellHeight: bodyRowH },
+      headStyles: { fillColor: [235, 235, 235], textColor: 30, fontStyle: 'bold', fontSize: 9, minCellHeight: headerRowH, halign: 'left', valign: 'middle' },
+      theme: 'grid'
+    });
+
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+      doc.text('Enter completed entries into Bar Cop after shift close.', margin, pageH - 22);
+      doc.text('Page ' + i + ' of ' + pages, pageW - margin, pageH - 22, { align: 'right' });
+    }
+
+    // Filename: strip the trailing noun from the title and append "Worksheet".
+    const base = String(title).replace(/\s*(Log|Sheet|Pad|Book|Calendar|Worksheet|List)\s*$/i, '').trim() || String(title);
+    const tag = base.replace(/[^A-Za-z0-9]+/g, '');
+    await this._savePDF(doc, 'BarCop_' + tag + '_Worksheet_' + this._pdfDateStamp() + '.pdf');
+  },
+
+  // In-app confirmation modal — replaces window.confirm() so dialogs match
+  // Bar Cop's visual language (no jarring native browser prompts). Returns
+  // a Promise that resolves to true (confirmed) or false (cancelled).
+  // Usage: if (!(await App.confirm({title, message, confirmText, danger}))) return;
+  confirm(opts) {
+    opts = opts || {};
+    const title       = opts.title       || 'Are you sure?';
+    const message     = opts.message     || '';
+    const confirmText = opts.confirmText || 'Confirm';
+    const cancelText  = opts.cancelText  || 'Cancel';
+    const danger      = opts.danger !== false; // default to danger (red) confirm button
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+      overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + esc(title) + '</div>'
+        + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+          + '<button class="btn btn-ghost" data-act="cancel">' + esc(cancelText) + '</button>'
+          + '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" data-act="confirm">' + esc(confirmText) + '</button>'
+        + '</div></div>';
+      document.body.appendChild(overlay);
+      const cleanup = (val) => { document.body.removeChild(overlay); resolve(val); };
+      overlay.addEventListener('click', e => {
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        if (act === 'confirm') cleanup(true);
+        else if (act === 'cancel' || e.target === overlay) cleanup(false);
+      });
+      // Esc cancels
+      const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); cleanup(false); } };
+      document.addEventListener('keydown', onKey);
+    });
+  },
+
+  // ── Deliverable footer + disclaimer (legal protection helper) ───────────
+  // Single source for the disclaimer text + workbook Subject metadata + PDF
+  // footer HTML used across every Bar Cop deliverable: Books, Year-End,
+  // Weekly P&L Brief, Traffic Month End Brief, Bar Cop Audit PDF, and any
+  // future operator-facing export. Centralizing means the legal language
+  // stays in lockstep when it gets edited.
+  //
+  // Usage:
+  //   For XLSX consumers (Books, Year-End, Weekly P&L):
+  //     const f = App.deliverableFooter();
+  //     f.disclaimerLines  // array of 3 short strings, one per sheet footer row
+  //     f.workbookSubject  // single-line string for wb.Props.Subject
+  //
+  //   For PDF/HTML consumers (Traffic Month End Brief, Bar Cop Audit PDF):
+  //     html += App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Audit' });
+  //     returns a styled <div class="footer">...</div> block.
+  //
+  // opts.barName        — defaults to App.data.settings.bar_name or 'Bar Cop'
+  // opts.tagline        — short tagline shown above the disclaimer in PDFs
+  // opts.sourceText     — optional source note rendered above the disclaimer
+  // opts.generatedDate  — Date object, defaults to now
+  deliverableFooter(opts) {
+    opts = opts || {};
+    const dateStr = (opts.generatedDate || new Date()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const tagline = opts.tagline || 'Bar Cop';
+
+    const disclaimerLines = [
+      'Generated from data you entered in Bar Cop on ' + dateStr + '.',
+      'Bar Cop is a software tool, not a CPA, accountant, marketing consultant, or other professional advisor.',
+      'Review and verify before filing, presenting, or making material decisions.'
+    ];
+    const workbookSubject = disclaimerLines.join(' ');
+
+    if (opts.kind === 'pdf-html') {
+      const sourceLine = opts.sourceText
+        ? '<div>' + esc(opts.sourceText) + '</div>'
+        : '';
+      return '<div class="footer" style="margin-top:24px;font-size:9px;color:#999;line-height:1.5;font-family:Helvetica,Arial,sans-serif;border-top:1px solid #ddd;padding-top:10px;">'
+        + '<div>' + esc(tagline) + '</div>'
+        + sourceLine
+        + '<div style="font-style:italic;margin-top:6px;">' + esc(workbookSubject) + '</div>'
+        + '</div>';
+    }
+
+    return { disclaimerLines: disclaimerLines, workbookSubject: workbookSubject };
+  },
+
+  fmtPct(n, d=1) {
+    if (isNaN(n) || n == null) return ' ';
+    return Number(n).toFixed(d) + '%';
+  },
+
+  /* ── Dollarize a percentage gap (Section 10.2) ───────────────────────────
+     The shared helper that puts a dollar figure on a percentage. Pass the
+     metric, its target, and the annual revenue base it applies to. Returns
+     the signed gap in points and dollars (annual and weekly), where a
+     positive figure means the metric sits above target. Returns null when
+     any input is missing, so callers never print a fabricated number. */
+  dollarize(metric, target, annualBase) {
+    if (metric == null || target == null || !annualBase || isNaN(annualBase)) return null;
+    const gapPts = metric - target;
+    const annual = (gapPts / 100) * annualBase;
+    return { gapPts: gapPts, annual: annual, weekly: annual / 52 };
+  },
+
+  /* ── Unified audit score system (0-100) ──────────────────────────────────
+     One scale for every audit score in all three sections:
+       70-100  Strong        gold
+       50-69   Below Target  white
+       0-49    Critical      red                                          */
+  // Strong scores use green (success), below-target stays white, critical red.
+  // Gold is reserved for brand accents and CTAs, not "doing well" state.
+  scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red)'; },
+  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#9A5D34'      : '#C03828'; },
+  scoreLabel(s) { s = Number(s) || 0; return s >= 70 ? 'Strong'       : s >= 50 ? 'Below Target' : 'Critical'; },
+
+  // Slim 0-100 scale bar with red / amber / green zones and a marker at the score.
+  scoreBar(score) {
+    const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+    return '<div style="margin-top:10px;max-width:300px;">'
+      + '<div style="display:flex;height:7px;border-radius:4px;overflow:hidden;">'
+      +   '<div style="width:50%;background:var(--red);"></div>'
+      +   '<div style="width:20%;background:var(--amber);"></div>'
+      +   '<div style="width:30%;background:var(--green);"></div>'
+      + '</div>'
+      + '<div style="position:relative;height:0;">'
+      +   '<div style="position:absolute;top:-10px;left:' + s + '%;width:3px;height:13px;background:var(--w);border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 0 1.5px var(--surface);"></div>'
+      + '</div>'
+      + '<div style="display:flex;margin-top:6px;font-size:8px;font-weight:700;letter-spacing:0.5px;color:var(--t3);">'
+      +   '<span style="width:50%;">CRITICAL</span>'
+      +   '<span style="width:20%;text-align:center;">BELOW TGT</span>'
+      +   '<span style="width:30%;text-align:right;">STRONG</span>'
+      + '</div>'
+    + '</div>';
+  },
+
+  /* ── Reusable trend chart ─────────────────────────────────────────────────
+     opts: { title, points:[{label,value}], target (optional), suffix (optional) }
+     Returns a chart-card. Needs 2+ non-null values or shows a prompt.        */
+  trendChart(opts) {
+    const pts  = (opts.points || []).filter(Boolean);
+    const vals = pts.map(p => p.value).filter(v => v != null);
+    const title = opts.title || 'Trend';
+    const head = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">' + esc(title) + '</div>';
+    if (vals.length < 2) {
+      return '<div class="chart-card" style="padding:20px 24px 16px;">' + head
+        + '<div style="text-align:center;padding:16px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see this trend</div></div>';
+    }
+    const W = 700, H = 170, PAD = { t:24, r:18, b:34, l:46 };
+    const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
+    let minV = Math.min(...vals), maxV = Math.max(...vals);
+    if (opts.target != null) { minV = Math.min(minV, opts.target); maxV = Math.max(maxV, opts.target); }
+    const span = (maxV - minV) * 0.15 || 1;
+    const minY = minV - span, maxY = maxV + span;
+    const xs = i => PAD.l + (pts.length > 1 ? (i/(pts.length-1))*cw : cw/2);
+    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
+    const valid = pts.map((p,i) => p.value != null ? { x:xs(i), y:ys(p.value) } : null).filter(Boolean);
+    let d = 'M' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
+    for (let i = 1; i < valid.length; i++) {
+      const cp = (valid[i].x - valid[i-1].x) * 0.35;
+      d += ' C' + (valid[i-1].x+cp).toFixed(1) + ',' + valid[i-1].y.toFixed(1) + ' ' + (valid[i].x-cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
+    }
+    // Gradient area fill under the line — matches the module dashboard charts
+    const base = (PAD.t + ch).toFixed(1);
+    const area = d.replace('M' + valid[0].x.toFixed(1) + ',', 'M' + valid[0].x.toFixed(1) + ',' + base + ' L' + valid[0].x.toFixed(1) + ',')
+      + ' L' + valid[valid.length-1].x.toFixed(1) + ',' + base + ' Z';
+    const gid = 'tg' + Math.random().toString(36).slice(2,7);
+    const dots = pts.map((p,i) => p.value != null ? '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p.value).toFixed(1) + '" r="4" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>' : '').join('');
+    const xl = pts.map((p,i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H-8) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + esc(String(p.label||'')) + '</text>').join('');
+    const yt = [minY, (minY+maxY)/2, maxY].map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (PAD.l-8) + '" y="' + (ys(v)+4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (Math.round(v*10)/10) + '</text>').join('');
+    const tl = opts.target != null
+      ? '<line x1="' + PAD.l + '" y1="' + ys(opts.target).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(opts.target).toFixed(1) + '" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/><text x="' + (W-PAD.r+4) + '" y="' + (ys(opts.target)+4).toFixed(1) + '" fill="rgba(219,171,70,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
+      : '';
+    return '<div class="chart-card" style="padding:20px 24px 14px;">' + head
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible;">'
+      + '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
+      + yt + tl
+      + '<path d="' + area + '" fill="url(#' + gid + ')" stroke="none"/>'
+      + '<path d="' + d + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
+      + dots + xl
+      + '</svg></div>';
+  },
+
+  nextWeekNum() {
+    const weeks = this.data?.weeks || [];
+    if (weeks.length === 0) return 1;
+    return Math.max(...weeks.map(w => w.week_num || 0)) + 1;
+  },
+
+  nextSunday() {
+    const d = new Date();
+    const diff = (7 - d.getDay()) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().slice(0, 10);
+  },
+
+  // Newest event record by date. Event logs load date-desc from the events
+  // tables, so the last array element is no longer the latest — pick by date
+  // (date / period_end / generated_at) instead. Used wherever the Hub and the
+  // recovery dashboards show "the latest audit / week".
+  latestEvent(arr) {
+    if (!Array.isArray(arr) || !arr.length) return null;
+    const dk = r => ((r && (r.date || r.period_end || r.generated_at || r.saved_at || r.created_at)) || '') + '';
+    return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
+  },
+
+  uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+};
+
+/* ── Global screen namespace (declared in index.html before screen scripts) ── */
+
+/* ── Tooltip helper ── */
+function tt(id) {
+  return '<span class="tt" data-tt="' + id + '">?</span>';
+}
+
+/* ── HTML escape ── */
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Reviewed-on staleness note ── */
+function reviewedNote(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  if (isNaN(then.getTime())) return '';
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+  const stale = days > 30;
+  return '<div style="font-size:11px;color:' + (stale ? 'var(--gold)' : 'var(--t3)')
+    + ';margin-bottom:10px;">Last reviewed ' + when
+    + (stale ? ', update it' : '') + '</div>';
+}
+
+/* ── Auth UI ── */
+function wireAuth() {
+  const show = (id) => {
+    ['auth-login','auth-reset'].forEach(x => document.getElementById(x).style.display = x===id?'':'none');
+  };
+  document.getElementById('show-reset')?.addEventListener('click',  () => show('auth-reset'));
+  document.getElementById('show-login2')?.addEventListener('click', () => show('auth-login'));
+
+  document.getElementById('login-btn')?.addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-password').value;
+    const err   = document.getElementById('login-error');
+    const btn   = document.getElementById('login-btn');
+    if (!email || !pass) { err.textContent='Enter email and password.'; err.style.display='block'; return; }
+    btn.textContent='Signing in...'; btn.disabled=true;
+    const {error} = await DB.signIn(email, pass);
+    btn.textContent='Sign In'; btn.disabled=false;
+    if (error) { err.textContent=error.message; err.style.display='block'; }
+    else err.style.display='none';
+  });
+
+  ['login-email','login-password'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-btn')?.click(); });
+  });
+
+  document.getElementById('reset-btn')?.addEventListener('click', async () => {
+    const email = document.getElementById('reset-email').value.trim();
+    const msg   = document.getElementById('reset-msg');
+    const btn   = document.getElementById('reset-btn');
+    if (!email) { msg.style.color='var(--red)'; msg.textContent='Enter your email.'; msg.style.display='block'; return; }
+    btn.textContent='Sending...'; btn.disabled=true;
+    const {error} = await DB.resetPassword(email);
+    btn.textContent='Send Reset Link'; btn.disabled=false;
+    msg.style.color = error ? 'var(--red)' : 'var(--gold)';
+    msg.textContent = error ? error.message : 'Reset link sent. Check your email.';
+    msg.style.display='block';
+  });
+
+  document.getElementById('set-pw-btn')?.addEventListener('click', async () => {
+    const pw1 = document.getElementById('set-pw1').value;
+    const pw2 = document.getElementById('set-pw2').value;
+    const msg = document.getElementById('set-pw-msg');
+    const btn = document.getElementById('set-pw-btn');
+    if (!pw1 || pw1.length < 8) { msg.style.color='var(--red)'; msg.textContent='Password must be at least 8 characters.'; msg.style.display='block'; return; }
+    if (pw1 !== pw2) { msg.style.color='var(--red)'; msg.textContent='Passwords do not match.'; msg.style.display='block'; return; }
+    btn.textContent='Saving...'; btn.disabled=true;
+    const { data: updateData, error } = await DB._sb.auth.updateUser({ password: pw1 });
+    if (error) {
+      btn.textContent='Set Password and Sign In'; btn.disabled=false;
+      msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block';
+    } else {
+      msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block';
+      // Manually boot since SIGNED_IN may not re-fire after updateUser
+      await App.loadAllData();
+      App.subscription = await DB.getSubscription();
+      App.boot();
+    }
+  });
+
+  document.getElementById('signout-btn')?.addEventListener('click', async () => {
+    await DB.signOut();
+    App.showAuth();
+  });
+}
+
+/* ── Boot ── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Nav items are injected dynamically   wired in App._renderNav()
+  // Settings is one unified platform-wide screen (Hub-owned)
+  document.getElementById('nav-settings')?.addEventListener('click', () => {
+    App.navigate('settings');
+  });
+  wireAuth();
+  App.init();
+
+  // Quality-of-life: focusing any number input selects its current value, so a
+  // prepopulated "0" is overwritten the moment the operator types instead of
+  // having to delete it first (matches the bottle/keg slider's level field).
+  // Delegated on document so it also covers inputs rendered later (count cards,
+  // popups, spot check). setTimeout lets the browser's own focus handling run
+  // first, otherwise the selection gets cleared on some browsers.
+  document.addEventListener('focusin', e => {
+    const el = e.target;
+    if (el && el.tagName === 'INPUT' && el.type === 'number') {
+      setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
+    }
+  });
+});
