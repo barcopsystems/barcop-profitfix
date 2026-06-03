@@ -2,15 +2,19 @@
 
 /* ── Labor Control — Tip Log (writes lc_tips) ─────────────────────────────────
    Records tips by SHIFT and staff member — cash and card, totalled.
-   Phase 3: shift_id is the anchor. Picking a shift pre-fills date,
-   shift_type, and the active manager. Staff dropdown filters to that
-   shift's logged staff (with full roster fallback). Hours pull from
-   lc_actuals when staff + shift are both set. Operator types tip amounts
-   and that's it — every other field is derived. */
+   shift_id is the anchor. Picking a shift pre-fills date, shift_type, and the
+   active manager. Staff dropdown filters to that shift's logged staff (with full
+   roster fallback). Hours pull from lc_actuals when staff + shift are both set.
+
+   Landing = inline Log Tips form on top, a filter card, then the tip list.
+   Clicking a row opens its edit page (same form, minus How it works). */
 
 S.LaborTipLog = {
   editId: null,
   _pendingDelId: null,
+  filterFrom: '',
+  filterTo: '',
+  filterStaff: '',
 
   tips() {
     if (!App.laborData) App.laborData = {};
@@ -23,11 +27,8 @@ S.LaborTipLog = {
   shiftById(id) { return this.shifts().find(s => s.id === id); },
   actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
 
-  // Hours worked for a given staff member on a given date — pulled from
-  // Labor Control's lc_actuals so the operator doesn't have to retype.
-  // Shift dropdown options. Most-recent first. Includes Open shifts at the
-  // top, then closed shifts from the last 14 days, then an "Other / Manual"
-  // escape hatch for legacy or off-cycle entries.
+  // Shift dropdown options. Open shifts first, then closed shifts from the last
+  // 14 days, then a Manual escape hatch for off-cycle entries.
   shiftOptions(selectedId) {
     const all = this.shifts().slice().sort((a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
@@ -74,108 +75,55 @@ S.LaborTipLog = {
     this.renderList();
   },
 
-  renderList() {
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="tl-print-blank" style="margin-left:8px;">Worksheet</button>';
-    document.getElementById('tl-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Log', root: this.container }));
-    document.getElementById('tl-print-blank')?.addEventListener('click', () => this.printBlank());
-    if (this.staff().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add staff first</div>'
-        + '<div class="empty-sub">Tips are logged against your roster. Add staff in Staff Roster, then '
-        + 'log tips here.</div>'
-        + '<button class="btn btn-primary" id="tl-go-roster">Go to Staff Roster</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#tl-go-roster')) App.navigate('lc-staff-roster'); };
-      return;
-    }
-
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Log Tips';
-    addBtn.addEventListener('click', () => this.showForm());
-    this.actions.appendChild(addBtn);
-
-    const list = [...this.tips()].sort((a, b) =>
-      new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
-
-    let html;
-    if (list.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No tips logged yet</div>'
-        + '<div class="empty-sub">Log cash and card tips by shift. Pick the shift, the rest auto-fills.</div>'
-        + '<button class="btn btn-primary" id="tl-add-first">Log Tips</button></div>';
-    } else {
-      const cash = list.reduce((t, x) => t + (x.cash_tips || 0), 0);
-      const card = list.reduce((t, x) => t + (x.card_tips || 0), 0);
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + list.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Cash Tips</div><div class="calc-val">' + App.fmtCurrency(cash) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Card Tips</div><div class="calc-val">' + App.fmtCurrency(card) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good">' + App.fmtCurrency(cash + card) + '</div></div>'
-        + '</div>';
-      const rows = list.slice(0, App.listLimit('lc', 'tip')).map(x => {
-        const shiftLinked = !!x.shift_id;
-        const shiftLabel = shiftLinked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">SHIFT LINKED</span>' : '';
-        return '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDate(x.date) + '</div></td>'
-        + '<td>' + esc(x.name || '-') + '</td>'
-        + '<td>' + esc(x.shift_type || '-') + ' ' + shiftLabel + '</td>'
-        + '<td>' + App.fmtCurrency(x.cash_tips || 0) + '</td>'
-        + '<td>' + App.fmtCurrency(x.card_tips || 0) + '</td>'
-        + '<td class="val">' + App.fmtCurrency(x.total_tips || 0) + '</td>'
-        + '<td><div class="row-actions">'
-        + (App.canEdit('lc-tip-log') ? '<button class="btn btn-ghost btn-sm tl-edit" data-id="' + x.id + '">Edit</button>' : '')
-        + (App.canEdit('lc-tip-log') ? '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>' : '')
-        + '</div></td></tr>';
-      }).join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('lc', 'tip', list, false);
-    }
-
-    this.container.innerHTML = '<div class="screen">' + html + '</div>';
-    this.container.onclick = ev => {
-      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
-      const row = ev.target.closest('.tl-row');
-      const edit = ev.target.closest('.tl-edit');
-      const del = ev.target.closest('.tl-del');
-      const addF = ev.target.closest('#tl-add-first');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row && App.canEdit('lc-tip-log')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
-    };
+  showHowTo() {
+    App.showHelpModal('How the Tip Log Works', [
+      { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
+      { h: 'Logging Tips', p: ['Choose the shift, pick the staff member (the dropdown lists who worked that shift first), then enter cash and card tips. Tippable hours pull from logged hours automatically, and you can override them. Pick Manual entry instead of a shift for an off-cycle entry where you set the date and shift type yourself.'] },
+      { h: 'Where Tips Go', p: ['Tips feed the Tip Pool calculator and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
+      { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
+    ]);
   },
 
-  // ── Form ──────────────────────────────────────────────────────────────
-  // Shift dropdown first. Picking it auto-fills date + shift_type from the
-  // shift record. Staff dropdown filters to that shift's logged staff (with
-  // full roster as fallback). Hours auto-pulls from lc_actuals.
-  showForm(id) {
-    if (id && !App.canEdit('lc-tip-log')) return;
-    this.editId = id || null;
-    const x = id ? this.tips().find(t => t.id === id) : null;
-    // Default the shift dropdown to: existing record's shift, OR the active shift, OR none
-    let initialShiftId = x?.shift_id || '';
-    if (!initialShiftId && !x) {
-      const active = this.activeShift();
-      if (active) initialShiftId = active.id;
+  // The shift to default the dropdown to: an existing record's shift, an existing
+  // manual entry, the active shift, or none.
+  initialShiftIdFor(x) {
+    if (x) {
+      if (x.shift_id) return x.shift_id;
+      if (x.date) return '__manual';
+      return '';
     }
-    const isManual = initialShiftId === '__manual' || (x && !x.shift_id && x.date);
+    const a = this.activeShift();
+    return a ? a.id : '';
+  },
+
+  // Shared form fields used by the inline add form and the edit page. All entry
+  // cells on one row (Shift, Staff, Tippable Hours, Cash, Card, Total); the
+  // manual date/shift-type row and the shift summary are conditional, and Notes
+  // sits on its own row. Pass the record for edit, or null for a new entry.
+  formBody(x) {
+    const v = val => (val != null && val !== '') ? val : '';
+    const initialShiftId = this.initialShiftIdFor(x);
+    const isManual = initialShiftId === '__manual';
     const initialShift = initialShiftId && initialShiftId !== '__manual' ? this.shiftById(initialShiftId) : null;
     const defaultDate = x?.date || initialShift?.date || new Date().toISOString().slice(0, 10);
     const defaultShiftType = x?.shift_type || initialShift?.shift_type || '';
 
-    const v = val => (val != null && val !== '') ? val : '';
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Log') + ' Tips</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1;min-width:260px;"><label>Shift</label>'
-          + '<select id="tl-shift">' + this.shiftOptions(initialShiftId || (isManual ? '__manual' : '')) + '</select></div>'
+    return '<div class="form-row data-row" style="gap:12px;">'
+        + '<div class="f" style="flex:1.5 1 180px;min-width:0;"><label>Shift</label>'
+          + '<select id="tl-shift">' + this.shiftOptions(initialShiftId) + '</select></div>'
+        + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
+          + '<select id="tl-staff"></select></div>'
+        + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Tippable Hours</label>'
+          + '<input type="number" id="tl-hours" min="0" step="0.25" value="' + v(x?.hours) + '" placeholder="Auto"/></div>'
+        + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Cash Tips</label>'
+          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tl-cash" min="0" step="0.01" value="' + v(x?.cash_tips) + '"/></div></div>'
+        + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Card Tips</label>'
+          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tl-card" min="0" step="0.01" value="' + v(x?.card_tips) + '"/></div></div>'
+        + '<div class="f" style="flex:0.8 1 100px;min-width:0;"><label>Total</label>'
+          + '<div class="f-display" id="tl-c-total">-</div></div>'
       + '</div>'
 
-      // Hidden / collapsed: date + shift_type only show in Manual mode
+      // Manual mode reveals date + shift type (a shift pick derives them instead).
       + '<div id="tl-manual-row" class="form-row" style="gap:16px;' + (isManual ? '' : 'display:none;') + '">'
         + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
           + '<input type="date" id="tl-date" value="' + esc(defaultDate) + '"/></div>'
@@ -184,61 +132,177 @@ S.LaborTipLog = {
               '<option value="' + esc(t) + '"' + (defaultShiftType === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>'
       + '</div>'
 
-      // Shift summary card (only when a real shift is picked)
       + '<div id="tl-shift-summary" style="margin-bottom:14px;"></div>'
 
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Staff</label>'
-          + '<select id="tl-staff"></select></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Tippable Hours</label>'
-          + '<input type="number" id="tl-hours" min="0" step="0.25" value="' + v(x?.hours) + '" placeholder="Auto"/></div>'
-      + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
+        + '<textarea id="tl-notes" rows="2" placeholder="Optional">' + esc(x?.notes || '') + '</textarea></div></div>';
+  },
 
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cash Tips</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tl-cash" min="0" step="0.01" value="' + v(x?.cash_tips) + '"/></div></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Card Tips</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tl-card" min="0" step="0.01" value="' + v(x?.card_tips) + '"/></div></div>'
-        + '<div class="f" style="flex:1;min-width:140px;"><label>Total</label>'
-          + '<div class="f-display" id="tl-c-total">-</div></div>'
-      + '</div>'
-
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="tl-notes" rows="2" placeholder="Optional">' + esc(x?.notes || '') + '</textarea></div>'
-
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="tl-save">' + (id ? 'Update' : 'Save Tips') + '</button>'
-        + '<button class="btn btn-ghost" id="tl-cancel">Cancel</button>'
-        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    // Wire shift change → re-render staff list + shift summary + auto-fill
+  // Wire the form (inline add OR edit page). Uses element-level listeners so they
+  // never stack across re-renders. x = the record (null for a new entry).
+  wireForm(x) {
+    const initialShiftId = this.initialShiftIdFor(x);
     document.getElementById('tl-shift')?.addEventListener('change', e => this.onShiftChange(e.target.value, x));
-    // Wire staff change → auto-fill hours from lc_actuals
-    this.container.addEventListener('change', e => {
-      if (e.target.id === 'tl-staff') this.onStaffChange(x);
-    });
+    document.getElementById('tl-staff')?.addEventListener('change', () => this.onStaffChange(x));
     document.getElementById('tl-cash')?.addEventListener('input', () => this.calc());
     document.getElementById('tl-card')?.addEventListener('input', () => this.calc());
-    document.getElementById('tl-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('tl-save')?.addEventListener('click', () => this.save());
-
-    // Initial population of staff list + shift summary based on initial selection
+    document.getElementById('tl-cancel')?.addEventListener('click', () => this.renderList());
     this.populateStaffList(initialShiftId, x);
     this.renderShiftSummary(initialShiftId);
     this.calc();
   },
 
-  // When shift dropdown changes — reveal/hide manual fields, refresh staff list,
-  // refresh shift summary, auto-fill hours if staff already picked.
+  renderList() {
+    this.editId = null;
+    this.actions.innerHTML = '';
+
+    if (this.staff().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Log Your First Tips',
+        lead: 'Tips are logged against your roster, by shift and staff member. Add your staff and you can start logging.',
+        steps: [
+          { title: 'Add your staff', desc: 'Tips are logged against a staff member, so build your roster first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
+      return;
+    }
+
+    const addCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Log Tips</span>'
+      + App.helpButton('tl-how') + '</div>'
+      + this.formBody(null)
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="tl-save">Save Tips</button>'
+      + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+
+    const all = [...this.tips()].sort((a, b) =>
+      new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
+    const filtered = this.applyFilters(all);
+
+    let listHtml;
+    if (all.length === 0) {
+      listHtml = '<div class="card"><div class="card-title">Logged Tips</div>'
+        + '<div style="font-size:13px;color:var(--t3);">No tips logged yet. Log your first entry above. Pick the shift and the rest auto-fills.</div></div>';
+    } else {
+      const cash = filtered.reduce((t, x) => t + (x.cash_tips || 0), 0);
+      const card = filtered.reduce((t, x) => t + (x.card_tips || 0), 0);
+      const summary = '<div class="calc" style="margin-bottom:16px;">'
+        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Cash Tips</div><div class="calc-val">' + App.fmtCurrency(cash) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Card Tips</div><div class="calc-val">' + App.fmtCurrency(card) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good">' + App.fmtCurrency(cash + card) + '</div></div>'
+        + '</div>';
+      let body;
+      if (filtered.length === 0) {
+        body = '<div class="empty"><div class="empty-title">No tips match the filters</div>'
+          + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
+      } else {
+        const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x => {
+          return '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
+          + '<td><div class="val">' + this.fmtDate(x.date) + '</div></td>'
+          + '<td>' + esc(x.name || '-') + '</td>'
+          + '<td>' + esc(x.shift_type || '-') + '</td>'
+          + '<td>' + App.fmtCurrency(x.cash_tips || 0) + '</td>'
+          + '<td>' + App.fmtCurrency(x.card_tips || 0) + '</td>'
+          + '<td class="val">' + App.fmtCurrency(x.total_tips || 0) + '</td>'
+          + '<td><div class="row-actions">'
+          + (App.canEdit('lc-tip-log') ? '<button class="btn btn-ghost btn-sm tl-edit" data-id="' + x.id + '">Edit</button>' : '')
+          + (App.canEdit('lc-tip-log') ? '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
+        }).join('');
+        body = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+          + App.showOlderBar('lc', 'tip', filtered, !!(this.filterFrom || this.filterTo || this.filterStaff));
+      }
+      listHtml = summary + body;
+    }
+
+    this.container.innerHTML = '<div class="screen">' + addCard + this.filterCard() + listHtml + '</div>';
+    this.wireForm(null);
+    this.wireList();
+  },
+
+  filterCard() {
+    const staffOpts = '<option value="">All staff</option>'
+      + this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+          .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Filter</span>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tl-print-blank">Worksheet</button>'
+      + '</div></div>'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tl-f-to" value="' + esc(this.filterTo) + '"/></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="tl-f-staff">' + staffOpts + '</select></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tl-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+      + '</div></div>';
+  },
+
+  applyFilters(list) {
+    return list.filter(t => {
+      const date = t.date || '';
+      if (this.filterFrom && date < this.filterFrom) return false;
+      if (this.filterTo && date > this.filterTo) return false;
+      if (this.filterStaff && (t.staff_id || '') !== this.filterStaff) return false;
+      return true;
+    });
+  },
+
+  wireList() {
+    this.container.onclick = ev => {
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const row = ev.target.closest('.tl-row');
+      const edit = ev.target.closest('.tl-edit');
+      const del = ev.target.closest('.tl-del');
+      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
+      if (edit)      { ev.stopPropagation(); this.showForm(edit.dataset.id); return; }
+      if (row && App.canEdit('lc-tip-log')) this.showForm(row.dataset.id);
+    };
+    document.getElementById('tl-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('tl-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Log', root: this.container }));
+    document.getElementById('tl-print-blank')?.addEventListener('click', () => this.printBlank());
+    document.getElementById('tl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('tl-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+    document.getElementById('tl-f-staff')?.addEventListener('change', e => { this.filterStaff = e.target.value || ''; this.renderList(); });
+    document.getElementById('tl-f-clear')?.addEventListener('click', () => {
+      this.filterFrom = this.filterTo = this.filterStaff = '';
+      this.renderList();
+    });
+  },
+
+  // ── Edit page (same form, minus How it works) ──────────────────────────────
+  showForm(id) {
+    if (id && !App.canEdit('lc-tip-log')) return;
+    this.editId = id || null;
+    const x = id ? this.tips().find(t => t.id === id) : null;
+
+    this.container.innerHTML = '<div class="screen"><div class="card">'
+      + '<div class="card-title">Edit Tips</div>'
+      + this.formBody(x)
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="tl-save">Update</button>'
+        + '<button class="btn btn-ghost" id="tl-cancel">Cancel</button>'
+        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div></div>';
+
+    this.container.onclick = null;
+    this.wireForm(x);
+  },
+
+  // When the shift dropdown changes — reveal/hide manual fields, refresh staff
+  // list + shift summary, auto-fill hours if staff already picked.
   onShiftChange(shiftId, existingRec) {
     const manualRow = document.getElementById('tl-manual-row');
     if (shiftId === '__manual') {
       if (manualRow) manualRow.style.display = '';
     } else {
       if (manualRow) manualRow.style.display = 'none';
-      // Auto-fill date + shift_type from the shift record (display-only — actual values resolved at save time)
       const s = this.shiftById(shiftId);
       if (s) {
         const dateInp = document.getElementById('tl-date');
@@ -288,7 +352,6 @@ S.LaborTipLog = {
     const date = document.getElementById('tl-date')?.value || '';
     const hoursInp = document.getElementById('tl-hours');
     if (!hoursInp) return;
-    // If editing and the hours field already has the saved value, don't overwrite
     if (existingRec && hoursInp.value && parseFloat(hoursInp.value) > 0) return;
     const hrs = App.hoursFor(staffId, date);
     if (hrs != null && hrs > 0) hoursInp.value = hrs;
@@ -328,9 +391,6 @@ S.LaborTipLog = {
       date      = document.getElementById('tl-date')?.value;
       shiftType = document.getElementById('tl-shift-type')?.value || '';
       if (!date) { fail('Date is required for manual entry.'); return; }
-      // Manual entries still get a manager link when an active shift exists,
-      // so Form 8027 grouping has a chance at attribution. Falls back to empty
-      // when no shift is open.
       managerId = App.activeManagerId ? App.activeManagerId() : '';
     } else {
       const s = this.shiftById(shiftPick);
