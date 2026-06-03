@@ -68,6 +68,11 @@ S.LaborTipLog = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  normDate(raw) {
+    if (!raw) return '';
+    const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
+    return isNaN(d.getTime()) ? String(raw) : d.toISOString().slice(0, 10);
+  },
 
   render(container, actions) {
     this.container = container;
@@ -220,9 +225,99 @@ S.LaborTipLog = {
       }
     }
 
-    this.container.innerHTML = '<div class="screen">' + addCard + this.filterCard(summaryHtml) + listHtml + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addCard + this.importCard() + this.filterCard(summaryHtml) + listHtml + '</div>';
     this.wireForm(null);
     this.wireList();
+    this.mountTipImporter();
+  },
+
+  // Import card sits under the log form, so an operator can drop a POS tips
+  // export instead of entering by hand. No explainer here; How it works carries it.
+  importCard() {
+    return '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Import Tips</span>'
+      + App.helpButton('tl-imp-how') + '</div>'
+      + '<div id="tl-imp-csv"></div><div id="tl-imp-result"></div></div>';
+  },
+
+  mountTipImporter() {
+    const el = document.getElementById('tl-imp-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      fields: [
+        { key: 'name',      label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'server', 'server name'] },
+        { key: 'date',      label: 'Date',       required: true,  match: ['date', 'business date', 'work date', 'shift date'] },
+        { key: 'card_tips', label: 'Card Tips',  required: false, match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'charged tips', 'non-cash tips'] },
+        { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips'] },
+        { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart'] }
+      ],
+      confirmLabel: 'Import',
+      onComplete: rows => this.importTipRows(rows)
+    });
+  },
+
+  showTipImportHelp() {
+    App.showHelpModal('How Importing Tips Works', [
+      { p: ['Upload a tips export from your POS as a CSV or Excel file. Bar Cop reads your column headers, matches them to the right fields, and lets you fix anything it guessed wrong before importing.'] },
+      { h: 'The Columns', p: ['Staff Name and Date are required. Card Tips and Cash Tips are each optional, but a row needs at least one to import. Your headers do not need to match exactly; these common names are recognized:',
+        'Staff Name: employee, server, name, staff',
+        'Date: date, business date, work date',
+        'Card Tips: card tips, credit tips, cc tips, charged tips',
+        'Cash Tips: cash tips, declared cash tips',
+        'Shift: shift, daypart'] },
+      { h: 'Matching To Your Roster', p: ['Each row is matched to a staff member by name. A row that does not match anyone on the roster, or has no tip amount, is skipped and reported so you can fix it. Imported tips come in as date entries, not linked to a specific shift, which you can adjust by opening any entry.'] }
+    ]);
+  },
+
+  async importTipRows(rows) {
+    const staffByName = {};
+    this.staff().forEach(s => { staffByName[(s.name || '').trim().toLowerCase()] = s; });
+    const toAdd = [];
+    const skipped = [];
+    (rows || []).forEach(r => {
+      const staff = staffByName[(r.name || '').trim().toLowerCase()];
+      const cash = parseFloat(r.cash_tips) || 0;
+      const card = parseFloat(r.card_tips) || 0;
+      if (!staff || (cash + card) <= 0) { skipped.push(r.name || '(blank)'); return; }
+      toAdd.push({
+        id:          App.uid(),
+        shift_id:    '',
+        manager_id:  '',
+        date:        this.normDate(r.date),
+        staff_id:    staff.id,
+        name:        staff.name,
+        position_id: staff.position_id || '',
+        shift_type:  (r.shift || '').trim(),
+        cash_tips:   cash,
+        card_tips:   card,
+        total_tips:  cash + card,
+        hours:       null,
+        notes:       '',
+        imported:    true,
+        created_at:  new Date().toISOString()
+      });
+    });
+
+    const result = document.getElementById('tl-imp-result');
+    const imported = toAdd.length;
+    if (imported === 0) {
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + 'No rows imported. No staff names matched the roster, or no tip amounts were found.</div>';
+      return;
+    }
+    let ok = true;
+    for (const rec of toAdd) { ok = (await App.putRecord('lc', 'tip', rec)) && ok; }
+    if (!ok) {
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
+      return;
+    }
+    this.renderList();
+    const res2 = document.getElementById('tl-imp-result');
+    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
+      + 'Imported ' + imported + ' tip entr' + (imported === 1 ? 'y' : 'ies') + '.'
+      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length
+          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or no tip amount).</span>' : '') + '</div>';
   },
 
   filterCard(summaryHtml) {
@@ -271,6 +366,7 @@ S.LaborTipLog = {
       if (row && App.canEdit('lc-tip-log')) this.showForm(row.dataset.id);
     };
     document.getElementById('tl-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('tl-imp-how')?.addEventListener('click', () => this.showTipImportHelp());
     document.getElementById('tl-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Log', root: this.container }));
     document.getElementById('tl-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('tl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
