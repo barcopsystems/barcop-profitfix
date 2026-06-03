@@ -13,6 +13,7 @@ S.LaborDashboard = {
   positions() { return ((App.laborData && App.laborData.lc_positions) || []); },
   callouts()  { return ((App.laborData && App.laborData.lc_callouts) || []); },
   certs()     { return ((App.laborData && App.laborData.lc_certs) || []); },
+  posDept(id) { const p = this.positions().find(x => x.id === id); return p ? (p.department || 'Other') : 'Unassigned'; },
 
   fmtDate(str) {
     if (!str) return '-';
@@ -125,20 +126,31 @@ S.LaborDashboard = {
     const today = new Date().toISOString().slice(0, 10);
     const wkActuals = this.actuals().filter(a => (a.date || '') >= cutoff);
     const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(cutoff, today).total;
+    const salWeek = App.salariedCost(cutoff, today).total;
+    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWeek;
     const activeStaff = this.staff().filter(s => s.status !== 'Inactive').length;
 
-    // current-week overtime risk
+    // Current-week window + per-staff overtime projection (greater of logged and
+    // scheduled hours, the same basis as Overtime Watch).
     const wkStart = this.mondayOf(new Date()), wkEnd = this.addDays(wkStart, 6);
     const curWeek = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
-    const byStaff = {};
-    curWeek.forEach(a => { byStaff[a.staff_id || a.name] = (byStaff[a.staff_id || a.name] || 0) + (a.hours || 0); });
-    const over = Object.values(byStaff).filter(h => h > App.OT_THRESHOLD).length;
-    const approaching = Object.values(byStaff).filter(h => h >= App.OT_APPROACHING && h <= App.OT_THRESHOLD).length;
+    const sched = this.schedules().find(s => s.week_start === wkStart) || null;
+    const proj = {};
+    const ensure = (id, name) => { if (!proj[id]) proj[id] = { id, name: name || '-', actual: 0, scheduled: 0 }; return proj[id]; };
+    curWeek.forEach(a => { if (App.isSalaried(a.staff_id)) return; ensure(a.staff_id || a.name, a.name).actual += (a.hours || 0); });
+    if (sched) (sched.shifts || []).forEach(sh => { if (App.isSalaried(sh.staff_id)) return; ensure(sh.staff_id || sh.name, sh.name).scheduled += (sh.hours || 0); });
+    const projRows = Object.values(proj).map(e => {
+      const wage = App.wageForStaffOn ? (App.wageForStaffOn(e.id, wkStart) || 0) : 0;
+      const projected = Math.max(e.actual, e.scheduled);
+      const otHours = Math.max(0, projected - App.OT_THRESHOLD);
+      return { ...e, projected, otHours, otCost: otHours * wage * 0.5,
+        status: projected > App.OT_THRESHOLD ? 'over' : projected >= App.OT_APPROACHING ? 'approaching' : 'ok' };
+    }).sort((a, b) => b.projected - a.projected);
+    const over = projRows.filter(r => r.status === 'over').length;
+    const approaching = projRows.filter(r => r.status === 'approaching').length;
+    const otPremium = projRows.reduce((t, r) => t + r.otCost, 0);
 
-    const recentCallouts = this.callouts().filter(c => (c.date || '') >= cutoff);
-    const uncovered = recentCallouts.filter(c => !c.covered).length;
-
+    // ── KPI tiles ──
     const cards =
         this.metricCard('Labor Cost, Last 7 Days', App.fmtCurrency(wkCost),
              wkActuals.length + ' hours entr' + (wkActuals.length === 1 ? 'y' : 'ies'))
@@ -148,55 +160,100 @@ S.LaborDashboard = {
              over + ' over &middot; ' + approaching + ' approaching this week', (over + approaching) ? 'over-target' : 'on-target')
       + this.metricCard('Active Staff', String(activeStaff), this.staff().length + ' on the roster');
 
-    // Cert expiration sweep — expired or expiring within 30 days, active staff
-    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
-    const activeStaffIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
-    const expiredCerts = this.certs().filter(c => activeStaffIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today);
-    const expiringCerts = this.certs().filter(c => activeStaffIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30);
-
-    const alerts = [];
-    if (over) alerts.push({ sev: 'red', text: over + ' staff member' + (over === 1 ? '' : 's') + ' projected over 40 hours this week', go: 'lc-overtime-watch' });
-    if (approaching) alerts.push({ sev: 'amber', text: approaching + ' staff member' + (approaching === 1 ? '' : 's') + ' approaching overtime', go: 'lc-overtime-watch' });
-    if (uncovered) alerts.push({ sev: 'red', text: uncovered + ' uncovered call-out' + (uncovered === 1 ? '' : 's') + ' in the last 7 days', go: 'lc-callout-log' });
-    const hasWeekSchedule = this.schedules().some(s => s.week_start === wkStart);
-    if (!hasWeekSchedule) alerts.push({ sev: 'amber', text: 'No schedule built for the current week', go: 'lc-build-schedule' });
-    if (expiredCerts.length) alerts.push({ sev: 'red', text: expiredCerts.length + ' certification' + (expiredCerts.length === 1 ? '' : 's') + ' expired on active staff. Review before the next shift.', go: 'lc-staff-roster' });
-    if (expiringCerts.length) alerts.push({ sev: 'amber', text: expiringCerts.length + ' certification' + (expiringCerts.length === 1 ? '' : 's') + ' expiring within 30 days', go: 'lc-staff-roster' });
-
-    let alertCard;
-    if (alerts.length === 0) {
-      alertCard = '<div class="card" style="height:100%;"><div class="card-title">Alerts</div>'
-        + '<div style="font-size:13px;color:var(--gold);">All clear. No labor issues flagged.</div></div>';
+    // ── This Week (scheduled plan vs logged so far) — full-width hero ──
+    let weekCard;
+    if (!sched) {
+      weekCard = '<div class="card"><div class="card-title">This Week</div>'
+        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+        + '<div style="font-size:13px;color:var(--t2);">No schedule built for this week yet. Build one to set a labor budget and project overtime.</div>'
+        + '<button class="btn btn-primary btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">Build Schedule</button></div></div>';
     } else {
-      alertCard = '<div class="card" style="height:100%;"><div class="card-title">Alerts</div>'
-        + alerts.map((a, i) => '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
-            + (i < alerts.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-            + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'
-            + (a.sev === 'red' ? 'var(--red)' : 'var(--gold)') + ';"></span>'
-            + '<div style="flex:1;font-size:13px;color:var(--t1);">' + esc(a.text) + '</div>'
-            + '<button class="btn btn-ghost btn-sm ld-act" data-go="' + a.go + '" style="margin:0;">Fix It</button></div>').join('')
-        + '</div>';
+      const loggedHours = curWeek.reduce((t, a) => t + (a.hours || 0), 0);
+      const loggedCost = curWeek.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(wkStart, today).total;
+      const fc = sched.revenue_forecast || 0;
+      const planPct = fc > 0 ? (sched.total_cost || 0) / fc * 100 : null;
+      weekCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>This Week</span>'
+        + '<button class="btn btn-ghost btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">View Schedule</button></div>'
+        + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Scheduled</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--t1);line-height:1;">' + App.fmtCurrency(sched.total_cost || 0) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sched.total_hours || 0).toFixed(1) + ' hrs'
+        + (planPct != null ? ' &middot; ' + App.fmtPct(planPct) + ' of forecast' : '') + '</div></div>'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Logged So Far</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--gold);line-height:1;">' + App.fmtCurrency(loggedCost) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + loggedHours.toFixed(1) + ' hrs logged</div></div>'
+        + '</div></div>';
     }
 
+    // ── Labor Cost by Department (last 7 days) — bar chart ──
+    const deptCost = {};
+    wkActuals.forEach(a => { if (App.isSalaried(a.staff_id)) return; const d = this.posDept(a.position_id); deptCost[d] = (deptCost[d] || 0) + (a.cost || 0); });
+    if (salWeek > 0) deptCost['Salaried'] = (deptCost['Salaried'] || 0) + salWeek;
+    const deptRows = Object.entries(deptCost).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+    const deptMax = deptRows.length ? deptRows[0][1] : 1;
+    const deptCard = '<div class="card" style="height:100%;"><div class="card-title">Labor Cost by Department</div>'
+      + (deptRows.length
+          ? deptRows.map(([d, c]) => {
+              const pct = Math.max(2, Math.round(c / deptMax * 100));
+              return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
+                + '<span style="color:var(--t2);">' + esc(d) + '</span><span style="color:var(--t1);font-weight:600;">' + App.fmtCurrency(c) + '</span></div>'
+                + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
+            }).join('')
+          : '<div style="font-size:12px;color:var(--t3);">No labor cost in the last 7 days.</div>')
+      + '</div>';
+
+    // ── Hours This Week (per-staff projection, Movement-style) ──
+    const hLine = (r) => {
+      const col = r.status === 'over' ? 'var(--red)' : r.status === 'approaching' ? 'var(--amber)' : 'var(--t3)';
+      const word = r.status === 'over' ? 'Over' : r.status === 'approaching' ? 'Approaching' : 'OK';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">'
+        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(r.name) + '</div>'
+        + '<div style="font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;">' + r.projected.toFixed(1) + ' hrs</div>'
+        + '<span style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap;width:84px;text-align:right;">' + word + '</span></div>';
+    };
+    const hoursCard = '<div class="card" style="height:100%;"><div class="card-title">Hours This Week</div>'
+      + (projRows.length
+          ? projRows.slice(0, 6).map(hLine).join('')
+            + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Projected is the greater of logged and scheduled hours. Threshold ' + App.OT_THRESHOLD + ' hrs/week.</div>'
+          : '<div style="font-size:12px;color:var(--t3);">No hourly staff logged or scheduled this week.</div>')
+      + '</div>';
+
+    // ── Recent Hours ──
     const recent = [...this.actuals()]
       .sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime())
       .slice(0, 5);
-    let recentCard;
-    if (recent.length) {
-      const rows = recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
-        + '<td>' + esc(a.name || '-') + '</td>'
-        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-        + '<td class="val">' + (App.isSalaried(a.staff_id)
-            ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7)
-            : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('');
-      recentCard = '<div class="card" style="height:100%;"><div class="card-title">Recent Hours</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Staff</th><th>Hours</th><th>Cost</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    } else {
-      recentCard = '<div class="card" style="height:100%;"><div class="card-title">Recent Hours</div>'
-        + '<div style="font-size:12px;color:var(--t3);">The hours you log show up here.</div></div>';
-    }
+    const recentCard = '<div class="card" style="height:100%;"><div class="card-title">Recent Hours</div>'
+      + (recent.length
+          ? '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+            + '<th>Date</th><th>Staff</th><th>Hours</th><th>Cost</th></tr></thead><tbody>'
+            + recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
+                + '<td>' + esc(a.name || '-') + '</td>'
+                + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
+                + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('')
+            + '</tbody></table></div>'
+          : '<div style="font-size:12px;color:var(--t3);">The hours you log show up here.</div>')
+      + '</div>';
+
+    // ── Labor Watch (leaks-style, tappable) ──
+    const uncovered = this.callouts().filter(c => (c.date || '') >= cutoff && !c.covered).length;
+    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
+    const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
+    const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
+    const expiring = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
+    const watchRow = (label, val, screen, warn) =>
+      '<div class="ld-act" data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
+      + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
+      + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
+    const anyWatch = otPremium > 0 || uncovered > 0 || expired > 0 || expiring > 0;
+    const watchCard = '<div class="card" style="height:100%;"><div class="card-title">Labor Watch</div>'
+      + watchRow('Projected OT premium (this week)', App.fmtCurrency(otPremium), 'lc-overtime-watch', otPremium > 0)
+      + watchRow('Uncovered call-outs (7d)', String(uncovered), 'lc-callout-log', uncovered > 0)
+      + watchRow('Certifications expired (active staff)', String(expired), 'lc-staff-roster', expired > 0)
+      + watchRow('Certifications expiring (30d)', String(expiring), 'lc-staff-roster', expiring > 0)
+      + (anyWatch ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
+                  : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">All clear. No labor issues flagged.</div>')
+      + '</div>';
 
     const row = (a, b) =>
       '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
@@ -205,7 +262,9 @@ S.LaborDashboard = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
-      + row(alertCard, recentCard)
+      + '<div style="margin-bottom:16px;">' + weekCard + '</div>'
+      + row(deptCard, hoursCard)
+      + row(recentCard, watchCard)
       + this.quickActions()
       + '</div>';
   }
