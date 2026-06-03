@@ -267,6 +267,8 @@ input,select,textarea{color-scheme:dark;}
 /* Data rows keep all cells on one line (shrink-to-fit) on desktop; on mobile
    they stack full-width via the media query below. */
 .data-row{flex-wrap:nowrap;}
+/* Auto-fit input grid: several fields per row on desktop, one per row on mobile. */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
 
 /* Individual field */
 .f{display:flex;flex-direction:column;gap:5px;}
@@ -677,6 +679,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
   /* Shrink-to-fit data rows stack on mobile instead of squeezing. */
   .data-row{flex-wrap:wrap;}
+  .form-grid{grid-template-columns:1fr;}
 
   /* Bottle slider mobile pass: bigger SVG so a thumb can drive it, thicker
      drag handle so it is visible + grab-able, larger +/- buttons hitting
