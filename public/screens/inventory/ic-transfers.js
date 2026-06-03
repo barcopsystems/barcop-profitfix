@@ -70,20 +70,15 @@ S.InventoryTransfers = {
     this.editId = null;
     this.actions.innerHTML = '';
 
-    if (this.products().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Set up products first</div>'
-        + '<div class="empty-sub">Transfers move products between locations. Add products and locations under Setup, then log transfers here.</div>'
-        + '<button class="btn btn-primary" id="tr-go-products">Add Products</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#tr-go-products')) App.navigate('ic-product-setup'); };
-      return;
-    }
-    if (this.locations().length < 2) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Need at least two locations</div>'
-        + '<div class="empty-sub">A transfer moves product from one location to another. Set up your locations under Setup → Set Locations.</div>'
-        + '<button class="btn btn-primary" id="tr-go-locs">Set Locations</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#tr-go-locs')) App.navigate('ic-locations'); };
+    if (this.products().length === 0 || this.locations().length < 2) {
+      App.setupCard(this.container, {
+        title: 'Set Up Transfers',
+        lead: 'Transfers move product between locations and build an audit trail of every move. Two quick setup steps and you can start logging.',
+        steps: [
+          { title: 'Add your products', desc: 'Add the products you stock so a transfer has something to move.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 },
+          { title: 'Set your locations', desc: 'You need at least two storage locations to move product between, like a stockroom and the front bar.', btn: 'Set Locations', screen: 'ic-locations', done: this.locations().length >= 2 }
+        ]
+      });
       return;
     }
 
