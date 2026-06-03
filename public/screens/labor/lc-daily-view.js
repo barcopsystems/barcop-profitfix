@@ -41,10 +41,18 @@ S.LaborDailyView = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button>';
-    document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily View', root: this.container }));
+    actions.innerHTML = '';
     if (!this.date) this.date = new Date().toISOString().slice(0, 10);
     this.draw();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Day View Works', [
+      { p: ['Day View is one day at a time: who worked, the hours and cost they put up, and how that day stacked up against what you planned. Pick any date to jump to it.'] },
+      { h: 'The Numbers Up Top', p: ['Headcount, actual hours, and actual cost are what really happened that day. Scheduled Hours is what you planned in Build Schedule, and Hours vs Scheduled is the gap, green when you came in at or under the plan, amber when you ran over.'] },
+      { h: 'Fixing An Entry', p: ['Click Edit Hours on any row to correct the hours or notes right here without leaving the page. Entries in a closed pay period show as locked. Reopen the period in Pay Periods first if you need to change one.'] },
+      { h: 'Export', p: ['Use Export PDF to save a clean copy of the day for a manager, a payroll handoff, or your own records.'] }
+    ]);
   },
 
   draw() {
@@ -61,16 +69,8 @@ S.LaborDailyView = {
       schedCost = sched.reduce((t, s) => t + (s.cost || 0), 0);
     }
 
-    const dateCard = '<div class="card"><div class="card-title">Day</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;align-items:center;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<div style="font-size:13px;color:var(--t2);padding-bottom:8px;">' + esc(this.fmtDate(this.date)) + '</div></div>'
-      + '</div></div>';
-
     const hoursVar = schedHours != null ? actHours - schedHours : null;
-    const summary = '<div class="calc" style="margin-bottom:16px;">'
+    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Headcount</div><div class="calc-val">' + dayActuals.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
@@ -81,9 +81,22 @@ S.LaborDailyView = {
       + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
       + '</div>';
 
+    const dateCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Day View</span>'
+      + App.helpButton('dv-how') + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;align-items:center;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
+      + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
+      + '</div>'
+      + summary
+      + '</div>';
+
     let actualsCard;
     if (dayActuals.length === 0) {
-      actualsCard = '<div class="card"><div class="card-title">Logged Hours</div>'
+      actualsCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Logged Hours</span>'
+        + '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div>'
         + '<div style="font-size:13px;color:var(--t3);">No hours logged for this day. Log them in Log Hours.</div></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
@@ -104,7 +117,9 @@ S.LaborDailyView = {
         + '<td class="val">' + costCell + '</td>'
         + '<td>' + editBtn + '</td></tr>';
       }).join('');
-      actualsCard = '<div class="card"><div class="card-title">Logged Hours</div>'
+      actualsCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Logged Hours</span>'
+        + '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -124,8 +139,10 @@ S.LaborDailyView = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summary + actualsCard + schedCard + '</div>'
+    this.container.innerHTML = '<div class="screen">' + dateCard + actualsCard + schedCard + '</div>'
       + this.editModalHtml();
+    document.getElementById('dv-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily View', root: this.container }));
     document.getElementById('dv-date')?.addEventListener('change', e => {
       this.date = e.target.value || this.date;
       this.draw();
