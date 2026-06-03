@@ -127,7 +127,7 @@ S.LaborDailyView = {
         const sal = App.isSalaried(a.staff_id);
         const wageCell = sal ? '<span style="color:var(--t3);">Salary</span>'
           : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
-        const costCell = sal ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7)
+        const costCell = sal ? '<span style="color:var(--t3);">Salary</span>'
           : App.fmtCurrency(a.cost || 0);
         return '<tr><td><div class="val">' + esc(a.name || '-') + '</div></td>'
         + '<td>' + esc(a.shift_type || '-') + '</td>'
