@@ -129,7 +129,9 @@ S.LaborLogHours = {
         + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td>'
         + '<td><div class="row-actions">' + actions + '</div></td></tr>';
       }).join('');
-      listCard = '<div class="card"><div class="card-title">Logged Hours</div>'
+      listCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Logged Hours</span>'
+        + '<button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -148,6 +150,7 @@ S.LaborLogHours = {
     this.container.onclick = ev => {
       if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
       if (ev.target.closest('#lo-imp-how')) { this.showImportHelp(); return; }
+      if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
       if (ev.target.closest('#lo-save'))    { this.save(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.lo-row');
@@ -279,6 +282,34 @@ S.LaborLogHours = {
         'Shift: shift, shift type'] },
       { h: 'Matching To Your Roster', p: ['Each row is matched to a staff member by name. A row that does not match anyone on the roster, or is missing hours, is skipped and reported so you can fix it. Each entry costs out at the wage in effect on the date worked, not today\'s rate.'] }
     ]);
+  },
+
+  // Export the COMPLETE entry log to PDF. The on-screen list paginates (Show
+  // older), so we build an off-screen node holding every entry and hand that to
+  // exportPDF — otherwise the PDF would silently drop older rows.
+  exportLogged() {
+    const list = [...this.actuals()].sort((a, b) =>
+      new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
+    if (list.length === 0) return;
+    const rows = list.map(a => {
+      const wageCell = App.isSalaried(a.staff_id) ? 'Salary' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
+      const costCell = App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0);
+      return '<tr><td>' + this.fmtDate(a.date) + (a.locked ? ' (locked)' : '') + '</td>'
+        + '<td>' + esc(a.name || '-') + '</td>'
+        + '<td>' + esc(a.shift_type || '-') + '</td>'
+        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
+        + '<td>' + wageCell + '</td>'
+        + '<td>' + costCell + '</td></tr>';
+    }).join('');
+    const node = document.createElement('div');
+    node.className = 'screen';
+    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
+    node.innerHTML = '<div class="card"><div class="card-title">Logged Hours</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    document.body.appendChild(node);
+    Promise.resolve(App.exportPDF({ title: 'Logged Hours', root: node })).finally(() => node.remove());
   },
 
   // ── CSV import (drag-drop + column mapping, mounted in the Import card) ───────
