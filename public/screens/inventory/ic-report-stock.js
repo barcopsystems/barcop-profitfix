@@ -63,12 +63,13 @@ S.InventoryStockReport = {
   draw() {
     const asc = this.countsAsc();
     if (asc.length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">No counts yet</div>'
-        + '<div class="empty-sub">Stock value is read from an inventory count. '
-        + 'Submit a count in Take Inventory to see this report.</div>'
-        + '<button class="btn btn-primary" id="sr-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#sr-take')) App.navigate('ic-take-inventory'); };
+      App.setupCard(this.container, {
+        title: 'Stock Report',
+        lead: 'The Stock Report shows what your inventory is worth right now and where that cash is sitting.',
+        steps: [
+          { title: 'Take an inventory count', desc: 'Stock value is read from a count. Take one and this report fills in.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 

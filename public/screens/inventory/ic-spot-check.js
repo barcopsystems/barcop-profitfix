@@ -158,11 +158,13 @@ S.InventorySpotCheck = {
     this.actions.innerHTML = '';
 
     if (this.products().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">No products to check</div>'
-        + '<div class="empty-sub">Add the products you stock in the Products screen, then run a spot check '
-        + 'on your high-risk bottles.</div></div></div>';
-      this.container.onclick = null;
+      App.setupCard(this.container, {
+        title: 'Set Up Spot Checks',
+        lead: 'A spot check is a fast theft check on a few high-risk bottles mid-shift. Add your products and you can run one in under a minute.',
+        steps: [
+          { title: 'Add your products', desc: 'A spot check runs against the bottles you stock, so add your products first.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 }
+        ]
+      });
       return;
     }
 

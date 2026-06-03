@@ -307,12 +307,13 @@ S.InventoryVarianceReport = {
     this.container.onchange = null;
     const asc = this.countsAsc();
     if (asc.length < 2) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Not enough counts yet</div>'
-        + '<div class="empty-sub">Variance compares usage between two counts against POS sales. '
-        + 'Submit at least two inventory counts first.</div>'
-        + '<button class="btn btn-primary" id="vr-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#vr-take')) App.navigate('ic-take-inventory'); };
+      App.setupCard(this.container, {
+        title: 'Variance Report',
+        lead: 'Variance compares what you used against what your POS rang up, so theft, over-pouring, and waste surface as a dollar gap.',
+        steps: [
+          { title: 'Take two inventory counts', desc: 'Variance needs usage between two counts to compare against your sales. Submit at least two to get started.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 

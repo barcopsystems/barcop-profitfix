@@ -122,11 +122,13 @@ S.InventoryParSuggestions = {
     const settings = this.settings();
     const counts = this.countsAsc();
     if (counts.length < 2) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Not enough counts yet</div>'
-        + '<div class="empty-sub">Par suggestions need real usage data — at least two inventory counts. Take a few weekly counts and come back. The longer the history, the better the suggestion.</div>'
-        + '<button class="btn btn-primary" id="ps-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#ps-take')) App.navigate('ic-take-inventory'); };
+      App.setupCard(this.container, {
+        title: 'Dynamic Pars',
+        lead: 'Dynamic Pars reads your real usage and suggests par levels that match how you actually sell, so you stop guessing.',
+        steps: [
+          { title: 'Take two inventory counts', desc: 'Par suggestions need real usage, which means at least two counts. Take a few weekly counts, and the longer the history the sharper the suggestion.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 

@@ -119,10 +119,14 @@ S.InventoryOrderHistory = {
 
     let html;
     if (orders.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No orders yet</div>'
-        + '<div class="empty-sub">Orders you create on the Order Sheet are listed here, with line items, '
-        + 'value, and status.</div>'
-        + '<button class="btn btn-primary" id="oh-sheet">Go to Order Sheet</button></div>';
+      App.setupCard(this.container, {
+        title: 'Order History',
+        lead: 'Order History lists every order you create, with line items, value, and status, so you always have a paper trail.',
+        steps: [
+          { title: 'Create your first order', desc: 'Orders you create on the Order Sheet show up here. Create one to get started.', btn: 'Go to Order Sheet', screen: 'ic-order-sheet', done: false }
+        ]
+      });
+      return;
     } else {
       const vendors = [...new Set(orders.map(o => o.vendor).filter(Boolean))].sort();
       const filtered = this.vendorFilter ? orders.filter(o => o.vendor === this.vendorFilter) : orders;

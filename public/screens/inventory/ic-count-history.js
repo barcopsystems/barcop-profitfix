@@ -47,10 +47,14 @@ S.InventoryCountHistory = {
 
     let html;
     if (asc.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No counts yet</div>'
-        + '<div class="empty-sub">Inventory counts you submit in Take Inventory are listed here, '
-        + 'with value, variance, and side-by-side comparison.</div>'
-        + '<button class="btn btn-primary" id="ch-take">Take Inventory</button></div>';
+      App.setupCard(this.container, {
+        title: 'Count History',
+        lead: 'Count History is the record of every count you finalize, with its value, how it moved versus the count before, and a full breakdown you can open.',
+        steps: [
+          { title: 'Take your first count', desc: 'Counts you submit in Take Inventory show up here. Take one to get started.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
+      return;
     } else {
       const counters = [...new Set(asc.map(c => c.counted_by).filter(Boolean))].sort();
       const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'

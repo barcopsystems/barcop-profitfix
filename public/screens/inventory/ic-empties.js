@@ -62,11 +62,13 @@ S.InventoryEmpties = {
     this.actions.innerHTML = '';
 
     if (this.products().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Set up products first</div>'
-        + '<div class="empty-sub">Empties are tracked against your products. Add products under Setup, then log empties here.</div>'
-        + '<button class="btn btn-primary" id="em-go-products">Add Products</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#em-go-products')) App.navigate('ic-product-setup'); };
+      App.setupCard(this.container, {
+        title: 'Set Up the Empties Log',
+        lead: 'The Empties Log tracks empty containers as you clear them, for deposit redemption and the container record some states require. Add your products first.',
+        steps: [
+          { title: 'Add your products', desc: 'Empties are tracked against your products, so add what you stock first.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 }
+        ]
+      });
       return;
     }
 

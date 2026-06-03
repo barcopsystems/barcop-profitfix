@@ -78,11 +78,13 @@ S.InventoryAdjustments = {
     this.actions.innerHTML = '';
 
     if (this.products().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Set up products first</div>'
-        + '<div class="empty-sub">An adjustment writes off or finds a documented quantity of a real product. Add products under Setup, then log adjustments here.</div>'
-        + '<button class="btn btn-primary" id="adj-go-products">Add Products</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#adj-go-products')) App.navigate('ic-product-setup'); };
+      App.setupCard(this.container, {
+        title: 'Set Up Adjustments',
+        lead: 'An adjustment writes off or finds a documented quantity of a real product, so your counts stay clean and every loss has a cause. Add your products first.',
+        steps: [
+          { title: 'Add your products', desc: 'An adjustment is logged against a real product, so add what you stock first.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 }
+        ]
+      });
       return;
     }
 

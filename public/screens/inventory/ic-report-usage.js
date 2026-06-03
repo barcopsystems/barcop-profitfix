@@ -88,12 +88,13 @@ S.InventoryUsageReport = {
   draw() {
     const asc = this.countsAsc();
     if (asc.length < 2) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Not enough counts yet</div>'
-        + '<div class="empty-sub">Usage is measured between two inventory counts. '
-        + 'Submit at least two counts in Take Inventory to see this report.</div>'
-        + '<button class="btn btn-primary" id="ur-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#ur-take')) App.navigate('ic-take-inventory'); };
+      App.setupCard(this.container, {
+        title: 'Usage Report',
+        lead: 'Usage shows what you actually went through between two counts, with the cost and theoretical sales behind each product.',
+        steps: [
+          { title: 'Take two inventory counts', desc: 'Usage is measured between two counts. Submit at least two and this report fills in.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 

@@ -111,20 +111,15 @@ S.InventoryReceiveDelivery = {
   },
 
   renderForm() {
-    if (this.vendors().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add a vendor first</div>'
-        + '<div class="empty-sub">A delivery is logged against a vendor. Add the distributors you '
-        + 'receive from in the Vendors screen, then come back to record a delivery.</div>'
-        + '<button class="btn btn-primary" id="rd-go-vendors">Go to Vendors</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#rd-go-vendors')) App.navigate('ic-vendors'); };
-      return;
-    }
-    if (this.products().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">No products to receive</div>'
-        + '<div class="empty-sub">Add products in the Products screen before recording a delivery.</div>'
-        + '</div></div>';
+    if (this.vendors().length === 0 || this.products().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Set Up Receiving',
+        lead: 'Receiving logs what showed up against what you ordered and flags price changes before they cost you. Two quick steps and you can record a delivery.',
+        steps: [
+          { title: 'Add your vendors', desc: 'A delivery is logged against a vendor, so add the distributors you receive from.', btn: 'Add Vendors', screen: 'ic-vendors', done: this.vendors().length > 0 },
+          { title: 'Add your products', desc: 'Add the products you stock so a delivery has line items to receive.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 }
+        ]
+      });
       return;
     }
 

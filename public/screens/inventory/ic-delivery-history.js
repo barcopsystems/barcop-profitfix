@@ -44,10 +44,14 @@ S.InventoryDeliveryHistory = {
 
     let html;
     if (all.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No deliveries yet</div>'
-        + '<div class="empty-sub">Deliveries you record in Receive Delivery are listed here, '
-        + 'with totals and price-change discrepancy flags.</div>'
-        + '<button class="btn btn-primary" id="dh-receive">Receive Delivery</button></div>';
+      App.setupCard(this.container, {
+        title: 'Delivery History',
+        lead: 'Delivery History lists every delivery you record, with totals and price-change discrepancy flags so a sneaky price hike never slips through.',
+        steps: [
+          { title: 'Receive your first delivery', desc: 'Deliveries you record in Receive Delivery show up here. Record one to get started.', btn: 'Receive Delivery', screen: 'ic-receive-delivery', done: false }
+        ]
+      });
+      return;
     } else {
       const vendors = [...new Set(all.map(d => d.vendor).filter(Boolean))].sort();
       const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'

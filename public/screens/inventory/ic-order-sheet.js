@@ -98,12 +98,13 @@ S.InventoryOrderSheet = {
     const data = this.belowParByVendor();
 
     if (!data) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">No count to order from</div>'
-        + '<div class="empty-sub">The Order Sheet is built from your latest inventory count against par '
-        + 'levels. Take a count in Take Inventory, then come back.</div>'
-        + '<button class="btn btn-primary" id="os-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#os-take')) App.navigate('ic-take-inventory'); };
+      App.setupCard(this.container, {
+        title: 'Build Your First Order',
+        lead: 'The Order Sheet builds a reorder list from your latest count against your par levels, grouped by vendor. Take a count and it fills in here.',
+        steps: [
+          { title: 'Take an inventory count', desc: 'The order sheet compares your latest count to par to see what to reorder. Take a count to get started.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 

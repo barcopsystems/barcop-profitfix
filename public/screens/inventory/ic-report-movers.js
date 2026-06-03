@@ -73,12 +73,13 @@ S.InventoryMoversReport = {
   draw() {
     const pairs = this.pairs();
     if (pairs.length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Not enough counts yet</div>'
-        + '<div class="empty-sub">Movement is measured between two inventory counts. '
-        + 'Submit at least two counts in Take Inventory to see this report.</div>'
-        + '<button class="btn btn-primary" id="mv-take">Take Inventory</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#mv-take')) App.navigate('ic-take-inventory'); };
+      App.setupCard(this.container, {
+        title: 'Movement Report',
+        lead: 'Movement ranks what is selling fast, what is crawling, and what is sitting dead, so you can tighten ordering.',
+        steps: [
+          { title: 'Take two inventory counts', desc: 'Movement is measured between two counts. Submit at least two and this report fills in.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 
