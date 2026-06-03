@@ -57,11 +57,12 @@ S.InventoryCountHistory = {
       return;
     } else {
       const counters = [...new Set(asc.map(c => c.counted_by).filter(Boolean))].sort();
-      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
+      const filter = '<div class="form-row" style="margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
         + '<label>Filter by Counted By</label><select id="ch-filter">'
         + '<option value="">All staff</option>'
         + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
-        + '</select></div></div>';
+        + '</select></div>'
+        + '<button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div>';
 
       const ordered = asc.map((c, i) => {
         const prior = i > 0 ? asc[i - 1] : null;
@@ -104,6 +105,7 @@ S.InventoryCountHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      if (ev.target.closest('#ch-list-export')) { this.exportList(); return; }
       const how = ev.target.closest('#ch-how');
       const del = ev.target.closest('.ch-del');
       const view = ev.target.closest('.ch-view');
@@ -119,6 +121,39 @@ S.InventoryCountHistory = {
       this.countedByFilter = e.target.value || '';
       this.renderList();
     });
+  },
+
+  // Export the COMPLETE count list to PDF (every count, not just the on-screen
+  // window, which paginates via Show older). Built from an off-screen node.
+  exportList() {
+    const asc = this.sorted();
+    if (asc.length === 0) return;
+    const ordered = asc.map((c, i) => {
+      const prior = i > 0 ? asc[i - 1] : null;
+      const variance = prior ? (c.total_value || 0) - (prior.total_value || 0) : null;
+      const isLatest = i === asc.length - 1;
+      return { c, variance, isLatest };
+    }).reverse();
+    const rows = ordered.map(r => {
+      const c = r.c;
+      const varCell = r.variance == null ? '-' : (r.variance >= 0 ? '+' : '') + App.fmtCurrency(r.variance);
+      return '<tr><td>' + this.fmtDate(c.date) + '</td>'
+        + '<td>' + esc(c.type || '-') + '</td>'
+        + '<td>' + esc(c.counted_by || '-') + '</td>'
+        + '<td>' + (c.item_count || (c.items ? c.items.length : 0)) + '</td>'
+        + '<td>' + App.fmtCurrency(c.total_value || 0) + '</td>'
+        + '<td>' + varCell + '</td>'
+        + '<td>' + (r.isLatest ? 'Latest' : 'Past') + '</td></tr>';
+    }).join('');
+    const node = document.createElement('div');
+    node.className = 'screen';
+    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
+    node.innerHTML = '<div class="card"><div class="card-title">Count History</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th><th>Total Value</th><th>Variance vs Prior</th><th>Status</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    document.body.appendChild(node);
+    Promise.resolve(App.exportPDF({ title: 'Count History', root: node })).finally(() => node.remove());
   },
 
   // Guarded delete: a count is a finalized record, so removing one is behind
