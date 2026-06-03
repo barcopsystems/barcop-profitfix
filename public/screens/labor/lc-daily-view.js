@@ -49,8 +49,8 @@ S.LaborDailyView = {
     actions.innerHTML = '';
     if (this.actuals().length === 0) {
       App.setupCard(this.container, {
-        title: 'Daily View',
-        lead: 'Daily View shows one day at a time: who worked, their hours and cost, and how the day compared to the schedule.',
+        title: 'Daily Snapshot',
+        lead: 'Daily Snapshot shows one day at a time: who worked, their hours and cost, and how the day compared to the schedule.',
         steps: [
           { title: 'Log some hours', desc: 'Hours you log in Log Hours show up here, day by day. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
         ]
@@ -62,8 +62,8 @@ S.LaborDailyView = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Day View Works', [
-      { p: ['Day View is one day at a time: who worked, the hours and cost they put up, and how that day stacked up against what you planned. Pick any date to jump to it.'] },
+    App.showHelpModal('How Daily Snapshot Works', [
+      { p: ['Daily Snapshot is one day at a time: who worked, the hours and cost they put up, and how that day stacked up against what you planned. Pick any date to jump to it.'] },
       { h: 'The Numbers Up Top', p: ['Headcount, actual hours, and actual cost are what really happened that day. Scheduled Hours is what you planned in Build Schedule, and Hours vs Scheduled is the gap, green when you came in at or under the plan, amber when you ran over.'] },
       { h: 'Fixing An Entry', p: ['Click Edit Hours on any row to correct the hours or notes right here without leaving the page. Entries in a closed pay period show as locked. Reopen the period in Pay Periods first if you need to change one.'] },
       { h: 'Export', p: ['Use Export PDF to save a clean copy of the day for a manager, a payroll handoff, or your own records.'] }
@@ -161,7 +161,7 @@ S.LaborDailyView = {
     this.container.innerHTML = '<div class="screen">' + dateCard + actualsCard + schedCard + '</div>'
       + this.editModalHtml();
     document.getElementById('dv-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily View', root: this.container }));
+    document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily Snapshot', root: this.container }));
     document.getElementById('dv-date')?.addEventListener('change', e => {
       this.date = e.target.value || this.date;
       this.draw();
