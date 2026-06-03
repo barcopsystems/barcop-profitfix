@@ -492,7 +492,7 @@ S.InventoryProducts = {
     // ── Row 1: identity fields (Name, Brand, Sub-Cat, Vendor, Location) ────
     // Auto-fit grid: fits all five on one row on wide screens and wraps/stacks
     // cleanly on narrow screens instead of overflowing the form container.
-    const row1 = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:start;">'
+    const row1 = '<div class="form-grid" style="align-items:start;">'
       + '<div class="f"><label>Product Name ' + tt('ic-product-name') + '</label>'
       + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
       + '<div class="f"><label>Brand ' + tt('ic-brand') + '</label>'
