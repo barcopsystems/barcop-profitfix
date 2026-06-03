@@ -442,7 +442,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    via CSS so the form stays mounted underneath (in-progress entries preserved). */
 .card-collapse-head{cursor:pointer;}
 .card-collapse-head:hover .card-chevron{color:var(--gold);}
-.card-chevron{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;line-height:1;transition:transform 0.18s,color 0.12s;}
+.card-chevron{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);font-size:14px;line-height:1;transition:transform 0.18s,color 0.12s;}
 .card.collapsed .card-chevron{transform:rotate(-90deg);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
