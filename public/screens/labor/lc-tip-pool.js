@@ -31,20 +31,34 @@ S.LaborTipPool = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    if (!this.date) this.date = new Date().toISOString().slice(0, 10);
-    if (!this.rows) this.rows = [];
+    // Fresh form on every entry from the sidebar — a loaded pool never sticks
+    // around. Working state only persists across the in-screen re-renders.
+    this.date = new Date().toISOString().slice(0, 10);
+    this.pool = '';
+    this.rows = [];
+    this.method = 'hours';
     this.renderMain();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Tip Pool Calculator Works', [
+      { p: ['The Tip Pool Calculator splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Set the date and pool amount, add the participants, and Bar Cop works out each person\'s share live.'] },
+      { h: 'Load From The Tip Log', p: ['Pick a date and Load from Tip Log pulls in everyone who logged tips that day, totals their tips as the pool, and fills hours from their logged shift. From there you adjust participants or hours and the shares recompute.'] },
+      { h: 'Two Methods', p: ['By Hours Worked splits the pool in proportion to each person\'s hours. Equal Split divides it evenly across participants. Watch the Unallocated figure: it should land at zero when the whole pool is distributed.'] },
+      { h: 'Saving And Clearing', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Clear empties the form to start a fresh pool without saving.'] }
+    ]);
   },
 
   renderMain() {
     this.actions.innerHTML = '';
     if (this.staff().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add staff first</div>'
-        + '<div class="empty-sub">A tip pool is split across your roster. Add staff in Staff Roster, then '
-        + 'calculate pools here.</div>'
-        + '<button class="btn btn-primary" id="tp-go-roster">Go to Staff Roster</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#tp-go-roster')) App.navigate('lc-staff-roster'); };
+      App.setupCard(this.container, {
+        title: 'Calculate Your First Tip Pool',
+        lead: 'A tip pool is split across your staff by hours worked or in an equal split. Add your staff and you can start calculating.',
+        steps: [
+          { title: 'Add your staff', desc: 'A pool is split across your roster, so build it first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
       return;
     }
 
@@ -62,7 +76,10 @@ S.LaborTipPool = {
       + '<button class="btn btn-ghost btn-sm tp-remove" style="margin-bottom:6px;">Remove</button>'
       + '</div>').join('');
 
-    const setupCard = '<div class="card"><div class="card-title">Tip Pool</div>'
+    const setupCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Tip Pool</span>'
+      + App.helpButton('tp-how') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="tp-date" value="' + esc(this.date) + '"/></div>'
@@ -87,14 +104,16 @@ S.LaborTipPool = {
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="tp-save">Save Tip Pool</button>'
+      + '<button class="btn btn-ghost" id="tp-clear">Clear</button>'
       + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-
-    const tipDisclaimer = '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you distribute</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Tip pool eligibility and distribution rules vary by jurisdiction. Verify participation requirements before distributing tips.</div>'
+      + '</div>'
+      + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
+      + '</div>'
       + '</div>';
-    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + tipDisclaimer + this.historyCard() + '</div>'
+
+    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + this.historyCard() + '</div>'
       + this.delModal();
 
     const rowsEl = document.getElementById('tp-rows');
@@ -143,6 +162,8 @@ S.LaborTipPool = {
     });
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
+    document.getElementById('tp-clear')?.addEventListener('click', () => { this.rows = []; this.pool = ''; this.renderMain(); });
+    document.getElementById('tp-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
@@ -319,8 +340,7 @@ S.LaborTipPool = {
   renderDetail(id) {
     const p = this.pools().find(x => x.id === id);
     if (!p) { this.renderMain(); return; }
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button>';
-    document.getElementById('tp-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool Calculator', root: this.container }));
+    this.actions.innerHTML = '';
 
     const rows = (p.participants || []).map(pt => '<tr>'
       + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
@@ -328,8 +348,9 @@ S.LaborTipPool = {
       + '<td class="val">' + App.fmtCurrency(pt.share || 0) + '</td></tr>').join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="tp-back">&#8592; Back to Tip Pool</button></div>'
-      + '<div class="card"><div class="card-title">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Tip Pool &middot; ' + this.fmtDate(p.date) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0) + '</div></div>'
@@ -338,7 +359,8 @@ S.LaborTipPool = {
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
-    this.container.onclick = ev => { if (ev.target.closest('#tp-back')) this.renderMain(); };
+    this.container.onclick = null;
+    document.getElementById('tp-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: this.container }));
   },
 
   delModal() {
