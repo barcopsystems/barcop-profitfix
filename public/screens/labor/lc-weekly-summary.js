@@ -47,10 +47,19 @@ S.LaborWeeklySummary = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button>';
-    document.getElementById('ws-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly Summary', root: this.container }));
+    actions.innerHTML = '';
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Weekly Summary Works', [
+      { p: ['Weekly Summary rolls up a full week of labor: total hours and cost, how that compares to what you scheduled, and your labor percentage against the week\'s revenue forecast. Use the arrows to step week to week, or pick a date.'] },
+      { h: 'The Numbers Up Top', p: ['Actual Hours and Actual Labor Cost are what really happened. Scheduled Hours and Hours vs Scheduled compare it to your plan from Build Schedule. Labor % is your labor cost as a share of the forecast, green at or under your target, amber over it. RPLH is revenue per labor hour against that same forecast.'] },
+      { h: 'By Staff And By Day', p: ['By Staff shows each person\'s days worked, hours, and cost for the week, sorted by who cost the most. By Day breaks the week into seven days so you can see where the hours stacked up. Salaried staff carry a fixed weekly share of their salary, so they show a cost even on a light week.'] },
+      { h: 'Fixing Hours', p: ['Click Edit Hours on a staff row to correct that person\'s whole week at once, without leaving the page. Entries in a closed pay period show as locked; reopen the period in Pay Periods first.'] },
+      { h: 'Export', p: ['Use Export PDF to save the week for a manager, a payroll handoff, or your own records.'] }
+    ]);
   },
 
   draw() {
@@ -69,20 +78,8 @@ S.LaborWeeklySummary = {
     const rplh = actHours > 0 && forecast > 0 ? forecast / actHours : null;
     const target = this.laborTarget();
 
-    const dateCard = '<div class="card"><div class="card-title">Week</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;align-items:center;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
-      + '<input type="date" id="ws-start" value="' + esc(ws) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<div style="font-size:13px;color:var(--t2);padding-bottom:8px;">' + this.fmtDate(ws) + ' – ' + this.fmtDate(we) + '</div></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="ws-prev" style="margin-bottom:2px;">&#8592; Prev</button></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="ws-next" style="margin-bottom:2px;">Next &#8594;</button></div>'
-      + '</div></div>';
-
     const hoursVar = schedHours != null ? actHours - schedHours : null;
-    const summary = '<div class="calc" style="margin-bottom:16px;">'
+    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Labor Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val dim">'
@@ -95,6 +92,21 @@ S.LaborWeeklySummary = {
       + (laborPct != null ? App.fmtPct(laborPct) : '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">RPLH (vs Forecast)</div><div class="calc-val">'
       + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
+      + '</div>';
+
+    const dateCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Weekly Summary</span>'
+      + App.helpButton('ws-how') + '</div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
+      + '<input type="date" id="ws-start" value="' + esc(ws) + '"/></div>'
+      + '<div style="display:flex;gap:6px;padding-bottom:2px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&#8592;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&#8594;</button>'
+      + '</div>'
+      + '</div>'
+      + summary
       + '</div>';
 
     // By staff
@@ -118,7 +130,9 @@ S.LaborWeeklySummary = {
     let staffCard;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {
-      staffCard = '<div class="card"><div class="card-title">By Staff</div>'
+      staffCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>By Staff</span>'
+        + '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div>'
         + '<div style="font-size:13px;color:var(--t3);">No hours logged for this week.</div></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
@@ -136,7 +150,9 @@ S.LaborWeeklySummary = {
           + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
           + '<td>' + editBtn + '</td></tr>';
       }).join('');
-      staffCard = '<div class="card"><div class="card-title">By Staff</div>'
+      staffCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>By Staff</span>'
+        + '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -159,9 +175,11 @@ S.LaborWeeklySummary = {
       + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Cost</th>'
       + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summary + staffCard + dayCard + '</div>'
+    this.container.innerHTML = '<div class="screen">' + dateCard + staffCard + dayCard + '</div>'
       + this.editModalHtml();
 
+    document.getElementById('ws-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('ws-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly Summary', root: this.container }));
     document.getElementById('ws-start')?.addEventListener('change', e => {
       this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00'));
       this.draw();
