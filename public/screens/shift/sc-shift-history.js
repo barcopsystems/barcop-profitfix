@@ -41,36 +41,36 @@ S.ShiftHistory = {
     this.renderList();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Shift History Works', [
+      { p: ['Every shift you run lands here: the ones you close out in Active Shift and any you back-fill with Log a Past Shift. Click a row, or View, to open the full detail: revenue, covers, cash reconciliation, tips, exceptions, and the notes from that night.'] },
+      { h: 'Logging a Past Shift', p: ['Missed one, or running shifts from before Bar Cop? Log a Past Shift opens the shift form so you can enter it by hand. It lands in this list like any other shift.'] },
+      { h: 'Editing', p: ['Edit on any row opens that shift in the same form. Changes flow straight into your weekly Profit and Revenue numbers, so keep them accurate.'] },
+      { h: 'Export and Handoff', p: ['Export PDF saves the filtered list. Open a shift and use Save Handoff PDF or Email Handoff to send the one-page handoff to the next manager.'] }
+    ]);
+  },
+
   renderList() {
     const all = this.shifts();
     this.actions.innerHTML = '';
 
     if (all.length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Start a shift in Active Shift when service begins. Closed shifts appear here with revenue, covers, and check average. Shift revenue is what feeds your weekly Profit and Revenue numbers.</div>'
-        + '<div style="display:flex;gap:10px;justify-content:center;">'
-        + '<button class="btn btn-primary" id="sh-active">Open Active Shift</button>'
-        + '<button class="btn btn-ghost" id="sh-log-missed-empty">Log a Missed Shift</button>'
-        + '</div></div></div>';
-      this.container.onclick = ev => {
-        if (ev.target.closest('#sh-active')) App.navigate('sc-active-shift');
-        if (ev.target.closest('#sh-log-missed-empty')) App.navigate('sc-log-shift');
-      };
+      App.setupCard(this.container, {
+        title: 'Shift History',
+        lead: 'Every shift shows up here with revenue, covers, check average, cash, and tips. Shift revenue is what feeds your weekly Profit and Revenue numbers.',
+        steps: [
+          { title: 'Run a shift', desc: 'Start a shift in Active Shift when service begins. Close it out and it lands here.', btn: 'Open Active Shift', screen: 'sc-active-shift', done: false },
+          { title: 'Or log a past shift', desc: 'Back-fill a shift that was missed or run before Bar Cop.', btn: 'Log a Past Shift', screen: 'sc-log-shift', done: false }
+        ]
+      });
       return;
     }
-
-    // Log Missed Shift entry point lives here so the sidebar stays focused on
-    // the live-shift workflow (Active Shift). Active Shift is for the shift
-    // happening now; this button covers the rare case of back-filling a shift
-    // that was missed or run before Bar Cop was set up.
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-log-missed">Log Missed Shift</button>'
-      + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:8px;">Export PDF</button>';
 
     const rows = this.filtered();
     const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);
     const totCov = rows.reduce((t, s) => t + (s.covers || 0), 0);
     const avgChk = totCov > 0 ? totRev / totCov : null;
+    const canEdit = App.canEdit && App.canEdit('sc-log-shift');
 
     const SHIFT_TYPES = App.SHIFT_TYPES;
     const typeOpts = '<option value="">All shift types</option>'
@@ -79,38 +79,16 @@ S.ShiftHistory = {
       '<option value="' + s + '"' + (this.filterStatus === s ? ' selected' : '') + '>'
       + (s === '' ? 'All statuses' : s) + '</option>').join('');
 
-    const summary = '<div class="calc" style="margin-bottom:16px;">'
-      + '<div class="calc-item"><div class="calc-label">Shifts</div><div class="calc-val">' + rows.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + App.fmtCurrency(totRev) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Covers</div><div class="calc-val">' + totCov + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</div></div>'
-      + '</div>';
-
-    const filters = '<div class="card"><div class="card-title">Filter</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Shift Type</label>'
-      + '<select id="sh-f-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Status</label>'
-      + '<select id="sh-f-status">' + statusOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label>'
-      + '<input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label>'
-      + '<input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
-      + '</div></div>';
-
     let table;
     if (rows.length === 0) {
-      table = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
-        + '<div class="empty-sub">Adjust or clear the filters above to see logged shifts.</div></div>';
+      table = '<div style="font-size:13px;color:var(--t3);padding:6px 2px;">No shifts match these filters. Adjust or clear them above.</div>';
     } else {
       const displayRows = rows.slice(0, App.listLimit('sc', 'shift'));
       const trs = displayRows.map(s => {
         const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
-        const status = (s.status === 'Open')
-          ? '<span class="badge badge-ok">Open</span>'
-          : '<span class="badge badge-dim">Closed</span>';
+        const statusText = (s.status === 'Open')
+          ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
+          : '<span style="color:var(--t3);font-weight:700;">Closed</span>';
         return '<tr class="sh-row" data-id="' + s.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
           + '<td>' + esc(s.shift_type || '-') + '</td>'
@@ -118,28 +96,64 @@ S.ShiftHistory = {
           + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
           + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
           + '<td>' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + '</td>'
-          + '<td>' + status + '</td></tr>';
+          + '<td>' + statusText + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm sh-view" data-id="' + s.id + '">View</button>'
+          + (canEdit ? '<button class="btn btn-ghost btn-sm sh-edit" data-id="' + s.id + '">Edit</button>' : '')
+          + (canEdit ? '<button class="btn btn-danger btn-sm sh-del" data-id="' + s.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
       }).join('');
       table = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
-        + '<th>Covers</th><th>Check Avg</th><th>Status</th>'
+        + '<th>Covers</th><th>Check Avg</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
         + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterStatus || this.filterFrom || this.filterTo));
     }
 
-    this.container.innerHTML = '<div class="screen">' + summary + filters + table + '</div>';
+    const card = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span>Shift History</span>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="sh-log-missed">Log a Past Shift</button>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="sh-export">Export PDF</button>'
+      + App.helpButton('sh-how')
+      + '</div></div>'
+      + '<div class="form-row no-print" style="gap:16px;margin-bottom:14px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label>'
+      + '<select id="sh-f-type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label>'
+      + '<select id="sh-f-status">' + statusOpts + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label>'
+      + '<input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label>'
+      + '<input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
+      + '<button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
+      + '</div>'
+      + '<div class="calc" style="margin-bottom:14px;">'
+      + '<div class="calc-item"><div class="calc-label">Shifts</div><div class="calc-val">' + rows.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + App.fmtCurrency(totRev) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Covers</div><div class="calc-val">' + totCov + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</div></div>'
+      + '</div>'
+      + table
+      + '</div>';
 
-    document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
-    document.getElementById('sh-log-missed')?.addEventListener('click', () => App.navigate('sc-log-shift'));
+    this.container.innerHTML = '<div class="screen">' + card + '</div>';
+
     this.container.onclick = ev => {
+      if (ev.target.closest('#sh-how')) { this.showHowTo(); return; }
+      if (ev.target.closest('#sh-log-missed')) { if (S.ShiftLogShift) S.ShiftLogShift._openEditId = null; App.navigate('sc-log-shift'); return; }
+      if (ev.target.closest('#sh-export')) { App.exportPDF({ title: 'Shift History', root: this.container }); return; }
+      if (ev.target.closest('#sh-f-clear')) { this.filterType = this.filterStatus = this.filterFrom = this.filterTo = ''; this.renderList(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const del = ev.target.closest('.sh-del');
+      const edit = ev.target.closest('.sh-edit');
+      const view = ev.target.closest('.sh-view');
       const row = ev.target.closest('.sh-row');
-      if (ev.target.closest('#sh-f-clear')) {
-        this.filterType = this.filterStatus = this.filterFrom = this.filterTo = '';
-        this.renderList();
-      } else if (row) {
-        this.renderDetail(row.dataset.id);
-      }
+      if (del) { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
+      if (edit) { ev.stopPropagation(); if (S.ShiftLogShift) S.ShiftLogShift._openEditId = edit.dataset.id; App.navigate('sc-log-shift'); return; }
+      if (view) { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
+      if (row) { this.renderDetail(row.dataset.id); return; }
     };
     const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => {
       this[prop] = e.target.value || '';
@@ -149,6 +163,13 @@ S.ShiftHistory = {
     bind('sh-f-status', 'filterStatus');
     bind('sh-f-from', 'filterFrom');
     bind('sh-f-to', 'filterTo');
+  },
+
+  async confirmDel(id) {
+    const ok = await App.confirm({ title: 'Delete this shift?', confirmText: 'Delete', cancelText: 'Cancel' });
+    if (!ok) return;
+    await App.removeRecord('sc', 'shift', id);
+    this.renderList();
   },
 
   // ── Detail ──────────────────────────────────────────────────────────────────
@@ -279,7 +300,7 @@ S.ShiftHistory = {
       + notesCard
       + handoffCard
       + '<div class="card-actions" style="margin-top:4px;">'
-      + '<button class="btn btn-ghost" id="sh-edit">Edit in Log a Shift</button></div>'
+      + '<button class="btn btn-ghost" id="sh-edit">Edit</button></div>'
       + '</div>';
 
     this.container.onclick = ev => {
