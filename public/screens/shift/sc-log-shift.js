@@ -1,17 +1,14 @@
 'use strict';
 
-/* ── Shift Control — Log a Shift (writes sc_shifts) ───────────────────────────
-   Records a shift: type, manager, revenue, covers, cash. Shift revenue is the
-   single source of weekly revenue for Profit and Revenue Recovery; covers feed
-   check average. Stored in App.shiftData (sc_data table, Rule 21). */
+/* ── Shift Control — Log a Shift form (writes sc_shifts) ──────────────────────
+   The add/edit form for a single shift. Reached from Shift History: "Log a Past
+   Shift" (add) and a row's Edit (edit). The shift LIST and Delete live on Shift
+   History; this screen is form-only. Shift revenue is the single source of
+   weekly revenue for Profit and Revenue Recovery. Stored in App.shiftData. */
 
 S.ShiftLogShift = {
   editId: null,
   _openEditId: null,
-  _pendingDelId: null,
-  // SHIFT_TYPES kept as a backward-compat alias to App.SHIFT_TYPES. The
-  // canonical list lives on App.SHIFT_TYPES now; consumers should read from
-  // there. Old call sites that hit S.ShiftLogShift.SHIFT_TYPES still work.
   get SHIFT_TYPES() { return App.SHIFT_TYPES; },
 
   shifts() {
@@ -19,85 +16,28 @@ S.ShiftLogShift = {
     if (!Array.isArray(App.shiftData.sc_shifts)) App.shiftData.sc_shifts = [];
     return App.shiftData.sc_shifts;
   },
-  fmtDate(str) {
-    if (!str) return '-';
-    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  },
 
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Log a Shift';
-    addBtn.addEventListener('click', () => this.showForm());
-    actions.appendChild(addBtn);
+    if (actions) actions.innerHTML = '';
     const openId = this._openEditId;
     this._openEditId = null;
-    if (openId && this.shifts().some(x => x.id === openId)) this.showForm(openId);
-    else this.renderList();
+    this.showForm(openId && this.shifts().some(x => x.id === openId) ? openId : null);
   },
 
-  renderList() {
-    const shifts = [...this.shifts()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-
-    let html;
-    if (shifts.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Log each shift\'s revenue, covers, and cash. Shift revenue is what '
-        + 'feeds your weekly Profit and Revenue numbers automatically.</div>'
-        + '<button class="btn btn-primary" id="ls-add-first">Log a Shift</button></div>';
-    } else {
-      const rows = shifts.map(s => '<tr class="ls-row" data-id="' + s.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-        + '<td>' + esc(s.shift_type || '-') + '</td>'
-        + '<td>' + esc(s.manager || '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-        + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
-        + '<td>' + (s.status === 'Open'
-            ? '<span class="badge badge-ok">Open</span>'
-            : '<span class="badge badge-dim">Closed</span>') + '</td>'
-        + '<td><div class="row-actions">'
-        + (App.canEdit('sc-log-shift') ? '<button class="btn btn-ghost btn-sm ls-edit" data-id="' + s.id + '">Edit</button>' : '')
-        + (App.canEdit('sc-log-shift') ? '<button class="btn btn-danger btn-sm ls-del" data-id="' + s.id + '">Delete</button>' : '')
-        + '</div></td></tr>').join('');
-      html = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Covers</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-    }
-
-    const modal = '<div id="ls-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this shift?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="ls-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="ls-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
-    this.container.onclick = ev => {
-      const row = ev.target.closest('.ls-row');
-      const edit = ev.target.closest('.ls-edit');
-      const del = ev.target.closest('.ls-del');
-      const addF = ev.target.closest('#ls-add-first');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row && App.canEdit('sc-log-shift')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
-    };
-  },
+  back() { App.navigate('sc-shift-history'); },
 
   showForm(id) {
-    if (id && !App.canEdit('sc-log-shift')) return;
+    if (id && !App.canEdit('sc-log-shift')) { this.back(); return; }
     this.editId = id || null;
     const s = id ? this.shifts().find(x => x.id === id) : null;
     const typeOpts = this.SHIFT_TYPES.map(t => '<option' + (s && s.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const v = val => (val != null && val !== '') ? val : '';
+    const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false);
+    const defaultBank = (firstDrawer && firstDrawer.default_opening_bank != null) ? firstDrawer.default_opening_bank : '';
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Log a') + ' Shift</div>'
+      + '<div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
@@ -119,7 +59,7 @@ S.ShiftLogShift = {
 
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Opening Bank</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ls-bank" value="' + v(s?.opening_bank || (() => { const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false); return firstDrawer && firstDrawer.default_opening_bank != null ? firstDrawer.default_opening_bank : ''; })()) + '" step="0.01"/></div></div>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ls-bank" value="' + v(s?.opening_bank != null ? s.opening_bank : defaultBank) + '" step="0.01"/></div></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Staff on Floor</label>'
       + '<input type="number" id="ls-staff" value="' + v(s?.staff_on_floor) + '" min="0"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="ls-status">'
@@ -143,7 +83,7 @@ S.ShiftLogShift = {
       + '</div></div></div>';
 
     this.container.onclick = null;
-    document.getElementById('ls-cancel')?.addEventListener('click', () => this.renderList());
+    document.getElementById('ls-cancel')?.addEventListener('click', () => this.back());
     document.getElementById('ls-save')?.addEventListener('click', () => this.save());
     this.calc();
   },
@@ -198,24 +138,10 @@ S.ShiftLogShift = {
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_sc_shift');
-      this.renderList();
+      this.back();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Shift'; }
       fail('Save failed. Try again.');
     }
-  },
-
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('ls-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('ls-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('ls-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      await App.removeRecord('sc', 'shift', delId);
-      this.renderList();
-    };
   }
 };
