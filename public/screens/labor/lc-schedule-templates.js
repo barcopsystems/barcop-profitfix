@@ -54,13 +54,6 @@ S.LaborScheduleTemplates = {
       return;
     }
 
-    // Header action: templates are made in Build Schedule.
-    const buildBtn = document.createElement('button');
-    buildBtn.className = 'btn btn-primary btn-sm';
-    buildBtn.textContent = 'Build a Schedule';
-    buildBtn.addEventListener('click', () => App.navigate('lc-build-schedule'));
-    this.actions.appendChild(buildBtn);
-
     const list = this.templates();
     let html;
     if (list.length === 0) {
@@ -68,8 +61,7 @@ S.LaborScheduleTemplates = {
         + '<div class="empty-sub">Templates are made from Build Schedule. Build a week, then click "Save Week as Template" at the bottom. Saved ones show up here to load any time.</div>'
         + '<button class="btn btn-primary" id="lt-build">Build a Schedule</button></div>';
     } else {
-      const intro = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">A template is a typical week of shifts. Load one into Build Schedule to use it as-is or tweak it, then post the week. To make a new one, build a week in Build Schedule and save it as a template.</div>';
-      html = intro + list.map(t => {
+      html = list.map(t => {
         const st = this.templateStats(t);
         return '<div class="card lt-card" data-id="' + t.id + '" style="cursor:pointer;margin-bottom:12px;">'
           + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
