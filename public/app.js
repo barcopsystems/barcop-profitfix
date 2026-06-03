@@ -1746,6 +1746,36 @@ const App = {
       + bodyHtml + '</div>';
   },
 
+  // Reusable empty / prerequisite state. Renders a centered card (real card
+  // styling) with one or more numbered steps: gold badge + step title + a one
+  // line description + an action button. A completed step flips its badge to a
+  // gold check and swaps the button for a Done tag, so a half-set-up operator
+  // sees exactly what is left. Renders into container and wires the buttons.
+  // opts = { title, lead, steps:[{ title, desc, btn, screen, done }] }.
+  setupCard(container, opts) {
+    opts = opts || {};
+    const steps = opts.steps || [];
+    const rows = steps.map((s, i) => {
+      const done = !!s.done;
+      const badge = '<div class="setup-num' + (done ? ' done' : '') + '">' + (done ? '&#10003;' : (i + 1)) + '</div>';
+      const action = done
+        ? '<div class="setup-done-tag">Done</div>'
+        : (s.btn && s.screen ? '<button class="btn btn-primary setup-go" data-go="' + esc(s.screen) + '">' + esc(s.btn) + '</button>' : '');
+      return '<div class="setup-step">' + badge
+        + '<div class="setup-step-body"><div class="setup-step-title">' + esc(s.title) + '</div>'
+        + (s.desc ? '<div class="setup-step-desc">' + esc(s.desc) + '</div>' : '')
+        + action + '</div></div>';
+    }).join('');
+    container.innerHTML = '<div class="screen"><div class="card setup-card">'
+      + '<div class="card-title">' + esc(opts.title || 'Get Started') + '</div>'
+      + (opts.lead ? '<div class="setup-lead">' + esc(opts.lead) + '</div>' : '')
+      + rows + '</div></div>';
+    container.onclick = ev => {
+      const go = ev.target.closest('.setup-go');
+      if (go && go.dataset.go) App.navigate(go.dataset.go);
+    };
+  },
+
   // ── PDF export ─────────────────────────────────────────────────────────────
   // Excel-style export: click -> native Save dialog (filename pre-filled) -> Save,
   // no browser print preview. Generates the PDF client-side from the on-screen
