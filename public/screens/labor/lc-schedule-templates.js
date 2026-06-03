@@ -47,7 +47,7 @@ S.LaborScheduleTemplates = {
 
     if (this.staff().length === 0) {
       App.setupCard(this.container, {
-        title: 'Schedule Templates',
+        title: 'Saved Templates',
         lead: 'Templates are reusable weekly shift patterns built from your roster. Add your staff first, then build a week and save it as a template.',
         steps: [
           { title: 'Add your staff', desc: 'Templates are built from your roster, so build it first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
@@ -59,7 +59,7 @@ S.LaborScheduleTemplates = {
     const list = this.templates();
     if (list.length === 0) {
       App.setupCard(this.container, {
-        title: 'Schedule Templates',
+        title: 'Saved Templates',
         lead: 'Templates are reusable weekly shift patterns. You build them in Build Schedule and save them here to load any time.',
         steps: [
           { title: 'Build a schedule', desc: 'Build a week in Build Schedule, then click Save Week as Template at the bottom. Saved templates show up here.', btn: 'Build a Schedule', screen: 'lc-build-schedule', done: false }
