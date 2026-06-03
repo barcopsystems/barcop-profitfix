@@ -239,8 +239,7 @@ S.LaborBuildSchedule = {
 
     const gridCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Weekly Grid</span>'
-      + '<span style="font-size:11px;color:var(--t3);font-weight:400;">Click a day cell to add a shift</span></div>'
-      + (this.activeStaff().length === 0 ? '' : '')
+      + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button></div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
       + '<thead><tr><th style="padding:8px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--t3);">Staff</th>' + headCells + '</tr></thead>'
       + '<tbody>' + body + footer + '</tbody></table></div>'
@@ -256,18 +255,11 @@ S.LaborBuildSchedule = {
       + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">' + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
       + '</div></div>';
 
-    // Template + save actions
-    const tmpls = this.templates();
-    const tmplOpts = tmpls.length
-      ? '<option value="">Apply a template...</option>' + tmpls.map(t => '<option value="' + esc(t.id) + '">' + esc(t.name) + ' (' + ((t.shifts || []).length) + ' shifts)</option>').join('')
-      : '';
-    const actionsCard = '<div class="card"><div class="card-title">Templates and Save</div>'
+    // Save card — name it to also save a reusable template (optional).
+    const actionsCard = '<div class="card"><div class="card-title">Save</div>'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">'
-      + (tmpls.length
-          ? '<div class="f" style="width:260px;"><label>Apply Template</label><select id="bs-tmpl">' + tmplOpts + '</select></div>'
-            + '<button class="btn btn-ghost" id="bs-tmpl-apply" style="margin-bottom:2px;">Apply</button>'
-          : '<div style="font-size:11px;color:var(--t3);padding-bottom:10px;">No templates yet. Build a week, then save it as a template to reuse it.</div>')
-      + '<button class="btn btn-ghost" id="bs-save-tmpl" style="margin-bottom:2px;">Save Week as Template</button>'
+      + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name ' + tt('bs-tmpl-name') + '</label>'
+      + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional — name it to save as a template"/></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes</label><textarea id="bs-notes" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
       + '<div class="card-actions">'
@@ -278,7 +270,7 @@ S.LaborBuildSchedule = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Week and Labor Budget</span>'
-      + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button></div>'
+      + '<button class="btn btn-ghost btn-sm" id="bs-how">How This Works</button></div>'
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:14px;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
       + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'
@@ -306,6 +298,7 @@ S.LaborBuildSchedule = {
     });
     document.getElementById('bs-notes')?.addEventListener('input', e => { this.draft.notes = e.target.value || ''; this.saveDraft(); });
     document.getElementById('bs-fc')?.addEventListener('click', () => this.openForecastModal());
+    document.getElementById('bs-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('bs-save')?.addEventListener('click', () => this.save());
     document.getElementById('bs-new')?.addEventListener('click', async () => {
       if (this.draft.shifts.length) {
@@ -317,8 +310,6 @@ S.LaborBuildSchedule = {
       this.saveDraft(); this.draw();
     });
     document.getElementById('bs-cancel')?.addEventListener('click', () => { this.editId = null; App.navigate('lc-schedule-history'); });
-    document.getElementById('bs-tmpl-apply')?.addEventListener('click', () => this.applyTemplate(document.getElementById('bs-tmpl')?.value));
-    document.getElementById('bs-save-tmpl')?.addEventListener('click', () => this.openSaveTemplateModal());
 
     // Grid cell clicks: edit a block, or add to a cell.
     this.container.querySelectorAll('.bs-cell').forEach(cell => {
@@ -440,52 +431,16 @@ S.LaborBuildSchedule = {
     });
   },
 
-  // ── Templates ────────────────────────────────────────────────────────────────
-  async applyTemplate(id) {
-    if (!id) return;
-    const t = this.templates().find(x => x.id === id);
-    if (!t) return;
-    if (this.draft.shifts.length) {
-      const ok = await App.confirm({ title: 'Apply template?', message: 'This replaces the shifts currently in the grid with the template\'s shifts.', confirmText: 'Apply', cancelText: 'Cancel' });
-      if (!ok) return;
-    }
-    this.draft.shifts = (t.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
-    this.saveDraft(); this.draw();
-  },
-
-  openSaveTemplateModal() {
-    const validShifts = this.draft.shifts.filter(sh => sh.staff_id && sh.start && sh.end);
-    if (validShifts.length === 0) { const e = document.getElementById('bs-err'); if (e) { e.textContent = 'Add some shifts before saving a template.'; e.style.display = 'inline'; } return; }
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Save Week as Template</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Saves the ' + validShifts.length + ' shifts in the grid as a reusable template. Keep the same name to update an existing template, or rename it to save a new one.</div>'
-      + '<div class="f"><label>Template Name</label><input type="text" id="bs-tmpl-name" value="' + esc(this.draft.from_template_name || '') + '" placeholder="e.g. Standard Week"/></div>'
-      + '<div id="bs-tmpl-err" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>'
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">'
-      + '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
-      + '<button class="btn btn-primary" data-act="save">Save Template</button></div></div>';
-    document.body.appendChild(overlay);
-    const close = () => document.body.removeChild(overlay);
-    overlay.addEventListener('click', async ev => {
-      const act = ev.target.closest('[data-act]')?.dataset.act;
-      if (!act) { if (ev.target === overlay) close(); return; }
-      if (act === 'cancel') { close(); return; }
-      const name = (document.getElementById('bs-tmpl-name')?.value || '').trim();
-      const errEl = document.getElementById('bs-tmpl-err');
-      if (!name) { errEl.textContent = 'Give the template a name.'; errEl.style.display = 'block'; return; }
-      if (!App.laborData) App.laborData = {};
-      if (!Array.isArray(App.laborData.lc_schedule_templates)) App.laborData.lc_schedule_templates = [];
-      const tmpls = App.laborData.lc_schedule_templates;
-      const shifts = validShifts.map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
-      const existing = tmpls.find(x => (x.name || '').trim().toLowerCase() === name.toLowerCase());
-      if (existing) { existing.shifts = shifts; existing.name = name; existing.updated_at = new Date().toISOString(); }
-      else tmpls.push({ id: App.uid(), name, shifts, created_at: new Date().toISOString() });
-      this.draft.from_template_name = name; this.saveDraft();
-      await App.saveLabor();
-      close(); this.draw();
-    });
+  // ── How This Works ──────────────────────────────────────────────────────────
+  showHowTo() {
+    App.showHelpModal('How Build Schedule Works', [
+      { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
+      { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
+      { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast) and shows, live, what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
+      { h: 'Templates', p: ['To start from a typical week, Load a template from the Templates page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
+      { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched.'] },
+      { h: 'Salaried Staff', p: ['Salaried managers show their shift times in the grid, but their pay is a fixed weekly salary, not an hourly cost, so it counts toward the budget as a flat amount no matter how many hours you schedule.'] }
+    ]);
   },
 
   // ── Save schedule ────────────────────────────────────────────────────────────
@@ -540,6 +495,18 @@ S.LaborBuildSchedule = {
     const ok = await App.putRecord('lc', 'schedule', saved);
     if (ok) {
       App.markSetupDone('gs_lc_schedule');
+      // A name in the Template Name box also saves/updates a reusable template
+      // (same name updates it, a new name creates one).
+      const tmplName = (document.getElementById('bs-tmpl-name')?.value || '').trim();
+      if (tmplName) {
+        if (!Array.isArray(App.laborData.lc_schedule_templates)) App.laborData.lc_schedule_templates = [];
+        const tmpls = App.laborData.lc_schedule_templates;
+        const tshifts = validShifts.map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
+        const ex = tmpls.find(x => (x.name || '').trim().toLowerCase() === tmplName.toLowerCase());
+        if (ex) { ex.shifts = tshifts; ex.name = tmplName; ex.updated_at = new Date().toISOString(); }
+        else tmpls.push({ id: App.uid(), name: tmplName, shifts: tshifts, created_at: new Date().toISOString() });
+        await App.saveLabor();
+      }
       this.editId = null;
       this.clearDraft();
       App.navigate('lc-schedule-history');
