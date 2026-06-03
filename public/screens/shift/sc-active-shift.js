@@ -304,6 +304,31 @@ S.ShiftActiveShift = {
   },
 
   // ── Active shift dashboard ──────────────────────────────────────────────────
+  // The registers running this shift, shown live during service: each drawer's
+  // opening bank and what has been dropped from it so far. Reads s.drawers[]
+  // (multi-register), falling back to the single legacy drawer for old shifts.
+  registersCard(s) {
+    const drawers = (Array.isArray(s.drawers) && s.drawers.length)
+      ? s.drawers
+      : (s.drawer_id || s.drawer ? [{ drawer_id: s.drawer_id || '', name: s.drawer || 'Register', opening_bank: s.opening_bank }] : []);
+    if (!drawers.length) return '';
+    const dropsByDrawer = {};
+    this.byDate('sc_cash_drops', s.date).forEach(dp => {
+      const k = dp.drawer_id || '';
+      dropsByDrawer[k] = (dropsByDrawer[k] || 0) + (parseFloat(dp.amount) || 0);
+    });
+    const tiles = drawers.map(dr => {
+      const dropped = dropsByDrawer[dr.drawer_id] || 0;
+      return '<div style="width:165px;border:1px solid var(--b2);background:var(--input);border-radius:10px;padding:12px 14px;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(dr.name || 'Register') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Opening bank <span style="color:var(--t1);font-weight:700;float:right;">' + App.fmtCurrency(dr.opening_bank || 0) + '</span></div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Dropped <span style="color:var(--gold);font-weight:700;float:right;">' + App.fmtCurrency(dropped) + '</span></div>'
+        + '</div>';
+    }).join('');
+    return '<div class="card"><div class="card-title">Registers</div>'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + tiles + '</div></div>';
+  },
+
   renderActive(s) {
     this.mode = 'active';
     const drops = this.byDate('sc_cash_drops', s.date);
@@ -369,6 +394,8 @@ S.ShiftActiveShift = {
       + (s.started_at ? 'Running ' + this.elapsed(s.started_at) : '')
       + (s.opening_bank != null ? ' &middot; Opening bank ' + App.fmtCurrency(s.opening_bank) : '') + '</div>'
       + '</div>'
+
+      + this.registersCard(s)
 
       + '<div class="card"><div class="card-title">This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
