@@ -98,7 +98,7 @@ S.LaborDailyView = {
 
     const dateCard = '<div class="card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Day View</span>'
+      + '<span>Daily Snapshot</span>'
       + App.helpButton('dv-how') + '</div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
