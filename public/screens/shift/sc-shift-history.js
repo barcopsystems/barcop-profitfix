@@ -190,26 +190,53 @@ S.ShiftHistory = {
     let cashCard = '';
     if (s.cash_recon) {
       const cr = s.cash_recon;
-      const skipped = cr.skipped;
-      const variance = cr.variance;
-      const statusColor = skipped
-        ? 'var(--t3)'
-        : (variance == null ? 'var(--t3)'
-          : (Math.abs(variance) <= (App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10) ? 'var(--gold)' : 'var(--red)'));
-      const statusText = skipped ? 'SKIPPED'
-        : (variance == null ? 'NOT COUNTED'
-          : (Math.abs(variance) <= (App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10) ? 'OK'
-            : variance < 0 ? 'SHORT' : 'OVER'));
-      cashCard = '<div class="card"><div class="card-title">Cash Reconciliation</div>'
-        + '<div class="calc" style="margin-bottom:0;">'
-        + meta('Opening Bank', cr.opening_bank != null ? App.fmtCurrency(cr.opening_bank) : '-')
-        + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
-        + meta('Drops Out', cr.drops_total != null ? App.fmtCurrency(cr.drops_total) : '-')
-        + meta('Expected', cr.expected != null ? App.fmtCurrency(cr.expected) : '-')
-        + meta('Counted', cr.counted_cash != null ? App.fmtCurrency(cr.counted_cash) : '-')
-        + meta('Variance', skipped ? '-' : (variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
-        + meta('Status', '<span style="color:' + statusColor + ';font-weight:700;">' + statusText + '</span>')
-        + '</div></div>';
+      const tol = App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10;
+      const fmt = x => x != null ? App.fmtCurrency(x) : '-';
+      const vCell = (vr, sk, ct) => {
+        if (sk || vr == null || ct == null) return '<span style="color:var(--t4);">-</span>';
+        const col = Math.abs(vr) <= tol ? 'var(--gold)' : 'var(--red)';
+        return '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>';
+      };
+      const statusCell = st => {
+        const col = st === 'Within Tolerance' ? 'var(--gold)' : (st === 'Short' || st === 'Over') ? 'var(--red)' : 'var(--t3)';
+        return '<span style="color:' + col + ';font-weight:700;">' + esc(st || '-') + '</span>';
+      };
+      if (Array.isArray(cr.drawers) && cr.drawers.length) {
+        const rows = cr.drawers.map(c => '<tr>'
+          + '<td><div class="val">' + esc(c.name || 'Register') + '</div></td>'
+          + '<td>' + fmt(c.opening_bank) + '</td><td>' + fmt(c.drops_total) + '</td>'
+          + '<td>' + (c.sales_cash != null ? fmt(c.sales_cash) : '-') + '</td>'
+          + '<td>' + fmt(c.expected) + '</td>'
+          + '<td>' + (c.counted_cash != null ? fmt(c.counted_cash) : '-') + '</td>'
+          + '<td>' + vCell(c.variance, cr.skipped, c.counted_cash) + '</td>'
+          + '<td>' + statusCell(c.status) + '</td></tr>').join('');
+        const totalRow = '<tr style="border-top:2px solid var(--b1);">'
+          + '<td><div class="val" style="font-weight:800;">Total</div></td>'
+          + '<td>' + fmt(cr.opening_bank) + '</td><td>' + fmt(cr.drops_total) + '</td>'
+          + '<td>' + (cr.sales_cash != null ? fmt(cr.sales_cash) : '-') + '</td>'
+          + '<td>' + fmt(cr.expected) + '</td>'
+          + '<td>' + (cr.counted_cash != null ? fmt(cr.counted_cash) : '-') + '</td>'
+          + '<td>' + vCell(cr.variance, cr.skipped, cr.counted_cash) + '</td><td></td></tr>';
+        cashCard = '<div class="card"><div class="card-title">Cash Reconciliation</div>'
+          + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+          + '<th>Drawer</th><th>Opening</th><th>Drops</th><th>POS Cash</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
+          + '</tr></thead><tbody>' + rows + totalRow + '</tbody></table></div></div>';
+      } else {
+        const skipped = cr.skipped;
+        const variance = cr.variance;
+        const statusColor = skipped ? 'var(--t3)' : (variance == null ? 'var(--t3)' : (Math.abs(variance) <= tol ? 'var(--gold)' : 'var(--red)'));
+        const statusText = skipped ? 'SKIPPED' : (variance == null ? 'NOT COUNTED' : (Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER'));
+        cashCard = '<div class="card"><div class="card-title">Cash Reconciliation</div>'
+          + '<div class="calc" style="margin-bottom:0;">'
+          + meta('Opening Bank', fmt(cr.opening_bank))
+          + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
+          + meta('Drops Out', fmt(cr.drops_total))
+          + meta('Expected', fmt(cr.expected))
+          + meta('Counted', cr.counted_cash != null ? App.fmtCurrency(cr.counted_cash) : '-')
+          + meta('Variance', skipped ? '-' : (variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
+          + meta('Status', '<span style="color:' + statusColor + ';font-weight:700;">' + statusText + '</span>')
+          + '</div></div>';
+      }
     }
 
     // ── Tip Reconciliation card ──────────────────────────────────────────
