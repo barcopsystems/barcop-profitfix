@@ -1776,6 +1776,47 @@ const App = {
     };
   },
 
+  // Collapsible form cards. The add/import forms on a landing page stay open by
+  // default; this lets the operator tuck one away once they are past setup so the
+  // list below rises up. State is a per-device view preference (localStorage),
+  // not business data, so it is never written to the account. Collapsing hides
+  // the body via CSS — the form stays mounted, so in-progress entries and the CSV
+  // importer are preserved. Usage: put collapseToggle(key) just left of How This
+  // Works in the title, wrap the card body in <div class="collapse-body">, route
+  // the page's click delegation through toggleCollapse, and call applyCollapsed
+  // after setting innerHTML.
+  _collapseKey(key) { return 'barcop_collapse_' + key; },
+  collapsed(key) {
+    try { return localStorage.getItem(this._collapseKey(key)) === '1'; } catch (e) { return false; }
+  },
+  collapseToggle(key) {
+    const open = !this.collapsed(key);
+    return '<button class="card-collapse-toggle" data-collapse-key="' + esc(key) + '" '
+      + 'title="' + (open ? 'Hide' : 'Show') + '" aria-label="' + (open ? 'Hide' : 'Show') + '">'
+      + (open ? '&#9662;' : '&#9656;') + '</button>';
+  },
+  applyCollapsed(root) {
+    if (!root) return;
+    root.querySelectorAll('.card-collapse-toggle').forEach(btn => {
+      const card = btn.closest('.card');
+      if (card) card.classList.toggle('collapsed', this.collapsed(btn.dataset.collapseKey));
+    });
+  },
+  toggleCollapse(btn) {
+    if (!btn) return;
+    const card = btn.closest('.card');
+    if (!card) return;
+    const nowCollapsed = !card.classList.contains('collapsed');
+    card.classList.toggle('collapsed', nowCollapsed);
+    try {
+      if (nowCollapsed) localStorage.setItem(this._collapseKey(btn.dataset.collapseKey), '1');
+      else localStorage.removeItem(this._collapseKey(btn.dataset.collapseKey));
+    } catch (e) { /* storage unavailable — toggle still works for this view */ }
+    btn.innerHTML = nowCollapsed ? '&#9656;' : '&#9662;';
+    btn.title = nowCollapsed ? 'Show' : 'Hide';
+    btn.setAttribute('aria-label', nowCollapsed ? 'Show' : 'Hide');
+  },
+
   // ── PDF export ─────────────────────────────────────────────────────────────
   // Excel-style export: click -> native Save dialog (filename pre-filled) -> Save,
   // no browser print preview. Generates the PDF client-side from the on-screen
