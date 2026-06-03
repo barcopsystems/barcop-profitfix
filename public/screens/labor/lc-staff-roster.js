@@ -176,26 +176,26 @@ S.LaborStaffRoster = {
       return;
     }
 
-    // Bulk import (drag-drop + column mapping), so a new operator can upload a
-    // staff list instead of adding everyone by hand. Same component as the
-    // Inventory product import and the Log Hours timeclock import.
-    const importBtn = document.createElement('button');
-    importBtn.className = 'btn btn-ghost btn-sm';
-    importBtn.textContent = 'Import from File';
-    importBtn.addEventListener('click', () => this.showImport());
-    this.actions.appendChild(importBtn);
-
     const addForm = '<div class="card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Add Staff Member</span>'
       + '<button class="btn btn-ghost btn-sm" id="sr-how">How This Works</button></div>'
       + this.profileFormCells(null)
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
-      + '<label>Notes</label><textarea id="sr-notes" rows="2" placeholder="Optional"></textarea></div></div>'
+      + '<label>Notes</label><textarea id="sr-notes" rows="1" placeholder="Optional"></textarea></div></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
       + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
+
+    // Import card sits between Add Staff and the Roster, so a new operator can
+    // upload a staff list instead of adding everyone by hand. No explainer text
+    // here on purpose; the How This Works button carries it.
+    const importCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Import Staff</span>'
+      + '<button class="btn btn-ghost btn-sm" id="sr-imp-how">How This Works</button></div>'
+      + '<div id="sr-csv"></div><div id="sr-imp-result"></div></div>';
 
     const list = [...this.staff()].sort((a, b) => {
       if ((a.status === 'Inactive') !== (b.status === 'Inactive')) return a.status === 'Inactive' ? 1 : -1;
@@ -244,10 +244,11 @@ S.LaborStaffRoster = {
       + '<button class="btn btn-danger" id="sr-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + addForm + listCard + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addForm + importCard + listCard + '</div>' + modal;
     this.container.onclick = ev => {
-      if (ev.target.closest('#sr-how'))  { this.showHowTo(); return; }
-      if (ev.target.closest('#sr-save')) { this.saveProfile(null); return; }
+      if (ev.target.closest('#sr-how'))     { this.showHowTo(); return; }
+      if (ev.target.closest('#sr-imp-how')) { this.showImportHelp(); return; }
+      if (ev.target.closest('#sr-save'))    { this.saveProfile(null); return; }
       const edit = ev.target.closest('.sr-edit');
       const del = ev.target.closest('.sr-del');
       const row = ev.target.closest('.sr-row');
@@ -256,6 +257,29 @@ S.LaborStaffRoster = {
       else if (row)   this.renderUnified(row.dataset.id);
     };
     this.wirePayFields();
+    this.mountImporter();
+  },
+
+  // Mount the drag-drop + column mapper into the landing's Import card. No hint
+  // text — the How This Works button on the card carries the explanation.
+  mountImporter() {
+    const el = document.getElementById('sr-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      fields: [
+        { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name'] },
+        { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title'] },
+        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'pay'] },
+        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate'] },
+        { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual'] },
+        { key: 'status',        label: 'Status',        required: false, match: ['status', 'active'] },
+        { key: 'hire_date',     label: 'Hire Date',     required: false, match: ['hire date', 'hired', 'start date', 'hire'] },
+        { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
+        { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address'] }
+      ],
+      confirmLabel: 'Import Staff',
+      onComplete: rows => this.importStaffRows(rows)
+    });
   },
 
   showHowTo() {
@@ -268,38 +292,7 @@ S.LaborStaffRoster = {
     ]);
   },
 
-  // ── Bulk import from a file (drag-drop + column mapping) ────────────────────
-  showImport() {
-    this.detailId = null;
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sr-imp-back">&#8592; Back to Roster</button></div>'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Import Staff from a File</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sr-imp-how">How This Works</button></div>'
-      + '<div id="sr-csv"></div></div>'
-      + '<div id="sr-imp-result"></div></div>';
-    document.getElementById('sr-imp-back')?.addEventListener('click', () => this.renderList());
-    document.getElementById('sr-imp-how')?.addEventListener('click', () => this.showImportHelp());
-
-    CSVMapper.mount(document.getElementById('sr-csv'), {
-      fields: [
-        { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name'] },
-        { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title'] },
-        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'pay'] },
-        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate'] },
-        { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual'] },
-        { key: 'status',        label: 'Status',        required: false, match: ['status', 'active'] },
-        { key: 'hire_date',     label: 'Hire Date',     required: false, match: ['hire date', 'hired', 'start date', 'hire'] },
-        { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
-        { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address'] }
-      ],
-      hint: 'Upload your staff list (CSV or Excel) and match your columns. Only Name is required; anything left out imports blank and can be filled in on the roster afterward. Position is matched to your existing positions by name.',
-      confirmLabel: 'Import Staff',
-      onComplete: rows => this.importStaffRows(rows)
-    });
-  },
-
+  // ── Bulk import (drag-drop + column mapping) ────────────────────────────────
   showImportHelp() {
     App.showHelpModal('How Importing Staff Works', [
       { p: ['Upload your staff list as a CSV or Excel file. Bar Cop reads your column headers, matches them to the right fields, and lets you fix anything it guessed wrong before importing. Whatever your file does not include imports blank, and you fill it in on the roster after, so you are not building the whole team from scratch.'] },
@@ -365,11 +358,12 @@ S.LaborStaffRoster = {
     if (ok) {
       App.markSetupDone('gs_lc_roster');
       const noPos = toAdd.filter(s => !s.position_id).length;
-      if (result) result.innerHTML = '<div class="card">'
-        + '<div style="font-size:13px;color:var(--gold);font-weight:700;">Imported ' + toAdd.length + ' staff member' + (toAdd.length === 1 ? '' : 's') + '.</div>'
-        + (noPos > 0 ? '<div style="font-size:12px;color:var(--t3);margin-top:6px;">' + noPos + ' came in without a matched position. Open them on the roster to set one.</div>' : '')
-        + '<div style="margin-top:12px;"><button class="btn btn-primary btn-sm" id="sr-imp-done">Back to Roster</button></div></div>';
-      document.getElementById('sr-imp-done')?.addEventListener('click', () => this.renderList());
+      // Re-render the landing so the new staff show in the roster below, then
+      // drop the summary into the freshly-rendered import result slot.
+      this.renderList();
+      const res2 = document.getElementById('sr-imp-result');
+      if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' staff member' + (toAdd.length === 1 ? '' : 's') + '.'
+        + (noPos > 0 ? ' <span style="color:var(--t3);font-weight:400;">' + noPos + ' need a position set; open them on the roster below.</span>' : '') + '</div>';
     } else {
       const ids = new Set(toAdd.map(s => s.id));
       App.laborData.lc_staff = this.staff().filter(s => !ids.has(s.id));
