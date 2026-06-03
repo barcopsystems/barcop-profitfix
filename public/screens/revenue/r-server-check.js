@@ -276,7 +276,7 @@ S.RevenueServerCheck = {
       .map(t => '<option' + (shift === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     return '<div class="card">'
       + '<div class="card-title">New Shift Check</div>'
-      + '<div class="form-row" style="flex-wrap:nowrap;gap:10px;align-items:flex-end;">'
+      + '<div class="form-row data-row" style="gap:10px;align-items:flex-end;">'
         + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input type="date" id="rsc-date" value="' + today + '"/></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Shift</label><select id="rsc-shift">' + shiftOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="rsc-server">' + (servers.length ? serverOpts : '<option>Add staff in Labor Control</option>') + '</select></div>'
