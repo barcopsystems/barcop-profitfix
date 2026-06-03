@@ -226,8 +226,13 @@ S.LaborTipLog = {
   },
 
   filterCard(summaryHtml) {
+    // Only staff who actually have tip entries (plus the current selection), so
+    // the dropdown stays relevant — non-tipped staff who never got tips never
+    // clutter it, and a tip-out to a support role still shows up.
+    const withTips = new Set(this.tips().map(t => t.staff_id).filter(Boolean));
     const staffOpts = '<option value="">All staff</option>'
-      + this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      + this.staff().filter(s => withTips.has(s.id) || s.id === this.filterStaff)
+          .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
     return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Filter</span>'
