@@ -3,7 +3,10 @@
 /* ── Labor Control — Log Hours (writes lc_actuals) ────────────────────────────
    Records actual hours worked, by hand or by importing a timeclock CSV/Excel
    export through the shared csv-mapper component. lc_actuals feeds Revenue and
-   Profit Recovery weekly labor, prime cost, and the RPLH Tracker. */
+   Profit Recovery weekly labor, prime cost, and the RPLH Tracker.
+
+   Landing = inline Log Hours form + an Import card + the logged-hours list.
+   Clicking a row opens its edit page (same layout, minus How This Works). */
 
 S.LaborLogHours = {
   editId: null,
@@ -35,48 +38,82 @@ S.LaborLogHours = {
     this.renderList();
   },
 
+  // The form cells shared by the inline log form and the edit page so they never
+  // drift. All data cells (Date, Staff, Shift, Hours) on one row; Notes on its
+  // own row; the live Wage / Labor Cost preview below.
+  logFormCells(a) {
+    const v = val => (val != null && val !== '') ? val : '';
+    const shiftOpts = this.SHIFTS.map(s =>
+      '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
+    return '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
+      + '<input type="date" id="lo-date" value="' + esc(a?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="flex:1 1 200px;min-width:0;"><label>Staff</label>'
+      + '<select id="lo-staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
+      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Shift</label>'
+      + '<select id="lo-shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Hours</label>'
+      + '<input type="number" id="lo-hours" min="0" step="0.25" value="' + v(a?.hours) + '"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="lo-notes" rows="1" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div></div>'
+      + '<div class="calc" style="margin-bottom:0;">'
+      + '<div class="calc-item"><div class="calc-label">Wage</div><div class="calc-val" id="lo-c-wage">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="lo-c-cost">-</div></div>'
+      + '</div>';
+  },
+
+  // Attach the live-calc listeners for whichever form is mounted (inline or edit).
+  wireForm() {
+    document.getElementById('lo-staff')?.addEventListener('change', () => this.calc());
+    document.getElementById('lo-date')?.addEventListener('change', () => this.calc());
+    document.getElementById('lo-hours')?.addEventListener('input', () => this.calc());
+    this.calc();
+  },
+
   renderList() {
+    this.editId = null;
     this.actions.innerHTML = '';
+
     if (this.staff().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add staff first</div>'
-        + '<div class="empty-sub">Hours are logged against your roster. Add staff in Staff Roster, then '
-        + 'log or import their hours here.</div>'
-        + '<button class="btn btn-primary" id="lo-go-roster">Go to Staff Roster</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#lo-go-roster')) App.navigate('lc-staff-roster'); };
+      App.setupCard(this.container, {
+        title: 'Log Your First Hours',
+        lead: 'Hours are logged against your roster and feed your weekly labor cost, prime cost, and revenue per labor hour. Add your staff and you can start logging.',
+        steps: [
+          { title: 'Add your staff', desc: 'Hours are logged against a staff member, so build your roster first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
       return;
     }
 
-    const importBtn = document.createElement('button');
-    importBtn.className = 'btn btn-ghost btn-sm';
-    importBtn.textContent = 'Import CSV';
-    importBtn.addEventListener('click', () => this.showImport());
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Log Hours';
-    addBtn.addEventListener('click', () => this.showForm());
-    this.actions.appendChild(importBtn);
-    this.actions.appendChild(addBtn);
+    const addCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Log Hours</span>'
+      + '<button class="btn btn-ghost btn-sm" id="lo-how">How This Works</button></div>'
+      + this.logFormCells(null)
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
+      + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+
+    // Import card sits under the log form, so a new operator can drop a timeclock
+    // export instead of entering by hand. No explainer text here on purpose; the
+    // How This Works button carries it.
+    const importCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Import Hours</span>'
+      + '<button class="btn btn-ghost btn-sm" id="lo-imp-how">How This Works</button></div>'
+      + '<div id="lo-csv"></div><div id="lo-imp-result"></div></div>';
 
     const list = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
 
-    let html;
+    let listCard;
     if (list.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No hours logged yet</div>'
-        + '<div class="empty-sub">Log hours by hand, or import a timeclock export. Logged hours feed your '
-        + 'weekly labor cost in Profit and Revenue Recovery.</div>'
-        + '<button class="btn btn-primary" id="lo-add-first">Log Hours</button></div>';
+      listCard = '<div class="card"><div class="card-title">Logged Hours</div>'
+        + '<div style="font-size:13px;color:var(--t3);">No hours logged yet. Log your first entry above, or import a '
+        + 'timeclock export. Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div></div>';
     } else {
-      const totHours = list.reduce((t, a) => t + (a.hours || 0), 0);
-      const loDates = list.map(a => a.date).filter(Boolean).sort();
-      const loSal = loDates.length ? App.salariedCost(loDates[0], loDates[loDates.length - 1]).total : 0;
-      const totCost = list.reduce((t, a) => t + (a.cost || 0), 0) + loSal;
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + list.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + totHours.toFixed(1) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Labor Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
-        + '</div>';
       const rows = list.slice(0, App.listLimit('lc', 'actual')).map(a => {
         const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
         const actions = a.locked
@@ -92,10 +129,11 @@ S.LaborLogHours = {
         + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td>'
         + '<td><div class="row-actions">' + actions + '</div></td></tr>';
       }).join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listCard = '<div class="card"><div class="card-title">Logged Hours</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('lc', 'actual', list, false);
+        + App.showOlderBar('lc', 'actual', list, false) + '</div>';
     }
 
     const modal = '<div id="lo-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -106,18 +144,21 @@ S.LaborLogHours = {
       + '<button class="btn btn-danger" id="lo-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addCard + importCard + listCard + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
+      if (ev.target.closest('#lo-imp-how')) { this.showImportHelp(); return; }
+      if (ev.target.closest('#lo-save'))    { this.save(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.lo-row');
       const edit = ev.target.closest('.lo-edit');
       const del = ev.target.closest('.lo-del');
-      const addF = ev.target.closest('#lo-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('lc-log-hours')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
     };
+    this.wireForm();
+    this.mountImporter();
   },
 
   showForm(id) {
@@ -135,43 +176,20 @@ S.LaborLogHours = {
       this.editId = null;
       return;
     }
-    const shiftOpts = this.SHIFTS.map(s =>
-      '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
-    const v = val => (val != null && val !== '') ? val : '';
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Log') + ' Hours</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="lo-date" value="' + esc(a?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
-      + '<select id="lo-staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Shift</label>'
-      + '<select id="lo-shift">' + shiftOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Hours</label>'
-      + '<input type="number" id="lo-hours" min="0" step="0.25" value="' + v(a?.hours) + '"/></div>'
-      + '<div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="lo-notes" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div>'
-      + '</div>'
-      + '<div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Wage</div><div class="calc-val" id="lo-c-wage">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="lo-c-cost">-</div></div>'
-      + '</div>'
+      + '<div class="card-title">Edit Hours</div>'
+      + this.logFormCells(a)
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lo-save">' + (id ? 'Update' : 'Save Hours') + '</button>'
+      + '<button class="btn btn-primary" id="lo-save">Update</button>'
       + '<button class="btn btn-ghost" id="lo-cancel">Cancel</button>'
       + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 
     this.container.onclick = null;
-    document.getElementById('lo-staff')?.addEventListener('change', () => this.calc());
-    document.getElementById('lo-date')?.addEventListener('change', () => this.calc());
-    document.getElementById('lo-hours')?.addEventListener('input', () => this.calc());
     document.getElementById('lo-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('lo-save')?.addEventListener('click', () => this.save());
-    this.calc();
+    this.wireForm();
   },
 
   calc() {
@@ -241,24 +259,39 @@ S.LaborLogHours = {
     }
   },
 
-  // ── CSV import ──────────────────────────────────────────────────────────────
-  showImport() {
-    this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="lo-imp-back">&#8592; Back to Log Hours</button></div>'
-      + '<div class="card"><div class="card-title">Import Timeclock Hours</div>'
-      + '<div id="lo-csv"></div></div>'
-      + '<div id="lo-imp-result"></div></div>';
-    document.getElementById('lo-imp-back')?.addEventListener('click', () => this.renderList());
+  // ── How This Works ──────────────────────────────────────────────────────────
+  showHowTo() {
+    App.showHelpModal('How Logging Hours Works', [
+      { p: ['This is where actual hours worked get recorded. Logged hours feed your weekly labor cost, prime cost, and revenue per labor hour across Profit and Revenue Recovery, so what you enter here drives the numbers everywhere else.'] },
+      { h: 'Logging An Entry', p: ['Fill the row at the top: date, staff member, shift, and hours worked, then Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary.'] },
+      { h: 'Importing From A Timeclock', p: ['Instead of entering by hand, drop a timeclock or POS export into the Import card below and map the columns once. Rows are matched to your roster by name. It is the fast way to get a whole week in at once.'] },
+      { h: 'Closed Pay Periods', p: ['Once a pay period is closed in Pay Periods, its entries lock so the payroll handoff stays clean. Reopen the period there if you need to correct a locked entry.'] }
+    ]);
+  },
 
-    CSVMapper.mount(document.getElementById('lo-csv'), {
+  showImportHelp() {
+    App.showHelpModal('How Importing Hours Works', [
+      { p: ['Upload your timeclock or POS hours export as a CSV or Excel file. Bar Cop reads your column headers, matches them to the right fields, and lets you fix anything it guessed wrong before importing.'] },
+      { h: 'The Columns', p: ['Staff Name, Date, and Hours are required. Shift is optional. Your headers do not need to match exactly; these common names are recognized:',
+        'Staff Name: employee, employee name, name, staff',
+        'Date: date, work date, shift date',
+        'Hours: hours, total hours, hrs, worked',
+        'Shift: shift, shift type'] },
+      { h: 'Matching To Your Roster', p: ['Each row is matched to a staff member by name. A row that does not match anyone on the roster, or is missing hours, is skipped and reported so you can fix it. Each entry costs out at the wage in effect on the date worked, not today\'s rate.'] }
+    ]);
+  },
+
+  // ── CSV import (drag-drop + column mapping, mounted in the Import card) ───────
+  mountImporter() {
+    const el = document.getElementById('lo-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
       fields: [
         { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff'] },
         { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date'] },
         { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked'] },
         { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type'] }
       ],
-      hint: 'Upload your timeclock or POS hours export. Staff names are matched to your roster. '
-        + 'Rows that do not match a staff member are skipped.',
       confirmLabel: 'Import',
       onComplete: rows => this.importRows(rows)
     });
@@ -298,8 +331,8 @@ S.LaborLogHours = {
     const result = document.getElementById('lo-imp-result');
     const imported = toAdd.length;
     if (imported === 0) {
-      if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">'
-        + 'No rows imported. No staff names matched the roster, or hours were missing.</div></div>';
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + 'No rows imported. No staff names matched the roster, or hours were missing.</div>';
       return;
     }
     // Each row persists as its own lc_actuals event; putRecord reverts its own
@@ -307,20 +340,19 @@ S.LaborLogHours = {
     let ok = true;
     for (const rec of toAdd) { ok = (await App.putRecord('lc', 'actual', rec)) && ok; }
     if (!ok) {
-      if (result) result.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--red);">'
-        + 'Save failed. Try the import again.</div></div>';
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + 'Save failed. Try the import again.</div>';
       return;
     }
-    if (result) {
-      result.innerHTML = '<div class="card"><div style="text-align:center;padding:10px 0;">'
-        + '<div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:6px;">'
-        + imported + ' hours entr' + (imported === 1 ? 'y' : 'ies') + ' imported</div>'
-        + (skipped.length ? '<div style="font-size:11px;color:var(--t3);">' + skipped.length
-            + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or missing hours)</div>' : '')
-        + '<div class="card-actions" style="justify-content:center;">'
-        + '<button class="btn btn-primary" id="lo-imp-done">View Logged Hours</button></div></div></div>';
-      document.getElementById('lo-imp-done')?.addEventListener('click', () => this.renderList());
-    }
+    App.markSetupDone('gs_lc_hours');
+    // Re-render the landing so the imported hours show in the list below, then
+    // drop the summary into the freshly-rendered import result slot.
+    this.renderList();
+    const res2 = document.getElementById('lo-imp-result');
+    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
+      + 'Imported ' + imported + ' hours entr' + (imported === 1 ? 'y' : 'ies') + '.'
+      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length
+          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or missing hours).</span>' : '') + '</div>';
   },
 
   confirmDel(id) {
