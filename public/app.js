@@ -1793,7 +1793,7 @@ const App = {
   // edit, not a per-page change. Ghost-button border kept on purpose — operators
   // want an obvious target, not a faint link.
   helpButton(id, label) {
-    return '<button class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
+    return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
   },
 
   // A collapsible card header. The WHOLE header toggles the card open/closed; the
