@@ -77,7 +77,7 @@ S.LaborScheduleTemplates = {
           + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + st.count + ' shift' + (st.count === 1 ? '' : 's')
           + ' &middot; ' + st.hours.toFixed(1) + ' hrs &middot; ~' + App.fmtCurrency(st.cost) + '/wk</div></div>'
           + '<div class="row-actions" style="flex-shrink:0;">'
-          + '<button class="btn btn-primary btn-sm lt-use" data-id="' + t.id + '">Load</button>'
+          + '<button class="btn btn-ghost btn-sm lt-use" data-id="' + t.id + '">Load Template</button>'
           + '<button class="btn btn-danger btn-sm lt-del" data-id="' + t.id + '">Delete</button>'
           + '</div></div></div>';
       }).join('');
