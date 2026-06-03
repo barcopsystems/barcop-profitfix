@@ -1953,6 +1953,8 @@ S.HubSettings = {
       'Late Night': 20,
       'Full Day':   15
     };
+    // Comp over this dollar amount should carry a manager in Authorized By.
+    App.shiftData.settings.comp_auth_threshold = 25;
 
     // Drawers reference table. Seeded with realistic registers so the
     // dropdowns on Cash Drop and Variance Log render with options out of
@@ -1966,49 +1968,82 @@ S.HubSettings = {
     ];
     const scDrawers = App.shiftData.sc_drawers;
 
+    // Each operating day runs multiple typed services that sum to the day's
+    // bar_rev / food_rev / covers, so the weekly revenue feed is unchanged but
+    // Shift Reports (by type) and the per-type cash tolerances demo realistically.
+    // Weekends open with Brunch, weekdays with Lunch, and Dinner anchors the day.
     const scShifts = [];
+    const scDays   = [];   // one entry per operating day, drives the checklists
     ANCHS.weeks.forEach(a => {
       const baseAgo = (12 - a.wk) * 7;
       let barLeft = a.bar_rev, foodLeft = a.food_rev, covLeft = a.covers;
       dayW.forEach((w, di) => {
-        const last   = di === dayW.length - 1;
-        const bar    = last ? barLeft  : Math.round(a.bar_rev  * w);
-        const floor  = last ? foodLeft : Math.round(a.food_rev * w);
-        const covers = last ? covLeft  : Math.round(a.covers   * w);
-        barLeft -= bar; foodLeft -= floor; covLeft -= covers;
-        // Phase 0: event_tag + weather_tag give Profit / Revenue audits real
-        // context so a low-revenue Friday during a thunderstorm reads as bad
-        // luck, not bad ops. Mostly empty; a few salted with realistic tags.
+        const last     = di === dayW.length - 1;
+        const dayBar   = last ? barLeft  : Math.round(a.bar_rev  * w);
+        const dayFloor = last ? foodLeft : Math.round(a.food_rev * w);
+        const dayCov   = last ? covLeft  : Math.round(a.covers   * w);
+        barLeft -= dayBar; foodLeft -= dayFloor; covLeft -= dayCov;
+        const date    = dateStr(baseAgo + 6 - di);
+        const weekend = di >= 5;
         const isLastWeek = a.wk === 12;
-        const eventTag   = (isLastWeek && di === 4) ? 'live music' : '';
-        const weatherTag = (a.wk === 10 && di === 4) ? 'thunderstorm' : '';
-        scShifts.push({
-          id:uid(), date:dateStr(baseAgo + 6 - di), shift_type:'Full Day',
-          manager:mgrs[di % 3], bar_revenue:bar, floor_revenue:floor,
-          total_revenue:bar + floor, covers:covers, opening_bank:300,
-          staff_on_floor:di >= 4 ? 8 : 6, status:'Closed', notes:'',
-          event_tag:eventTag, weather_tag:weatherTag,
-          created_at:new Date().toISOString()
+        // daypart: [type, revenue share, staff on floor]. Dinner is the anchor.
+        const parts = weekend
+          ? [['Brunch', 0.35, 7], ['Dinner', 0.45, 9], ['Late Night', 0.20, 5]]
+          : [['Lunch', 0.30, 5], ['Dinner', 0.50, 8], ['Late Night', 0.20, 4]];
+        let bLeft = dayBar, fLeft = dayFloor, cLeft = dayCov;
+        parts.forEach((p, pi) => {
+          const lastPart = pi === parts.length - 1;
+          const bar   = lastPart ? bLeft : Math.round(dayBar   * p[1]);
+          const floor = lastPart ? fLeft : Math.round(dayFloor * p[1]);
+          const cov   = lastPart ? cLeft : Math.round(dayCov   * p[1]);
+          bLeft -= bar; fLeft -= floor; cLeft -= cov;
+          // Phase 0: event_tag + weather_tag give the audits real context so a
+          // low-revenue Friday during a thunderstorm reads as bad luck, not bad
+          // ops. Salted onto the Dinner service of a couple of days.
+          const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'live music' : '';
+          const weatherTag = (a.wk === 10 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
+          scShifts.push({
+            id:uid(), date:date, shift_type:p[0],
+            manager:mgrs[(di + pi) % 3], bar_revenue:bar, floor_revenue:floor,
+            total_revenue:bar + floor, covers:cov, opening_bank:300,
+            staff_on_floor:p[2], status:'Closed', notes:'',
+            event_tag:eventTag, weather_tag:weatherTag,
+            created_at:new Date().toISOString()
+          });
         });
+        scDays.push({ date:date, manager:mgrs[di % 3] });
       });
     });
     App.shiftData.sc_shifts = scShifts;
 
-    // ── Opening + Closing Checklists ──
-    // One of each per operating day. A disciplined, recovered operation runs at
-    // near-100% completion with the rare item missed. Feeds the Bar Cop Audit's
-    // Operational Discipline (opening + closing completion) and the shift-close
-    // exception read. Type strings match the checklist screens ('Opening' /
-    // 'Closing'); done_count/total_count are the real fields those screens save.
+    // ── Checklist Templates + Opening / Closing runs ──
+    // Templates mirror the built-in defaults so the Templates library is not
+    // empty and the runs reference a real template. One run of each per operating
+    // DAY (not per service). A disciplined, recovered operation runs at near-100%
+    // completion with the rare item missed. Records match what the run screens
+    // save: the full items array plus done_count / total_count.
+    const scOpenItems  = (window.S && S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || [];
+    const scCloseItems = (window.S && S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || [];
+    const scOpenTplId  = uid();
+    const scCloseTplId = uid();
+    App.shiftData.sc_checklist_templates = [
+      { id:scOpenTplId,  name:'Standard Open',  type:'Opening', items:scOpenItems.slice(),  created_at:new Date().toISOString() },
+      { id:scCloseTplId, name:'Standard Close', type:'Closing', items:scCloseItems.slice(), created_at:new Date().toISOString() },
+    ];
+    const mkChkItems = (arr, doneN) => arr.map((text, idx) => ({ text:text, done:idx < doneN }));
     const scChecklists = [];
-    scShifts.forEach((sh, i) => {
-      const mgr = mgrs[i % 3];
-      const openDone  = (i % 9 === 0) ? 9  : 10;   // ~89% of days fully complete
-      const closeDone = (i % 7 === 0) ? 13 : 14;   // ~86% fully complete
-      scChecklists.push({ id:uid(), date:sh.date, type:'Opening', shift_type:'AM',
-        completed_by:mgr, completed_by_id:'', done_count:openDone, total_count:10, created_at:new Date().toISOString() });
-      scChecklists.push({ id:uid(), date:sh.date, type:'Closing', shift_type:'Close',
-        completed_by:mgr, completed_by_id:'', done_count:closeDone, total_count:14, created_at:new Date().toISOString() });
+    scDays.forEach((d, i) => {
+      const mgr = d.manager;
+      const openDone  = (i % 9 === 0) ? scOpenItems.length  - 1 : scOpenItems.length;   // ~89% fully complete
+      const closeDone = (i % 7 === 0) ? scCloseItems.length - 1 : scCloseItems.length;  // ~86% fully complete
+      scChecklists.push({ id:uid(), type:'Opening', template_id:scOpenTplId, template_name:'Standard Open',
+        date:d.date, completed_by:mgr, completed_by_id:'', items:mkChkItems(scOpenItems, openDone),
+        done_count:openDone, total_count:scOpenItems.length, notes:'',
+        completed_at:new Date().toISOString(), created_at:new Date().toISOString() });
+      scChecklists.push({ id:uid(), type:'Closing', template_id:scCloseTplId, template_name:'Standard Close',
+        date:d.date, completed_by:mgr, completed_by_id:'', items:mkChkItems(scCloseItems, closeDone),
+        done_count:closeDone, total_count:scCloseItems.length, notes:'',
+        completed_at:new Date().toISOString(), created_at:new Date().toISOString() });
     });
     App.shiftData.sc_checklists = scChecklists;
 
@@ -2116,25 +2151,70 @@ S.HubSettings = {
     App.shiftData.sc_cash_drops = scCashDrops;
     App.shiftData.sc_safe_log = scSafeLog;
 
+    // Currently-out items (status '86') are recent; older ones are Back In Stock
+    // (status 'Back' + date_back). Ribeye, Hazy IPA, and the Espresso Martini
+    // repeat across the window so the repeat-86 -> Inventory par alert has signal.
     App.shiftData.sc_86_list = [
-      { id:uid(), item:'Ribeye (10 oz)',   category:'Food',      reason:'Out of product, delivery Thursday',
-        date_86:dateStr(2),  time_86:'19:40', reported_by:'Luis V.',  status:'86', date_back:'', notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Espresso Martini', category:'Cocktails', reason:'Espresso machine down',
-        date_86:dateStr(1),  time_86:'18:10', reported_by:'Maria G.', status:'86', date_back:'', notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'House Chardonnay', category:'Wine',      reason:'Ran the case, reorder placed',
-        date_86:dateStr(4),  time_86:'21:30', reported_by:'Jake T.',  status:'86', date_back:'', notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Out of product, delivery Thursday',
+        date_86:dateStr(2),  time_86:'19:40', reported_by:'Luis V.',   status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Espresso Martini',    category:'Cocktails',  reason:'Espresso machine down',
+        date_86:dateStr(1),  time_86:'18:10', reported_by:'Maria G.',  status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'House Chardonnay',    category:'Wine',       reason:'Ran the case, reorder placed',
+        date_86:dateStr(4),  time_86:'21:30', reported_by:'Jake T.',   status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Burrata',             category:'Food',       reason:'Out until morning prep',
+        date_86:dateStr(9),  time_86:'12:30', reported_by:'Hector M.', status:'Back', date_back:dateStr(9),  notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Hazy IPA',            category:'Draft Beer', reason:'Keg blew, tapping new in the morning',
+        date_86:dateStr(12), time_86:'22:15', reported_by:'Maria G.',  status:'Back', date_back:dateStr(11), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Short on the delivery again',
+        date_86:dateStr(16), time_86:'20:05', reported_by:'Sam P.',    status:'Back', date_back:dateStr(15), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Oysters',             category:'Food',       reason:'Daily count sold out',
+        date_86:dateStr(18), time_86:'21:00', reported_by:'Luis V.',   status:'Back', date_back:dateStr(18), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Branzino',            category:'Food',       reason:'Sold out at dinner',
+        date_86:dateStr(24), time_86:'20:30', reported_by:'Sam P.',    status:'Back', date_back:dateStr(24), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Hazy IPA',            category:'Draft Beer', reason:'Keg kicked mid-service',
+        date_86:dateStr(27), time_86:'21:45', reported_by:'Jake T.',   status:'Back', date_back:dateStr(26), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Weekend rush sold out',
+        date_86:dateStr(33), time_86:'20:50', reported_by:'Hector M.', status:'Back', date_back:dateStr(33), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Espresso Martini',    category:'Cocktails',  reason:'Out of espresso beans',
+        date_86:dateStr(31), time_86:'19:00', reported_by:'Ashley B.', status:'Back', date_back:dateStr(30), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'Barrel Old Fashioned',category:'Cocktails',  reason:'Barrel batch empty, re-batching',
+        date_86:dateStr(38), time_86:'18:40', reported_by:'Maria G.',  status:'Back', date_back:dateStr(37), notes:'', created_at:new Date().toISOString() },
+      { id:uid(), item:'House Margarita',     category:'Cocktails',  reason:'Out of fresh lime',
+        date_86:dateStr(45), time_86:'18:20', reported_by:'Jake T.',   status:'Back', date_back:dateStr(44), notes:'', created_at:new Date().toISOString() },
     ];
 
+    // A real mix of Open / In Progress / Resolved across the window. Resolved
+    // rows carry a resolution date and the repair cost so the cost rollup is
+    // honest. The open Walk-in Cooler ties to the same equipment as the temp
+    // checklist item and the cooler running warm.
     App.shiftData.sc_maintenance = [
       { id:uid(), date_reported:dateStr(3),  equipment:'Walk-in Cooler', location:'Kitchen',
         issue:'Temperature running 4 degrees high', priority:'High', status:'Open',
         reported_by:'Luis V.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(6),  equipment:'Beer Tap 3', location:'Main Bar',
+        issue:'Foaming, needs line cleaning and FOB check', priority:'Normal', status:'Open',
+        reported_by:'Jake T.', assigned_to:'', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(8),  equipment:'Ice Machine', location:'Main Bar',
-        issue:'Slow ice production', priority:'Normal', status:'Open',
-        reported_by:'Maria G.', assigned_to:'', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+        issue:'Slow ice production', priority:'Normal', status:'In Progress',
+        reported_by:'Maria G.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'Tech scheduled', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(11), equipment:'Dish Machine', location:'Kitchen',
+        issue:'Not reaching sanitizing temp', priority:'Urgent', status:'Resolved',
+        reported_by:'Luis V.', assigned_to:'Ecolab', date_resolved:dateStr(10), cost:310, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(14), equipment:'Walk-in Cooler', location:'Kitchen',
+        issue:'Door gasket torn, not sealing', priority:'High', status:'Resolved',
+        reported_by:'Hector M.', assigned_to:'CoolTech Repair', date_resolved:dateStr(10), cost:220, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(18), equipment:'Glass Washer', location:'Main Bar',
+        issue:'Leaving spots, rinse aid line', priority:'Low', status:'Resolved',
+        reported_by:'Ashley B.', assigned_to:'', date_resolved:dateStr(17), cost:null, notes:'Adjusted rinse aid in-house', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(20), equipment:'POS Terminal 2', location:'Front of House',
         issue:'Card reader intermittent', priority:'Normal', status:'Resolved',
         reported_by:'Jessica M.', assigned_to:'POS Vendor', date_resolved:dateStr(16), cost:140, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(25), equipment:'Mens Restroom', location:'Front of House',
+        issue:'Faucet leaking at the base', priority:'Low', status:'Resolved',
+        reported_by:'Owen L.', assigned_to:'Handyman', date_resolved:dateStr(21), cost:85, notes:'', created_at:new Date().toISOString() },
+      { id:uid(), date_reported:dateStr(30), equipment:'HVAC', location:'Dining Room',
+        issue:'Dining room runs warm on busy Saturdays', priority:'Normal', status:'Open',
+        reported_by:'Carlos P.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
     ];
 
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
@@ -2396,6 +2476,90 @@ S.HubSettings = {
     });
     App.shiftData.sc_void_comps = scVoidComps;
 
+    // ── Shift Control staff-linked logs (Walked Tabs, Incidents, Waste) ──
+    // Seeded here, after the roster exists, because each form requires a real
+    // staff member (server / manager / recorded_by) for its open->save round
+    // trip. icProducts is in scope for the waste cost, which mirrors the
+    // costFor()/unitLabel() logic in sc-waste.js so the Total Cost is honest.
+    const wtServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Priya N.'];
+    const wtReasons = ['Walked', 'Mis-bill', 'Lost Check', 'Refused to Pay', 'Other'];
+    const scWalkedTabs = [];
+    ANCHS.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      const improving = a.wk >= ANCHS.fix_week;
+      const n = improving ? 1 : 2;   // walked tabs taper after the fix lands
+      for (let k = 0; k < n; k++) {
+        const server = wtServers[(a.wk + k) % wtServers.length];
+        const mgr    = mgrs[(a.wk + k) % 3];
+        const reason = wtReasons[(a.wk + k) % wtReasons.length];
+        const amount = 20 + Math.round(Math.random() * (improving ? 55 : 100));
+        scWalkedTabs.push({
+          id:uid(), date:dateStr(baseAgo + (k === 0 ? 5 : 6)), time:(k === 0 ? '21:50' : '23:10'),
+          server_id:staffIdByName(server), server:server,
+          check_ref:'#' + (4000 + a.wk * 7 + k), amount:amount, reason:reason,
+          manager_id:staffIdByName(mgr), manager:mgr, notes:'',
+          created_at:new Date().toISOString()
+        });
+      }
+    });
+    App.shiftData.sc_walked_tabs = scWalkedTabs;
+
+    // Incident Log — the manager's insurance / legal logbook. A realistic spread
+    // over the quarter; nothing routine, each one is a real event.
+    const scIncidentSeed = [
+      { type:'Slip / Fall',            severity:'Medium', daysAgo:33, time:'20:15', mgr:'Carlos P.', location:'Dining room near the server station', people:'One guest (declined medical care)', desc:'Guest slipped on a wet patch by the server station. Sat with ice, declined an ambulance, left under their own power.', witnesses:'Jessica M., Marcus T.', action:'Cleaned the spill, put out a wet-floor sign, logged a maintenance note on the ice-well drip.', notes:'Followed up by phone the next day, guest was fine.', follow:false },
+      { type:'Customer Altercation',   severity:'High',   daysAgo:26, time:'23:40', mgr:'Maria G.',  location:'Main Bar', people:'Two guests', desc:'Verbal argument between two guests at the bar escalated to shoving. Staff separated them, both asked to leave. No injuries, no property damage.', witnesses:'Jake T.', action:'Cut both off, walked them out separately, comped the surrounding tables a round.', notes:'', follow:false },
+      { type:'Refusal of Service',     severity:'Low',    daysAgo:19, time:'22:10', mgr:'Jake T.',   location:'Main Bar', people:'One guest', desc:'Guest showing clear signs of intoxication. Refused further service and helped arrange a rideshare.', witnesses:'Ashley B.', action:'Refused service, got the guest water, confirmed the rideshare pickup.', notes:'', follow:false },
+      { type:'Employee Injury',        severity:'Medium', daysAgo:12, time:'18:30', mgr:'Renee K.',  location:'Kitchen line', people:'One line cook', desc:'Line cook caught a finger on the slicer guard, minor laceration. First aid on site, did not need stitches.', witnesses:'Luis V.', action:'First aid, bandaged, sent home early. Filed the injury note for workers comp records.', notes:'Re-trained the line on slicer-guard use.', follow:true },
+      { type:'Health Inspector Visit', severity:'Low',    daysAgo:40, time:'14:00', mgr:'Carlos P.', location:'Whole house', people:'County health inspector', desc:'Routine inspection. Passed with two minor notes: date-label the walk-in containers and recaulk one prep sink.', witnesses:'', action:'Corrected the labeling the same day, scheduled the caulk repair.', notes:'Copy of the report is in the office binder.', follow:true },
+      { type:'Property Damage',        severity:'Low',    daysAgo:54, time:'21:00', mgr:'Maria G.',  location:'Patio', people:'', desc:'Wind knocked over a patio umbrella and cracked one tabletop. No one was hurt.', witnesses:'Owen L.', action:'Removed the broken table, secured the remaining umbrellas.', notes:'', follow:false },
+    ];
+    App.shiftData.sc_incidents = scIncidentSeed.map(x => ({
+      id:uid(), date:dateStr(x.daysAgo), time:x.time, type:x.type, severity:x.severity,
+      manager_id:staffIdByName(x.mgr), manager:x.mgr, location:x.location,
+      people_involved:x.people, description:x.desc, witnesses:x.witnesses,
+      action_taken:x.action, notes:x.notes, follow_up_needed:x.follow,
+      created_at:new Date().toISOString()
+    }));
+
+    // Waste / Spill Log — products pulled from the real inventory; cost mirrors
+    // sc-waste.js costFor()/unitLabel() exactly so the Total Cost is honest.
+    const wasteUnitOf = p => !p ? 'units'
+      : p.category === 'Bottle Beer' ? 'btls'
+      : p.category === 'Draft Beer'  ? 'oz'
+      : (p.category === 'Food' || p.category === 'Misc') ? (p.unit_type || 'units')
+      : 'btls';
+    const wasteCostOf = (p, units) => {
+      if (!p || !units) return 0;
+      if (p.category === 'Draft Beer') return (!p.container_size_oz || p.unit_cost == null) ? 0 : (units / p.container_size_oz) * p.unit_cost;
+      if (p.category === 'Food' || p.category === 'Misc') return (p.unit_cost != null) ? units * p.unit_cost : 0;
+      const bc = App.bottleCost ? App.bottleCost(p) : null;
+      return bc != null ? units * bc : 0;
+    };
+    const wByCat = cat => icProducts.filter(p => p.category === cat);
+    const wFood = wByCat('Food'), wLiquor = wByCat('Liquor'), wDraft = wByCat('Draft Beer');
+    const wPick = (arr, i) => (arr.length ? arr[i % arr.length] : null);
+    const scWaste = [];
+    ANCHS.weeks.forEach(a => {
+      const baseAgo = (12 - a.wk) * 7;
+      const slots = [
+        { p:wPick(wFood, a.wk),   units:1 + (a.wk % 3), reason:'Dumped / Tasted Bad', day:2, who:'Luis V.',  shift:'Dinner' },
+        { p:wPick(wLiquor, a.wk), units:1,              reason:'Broken',             day:5, who:'Maria G.', shift:'Dinner' },
+        { p:wPick(wDraft, a.wk),  units:12,             reason:'Spill',              day:4, who:'Jake T.',  shift:'Late Night' },
+      ];
+      slots.forEach(s => {
+        if (!s.p) return;
+        scWaste.push({
+          id:uid(), date:dateStr(baseAgo + s.day), shift_type:s.shift,
+          product_id:s.p.id, product_name:s.p.name, product_category:s.p.category,
+          unit:wasteUnitOf(s.p), units:s.units, cost:+wasteCostOf(s.p, s.units).toFixed(2),
+          reason:s.reason, recorded_by_id:staffIdByName(s.who), recorded_by:s.who, notes:'',
+          created_at:new Date().toISOString()
+        });
+      });
+    });
+    App.shiftData.sc_waste = scWaste;
+
     // Phase 4: patch staff_id + shift_id onto every revenue_server_checks
     // record so the Server Scorecard joins cleanly to lc_staff and sc_shifts.
     (App.data.revenue_server_checks || []).forEach(c => {
@@ -2494,7 +2658,7 @@ S.HubSettings = {
     const lcTips = [];
     [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
       const tipDate = dateStr(d);
-      const matchedShift = scShifts.find(s => s.date === tipDate);
+      const matchedShift = scShifts.find(s => s.date === tipDate && s.shift_type === 'Dinner') || scShifts.find(s => s.date === tipDate);
       const shiftId = matchedShift ? matchedShift.id : '';
       lcTipped.forEach(st => {
         const role = posNameOf(st.position_id);
