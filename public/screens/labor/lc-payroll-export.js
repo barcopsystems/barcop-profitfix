@@ -45,26 +45,37 @@ S.LaborPayrollExport = {
 
     container.innerHTML = '<div class="screen">'
       + '<div class="card" style="margin-bottom:18px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Payroll Export</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a pay period. Bar Cop pulls everyone\'s hours, overtime, tip share, and pay into one file you hand to whoever runs payroll. Download the Workbook for a clean, readable file, or the Import CSV for a payroll system that imports. Salaried staff show a fixed weekly salary with no overtime. Everything is built from what you log in Labor Control. Nothing to re-enter.</div>'
+        + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Payroll Export</span>'
+        + App.helpButton('px-how') + '</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
           + '<div class="f" style="width:300px;"><label>Pay Period</label><select id="px-week">' + opts + '</select></div>'
           + '<div style="display:flex;align-items:flex-end;gap:10px;">'
             + '<button class="btn btn-primary" id="px-xlsx">Download Workbook</button>'
-            + '<button class="btn btn-ghost" id="px-csv">Download Import CSV</button>'
+            + '<button class="btn btn-ghost" id="px-csv">Download CSV</button>'
           + '</div>'
         + '</div>'
         + '<div id="px-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
-        + '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-top:18px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you run payroll</div>'
+        + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:18px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll or timekeeping record. Verify every figure before running payroll.</div>'
         + '</div>'
       + '</div>'
       + this._whatsInsideCard()
       + '</div>';
 
+    document.getElementById('px-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('px-xlsx')?.addEventListener('click', () => this._downloadWorkbook(document.getElementById('px-week')?.value));
     document.getElementById('px-csv')?.addEventListener('click', () => this._downloadCSV(document.getElementById('px-week')?.value));
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Payroll Export Works', [
+      { p: ['Pick a pay period and Bar Cop pulls everyone\'s hours, overtime, tip share, and pay into one file you hand to whoever runs payroll. It is all built from what you log in Labor Control, so there is nothing to re-enter.'] },
+      { h: 'Two Formats', p: ['Download the Workbook for a clean, readable Excel file with your establishment header and the disclaimer, made for a person to review. Download the CSV for a payroll system that imports a file, just the columns with no extra rows.'] },
+      { h: 'Salaried Staff', p: ['Salaried staff show a fixed weekly salary, their annual divided by 52, with no overtime. Their logged hours appear as coverage only and do not drive pay.'] },
+      { h: 'A Worksheet, Not The Record', p: ['Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running payroll.'] }
+    ]);
   },
 
   _setStatus(msg, color) {
