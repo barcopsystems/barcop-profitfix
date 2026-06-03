@@ -192,10 +192,7 @@ S.LaborPayPeriods = {
       + '<div class="card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Pay Periods</span>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + App.helpButton('pp-how')
-      + '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button>'
-      + '</div></div>'
+      + App.helpButton('pp-how') + '</div>'
       + summary
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Week</th><th>Status</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
@@ -204,7 +201,6 @@ S.LaborPayPeriods = {
       + '</div>';
 
     document.getElementById('pp-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { this.detailWeekStart = b.dataset.ws; this.renderDetail(b.dataset.ws); }));
     this.container.querySelectorAll('.pp-csv').forEach(b => b.addEventListener('click', () => this.openPayrollExport(b.dataset.ws)));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
