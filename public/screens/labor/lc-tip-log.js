@@ -174,14 +174,13 @@ S.LaborTipLog = {
     }
 
     const addCard = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Log Tips</span>'
-      + App.helpButton('tl-how') + '</div>'
+      + App.collapsibleCardTitle('lc-tip-log', 'Log Tips', App.helpButton('tl-how'))
+      + '<div class="collapse-body">'
       + this.formBody(null)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="tl-save">Save Tips</button>'
       + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
 
     const all = [...this.tips()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
@@ -234,7 +233,7 @@ S.LaborTipLog = {
   // Import card sits under the log form, so an operator can drop a POS tips
   // export instead of entering by hand. No explainer here; How it works carries it.
   importCard() {
-    return '<div class="card">'
+    return '<div class="card" data-collapse-group="lc-tip-log">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Import Tips</span>'
       + App.helpButton('tl-imp-how') + '</div>'
@@ -357,6 +356,8 @@ S.LaborTipLog = {
 
   wireList() {
     this.container.onclick = ev => {
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.tl-row');
       const edit = ev.target.closest('.tl-edit');
@@ -376,6 +377,7 @@ S.LaborTipLog = {
       this.filterFrom = this.filterTo = this.filterStaff = '';
       this.renderList();
     });
+    App.applyCollapsed(this.container);
   },
 
   // ── Edit page (same form, minus How it works) ──────────────────────────────

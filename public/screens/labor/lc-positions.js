@@ -51,16 +51,15 @@ S.LaborPositions = {
 
     // Inline add form, always at the top of the landing page.
     const addForm = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Add Position</span>'
-      + '<button class="btn btn-ghost btn-sm" id="lp-how">How This Works</button></div>'
+      + App.collapsibleCardTitle('lc-positions', 'Add Position', App.helpButton('lp-how'))
+      + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.formCells(null) + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
       + '<label>Notes</label><textarea id="lp-notes" rows="2" placeholder="Optional"></textarea></div></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lp-add">Add Position</button>'
       + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
 
     let listCard;
     if (list.length === 0) {
@@ -96,6 +95,8 @@ S.LaborPositions = {
     this.container.innerHTML = '<div class="screen">' + addForm + listCard + '</div>' + modal;
     this.container.onclick = ev => {
       if (ev.target.closest('#lp-how')) { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lp-add')) { this.editId = null; this.save(); return; }
       const edit = ev.target.closest('.lp-edit');
       const del = ev.target.closest('.lp-del');
@@ -104,6 +105,7 @@ S.LaborPositions = {
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row)  this.showForm(row.dataset.id);
     };
+    App.applyCollapsed(this.container);
   },
 
   // Edit form — same one-row layout as the inline add form, minus the How This

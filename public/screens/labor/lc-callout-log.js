@@ -96,14 +96,13 @@ S.LaborCalloutLog = {
     }
 
     const addCard = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Log Call-Out</span>'
-      + App.helpButton('co-how') + '</div>'
+      + App.collapsibleCardTitle('lc-callout-log', 'Log Call-Out', App.helpButton('co-how'))
+      + '<div class="collapse-body">'
       + this.formCells(null)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="co-save">Save Call-Out</button>'
       + '<span id="co-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
 
     const list = [...this.callouts()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
@@ -150,6 +149,8 @@ S.LaborCalloutLog = {
     this.container.innerHTML = '<div class="screen">' + addCard + listCard + '</div>' + modal;
     this.container.onclick = ev => {
       if (ev.target.closest('#co-how'))  { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#co-save')) { this.save(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.co-row');
@@ -159,6 +160,7 @@ S.LaborCalloutLog = {
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('lc-callout-log')) this.showForm(row.dataset.id);
     };
+    App.applyCollapsed(this.container);
   },
 
   showForm(id) {

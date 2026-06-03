@@ -21,20 +21,23 @@ S.LaborWageSettings = {
     this.draw();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Wage Policies Work', [
+      { p: ['Wage Policies holds the wage settings that drive Labor Control. Right now that is your state minimum wage, which powers the tip-credit check on Pay Periods.'] },
+      { h: 'The Tip Credit Check', p: ['When a tipped employee\'s base wage plus their tip share falls below the minimum you set here for a week, Bar Cop flags that row on the Pay Periods detail so you can make up the difference before payroll runs. Set it once and every screen reads from this one value.'] },
+      { h: 'Verify For Your Jurisdiction', p: ['This is a planning and review aid, not legal or payroll advice. Minimum wage and tip-credit rules vary by state and city and change over time. Confirm the right figure for your location before relying on the check.'] }
+    ]);
+  },
+
   draw() {
     const s = this.settings();
     const v = val => (val != null && val !== '') ? val : '';
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card">'
-      + '<div class="card-title">State Minimum Wage</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px;">'
-        + 'Your state\'s minimum wage drives the tip credit check on the payroll worksheet. If a tipped employee\'s base wage plus their tip share falls below state minimum for the week, Bar Cop flags the row on Pay Periods detail so you can make up the difference before payroll runs. Set it once here; every consumer reads from this single value.'
-      + '</div>'
-      + '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-bottom:14px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads up</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop uses this value for planning and payroll review purposes only. Verify all wage and tip-credit requirements for your jurisdiction before processing payroll.</div>'
-      + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>State Minimum Wage</span>'
+      + App.helpButton('lws-how') + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:center;">'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>State Min Wage ' + tt('lws-min-wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lws-min-wage" min="0" step="0.01" value="' + v(s.state_min_wage != null ? s.state_min_wage : '') + '" placeholder="Per hour"/></div></div>'
@@ -43,9 +46,14 @@ S.LaborWageSettings = {
       + '<button class="btn btn-primary" id="lws-save">Save Wage Policies</button>'
       + '<span id="lws-msg" style="font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
+      + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop uses this value for planning and payroll review only. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Minimum wage, tip credit, and tip-pool rules vary by federal, state, and local law, change over time, and some cities set their own rates. You and your payroll provider are responsible for verifying the correct wage and tip-credit requirements for your jurisdiction before processing payroll.</div>'
+      + '</div>'
       + '</div>'
       + '</div>';
 
+    document.getElementById('lws-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('lws-save')?.addEventListener('click', () => this.save());
   },
 

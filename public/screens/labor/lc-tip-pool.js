@@ -77,10 +77,9 @@ S.LaborTipPool = {
       + '</div>').join('');
 
     const setupCard = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Tip Pool</span>'
-      + App.helpButton('tp-how') + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
+      + App.collapsibleCardTitle('lc-tip-pool', 'Tip Pool', App.helpButton('tp-how'))
+      + '<div class="collapse-body">'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="tp-date" value="' + esc(this.date) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
@@ -91,9 +90,9 @@ S.LaborTipPool = {
       + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
       + '<button class="btn btn-ghost" id="tp-load" style="margin-bottom:2px;">Load from Tip Log</button></div>'
-      + '</div></div>';
+      + '</div></div></div>';
 
-    const participantsCard = '<div class="card"><div class="card-title">Participants</div>'
+    const participantsCard = '<div class="card" data-collapse-group="lc-tip-pool"><div class="card-title">Participants</div>'
       + '<div id="tp-rows">' + (rowHtml || '<div style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Add staff below or load from the Tip Log.</div>') + '</div>'
       + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
@@ -166,6 +165,8 @@ S.LaborTipPool = {
     document.getElementById('tp-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.tp-hrow');
       const hview = ev.target.closest('.tp-hview');
@@ -174,6 +175,7 @@ S.LaborTipPool = {
       else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
     };
+    App.applyCollapsed(this.container);
     this.recalc();
   },
 

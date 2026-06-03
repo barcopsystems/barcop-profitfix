@@ -270,7 +270,7 @@ S.LaborBuildSchedule = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Week and Labor Budget</span>'
-      + '<button class="btn btn-ghost btn-sm" id="bs-how">How This Works</button></div>'
+      + App.helpButton('bs-how') + '</div>'
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:14px;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
       + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'

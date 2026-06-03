@@ -173,24 +173,24 @@ S.LaborStaffRoster = {
     }
 
     const addForm = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Add Staff Member</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sr-how">How This Works</button></div>'
+      + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member', App.helpButton('sr-how'))
+      + '<div class="collapse-body">'
       + this.profileFormCells(null)
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
       + '<label>Notes</label><textarea id="sr-notes" rows="1" placeholder="Optional"></textarea></div></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
       + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
 
     // Import card sits between Add Staff and the Roster, so a new operator can
     // upload a staff list instead of adding everyone by hand. No explainer text
-    // here on purpose; the How This Works button carries it.
-    const importCard = '<div class="card">'
+    // here on purpose; the How it works button carries it. Collapses with the
+    // Add Staff form via the shared group key.
+    const importCard = '<div class="card" data-collapse-group="lc-staff-roster">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Import Staff</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sr-imp-how">How This Works</button></div>'
+      + App.helpButton('sr-imp-how') + '</div>'
       + '<div id="sr-csv"></div><div id="sr-imp-result"></div></div>';
 
     const list = [...this.staff()].sort((a, b) => {
@@ -244,6 +244,8 @@ S.LaborStaffRoster = {
     this.container.onclick = ev => {
       if (ev.target.closest('#sr-how'))     { this.showHowTo(); return; }
       if (ev.target.closest('#sr-imp-how')) { this.showImportHelp(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#sr-save'))    { this.saveProfile(null); return; }
       const edit = ev.target.closest('.sr-edit');
       const del = ev.target.closest('.sr-del');
@@ -254,6 +256,7 @@ S.LaborStaffRoster = {
     };
     this.wirePayFields();
     this.mountImporter();
+    App.applyCollapsed(this.container);
   },
 
   // Mount the drag-drop + column mapper into the landing's Import card. No hint

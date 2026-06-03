@@ -62,7 +62,7 @@ S.LaborScheduleHistory = {
       }).join('');
       html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Schedule History</span>'
-        + '<button class="btn btn-ghost btn-sm" id="lh-how">How This Works</button></div>'
+        + App.helpButton('lh-how') + '</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
