@@ -180,16 +180,7 @@ S.ShiftHistory = {
     const s = this.shifts().find(x => x.id === id);
     if (!s) { this.renderList(); return; }
 
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="sh-handoff-email" style="margin-left:8px;">Email Handoff</button>'
-      + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:8px;">Export PDF</button>';
-    document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
-    document.getElementById('sh-handoff')?.addEventListener('click', () => {
-      if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id);
-    });
-    document.getElementById('sh-handoff-email')?.addEventListener('click', () => {
-      if (S.ShiftHandoff && S.ShiftHandoff.emailForShift) S.ShiftHandoff.emailForShift(id);
-    });
+    this.actions.innerHTML = '';
 
     const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
     const meta = (label, val) =>
@@ -276,8 +267,12 @@ S.ShiftHistory = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sh-back">&laquo; Back to Shift History</button></div>'
-      + '<div class="card"><div class="card-title">'
-      + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span>'
+      + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</span>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="sh-export">Export PDF</button>'
+      + '</div></div>'
       + '<div class="calc" style="margin-bottom:0;">'
       + meta('Manager', esc(s.manager || '-'))
       + meta('Status', s.status === 'Open' ? 'Open' : 'Closed')
@@ -304,10 +299,12 @@ S.ShiftHistory = {
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#sh-back')) this.renderList();
-      else if (ev.target.closest('#sh-edit')) {
-        // Hand the shift id to Log a Shift's edit flow so the form opens with
-        // this shift already loaded — no manual navigation back to find it.
+      if (ev.target.closest('#sh-back')) { this.renderList(); return; }
+      if (ev.target.closest('#sh-handoff')) { if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id); return; }
+      if (ev.target.closest('#sh-export')) { App.exportPDF({ title: 'Shift History', root: this.container }); return; }
+      if (ev.target.closest('#sh-edit')) {
+        // Hand the shift id to the form's edit flow so it opens with this shift
+        // already loaded, no manual navigation back to find it.
         if (S.ShiftLogShift) S.ShiftLogShift._openEditId = id;
         App.navigate('sc-log-shift');
       }
