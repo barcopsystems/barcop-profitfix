@@ -54,11 +54,12 @@ S.InventoryDeliveryHistory = {
       return;
     } else {
       const vendors = [...new Set(all.map(d => d.vendor).filter(Boolean))].sort();
-      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
+      const filter = '<div class="form-row" style="margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
         + '<label>Filter by Vendor</label><select id="dh-filter">'
         + '<option value="">All vendors</option>'
         + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
-        + '</select></div></div>';
+        + '</select></div>'
+        + '<button class="btn btn-ghost btn-sm" id="dh-list-export">Export PDF</button></div>';
 
       const rows = filtered.slice(0, App.listLimit('ic', 'delivery')).map(d => {
         let disc;
@@ -95,6 +96,7 @@ S.InventoryDeliveryHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      if (ev.target.closest('#dh-list-export')) { this.exportList(); return; }
       const how = ev.target.closest('#dh-how');
       const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');
@@ -110,6 +112,39 @@ S.InventoryDeliveryHistory = {
       this.vendorFilter = e.target.value || '';
       this.renderList();
     });
+  },
+
+  // Export the COMPLETE delivery list to PDF (every delivery, not just the
+  // on-screen window, which paginates via Show older). Built from an off-screen node.
+  exportList() {
+    const all = this.sorted();
+    if (all.length === 0) return;
+    const rows = all.map(d => {
+      let disc;
+      if (d.has_discrepancy) {
+        const parts = [];
+        if (d.price_change_count) parts.push(d.price_change_count + ' Price Change' + (d.price_change_count === 1 ? '' : 's'));
+        if (d.short_count_count)  parts.push(d.short_count_count + ' Short Count' + (d.short_count_count === 1 ? '' : 's'));
+        disc = parts.join(', ') || 'Discrepancy';
+      } else {
+        disc = 'Clean';
+      }
+      return '<tr><td>' + this.fmtDate(d.date) + '</td>'
+        + '<td>' + esc(d.vendor || '-') + '</td>'
+        + '<td>' + esc(d.invoice_number || '-') + '</td>'
+        + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
+        + '<td>' + App.fmtCurrency(d.total || 0) + '</td>'
+        + '<td>' + esc(disc) + '</td></tr>';
+    }).join('');
+    const node = document.createElement('div');
+    node.className = 'screen';
+    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
+    node.innerHTML = '<div class="card"><div class="card-title">Delivery History</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    document.body.appendChild(node);
+    Promise.resolve(App.exportPDF({ title: 'Delivery History', root: node })).finally(() => node.remove());
   },
 
   // Guarded delete: a delivery is a finalized record, so removing one is behind
