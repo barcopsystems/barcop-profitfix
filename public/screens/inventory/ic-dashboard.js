@@ -128,14 +128,61 @@ S.InventoryDashboard = {
     const prev   = asc.length >= 2 ? asc[asc.length - 2] : null;
 
     if (!latest) {
-      this.container.innerHTML = '<div class="screen">'
-        + '<div class="card"><div class="card-title">Welcome to Inventory Control</div>'
-        + '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
-        + 'Your dashboard fills in once you take your first count. Set up your products and locations, then run a count and Bar Cop will show you what to reorder, where your cash is tied up, and where you are leaking.</div>'
+      // Day-one state: the real dashboard layout, in placeholder form, with a
+      // Get Started strip up top. Shows what the page becomes and the path to
+      // fill it, instead of a bare welcome card.
+      const card = (label, valHtml, target, cls) =>
+        '<div class="metric-card"><div class="metric-label">' + label + '</div>'
+        + '<div class="metric-val ' + (cls || '') + '">' + valHtml + '</div>'
+        + '<div class="metric-target">' + target + '</div><div class="metric-trend"> </div></div>';
+      const row = (a, b) =>
+        '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
+        + '<div style="flex:1 1 300px;min-width:0;">' + a + '</div>'
+        + '<div style="flex:1 1 280px;min-width:0;">' + b + '</div></div>';
+      const emptyPanel = (title, msg, btns) =>
+        '<div class="card" style="height:100%;"><div class="card-title">' + title + '</div>'
+        + '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>'
+        + (btns || '') + '</div>';
+
+      const hasProducts  = this.products().length > 0;
+      const hasLocations = ((App.inventoryData && App.inventoryData.ic_locations) || []).length > 0;
+      const step = (done, label, screen, current) =>
+        '<div class="ic-d-go" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:170px;padding:10px 12px;border:1px solid ' + (current ? 'var(--gold)' : 'var(--b2)') + ';border-radius:6px;background:var(--input);">'
+        + '<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
+        + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : '') + '</span>'
+        + '<span style="font-size:12px;font-weight:600;color:' + (current ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</span></div>';
+      const startStrip = '<div class="card" style="margin-bottom:16px;">'
+        + '<div class="card-title">Get Started</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps and this dashboard fills in with what to reorder, where your cash is tied up, and where you are leaking.</div>'
         + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-        + this.actionBtn('ic-product-setup', 'Add Products')
-        + this.actionBtn('ic-take-inventory', 'Take Your First Count')
-        + '</div></div></div>';
+        + step(hasProducts, '1. Add products', 'ic-product-setup', !hasProducts)
+        + step(hasLocations, '2. Set locations', 'ic-locations', hasProducts && !hasLocations)
+        + step(false, '3. Take your first count', 'ic-take-inventory', hasProducts && hasLocations)
+        + '</div></div>';
+
+      const cards =
+          card('Inventory Value', '$0', 'After your first count')
+        + card('To Reorder', '&mdash;', 'After your first count')
+        + card('Used This Period', '&mdash;', 'Needs two counts')
+        + card('Count Freshness', 'No counts', 'Take your first count');
+
+      const reorderCard = emptyPanel('Reorder Plan',
+        'Add products and take a count, then Bar Cop builds your reorder plan by vendor right here.',
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
+          + this.actionBtn('ic-product-setup', 'Add Products')
+          + this.actionBtn('ic-take-inventory', 'Take Your First Count') + '</div>');
+      const catCard      = emptyPanel('Where Your Cash Sits', 'Take a count to see how much cash is tied up in each category.');
+      const movementCard = emptyPanel('Movement', 'Take two counts to see what is moving fast, slow, and not at all.');
+      const sinceCard    = emptyPanel('Since Last Count', 'Trends appear once you have two counts.');
+      const leakCard     = emptyPanel('Leaks &amp; Watch', 'Shrinkage, spot-check flags, and repeat 86s surface here as you log.');
+
+      this.container.innerHTML = '<div class="screen">'
+        + startStrip
+        + '<div class="metric-grid">' + cards + '</div>'
+        + '<div style="margin-bottom:16px;">' + reorderCard + '</div>'
+        + row(catCard, movementCard)
+        + row(sinceCard, leakCard)
+        + '</div>';
       this.wire();
       return;
     }
