@@ -180,7 +180,7 @@ S.InventorySpotCheck = {
       .map(t => '<option' + (t === defaultShift ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const setup = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Spot Check</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sp-how">How This Works</button></div>'
+      + App.helpButton('sp-how') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="sp-date" value="' + today + '" style="height:44px;"/></div>'

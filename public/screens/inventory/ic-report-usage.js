@@ -115,7 +115,7 @@ S.InventoryUsageReport = {
 
     const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Usage Report</span>'
-      + '<button class="btn btn-ghost btn-sm" id="ur-how">How This Works</button></div>'
+      + App.helpButton('ur-how') + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:230px;"><label>Count Period</label><select id="ur-period">' + periodOpts + '</select></div>'
       + '<div class="f" style="width:180px;"><label>Category</label><select id="ur-cat">' + catOpts + '</select></div>'

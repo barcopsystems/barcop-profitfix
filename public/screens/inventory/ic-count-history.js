@@ -92,7 +92,7 @@ S.InventoryCountHistory = {
       }).join('');
       html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Count History</span>'
-        + '<button class="btn btn-ghost btn-sm" id="ch-how">How This Works</button></div>'
+        + App.helpButton('ch-how') + '</div>'
         + filter
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'

@@ -105,33 +105,33 @@ S.InventoryVendors = {
 
   addFormCard() {
     return '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Add a Vendor</span>'
-        + '<button class="btn btn-ghost btn-sm" id="iv-how">How This Works</button>'
-      + '</div>'
+      + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor', App.helpButton('iv-how'))
+      + '<div class="collapse-body">'
       + this.formFieldsHTML(null)
       + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
         + '<button class="btn btn-primary" id="iv-save">Save Vendor</button>'
         + '<button class="btn btn-ghost" id="iv-clear">Clear</button>'
         + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
   },
 
   wireList() {
     this.container.onclick = ev => {
-      const how  = ev.target.closest('#iv-how');
+      if (ev.target.closest('#iv-how')) { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       const save = ev.target.closest('#iv-save');
       const clr  = ev.target.closest('#iv-clear');
       const open = ev.target.closest('.iv-open');
       const edit = ev.target.closest('.iv-edit');
       const del  = ev.target.closest('.iv-del');
-      if (how)       this.showHowTo();
-      else if (save) this.saveVendor();
+      if (save)      this.saveVendor();
       else if (clr)  this.renderList();
       else if (open) this.openEdit(open.dataset.id);
       else if (edit) this.openEdit(edit.dataset.id);
       else if (del)  this.confirmDel(del.dataset.id);
     };
+    App.applyCollapsed(this.container);
   },
 
   // ── Edit page (own page; same form + product/price cards; Cancel → landing) ──

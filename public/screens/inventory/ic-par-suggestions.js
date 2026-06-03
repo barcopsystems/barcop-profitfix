@@ -139,7 +139,7 @@ S.InventoryParSuggestions = {
     // Settings card
     const settingsCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Dynamic Pars Settings</span>'
-      + '<button class="btn btn-ghost btn-sm" id="ps-how">How This Works</button></div>'
+      + App.helpButton('ps-how') + '</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Window (weeks) ' + tt('ic-par-window') + '</label>'
           + '<input type="number" id="ps-window" min="2" max="26" step="1" value="' + settings.window_weeks + '"/></div>'

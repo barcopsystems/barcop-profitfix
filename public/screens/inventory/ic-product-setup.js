@@ -1104,7 +1104,7 @@ S.InventoryProducts = {
     const spec = this.FORM_SPEC[cat] || {};
     const header = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
       + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-how">How This Works</button>'
+      + App.helpButton('ip-imp-how')
       + '</div>';
     if (this._import.stage === 'mapper') {
       return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>';

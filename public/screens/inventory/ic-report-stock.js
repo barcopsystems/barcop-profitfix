@@ -83,7 +83,7 @@ S.InventoryStockReport = {
 
     const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Stock Report</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sr-how">How This Works</button></div>'
+      + App.helpButton('sr-how') + '</div>'
       + '<div class="form-row" style="margin-bottom:0;"><div class="f" style="width:260px;">'
       + '<label>Count</label><select id="sr-count">' + countOpts + '</select></div></div></div>';
 

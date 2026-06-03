@@ -147,7 +147,7 @@ S.InventoryOrderHistory = {
         + '</div></td></tr>').join('');
       html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Order History</span>'
-        + '<button class="btn btn-ghost btn-sm" id="oh-how">How This Works</button></div>'
+        + App.helpButton('oh-how') + '</div>'
         + filter
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th><th></th>'

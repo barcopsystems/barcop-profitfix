@@ -98,7 +98,7 @@ S.InventoryMoversReport = {
 
     const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Movement Report</span>'
-      + '<button class="btn btn-ghost btn-sm" id="mv-how">How This Works</button></div>'
+      + App.helpButton('mv-how') + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:260px;"><label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div>'
       + '<div class="f" style="width:180px;"><label>Category</label><select id="mv-cat">' + catOpts + '</select></div>'

@@ -132,14 +132,14 @@ S.InventoryTransfers = {
 
   // The Log a Transfer form lives at the top of the landing page, always open.
   logFormCard() {
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Log a Transfer</span>'
-      + '<button class="btn btn-ghost btn-sm" id="tr-how">How This Works</button></div>'
+    return '<div class="card no-print">'
+      + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer', App.helpButton('tr-how'))
+      + '<div class="collapse-body">'
       + this.formRows(null)
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tr-save">Log Transfer</button>'
         + '<span id="tr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
   },
 
   // Shared two-row field layout for both the inline log form and the edit page.
@@ -188,6 +188,9 @@ S.InventoryTransfers = {
     document.getElementById('tr-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('tr-save')?.addEventListener('click', () => this.save());
     this.wireProdChange();
+    const head = this.container.querySelector('.card-collapse-head');
+    if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
+    App.applyCollapsed(this.container);
   },
 
   // Product change: re-pop unit options + default From to the product's primary.

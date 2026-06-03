@@ -541,7 +541,7 @@ S.InventoryOrderSheet = {
     return '<div class="card os-vcard os-custom" data-vendor="">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>New Custom Order</span>'
-      + '<button class="btn btn-ghost btn-sm" id="os-how">How This Works</button></div>'
+      + App.helpButton('os-how') + '</div>'
       + '<div class="form-row" style="margin-bottom:12px;">'
         + '<div class="f" style="width:280px;"><label>Vendor</label>'
           + '<select class="os-co-vendor">' + opts + '</select>'

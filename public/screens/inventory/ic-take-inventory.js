@@ -126,7 +126,7 @@ S.InventoryTakeInventory = {
     this.container.innerHTML = '<div class="screen">' + resumeBar
       + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
-      + '<button class="btn btn-ghost btn-sm" id="ti-how">How This Works</button></div>'
+      + App.helpButton('ti-how') + '</div>'
       + locPicker
       + '<div class="form-row" style="gap:16px;margin-top:14px;">'
       + '<div class="f w-md"><label>Counted By</label>'

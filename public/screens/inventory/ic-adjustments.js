@@ -143,14 +143,14 @@ S.InventoryAdjustments = {
 
   // The Log an Adjustment form lives at the top of the landing page, always open.
   logFormCard() {
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Log an Adjustment</span>'
-      + '<button class="btn btn-ghost btn-sm" id="adj-how">How This Works</button></div>'
+    return '<div class="card no-print">'
+      + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment', App.helpButton('adj-how'))
+      + '<div class="collapse-body">'
       + this.formRows(null)
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="adj-save">Log Adjustment</button>'
         + '<span id="adj-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
   },
 
   // Shared two-row field layout for both the inline log form and the edit page.
@@ -203,6 +203,9 @@ S.InventoryAdjustments = {
     document.getElementById('adj-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('adj-save')?.addEventListener('click', () => this.save());
     this.wireFormFields();
+    const head = this.container.querySelector('.card-collapse-head');
+    if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
+    App.applyCollapsed(this.container);
   },
 
   // Reason → default direction, product → unit options, and live value recalc.

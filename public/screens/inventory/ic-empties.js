@@ -125,14 +125,14 @@ S.InventoryEmpties = {
 
   // The Log Empties form lives at the top of the landing page, always open.
   logFormCard() {
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Log Empties</span>'
-      + '<button class="btn btn-ghost btn-sm" id="em-how">How This Works</button></div>'
+    return '<div class="card no-print">'
+      + App.collapsibleCardTitle('ic-empties', 'Log Empties', App.helpButton('em-how'))
+      + '<div class="collapse-body">'
       + this.formRows(null)
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="em-save">Log Empties</button>'
         + '<span id="em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
   },
 
   // Shared single-row field layout for both the inline log form and the edit
@@ -170,6 +170,9 @@ S.InventoryEmpties = {
     document.getElementById('em-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('em-save')?.addEventListener('click', () => this.save());
     this.wireProdChange();
+    const head = this.container.querySelector('.card-collapse-head');
+    if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
+    App.applyCollapsed(this.container);
   },
 
   // Product change updates the Qty unit suffix to match the product category.

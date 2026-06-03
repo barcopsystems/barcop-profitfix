@@ -144,10 +144,10 @@ S.PrepBatches = {
     const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
     const title = id ? 'Editing ' + esc(b?.name || 'Batch') : 'Add a Prep Batch';
     return '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>' + title + '</span>'
-        + (id ? '' : '<button class="btn btn-ghost btn-sm" id="pb-how">How This Works</button>')
-      + '</div>'
+      + (id
+          ? '<div class="card-title">' + title + '</div>'
+          : App.collapsibleCardTitle('ic-prep-batches', title, App.helpButton('pb-how')))
+      + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="width:175px;flex-shrink:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
@@ -171,7 +171,7 @@ S.PrepBatches = {
         + '<button class="btn btn-primary" id="pb-save">' + (id ? 'Update Batch' : 'Save Batch') + '</button>'
         + '<button class="btn btn-ghost" id="pb-cancel">' + (id ? 'Cancel' : 'Clear') + '</button>'
         + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
   },
 
   // Landing: the add form on top, the batch list below.
@@ -257,6 +257,8 @@ S.PrepBatches = {
   _wire() {
     this.container.onclick = ev => {
       if (ev.target.closest('#pb-how'))     { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#pb-save'))    { this.saveBatch(); return; }
       if (ev.target.closest('#pb-cancel'))  { this.cancelForm(); return; }
       if (ev.target.closest('#pb-add-ing')) { this.addRow(); return; }
@@ -291,6 +293,7 @@ S.PrepBatches = {
       if (['pb-yield', 'pb-serv'].includes(ev.target.id)) this.calc();
       if (ev.target.id === 'pb-name') this.refreshFieldMissing();
     };
+    App.applyCollapsed(this.container);
   },
 
   // Required = name + category. Ingredient list is operationally needed but

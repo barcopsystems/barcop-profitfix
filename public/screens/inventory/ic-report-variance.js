@@ -333,7 +333,7 @@ S.InventoryVarianceReport = {
     }
     const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Variance Report</span>'
-      + '<button class="btn btn-ghost btn-sm" id="vr-how">How This Works</button></div>'
+      + App.helpButton('vr-how') + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:260px;">'
       + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div>' + catCtl + '</div></div>';
 
@@ -341,7 +341,7 @@ S.InventoryVarianceReport = {
     if (!this.posRows) {
       body = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Import POS Sales</span>'
-        + '<button class="btn btn-ghost btn-sm" id="vr-import-how">How This Works</button></div>'
+        + App.helpButton('vr-import-how') + '</div>'
         + '<div id="vr-import"></div></div>';
     } else {
       body = this.matchSummary() + this.unmatchedCard()

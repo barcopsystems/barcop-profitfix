@@ -150,10 +150,8 @@ S.InventoryLocations = {
 
   addFormCard() {
     return '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Add a Location</span>'
-        + '<button class="btn btn-ghost btn-sm" id="il-how">How This Works</button>'
-      + '</div>'
+      + App.collapsibleCardTitle('ic-locations', 'Add a Location', App.helpButton('il-how'))
+      + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label>'
           + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler"/></div>'
@@ -165,7 +163,7 @@ S.InventoryLocations = {
         + '<button class="btn btn-ghost" id="il-new-clear">Clear</button>'
         + '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
         + '<span id="il-new-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div></div></div>';
   },
 
   newFilterHTML() {
@@ -191,7 +189,9 @@ S.InventoryLocations = {
         if (el) el.innerHTML = this.newFilterHTML();
         return;
       }
-      const how  = ev.target.closest('#il-how');
+      if (ev.target.closest('#il-how')) { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       const save = ev.target.closest('#il-new-save');
       const clr  = ev.target.closest('#il-new-clear');
       const open = ev.target.closest('.il-open');
@@ -199,8 +199,7 @@ S.InventoryLocations = {
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
       const addD = ev.target.closest('#il-add-defaults');
-      if (how)       this.showHowTo();
-      else if (save) this.saveNewLocation();
+      if (save)      this.saveNewLocation();
       else if (clr)  this.renderList();
       else if (open) this.openEdit(open.dataset.id);
       else if (edit) this.openEdit(edit.dataset.id);
@@ -218,6 +217,7 @@ S.InventoryLocations = {
     };
     const body = document.getElementById('il-loc-body');
     if (body) DragReorder.wire({ container: body, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', onCommit: ids => this._persistLocationOrder(ids) });
+    App.applyCollapsed(this.container);
   },
 
   async saveNewLocation() {

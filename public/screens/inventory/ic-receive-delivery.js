@@ -131,7 +131,7 @@ S.InventoryReceiveDelivery = {
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
-      + '<button class="btn btn-ghost btn-sm" id="rd-how">How This Works</button></div>'
+      + App.helpButton('rd-how') + '</div>'
       + '<div class="form-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
