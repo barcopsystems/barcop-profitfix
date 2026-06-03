@@ -130,11 +130,12 @@ S.InventoryOrderHistory = {
     } else {
       const vendors = [...new Set(orders.map(o => o.vendor).filter(Boolean))].sort();
       const filtered = this.vendorFilter ? orders.filter(o => o.vendor === this.vendorFilter) : orders;
-      const filter = '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
+      const filter = '<div class="form-row" style="margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
         + '<label>Filter by Vendor</label><select id="oh-filter">'
         + '<option value="">All vendors</option>'
         + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
-        + '</select></div></div>';
+        + '</select></div>'
+        + '<button class="btn btn-ghost btn-sm" id="oh-list-export">Export PDF</button></div>';
       const rows = filtered.slice(0, App.listLimit('ic', 'order')).map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(o.date) + '</div></td>'
         + '<td>' + esc(o.vendor || '-') + '</td>'
@@ -158,6 +159,7 @@ S.InventoryOrderHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      if (ev.target.closest('#oh-list-export')) { this.exportList(); return; }
       const how = ev.target.closest('#oh-how');
       const row = ev.target.closest('.oh-row');
       const view = ev.target.closest('.oh-view');
@@ -173,6 +175,28 @@ S.InventoryOrderHistory = {
       this.vendorFilter = e.target.value || '';
       this.renderList();
     });
+  },
+
+  // Export the COMPLETE order list to PDF (every order, not just the on-screen
+  // window, which paginates via Show older). Built from an off-screen node.
+  exportList() {
+    const all = this.sorted();
+    if (all.length === 0) return;
+    const statusPlain = s => s === 'Received' ? 'Received' : s === 'Submitted' ? 'Submitted' : 'Open';
+    const rows = all.map(o => '<tr><td>' + this.fmtDate(o.date) + '</td>'
+      + '<td>' + esc(o.vendor || '-') + '</td>'
+      + '<td>' + (o.item_count || (o.line_items ? o.line_items.length : 0)) + '</td>'
+      + '<td>' + App.fmtCurrency(o.total || 0) + '</td>'
+      + '<td>' + statusPlain(o.status) + '</td></tr>').join('');
+    const node = document.createElement('div');
+    node.className = 'screen';
+    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
+    node.innerHTML = '<div class="card"><div class="card-title">Order History</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    document.body.appendChild(node);
+    Promise.resolve(App.exportPDF({ title: 'Order History', root: node })).finally(() => node.remove());
   },
 
   renderDetail(id) {
