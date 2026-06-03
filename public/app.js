@@ -1789,42 +1789,49 @@ const App = {
   collapsed(key) {
     try { return localStorage.getItem(this._collapseKey(key)) === '1'; } catch (e) { return false; }
   },
-  // The chevron toggle, placed just left of How This Works in the CONTROLLING
-  // card's title. One toggle governs a whole group: its own card body (wrapped in
-  // .collapse-body) plus any element tagged data-collapse-group="<key>" — e.g. the
-  // drag/drop import card that sits below the form. They open and close as a unit.
-  collapseToggle(key) {
-    const open = !this.collapsed(key);
-    return '<button class="card-collapse-toggle" data-collapse-key="' + esc(key) + '" '
-      + 'title="' + (open ? 'Hide' : 'Show') + '" aria-label="' + (open ? 'Hide' : 'Show') + '">'
-      + (open ? '&#9662;' : '&#9656;') + '</button>';
+  // Standard help button. Centralized so the label and style are a one-place
+  // edit, not a per-page change. Ghost-button border kept on purpose — operators
+  // want an obvious target, not a faint link.
+  helpButton(id, label) {
+    return '<button class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
+  },
+
+  // A collapsible card header. The WHOLE header toggles the card open/closed; the
+  // chevron is just a rotating visual indicator, so the operator does not have to
+  // hit the tiny target. The help button on the right is excluded by the page's
+  // click delegation (it is checked first). One header governs a group: its own
+  // card body (wrapped in .collapse-body) plus any element tagged
+  // data-collapse-group="<key>" — e.g. the drag/drop import card below the form.
+  collapsibleCardTitle(key, titleText, rightHtml) {
+    return '<div class="card-title card-collapse-head" data-collapse-key="' + esc(key) + '" '
+      + 'style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + esc(titleText) + '</span>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      + (rightHtml || '')
+      + '</div></div>';
   },
   _applyCollapseState(key, isCollapsed, root) {
     root = root || document;
-    const toggle = root.querySelector('.card-collapse-toggle[data-collapse-key="' + key + '"]');
-    if (toggle) {
-      const card = toggle.closest('.card');
-      if (card) card.classList.toggle('collapsed', isCollapsed);
-      toggle.innerHTML = isCollapsed ? '&#9656;' : '&#9662;';
-      toggle.title = isCollapsed ? 'Show' : 'Hide';
-      toggle.setAttribute('aria-label', isCollapsed ? 'Show' : 'Hide');
-    }
+    const head = root.querySelector('.card-collapse-head[data-collapse-key="' + key + '"]');
+    const card = head ? head.closest('.card') : null;
+    if (card) card.classList.toggle('collapsed', isCollapsed);
     root.querySelectorAll('[data-collapse-group="' + key + '"]').forEach(el => el.classList.toggle('collapse-off', isCollapsed));
   },
   applyCollapsed(root) {
     root = root || document;
-    root.querySelectorAll('.card-collapse-toggle').forEach(btn =>
-      this._applyCollapseState(btn.dataset.collapseKey, this.collapsed(btn.dataset.collapseKey), root));
+    root.querySelectorAll('.card-collapse-head').forEach(head =>
+      this._applyCollapseState(head.dataset.collapseKey, this.collapsed(head.dataset.collapseKey), root));
   },
-  toggleCollapse(btn) {
-    if (!btn) return;
-    const key = btn.dataset.collapseKey;
+  toggleCollapse(head) {
+    if (!head) return;
+    const key = head.dataset.collapseKey;
     const isCollapsed = !this.collapsed(key);
     try {
       if (isCollapsed) localStorage.setItem(this._collapseKey(key), '1');
       else localStorage.removeItem(this._collapseKey(key));
     } catch (e) { /* storage unavailable — toggle still works for this view */ }
-    this._applyCollapseState(key, isCollapsed, btn.closest('.screen') || document);
+    this._applyCollapseState(key, isCollapsed, head.closest('.screen') || document);
   },
 
   // ── PDF export ─────────────────────────────────────────────────────────────
