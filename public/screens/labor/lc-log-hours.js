@@ -12,6 +12,9 @@ S.LaborLogHours = {
   editId: null,
   _pendingDelId: null,
   mode: 'list',
+  filterFrom: '',
+  filterTo: '',
+  filterStaff: '',
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
   actuals() {
@@ -71,6 +74,34 @@ S.LaborLogHours = {
     this.calc();
   },
 
+  applyFilters(list) {
+    return list.filter(a => {
+      const date = a.date || '';
+      if (this.filterFrom && date < this.filterFrom) return false;
+      if (this.filterTo && date > this.filterTo) return false;
+      if (this.filterStaff && (a.staff_id || '') !== this.filterStaff) return false;
+      return true;
+    });
+  },
+
+  // Filter card above the logged-hours list. Holds the date/staff filters and
+  // the Export PDF button (the high-volume hours log gets the same treatment as
+  // the Tip Log). Export covers the full filtered set, not just the visible page.
+  filterCard() {
+    const staffOpts = '<option value="">All staff</option>'
+      + this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+          .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Filter</span>'
+      + '<button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div>'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lo-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="lo-f-to" value="' + esc(this.filterTo) + '"/></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="lo-f-staff">' + staffOpts + '</select></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lo-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+      + '</div></div>';
+  },
+
   renderList() {
     this.editId = null;
     this.actions.innerHTML = '';
@@ -113,16 +144,22 @@ S.LaborLogHours = {
       + App.helpButton('lo-imp-how') + '</div>'
       + '<div id="lo-csv"></div><div id="lo-imp-result"></div></div>';
 
-    const list = [...this.actuals()].sort((a, b) =>
+    const all = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
+    const filtered = this.applyFilters(all);
+    const filterCardHtml = all.length === 0 ? '' : this.filterCard();
 
     let listCard;
-    if (list.length === 0) {
+    if (all.length === 0) {
       listCard = '<div class="card"><div class="card-title">Logged Hours</div>'
         + '<div style="font-size:13px;color:var(--t3);">No hours logged yet. Log your first entry above, or import a '
         + 'timeclock export. Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div></div>';
+    } else if (filtered.length === 0) {
+      listCard = '<div class="card"><div class="card-title">Logged Hours</div>'
+        + '<div class="empty"><div class="empty-title">No hours match the filters</div>'
+        + '<div class="empty-sub">Adjust or clear the filters above.</div></div></div>';
     } else {
-      const rows = list.slice(0, App.listLimit('lc', 'actual')).map(a => {
+      const rows = filtered.slice(0, App.listLimit('lc', 'actual')).map(a => {
         const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
         const actions = a.locked
           ? '<span style="font-size:10px;color:var(--t3);">Pay period closed</span>'
@@ -137,13 +174,11 @@ S.LaborLogHours = {
         + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td>'
         + '<td><div class="row-actions">' + actions + '</div></td></tr>';
       }).join('');
-      listCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Logged Hours</span>'
-        + '<button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div>'
+      listCard = '<div class="card"><div class="card-title">Logged Hours</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('lc', 'actual', list, false) + '</div>';
+        + App.showOlderBar('lc', 'actual', filtered, !!(this.filterFrom || this.filterTo || this.filterStaff)) + '</div>';
     }
 
     const modal = '<div id="lo-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -154,13 +189,14 @@ S.LaborLogHours = {
       + '<button class="btn btn-danger" id="lo-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + addCard + importCard + listCard + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addCard + importCard + filterCardHtml + listCard + '</div>' + modal;
     this.container.onclick = ev => {
       if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
       if (ev.target.closest('#lo-imp-how')) { this.showImportHelp(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
+      if (ev.target.closest('#lo-f-clear')) { this.filterFrom = this.filterTo = this.filterStaff = ''; this.renderList(); return; }
       if (ev.target.closest('#lo-save'))    { this.save(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.lo-row');
@@ -172,6 +208,9 @@ S.LaborLogHours = {
     };
     this.wireForm();
     this.mountImporter();
+    document.getElementById('lo-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('lo-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+    document.getElementById('lo-f-staff')?.addEventListener('change', e => { this.filterStaff = e.target.value || ''; this.renderList(); });
     App.applyCollapsed(this.container);
   },
 
@@ -299,8 +338,9 @@ S.LaborLogHours = {
   // older), so we build an off-screen node holding every entry and hand that to
   // exportPDF — otherwise the PDF would silently drop older rows.
   exportLogged() {
-    const list = [...this.actuals()].sort((a, b) =>
+    const all = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
+    const list = this.applyFilters(all);
     if (list.length === 0) return;
     const rows = list.map(a => {
       const wageCell = App.isSalaried(a.staff_id) ? 'Salary' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
