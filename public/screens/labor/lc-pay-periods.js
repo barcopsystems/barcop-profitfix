@@ -123,14 +123,25 @@ S.LaborPayPeriods = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    if (this.detailWeekStart) this.renderDetail(this.detailWeekStart);
-    else this.renderList();
+    // Entering the screen from the sidebar always lands on the list, not a stale
+    // detail view. The detail is reached via View within the screen.
+    this.detailWeekStart = null;
+    this.renderList();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Pay Periods Work', [
+      { p: ['Pay Periods rolls each week, Monday through Sunday, into a payroll-ready summary: total hours, overtime, and gross pay for everyone who worked. The last 12 weeks are listed, newest first.'] },
+      { h: 'Closing A Period', p: ['When a week is final, Close and Lock it. That locks every logged-hours entry in the week so Log Hours stops accepting edits, and saves a permanent record of what was paid. Reopen it any time you need to fix something, then close it again.'] },
+      { h: 'Overtime', p: ['Hours over ' + App.OT_THRESHOLD + ' in a week are treated as overtime and paid at time and a half in the gross figure. Salaried staff are exempt, so they carry a fixed weekly salary and never show overtime.'] },
+      { h: 'Tip Credit Check', p: ['For tipped positions, the View screen compares each person\'s effective hourly, their wages plus tip-pool share divided by hours, against your state minimum wage and flags anyone who came up short so you can make up the difference before payroll runs. Set your state minimum in Wage Settings. This is a planning aid, not legal or payroll advice. Verify the wage and tip-credit rules for your jurisdiction.'] },
+      { h: 'Payroll Export', p: ['Payroll Export turns any period into a formatted workbook or a clean import file for whoever runs your payroll. Open it from a row or from the View screen.'] }
+    ]);
   },
 
   renderList() {
     this.detailWeekStart = null;
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button>';
-    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
+    this.actions.innerHTML = '';
 
     // Build the last 12 weeks ending with the current week
     const today = new Date().toISOString().slice(0, 10);
@@ -171,23 +182,29 @@ S.LaborPayPeriods = {
       return t;
     }, { hours: 0, gross: 0, ot_hours: 0 });
 
-    const summary = '<div class="calc" style="margin-bottom:16px;">'
+    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:16px;">'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Hours</div><div class="calc-val">' + totals.hours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks OT Hours</div><div class="calc-val ' + (totals.ot_hours > 0 ? 'warn' : '') + '">' + totals.ot_hours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Gross</div><div class="calc-val good">' + App.fmtCurrency(totals.gross) + '</div></div>'
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.55;">'
-        + 'Weekly pay periods, Monday through Sunday. Closing a period locks every lc_actuals record in the range so Log Hours stops accepting edits. The Payroll Export screen turns any period into a formatted workbook or a clean import file for your payroll provider. OT premium (half-time) is included in gross for hours over '
-        + App.OT_THRESHOLD + '/week.'
-      + '</div>'
+      + '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Pay Periods</span>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + App.helpButton('pp-how')
+      + '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button>'
+      + '</div></div>'
       + summary
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Week</th><th>Status</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '</div>'
       + '</div>';
 
+    document.getElementById('pp-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { this.detailWeekStart = b.dataset.ws; this.renderDetail(b.dataset.ws); }));
     this.container.querySelectorAll('.pp-csv').forEach(b => b.addEventListener('click', () => this.openPayrollExport(b.dataset.ws)));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
@@ -196,8 +213,7 @@ S.LaborPayPeriods = {
 
   // ── Detail view ─────────────────────────────────────────────────────
   renderDetail(weekStart) {
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button>';
-    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
+    this.actions.innerHTML = '';
     const agg = this.aggregateWeek(weekStart);
     const saved = this.periods().find(p => p.week_start === weekStart);
     const isClosed = !!saved && saved.status === 'Closed';
@@ -232,15 +248,11 @@ S.LaborPayPeriods = {
         + '</tr>';
     }).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No hours logged this period.</td></tr>';
 
-    const statusInfo = isClosed
-      ? '<div style="font-size:11px;color:var(--gold);margin-bottom:10px;">Closed ' + (saved.closed_at ? this.fmtDate(saved.closed_at.slice(0, 10)) : '') + '. ' + agg.lockedCount + ' record' + (agg.lockedCount === 1 ? '' : 's') + ' locked.</div>'
-      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Open. ' + agg.totalCount + ' record' + (agg.totalCount === 1 ? '' : 's') + ' in this period.</div>';
-
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="pp-back">&#8592; Back to Pay Periods</button></div>'
-      + '<div class="card"><div class="card-title">Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</div>'
-      + statusInfo
-      + '<div class="calc" style="margin-bottom:14px;">'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button></div>'
+      + '<div class="calc" style="margin-top:14px;margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + agg.totals.hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val">' + App.fmtCurrency(agg.totals.cost) + '</div></div>'
@@ -261,7 +273,7 @@ S.LaborPayPeriods = {
       + '</div>'
       + '</div></div>';
 
-    document.getElementById('pp-back')?.addEventListener('click', () => { this.detailWeekStart = null; this.renderList(); });
+    document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Period', root: this.container }));
     document.getElementById('pp-csv-detail')?.addEventListener('click', () => this.openPayrollExport(weekStart));
     document.getElementById('pp-close-detail')?.addEventListener('click', () => this.closePeriod(weekStart));
     document.getElementById('pp-reopen-detail')?.addEventListener('click', () => this.reopenPeriod(weekStart));
@@ -272,7 +284,7 @@ S.LaborPayPeriods = {
     const agg = this.aggregateWeek(weekStart);
     const ok = await App.confirm({
       title: 'Close and lock this period?',
-      message: 'This stamps ' + agg.totalCount + ' lc_actuals record' + (agg.totalCount === 1 ? '' : 's') + ' as locked. Log Hours will refuse edits to those entries until you Reopen the period.',
+      message: 'This locks the ' + agg.totalCount + ' logged-hours entr' + (agg.totalCount === 1 ? 'y' : 'ies') + ' in this week so Log Hours stops accepting edits to them until you reopen the period.',
       confirmText: 'Close + Lock',
       cancelText: 'Cancel'
     });
@@ -316,7 +328,7 @@ S.LaborPayPeriods = {
   async reopenPeriod(weekStart) {
     const ok = await App.confirm({
       title: 'Reopen this pay period?',
-      message: 'The lock on this period\'s lc_actuals records will be removed. Log Hours will accept edits again. The saved period summary stays as a record.',
+      message: 'This unlocks the logged-hours entries in this period so Log Hours accepts edits again. The saved period summary stays as a record.',
       confirmText: 'Reopen',
       cancelText: 'Cancel'
     });
