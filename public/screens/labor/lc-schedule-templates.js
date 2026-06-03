@@ -62,7 +62,7 @@ S.LaborScheduleTemplates = {
         title: 'Saved Templates',
         lead: 'Templates are reusable weekly shift patterns. You build them in Build Schedule and save them here to load any time.',
         steps: [
-          { title: 'Build a schedule', desc: 'Build a week in Build Schedule, then click Save Week as Template at the bottom. Saved templates show up here.', btn: 'Build a Schedule', screen: 'lc-build-schedule', done: false }
+          { title: 'Build a schedule', desc: 'Build a week in Build Schedule, name it in the Template Name box, and click Save Schedule. Named schedules show up here as templates.', btn: 'Build a Schedule', screen: 'lc-build-schedule', done: false }
         ]
       });
       return;
