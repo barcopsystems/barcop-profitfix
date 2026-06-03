@@ -20,6 +20,11 @@ S.LaborDailyView = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
   },
+  addDays(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  },
 
   // the schedule covering a date, and that day's scheduled shifts
   scheduledForDate(dateStr) {
@@ -85,9 +90,13 @@ S.LaborDailyView = {
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Day View</span>'
       + App.helpButton('dv-how') + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;align-items:center;">'
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
+      + '<div style="display:flex;gap:6px;padding-bottom:2px;">'
+      + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&#8592;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&#8594;</button>'
+      + '</div>'
       + '</div>'
       + summary
       + '</div>';
@@ -147,6 +156,8 @@ S.LaborDailyView = {
       this.date = e.target.value || this.date;
       this.draw();
     });
+    document.getElementById('dv-prev')?.addEventListener('click', () => { this.date = this.addDays(this.date, -1); this.draw(); });
+    document.getElementById('dv-next')?.addEventListener('click', () => { this.date = this.addDays(this.date, 1); this.draw(); });
     // Inline edit on logged hours rows — opens the actuals editor in a modal
     // so the operator never leaves Daily View.
     this.container.querySelectorAll('.dv-edit').forEach(btn => {
