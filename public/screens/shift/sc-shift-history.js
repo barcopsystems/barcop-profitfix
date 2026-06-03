@@ -239,19 +239,6 @@ S.ShiftHistory = {
       }
     }
 
-    // ── Tip Reconciliation card ──────────────────────────────────────────
-    let tipCard = '';
-    if (s.tip_recon) {
-      const tr = s.tip_recon;
-      const variance = tr.variance;
-      tipCard = '<div class="card"><div class="card-title">Tip Reconciliation</div>'
-        + '<div class="calc" style="margin-bottom:0;">'
-        + meta('Logged Total', tr.logged_total != null ? App.fmtCurrency(tr.logged_total) : '-')
-        + meta('POS Reported', tr.pos_reported != null ? App.fmtCurrency(tr.pos_reported) : '-')
-        + meta('Variance', variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-')
-        + '</div></div>';
-    }
-
     // ── Exception Review acknowledgments ─────────────────────────────────
     let exCard = '';
     if (s.exception_ack && Object.keys(s.exception_ack).length) {
@@ -292,43 +279,57 @@ S.ShiftHistory = {
         + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.handoff_notes) + '</div></div>'
       : '';
 
+    const statTile = (label, val, sub, color) =>
+      '<div style="flex:1;min-width:150px;background:var(--input);border:1px solid var(--b2);border-radius:8px;padding:14px 16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1.15;color:' + (color || 'var(--t1)') + ';">' + val + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sub || '') + '</div></div>';
+
+    let cashVar = '-', cashVarColor = 'var(--t1)', cashVarSub = 'No registers';
+    if (s.cash_recon) {
+      const cr = s.cash_recon;
+      const tol = App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10;
+      if (cr.skipped) { cashVarSub = 'Skipped'; cashVarColor = 'var(--t3)'; }
+      else if (cr.variance == null) { cashVarSub = 'Not counted'; cashVarColor = 'var(--t3)'; }
+      else { cashVar = (cr.variance >= 0 ? '+' : '') + App.fmtCurrency(cr.variance); cashVarColor = Math.abs(cr.variance) <= tol ? 'var(--gold)' : 'var(--red)'; cashVarSub = Math.abs(cr.variance) <= tol ? 'Within tolerance' : cr.variance < 0 ? 'Short' : 'Over'; }
+    }
+    const tipsVal = (s.tip_recon && s.tip_recon.logged_total != null) ? App.fmtCurrency(s.tip_recon.logged_total) : '-';
+    const tipsSub = (s.tip_recon && s.tip_recon.variance != null) ? ((s.tip_recon.variance >= 0 ? '+' : '') + App.fmtCurrency(s.tip_recon.variance) + ' vs POS') : 'logged tips';
+    const statusPill = s.status === 'Open'
+      ? '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:2px 7px;">Open</span>'
+      : '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:2px 7px;">Closed</span>';
+    const heroMeta = [];
+    if (s.manager) heroMeta.push('Manager: ' + esc(s.manager));
+    if (s.staff_on_floor != null) heroMeta.push(s.staff_on_floor + ' on floor');
+
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sh-back">&laquo; Back to Shift History</button></div>'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span>'
-      + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</span>'
+      + '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</span>' + statusPill + '</div>'
+      + (heroMeta.length ? '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + heroMeta.join(' &middot; ') + '</div>' : '')
+      + '</div>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>'
-      + '<button class="btn btn-ghost btn-sm no-print" id="sh-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" id="sh-edit">Edit</button>'
+      + '</div></div></div>'
+
+      + '<div class="card"><div style="display:flex;gap:12px;flex-wrap:wrap;">'
+      + statTile('Revenue', App.fmtCurrency(s.total_revenue || 0), App.fmtCurrency(s.bar_revenue || 0) + ' bar &middot; ' + App.fmtCurrency(s.floor_revenue || 0) + ' floor')
+      + statTile('Covers', s.covers != null ? s.covers : '-', checkAvg != null ? App.fmtCurrency(checkAvg) + ' check avg' : 'No covers')
+      + statTile('Cash Variance', cashVar, cashVarSub, cashVarColor)
+      + statTile('Tips', tipsVal, tipsSub)
       + '</div></div>'
-      + '<div class="calc" style="margin-bottom:0;">'
-      + meta('Manager', esc(s.manager || '-'))
-      + meta('Status', s.status === 'Open' ? 'Open' : 'Closed')
-      + meta('Staff on Floor', s.staff_on_floor != null ? s.staff_on_floor : '-')
-      + meta('Drawer', esc(s.drawer || '-'))
-      + meta('Opening Bank', s.opening_bank != null ? App.fmtCurrency(s.opening_bank) : '-')
-      + '</div></div>'
-      + '<div class="card"><div class="card-title">Revenue</div>'
-      + '<div class="calc" style="margin-bottom:0;">'
-      + meta('Bar Revenue', App.fmtCurrency(s.bar_revenue || 0))
-      + meta('Floor Revenue', App.fmtCurrency(s.floor_revenue || 0))
-      + meta('Total Revenue', App.fmtCurrency(s.total_revenue || 0))
-      + meta('Covers', s.covers != null ? s.covers : '-')
-      + meta('Check Average', checkAvg != null ? App.fmtCurrency(checkAvg) : '-')
-      + '</div></div>'
+
       + cashCard
-      + tipCard
       + exCard
       + midNotesCard
       + notesCard
       + handoffCard
-      + '<div class="card-actions" style="margin-top:4px;">'
-      + '<button class="btn btn-ghost" id="sh-edit">Edit</button></div>'
       + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sh-back')) { this.renderList(); return; }
       if (ev.target.closest('#sh-handoff')) { if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id); return; }
-      if (ev.target.closest('#sh-export')) { App.exportPDF({ title: 'Shift History', root: this.container }); return; }
       if (ev.target.closest('#sh-edit')) {
         // Hand the shift id to the form's edit flow so it opens with this shift
         // already loaded, no manual navigation back to find it.
