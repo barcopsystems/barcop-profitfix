@@ -5,9 +5,9 @@
    Variance Log, and any cash-related form pulls from here instead of asking
    the operator to free-type a drawer name (which produced "Bar 1" / "Front
    Bar" / "Main Bar" inconsistency across the same physical register).
-   default_opening_bank is optional convenience — Start a Shift can pre-fill
-   the opening bank field when the operator picks the drawer this shift
-   runs on. */
+   default_opening_bank pre-fills the opening bank when Start a Shift picks
+   the drawer this shift runs on. Landing = inline add form (collapsible) over
+   the list; Edit opens on its own page. */
 
 S.ShiftDrawers = {
   editId: null,
@@ -19,29 +19,63 @@ S.ShiftDrawers = {
     return App.shiftData.sc_drawers;
   },
 
-  // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Add Drawer';
-    addBtn.addEventListener('click', () => this.showForm());
-    actions.appendChild(addBtn);
+    if (actions) actions.innerHTML = '';   // form is inline on the page now
     this.renderList();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Drawers and Registers Work', [
+      { p: ['Every drawer or register in your operation lives here: the main bar register, a service bar well, each floor register. Cash Drop and the Variance Log pull from this list, so every cash event lands on the same drawer name instead of "Bar 1" one night and "Front Bar" the next.'] },
+      { h: 'Adding a Drawer', p: ['Give it a clear name, tie it to a location if you want, and set a default opening bank if it normally opens with the same starting cash. That default pre-fills the opening bank when you start a shift on the drawer, so you are not retyping it every day.'] },
+      { h: 'Archiving', p: ['Retire a drawer you no longer use with Archive. It drops out of the dropdowns but stays on past records, so your history stays intact. Restore it any time to bring it back.'] }
+    ]);
+  },
+
+  // Shared field markup for the add form (d = null) and the edit page (d = record).
+  fieldsHtml(d) {
+    const locations = ((App.inventoryData && App.inventoryData.ic_locations) || [])
+      .filter(l => !l.archived)
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    let locOpts = '<option value="">(none)</option>';
+    locations.forEach(l => {
+      locOpts += '<option value="' + esc(l.name) + '"' + (d?.location === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>';
+    });
+    if (d?.location && !locations.some(l => l.name === d.location)) {
+      locOpts += '<option value="' + esc(d.location) + '" selected>' + esc(d.location) + ' (unsaved)</option>';
+    }
+    const v = val => (val != null && val !== '') ? val : '';
+    return '<div class="form-row data-row" style="gap:16px;">'
+      + '<div class="f w-lg"><label>Drawer / Register Name</label>'
+      + '<input type="text" id="dr-name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
+      + '<div class="f" style="width:220px;min-width:0;"><label>Location</label>'
+      + '<select id="dr-loc">' + locOpts + '</select></div>'
+      + '<div class="f" style="width:210px;min-width:0;"><label>Default Opening Bank ' + tt('dr-bank') + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="dr-bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<input type="text" id="dr-notes" value="' + esc(d?.notes || '') + '" placeholder="Optional"/></div></div>';
+  },
+
   renderList() {
+    this.editId = null;
     const all = this.drawers();
     const active   = all.filter(d => d.active !== false);
     const archived = all.filter(d => d.active === false);
 
-    let html;
+    const formCard = '<div class="card">'
+      + App.collapsibleCardTitle('sc-drawers', 'Add Drawer', App.helpButton('dr-how'))
+      + '<div class="collapse-body">'
+      + this.fieldsHtml(null)
+      + '<div class="card-actions"><button class="btn btn-primary" id="dr-save">Save</button>'
+      + '<span id="dr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
+      + '</div></div>';
+
+    let listHtml;
     if (all.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No drawers set up yet</div>'
-        + '<div class="empty-sub">Add every drawer or register in the operation: Main Bar, Service Bar, Floor Register, etc. Cash Drop and Variance Log pull from this list so every cash event lands on the right drawer.</div>'
-        + '<button class="btn btn-primary" id="dr-add-first">Add Drawer</button></div>';
+      listHtml = '<div style="font-size:13px;color:var(--t3);padding:2px 2px 6px;">No drawers yet. Add your first one above. Cash Drop and Variance Log pull from this list so every cash event lands on the right drawer.</div>';
     } else {
       const row = d => '<tr>'
         + '<td><div class="val">' + esc(d.name) + '</div></td>'
@@ -50,17 +84,15 @@ S.ShiftDrawers = {
         + '<td>' + esc(d.notes || '-') + '</td>'
         + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm dr-edit" data-id="' + d.id + '">Edit</button>'
-          + (d.active === false
-              ? '<button class="btn btn-ghost btn-sm dr-restore" data-id="' + d.id + '">Restore</button>'
-              : '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>')
+          + '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>'
         + '</div></td></tr>';
 
-      html = '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      listHtml = '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
         + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>';
 
       if (archived.length) {
-        html += '<div class="sh" style="margin:24px 0 8px;">Archived</div>'
+        listHtml += '<div class="sh" style="margin:24px 0 8px;">Archived</div>'
           + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Restore any to bring them back into the dropdowns.</div>'
           + '<div class="tbl-wrap"><table class="tbl"><tbody>'
           + archived.map(d => '<tr style="opacity:0.55;">'
@@ -75,16 +107,19 @@ S.ShiftDrawers = {
       }
     }
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + listHtml + '</div>';
+    App.applyCollapsed(this.container);
     this.container.onclick = ev => {
-      const edit  = ev.target.closest('.dr-edit');
-      const arch  = ev.target.closest('.dr-archive');
-      const rest  = ev.target.closest('.dr-restore');
-      const first = ev.target.closest('#dr-add-first');
+      if (ev.target.closest('#dr-how')) { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#dr-save')) { this.save(); return; }
+      const edit = ev.target.closest('.dr-edit');
+      const arch = ev.target.closest('.dr-archive');
+      const rest = ev.target.closest('.dr-restore');
       if (edit) this.showForm(edit.dataset.id);
       else if (arch) this.setArchived(arch.dataset.id, true);
       else if (rest) this.setArchived(rest.dataset.id, false);
-      else if (first) this.showForm();
     };
   },
 
@@ -96,41 +131,18 @@ S.ShiftDrawers = {
     this.renderList();
   },
 
-  // ── Form ──────────────────────────────────────────────────────────────────
+  // Edit opens on its own page (no How it works, no collapse). Cancel -> landing.
   showForm(id) {
     this.editId = id || null;
     const d = id ? this.drawers().find(x => x.id === id) : null;
-    const locations = ((App.inventoryData && App.inventoryData.ic_locations) || [])
-      .filter(l => !l.archived)
-      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    let locOpts = '<option value="">(none)</option>';
-    locations.forEach(l => {
-      locOpts += '<option value="' + esc(l.name) + '"' + (d?.location === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>';
-    });
-    if (d?.location && !locations.some(l => l.name === d.location)) {
-      locOpts += '<option value="' + esc(d.location) + '" selected>' + esc(d.location) + ' (unsaved)</option>';
-    }
-
-    const v = val => (val != null && val !== '') ? val : '';
-
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Drawer</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f w-lg"><label>Drawer / Register Name</label>'
-      + '<input type="text" id="dr-name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Location <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-      + '<select id="dr-loc">' + locOpts + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Default Opening Bank <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="dr-bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<input type="text" id="dr-notes" value="' + esc(d?.notes || '') + '" placeholder="Optional"/></div></div>'
+      + this.fieldsHtml(d)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dr-save">' + (id ? 'Update' : 'Save') + '</button>'
       + '<button class="btn btn-ghost" id="dr-cancel">Cancel</button>'
       + '<span id="dr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
-
     this.container.onclick = null;
     document.getElementById('dr-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('dr-save')?.addEventListener('click', () => this.save());
