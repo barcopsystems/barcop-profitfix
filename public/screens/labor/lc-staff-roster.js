@@ -97,10 +97,10 @@ S.LaborStaffRoster = {
   },
 
   // The profile cells shared by the inline add form and the edit profile form
-  // so they never drift. First row (Name, Position, Pay Type, Wage/Salary,
-  // Status, Hire Date) grows to span the form; Phone and Email sit on a second
-  // row. Pay Type swaps the pay field between an hourly Wage and an Annual
-  // Salary; salaried = exempt (fixed weekly cost, no overtime).
+  // so they never drift. One data row (Name, Position, Pay Type, Wage/Salary,
+  // Phone, Email, Status) that shrinks to fit on desktop and stacks full-width
+  // on mobile. Pay Type swaps the pay field between an hourly Wage and an
+  // Annual Salary; salaried = exempt (fixed weekly cost, no overtime).
   profileFormCells(s) {
     const positions = this.positions();
     const posOpts = positions.map(p =>
@@ -112,28 +112,24 @@ S.LaborStaffRoster = {
     const payVal = isSal
       ? ((s && s.annual_salary != null && s.annual_salary !== '') ? s.annual_salary : '')
       : ((hourly != null && hourly !== '') ? hourly : '');
-    return '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Name</label>'
+    return '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Name</label>'
       + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
-      + '<div class="f" style="flex:1 1 165px;min-width:0;"><label>Position</label>'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Position</label>'
       + '<select id="sr-pos">' + posOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 96px;min-width:0;"><label>Pay Type</label><select id="sr-paytype">'
+      + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Pay Type</label><select id="sr-paytype">'
       + '<option' + (!isSal ? ' selected' : '') + '>Hourly</option>'
       + '<option' + (isSal ? ' selected' : '') + '>Salary</option></select></div>'
-      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-pay" min="0" step="0.01" '
       + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Phone</label>'
+      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
+      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
-      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Hire Date</label>'
-      + '<input type="date" id="sr-hire" value="' + esc(s?.hire_date || '') + '"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;flex-wrap:nowrap;">'
-      + '<div class="f" style="width:100px;min-width:0;"><label>Phone</label>'
-      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="width:128px;min-width:0;"><label>Email</label>'
-      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
       + '</div>';
   },
 
@@ -273,7 +269,6 @@ S.LaborStaffRoster = {
         { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate'] },
         { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual'] },
         { key: 'status',        label: 'Status',        required: false, match: ['status', 'active'] },
-        { key: 'hire_date',     label: 'Hire Date',     required: false, match: ['hire date', 'hired', 'start date', 'hire'] },
         { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
         { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address'] }
       ],
@@ -303,20 +298,11 @@ S.LaborStaffRoster = {
         'Wage: wage, rate, hourly, pay rate',
         'Annual Salary: salary, annual salary',
         'Status: status, active (Active or Inactive)',
-        'Hire Date: hire date, hired, start date',
         'Phone: phone, mobile, cell',
         'Email: email, e-mail'] },
       { h: 'Positions', p: ['Each person\'s position is matched to your existing positions by name. If it does not match or is blank, the person still imports, just without a position. Open them on the roster and pick one. Setting up your positions first gives the cleanest import.'] },
       { h: 'Hourly or Salaried', p: ['If a row\'s Pay Type is Salary, Bar Cop uses the Annual Salary column. Otherwise the person is Hourly and uses the Wage column. You can change any of this per person afterward.'] }
     ]);
-  },
-
-  _normImportDate(v) {
-    if (!v) return '';
-    const s = String(v).trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
   },
 
   async importStaffRows(rows) {
@@ -340,7 +326,6 @@ S.LaborStaffRoster = {
         annual_salary: salaried ? (isNaN(salNum) ? null : salNum) : null,
         wage_history:  [],
         status:        inactive ? 'Inactive' : 'Active',
-        hire_date:     this._normImportDate(r.hire_date),
         phone:         (r.phone || '').trim(),
         email:         (r.email || '').trim(),
         notes:         '',
@@ -681,7 +666,6 @@ S.LaborStaffRoster = {
       annual_salary: annualSalary,
       wage_history:  wageHistory,
       status:        document.getElementById('sr-status')?.value || 'Active',
-      hire_date:     document.getElementById('sr-hire')?.value || '',
       phone:         document.getElementById('sr-phone')?.value.trim() || '',
       email:         document.getElementById('sr-email')?.value.trim() || '',
       notes:         document.getElementById('sr-notes')?.value.trim() || ''
