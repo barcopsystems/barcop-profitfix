@@ -261,7 +261,7 @@ S.LaborBuildSchedule = {
     const actionsCard = '<div class="card"><div class="card-title">Save</div>'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">'
       + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name ' + tt('bs-tmpl-name') + '</label>'
-      + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional — name it to save as a template"/></div>'
+      + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional, name it to save as a template"/></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes</label><textarea id="bs-notes" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
       + '<div class="card-actions">'
@@ -399,7 +399,7 @@ S.LaborBuildSchedule = {
           ? '<div style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
             + '<div style="font-size:12px;color:var(--t2);">From your recent weeks: <span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(sug) + '</span></div>'
             + '<button class="btn btn-ghost btn-sm" data-act="use-sug">Use this</button></div>'
-          : '<div style="font-size:11px;color:var(--t4);line-height:1.5;margin-bottom:14px;">Not enough shift history yet for a suggestion. Enter your own number to get a labor budget today; Bar Cop starts suggesting once you have a few weeks logged.</div>')
+          : '<div style="font-size:11px;color:var(--t4);line-height:1.5;margin-bottom:14px;">Not enough sales history yet for a suggestion. Enter your own number to get a labor budget today; Bar Cop starts suggesting once you have a few weeks logged.</div>')
       + '<div class="f" style="width:200px;"><label>' + (sug > 0 ? 'Or enter your own ($)' : 'Expected Revenue ($)') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div>'
       + (hasDetail ? '<div style="font-size:10px;color:var(--amber);margin-top:8px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
       + '<div id="bs-fc-err" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>'
@@ -439,7 +439,7 @@ S.LaborBuildSchedule = {
       { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
       { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
       { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast) and shows, live, what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
-      { h: 'Templates', p: ['To start from a typical week, Load a template from the Templates page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
+      { h: 'Templates', p: ['To start from a typical week, Load a template from the Saved Templates page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
       { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched.'] },
       { h: 'Salaried Staff', p: ['Salaried managers show their shift times in the grid, but their pay is a fixed weekly salary, not an hourly cost, so it counts toward the budget as a flat amount no matter how many hours you schedule.'] }
     ]);
