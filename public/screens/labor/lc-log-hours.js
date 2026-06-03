@@ -86,11 +86,15 @@ S.LaborLogHours = {
       return;
     }
 
+    // One chevron on the Log Hours card governs the whole entry section: its own
+    // form body plus the Import card below (tagged into the same group). They
+    // open and close together so the operator can tuck the entry tools away in
+    // one click once they are mostly reviewing the list.
     const addCard = '<div class="card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Log Hours</span>'
       + '<div style="display:flex;align-items:center;gap:8px;">'
-      + App.collapseToggle('lc-log-hours.form')
+      + App.collapseToggle('lc-log-hours')
       + '<button class="btn btn-ghost btn-sm" id="lo-how">How This Works</button></div></div>'
       + '<div class="collapse-body">'
       + this.logFormCells(null)
@@ -101,14 +105,13 @@ S.LaborLogHours = {
 
     // Import card sits under the log form, so a new operator can drop a timeclock
     // export instead of entering by hand. No explainer text here on purpose; the
-    // How This Works button carries it.
-    const importCard = '<div class="card">'
+    // How This Works button carries it. No own chevron: it collapses with the
+    // form via the shared group key.
+    const importCard = '<div class="card" data-collapse-group="lc-log-hours">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Import Hours</span>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + App.collapseToggle('lc-log-hours.import')
-      + '<button class="btn btn-ghost btn-sm" id="lo-imp-how">How This Works</button></div></div>'
-      + '<div class="collapse-body"><div id="lo-csv"></div><div id="lo-imp-result"></div></div></div>';
+      + '<button class="btn btn-ghost btn-sm" id="lo-imp-how">How This Works</button></div>'
+      + '<div id="lo-csv"></div><div id="lo-imp-result"></div></div>';
 
     const list = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
