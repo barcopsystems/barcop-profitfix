@@ -437,6 +437,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .setup-step-desc{font-size:12px;color:var(--t3);line-height:1.5;margin-bottom:12px;}
 .setup-done-tag{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);}
 
+/* Collapsible form cards: the always-open landing forms can be tucked away once
+   the operator is past setup. Chevron toggle sits in the title; the body hides
+   via CSS so the form stays mounted underneath (in-progress entries preserved). */
+.card-collapse-toggle{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:13px;line-height:1;padding:4px 7px;border-radius:var(--r2);transition:color 0.12s,background 0.12s;}
+.card-collapse-toggle:hover{color:var(--gold);background:var(--input);}
+.card.collapsed .collapse-body{display:none;}
+.card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+
 /* ══ SCORE ROWS ══ */
 .score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
 .score-num{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--t3);width:20px;flex-shrink:0;text-align:center;padding-top:2px;}
