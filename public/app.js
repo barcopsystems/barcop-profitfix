@@ -239,6 +239,7 @@ const TT = {
     'vr-std-misc':    {t:'Mixer Standard',b:'Mixers are measured by eye in the quart, so the line sits wider. Set the most you will accept; over it usually means waste or a recipe that has drifted from the pour. Adjust to taste.'},
     'vr-std-food':    {t:'Food Standard',b:'Food carries real yield and trim loss, but over-portioning is a true cost leak. Set the most you will accept; over it flags. Tighten or loosen it to match how tightly your kitchen portions.'},
     'lws-min-wage':   {t:'State Minimum Wage',b:'The hourly minimum wage in your state. Bar Cop uses it for one thing: the tip-credit check on the payroll worksheet. If a tipped employee\'s base wage plus their tip share comes out below this for the week, Bar Cop flags the row on Pay Periods so you can make up the difference before payroll runs. Leave it blank if your state does not allow a tip credit or you do not run tip-credit math. This value is for planning and payroll review only. Verify the current wage and tip-credit rules for your jurisdiction before processing payroll.'},
+    'bs-tmpl-name':   {t:'Template Name',b:'Name this week to also save it as a reusable template when you save the schedule. Leave it blank to just post the schedule with no template. If you loaded a template, its name is already here: keep it to update that template, or change it to save a new one under the new name.'},
   },
   show(icon) {
     const id = icon.dataset.tt;
