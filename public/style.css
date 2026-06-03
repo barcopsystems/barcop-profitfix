@@ -264,6 +264,9 @@ input,select,textarea{color-scheme:dark;}
 /* All form rows: flex, wrap allowed, consistent gap */
 .form-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
 .form-row:last-of-type{margin-bottom:0;}
+/* Data rows keep all cells on one line (shrink-to-fit) on desktop; on mobile
+   they stack full-width via the media query below. */
+.data-row{flex-wrap:nowrap;}
 
 /* Individual field */
 .f{display:flex;flex-direction:column;gap:5px;}
@@ -672,6 +675,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   /* Form rows stack vertically on narrow widths so fields get full width
      instead of squeezing into truncated columns. */
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+  /* Shrink-to-fit data rows stack on mobile instead of squeezing. */
+  .data-row{flex-wrap:wrap;}
 
   /* Bottle slider mobile pass: bigger SVG so a thumb can drive it, thicker
      drag handle so it is visible + grab-able, larger +/- buttons hitting
