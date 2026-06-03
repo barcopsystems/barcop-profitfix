@@ -43,10 +43,18 @@ S.LaborOvertimeWatch = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button>';
-    document.getElementById('ow-export')?.addEventListener('click', () => App.exportPDF({ title: 'Overtime Watch', root: this.container }));
+    actions.innerHTML = '';
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Overtime Watch Works', [
+      { p: ['Overtime Watch looks ahead at a week and flags who is heading into overtime before it happens, so you can adjust the schedule while there is still time. Step week to week with the arrows.'] },
+      { h: 'How The Projection Works', p: ['For each hourly staff member, Projected is the greater of hours already logged and hours still scheduled this week. Anything over ' + App.OT_THRESHOLD + ' hours is overtime, and Extra OT Cost is the half-time premium on those hours. Salaried staff are exempt and never appear.'] },
+      { h: 'The Suggested Action', p: ['When someone is projected over, the Suggested Action column shows the exact hours to cut from their remaining shifts to clear the threshold. Open the week\'s schedule to make the change.'] },
+      { h: 'Export', p: ['Export PDF saves the week\'s projection for a manager or your own records.'] }
+    ]);
   },
 
   draw() {
@@ -96,30 +104,35 @@ S.LaborOvertimeWatch = {
     const totalOtHours = rows.reduce((t, r) => t + r.otHours, 0);
     const totalOtCost = rows.reduce((t, r) => t + r.otCost, 0);
 
-    const dateCard = '<div class="card"><div class="card-title">Week</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;align-items:center;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
-      + '<input type="date" id="ow-start" value="' + esc(ws) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<div style="font-size:13px;color:var(--t2);padding-bottom:8px;">' + this.fmtDate(ws) + ' – ' + this.fmtDate(we) + '</div></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="ow-prev" style="margin-bottom:2px;">&#8592; Prev</button></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="ow-next" style="margin-bottom:2px;">Next &#8594;</button></div>'
-      + '</div></div>';
-
-    const summary = '<div class="calc" style="margin-bottom:16px;">'
+    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Projected Over OT</div><div class="calc-val ' + (over.length ? 'warn' : 'good') + '">' + over.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Approaching</div><div class="calc-val ' + (approaching.length ? 'warn' : '') + '">' + approaching.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Projected OT Hours</div><div class="calc-val">' + totalOtHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Extra OT Cost</div><div class="calc-val ' + (totalOtCost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(totalOtCost) + '</div></div>'
       + '</div>';
 
-    let table;
+    const dateCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Week</span>'
+      + App.helpButton('ow-how') + '</div>'
+      + '<div class="form-row no-print" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
+      + '<input type="date" id="ow-start" value="' + esc(ws) + '"/></div>'
+      + '<div style="display:flex;gap:6px;padding-bottom:2px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ow-prev" title="Previous week" aria-label="Previous week">&#8592;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ow-next" title="Next week" aria-label="Next week">&#8594;</button>'
+      + '</div>'
+      + '</div>'
+      + summary
+      + '</div>';
+
+    let projCard;
     if (rows.length === 0) {
-      table = '<div class="empty"><div class="empty-title">No hours this week</div>'
+      projCard = '<div class="card"><div class="card-title">Hours Projection</div>'
+        + '<div class="empty"><div class="empty-title">No hours this week</div>'
         + '<div class="empty-sub">Log hours or build a schedule for this week and Overtime Watch will '
-        + 'project who is heading into overtime.</div></div>';
+        + 'project who is heading into overtime.</div></div>'
+        + '<div style="margin-top:4px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div></div>';
     } else {
       const trs = rows.map(r => {
         const badge = r.status === 'Over' ? '<span style="color:var(--red);font-weight:700;">Over</span>'
@@ -142,18 +155,19 @@ S.LaborOvertimeWatch = {
           + '<td>' + badge + '</td>'
           + '<td>' + action + '</td></tr>';
       }).join('');
-      table = '<div class="card"><div class="card-title">Hours Projection</div>'
+      projCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Hours Projection</span>'
+        + '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button></div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
         + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
-        + 'Projected is the greater of hours logged and hours scheduled. Threshold ' + App.OT_THRESHOLD
-        + ' hrs/week; extra OT cost is the half-time premium on projected overtime hours. The Suggested Action column shows the exact cut needed to clear the threshold.</div>'
         + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summary + table + '</div>';
+    this.container.innerHTML = '<div class="screen">' + dateCard + projCard + '</div>';
+    document.getElementById('ow-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('ow-export')?.addEventListener('click', () => App.exportPDF({ title: 'Overtime Watch', root: this.container }));
     document.getElementById('ow-start')?.addEventListener('change', e => {
       this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00'));
       this.draw();
