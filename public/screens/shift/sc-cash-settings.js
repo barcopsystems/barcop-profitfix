@@ -28,6 +28,15 @@ S.ShiftCashSettings = {
     this.draw();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Cash Tolerances Work', [
+      { p: ['Cash tolerance is the most a drawer can be off before Bar Cop flags it. A count that comes in under the tolerance stays green; over it, the shift flags on the Variance Log, Cash Reconciliation, and the Shift Handoff Report.'] },
+      { h: 'The Default', p: ['The Default Tolerance is your baseline. It applies to any shift type that does not have its own number set below.'] },
+      { h: 'Per Shift-Type', p: ['Some shifts carry more cash risk than others. A busy late night is tougher to count tight than a slow brunch. Set a different tolerance for a shift type here and it overrides the default for that type. Leave a type blank to inherit the default.'] },
+      { h: 'One-Off Overrides', p: ['Start a Shift can still override the tolerance for one specific shift, without touching these settings.'] }
+    ]);
+  },
+
   draw() {
     const s = this.settings();
     const v = val => (val != null && val !== '') ? val : '';
@@ -44,31 +53,25 @@ S.ShiftCashSettings = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card">'
-      + '<div class="card-title">Default Cash Variance Tolerance</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px;">'
-        + 'The maximum dollar amount you treat as acceptable for a drawer to be off. Variance under this stays green; over flags the shift on Variance Log, Cash Reconciliation, and the Shift Handoff Report. This is the baseline; per-shift-type defaults below can override it for a specific shift, and Start a Shift lets the operator override for one specific shift.'
-      + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Default Cash Variance Tolerance</span>'
+      + App.helpButton('cs-how') + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:center;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Default Tolerance</label>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Default Tolerance ' + tt('cs-tolerance') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="cs-default" min="0" step="0.5" value="' + v(s.cash_tolerance != null ? s.cash_tolerance : 10) + '"/></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);padding-bottom:10px;">Applies to any shift type that does not have its own default below.</div>'
       + '</div>'
       + '</div>'
 
       + '<div class="card">'
-      + '<div class="card-title">Per Shift-Type Defaults <span style="color:var(--t4);font-weight:400;font-size:12px;text-transform:none;letter-spacing:0;">(optional)</span></div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px;">'
-        + 'If a shift type runs different cash risk (busy late nights are tougher to count tight than a slow brunch), set a different tolerance for that shift type. Leave blank to inherit the default above.'
-      + '</div>'
+      + '<div class="card-title">Per Shift-Type Defaults</div>'
       + typeRows
-      + '</div>'
-
-      + '<div class="card-actions" style="margin-top:6px;">'
+      + '<div class="card-actions" style="margin-top:14px;">'
       + '<button class="btn btn-primary" id="cs-save">Save Cash Settings</button>'
       + '<span id="cs-msg" style="font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
+      + '</div>'
       + '</div>';
 
+    document.getElementById('cs-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('cs-save')?.addEventListener('click', () => this.save());
   },
 
