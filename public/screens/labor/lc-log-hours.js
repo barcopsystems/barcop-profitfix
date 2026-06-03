@@ -90,12 +90,12 @@ S.LaborLogHours = {
     // form body plus the Import card below (tagged into the same group). They
     // open and close together so the operator can tuck the entry tools away in
     // one click once they are mostly reviewing the list.
+    // One header on the Log Hours card governs the whole entry section: its own
+    // form body plus the Import card below (tagged into the same group). Clicking
+    // anywhere on the header opens/closes both, so the operator can tuck the entry
+    // tools away in one click once they are mostly reviewing the list.
     const addCard = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Log Hours</span>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + App.collapseToggle('lc-log-hours')
-      + '<button class="btn btn-ghost btn-sm" id="lo-how">How This Works</button></div></div>'
+      + App.collapsibleCardTitle('lc-log-hours', 'Log Hours', App.helpButton('lo-how'))
       + '<div class="collapse-body">'
       + this.logFormCells(null)
       + '<div class="card-actions">'
@@ -105,12 +105,12 @@ S.LaborLogHours = {
 
     // Import card sits under the log form, so a new operator can drop a timeclock
     // export instead of entering by hand. No explainer text here on purpose; the
-    // How This Works button carries it. No own chevron: it collapses with the
+    // How it works button carries it. No own header toggle: it collapses with the
     // form via the shared group key.
     const importCard = '<div class="card" data-collapse-group="lc-log-hours">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Import Hours</span>'
-      + '<button class="btn btn-ghost btn-sm" id="lo-imp-how">How This Works</button></div>'
+      + App.helpButton('lo-imp-how') + '</div>'
       + '<div id="lo-csv"></div><div id="lo-imp-result"></div></div>';
 
     const list = [...this.actuals()].sort((a, b) =>
@@ -156,10 +156,10 @@ S.LaborLogHours = {
 
     this.container.innerHTML = '<div class="screen">' + addCard + importCard + listCard + '</div>' + modal;
     this.container.onclick = ev => {
-      const toggle = ev.target.closest('.card-collapse-toggle');
-      if (toggle) { App.toggleCollapse(toggle); return; }
       if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
       if (ev.target.closest('#lo-imp-how')) { this.showImportHelp(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
       if (ev.target.closest('#lo-save'))    { this.save(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
