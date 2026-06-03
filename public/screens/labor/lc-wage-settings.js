@@ -39,11 +39,10 @@ S.LaborWageSettings = {
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>State Min Wage ' + tt('lws-min-wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lws-min-wage" min="0" step="0.01" value="' + v(s.state_min_wage != null ? s.state_min_wage : '') + '" placeholder="Per hour"/></div></div>'
       + '</div>'
-      + '</div>'
-
       + '<div class="card-actions" style="margin-top:6px;">'
       + '<button class="btn btn-primary" id="lws-save">Save Wage Policies</button>'
       + '<span id="lws-msg" style="font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>'
       + '</div>'
       + '</div>';
 
