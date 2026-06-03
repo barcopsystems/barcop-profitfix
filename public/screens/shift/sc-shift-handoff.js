@@ -71,7 +71,22 @@ S.ShiftHandoff = {
     // ── Cash Reconciliation ──
     if (cr.skipped) {
       b.sectionTitle('Cash Reconciliation (Skipped)');
-      b.paragraph('Drawer was not counted this shift.', { italic: true, gray: 130 });
+      b.paragraph('Drawers were not counted this shift.', { italic: true, gray: 130 });
+    } else if (Array.isArray(cr.drawers) && cr.drawers.length) {
+      const okTotal = cr.variance == null ? true : Math.abs(cr.variance) <= tol;
+      const statusTotal = cr.variance == null ? '' : okTotal ? 'Within Tolerance' : cr.variance < 0 ? 'Short' : 'Over';
+      b.sectionTitle('Cash Reconciliation' + (statusTotal ? ' (' + statusTotal + ')' : ''));
+      const vstr = vr => vr != null ? ((vr >= 0 ? '+' : '') + fmt$(vr)) : '-';
+      const rows = cr.drawers.map(c => [
+        c.name || 'Register', fmt$(c.opening_bank), fmt$(c.drops_total),
+        c.sales_cash != null ? fmt$(c.sales_cash) : '-', fmt$(c.expected),
+        c.counted_cash != null ? fmt$(c.counted_cash) : '-', vstr(c.variance)
+      ]);
+      rows.push(['Total', fmt$(cr.opening_bank), fmt$(cr.drops_total),
+        cr.sales_cash != null ? fmt$(cr.sales_cash) : '-', fmt$(cr.expected),
+        cr.counted_cash != null ? fmt$(cr.counted_cash) : '-', vstr(cr.variance)]);
+      b.table(['Drawer', 'Opening', 'Drops', 'POS Cash', 'Expected', 'Counted', 'Variance'], rows,
+        { columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } } });
     } else if (cr.opening_bank != null || cr.counted_cash != null || cr.sales_cash != null) {
       const ok = cr.variance == null ? true : Math.abs(cr.variance) <= tol;
       const status = cr.variance == null ? '' : ok ? 'Within Tolerance' : cr.variance < 0 ? 'Short' : 'Over';
