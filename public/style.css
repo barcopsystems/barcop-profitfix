@@ -444,6 +444,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-collapse-toggle:hover{color:var(--gold);background:var(--input);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+.collapse-off{display:none;}
 
 /* ══ SCORE ROWS ══ */
 .score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
