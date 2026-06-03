@@ -39,45 +39,81 @@ S.LaborCalloutLog = {
     this.renderList();
   },
 
+  showHowTo() {
+    App.showHelpModal('How the Call-Out Log Works', [
+      { p: ['The Call-Out Log tracks attendance exceptions, no-shows, sick calls, late arrivals, and early-outs, so reliability patterns surface instead of living in your head.'] },
+      { h: 'Logging A Call-Out', p: ['Fill the row at the top: date, staff member, what happened, the shift, and whether it got covered and by whom. Reason and notes are optional but worth a line if it might matter later.'] },
+      { h: 'Repeat Flags', p: ['When someone has more than one call-out in the last 60 days, the list flags the count in red next to their name, so a pattern is easy to spot before it becomes a problem.'] },
+      { h: 'Coverage', p: ['Marking whether a call-out was covered, and by whom, builds a record of who picks up the slack, which is useful at review time.'] }
+    ]);
+  },
+
+  // Form cells shared by the inline log form and the edit page. The six data
+  // cells (Date, Staff, Type, Shift, Shift Covered, Covered By) on one row;
+  // Reason and Notes on their own rows. Pass the record for edit, or null.
+  formCells(c) {
+    const staffOpts = '<option value="">Select staff...</option>'
+      + this.staff().filter(s => s.status !== 'Inactive' || (c && c.staff_id === s.id)).map(s =>
+          '<option value="' + s.id + '"' + (c && c.staff_id === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+    const typeOpts = this.TYPES.map(t =>
+      '<option' + ((c ? c.type : 'No-Show') === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    const shiftOpts = this.SHIFTS.map(s =>
+      '<option value="' + s + '"' + (c && c.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
+    return '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Date</label>'
+        + '<input type="date" id="co-date" value="' + esc(c?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
+        + '<select id="co-staff">' + staffOpts + '</select></div>'
+      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Type</label>'
+        + '<select id="co-type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Shift</label>'
+        + '<select id="co-shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Shift Covered?</label><select id="co-covered">'
+        + '<option value="no"' + (!c || !c.covered ? ' selected' : '') + '>Not Covered</option>'
+        + '<option value="yes"' + (c && c.covered ? ' selected' : '') + '>Covered</option></select></div>'
+      + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Covered By</label>'
+        + '<select id="co-coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Reason</label>'
+        + '<input type="text" id="co-reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
+        + '<textarea id="co-notes" rows="2" placeholder="Optional">' + esc(c?.notes || '') + '</textarea></div></div>';
+  },
+
   renderList() {
-    this.actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="co-export">Export PDF</button>';
-    document.getElementById('co-export')?.addEventListener('click', () => App.exportPDF({ title: 'Call-Out Log', root: this.container }));
+    this.editId = null;
+    this.actions.innerHTML = '';
+
     if (this.staff().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add staff first</div>'
-        + '<div class="empty-sub">Call-outs are logged against your roster. Add staff in Staff Roster, '
-        + 'then track attendance here.</div>'
-        + '<button class="btn btn-primary" id="co-go-roster">Go to Staff Roster</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#co-go-roster')) App.navigate('lc-staff-roster'); };
+      App.setupCard(this.container, {
+        title: 'Log Your First Call-Out',
+        lead: 'Call-outs are logged against your roster so reliability patterns surface. Add your staff and you can start tracking attendance.',
+        steps: [
+          { title: 'Add your staff', desc: 'Call-outs are logged against a staff member, so build your roster first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
       return;
     }
 
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'Log Call-Out';
-    addBtn.addEventListener('click', () => this.showForm());
-    this.actions.appendChild(addBtn);
+    const addCard = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Log Call-Out</span>'
+      + App.helpButton('co-how') + '</div>'
+      + this.formCells(null)
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="co-save">Save Call-Out</button>'
+      + '<span id="co-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
 
     const list = [...this.callouts()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
 
-    let html;
+    let listCard;
     if (list.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No call-outs logged</div>'
-        + '<div class="empty-sub">Log no-shows, sick calls, and late arrivals here. Repeat call-outs from '
-        + 'one person get flagged so patterns are easy to spot.</div>'
-        + '<button class="btn btn-primary" id="co-add-first">Log Call-Out</button></div>';
+      listCard = '<div class="card"><div class="card-title">Call-Out Log</div>'
+        + '<div style="font-size:13px;color:var(--t3);">No call-outs logged yet. Log no-shows, sick calls, and late '
+        + 'arrivals above. Repeat call-outs from one person get flagged so patterns are easy to spot.</div></div>';
     } else {
-      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-      const last30 = list.filter(c => new Date((c.date || '') + 'T00:00:00') >= cutoff).length;
-      const noShows = list.filter(c => c.type === 'No-Show').length;
-      const uncovered = list.filter(c => !c.covered).length;
-      const summary = '<div class="calc" style="margin-bottom:16px;">'
-        + '<div class="calc-item"><div class="calc-label">Total Call-Outs</div><div class="calc-val">' + list.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Last 30 Days</div><div class="calc-val">' + last30 + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">No-Shows</div><div class="calc-val ' + (noShows ? 'warn' : '') + '">' + noShows + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Uncovered</div><div class="calc-val ' + (uncovered ? 'warn' : '') + '">' + uncovered + '</div></div>'
-        + '</div>';
       const rows = list.slice(0, App.listLimit('lc', 'callout')).map(c => {
         const reps = this.repeatCount(c.staff_id);
         const repTag = reps > 1 ? ' <span style="color:var(--red);font-weight:700;">' + reps + '&times; / 60d</span>' : '';
@@ -96,10 +132,11 @@ S.LaborCalloutLog = {
           + (App.canEdit('lc-callout-log') ? '<button class="btn btn-danger btn-sm co-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      html = summary + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listCard = '<div class="card"><div class="card-title">Call-Out Log</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Type</th><th>Shift</th><th>Coverage</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('lc', 'callout', list, false);
+        + App.showOlderBar('lc', 'callout', list, false) + '</div>';
     }
 
     const modal = '<div id="co-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
@@ -110,17 +147,17 @@ S.LaborCalloutLog = {
       + '<button class="btn btn-danger" id="co-del-confirm">Delete</button>'
       + '</div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addCard + listCard + '</div>' + modal;
     this.container.onclick = ev => {
+      if (ev.target.closest('#co-how'))  { this.showHowTo(); return; }
+      if (ev.target.closest('#co-save')) { this.save(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.co-row');
       const edit = ev.target.closest('.co-edit');
       const del = ev.target.closest('.co-del');
-      const addF = ev.target.closest('#co-add-first');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
       else if (row && App.canEdit('lc-callout-log')) this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
     };
   },
 
@@ -128,40 +165,12 @@ S.LaborCalloutLog = {
     if (id && !App.canEdit('lc-callout-log')) return;
     this.editId = id || null;
     const c = id ? this.callouts().find(x => x.id === id) : null;
-    const staffOpts = '<option value="">Select staff...</option>'
-      + this.staff().filter(s => s.status !== 'Inactive' || (c && c.staff_id === s.id)).map(s =>
-          '<option value="' + s.id + '"' + (c && c.staff_id === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-    const typeOpts = this.TYPES.map(t =>
-      '<option' + ((c ? c.type : 'No-Show') === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const shiftOpts = this.SHIFTS.map(s =>
-      '<option value="' + s + '"' + (c && c.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Log') + ' Call-Out</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="co-date" value="' + esc(c?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
-      + '<select id="co-staff">' + staffOpts + '</select></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Type</label>'
-      + '<select id="co-type">' + typeOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Shift</label>'
-      + '<select id="co-shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Covered?</label><select id="co-covered">'
-      + '<option value="no"' + (!c || !c.covered ? ' selected' : '') + '>Not Covered</option>'
-      + '<option value="yes"' + (c && c.covered ? ' selected' : '') + '>Covered</option>'
-      + '</select></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Covered By</label>'
-      + '<select id="co-coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Reason</label>'
-      + '<input type="text" id="co-reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="co-notes" rows="2" placeholder="Optional">' + esc(c?.notes || '') + '</textarea></div></div>'
+      + '<div class="card-title">Edit Call-Out</div>'
+      + this.formCells(c)
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="co-save">' + (id ? 'Update' : 'Save Call-Out') + '</button>'
+      + '<button class="btn btn-primary" id="co-save">Update</button>'
       + '<button class="btn btn-ghost" id="co-cancel">Cancel</button>'
       + '<span id="co-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
