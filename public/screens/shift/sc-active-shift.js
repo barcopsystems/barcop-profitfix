@@ -544,12 +544,37 @@ S.ShiftActiveShift = {
     { key: 'handoff',    label: 'Handoff Notes' }
   ],
 
+  // One cash-recon row per open drawer: its opening bank plus the drops pulled
+  // from it (attributed by drawer_id; any drop that does not match an open
+  // drawer falls onto the first one so the totals reconcile). sales_cash and
+  // counted_cash are filled in by the operator during the close.
+  _initCashDrawers(s) {
+    const base = (Array.isArray(s.drawers) && s.drawers.length)
+      ? s.drawers.map(dr => ({ drawer_id: dr.drawer_id, name: dr.name, opening_bank: dr.opening_bank || 0 }))
+      : (s.drawer_id || s.drawer ? [{ drawer_id: s.drawer_id || '', name: s.drawer || 'Register', opening_bank: s.opening_bank || 0 }] : []);
+    if (!base.length) return [];
+    const dropsBy = {};
+    this.byDate('sc_cash_drops', s.date).forEach(dp => {
+      const k = dp.drawer_id || '';
+      dropsBy[k] = (dropsBy[k] || 0) + (parseFloat(dp.amount) || 0);
+    });
+    const known = new Set(base.map(x => x.drawer_id));
+    let orphan = 0;
+    Object.keys(dropsBy).forEach(k => { if (!known.has(k)) orphan += dropsBy[k]; });
+    return base.map((dr, idx) => ({
+      drawer_id:   dr.drawer_id,
+      name:        dr.name,
+      opening_bank: dr.opening_bank || 0,
+      drops_total: (dropsBy[dr.drawer_id] || 0) + (idx === 0 ? orphan : 0),
+      sales_cash:  null,
+      counted_cash: null
+    }));
+  },
+
   renderEnd(s) {
     this.mode = 'end';
     if (!this._closeDraft || this._closeDraft.shift_id !== s.id) {
       // Initialize wizard draft from the live shift record
-      const drops = this.byDate('sc_cash_drops', s.date);
-      const dropsTotal = drops.reduce((t, d) => t + (parseFloat(d.amount) || 0), 0);
       this._closeDraft = {
         shift_id:      s.id,
         step:          'revenue',
@@ -557,11 +582,8 @@ S.ShiftActiveShift = {
         floor_revenue: s.floor_revenue || null,
         covers:        s.covers || null,
         notes:         s.notes || '',
-        // Cash recon defaults
-        opening_bank:  s.opening_bank || 0,
-        drops_total:   dropsTotal,
-        sales_cash:    null,
-        counted_cash:  null,
+        // Per-drawer cash recon
+        cashDrawers:   this._initCashDrawers(s),
         cash_skipped:  false,
         // Tip recon defaults
         tips_pos_reported: null,
@@ -640,30 +662,40 @@ S.ShiftActiveShift = {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
     const tolerance = App.cashToleranceForShift(s);
-    return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Opening bank and shift drops are filled in for you. Enter the POS cash sales total and what you counted in the drawer at close.</div>'
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Opening Bank <span style="color:var(--t4);font-weight:400;">(locked)</span></label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" value="' + v(d.opening_bank) + '" disabled style="height:44px;font-size:15px;"/></div></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Drops Out <span style="color:var(--t4);font-weight:400;">(locked)</span></label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" value="' + v(d.drops_total) + '" disabled style="height:44px;font-size:15px;"/></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>POS Cash Sales</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="aw-sales-cash" min="0" step="0.01" inputmode="decimal" value="' + v(d.sales_cash) + '" placeholder="From POS" style="height:44px;font-size:15px;"/></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Counted Cash</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="aw-counted" min="0" step="0.01" inputmode="decimal" value="' + v(d.counted_cash) + '" placeholder="From drawer" style="height:44px;font-size:15px;"/></div></div>'
-      + '</div>'
-      + '<div class="calc" style="margin-top:6px;">'
-        + '<div class="calc-item"><div class="calc-label">Expected</div><div class="calc-val" id="aw-expected">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="aw-variance">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="aw-vstatus">-</div></div>'
-      + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tolerance ' + App.fmtCurrency(tolerance) + ' from Shift Control Cash Settings. A variance outside tolerance auto-logs to the Variance Log when you close the shift.</div>'
-      + '<div style="margin-top:14px;">'
-        + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
+    const cd = d.cashDrawers || [];
+
+    let body;
+    if (cd.length === 0) {
+      body = '<div style="font-size:13px;color:var(--t3);padding:6px 0;">No registers were opened on this shift, so there is nothing to count. Continue to the next step.</div>';
+    } else {
+      const rows = cd.map((c, i) =>
+        '<div style="border:1px solid var(--b2);border-radius:8px;padding:14px;margin-bottom:10px;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:10px;">' + esc(c.name || 'Register') + '</div>'
+        + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:10px;">'
+          + '<div class="f" style="width:118px;flex-shrink:0;"><label>Opening Bank</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" value="' + v(c.opening_bank) + '" disabled style="height:42px;"/></div></div>'
+          + '<div class="f" style="width:118px;flex-shrink:0;"><label>Drops Out</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" value="' + v(c.drops_total) + '" disabled style="height:42px;"/></div></div>'
+          + '<div class="f" style="width:140px;flex-shrink:0;"><label>POS Cash Sales</label><div class="fw"><span class="pre">$</span><input class="pre aw-sales" data-i="' + i + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + v(c.sales_cash) + '" placeholder="From POS" style="height:42px;"/></div></div>'
+          + '<div class="f" style="width:140px;flex-shrink:0;"><label>Counted</label><div class="fw"><span class="pre">$</span><input class="pre aw-counted-d" data-i="' + i + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + v(c.counted_cash) + '" placeholder="From drawer" style="height:42px;"/></div></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:22px;font-size:12px;color:var(--t3);">'
+          + '<div>Expected <span class="aw-exp" data-i="' + i + '" style="color:var(--t1);font-weight:700;">-</span></div>'
+          + '<div>Variance <span class="aw-var" data-i="' + i + '" style="font-weight:700;">-</span></div>'
+        + '</div></div>').join('');
+      const totals = '<div class="calc" style="margin-top:4px;">'
+        + '<div class="calc-item"><div class="calc-label">Total Expected</div><div class="calc-val" id="aw-t-expected">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Counted</div><div class="calc-val" id="aw-t-counted">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val" id="aw-t-variance">-</div></div>'
+        + '</div>';
+      body = rows + totals
+        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tolerance ' + App.fmtCurrency(tolerance) + ' per drawer, from Cash Tolerances. Any drawer outside tolerance auto-logs to the Variance Log when you close.</div>'
+        + '<div style="margin-top:14px;"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
           + '<input type="checkbox" id="aw-cash-skip" ' + (d.cash_skipped ? 'checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>'
-          + 'Skip cash reconciliation (drawer was not counted this shift)'
-        + '</label>'
-      + '</div>'
+          + 'Skip cash reconciliation (drawers not counted this shift)</label></div>';
+    }
+
+    return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Opening bank and drops are filled in per register. Enter the POS cash sales and what you counted in each drawer at close.</div>'
+      + body
       + '<div class="card-actions"><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button></div>'
     + '</div>';
   },
@@ -1010,8 +1042,9 @@ S.ShiftActiveShift = {
       d.covers        = num('aw-covers');
       d.walkouts      = num('aw-walkouts');
     } else if (d.step === 'cash') {
-      d.sales_cash    = num('aw-sales-cash');
-      d.counted_cash  = num('aw-counted');
+      const cd = d.cashDrawers || [];
+      this.container.querySelectorAll('.aw-sales').forEach(el => { const i = +el.dataset.i; if (cd[i]) { const n = parseFloat(el.value); cd[i].sales_cash = (el.value === '' || isNaN(n)) ? null : n; } });
+      this.container.querySelectorAll('.aw-counted-d').forEach(el => { const i = +el.dataset.i; if (cd[i]) { const n = parseFloat(el.value); cd[i].counted_cash = (el.value === '' || isNaN(n)) ? null : n; } });
       d.cash_skipped  = !!document.getElementById('aw-cash-skip')?.checked;
     } else if (d.step === 'exceptions') {
       document.querySelectorAll('.aw-ack').forEach(c => { d.ack[c.dataset.key] = c.checked; });
@@ -1060,30 +1093,46 @@ S.ShiftActiveShift = {
       recalc();
     }
 
-    // Step 2: live cash recon calc
+    // Step 2: live per-drawer cash recon calc
     if (d.step === 'cash') {
+      const cd = d.cashDrawers || [];
+      const tol = App.cashToleranceForShift(s);
       const recalc = () => {
-        const num = id => parseFloat(document.getElementById(id)?.value) || 0;
         const skipped = !!document.getElementById('aw-cash-skip')?.checked;
-        const expected = (d.opening_bank || 0) + num('aw-sales-cash') - (d.drops_total || 0);
-        const counted  = num('aw-counted');
-        const variance = counted - expected;
-        const tol = App.cashToleranceForShift(s);
-        const status = skipped ? 'SKIPPED' : Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER';
-        const color = skipped ? 'var(--t3)' : status === 'OK' ? 'var(--gold)' : 'var(--red)';
+        let tExp = 0, tCnt = 0, tVar = 0, anyCounted = false;
+        cd.forEach((c, i) => {
+          const salesEl = this.container.querySelector('.aw-sales[data-i="' + i + '"]');
+          const cntEl   = this.container.querySelector('.aw-counted-d[data-i="' + i + '"]');
+          const sales = parseFloat(salesEl?.value) || 0;
+          const cntStr = cntEl ? cntEl.value : '';
+          const counted = parseFloat(cntStr) || 0;
+          const countedEntered = cntEl && cntStr !== '' && !isNaN(parseFloat(cntStr));
+          c.sales_cash = (salesEl && salesEl.value !== '' && !isNaN(parseFloat(salesEl.value))) ? sales : null;
+          c.counted_cash = countedEntered ? counted : null;
+          const expected = (c.opening_bank || 0) + sales - (c.drops_total || 0);
+          const variance = counted - expected;
+          const expEl = this.container.querySelector('.aw-exp[data-i="' + i + '"]');
+          if (expEl) expEl.textContent = App.fmtCurrency(expected);
+          const varEl = this.container.querySelector('.aw-var[data-i="' + i + '"]');
+          if (varEl) {
+            if (skipped || !countedEntered) { varEl.textContent = '-'; varEl.style.color = 'var(--t4)'; }
+            else { varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.style.color = Math.abs(variance) <= tol ? 'var(--gold)' : 'var(--red)'; }
+          }
+          tExp += expected;
+          if (countedEntered) { tCnt += counted; tVar += variance; anyCounted = true; }
+        });
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        set('aw-expected', App.fmtCurrency(expected));
-        const vEl = document.getElementById('aw-variance');
-        if (vEl) {
-          vEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance);
-          vEl.style.color = skipped ? 'var(--t4)' : status === 'OK' ? 'var(--gold)' : 'var(--red)';
+        set('aw-t-expected', App.fmtCurrency(tExp));
+        set('aw-t-counted', (anyCounted && !skipped) ? App.fmtCurrency(tCnt) : '-');
+        const tvEl = document.getElementById('aw-t-variance');
+        if (tvEl) {
+          if (skipped || !anyCounted) { tvEl.textContent = '-'; tvEl.style.color = ''; }
+          else { tvEl.textContent = (tVar >= 0 ? '+' : '') + App.fmtCurrency(tVar); tvEl.style.color = Math.abs(tVar) <= tol ? 'var(--gold)' : 'var(--red)'; }
         }
-        const sEl = document.getElementById('aw-vstatus');
-        if (sEl) { sEl.textContent = status; sEl.style.color = color; }
       };
-      ['aw-sales-cash','aw-counted','aw-cash-skip'].forEach(fid =>
-        document.getElementById(fid)?.addEventListener('input', recalc));
-      document.getElementById('aw-cash-skip')?.addEventListener('change', recalc);
+      this.container.querySelectorAll('.aw-sales, .aw-counted-d').forEach(el => el.addEventListener('input', recalc));
+      const skipEl = document.getElementById('aw-cash-skip');
+      if (skipEl) { skipEl.addEventListener('input', recalc); skipEl.addEventListener('change', recalc); }
       recalc();
     }
 
@@ -1156,9 +1205,21 @@ S.ShiftActiveShift = {
     if (i < 0) { this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')); return; }
 
     const bar = d.bar_revenue || 0, floor = d.floor_revenue || 0;
-    const expected = (d.opening_bank || 0) + (d.sales_cash || 0) - (d.drops_total || 0);
-    const cashVariance = d.cash_skipped ? null : ((d.counted_cash || 0) - expected);
     const tol = App.cashToleranceForShift(s);
+
+    // Per-drawer cash recon: expected = opening bank + POS cash sales - drops, per drawer.
+    const reconDrawers = (d.cashDrawers || []).map(c => {
+      const expected = (c.opening_bank || 0) + (c.sales_cash || 0) - (c.drops_total || 0);
+      const counted = (!d.cash_skipped && c.counted_cash != null) ? c.counted_cash : null;
+      const variance = counted != null ? (counted - expected) : null;
+      const status = d.cash_skipped ? 'Skipped' : counted == null ? 'Not Counted'
+        : Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over';
+      return { drawer_id: c.drawer_id, name: c.name, opening_bank: c.opening_bank || 0, drops_total: c.drops_total || 0, sales_cash: c.sales_cash, counted_cash: counted, expected, variance, status };
+    });
+    const anySales = reconDrawers.some(c => c.sales_cash != null);
+    const anyCounted = !d.cash_skipped && reconDrawers.some(c => c.counted_cash != null);
+    const tExpected = reconDrawers.reduce((t, c) => t + (c.expected || 0), 0);
+    const tVariance = anyCounted ? reconDrawers.reduce((t, c) => t + (c.variance || 0), 0) : null;
 
     const snapshot = { ...list[i] };
     list[i] = {
@@ -1171,13 +1232,14 @@ S.ShiftActiveShift = {
       notes:         d.notes || '',
       handoff_notes: d.handoff_notes || '',
       cash_recon: {
-        opening_bank: d.opening_bank || 0,
-        drops_total:  d.drops_total || 0,
-        sales_cash:   d.sales_cash,
-        counted_cash: d.counted_cash,
-        expected,
-        variance:     cashVariance,
-        skipped:      d.cash_skipped
+        skipped:      d.cash_skipped,
+        drawers:      reconDrawers,
+        opening_bank: reconDrawers.reduce((t, c) => t + (c.opening_bank || 0), 0),
+        drops_total:  reconDrawers.reduce((t, c) => t + (c.drops_total || 0), 0),
+        sales_cash:   anySales ? reconDrawers.reduce((t, c) => t + (c.sales_cash || 0), 0) : null,
+        counted_cash: anyCounted ? reconDrawers.reduce((t, c) => t + (c.counted_cash || 0), 0) : null,
+        expected:     tExpected,
+        variance:     tVariance
       },
       tip_recon: {
         logged_total: ((App.laborData && App.laborData.lc_tips) || [])
@@ -1193,46 +1255,54 @@ S.ShiftActiveShift = {
       closed_at:     new Date().toISOString()
     };
 
-    // Auto-log cash variance to sc_variances when the operator actually
-    // counted the drawer. This is what fed Cash Reconciliation in Profit
-    // Recovery without forcing the operator to navigate to a separate
-    // screen and re-enter the same numbers.
-    let varianceLogged = null;
-    if (!d.cash_skipped && cashVariance != null) {
+    // Auto-log each counted drawer's variance to sc_variances so Cash
+    // Reconciliation in Profit Recovery and the Variance Log get the count
+    // without re-entry. One record per drawer that was actually counted.
+    const variancesLogged = [];
+    if (!d.cash_skipped) {
       if (!Array.isArray(App.shiftData.sc_variances)) App.shiftData.sc_variances = [];
-      varianceLogged = {
-        id:            App.uid(),
-        date:          s.date,
-        shift_type:    s.shift_type || 'Close',
-        drawer_id:     s.drawer_id || '',
-        drawer:        s.drawer || ((App.drawerById && s.drawer_id) ? (App.drawerById(s.drawer_id) || {}).name || '' : ''),
-        cashier_id:    s.manager_id || '',
-        cashier:       s.manager || '',
-        expected_cash: expected,
-        counted_cash:  d.counted_cash || 0,
-        variance:      cashVariance,
-        tolerance:     tol,
-        status:        Math.abs(cashVariance) <= tol ? 'Within Tolerance' : cashVariance < 0 ? 'Short' : 'Over',
-        reason:        '',
-        notes:         'Auto-logged from Shift Close wizard',
-        source:        'shift-close',
-        source_id:     s.id,
-        created_at:    new Date().toISOString()
-      };
-      App.shiftData.sc_variances.push(varianceLogged);
-      list[i].cash_recon.variance_log_id = varianceLogged.id;
+      reconDrawers.forEach(c => {
+        if (c.counted_cash == null) return;
+        const vrec = {
+          id:            App.uid(),
+          date:          s.date,
+          shift_type:    s.shift_type || 'Close',
+          drawer_id:     c.drawer_id || '',
+          drawer:        c.name || '',
+          cashier_id:    s.manager_id || '',
+          cashier:       s.manager || '',
+          expected_cash: c.expected,
+          counted_cash:  c.counted_cash,
+          variance:      c.variance,
+          tolerance:     tol,
+          status:        Math.abs(c.variance) <= tol ? 'Within Tolerance' : c.variance < 0 ? 'Short' : 'Over',
+          reason:        '',
+          notes:         'Auto-logged from Shift Close wizard',
+          source:        'shift-close',
+          source_id:     s.id,
+          created_at:    new Date().toISOString()
+        };
+        App.shiftData.sc_variances.push(vrec);
+        variancesLogged.push(vrec);
+      });
+      if (variancesLogged.length) list[i].cash_recon.variance_log_ids = variancesLogged.map(v => v.id);
     }
 
     const btn = document.getElementById('aw-finalize');
     if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
     let ok = await App.putRecord('sc', 'shift', list[i]);
-    if (ok && varianceLogged) ok = await App.putRecord('sc', 'variance', varianceLogged);
+    if (ok) {
+      for (const vrec of variancesLogged) { ok = await App.putRecord('sc', 'variance', vrec); if (!ok) break; }
+    }
     if (ok) {
       this._closeDraft = null;
       this.renderClosed(list[i]);
     } else {
       list[i] = snapshot;
-      if (varianceLogged) App.shiftData.sc_variances = App.shiftData.sc_variances.filter(v => v.id !== varianceLogged.id);
+      if (variancesLogged.length) {
+        const ids = new Set(variancesLogged.map(v => v.id));
+        App.shiftData.sc_variances = App.shiftData.sc_variances.filter(v => !ids.has(v.id));
+      }
       if (btn) { btn.disabled = false; btn.textContent = 'Close Shift'; }
       fail('Could not close the shift. Try again.');
     }
