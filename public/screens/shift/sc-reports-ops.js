@@ -72,7 +72,6 @@ S.ShiftReportsOps = {
       + this.vcByServer(vc) + this.vcByReason(vc) + this.most86(items86)
       + this.maintByPriority(maint) + this.checklistCard(checks) + '</div>';
 
-    document.getElementById('ro-export')?.addEventListener('click', () => App.exportPDF({ title: 'Operations Reports', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#ro-clear')) {
         this.filterFrom = this.filterTo = '';

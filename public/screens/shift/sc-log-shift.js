@@ -7,6 +7,7 @@
 
 S.ShiftLogShift = {
   editId: null,
+  _openEditId: null,
   _pendingDelId: null,
   // SHIFT_TYPES kept as a backward-compat alias to App.SHIFT_TYPES. The
   // canonical list lives on App.SHIFT_TYPES now; consumers should read from
@@ -32,7 +33,10 @@ S.ShiftLogShift = {
     addBtn.textContent = 'Log a Shift';
     addBtn.addEventListener('click', () => this.showForm());
     actions.appendChild(addBtn);
-    this.renderList();
+    const openId = this._openEditId;
+    this._openEditId = null;
+    if (openId && this.shifts().some(x => x.id === openId)) this.showForm(openId);
+    else this.renderList();
   },
 
   renderList() {

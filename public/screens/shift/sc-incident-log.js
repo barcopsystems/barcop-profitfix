@@ -209,7 +209,7 @@ S.ShiftIncidentLog = {
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="in-save">' + (id ? 'Update' : 'Log Incident') + '</button>'
         + '<button class="btn btn-ghost" id="in-cancel">Cancel</button>'
-        + '<button class="btn btn-ghost" id="in-print" style="margin-left:auto;"' + (id ? '' : ' disabled style="margin-left:auto;opacity:0.5;cursor:not-allowed;"') + '>Print Insurance Report</button>'
+        + '<button class="btn btn-ghost" id="in-print"' + (id ? ' style="margin-left:auto;"' : ' disabled style="margin-left:auto;opacity:0.5;cursor:not-allowed;"') + '>Print Insurance Report</button>'
         + '<span id="in-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 
@@ -275,39 +275,49 @@ S.ShiftIncidentLog = {
     this.renderList();
   },
 
-  // Insurance-ready report: one-page printable record for handing to a broker
-  // or attorney. Operator voice + the legal-protection disclaimer.
-  printReport(id) {
+  // Insurance-ready report: one-page record for handing to a broker or attorney.
+  // Saved straight to a PDF through the shared App._pdfBuilder (no window.print).
+  // Operator voice + the legal-protection disclaimer.
+  async printReport(id) {
     const r = this.incidents().find(x => x.id === id);
     if (!r) return;
-    const barName = (App.data?.settings?.bar_name) || '';
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+
     const bar = (App.data?.settings || {});
-    const when = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    const escH = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const line = (label, val) => '<div style="display:flex;padding:6px 0;border-bottom:1px solid #e5e5e5;"><div style="width:170px;font-weight:700;color:#555;font-size:11px;letter-spacing:1px;text-transform:uppercase;">' + escH(label) + '</div><div style="font-size:13px;color:#111;">' + escH(val || '-') + '</div></div>';
-    const block = (label, val) => '<div style="margin-top:14px;"><div style="font-weight:700;color:#555;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">' + escH(label) + '</div><div style="font-size:13px;color:#111;line-height:1.6;white-space:pre-wrap;">' + escH(val || '(none)') + '</div></div>';
-    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Incident Report</title>'
-      + '<style>body{font-family:Georgia,serif;color:#111;max-width:780px;margin:30px auto;padding:0 24px;}h1{font-size:20px;margin:0 0 4px;}.sub{color:#666;font-size:12px;margin-bottom:18px;}.footer{margin-top:30px;padding-top:14px;border-top:1px solid #ccc;font-size:10px;color:#666;line-height:1.6;}@media print{body{margin:0;}}</style>'
-      + '</head><body>'
-      + '<h1>Incident Report</h1>'
-      + '<div class="sub">' + escH(barName) + (bar.city_state ? ' &middot; ' + escH(bar.city_state) : '') + ' &middot; Report printed ' + escH(when) + '</div>'
-      + line('Date of Incident', this.fmtDate(r.date))
-      + line('Time', r.time)
-      + line('Type', r.type)
-      + line('Severity', r.severity)
-      + line('Manager on Duty', r.manager)
-      + line('Location in Building', r.location)
-      + line('People Involved', r.people_involved)
-      + block('Description', r.description)
-      + block('Witnesses', r.witnesses)
-      + block('Action Taken at the Time', r.action_taken)
-      + block('Follow-Up Needed', (r.follow_up_needed ? 'Yes. ' : 'No. ') + (r.notes || ''))
-      + '<div class="footer">Generated from your input data on ' + escH(when) + '. This is the operator\'s record of events at the time, not legal or insurance advice. Coordinate with your broker or attorney on any claim or matter that arises from this incident.</div>'
-      + '</body></html>';
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+    const metaBits = [];
+    if (bar.bar_name) metaBits.push(bar.bar_name);
+    if (bar.city_state) metaBits.push(bar.city_state);
+    metaBits.push('Printed ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+
+    const b = App._pdfBuilder('Incident Report');
+    b.header({ right: 'Incident Report', meta: metaBits.join('   |   ') });
+
+    b.table(null, [
+      ['Date of Incident', this.fmtDate(r.date)],
+      ['Time', r.time || '-'],
+      ['Type', r.type || '-'],
+      ['Severity', r.severity || '-'],
+      ['Manager on Duty', r.manager || '-'],
+      ['Location in Building', r.location || '-'],
+      ['People Involved', r.people_involved || '-']
+    ]);
+
+    b.sectionTitle('Description');
+    b.paragraph(r.description || '(none)');
+    b.sectionTitle('Witnesses');
+    b.paragraph(r.witnesses || '(none)');
+    b.sectionTitle('Action Taken at the Time');
+    b.paragraph(r.action_taken || '(none)');
+    b.sectionTitle('Follow-Up Needed');
+    b.paragraph((r.follow_up_needed ? 'Yes. ' : 'No. ') + (r.notes || ''));
+
+    b.spacer(4);
+    b.paragraph('Generated from your input data. This is the operator\'s record of events at the time, '
+      + 'not legal or insurance advice. Coordinate with your broker or attorney on any claim or matter '
+      + 'that arises from this incident.', { italic: true, gray: 130, size: 8 });
+
+    const ds = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date.replace(/-/g, '') : App._pdfDateStamp();
+    await b.save('BarCop_IncidentReport_' + ds + '.pdf');
   }
 };

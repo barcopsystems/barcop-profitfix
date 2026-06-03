@@ -37,8 +37,8 @@ S.ShiftCashSettings = {
       return '<div class="form-row" style="gap:14px;align-items:center;margin-bottom:8px;">'
         + '<div style="width:200px;flex-shrink:0;font-size:13px;color:var(--t1);font-weight:600;">' + esc(t) + '</div>'
         + '<div class="f" style="width:160px;flex-shrink:0;margin:0;">'
-        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" min="0" step="0.5" '
-        + 'data-type="' + esc(t) + '" class="cs-type-tol" value="' + v(cur) + '" placeholder="Inherit default"/></div></div>'
+        + '<div class="fw"><span class="pre">$</span><input class="pre cs-type-tol" type="number" min="0" step="0.5" '
+        + 'data-type="' + esc(t) + '" value="' + v(cur) + '" placeholder="Inherit default"/></div></div>'
       + '</div>';
     }).join('');
 

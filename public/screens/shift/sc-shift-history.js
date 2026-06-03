@@ -287,7 +287,7 @@ S.ShiftHistory = {
       else if (ev.target.closest('#sh-edit')) {
         // Hand the shift id to Log a Shift's edit flow so the form opens with
         // this shift already loaded — no manual navigation back to find it.
-        if (S.ShiftLogShift) S.ShiftLogShift.editId = id;
+        if (S.ShiftLogShift) S.ShiftLogShift._openEditId = id;
         App.navigate('sc-log-shift');
       }
     };

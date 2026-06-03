@@ -81,7 +81,6 @@ S.ShiftReportsShift = {
 
     this.container.innerHTML = '<div class="screen">' + filterCard + body + '</div>';
 
-    document.getElementById('rs-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift Reports', root: this.container }));
     this.container.onclick = ev => {
       if (ev.target.closest('#rs-clear')) {
         this.filterFrom = this.filterTo = '';
