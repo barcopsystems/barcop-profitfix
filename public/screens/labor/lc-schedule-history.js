@@ -35,14 +35,18 @@ S.LaborScheduleHistory = {
   renderList() {
     this.actions.innerHTML = '';
     const list = this.sorted();
-
-    let html;
     if (list.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No schedules yet</div>'
-        + '<div class="empty-sub">Schedules you save in Build Schedule are listed here, with labor cost, '
-        + 'labor %, and RPLH.</div>'
-        + '<button class="btn btn-primary" id="lh-build">Build a Schedule</button></div>';
-    } else {
+      App.setupCard(this.container, {
+        title: 'Schedule History',
+        lead: 'Schedule History lists every weekly schedule you save, with labor cost, labor percentage, and revenue per labor hour.',
+        steps: [
+          { title: 'Build a schedule', desc: 'Schedules you save in Build Schedule show up here. Build your first to get started.', btn: 'Build a Schedule', screen: 'lc-build-schedule', done: false }
+        ]
+      });
+      return;
+    }
+    let html;
+    {
       const target = this.laborTarget();
       const rows = list.slice(0, App.listLimit('lc', 'schedule')).map(s => {
         const pct = s.labor_pct;

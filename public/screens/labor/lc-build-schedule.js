@@ -91,11 +91,13 @@ S.LaborBuildSchedule = {
     if (actions) actions.innerHTML = '';
     this.draft = this.loadDraft();
     if (this.activeStaff().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add staff first</div>'
-        + '<div class="empty-sub">A schedule is built from your roster. Add staff in Staff Roster, then come back to build the week.</div>'
-        + '<button class="btn btn-primary" id="bs-go-roster">Go to Staff Roster</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#bs-go-roster')) App.navigate('lc-staff-roster'); };
+      App.setupCard(this.container, {
+        title: 'Build Your First Schedule',
+        lead: 'A schedule is built from your roster. Add your staff and you can lay out the week on a grid with a live labor budget.',
+        steps: [
+          { title: 'Add your staff', desc: 'A schedule is built from your roster, so build it first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
       return;
     }
     this.draw();

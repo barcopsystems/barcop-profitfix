@@ -46,21 +46,29 @@ S.LaborScheduleTemplates = {
     this.actions.innerHTML = '';
 
     if (this.staff().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add staff first</div>'
-        + '<div class="empty-sub">Templates are built from your roster. Add staff in Staff Roster, then build a week and save it as a template.</div>'
-        + '<button class="btn btn-primary" id="lt-go-roster">Go to Staff Roster</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#lt-go-roster')) App.navigate('lc-staff-roster'); };
+      App.setupCard(this.container, {
+        title: 'Schedule Templates',
+        lead: 'Templates are reusable weekly shift patterns built from your roster. Add your staff first, then build a week and save it as a template.',
+        steps: [
+          { title: 'Add your staff', desc: 'Templates are built from your roster, so build it first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
       return;
     }
 
     const list = this.templates();
-    let html;
     if (list.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No templates yet</div>'
-        + '<div class="empty-sub">Templates are made from Build Schedule. Build a week, then click "Save Week as Template" at the bottom. Saved ones show up here to load any time.</div>'
-        + '<button class="btn btn-primary" id="lt-build">Build a Schedule</button></div>';
-    } else {
+      App.setupCard(this.container, {
+        title: 'Schedule Templates',
+        lead: 'Templates are reusable weekly shift patterns. You build them in Build Schedule and save them here to load any time.',
+        steps: [
+          { title: 'Build a schedule', desc: 'Build a week in Build Schedule, then click Save Week as Template at the bottom. Saved templates show up here.', btn: 'Build a Schedule', screen: 'lc-build-schedule', done: false }
+        ]
+      });
+      return;
+    }
+    let html;
+    {
       html = list.map(t => {
         const st = this.templateStats(t);
         return '<div class="card lt-card" data-id="' + t.id + '" style="cursor:pointer;margin-bottom:12px;">'

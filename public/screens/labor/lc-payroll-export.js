@@ -20,6 +20,16 @@ S.LaborPayrollExport = {
     this.container = container;
     if (actions) actions.innerHTML = '';
     const pp = this.PP();
+    if (pp.actuals().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Payroll Export',
+        lead: 'Payroll Export turns any pay period into a formatted workbook or a clean import file for whoever runs your payroll, built from what you log.',
+        steps: [
+          { title: 'Log some hours', desc: 'Hours you log in Log Hours feed each pay period. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
+        ]
+      });
+      return;
+    }
     const today = new Date().toISOString().slice(0, 10);
     const thisMon = pp.mondayOf(today);
     // Last 12 weeks, newest first.

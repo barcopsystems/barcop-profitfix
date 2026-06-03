@@ -48,6 +48,16 @@ S.LaborWeeklySummary = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    if (this.actuals().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Weekly Summary',
+        lead: 'Weekly Summary rolls up a full week of labor: hours and cost by staff and by day, with labor percentage against your forecast.',
+        steps: [
+          { title: 'Log some hours', desc: 'Hours you log in Log Hours feed this weekly rollup. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
+        ]
+      });
+      return;
+    }
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
   },

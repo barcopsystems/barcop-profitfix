@@ -126,6 +126,17 @@ S.LaborPayPeriods = {
     // Entering the screen from the sidebar always lands on the list, not a stale
     // detail view. The detail is reached via View within the screen.
     this.detailWeekStart = null;
+    if (this.actuals().length === 0) {
+      this.actions.innerHTML = '';
+      App.setupCard(this.container, {
+        title: 'Pay Periods',
+        lead: 'Pay Periods rolls each week into a payroll-ready summary you can close, lock, and hand off, with overtime and a tip-credit check.',
+        steps: [
+          { title: 'Log some hours', desc: 'Hours you log in Log Hours build each week here. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
+        ]
+      });
+      return;
+    }
     this.renderList();
   },
 

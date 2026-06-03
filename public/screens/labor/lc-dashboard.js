@@ -157,7 +157,7 @@ S.LaborDashboard = {
       + this.metricCard('Labor Hours, Last 7 Days', wkHours.toFixed(1),
              wkHours > 0 ? App.fmtCurrency(wkHours > 0 ? wkCost / wkHours : 0) + ' avg wage' : 'No hours logged')
       + this.metricCard('Overtime Risk', String(over + approaching),
-             over + ' over &middot; ' + approaching + ' approaching this week', (over + approaching) ? 'over-target' : 'on-target')
+             over + ' over &middot; ' + approaching + ' approaching', (over + approaching) ? 'over-target' : 'on-target')
       + this.metricCard('Active Staff', String(activeStaff), this.staff().length + ' on the roster');
 
     // ── This Week (scheduled plan vs logged so far) — full-width hero ──

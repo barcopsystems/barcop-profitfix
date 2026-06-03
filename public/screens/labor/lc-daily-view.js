@@ -47,6 +47,16 @@ S.LaborDailyView = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    if (this.actuals().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Daily View',
+        lead: 'Daily View shows one day at a time: who worked, their hours and cost, and how the day compared to the schedule.',
+        steps: [
+          { title: 'Log some hours', desc: 'Hours you log in Log Hours show up here, day by day. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
+        ]
+      });
+      return;
+    }
     if (!this.date) this.date = new Date().toISOString().slice(0, 10);
     this.draw();
   },

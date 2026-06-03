@@ -44,6 +44,16 @@ S.LaborOvertimeWatch = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    if (this.actuals().length === 0 && this.schedules().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Overtime Watch',
+        lead: 'Overtime Watch looks ahead at a week and flags who is heading into overtime before it happens, from the greater of logged and scheduled hours.',
+        steps: [
+          { title: 'Build a schedule', desc: 'Build a week in the schedule and Overtime Watch projects who is heading toward overtime. Logging hours feeds it too.', btn: 'Build Schedule', screen: 'lc-build-schedule', done: false }
+        ]
+      });
+      return;
+    }
     if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
     this.draw();
   },

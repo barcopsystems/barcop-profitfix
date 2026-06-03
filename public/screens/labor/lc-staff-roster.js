@@ -163,12 +163,13 @@ S.LaborStaffRoster = {
     this.actions.innerHTML = '';
 
     if (this.positions().length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
-        + '<div class="empty-title">Add positions first</div>'
-        + '<div class="empty-sub">Each staff member is assigned a position. Set up your positions, then '
-        + 'build the roster.</div>'
-        + '<button class="btn btn-primary" id="sr-go-positions">Go to Positions</button></div></div>';
-      this.container.onclick = ev => { if (ev.target.closest('#sr-go-positions')) App.navigate('lc-positions'); };
+      App.setupCard(this.container, {
+        title: 'Build Your Roster',
+        lead: 'Each staff member is assigned a position, which sets their department and default wage. Add your positions first, then build the roster.',
+        steps: [
+          { title: 'Add your positions', desc: 'Set up the job roles you staff, like bartender and server, before adding people.', btn: 'Go to Positions', screen: 'lc-positions', done: false }
+        ]
+      });
       return;
     }
 
