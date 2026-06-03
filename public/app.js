@@ -3005,10 +3005,11 @@ const App = {
      and opens a Save dialog. The set is every screen in a module's REPORTS
      section plus the three Recovery Reports and History screens. */
   _REPORT_SCREENS: {
-    // The four Inventory reports carry their own Export PDF inside the report
-    // panel, so they are intentionally NOT here (no duplicate topbar button).
+    // Screens that carry their own in-content Export PDF are intentionally NOT
+    // here (no duplicate topbar button): the four Inventory reports, plus the
+    // swept Labor reports (lc-reports / lc-overtime-watch export from the card;
+    // lc-callout-log needs no export).
     'reports': 1, 'r-reports': 1, 't-reports': 1,
-    'lc-reports': 1, 'lc-overtime-watch': 1, 'lc-callout-log': 1,
     'sc-reports-shift': 1, 'sc-reports-cash': 1, 'sc-reports-ops': 1
   },
   _exportBtn(id, actions) {
