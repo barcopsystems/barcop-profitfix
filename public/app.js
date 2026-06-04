@@ -2383,7 +2383,8 @@ const App = {
         shift: 'sc_shifts', void_comp: 'sc_void_comps', cash_drop: 'sc_cash_drops',
         variance: 'sc_variances', safe_log: 'sc_safe_log', eighty_six: 'sc_86_list',
         maintenance: 'sc_maintenance', walked_tab: 'sc_walked_tabs',
-        incident: 'sc_incidents', waste: 'sc_waste', checklist: 'sc_checklists'
+        incident: 'sc_incidents', waste: 'sc_waste', checklist: 'sc_checklists',
+        safe_count: 'sc_safe_counts'
       }
     },
     lc: {
