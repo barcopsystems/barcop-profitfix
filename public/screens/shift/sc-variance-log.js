@@ -51,14 +51,20 @@ S.ShiftVarianceLog = {
     exportBtn.textContent = 'Export PDF';
     exportBtn.addEventListener('click', () => App.exportPDF({ title: 'Variance Log', root: this.container }));
     actions.appendChild(exportBtn);
+    // Deep-link from the Cash Board's "Count Drawer": open the form prefilled to
+    // that drawer instead of the list.
+    if (this._openNew) {
+      const pf = this._openNew; this._openNew = null;
+      this.showForm(null, pf);
+      return;
+    }
     this.renderList();
   },
 
   statusBadge(status) {
-    if (status === 'Within Tolerance') return '<span class="badge badge-ok">Within Tolerance</span>';
-    if (status === 'Over') return '<span class="badge badge-dim">Over</span>';
-    if (status === 'Not Counted') return '<span class="badge badge-dim">Not Counted</span>';
-    return '<span class="badge badge-warn">Short</span>';
+    const col = status === 'Short' ? 'var(--red)' : status === 'Over' ? 'var(--amber)'
+      : status === 'Not Counted' ? 'var(--t3)' : 'var(--green)';
+    return '<span style="color:' + col + ';font-weight:700;">' + esc(status || '') + '</span>';
   },
 
   renderList() {
@@ -128,12 +134,15 @@ S.ShiftVarianceLog = {
     };
   },
 
-  showForm(id) {
+  showForm(id, prefill) {
     if (id && !App.canEdit('sc-variance-log')) return;
     this.editId = id || null;
     const v = id ? this.variances().find(x => x.id === id) : null;
+    const pf = prefill || {};
+    const selType   = v ? v.shift_type : (pf.shift_type || '');
+    const selDrawer = v ? (v.drawer_id || v.drawer) : (pf.drawer_id || '');
     const typeOpts = this.shiftTypes().map(t =>
-      '<option' + (v && v.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
+      '<option' + (selType === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const reasonOpts = '<option value="">Select reason...</option>'
       + this.REASONS.map(r => '<option' + (v && v.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
     const val = x => (x != null && x !== '') ? x : '';
@@ -147,7 +156,7 @@ S.ShiftVarianceLog = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label>'
       + '<select id="vl-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Drawer / Register</label>'
-      + '<select id="vl-drawer">' + App.drawerOptions(v?.drawer_id || v?.drawer, { placeholder: 'Select drawer...' }) + '</select></div>'
+      + '<select id="vl-drawer">' + App.drawerOptions(selDrawer, { placeholder: 'Select drawer...' }) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Cashier</label>'
       + '<select id="vl-cashier">' + App.staffOptions(v?.cashier_id || v?.cashier, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
