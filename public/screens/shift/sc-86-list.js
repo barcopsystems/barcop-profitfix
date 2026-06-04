@@ -174,24 +174,35 @@ S.Shift86List = {
   // ── Entry ──────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
-    actions.innerHTML = '<button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="el-print-blank" style="margin-left:8px;">Worksheet</button>';
-    document.getElementById('el-export')?.addEventListener('click', () => App.exportPDF({ title: '86 List', root: this.container }));
-    document.getElementById('el-print-blank')?.addEventListener('click', () => this.printBlank());
+    if (actions) actions.innerHTML = '';   // Export / Worksheet live on the Currently 86'd card now
     this.editId = null;
     this.customMode = false;
     this.alsoIds = {};
     this.renderMain();
   },
 
-  catBadge(cat) {
-    return '<span class="badge badge-dim">' + esc(cat || 'Other') + '</span>';
+  showHowTo() {
+    App.showHelpModal('How the 86 List Works', [
+      { p: ['The 86 List is your running list of what ran out during service. 86 an item the moment it is gone so the next bartender, the servers, and the kitchen all see it, and so the par-alert and the audit catch the repeat offenders.'] },
+      { h: '86 an item', p: ['Pick a menu item OR an inventory item (products and prep batches). If Bar Cop does not track it, add it as a custom item. When you pick an inventory item, Bar Cop flags the menu items and batches that use it so you can 86 those in the same save.'] },
+      { h: 'Currently 86\'d', p: ['Everything that is out right now. Back In Stock clears it and drops it to the list below. An item 86\'d more than once in 30 days gets flagged so you can chase the real cause.'] },
+      { h: 'Worksheet and Export', p: ['Worksheet prints a blank sheet to mark 86s by hand during the rush, then enter them after close. Export PDF saves the current list.'] }
+    ]);
+  },
+
+  catText(cat) {
+    return '<span style="color:var(--t3);font-size:12px;font-weight:600;">' + esc(cat || 'Other') + '</span>';
+  },
+  srcText(srcType) {
+    const map = { menu_item: 'Menu', batch: 'Batch', product: 'Product', custom: 'Custom' };
+    const lbl = map[srcType];
+    return lbl ? '<span style="color:var(--t3);font-size:11px;">' + lbl + '</span>' : '';
   },
 
   // ── Entry form ─────────────────────────────────────────────────────────
   entryFormHTML() {
-    const editing = !!this.editId;
-    const i = editing ? this.items().find(x => x.id === this.editId) : null;
+    const editing = false;   // edits open in a pop-up; this form is always a new 86
+    const i = null;
     const activeMgr = (this.activeShift() || {}).manager_id || '';
 
     // Resolve saved record back to picker state.
@@ -209,9 +220,8 @@ S.Shift86List = {
     const reportedBy = i?.reported_by_id || i?.reported_by || activeMgr;
 
     return '<div class="card">'
-      + '<div class="card-title">' + (editing ? 'Edit 86 Entry' : '86 An Item') + '</div>'
-      + (editing ? '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Editing the entry below. Save to apply or Cancel to go back to logging new items.</div>'
-                 : '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.55;">Pick a menu item OR an inventory item. The form will flag related items that may need 86\'d too.</div>')
+      + App.collapsibleCardTitle('sc-86-list', '86 An Item', App.helpButton('el-how'))
+      + '<div class="collapse-body">'
 
       // Row 1: Menu Item + Inventory Item side by side
       + '<div class="form-row" style="gap:14px;align-items:flex-end;">'
@@ -256,11 +266,10 @@ S.Shift86List = {
         + '<textarea id="qa-notes" rows="2" placeholder="Anything the next shift needs to know">' + esc(i?.notes || '') + '</textarea></div></div>'
 
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary btn-lg" id="qa-go">' + (editing ? 'Update' : '86 It') + '</button>'
-        + (editing ? '<button class="btn btn-ghost" id="qa-cancel">Cancel</button>' : '')
+        + '<button class="btn btn-primary btn-lg" id="qa-go">86 It</button>'
         + '<span id="qa-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
-    + '</div>';
+      + '</div></div>';
   },
 
   // ── Cross-reference panel ──────────────────────────────────────────────
@@ -356,37 +365,35 @@ S.Shift86List = {
       .sort((a, b) => new Date(b.date_back || b.created_at || 0).getTime() - new Date(a.date_back || a.created_at || 0).getTime())
       .slice(0, 50);
 
+    const ew = '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="el-print-blank">Worksheet</button></div>';
+    const activeTitle = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Currently 86\'d' + (active.length ? ' &middot; ' + active.length : '') + '</span>' + ew + '</div>';
+
     let activeCards;
     if (active.length === 0) {
-      activeCards = '<div class="card"><div class="card-title">Currently 86\'d</div>'
+      activeCards = '<div class="card">' + activeTitle
         + '<div style="font-size:13px;color:var(--t3);padding:6px 0;">Nothing is 86\'d right now. The full bar and kitchen are available.</div></div>';
     } else {
-      activeCards = '<div class="card"><div class="card-title">Currently 86\'d &middot; ' + active.length + '</div>'
+      activeCards = '<div class="card">' + activeTitle
         + active.map(i => {
           const reps = this.repeatCount(i.item);
-          const repTag = reps > 1
-            ? '<span class="badge badge-warn" style="margin-left:8px;">86\'d ' + reps + '&times; / 30d</span>'
-            : '';
-          const srcBadge = i.source_type === 'menu_item' ? '<span class="badge badge-dim" style="margin-left:6px;">Menu</span>'
-                          : i.source_type === 'batch' ? '<span class="badge badge-dim" style="margin-left:6px;">Batch</span>'
-                          : i.source_type === 'product' ? '<span class="badge badge-dim" style="margin-left:6px;">Product</span>'
-                          : i.source_type === 'custom' ? '<span class="badge badge-dim" style="margin-left:6px;">Custom</span>'
-                          : '';
-          const isEditing = this.editId === i.id;
-          return '<div class="ei-86" data-id="' + i.id + '" style="border:1px solid ' + (isEditing ? 'var(--gold)' : 'var(--b1)') + ';border-radius:6px;padding:14px;margin-bottom:10px;' + (isEditing ? 'background:rgba(218,171,70,0.06);' : '') + '">'
+          const repText = reps > 1 ? '<span style="color:var(--amber);font-size:11px;font-weight:700;margin-left:4px;">86\'d ' + reps + '&times; / 30d</span>' : '';
+          const srcTxt = this.srcText(i.source_type);
+          return '<div class="ei-86" data-id="' + i.id + '" style="border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
+            + '<div style="flex:1;min-width:200px;">'
             + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
             + '<span style="font-size:16px;font-weight:700;color:var(--t1);">' + esc(i.item) + '</span>'
-            + this.catBadge(i.category) + srcBadge + repTag
-            + (isEditing ? '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:var(--gold);">EDITING</span>' : '')
+            + this.catText(i.category) + (srcTxt || '') + repText
             + '</div>'
-            + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">86\'d ' + this.fmtDate(i.date_86)
+            + '<div style="font-size:12px;color:var(--t3);">86\'d ' + this.fmtDate(i.date_86)
             + (i.time_86 ? ' at ' + esc(i.time_86) : '')
             + (i.reason ? ' &middot; ' + esc(i.reason) : '')
             + (i.reported_by ? ' &middot; by ' + esc(i.reported_by) : '') + '</div>'
-            + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-            + '<button class="btn btn-primary ei-back" data-id="' + i.id + '" style="height:44px;">Back In Stock</button>'
-            + (App.canEdit('sc-86-list') ? '<button class="btn btn-ghost ei-edit" data-id="' + i.id + '" style="height:44px;">Edit</button>' : '')
-            + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger ei-del" data-id="' + i.id + '" style="height:44px;">Delete</button>' : '')
+            + '</div>'
+            + '<div class="row-actions" style="flex-shrink:0;">'
+            + '<button class="btn btn-primary btn-sm ei-back" data-id="' + i.id + '">Back In Stock</button>'
+            + (App.canEdit('sc-86-list') ? '<button class="btn btn-ghost btn-sm ei-edit" data-id="' + i.id + '">Edit</button>' : '')
+            + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
             + '</div></div>';
         }).join('') + '</div>';
     }
@@ -401,7 +408,7 @@ S.Shift86List = {
         + '<button class="btn btn-ghost btn-sm ei-re86" data-id="' + i.id + '">Re-86</button>'
         + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      backCard = '<div class="card"><div class="card-title">Recently Back In Stock</div>'
+      backCard = '<div class="card">'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Item</th><th>Category</th><th>86\'d</th><th>Back</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -416,29 +423,27 @@ S.Shift86List = {
       + '</div></div></div>';
 
     this.container.innerHTML = '<div class="screen">' + this.entryFormHTML() + activeCards + backCard + '</div>' + modal;
+    App.applyCollapsed(this.container);
     this.wireMain();
     this.recomputeCrossRef();
   },
 
   wireMain() {
     this.container.onclick = ev => {
+      if (ev.target.closest('#el-how')) { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#el-export')) { App.exportPDF({ title: '86 List', root: this.container }); return; }
+      if (ev.target.closest('#el-print-blank')) { this.printBlank(); return; }
       const back = ev.target.closest('.ei-back');
       const edit = ev.target.closest('.ei-edit');
       const del = ev.target.closest('.ei-del');
       const re86 = ev.target.closest('.ei-re86');
       if (ev.target.closest('#qa-go')) this.save();
-      else if (ev.target.closest('#qa-cancel')) { this.editId = null; this.customMode = false; this.alsoIds = {}; this.renderMain(); }
       else if (ev.target.closest('#qa-custom-toggle')) { ev.preventDefault(); this.toggleCustom(true); }
       else if (ev.target.closest('#qa-custom-cancel'))  { ev.preventDefault(); this.toggleCustom(false); }
       else if (back) this.markBack(back.dataset.id);
-      else if (edit) {
-        this.editId = edit.dataset.id;
-        this.customMode = false;
-        this.alsoIds = {};
-        this.renderMain();
-        const form = this.container.querySelector('.card');
-        if (form && form.scrollIntoView) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      else if (edit) this.openEditModal(edit.dataset.id);
       else if (re86) this.re86(re86.dataset.id);
       else if (del)  this.confirmDel(del.dataset.id);
     };
@@ -631,6 +636,68 @@ S.Shift86List = {
       await App.removeRecord('sc', 'eighty_six', delId);
       this.renderMain();
     };
+  },
+
+  // Edit a logged 86 in a focused pop-up (just this item's info, no pickers).
+  openEditModal(id) {
+    if (!App.canEdit('sc-86-list')) return;
+    const it = this.items().find(x => x.id === id);
+    if (!it) return;
+    const isCustom = it.source_type === 'custom';
+    const catOpts = this.categories().map(c => '<option' + (it.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    const srcTxt = this.srcText(it.source_type);
+    const itemField = isCustom
+      ? '<div class="f" style="flex:1;min-width:200px;"><label>Item</label><input type="text" id="qe-item" value="' + esc(it.item || '') + '" style="height:44px;"/></div>'
+      : '<div class="f" style="flex:1;min-width:200px;"><label>Item</label><div class="f-display" style="height:44px;display:flex;align-items:center;gap:8px;">' + esc(it.item || '') + (srcTxt || '') + '</div></div>';
+
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit 86 Item</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      + itemField
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Category</label><select id="qe-cat" style="height:44px;">' + catOpts + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date 86\'d</label><input type="date" id="qe-date" value="' + esc(it.date_86 || '') + '" style="height:44px;"/></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Time</label><input type="time" id="qe-time" value="' + esc(it.time_86 || '') + '" style="height:44px;"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reported By</label><select id="qe-by" style="height:44px;">' + App.staffOptions(it.reported_by_id || it.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Reason</label><input type="text" id="qe-reason" value="' + esc(it.reason || '') + '" placeholder="Optional"/></div></div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="qe-notes" rows="2" placeholder="Optional">' + esc(it.notes || '') + '</textarea></div></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="qe-save">Update</button><button class="btn btn-ghost" id="qe-cancel">Cancel</button>'
+      + '<span id="qe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-danger" id="qe-del" style="margin-left:auto;">Delete</button></div></div>';
+
+    App.openModal(html, { id: 'ei-edit-modal', maxWidth: 600, noClose: true });
+    document.getElementById('qe-cancel')?.addEventListener('click', () => App.closeModal('ei-edit-modal'));
+    document.getElementById('qe-save')?.addEventListener('click', () => this.saveEdit(id, isCustom));
+    document.getElementById('qe-del')?.addEventListener('click', () => { App.closeModal('ei-edit-modal'); this.confirmDel(id); });
+  },
+
+  async saveEdit(id, isCustom) {
+    const it = this.items().find(x => x.id === id);
+    if (!it) return;
+    const err = document.getElementById('qe-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date = document.getElementById('qe-date')?.value;
+    if (!date) { fail('Date is required.'); return; }
+    if (isCustom) {
+      const nm = document.getElementById('qe-item')?.value.trim();
+      if (!nm) { fail('Item name is required.'); return; }
+      it.item = nm;
+    }
+    it.category = document.getElementById('qe-cat')?.value || it.category;
+    it.date_86 = date;
+    it.time_86 = document.getElementById('qe-time')?.value || '';
+    const byId = document.getElementById('qe-by')?.value || '';
+    it.reported_by_id = byId;
+    it.reported_by = (App.staffById(byId) || {}).name || '';
+    it.reason = document.getElementById('qe-reason')?.value.trim() || '';
+    it.notes = document.getElementById('qe-notes')?.value.trim() || '';
+
+    const btn = document.getElementById('qe-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'eighty_six', it);
+    if (ok) { App.closeModal('ei-edit-modal'); this.renderMain(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   // Paper-at-bar workflow. Bartenders + managers commonly mark 86s on a
