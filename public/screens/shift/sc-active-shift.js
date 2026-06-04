@@ -229,7 +229,7 @@ S.ShiftActiveShift = {
       + '<span id="asf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (id ? '<button class="btn btn-danger" id="asf-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
-    App.openModal(html, { id: 'as-shift-modal', maxWidth: 760, noClose: true });
+    App.openModal(html, { id: 'as-shift-modal', maxWidth: 880, noClose: true });
     document.getElementById('asf-cancel')?.addEventListener('click', () => { this._shiftFormId = null; App.closeModal('as-shift-modal'); });
     document.getElementById('asf-save')?.addEventListener('click', () => this.saveShiftForm());
     document.getElementById('asf-del')?.addEventListener('click', () => this.confirmDeleteShift(id));
