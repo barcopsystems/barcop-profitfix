@@ -25,12 +25,15 @@ S.ShiftCashHistory = {
   },
 
   draw() {
-    const body = this.tab === 'drops' ? this.bodyDrops()
+    const parts = this.tab === 'drops' ? this.bodyDrops()
       : this.tab === 'safe' ? this.bodySafe()
       : this.bodyVariances();
+    // The tab box wraps only the filters + stats; the data table sits OUTSIDE it
+    // (no rows inside a card), with background space between.
     this.container.innerHTML = '<div class="screen">'
       + App.reportTabBar(this.TABS, this.tab)
-      + App.reportPanel(this.TABS, this.tab, 'ch-export', body)
+      + App.reportPanel(this.TABS, this.tab, 'ch-export', parts.panel)
+      + (parts.table ? '<div style="margin-top:16px;">' + parts.table + '</div>' : '')
       + '</div>';
     this.wire();
   },
@@ -78,7 +81,7 @@ S.ShiftCashHistory = {
   // ── Cash Drops tab ──────────────────────────────────────────────────────────
   bodyDrops() {
     const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return this.emptyTab('No cash drops logged yet.', 'Log a drop on the Cash Board.');
+    if (!all.length) return { panel: this.emptyTab('No cash drops logged yet.', 'Log a drop on the Cash Board.'), table: '' };
     const drawerNames = [...new Set(all.map(d => d.drawer).filter(Boolean))].sort();
     const byNames = [...new Set(all.map(d => d.performed_by).filter(Boolean))].sort();
     const filtered = all.filter(d => {
@@ -103,13 +106,13 @@ S.ShiftCashHistory = {
       + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('sc', 'cash_drop', filtered, false);
-    return this.filterWrap(controls, stats) + table;
+    return { panel: this.filterWrap(controls, stats), table: table };
   },
 
   // ── Safe Log tab ────────────────────────────────────────────────────────────
   bodySafe() {
     const chrono = S.ShiftSafeLog.chrono();
-    if (!chrono.length) return this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.');
+    if (!chrono.length) return { panel: this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.'), table: '' };
     let bal = 0;
     const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
     const lifetime = bal;
@@ -146,13 +149,13 @@ S.ShiftCashHistory = {
       + '<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th><th>Amount</th><th>Balance</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + (shown.length ? App.showOlderBar('sc', 'safe_log', shown, false) : '');
-    return this.filterWrap(controls, stats) + table;
+    return { panel: this.filterWrap(controls, stats), table: table };
   },
 
   // ── Variances tab ───────────────────────────────────────────────────────────
   bodyVariances() {
     const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.');
+    if (!all.length) return { panel: this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.'), table: '' };
     const drawerNames = [...new Set(all.map(v => v.drawer).filter(Boolean))].sort();
     const filtered = all.filter(v => {
       if (this.f.from && (v.date || '') < this.f.from) return false;
@@ -185,6 +188,6 @@ S.ShiftCashHistory = {
       + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('sc', 'variance', filtered, false);
-    return this.filterWrap(controls, stats) + table;
+    return { panel: this.filterWrap(controls, stats), table: table };
   }
 };
