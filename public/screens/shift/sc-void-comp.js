@@ -14,13 +14,12 @@ S.ShiftVoidComp = {
   filterType: '',
   filterServerId: '',
 
+  // Void reasons. Comp reasons live in App.SC_COMP_REASONS (each tagged loss vs
+  // policy expense) so the operator picks ONE thing and Theft Risk, Books, and
+  // Year-End all classify a comp from that single source.
   REASONS: {
-    Void: ['Rung in error', 'Wrong item', 'Customer changed mind', 'Kitchen error', 'Sent back', 'Other'],
-    Comp: ['Service recovery', 'Manager comp', 'Regular / VIP', 'Marketing / promo', 'Other']
+    Void: ['Rung in error', 'Wrong item', 'Customer changed mind', 'Kitchen error', 'Sent back', 'Other']
   },
-  // Loss categories feed Theft Risk; expense categories are tracked as separate
-  // cost lines in Books and Year-End. Default = Customer Comp.
-  CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
 
   records() {
     if (!App.shiftData) App.shiftData = {};
@@ -44,7 +43,7 @@ S.ShiftVoidComp = {
 
   // ── Item picker: menu items + inventory products + custom, one dropdown ─────
   itemOptions(selectedKey) {
-    let h = '<option value="">Select item...</option>'
+    let h = '<option value="">No item</option>'
       + '<option value="custom"' + (selectedKey === 'custom' ? ' selected' : '') + '>Custom / not tracked</option>';
     const menu = this.menuItems();
     if (menu.length) {
@@ -76,12 +75,11 @@ S.ShiftVoidComp = {
     return '';
   },
   reasonOptions(type, selected) {
+    const list = type === 'Comp'
+      ? (App.SC_COMP_REASONS || []).map(x => x.value)
+      : (this.REASONS.Void || []);
     return '<option value="">Select reason...</option>'
-      + (this.REASONS[type] || []).map(r => '<option' + (r === selected ? ' selected' : '') + '>' + r + '</option>').join('');
-  },
-  categoryOptions(selected) {
-    const sel = selected || 'Customer Comp';
-    return this.CATEGORIES.map(c => '<option' + (c === sel ? ' selected' : '') + '>' + c + '</option>').join('');
+      + list.map(r => '<option' + (r === selected ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
   },
 
   render(container, actions) {
@@ -93,15 +91,20 @@ S.ShiftVoidComp = {
   showHowTo() {
     App.showHelpModal('How the Void and Comp Log Works', [
       { p: ['Voids and comps are your exception transactions. Logging every one feeds Theft Risk and the Profit Audit, so the bartender comping a round without a manager shows up as a pattern instead of disappearing.'] },
-      { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away. Pick the item from your menu or inventory, or choose Custom if Bar Cop does not track it.'] },
-      { h: 'Comp category matters', p: ['On a comp, the category separates loss from policy expense. Customer Comp and Service Recovery are loss and feed Theft Risk. Staff Meal and Shift Drink are policy expense, tracked as cost lines in Books and Year-End, not theft. Categorizing honestly keeps the theft score real.'] },
-      { h: 'Linked item and units', p: ['When you pick an inventory product, set the units so the Inventory Variance Report subtracts that known comp from usage and it does not read as shrinkage.'] },
+      { h: 'One record, the dollar amount', p: ['A void or comp is logged by the amount, not item by item. Comp a whole table\'s meal and you log one line for the total. The amount is what matters. The item is optional.'] },
+      { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away.'] },
+      { h: 'The Reason carries the classification', p: ['On a comp, the reason tells Bar Cop whether it is a loss or a policy expense. Service Recovery, Customer Goodwill, Manager Comp, Regular / VIP, and Marketing / Promo are give-aways and feed Theft Risk. Staff Meal and Shift Drink are policy expense, tracked as cost lines in Books and Year-End, not theft. Pick honestly and the theft score stays real.'] },
+      { h: 'Linking a tracked item (Units)', p: ['Most comps need no item. But if you give away a tracked inventory product, a bottle of wine off the shelf, a six-pack, pick it under Item and set how many Units you gave away. The Inventory Variance Report subtracts that known comp from usage so it does not read as shrinkage.'] },
       { h: 'Filter, Export, Worksheet', p: ['Filter by date, type, or server and the totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to tally voids and comps by hand during the rush.'] }
     ]);
   },
 
-  // ── Shared form fields ──────────────────────────────────────────────────────
-  formFields(r) {
+  // ── Shared form fields (inline log form p='vc-', edit pop-up p='vce-') ──────
+  // Amount-driven: a comp is ONE record (a whole comped meal is one line, not one
+  // per item). Item is optional; Units shows only when a tracked inventory product
+  // is linked, right beside the Item picker, so nothing lands alone on a row.
+  formFields(r, p) {
+    p = p || 'vc-';
     const v = val => (val != null && val !== '') ? val : '';
     const type = (r && r.type) || 'Void';
     const typeOpts = ['Void', 'Comp'].map(t => '<option' + (type === t ? ' selected' : '') + '>' + t + '</option>').join('');
@@ -111,37 +114,44 @@ S.ShiftVoidComp = {
     const isProduct = itemKey.startsWith('p:');
 
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="vc-date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Type</label><select id="vc-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label><select id="vc-shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vc-amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
-      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Item</label><select id="vc-item-sel">' + this.itemOptions(itemKey) + '</select></div>'
-      + '<div class="f" id="vc-custom-wrap" style="width:220px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="vc-custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
-      + '<div class="f" id="vc-units-wrap" style="width:120px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="vc-units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label><select id="' + p + 'shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="vc-server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Authorized By</label><select id="vc-auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Check #</label><input type="text" id="vc-check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" id="vc-cat-wrap" style="width:190px;flex-shrink:0;' + (type === 'Void' ? 'display:none;' : '') + '"><label>Category</label><select id="vc-cat">' + this.categoryOptions(r?.category) + '</select></div>'
-      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reason</label><select id="vc-reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By</label><select id="' + p + 'auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
       + '</div>'
 
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vc-notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+
+      // Item optional. Units (tracked product) or Custom Name (custom) sit inline
+      // to its right, so neither ever lands alone on its own row.
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="flex:1;min-width:240px;"><label>Item <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="' + p + 'item-sel">' + this.itemOptions(itemKey) + '</select></div>'
+      + '<div class="f" id="' + p + 'units-wrap" style="width:120px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="' + p + 'units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
+      + '<div class="f" id="' + p + 'custom-wrap" style="flex:1;min-width:200px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="' + p + 'custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + 'notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
   },
 
-  // type + item change handlers (wired by both the inline form and the edit page)
-  wireFormFields() {
-    document.getElementById('vc-type')?.addEventListener('change', e => {
-      const t = e.target.value;
-      const sel = document.getElementById('vc-reason'); if (sel) sel.innerHTML = this.reasonOptions(t, '');
-      const catWrap = document.getElementById('vc-cat-wrap'); if (catWrap) catWrap.style.display = t === 'Void' ? 'none' : '';
+  // Type + item change handlers. p = id prefix ('vc-' inline form, 'vce-' modal).
+  wireFormFields(p) {
+    p = p || 'vc-';
+    document.getElementById(p + 'type')?.addEventListener('change', e => {
+      const sel = document.getElementById(p + 'reason');
+      if (sel) sel.innerHTML = this.reasonOptions(e.target.value, '');
     });
-    document.getElementById('vc-item-sel')?.addEventListener('change', e => {
+    document.getElementById(p + 'item-sel')?.addEventListener('change', e => {
       const k = e.target.value;
-      const cw = document.getElementById('vc-custom-wrap'); if (cw) cw.style.display = k === 'custom' ? '' : 'none';
-      const uw = document.getElementById('vc-units-wrap'); if (uw) uw.style.display = k.startsWith('p:') ? '' : 'none';
+      const uw = document.getElementById(p + 'units-wrap'); if (uw) uw.style.display = k.startsWith('p:') ? '' : 'none';
+      const cw = document.getElementById(p + 'custom-wrap'); if (cw) cw.style.display = k === 'custom' ? '' : 'none';
     });
   },
 
@@ -187,7 +197,7 @@ S.ShiftVoidComp = {
     const formCard = '<div class="card">'
       + App.collapsibleCardTitle('sc-void-comp', 'Log Void / Comp', App.helpButton('vc-how'))
       + '<div class="collapse-body">'
-      + this.formFields(null)
+      + this.formFields(null, 'vc-')
       + '<div class="card-actions"><button class="btn btn-primary" id="vc-save">Save</button>'
       + '<span id="vc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div></div>';
@@ -234,7 +244,7 @@ S.ShiftVoidComp = {
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
     App.applyCollapsed(this.container);
     this.wireList();
-    this.wireFormFields();
+    this.wireFormFields('vc-');
   },
 
   wireList() {
@@ -263,115 +273,58 @@ S.ShiftVoidComp = {
     });
   },
 
-  // ── Edit in a focused pop-up (matches the 86 List edit pattern) ─────────────
-  // Same fields as the log form, but the conditional cells (Custom Name, Units,
-  // Category) sit in fixed slots so the form keeps the same shape whether they
-  // show or hide, and the pop-up reads identical to the landing form.
-  editFields(r) {
-    const v = val => (val != null && val !== '') ? val : '';
-    const type = (r && r.type) || 'Void';
-    const typeOpts = ['Void', 'Comp'].map(t => '<option' + (type === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const shiftOpts = this.shiftTypes().map(t => '<option' + (r && r.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const itemKey = this.itemKeyOf(r);
-    const isCustom = itemKey === 'custom';
-    const isProduct = itemKey.startsWith('p:');
-    const showCond = isCustom || isProduct;
-
-    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="vce-date" value="' + esc(r?.date || '') + '"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Type</label><select id="vce-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label><select id="vce-shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vce-amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Item</label><select id="vce-item-sel">' + this.itemOptions(itemKey) + '</select></div></div>'
-
-      // Conditional row: Custom Name OR Units. Fixed slot, hidden when neither applies.
-      + '<div class="form-row" id="vce-cond-row" style="gap:12px;flex-wrap:wrap;' + (showCond ? '' : 'display:none;') + '">'
-      + '<div class="f" id="vce-custom-wrap" style="flex:1;min-width:240px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="vce-custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
-      + '<div class="f" id="vce-units-wrap" style="width:140px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="vce-units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:180px;"><label>Server</label><select id="vce-server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:180px;"><label>Authorized By</label><select id="vce-auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Check #</label><input type="text" id="vce-check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" id="vce-cat-wrap" style="width:190px;flex-shrink:0;' + (type === 'Void' ? 'display:none;' : '') + '"><label>Category</label><select id="vce-cat">' + this.categoryOptions(r?.category) + '</select></div>'
-      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reason</label><select id="vce-reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vce-notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
-  },
-
+  // ── Edit in a focused pop-up (same unified form as the landing) ─────────────
   openEditModal(id) {
     if (!App.canEdit('sc-void-comp')) return;
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
     const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Void / Comp</div>'
-      + this.editFields(r)
+      + this.formFields(r, 'vce-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vce-save">Update</button>'
       + '<button class="btn btn-ghost" id="vce-cancel">Cancel</button>'
       + '<span id="vce-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="vce-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 620, noClose: true });
-    this.wireEditFields();
+    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 700, noClose: true });
+    this.wireFormFields('vce-');
     document.getElementById('vce-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); });
     document.getElementById('vce-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('vce-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); this.confirmDel(id); });
   },
 
-  // Conditional-field wiring for the edit pop-up (own vce- ids).
-  wireEditFields() {
-    document.getElementById('vce-type')?.addEventListener('change', e => {
-      const t = e.target.value;
-      const sel = document.getElementById('vce-reason'); if (sel) sel.innerHTML = this.reasonOptions(t, '');
-      const catWrap = document.getElementById('vce-cat-wrap'); if (catWrap) catWrap.style.display = t === 'Void' ? 'none' : '';
-    });
-    document.getElementById('vce-item-sel')?.addEventListener('change', e => {
-      const k = e.target.value;
-      const isCustom = k === 'custom', isProduct = k.startsWith('p:');
-      const cw = document.getElementById('vce-custom-wrap'); if (cw) cw.style.display = isCustom ? '' : 'none';
-      const uw = document.getElementById('vce-units-wrap'); if (uw) uw.style.display = isProduct ? '' : 'none';
-      const row = document.getElementById('vce-cond-row'); if (row) row.style.display = (isCustom || isProduct) ? '' : 'none';
-    });
-  },
-
-  async saveEdit(id) {
-    const err = document.getElementById('vce-err');
+  // Collect the form (prefix p) into a record body, or null after an error.
+  // One place so the log form and the edit pop-up never drift apart.
+  async _collect(p) {
+    const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('vce-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
-    const amount = parseFloat(document.getElementById('vce-amount')?.value);
-    if (isNaN(amount) || amount < 0) { fail('Enter the amount.'); return; }
+    const date = document.getElementById(p + 'date')?.value;
+    if (!date) { fail('Date is required.'); return null; }
+    const amount = parseFloat(document.getElementById(p + 'amount')?.value);
+    if (isNaN(amount) || amount < 0) { fail('Enter the amount.'); return null; }
 
-    // Resolve the item from the single picker.
-    const itemKey = document.getElementById('vce-item-sel')?.value || '';
+    // Item is optional. Resolve from the single picker; blank = a whole-check
+    // comp or an untracked void.
+    const itemKey = document.getElementById(p + 'item-sel')?.value || '';
     let item = '', productId = '', productName = '', menuItemId = '', units = null;
     if (itemKey === 'custom') {
-      item = (document.getElementById('vce-custom')?.value || '').trim();
-      if (!item) { fail('Enter the custom item name.'); return; }
+      item = (document.getElementById(p + 'custom')?.value || '').trim();
+      if (!item) { fail('Name the custom item, or set Item to No item.'); return null; }
     } else if (itemKey.startsWith('m:')) {
       const m = this.menuItemById(itemKey.slice(2));
-      if (!m) { fail('Pick an item.'); return; }
+      if (!m) { fail('Pick an item or set Item to No item.'); return null; }
       item = m.name; menuItemId = m.id;
     } else if (itemKey.startsWith('p:')) {
-      const p = this.productById(itemKey.slice(2));
-      if (!p) { fail('Pick an item.'); return; }
-      item = p.name; productId = p.id; productName = p.name;
-      const u = parseFloat(document.getElementById('vce-units')?.value);
+      const pr = this.productById(itemKey.slice(2));
+      if (!pr) { fail('Pick an item or set Item to No item.'); return null; }
+      item = pr.name; productId = pr.id; productName = pr.name;
+      const u = parseFloat(document.getElementById(p + 'units')?.value);
       units = isNaN(u) ? null : u;
-    } else {
-      fail('Pick an item or choose Custom.'); return;
     }
 
-    const type = document.getElementById('vce-type')?.value || 'Void';
-    const authBy = document.getElementById('vce-auth')?.value || '';
+    const type = document.getElementById(p + 'type')?.value || 'Void';
+    const authBy = document.getElementById(p + 'auth')?.value || '';
 
     // Comp authorization threshold check.
     const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
@@ -384,17 +337,15 @@ S.ShiftVoidComp = {
         confirmText: 'Continue Without Auth',
         cancelText: 'Cancel'
       });
-      if (!ok) return;
+      if (!ok) return null;
       authThresholdOverride = true;
     }
 
-    const category = type === 'Comp' ? (document.getElementById('vce-cat')?.value || 'Customer Comp') : '';
-    const serverId = document.getElementById('vce-server')?.value || '';
-    const patch = {
+    const serverId = document.getElementById(p + 'server')?.value || '';
+    return {
       date,
       type,
-      category,
-      shift_type:    document.getElementById('vce-shift')?.value || '',
+      shift_type:    document.getElementById(p + 'shift')?.value || '',
       item,
       amount,
       product_id:    productId,
@@ -405,110 +356,42 @@ S.ShiftVoidComp = {
       server:           (App.staffById(serverId) || {}).name || '',
       authorized_by_id: authBy,
       authorized_by:    (App.staffById(authBy) || {}).name || '',
-      check_number:  document.getElementById('vce-check')?.value.trim() || '',
-      reason:        document.getElementById('vce-reason')?.value || '',
-      notes:         document.getElementById('vce-notes')?.value.trim() || '',
+      check_number:  document.getElementById(p + 'check')?.value.trim() || '',
+      reason:        document.getElementById(p + 'reason')?.value || '',
+      notes:         document.getElementById(p + 'notes')?.value.trim() || '',
       auth_threshold_override: authThresholdOverride
     };
+  },
 
+  async save() {
+    const body = await this._collect('vc-');
+    if (!body) return;
+    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
+    const list = this.records();
+    list.push(rec);
+    const btn = document.getElementById('vc-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'void_comp', rec);
+    if (ok) this.renderList();
+    else {
+      const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
+      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+      const err = document.getElementById('vc-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+    }
+  },
+
+  async saveEdit(id) {
+    const body = await this._collect('vce-');
+    if (!body) return;
     const list = this.records();
     const i = list.findIndex(x => x.id === id);
-    if (i < 0) { fail('Record not found.'); return; }
-    list[i] = { ...list[i], ...patch };
-
+    if (i < 0) { const err = document.getElementById('vce-err'); if (err) { err.textContent = 'Record not found.'; err.style.display = 'inline'; } return; }
+    list[i] = { ...list[i], ...body };
     const btn = document.getElementById('vce-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'void_comp', list[i]);
     if (ok) { this.editId = null; App.closeModal('vc-edit-modal'); this.renderList(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
-  },
-
-  async save() {
-    const err = document.getElementById('vc-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('vc-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
-    const amount = parseFloat(document.getElementById('vc-amount')?.value);
-    if (isNaN(amount) || amount < 0) { fail('Enter the amount.'); return; }
-
-    // Resolve the item from the single picker.
-    const itemKey = document.getElementById('vc-item-sel')?.value || '';
-    let item = '', productId = '', productName = '', menuItemId = '', units = null;
-    if (itemKey === 'custom') {
-      item = (document.getElementById('vc-custom')?.value || '').trim();
-      if (!item) { fail('Enter the custom item name.'); return; }
-    } else if (itemKey.startsWith('m:')) {
-      const m = this.menuItemById(itemKey.slice(2));
-      if (!m) { fail('Pick an item.'); return; }
-      item = m.name; menuItemId = m.id;
-    } else if (itemKey.startsWith('p:')) {
-      const p = this.productById(itemKey.slice(2));
-      if (!p) { fail('Pick an item.'); return; }
-      item = p.name; productId = p.id; productName = p.name;
-      const u = parseFloat(document.getElementById('vc-units')?.value);
-      units = isNaN(u) ? null : u;
-    } else {
-      fail('Pick an item or choose Custom.'); return;
-    }
-
-    const type = document.getElementById('vc-type')?.value || 'Void';
-    const authBy = document.getElementById('vc-auth')?.value || '';
-
-    // Comp authorization threshold check.
-    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
-    const thresholdActive = !isNaN(threshold) && threshold > 0;
-    let authThresholdOverride = false;
-    if (type === 'Comp' && thresholdActive && amount > threshold && !authBy) {
-      const ok = await App.confirm({
-        title: 'Comp over your $' + threshold + ' threshold',
-        message: 'No manager is set in Authorized By. Continue without manager authorization? The comp will be flagged in Theft Risk as an unauthorized large comp.',
-        confirmText: 'Continue Without Auth',
-        cancelText: 'Cancel'
-      });
-      if (!ok) return;
-      authThresholdOverride = true;
-    }
-
-    const category = type === 'Comp' ? (document.getElementById('vc-cat')?.value || 'Customer Comp') : '';
-    const serverId = document.getElementById('vc-server')?.value || '';
-    const rec = {
-      id:            this.editId || App.uid(),
-      date,
-      type,
-      category,
-      shift_type:    document.getElementById('vc-shift')?.value || '',
-      item,
-      amount,
-      product_id:    productId,
-      product_name:  productName,
-      menu_item_id:  menuItemId,
-      units,
-      staff_id:         serverId,
-      server:           (App.staffById(serverId) || {}).name || '',
-      authorized_by_id: authBy,
-      authorized_by:    (App.staffById(authBy) || {}).name || '',
-      check_number:  document.getElementById('vc-check')?.value.trim() || '',
-      reason:        document.getElementById('vc-reason')?.value || '',
-      notes:         document.getElementById('vc-notes')?.value.trim() || '',
-      auth_threshold_override: authThresholdOverride
-    };
-    if (!this.editId) rec.created_at = new Date().toISOString();
-
-    const list = this.records();
-    let saved = rec;
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
-    } else {
-      list.push(rec);
-    }
-
-    const btn = document.getElementById('vc-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'void_comp', saved);
-    this.editId = null;
-    if (ok) this.renderList();
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } fail('Save failed. Try again.'); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } const err = document.getElementById('vce-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
   async confirmDel(id) {
