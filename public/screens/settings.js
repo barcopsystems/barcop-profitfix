@@ -2076,28 +2076,70 @@ S.HubSettings = {
     // (assumed pre-pour, not subtracted from variance). staff_id gets patched
     // in after lcStaff is built (below).
     const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Devin R.', 'Carlos P.'];
-    const compProductNames = ['Tito\'s Handmade Vodka', 'House Cabernet', "Hendrick's Gin", 'Bulleit Bourbon'];
     const findProdId = (name) => (icProducts.find(p => p.name === name) || {}).id || '';
+    const findMenuId = (name) => (((App.data && App.data.menu_items) || []).find(m => m.name === name) || {}).id || '';
+    const vcShifts = ['Dinner', 'Late Night', 'Dinner', 'Lunch', 'Brunch', 'Dinner'];
+    // Voids = a sale reversed (error). Comps = a sale given away, carrying a
+    // category that splits loss (Customer Comp / Service Recovery) from policy
+    // expense (Staff Meal / Shift Drink). Some comps link to a tracked product so
+    // the Variance Report subtracts the known pour. The mix and the unauthorized
+    // rate ease off after the fix week, matching the audit arc.
+    const VOID_SC = [
+      { kind:'menu',   name:'Anchor Burger',           reason:'Wrong item',            amount:18 },
+      { kind:'menu',   name:'House Margarita',         reason:'Customer changed mind', amount:14 },
+      { kind:'menu',   name:'Fish and Chips',          reason:'Kitchen error',         amount:21 },
+      { kind:'custom', name:'Draft pour, over-poured', reason:'Rung in error',         amount:8  },
+      { kind:'menu',   name:'Steak Frites',            reason:'Sent back',             amount:34 },
+      { kind:'menu',   name:'Old Fashioned',           reason:'Rung in error',         amount:16 },
+      { kind:'menu',   name:'Pan-Seared Salmon',       reason:'Sent back',             amount:29 },
+      { kind:'menu',   name:'Whiskey Sour',            reason:'Wrong item',            amount:15 }
+    ];
+    const COMP_SC = [
+      { kind:'product', name:'House Cabernet',               reason:'Regular / VIP',    category:'Customer Comp',    units:1, amount:13 },
+      { kind:'menu',    name:'Old Fashioned',                reason:'Service recovery', category:'Service Recovery', amount:16 },
+      { kind:'product', name:'Modelo',                       reason:'Manager comp',     category:'Shift Drink',      units:1, amount:6  },
+      { kind:'menu',    name:'Anchor Burger',                reason:'Service recovery', category:'Service Recovery', amount:18 },
+      { kind:'custom',  name:'Staff meal, Brisket Sandwich', reason:'Manager comp',     category:'Staff Meal',       amount:14 },
+      { kind:'product', name:"Tito's Handmade Vodka",        reason:'Service recovery', category:'Service Recovery', units:1, amount:12 },
+      { kind:'menu',    name:'Pan-Seared Salmon',            reason:'Regular / VIP',    category:'Customer Comp',    amount:29 },
+      { kind:'custom',  name:'Shift drink, Lone Star',       reason:'Manager comp',     category:'Shift Drink',      amount:5  }
+    ];
+    const VC_THRESHOLD = 25;
     const scVoidComps = [];
+    let vcVi = 0, vcCi = 0;
     ANCHS.weeks.forEach(a => {
       const baseAgo = (12 - a.wk) * 7;
       const improving = a.wk >= ANCHS.fix_week;
-      const n = improving ? 2 : 4;
-      for (let k = 0; k < n; k++) {
-        const isComp = k % 2 === 1;
-        const compProdName = isComp ? compProductNames[(a.wk + k) % compProductNames.length] : '';
+      const voidN = improving ? 1 : 3;
+      const compN = improving ? 1 : 2;
+      let vcDay = 1;
+      for (let j = 0; j < voidN; j++) {
+        const s = VOID_SC[vcVi % VOID_SC.length]; vcVi++;
         scVoidComps.push({
-          id:uid(), date:dateStr(baseAgo + (k + 1)), type:isComp ? 'Comp' : 'Void',
-          shift_type:'Dinner', item:isComp ? compProdName + ' (guest recovery)' : 'Wrong item rung',
-          amount:isComp ? 8 + Math.round(Math.random() * 22) : 6 + Math.round(Math.random() * 16),
-          product_id:isComp ? findProdId(compProdName) : '',
-          product_name:isComp ? compProdName : '',
-          units:isComp ? 1 : null,
-          server:vcServers[(a.wk + k) % 5],
-          staff_id:'',  // patched below after lcStaff is built
-          authorized_by:improving ? mgrs[(a.wk + k) % 3] : (k === 0 ? '' : mgrs[k % 3]),
-          check_number:'', reason:isComp ? 'Service recovery' : 'Order error',
-          notes:'', created_at:new Date().toISOString()
+          id:uid(), date:dateStr(baseAgo + vcDay++), type:'Void', shift_type:vcShifts[(a.wk + j) % vcShifts.length],
+          item:s.name, menu_item_id:(s.kind === 'menu' ? findMenuId(s.name) : ''),
+          product_id:'', product_name:'', units:null, amount:s.amount,
+          server:vcServers[(a.wk + j) % vcServers.length], staff_id:'',
+          authorized_by:improving ? mgrs[(a.wk + j) % 3] : (j === 0 ? '' : mgrs[j % 3]),
+          check_number:'', category:'', reason:s.reason, notes:'', auth_threshold_override:false,
+          created_at:new Date().toISOString()
+        });
+      }
+      for (let j = 0; j < compN; j++) {
+        const s = COMP_SC[vcCi % COMP_SC.length]; vcCi++;
+        // Pre-fix, comps concentrate on one server, which feeds the Theft Risk pattern.
+        const server = (!improving && j === 0) ? 'Brianna K.' : vcServers[(a.wk + j + 2) % vcServers.length];
+        const pid = s.kind === 'product' ? findProdId(s.name) : '';
+        const noAuth = !improving && ((a.wk + j) % 2 === 0);
+        scVoidComps.push({
+          id:uid(), date:dateStr(baseAgo + vcDay++), type:'Comp', shift_type:vcShifts[(a.wk + j + 1) % vcShifts.length],
+          item:s.name, menu_item_id:(s.kind === 'menu' ? findMenuId(s.name) : ''),
+          product_id:pid, product_name:(pid ? s.name : ''), units:(pid ? (s.units || 1) : null),
+          amount:s.amount, server:server, staff_id:'',
+          authorized_by:noAuth ? '' : mgrs[(a.wk + j) % 3],
+          check_number:'', category:s.category, reason:s.reason, notes:'',
+          auth_threshold_override:(noAuth && s.amount > VC_THRESHOLD),
+          created_at:new Date().toISOString()
         });
       }
     });
@@ -2519,26 +2561,39 @@ S.HubSettings = {
       return bc != null ? units * bc : 0;
     };
     const wByCat = cat => icProducts.filter(p => p.category === cat);
-    const wFood = wByCat('Food'), wLiquor = wByCat('Liquor'), wDraft = wByCat('Draft Beer');
     const wPick = (arr, i) => (arr.length ? arr[i % arr.length] : null);
+    // Realistic waste: varied reasons (from the form's list), products, people,
+    // shifts, and days across the quarter instead of the same three every week.
+    // Units feed wasteCostOf() so the Total Cost stays honest.
+    const WASTE_SC = [
+      { cat:'Food',        reason:'Expired / Past Date',              units:2,  who:'Luis V.',   shift:'Lunch',      day:3 },
+      { cat:'Liquor',      reason:'Broken',                           units:1,  who:'Maria G.',  shift:'Dinner',     day:5 },
+      { cat:'Draft Beer',  reason:'Spill',                            units:32, who:'Jake T.',   shift:'Late Night', day:4 },
+      { cat:'Food',        reason:'Dumped / Tasted Bad',              units:1,  who:'Renee K.',  shift:'Dinner',     day:6 },
+      { cat:'Wine',        reason:'Bad Pour / Customer Dissatisfied', units:1,  who:'Devin R.',  shift:'Dinner',     day:2 },
+      { cat:'Food',        reason:'Expired / Past Date',              units:3,  who:'Luis V.',   shift:'Brunch',     day:1 },
+      { cat:'Liquor',      reason:'Bad Pour / Customer Dissatisfied', units:1,  who:'Brianna K.',shift:'Late Night', day:5 },
+      { cat:'Draft Beer',  reason:'Training',                         units:16, who:'Marcus T.', shift:'Lunch',      day:3 },
+      { cat:'Bottle Beer', reason:'Broken',                           units:1,  who:'Maria G.',  shift:'Dinner',     day:4 },
+      { cat:'Food',        reason:'Dumped / Tasted Bad',              units:1,  who:'Luis V.',   shift:'Dinner',     day:5 }
+    ];
     const scWaste = [];
+    let wsI = 0;
     ANCHS.weeks.forEach(a => {
       const baseAgo = (12 - a.wk) * 7;
-      const slots = [
-        { p:wPick(wFood, a.wk),   units:1 + (a.wk % 3), reason:'Dumped / Tasted Bad', day:2, who:'Luis V.',  shift:'Dinner' },
-        { p:wPick(wLiquor, a.wk), units:1,              reason:'Broken',             day:5, who:'Maria G.', shift:'Dinner' },
-        { p:wPick(wDraft, a.wk),  units:12,             reason:'Spill',              day:4, who:'Jake T.',  shift:'Late Night' },
-      ];
-      slots.forEach(s => {
-        if (!s.p) return;
+      const count = (a.wk % 2 === 0) ? 2 : 3;
+      for (let j = 0; j < count; j++) {
+        const s = WASTE_SC[wsI % WASTE_SC.length]; wsI++;
+        const p = wPick(wByCat(s.cat), a.wk + j);
+        if (!p) continue;
         scWaste.push({
-          id:uid(), date:dateStr(baseAgo + s.day), shift_type:s.shift,
-          product_id:s.p.id, product_name:s.p.name, product_category:s.p.category,
-          unit:wasteUnitOf(s.p), units:s.units, cost:+wasteCostOf(s.p, s.units).toFixed(2),
+          id:uid(), date:dateStr(baseAgo + s.day + (j % 2)), shift_type:s.shift,
+          product_id:p.id, product_name:p.name, product_category:p.category,
+          unit:wasteUnitOf(p), units:s.units, cost:+wasteCostOf(p, s.units).toFixed(2),
           reason:s.reason, recorded_by_id:staffIdByName(s.who), recorded_by:s.who, notes:'',
           created_at:new Date().toISOString()
         });
-      });
+      }
     });
     App.shiftData.sc_waste = scWaste;
 
