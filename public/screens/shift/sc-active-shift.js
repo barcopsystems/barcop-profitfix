@@ -229,7 +229,7 @@ S.ShiftActiveShift = {
       + '<span id="asf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (id ? '<button class="btn btn-danger" id="asf-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
-    App.openModal(html, { id: 'as-shift-modal', maxWidth: 880, noClose: true });
+    App.openModal(html, { id: 'as-shift-modal', maxWidth: 760, noClose: true });
     document.getElementById('asf-cancel')?.addEventListener('click', () => { this._shiftFormId = null; App.closeModal('as-shift-modal'); });
     document.getElementById('asf-save')?.addEventListener('click', () => this.saveShiftForm());
     document.getElementById('asf-del')?.addEventListener('click', () => this.confirmDeleteShift(id));
@@ -244,13 +244,15 @@ S.ShiftActiveShift = {
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + '<div class="f" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="asf-date" value="' + esc(s?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:130px;"><label>Shift Type</label><select id="asf-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Manager on Duty</label><select id="asf-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-bar" step="0.01" value="' + v(s?.bar_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Floor Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-floor" step="0.01" value="' + v(s?.floor_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Manager on Duty</label><select id="asf-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Covers</label><input type="number" id="asf-covers" min="0" value="' + v(s?.covers) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Walkouts</label><input type="number" id="asf-walkouts" min="0" value="' + v(s?.walkouts) + '" placeholder="0"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Opening Bank</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-bank" step="0.01" value="' + v(s?.opening_bank != null ? s.opening_bank : defaultBank) + '"/></div></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Staff on Floor</label><input type="number" id="asf-staff" min="0" value="' + v(s?.staff_on_floor) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Status</label><select id="asf-status"><option' + (s && s.status === 'Open' ? ' selected' : '') + '>Open</option><option' + (!s || s.status !== 'Open' ? ' selected' : '') + '>Closed</option></select></div>'
