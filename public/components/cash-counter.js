@@ -52,7 +52,8 @@ window.CashCounter = {
       + this._stepBtn(-1, dn.key)
       + '<input type="number" class="ccd-cnt" id="' + p + '-' + dn.key + '" data-key="' + dn.key + '" data-val="' + dn.val + '" '
       + 'min="0" step="1" inputmode="numeric" value="' + v(vals[dn.key]) + '" '
-      + 'style="width:62px;flex-shrink:0;height:44px;text-align:center;font-size:16px;"/>'
+      + 'style="width:62px;flex-shrink:0;height:44px;text-align:center;font-size:16px;'
+      + 'background:var(--input);border:1px solid var(--b1);border-radius:6px;color:var(--w);"/>'
       + this._stepBtn(1, dn.key)
       + '<div class="ccd-sub" data-key="' + dn.key + '" style="flex:1;text-align:right;font-size:14px;color:var(--t2);min-width:0;">$0</div>'
       + '</div>';
@@ -62,7 +63,8 @@ window.CashCounter = {
       + '<div style="width:52px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">Coins</div>'
       + '<div class="fw" style="flex:1;"><span class="pre">$</span>'
       + '<input class="pre ccd-coins" id="' + p + '-coins" type="number" min="0" step="0.01" inputmode="decimal" '
-      + 'value="' + v(vals.coins) + '" style="height:44px;font-size:16px;"/></div>'
+      + 'value="' + v(vals.coins) + '" style="height:44px;font-size:16px;'
+      + 'background:var(--input);border:1px solid var(--b1);border-radius:6px;color:var(--w);"/></div>'
       + '</div>';
 
     return '<div class="cash-counter" data-prefix="' + p + '">'
