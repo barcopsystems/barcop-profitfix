@@ -500,17 +500,9 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4h12v9h-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="2.2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5h0.7M11.3 8.5H12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Cash Control</span>
       </div>
-      <div class="nav-item" data-screen="sc-cash-drop" id="nav-sc-cash-drop">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="6" width="13" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.2" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 1.5v3.5M6.8 3.3l1.7 1.7 1.7-1.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Cash Drop History</span>
-      </div>
-      <div class="nav-item" data-screen="sc-safe-log" id="nav-sc-safe-log">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 8.5V6M11.5 8.5H14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Safe Log History</span>
-      </div>
-      <div class="nav-item" data-screen="sc-variance-log" id="nav-sc-variance-log">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L15.5 14.5H1.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v3.4M8.5 12v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Variance History</span>
+      <div class="nav-item" data-screen="sc-cash-history" id="nav-sc-cash-history">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h10v12l-2-1.2-2 1.2-2-1.2-2 1.2v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 6h5M6 9h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Cash History</span>
       </div>
       <div class="nav-section">Operations</div>
       <div class="nav-item" data-screen="sc-86-list" id="nav-sc-86-list">
