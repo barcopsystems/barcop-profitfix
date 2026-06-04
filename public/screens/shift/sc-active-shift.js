@@ -621,7 +621,7 @@ S.ShiftActiveShift = {
 
       + '<div class="card"><div class="card-title">Log During This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + action('sc-cash-control', 'Cash')
+      + '<button class="btn btn-ghost" id="ld-cash" style="height:52px;flex:1;min-width:120px;">Cash Drop</button>'
       + action('sc-void-comp', 'Void / Comp')
       + action('sc-waste', 'Waste / Spill')
       + action('sc-86-list', '86 an Item')
@@ -637,6 +637,7 @@ S.ShiftActiveShift = {
       + '</div></div></div>';
 
     this.container.onclick = ev => {
+      if (ev.target.closest('#ld-cash')) { S.ShiftCashControl.openDrop(null, '', () => this.renderActive(s)); return; }
       const go = ev.target.closest('.as-go');
       if (go) App.navigate(go.dataset.go);
       else if (ev.target.closest('#as-how')) this.showHowToActive();
@@ -652,7 +653,7 @@ S.ShiftActiveShift = {
       { p: ['This is your command center while the shift is live. Everything you log during service lands on the shift and rolls into the close.'] },
       { h: 'Registers', p: ['The registers you opened sit up top with their bank and what has been dropped from each so far.'] },
       { h: 'This Shift', p: ['Live counts as the night runs: cover goal, labor so far, cash drops, voids and comps, 86\'d items, and open maintenance. The Cover Goal comes from the covers you set per day in Revenue Recovery, Revenue Forecast. Set it there and it shows here.'] },
-      { h: 'Log During This Shift', p: ['Tap any of these to log it the moment it happens: a cash drop, a void or comp, waste or a spill, an 86, a safe move, or a maintenance issue. Each feeds its own log and the shift exceptions.'] },
+      { h: 'Log During This Shift', p: ['Tap any of these to log it the moment it happens: a cash drop, a void or comp, waste or a spill, an 86, or a maintenance issue. Cash Drop opens right here so you never leave the shift. Each feeds its own log and the shift exceptions.'] },
       { h: 'Shift Notes', p: ['Drop timestamped notes through the night for the closer or the next manager. They flow into the Handoff Report at close.'] },
       { h: 'Ending the Shift', p: ['End Shift runs the close wizard: revenue and covers, cash count per register, exceptions, tips, and handoff notes. Cancel Shift discards the shift without saving if you opened it by mistake.'] }
     ]);
