@@ -250,8 +250,8 @@ S.ShiftVoidComp = {
       const del  = ev.target.closest('.vc-del');
       const row  = ev.target.closest('.vc-row');
       if (del)  { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
-      if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); return; }
-      if (row && App.canEdit('sc-void-comp')) this.showForm(row.dataset.id);
+      if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
+      if (row && App.canEdit('sc-void-comp')) this.openEditModal(row.dataset.id);
     };
     document.getElementById('vc-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('vc-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
@@ -263,23 +263,164 @@ S.ShiftVoidComp = {
     });
   },
 
-  // Edit on its own page (same fields, no How it works). Cancel returns to the list.
-  showForm(id) {
-    if (id && !App.canEdit('sc-void-comp')) return;
-    this.editId = id || null;
-    const r = id ? this.records().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit Void / Comp' : 'Log Void / Comp') + '</div>'
-      + this.formFields(r)
+  // ── Edit in a focused pop-up (matches the 86 List edit pattern) ─────────────
+  // Same fields as the log form, but the conditional cells (Custom Name, Units,
+  // Category) sit in fixed slots so the form keeps the same shape whether they
+  // show or hide, and the pop-up reads identical to the landing form.
+  editFields(r) {
+    const v = val => (val != null && val !== '') ? val : '';
+    const type = (r && r.type) || 'Void';
+    const typeOpts = ['Void', 'Comp'].map(t => '<option' + (type === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    const shiftOpts = this.shiftTypes().map(t => '<option' + (r && r.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    const itemKey = this.itemKeyOf(r);
+    const isCustom = itemKey === 'custom';
+    const isProduct = itemKey.startsWith('p:');
+    const showCond = isCustom || isProduct;
+
+    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="vce-date" value="' + esc(r?.date || '') + '"/></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Type</label><select id="vce-type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label><select id="vce-shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vce-amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Item</label><select id="vce-item-sel">' + this.itemOptions(itemKey) + '</select></div></div>'
+
+      // Conditional row: Custom Name OR Units. Fixed slot, hidden when neither applies.
+      + '<div class="form-row" id="vce-cond-row" style="gap:12px;flex-wrap:wrap;' + (showCond ? '' : 'display:none;') + '">'
+      + '<div class="f" id="vce-custom-wrap" style="flex:1;min-width:240px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="vce-custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
+      + '<div class="f" id="vce-units-wrap" style="width:140px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="vce-units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="flex:1;min-width:180px;"><label>Server</label><select id="vce-server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:180px;"><label>Authorized By</label><select id="vce-auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Check #</label><input type="text" id="vce-check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" id="vce-cat-wrap" style="width:190px;flex-shrink:0;' + (type === 'Void' ? 'display:none;' : '') + '"><label>Category</label><select id="vce-cat">' + this.categoryOptions(r?.category) + '</select></div>'
+      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reason</label><select id="vce-reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vce-notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+  },
+
+  openEditModal(id) {
+    if (!App.canEdit('sc-void-comp')) return;
+    const r = this.records().find(x => x.id === id);
+    if (!r) return;
+    this.editId = id;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Void / Comp</div>'
+      + this.editFields(r)
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="vc-save">' + (id ? 'Update' : 'Save') + '</button>'
-      + '<button class="btn btn-ghost" id="vc-cancel">Cancel</button>'
-      + '<span id="vc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-    this.container.onclick = null;
-    document.getElementById('vc-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('vc-save')?.addEventListener('click', () => this.save());
-    this.wireFormFields();
+      + '<button class="btn btn-primary" id="vce-save">Update</button>'
+      + '<button class="btn btn-ghost" id="vce-cancel">Cancel</button>'
+      + '<span id="vce-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-danger" id="vce-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 620, noClose: true });
+    this.wireEditFields();
+    document.getElementById('vce-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); });
+    document.getElementById('vce-save')?.addEventListener('click', () => this.saveEdit(id));
+    document.getElementById('vce-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); this.confirmDel(id); });
+  },
+
+  // Conditional-field wiring for the edit pop-up (own vce- ids).
+  wireEditFields() {
+    document.getElementById('vce-type')?.addEventListener('change', e => {
+      const t = e.target.value;
+      const sel = document.getElementById('vce-reason'); if (sel) sel.innerHTML = this.reasonOptions(t, '');
+      const catWrap = document.getElementById('vce-cat-wrap'); if (catWrap) catWrap.style.display = t === 'Void' ? 'none' : '';
+    });
+    document.getElementById('vce-item-sel')?.addEventListener('change', e => {
+      const k = e.target.value;
+      const isCustom = k === 'custom', isProduct = k.startsWith('p:');
+      const cw = document.getElementById('vce-custom-wrap'); if (cw) cw.style.display = isCustom ? '' : 'none';
+      const uw = document.getElementById('vce-units-wrap'); if (uw) uw.style.display = isProduct ? '' : 'none';
+      const row = document.getElementById('vce-cond-row'); if (row) row.style.display = (isCustom || isProduct) ? '' : 'none';
+    });
+  },
+
+  async saveEdit(id) {
+    const err = document.getElementById('vce-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date = document.getElementById('vce-date')?.value;
+    if (!date) { fail('Date is required.'); return; }
+    const amount = parseFloat(document.getElementById('vce-amount')?.value);
+    if (isNaN(amount) || amount < 0) { fail('Enter the amount.'); return; }
+
+    // Resolve the item from the single picker.
+    const itemKey = document.getElementById('vce-item-sel')?.value || '';
+    let item = '', productId = '', productName = '', menuItemId = '', units = null;
+    if (itemKey === 'custom') {
+      item = (document.getElementById('vce-custom')?.value || '').trim();
+      if (!item) { fail('Enter the custom item name.'); return; }
+    } else if (itemKey.startsWith('m:')) {
+      const m = this.menuItemById(itemKey.slice(2));
+      if (!m) { fail('Pick an item.'); return; }
+      item = m.name; menuItemId = m.id;
+    } else if (itemKey.startsWith('p:')) {
+      const p = this.productById(itemKey.slice(2));
+      if (!p) { fail('Pick an item.'); return; }
+      item = p.name; productId = p.id; productName = p.name;
+      const u = parseFloat(document.getElementById('vce-units')?.value);
+      units = isNaN(u) ? null : u;
+    } else {
+      fail('Pick an item or choose Custom.'); return;
+    }
+
+    const type = document.getElementById('vce-type')?.value || 'Void';
+    const authBy = document.getElementById('vce-auth')?.value || '';
+
+    // Comp authorization threshold check.
+    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
+    const thresholdActive = !isNaN(threshold) && threshold > 0;
+    let authThresholdOverride = false;
+    if (type === 'Comp' && thresholdActive && amount > threshold && !authBy) {
+      const ok = await App.confirm({
+        title: 'Comp over your $' + threshold + ' threshold',
+        message: 'No manager is set in Authorized By. Continue without manager authorization? The comp will be flagged in Theft Risk as an unauthorized large comp.',
+        confirmText: 'Continue Without Auth',
+        cancelText: 'Cancel'
+      });
+      if (!ok) return;
+      authThresholdOverride = true;
+    }
+
+    const category = type === 'Comp' ? (document.getElementById('vce-cat')?.value || 'Customer Comp') : '';
+    const serverId = document.getElementById('vce-server')?.value || '';
+    const patch = {
+      date,
+      type,
+      category,
+      shift_type:    document.getElementById('vce-shift')?.value || '',
+      item,
+      amount,
+      product_id:    productId,
+      product_name:  productName,
+      menu_item_id:  menuItemId,
+      units,
+      staff_id:         serverId,
+      server:           (App.staffById(serverId) || {}).name || '',
+      authorized_by_id: authBy,
+      authorized_by:    (App.staffById(authBy) || {}).name || '',
+      check_number:  document.getElementById('vce-check')?.value.trim() || '',
+      reason:        document.getElementById('vce-reason')?.value || '',
+      notes:         document.getElementById('vce-notes')?.value.trim() || '',
+      auth_threshold_override: authThresholdOverride
+    };
+
+    const list = this.records();
+    const i = list.findIndex(x => x.id === id);
+    if (i < 0) { fail('Record not found.'); return; }
+    list[i] = { ...list[i], ...patch };
+
+    const btn = document.getElementById('vce-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'void_comp', list[i]);
+    if (ok) { this.editId = null; App.closeModal('vc-edit-modal'); this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   async save() {
