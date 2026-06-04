@@ -408,10 +408,9 @@ S.Shift86List = {
         + '<button class="btn btn-ghost btn-sm ei-re86" data-id="' + i.id + '">Re-86</button>'
         + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      backCard = '<div class="card">'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      backCard = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:16px;"><table class="tbl"><thead><tr>'
         + '<th>Item</th><th>Category</th><th>86\'d</th><th>Back</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     const modal = '<div id="ei-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
