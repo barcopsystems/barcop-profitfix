@@ -58,10 +58,10 @@ S.ShiftWalkedTabs = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
@@ -185,7 +185,7 @@ S.ShiftWalkedTabs = {
       + '<span id="wte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="wte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 840, noClose: true });
+    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 680, noClose: true });
     document.getElementById('wte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); });
     document.getElementById('wte-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('wte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); this.confirmDel(id); });
