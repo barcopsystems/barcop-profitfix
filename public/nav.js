@@ -509,6 +509,10 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 4l9 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">86 List</span>
       </div>
+      <div class="nav-item" data-screen="sc-walked-tabs" id="nav-sc-walked-tabs">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Walked Tabs</span>
+      </div>
       <div class="nav-item" data-screen="sc-void-comp" id="nav-sc-void-comp">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h9v12l-2-1.3-2.5 1.3-2.5-1.3-2 1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 6.5l4 4M10.5 6.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Void and Comp Log</span>
@@ -520,14 +524,6 @@ const Shift = {
       <div class="nav-item" data-screen="sc-maintenance" id="nav-sc-maintenance">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
         <span class="nav-label">Maintenance Log</span>
-      </div>
-      <div class="nav-item" data-screen="sc-walked-tabs" id="nav-sc-walked-tabs">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Walked Tabs</span>
-      </div>
-      <div class="nav-item" data-screen="sc-incident-log" id="nav-sc-incident-log">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L15.5 14.5H1.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="10.5" r="0.8" fill="currentColor"/><path d="M8.5 6v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Incident Log</span>
       </div>
       <div class="nav-section">Checklists</div>
       <div class="nav-item" data-screen="sc-opening-checklist" id="nav-sc-opening-checklist">
