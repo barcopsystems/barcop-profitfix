@@ -381,7 +381,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--b2);color:var(--t2);vertical-align:middle;}
 .tbl tr:last-child td{border-bottom:none;}
 .tbl tr:hover td{background:var(--hover);}
-.row-actions{display:flex;gap:6px;}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
