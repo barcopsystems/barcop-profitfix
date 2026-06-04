@@ -452,11 +452,10 @@ S.ShiftActiveShift = {
 
       + '<div class="card"><div class="card-title">Log During This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + action('sc-cash-drop', 'Cash Drop')
+      + action('sc-cash-control', 'Cash')
       + action('sc-void-comp', 'Void / Comp')
       + action('sc-waste', 'Waste / Spill')
       + action('sc-86-list', '86 an Item')
-      + action('sc-safe-log', 'Safe Log')
       + action('sc-maintenance', 'Maintenance')
       + '</div></div>'
 
