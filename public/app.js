@@ -1599,6 +1599,34 @@ const App = {
   // different files, which would silently desync the moment one changed.
   SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
 
+  // Void/Comp comp reasons — the single dropdown on a comp. Each carries its own
+  // loss-vs-expense classification so the operator picks one thing and Theft
+  // Risk, Books, and Year-End all stay honest from one source. A comp is a LOSS
+  // (a give-away that feeds Theft Risk) unless it is an internal-policy EXPENSE.
+  // Only Staff Meal and Shift Drink are expense; every customer-facing comp,
+  // including Marketing / Promo, is loss so it stays visible in the comp signal.
+  // Voids keep their own reason list (they are not comps) over in sc-void-comp.
+  SC_COMP_REASONS: [
+    { value: 'Service Recovery',  cls: 'loss' },
+    { value: 'Customer Goodwill', cls: 'loss' },
+    { value: 'Manager Comp',      cls: 'loss' },
+    { value: 'Regular / VIP',     cls: 'loss' },
+    { value: 'Marketing / Promo', cls: 'loss' },
+    { value: 'Staff Meal',        cls: 'expense' },
+    { value: 'Shift Drink',       cls: 'expense' }
+  ],
+  // Classify a comp by its reason. Accepts a reason string (or a legacy category
+  // value). Unknown/blank defaults to loss — the conservative call for Theft
+  // Risk. Returns true for loss, false for policy expense.
+  compReasonIsLoss(reason) {
+    const r = String(reason || '');
+    const hit = (this.SC_COMP_REASONS || []).find(x => x.value === r);
+    if (hit) return hit.cls === 'loss';
+    // Legacy category values from before the reason/category merge.
+    if (r === 'Staff Meal' || r === 'Shift Drink') return false;
+    return true;
+  },
+
   // Overtime thresholds — federal 40 hr/week; "approaching" is the UI watch
   // line. Labor Dashboard, Overtime Watch, and Pay Periods all read from here
   // so the number can never desync across the three screens that act on it.
