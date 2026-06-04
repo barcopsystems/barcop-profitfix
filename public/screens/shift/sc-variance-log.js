@@ -123,8 +123,7 @@ S.ShiftVarianceLog = {
         + App.showOlderBar('sc', 'variance', filtered, false);
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.filterCard(stats) + listHtml
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Read-only. Count, edit, or delete drawer reconciles on the Cash Board.</div></div>';
+    this.container.innerHTML = '<div class="screen">' + this.filterCard(stats) + listHtml + '</div>';
 
     document.getElementById('vl-export')?.addEventListener('click', () => App.exportPDF({ title: 'Variance History', root: this.container }));
     document.getElementById('vl-f-from')?.addEventListener('change', e => { this.fFrom = e.target.value || ''; this.renderList(); });
