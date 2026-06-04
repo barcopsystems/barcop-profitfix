@@ -101,8 +101,10 @@ S.ShiftActiveShift = {
     }
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
       + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
+      + '</div>' + App.helpButton('of-how') + '</div>'
 
       + '<div style="margin-top:20px;"><div style="' + lbl + '">Daypart</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + chips + '</div></div>'
@@ -132,6 +134,7 @@ S.ShiftActiveShift = {
       const chip = ev.target.closest('.of-chip');
       const mod = ev.target.closest('.of-mod');
       const tile = ev.target.closest('.reg-tile');
+      if (ev.target.closest('#of-how')) { this.showHowToOpen(); return; }
       if (ev.target.closest('#of-add-drawers')) { App.navigate('sc-drawers'); return; }
       if (chip) { d.shift_type = chip.dataset.type; d.cash_tolerance = this._defaultToleranceFor(d.shift_type); this.renderStart(); return; }
       if (mod) { d.manager_id = (d.manager_id === mod.dataset.mgr) ? '' : mod.dataset.mgr; this.renderStart(); return; }
@@ -150,6 +153,16 @@ S.ShiftActiveShift = {
       }
       if (ev.target.closest('#as-start')) this.startShift();
     };
+  },
+
+  showHowToOpen() {
+    App.showHelpModal('How Open the Floor Works', [
+      { p: ['This is how you start a shift. Tap through it: pick the daypart, tap who is running it, turn on the registers in play tonight and set each bank, then open the floor. The line up top fills in as you go so you watch the shift come together.'] },
+      { h: '1. Daypart', p: ['Tap the service you are opening: Brunch, Lunch, Dinner, or Late Night. Bar Cop pre-picks one by the time of day; tap another chip to change it. The daypart also sets this shift\'s cash tolerance.'] },
+      { h: '2. Running It', p: ['Tap the manager on duty. The list is your managers and bartenders, the people who actually run a shift.'] },
+      { h: '3. Registers', p: ['Every register you set up shows as a tile, turned on with its default bank. Tap a tile to turn it off if it is not running tonight, and type each register\'s starting cash right on the tile. Run one register or ten.'] },
+      { h: '4. Floor and Tolerance', p: ['Set how many are on the floor and confirm the cash tolerance, which is how far a drawer can be off before Bar Cop flags it. Then Open the Floor and the shift goes live.'] }
+    ]);
   },
 
   _freshDraft() {
@@ -398,7 +411,7 @@ S.ShiftActiveShift = {
     })();
     const coverProgressLabel = goalForToday > 0
       ? coversSoFar.toFixed(0) + ' of ' + goalForToday + (coversSoFar >= goalForToday ? ' (hit)' : ' (' + (goalForToday - coversSoFar).toFixed(0) + ' to goal)')
-      : (coversSoFar > 0 ? coversSoFar.toFixed(0) + ' so far' : 'No goal set');
+      : (coversSoFar > 0 ? coversSoFar.toFixed(0) + ' so far' : 'Set in Revenue Forecast');
 
     const stat = (label, val, sub) =>
       '<div style="flex:1;min-width:130px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:14px;">'
@@ -407,7 +420,7 @@ S.ShiftActiveShift = {
       + '<div style="font-size:11px;color:var(--t3);">' + sub + '</div></div>';
 
     const action = (id, label) =>
-      '<button class="btn btn-ghost as-go" data-go="' + id + '" style="height:52px;flex:1;min-width:150px;">' + label + '</button>';
+      '<button class="btn btn-ghost as-go" data-go="' + id + '" style="height:52px;flex:1;min-width:120px;">' + label + '</button>';
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card">'
@@ -421,7 +434,7 @@ S.ShiftActiveShift = {
       + (s.started_at ? 'Running ' + this.elapsed(s.started_at) : '')
       + (s.opening_bank != null ? ' &middot; Opening bank ' + App.fmtCurrency(s.opening_bank) : '') + '</div>'
       + '</div>'
-      + '<button class="btn btn-ghost btn-sm" id="as-cancel" style="color:var(--red);flex-shrink:0;">Cancel Shift</button>'
+      + App.helpButton('as-how')
       + '</div>'
       + '</div>'
 
@@ -450,19 +463,31 @@ S.ShiftActiveShift = {
       + this.renderShiftNotesCard(s)
 
       + '<div class="card"><div class="card-title">End of Shift</div>'
-      + '<div style="font-size:13px;color:var(--t3);margin-bottom:14px;">Closing the shift records its revenue '
-      + 'and covers. That revenue is what feeds your weekly Profit and Revenue numbers.</div>'
+      + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button>'
-      + '</div></div>';
+      + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
+      + '</div></div></div>';
 
     this.container.onclick = ev => {
       const go = ev.target.closest('.as-go');
       if (go) App.navigate(go.dataset.go);
+      else if (ev.target.closest('#as-how')) this.showHowToActive();
       else if (ev.target.closest('#as-cancel')) this.cancelShift(s);
       else if (ev.target.closest('#as-end')) this.renderEnd(s);
       else if (ev.target.closest('#sn-add')) this.addShiftNote(s);
       else if (ev.target.closest('.sn-del')) this.removeShiftNote(s, ev.target.closest('.sn-del').dataset.id);
     };
+  },
+
+  showHowToActive() {
+    App.showHelpModal('How the Running Shift Works', [
+      { p: ['This is your command center while the shift is live. Everything you log during service lands on the shift and rolls into the close.'] },
+      { h: 'Registers', p: ['The registers you opened sit up top with their bank and what has been dropped from each so far.'] },
+      { h: 'This Shift', p: ['Live counts as the night runs: cover goal, labor so far, cash drops, voids and comps, 86\'d items, and open maintenance. The Cover Goal comes from the covers you set per day in Revenue Recovery, Revenue Forecast. Set it there and it shows here.'] },
+      { h: 'Log During This Shift', p: ['Tap any of these to log it the moment it happens: a cash drop, a void or comp, waste or a spill, an 86, a safe move, or a maintenance issue. Each feeds its own log and the shift exceptions.'] },
+      { h: 'Shift Notes', p: ['Drop timestamped notes through the night for the closer or the next manager. They flow into the Handoff Report at close.'] },
+      { h: 'Ending the Shift', p: ['End Shift runs the close wizard: revenue and covers, cash count per register, exceptions, tips, and handoff notes. Cancel Shift discards the shift without saving if you opened it by mistake.'] }
+    ]);
   },
 
   // ── Mid-shift Notes ────────────────────────────────────────────────────────
@@ -610,13 +635,13 @@ S.ShiftActiveShift = {
     + '</div>';
 
     const header = '<div class="card" style="margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px;">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:22px;">'
         + '<div>'
           + '<div style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Closing Shift</div>'
           + '<div style="font-size:18px;font-weight:800;color:var(--t1);margin-top:2px;">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
           + (s.manager ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Manager: ' + esc(s.manager) + '</div>' : '')
         + '</div>'
-        + '<button class="btn btn-ghost btn-sm" id="aw-cancel">Cancel and Return</button>'
+        + App.helpButton('aw-how')
       + '</div>'
       + stepper
     + '</div>';
@@ -637,8 +662,7 @@ S.ShiftActiveShift = {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
     return '<div class="card"><div class="card-title">Step 1 of 5 &middot; Revenue and Covers</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Pull these straight from your POS end-of-shift report. Total revenue feeds your weekly Profit and Revenue numbers.</div>'
-      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="form-row" style="gap:16px;margin-top:4px;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Bar Revenue</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="aw-bar" min="0" step="0.01" inputmode="decimal" value="' + v(d.bar_revenue) + '" style="height:48px;font-size:16px;"/></div></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Floor Revenue</label>'
@@ -648,12 +672,11 @@ S.ShiftActiveShift = {
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Walkouts</label>'
           + '<input type="number" id="aw-walkouts" min="0" inputmode="numeric" value="' + v(d.walkouts) + '" placeholder="0" style="height:48px;font-size:16px;"/></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5;">Walkouts: parties that came in but left without ordering, usually because the wait was too long. Real lost-cover signal for capacity planning.</div>'
-      + '<div class="calc" style="margin-top:6px;">'
+      + '<div class="calc" style="margin-top:10px;">'
         + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val good" id="aw-total">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="aw-check">-</div></div>'
       + '</div>'
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Cash Reconciliation</button></div>'
+      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Cash Reconciliation</button></div>'
     + '</div>';
   },
 
@@ -687,16 +710,15 @@ S.ShiftActiveShift = {
         + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val" id="aw-t-variance">-</div></div>'
         + '</div>';
       body = rows + totals
-        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tolerance ' + App.fmtCurrency(tolerance) + ' per drawer, from Cash Tolerances. Any drawer outside tolerance auto-logs to the Variance Log when you close.</div>'
         + '<div style="margin-top:14px;"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
           + '<input type="checkbox" id="aw-cash-skip" ' + (d.cash_skipped ? 'checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>'
           + 'Skip cash reconciliation (drawers not counted this shift)</label></div>';
     }
 
     return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Opening bank and drops are filled in per register. Enter the POS cash sales and what you counted in each drawer at close.</div>'
+      + '<div style="margin-top:4px;"></div>'
       + body
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button></div>'
+      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button></div>'
     + '</div>';
   },
 
@@ -744,12 +766,12 @@ S.ShiftActiveShift = {
 
     const bigVcTotal = vc.reduce((t, r) => t + (parseFloat(r.amount) || 0), 0);
     return '<div class="card"><div class="card-title">Step 3 of 5 &middot; Exception Review</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Eyes on the exceptions before you close. Open one to investigate or fix; acknowledge each line when you have looked at it.</div>'
+      + '<div style="margin-top:4px;"></div>'
       + item('e86', eighty6.length, '86\'d Items Still Out', eighty6.length === 0 ? 'Nothing 86\'d.' : eighty6.slice(0, 3).map(i => i.item).join(', ') + (eighty6.length > 3 ? '...' : ''), 'sc-86-list', 'var(--red)')
       + item('vc',  vc.length, 'Big Voids and Comps This Shift', vc.length === 0 ? 'No voids or comps over $' + vcThreshold + '.' : 'Over $' + vcThreshold + ' threshold &middot; ' + App.fmtCurrency(bigVcTotal) + ' total', 'sc-void-comp', 'var(--red)')
       + item('mt',  openMaint.length, 'Open Maintenance Issues', openMaint.length === 0 ? 'Nothing flagged.' : openMaint.slice(0, 3).map(m => m.issue || m.item || 'Issue').join(', ') + (openMaint.length > 3 ? '...' : ''), 'sc-maintenance', 'var(--red)')
       + item('cl',  checklistIncomplete ? 1 : 0, 'Closing Checklist', !closingCheck ? 'No closing checklist run yet for tonight.' : checklistIncomplete ? checklistDone + '% complete &middot; finish before closing' : 'Complete.', 'sc-closing-checklist', 'var(--red)')
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button></div>'
+      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button></div>'
     + '</div>';
   },
 
@@ -774,7 +796,7 @@ S.ShiftActiveShift = {
     const savedExisting = !!pool.saved_id;
 
     return '<div class="card"><div class="card-title">Step 4 of 5 &middot; Tip Reconciliation</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Tips logged in Labor Control for this shift roll up here. Enter the total tips your POS reported, then split the pool with the inline calculator below.</div>'
+      + '<div style="margin-top:4px;"></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Logged Cash Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCash) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Logged Card Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCard) + '</div></div>'
@@ -822,7 +844,7 @@ S.ShiftActiveShift = {
         + '</div>'
       + '</div>'
 
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button></div>'
+      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button></div>'
     + '</div>';
   },
 
@@ -1019,11 +1041,10 @@ S.ShiftActiveShift = {
   stepHandoff(s) {
     const d = this._closeDraft;
     return '<div class="card"><div class="card-title">Step 5 of 5 &middot; Handoff Notes</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Anything the next manager needs to know before they open. These notes print on the Shift Handoff Report.</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes for the Opener</label>'
+      + '<div class="form-row" style="gap:14px;margin-top:4px;"><div class="f" style="width:100%;"><label>Notes for the Opener</label>'
         + '<textarea id="aw-handoff" rows="5" placeholder="Restock priorities, equipment to watch, customer follow-ups, anything the opener will inherit...">' + esc(d.handoff_notes || '') + '</textarea></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;">Closing the shift saves revenue, logs the cash variance (if any), and writes these notes to the shift record. A Shift Handoff Report will be ready to print or email on the next screen.</div>'
       + '<div class="card-actions">'
+        + '<button class="btn btn-ghost" id="aw-cancel">Return To Shift</button>'
         + '<button class="btn btn-ghost" id="aw-back">Back</button>'
         + '<button class="btn btn-primary btn-lg" id="aw-finalize">Close Shift</button>'
         + '<span id="aw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
@@ -1055,8 +1076,41 @@ S.ShiftActiveShift = {
     }
   },
 
+  showHowToStep(step) {
+    const M = {
+      revenue: ['Step 1: Revenue and Covers', [
+        { p: ['Pull these straight from your POS end-of-shift report.'] },
+        { h: 'What To Enter', p: ['Bar Revenue and Floor Revenue split your sales; together they are the total that feeds your weekly Profit and Revenue numbers. Covers is how many guests you served. Walkouts is parties that came in but left without ordering, usually because the wait was too long, a real lost-cover signal for capacity planning.'] },
+        { h: 'Check Average', p: ['Bar Cop divides total revenue by covers and shows the check average live as you type.'] }
+      ]],
+      cash: ['Step 2: Cash Reconciliation', [
+        { p: ['Count each register that ran this shift.'] },
+        { h: 'Per Register', p: ['Opening bank and drops are filled in for you from what you opened with and dropped during the shift. Enter the POS cash sales for that register and what you physically counted in the drawer. Bar Cop shows Expected (opening + sales minus drops) and the Variance against it, per drawer and as a total.'] },
+        { h: 'Tolerance And Logging', p: ['Each drawer is judged against your cash tolerance from Cash Tolerances. Any drawer outside tolerance auto-logs to the Variance Log when you close, so you never re-enter it. Tick Skip if the drawers were not counted this shift.'] }
+      ]],
+      exceptions: ['Step 3: Exception Review', [
+        { p: ['A last look at the loose ends before you close.'] },
+        { h: 'The Lines', p: ['86\'d items still out, big voids and comps this shift, open maintenance issues, and the closing checklist. A line in red means there is something to look at.'] },
+        { h: 'Open And Acknowledge', p: ['Open any line to investigate or fix it on its own screen, then come right back. Tick Acknowledged once you have eyes on it. Acknowledgments save with the shift so the record shows you reviewed them.'] }
+      ]],
+      tips: ['Step 4: Tip Reconciliation', [
+        { p: ['Reconcile tips and split the pool without leaving the close.'] },
+        { h: 'Logged vs POS', p: ['Tips logged in Labor Control for this shift roll up here. Enter the total your POS reported so Bar Cop can show any variance.'] },
+        { h: 'Split The Pool', p: ['The inline pool calculator pre-loads the shift\'s tipped staff and their hours. Pick split by hours or equal, then Save Pool. It writes a tip pool tied to this shift, which the Books Form 8027 worksheet reads later.'] }
+      ]],
+      handoff: ['Step 5: Handoff Notes', [
+        { p: ['The last word for whoever opens next.'] },
+        { h: 'What To Write', p: ['Restock priorities, equipment to watch, customer follow-ups, anything the opener inherits. These notes, plus your timestamped shift notes, print on the Shift Handoff Report.'] },
+        { h: 'Closing', p: ['Close Shift saves the revenue, logs any cash variance, and writes these notes to the shift. The Handoff Report is ready to save on the next screen.'] }
+      ]]
+    };
+    const m = M[step] || M.revenue;
+    App.showHelpModal(m[0], m[1]);
+  },
+
   wireWizard(s) {
     const d = this._closeDraft;
+    document.getElementById('aw-how')?.addEventListener('click', () => this.showHowToStep(d.step));
     document.getElementById('aw-cancel')?.addEventListener('click', () => {
       this._closeDraft = null;
       this.renderActive(s);
@@ -1326,16 +1380,12 @@ S.ShiftActiveShift = {
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="ac-handoff" data-shift-id="' + esc(s.id) + '">Save Handoff PDF</button>'
-      + '<button class="btn btn-ghost" id="ac-handoff-email" data-shift-id="' + esc(s.id) + '">Email Handoff</button>'
       + '<button class="btn btn-ghost" id="ac-start">Start Another Shift</button>'
       + '<button class="btn btn-ghost" id="ac-history">View Shift History</button>'
       + '</div></div></div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#ac-start')) this.renderStart();
       else if (ev.target.closest('#ac-history')) App.navigate('sc-shift-history');
-      else if (ev.target.closest('#ac-handoff-email')) {
-        if (S.ShiftHandoff && S.ShiftHandoff.emailForShift) S.ShiftHandoff.emailForShift(s.id);
-      }
       else if (ev.target.closest('#ac-handoff')) {
         if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(s.id);
         else App.navigate('sc-shift-history');
