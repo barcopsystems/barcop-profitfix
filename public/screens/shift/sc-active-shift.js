@@ -328,7 +328,9 @@ S.ShiftActiveShift = {
       { h: '1. Daypart', p: ['Tap the service you are opening: Brunch, Lunch, Dinner, or Late Night. Bar Cop pre-picks one by the time of day; tap another chip to change it. The daypart also sets this shift\'s cash tolerance.'] },
       { h: '2. Running It', p: ['Tap the manager on duty. The list is your managers and bartenders, the people who actually run a shift.'] },
       { h: '3. Registers', p: ['Every register you set up shows as a tile, turned on with its default bank. Tap a tile to turn it off if it is not running tonight, and type each register\'s starting cash right on the tile. Run one register or ten.'] },
-      { h: '4. Floor and Tolerance', p: ['Set how many are on the floor and confirm the cash tolerance, which is how far a drawer can be off before Bar Cop flags it. Then Open the Floor and the shift goes live.'] }
+      { h: '4. Floor and Tolerance', p: ['Set how many are on the floor and confirm the cash tolerance, which is how far a drawer can be off before Bar Cop flags it. Then Open the Floor and the shift goes live.'] },
+      { h: 'Recent Shifts', p: ['Below the opener is every shift you have run. Log a Past Shift back-fills one you missed or ran before Bar Cop, Edit fixes any shift, and View opens its full recap. Creating, editing, and deleting shifts all happen here.'] },
+      { h: 'Shift History', p: ['Shift History in the sidebar is the read-only record of every shift: filter it, open a recap, and export. The editing all happens here on Active Shift, so the history stays a clean reference. Shift revenue flows straight into Profit and Revenue Recovery, so keep it accurate.'] }
     ]);
   },
 
@@ -842,7 +844,7 @@ S.ShiftActiveShift = {
         + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val good" id="aw-total">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="aw-check">-</div></div>'
       + '</div>'
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Cash Reconciliation</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Cash Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -884,7 +886,7 @@ S.ShiftActiveShift = {
     return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
       + '<div style="margin-top:4px;"></div>'
       + body
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -937,7 +939,7 @@ S.ShiftActiveShift = {
       + item('vc',  vc.length, 'Big Voids and Comps This Shift', vc.length === 0 ? 'No voids or comps over $' + vcThreshold + '.' : 'Over $' + vcThreshold + ' threshold &middot; ' + App.fmtCurrency(bigVcTotal) + ' total', 'sc-void-comp', 'var(--red)')
       + item('mt',  openMaint.length, 'Open Maintenance Issues', openMaint.length === 0 ? 'Nothing flagged.' : openMaint.slice(0, 3).map(m => m.issue || m.item || 'Issue').join(', ') + (openMaint.length > 3 ? '...' : ''), 'sc-maintenance', 'var(--red)')
       + item('cl',  checklistIncomplete ? 1 : 0, 'Closing Checklist', !closingCheck ? 'No closing checklist run yet for tonight.' : checklistIncomplete ? checklistDone + '% complete &middot; finish before closing' : 'Complete.', 'sc-closing-checklist', 'var(--red)')
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -1010,7 +1012,7 @@ S.ShiftActiveShift = {
         + '</div>'
       + '</div>'
 
-      + '<div class="card-actions"><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -1210,9 +1212,9 @@ S.ShiftActiveShift = {
       + '<div class="form-row" style="gap:14px;margin-top:4px;"><div class="f" style="width:100%;"><label>Notes for the Opener</label>'
         + '<textarea id="aw-handoff" rows="5" placeholder="Restock priorities, equipment to watch, customer follow-ups, anything the opener will inherit...">' + esc(d.handoff_notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
-        + '<button class="btn btn-ghost" id="aw-cancel">Return To Shift</button>'
-        + '<button class="btn btn-ghost" id="aw-back">Back</button>'
         + '<button class="btn btn-primary btn-lg" id="aw-finalize">Close Shift</button>'
+        + '<button class="btn btn-ghost" id="aw-back">Back</button>'
+        + '<button class="btn btn-ghost" id="aw-cancel">Return To Shift</button>'
         + '<span id="aw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
     + '</div>';
