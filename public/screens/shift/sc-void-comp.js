@@ -18,7 +18,7 @@ S.ShiftVoidComp = {
   // policy expense) so the operator picks ONE thing and Theft Risk, Books, and
   // Year-End all classify a comp from that single source.
   REASONS: {
-    Void: ['Rung in error', 'Wrong item', 'Customer changed mind', 'Kitchen error', 'Sent back', 'Other']
+    Void: ['Rung in error', 'Wrong item', 'Changed mind', 'Kitchen error', 'Sent back', 'Other']
   },
 
   records() {
