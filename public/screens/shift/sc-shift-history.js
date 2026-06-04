@@ -45,14 +45,6 @@ S.ShiftHistory = {
     this.renderList();
   },
 
-  showHowTo() {
-    App.showHelpModal('How Shift History Works', [
-      { p: ['Every shift lands here: the ones you close out in Active Shift and any you back-fill there with Log a Past Shift. This page is your read-only record. Click a row, or View, to open the full recap: revenue, covers, cash reconciliation, tips, exceptions, and the notes from that night.'] },
-      { h: 'Filter and Export', p: ['Use the Filter card to pull up a shift type, a status, or a date range; the totals update to match. Export PDF saves the filtered list.'] },
-      { h: 'Logging and editing', p: ['Logging a past shift, editing, and deleting all happen in Active Shift under Recent Shifts. Keeping that work there keeps your history a clean reference. The revenue flows straight into Profit and Revenue Recovery, so keep it accurate.'] }
-    ]);
-  },
-
   // ── Filter + totals ─────────────────────────────────────────────────────────
   filterCard(count, totRev, totCov, avgChk) {
     const typeOpts = '<option value="">All shift types</option>'
@@ -61,7 +53,7 @@ S.ShiftHistory = {
       '<option value="' + x + '"' + (this.filterStatus === x ? ' selected' : '') + '>' + (x === '' ? 'All statuses' : x) + '</option>').join('');
     return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Filter</span>'
-      + '<div style="display:flex;gap:8px;">' + App.helpButton('sh-how') + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button></div>'
+      + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
@@ -134,7 +126,6 @@ S.ShiftHistory = {
       if (view) { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
       if (row) this.renderDetail(row.dataset.id);
     };
-    document.getElementById('sh-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-f-clear')?.addEventListener('click', () => {
       this.filterType = this.filterStatus = this.filterFrom = this.filterTo = '';
