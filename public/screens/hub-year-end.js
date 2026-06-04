@@ -15,7 +15,7 @@
      5. Tip Allocation       — Form 8027 Worksheet for the whole year
      6. Cash Control Summary — variance totals by month + worst-offender shifts
      7. Audit History        — every audit run in the year with score + opportunity
-     8. Operational Events   — voids/comps, walked tabs, incidents, call-outs, expired certs
+     8. Operational Events   — voids/comps, walked tabs, call-outs, expired certs
 
    PDF Executive Summary (~4 pages):
      1. Headline numbers + YOY deltas
@@ -87,7 +87,7 @@ S.HubYearEnd = {
       ['Tip Allocation',       'Annual Form 8027 Worksheet. Per-employee yearly totals. Your accountant transcribes to the actual IRS form.'],
       ['Cash Control Summary', 'Variance totals by month. Worst-offender shifts. The cash story for the whole year on one page.'],
       ['Audit History',        'Every audit you ran during the year. Score, monthly opportunity, top action items per audit.'],
-      ['Operational Events',   'Voids and comps, walked tabs, incidents, call-outs, certifications that lapsed during the year.']
+      ['Operational Events',   'Voids and comps, walked tabs, call-outs, certifications that lapsed during the year.']
     ];
     const listHtml = rows.map(r =>
       '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
@@ -904,7 +904,6 @@ S.HubYearEnd = {
     const shiftDrinks  = comps.filter(c => categoryOf(c) === 'Shift Drink');
     const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
     const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
-    const incidents = (App.shiftData?.sc_incidents || []).filter(i => inYear(i.date));
     const certs = (App.laborData?.lc_certs || []).filter(c => inYear(c.expiration_date));
 
     const sum = (list, field) => list.reduce((s, r) => s + (parseFloat(r[field]) || 0), 0);
@@ -917,22 +916,9 @@ S.HubYearEnd = {
     rows.push(['Staff Meals',          staffMeals.length, sum(staffMeals, 'amount'),       'Policy expense, not loss']);
     rows.push(['Shift Drinks',         shiftDrinks.length, sum(shiftDrinks, 'amount'),     'Policy expense, not loss']);
     rows.push(['Walked Tabs',          walked.length, sum(walked, 'amount'),         'Unpaid checks, mis-bills, lost tickets']);
-    rows.push(['Incidents',            incidents.length, '',                         'Slip-and-fall, altercation, employee injury, regulatory visit']);
     rows.push(['Call-Outs',            callouts.length, '',                          'Staff call-outs and no-shows']);
     rows.push(['Certs Lapsed',         certs.length, '',                             'Certifications with expiration date in ' + year]);
     rows.push(blank());
-
-    // Incident breakdown by type
-    if (incidents.length > 0) {
-      rows.push(['Incidents by Type', '', '', '']);
-      const byType = {};
-      incidents.forEach(i => {
-        const t = i.type || 'Other';
-        byType[t] = (byType[t] || 0) + 1;
-      });
-      Object.keys(byType).sort().forEach(t => rows.push(['  ' + t, byType[t], '', '']));
-      rows.push(blank());
-    }
 
     // Lapsed certifications detail
     if (certs.length > 0) {
@@ -963,7 +949,7 @@ S.HubYearEnd = {
         .forEach(n => rows.push(['  ' + n, byStaff[n], '', '']));
     }
 
-    this._pushFooter(rows, merges, 'Sources: Shift Control (voids, comps, walked tabs, incidents), Labor Control (call-outs, certifications).', COL_COUNT);
+    this._pushFooter(rows, merges, 'Sources: Shift Control (voids, comps, walked tabs), Labor Control (call-outs, certifications).', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -1021,7 +1007,6 @@ S.HubYearEnd = {
     const variances = (App.shiftData?.sc_variances || []).filter(v => inYear(v.date));
     const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
     const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
-    const incidents = (App.shiftData?.sc_incidents || []).filter(i => inYear(i.date));
     const tips = (App.laborData?.lc_tips || []).filter(t => inYear(t.date));
     const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
 
@@ -1100,7 +1085,6 @@ S.HubYearEnd = {
       ['Voids logged', String(voids.length)],
       ['Comps logged', comps.length + ' (' + fmt$(comps.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)) + ')'],
       ['Walked Tabs', walked.length + ' (' + fmt$(walked.reduce((s, w) => s + (parseFloat(w.amount) || 0), 0)) + ')'],
-      ['Incidents logged', String(incidents.length)],
       ['Cash variances logged', String(variances.length)],
       ['Call-outs logged', String(callouts.length)],
       ['Tips logged (total)', fmt$(totalTips)]
