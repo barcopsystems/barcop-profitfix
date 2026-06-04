@@ -42,9 +42,10 @@ S.ShiftVoidComp = {
   },
 
   // ── Item picker: menu items + inventory products + custom, one dropdown ─────
-  itemOptions(selectedKey) {
+  itemOptions(selectedKey, includeCustom) {
+    if (includeCustom == null) includeCustom = true;
     let h = '<option value="">No item</option>'
-      + '<option value="custom"' + (selectedKey === 'custom' ? ' selected' : '') + '>Custom / not tracked</option>';
+      + (includeCustom ? '<option value="custom"' + (selectedKey === 'custom' ? ' selected' : '') + '>Custom / not tracked</option>' : '');
     const menu = this.menuItems();
     if (menu.length) {
       h += '<optgroup label="Menu Items">';
@@ -92,6 +93,7 @@ S.ShiftVoidComp = {
     App.showHelpModal('How the Void and Comp Log Works', [
       { p: ['Voids and comps are your exception transactions. Logging every one feeds Theft Risk and the Profit Audit, so the bartender comping a round without a manager shows up as a pattern instead of disappearing.'] },
       { h: 'One record, the dollar amount', p: ['A void or comp is logged by the amount, not item by item. Comp a whole table\'s meal and you log one line for the total. The amount is what matters. The item is optional.'] },
+      { h: 'Enter the whole shift at once', p: ['Set the date and shift up top, then add a line for each void or comp off your sheet or POS list. Authorized By up top applies to your comps. Add Line for another, and Save All writes them in one shot, no running to Bar Cop every time one happens. Need a check number, a custom item, or a note on one? Save it, then Edit that row.'] },
       { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away.'] },
       { h: 'The Reason carries the classification', p: ['On a comp, the reason tells Bar Cop whether it is a loss or a policy expense. Service Recovery, Customer Goodwill, Manager Comp, Regular / VIP, and Marketing / Promo are give-aways and feed Theft Risk. Staff Meal and Shift Drink are policy expense, tracked as cost lines in Books and Year-End, not theft. Pick honestly and the theft score stays real.'] },
       { h: 'Linking a tracked item (Units)', p: ['Most comps need no item. But if you give away a tracked inventory product, a bottle of wine off the shelf, a six-pack, pick it under Item and set how many Units you gave away. The Inventory Variance Report subtracts that known comp from usage so it does not read as shrinkage.'] },
@@ -194,13 +196,7 @@ S.ShiftVoidComp = {
     const filtered = this.applyFilters(all).sort((a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
-    const formCard = '<div class="card">'
-      + App.collapsibleCardTitle('sc-void-comp', 'Log Void / Comp', App.helpButton('vc-how'))
-      + '<div class="collapse-body">'
-      + this.formFields(null, 'vc-')
-      + '<div class="card-actions"><button class="btn btn-primary" id="vc-save">Save</button>'
-      + '<span id="vc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
-      + '</div></div>';
+    const formCard = this.builderCard();
 
     let below;
     if (all.length === 0) {
@@ -244,7 +240,6 @@ S.ShiftVoidComp = {
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
     App.applyCollapsed(this.container);
     this.wireList();
-    this.wireFormFields('vc-');
   },
 
   wireList() {
@@ -254,7 +249,10 @@ S.ShiftVoidComp = {
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#vc-export')) { App.exportPDF({ title: 'Void and Comp Log', root: this.container }); return; }
       if (ev.target.closest('#vc-print-blank')) { this.printBlank(); return; }
-      if (ev.target.closest('#vc-save')) { this.save(); return; }
+      if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
+      if (ev.target.closest('#vcb-save')) { this.saveBatch(); return; }
+      const rm = ev.target.closest('.vcl-del');
+      if (rm) { this.removeLine(rm.closest('.vc-line')); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const edit = ev.target.closest('.vc-edit');
       const del  = ev.target.closest('.vc-del');
@@ -262,6 +260,19 @@ S.ShiftVoidComp = {
       if (del)  { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
       if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
       if (row && App.canEdit('sc-void-comp')) this.openEditModal(row.dataset.id);
+    };
+    // Per-line conditional fields: Type drives the Reason list, a tracked
+    // product reveals Units. Delegated so new lines work without rewiring.
+    this.container.onchange = ev => {
+      const line = ev.target.closest('.vc-line');
+      if (!line) return;
+      if (ev.target.classList.contains('vcl-type')) {
+        const reason = line.querySelector('.vcl-reason');
+        if (reason) reason.innerHTML = this.reasonOptions(ev.target.value, '');
+      } else if (ev.target.classList.contains('vcl-item')) {
+        const uw = line.querySelector('.vcl-units-wrap');
+        if (uw) uw.style.display = (ev.target.value || '').startsWith('p:') ? '' : 'none';
+      }
     };
     document.getElementById('vc-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('vc-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
@@ -363,21 +374,109 @@ S.ShiftVoidComp = {
     };
   },
 
-  async save() {
-    const body = await this._collect('vc-');
-    if (!body) return;
-    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
-    const list = this.records();
-    list.push(rec);
-    const btn = document.getElementById('vc-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'void_comp', rec);
-    if (ok) this.renderList();
-    else {
-      const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
-      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-      const err = document.getElementById('vc-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+  // ── Batch entry builder ─────────────────────────────────────────────────────
+  // A header (Date / Shift / Authorized By) over a stack of lines, Add Line for
+  // more, one Save All. Matches how a manager actually enters a shift's voids
+  // and comps at close, off a written sheet or a POS list, instead of one at a
+  // time. Each saved line is its own record, so the list, edits, Variance, and
+  // Theft Risk all keep working unchanged.
+  builderCard() {
+    const today = new Date().toISOString().slice(0, 10);
+    const shiftOpts = this.shiftTypes().map(t => '<option>' + esc(t) + '</option>').join('');
+    return '<div class="card">'
+      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))
+      + '<div class="collapse-body">'
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="vcb-date" value="' + today + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="vcb-shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By <span style="color:var(--t4);font-weight:400;">(comps)</span></label><select id="vcb-auth">' + App.staffOptions('', { placeholder: 'Select manager...' }) + '</select></div>'
+      + '</div>'
+      + '<div id="vcb-lines">' + this.lineHtml() + '</div>'
+      + '<div style="margin-top:2px;"><button class="btn btn-ghost btn-sm" id="vcb-add" type="button">+ Add Line</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
+      + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
+      + '</div></div>';
+  },
+
+  // One entry line. Type drives the Reason list; a tracked product reveals Units.
+  // The Item picker omits Custom here to keep lines lean (use a row's Edit for a
+  // custom item, a check number, or notes).
+  lineHtml() {
+    const typeOpts = ['Void', 'Comp'].map(t => '<option>' + t + '</option>').join('');
+    return '<div class="vc-line" style="border:1px solid var(--b1);border-radius:6px;padding:12px;margin-bottom:10px;">'
+      + '<div class="form-row" style="gap:10px;flex-wrap:wrap;margin-bottom:0;">'
+      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Type</label><select class="vcl-type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre vcl-amount" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select class="vcl-server">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Reason</label><select class="vcl-reason">' + this.reasonOptions('Void', '') + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:200px;"><label>Item <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select class="vcl-item">' + this.itemOptions('', false) + '</select></div>'
+      + '<div class="f vcl-units-wrap" style="width:90px;flex-shrink:0;display:none;"><label>Units</label><input class="vcl-units" type="number" min="0" step="0.01" placeholder="1"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm vcl-del" type="button" style="color:var(--red);">Remove</button></div>'
+      + '</div></div>';
+  },
+
+  addLine() {
+    const wrap = document.getElementById('vcb-lines');
+    if (wrap) wrap.insertAdjacentHTML('beforeend', this.lineHtml());
+  },
+
+  removeLine(line) {
+    const wrap = document.getElementById('vcb-lines');
+    if (!wrap || !line) return;
+    // Keep at least one line; clearing the last one just resets it.
+    if (wrap.querySelectorAll('.vc-line').length <= 1) wrap.innerHTML = this.lineHtml();
+    else line.remove();
+  },
+
+  async saveBatch() {
+    const err = document.getElementById('vcb-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date = document.getElementById('vcb-date')?.value;
+    if (!date) { fail('Date is required.'); return; }
+    const shift = document.getElementById('vcb-shift')?.value || '';
+    const authBy = document.getElementById('vcb-auth')?.value || '';
+    const authName = (App.staffById(authBy) || {}).name || '';
+    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
+    const thresholdActive = !isNaN(threshold) && threshold > 0;
+
+    const recs = [];
+    for (const line of [...this.container.querySelectorAll('.vc-line')]) {
+      const amtRaw   = line.querySelector('.vcl-amount')?.value;
+      const itemKey  = line.querySelector('.vcl-item')?.value || '';
+      const serverId = line.querySelector('.vcl-server')?.value || '';
+      const reason   = line.querySelector('.vcl-reason')?.value || '';
+      const type     = line.querySelector('.vcl-type')?.value || 'Void';
+      // Skip a line the manager added but never filled.
+      if ((amtRaw === '' || amtRaw == null) && !itemKey && !serverId && !reason) continue;
+      const amount = parseFloat(amtRaw);
+      if (isNaN(amount) || amount < 0) { fail('Enter the amount on every line, or remove the blank line.'); return; }
+      let item = '', productId = '', productName = '', menuItemId = '', units = null;
+      if (itemKey.startsWith('m:')) {
+        const m = this.menuItemById(itemKey.slice(2)); if (m) { item = m.name; menuItemId = m.id; }
+      } else if (itemKey.startsWith('p:')) {
+        const pr = this.productById(itemKey.slice(2));
+        if (pr) { item = pr.name; productId = pr.id; productName = pr.name; const u = parseFloat(line.querySelector('.vcl-units')?.value); units = isNaN(u) ? null : u; }
+      }
+      const isComp = type === 'Comp';
+      const override = isComp && thresholdActive && amount > threshold && !authBy;
+      recs.push({
+        id: App.uid(), date, type, shift_type: shift, item, amount,
+        product_id: productId, product_name: productName, menu_item_id: menuItemId, units,
+        staff_id: serverId, server: (App.staffById(serverId) || {}).name || '',
+        authorized_by_id: isComp ? authBy : '', authorized_by: isComp ? authName : '',
+        check_number: '', reason, notes: '', auth_threshold_override: override,
+        created_at: new Date().toISOString()
+      });
     }
+    if (!recs.length) { fail('Fill in at least one line.'); return; }
+
+    const btn = document.getElementById('vcb-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const list = this.records();
+    let ok = true;
+    for (const r of recs) { list.push(r); ok = (await App.putRecord('sc', 'void_comp', r)) && ok; }
+    if (ok) this.renderList();
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
   },
 
   async saveEdit(id) {
