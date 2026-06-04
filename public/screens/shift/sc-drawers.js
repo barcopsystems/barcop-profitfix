@@ -34,8 +34,11 @@ S.ShiftDrawers = {
     ]);
   },
 
-  // Shared field markup for the add form (d = null) and the edit page (d = record).
-  fieldsHtml(d) {
+  // Shared field markup. p = element-id prefix ('dr-' for the inline add form,
+  // 'dre-' for the edit pop-up) so the modal's inputs never collide with the
+  // inline form sitting behind it.
+  fieldsHtml(d, p) {
+    p = p || 'dr-';
     const locations = ((App.inventoryData && App.inventoryData.ic_locations) || [])
       .filter(l => !l.archived)
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -49,14 +52,14 @@ S.ShiftDrawers = {
     const v = val => (val != null && val !== '') ? val : '';
     return '<div class="form-row data-row" style="gap:16px;">'
       + '<div class="f w-lg"><label>Drawer / Register Name</label>'
-      + '<input type="text" id="dr-name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
+      + '<input type="text" id="' + p + 'name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
       + '<div class="f" style="width:220px;min-width:0;"><label>Location</label>'
-      + '<select id="dr-loc">' + locOpts + '</select></div>'
+      + '<select id="' + p + 'loc">' + locOpts + '</select></div>'
       + '<div class="f" style="width:210px;min-width:0;"><label>Default Opening Bank ' + tt('dr-bank') + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="dr-bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<input type="text" id="dr-notes" value="' + esc(d?.notes || '') + '" placeholder="Optional"/></div></div>';
+      + '<input type="text" id="' + p + 'notes" value="' + esc(d?.notes || '') + '" placeholder="Optional"/></div></div>';
   },
 
   renderList() {
@@ -117,7 +120,7 @@ S.ShiftDrawers = {
       const edit = ev.target.closest('.dr-edit');
       const arch = ev.target.closest('.dr-archive');
       const rest = ev.target.closest('.dr-restore');
-      if (edit) this.showForm(edit.dataset.id);
+      if (edit) this.openEditModal(edit.dataset.id);
       else if (arch) this.setArchived(arch.dataset.id, true);
       else if (rest) this.setArchived(rest.dataset.id, false);
     };
@@ -131,22 +134,43 @@ S.ShiftDrawers = {
     this.renderList();
   },
 
-  // Edit opens on its own page (no How it works, no collapse). Cancel -> landing.
-  showForm(id) {
-    this.editId = id || null;
-    const d = id ? this.drawers().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'New') + ' Drawer</div>'
-      + this.fieldsHtml(d)
+  // Edit opens in a focused pop-up (own dre- ids). Cancel closes it.
+  openEditModal(id) {
+    const d = this.drawers().find(x => x.id === id);
+    if (!d) return;
+    this.editId = id;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Drawer</div>'
+      + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="dr-save">' + (id ? 'Update' : 'Save') + '</button>'
-      + '<button class="btn btn-ghost" id="dr-cancel">Cancel</button>'
-      + '<span id="dr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-    this.container.onclick = null;
-    document.getElementById('dr-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('dr-save')?.addEventListener('click', () => this.save());
-    document.getElementById('dr-name')?.focus();
+      + '<button class="btn btn-primary" id="dre-save">Update</button>'
+      + '<button class="btn btn-ghost" id="dre-cancel">Cancel</button>'
+      + '<span id="dre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'dr-edit-modal', maxWidth: 640, noClose: true });
+    document.getElementById('dre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('dr-edit-modal'); });
+    document.getElementById('dre-save')?.addEventListener('click', () => this.saveEdit(id));
+    document.getElementById('dre-name')?.focus();
+  },
+
+  async saveEdit(id) {
+    const err = document.getElementById('dre-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const name = document.getElementById('dre-name')?.value.trim();
+    if (!name) { fail('Drawer name required.'); return; }
+    const dup = this.drawers().some(d => d.id !== id && (d.name || '').toLowerCase() === name.toLowerCase());
+    if (dup) { fail('A drawer with that name already exists.'); return; }
+    const numOr = (eid, def) => { const n = parseFloat(document.getElementById(eid)?.value); return isNaN(n) ? def : n; };
+    const d = this.drawers().find(x => x.id === id);
+    if (!d) { fail('Drawer not found.'); return; }
+    d.name                 = name;
+    d.location             = document.getElementById('dre-loc')?.value.trim() || '';
+    d.default_opening_bank = numOr('dre-bank', null);
+    d.notes                = document.getElementById('dre-notes')?.value.trim() || '';
+    const btn = document.getElementById('dre-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.saveShift();
+    if (ok) { this.editId = null; App.closeModal('dr-edit-modal'); this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   async save() {

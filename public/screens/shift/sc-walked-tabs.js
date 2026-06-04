@@ -47,23 +47,26 @@ S.ShiftWalkedTabs = {
     ]);
   },
 
-  // Shared fields: all data cells on one row, Notes on its own row. r=record (edit) or null (add).
-  formFields(r) {
+  // Shared fields: all data cells on one row, Notes on its own row. r=record (edit)
+  // or null (add). p = element-id prefix ('wt-' inline add form, 'wte-' edit
+  // pop-up) so the modal's inputs never collide with the inline form behind it.
+  formFields(r, p) {
+    p = p || 'wt-';
     const v = val => (val != null && val !== '') ? val : '';
     const reasonOpts = this.REASONS.map(rs => '<option' + (r && r.reason === rs ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="wt-date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label><input type="time" id="wt-time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select id="wt-server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Check #</label><input type="text" id="wt-check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="wt-amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reason</label><select id="wt-reason">' + reasonOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Manager</label><select id="wt-mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="wt-notes" rows="2" placeholder="What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + '<textarea id="' + p + 'notes" rows="2" placeholder="What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.">' + esc(r?.notes || '') + '</textarea></div></div>';
   },
 
   filterCard(stats) {
@@ -156,8 +159,8 @@ S.ShiftWalkedTabs = {
       const del  = ev.target.closest('.wt-del');
       const row  = ev.target.closest('.wt-row');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
-      if (edit)      { ev.stopPropagation(); this.showForm(edit.dataset.id); return; }
-      if (row) this.showForm(row.dataset.id);
+      if (edit)      { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
+      if (row) this.openEditModal(row.dataset.id);
     };
     document.getElementById('wt-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('wt-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
@@ -169,21 +172,58 @@ S.ShiftWalkedTabs = {
     });
   },
 
-  // Edit on its own page (same fields, no How it works). Cancel returns to the list.
-  showForm(id) {
-    this.editId = id || null;
-    const r = id ? this.tabs().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit Walked Tab' : 'Log a Walked Tab') + '</div>'
-      + this.formFields(r)
+  // Edit in a focused pop-up (own wte- ids). Cancel closes it.
+  openEditModal(id) {
+    const r = this.tabs().find(x => x.id === id);
+    if (!r) return;
+    this.editId = id;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Walked Tab</div>'
+      + this.formFields(r, 'wte-')
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="wt-save">' + (id ? 'Update' : 'Log Walked Tab') + '</button>'
-        + '<button class="btn btn-ghost" id="wt-cancel">Cancel</button>'
-        + '<span id="wt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-    this.container.onclick = null;
-    document.getElementById('wt-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('wt-save')?.addEventListener('click', () => this.save());
+      + '<button class="btn btn-primary" id="wte-save">Update</button>'
+      + '<button class="btn btn-ghost" id="wte-cancel">Cancel</button>'
+      + '<span id="wte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-danger" id="wte-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 680, noClose: true });
+    document.getElementById('wte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); });
+    document.getElementById('wte-save')?.addEventListener('click', () => this.saveEdit(id));
+    document.getElementById('wte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); this.confirmDel(id); });
+  },
+
+  async saveEdit(id) {
+    const err = document.getElementById('wte-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date = document.getElementById('wte-date')?.value;
+    if (!date) { fail('Date is required.'); return; }
+    const amount = parseFloat(document.getElementById('wte-amount')?.value);
+    if (isNaN(amount) || amount <= 0) { fail('Enter the dollar amount lost.'); return; }
+    const serverId = document.getElementById('wte-server')?.value || '';
+    if (!serverId) { fail('Pick the server.'); return; }
+    const managerId = document.getElementById('wte-mgr')?.value || '';
+    if (!managerId) { fail('Pick the manager.'); return; }
+    const list = this.tabs();
+    const i = list.findIndex(x => x.id === id);
+    if (i < 0) { fail('Record not found.'); return; }
+    const patch = {
+      date,
+      time:       document.getElementById('wte-time')?.value || '',
+      server_id:  serverId,
+      server:     (App.staffById(serverId) || {}).name || '',
+      check_ref:  document.getElementById('wte-check')?.value.trim() || '',
+      amount,
+      reason:     document.getElementById('wte-reason')?.value || 'Walked',
+      manager_id: managerId,
+      manager:    (App.staffById(managerId) || {}).name || '',
+      notes:      document.getElementById('wte-notes')?.value.trim() || '',
+      updated_at: new Date().toISOString()
+    };
+    list[i] = { ...list[i], ...patch };
+    const btn = document.getElementById('wte-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'walked_tab', list[i]);
+    if (ok) { this.editId = null; App.closeModal('wt-edit-modal'); this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   async save() {

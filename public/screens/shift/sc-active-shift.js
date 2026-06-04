@@ -216,22 +216,21 @@ S.ShiftActiveShift = {
     this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div'));
   },
 
-  // ── Log a Past Shift / Edit a shift (full-screen sub-view) ──────────────────
+  // ── Log a Past Shift / Edit a shift (focused pop-up over the command center) ─
   showShiftForm(id) {
     if (id && App.canEdit && !App.canEdit('sc-active-shift')) return;
     this._shiftFormId = id || null;
     const s = id ? this.shifts().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
+    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
       + this.shiftFormRows(s)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="asf-save">' + (id ? 'Update' : 'Save Shift') + '</button>'
       + '<button class="btn btn-ghost" id="asf-cancel">Cancel</button>'
       + '<span id="asf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (id ? '<button class="btn btn-danger" id="asf-del" style="margin-left:auto;">Delete</button>' : '')
-      + '</div></div></div>';
-    this.container.onclick = null;
-    document.getElementById('asf-cancel')?.addEventListener('click', () => this._reDispatch());
+      + '</div></div>';
+    App.openModal(html, { id: 'as-shift-modal', maxWidth: 760, noClose: true });
+    document.getElementById('asf-cancel')?.addEventListener('click', () => { this._shiftFormId = null; App.closeModal('as-shift-modal'); });
     document.getElementById('asf-save')?.addEventListener('click', () => this.saveShiftForm());
     document.getElementById('asf-del')?.addEventListener('click', () => this.confirmDeleteShift(id));
     this.calcShiftForm();
@@ -309,7 +308,7 @@ S.ShiftActiveShift = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'shift', saved);
     this._shiftFormId = null;
-    if (ok) { if (App.markSetupDone) App.markSetupDone('gs_sc_shift'); this._reDispatch(); }
+    if (ok) { if (App.markSetupDone) App.markSetupDone('gs_sc_shift'); App.closeModal('as-shift-modal'); this._reDispatch(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save Shift'; } fail('Save failed. Try again.'); }
   },
 
@@ -319,6 +318,7 @@ S.ShiftActiveShift = {
     if (!ok) return;
     await App.removeRecord('sc', 'shift', id);
     this._shiftFormId = null;
+    App.closeModal('as-shift-modal');
     this._reDispatch();
   },
 
