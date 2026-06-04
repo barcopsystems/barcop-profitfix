@@ -735,13 +735,13 @@ S.HubBooks = {
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
     rows.push(blank());
 
-    // Category column shows the operator's classification on each Comp row
-    // (Customer Comp, Service Recovery, Staff Meal, Shift Drink). Voids
-    // leave it blank.
-    rows.push(['Date', 'Type', 'Category', 'Shift', 'Item', 'Amount', 'Server', 'Authorized By', 'Reason']);
+    // Class column shows each Comp's loss-vs-expense classification, derived
+    // from its reason (Staff Meal and Shift Drink are policy expense; every
+    // customer-facing comp is loss). Voids leave it blank.
+    rows.push(['Date', 'Type', 'Class', 'Shift', 'Item', 'Amount', 'Server', 'Authorized By', 'Reason']);
 
     let totalVoids = 0, totalComps = 0;
-    const byMgr = {}, byReason = {}, byCategory = {};
+    const byMgr = {}, byReason = {}, byClass = {};
 
     if (records.length === 0) {
       rows.push(this._lineRow('(no voids or comps recorded this month)', COL_COUNT));
@@ -750,15 +750,15 @@ S.HubBooks = {
       records.forEach(r => {
         const amt = parseFloat(r.amount) || 0;
         const type = (r.type || '').toLowerCase();
-        const cat = type === 'comp' ? (r.category || 'Customer Comp') : '';
-        rows.push([r.date || '', r.type || '', cat, r.shift_type || '', r.item || '', amt, r.server || '', r.authorized_by || '', r.reason || '']);
+        const cls = type === 'comp' ? (App.compReasonIsLoss(r.reason || r.category) ? 'Loss' : 'Expense') : '';
+        rows.push([r.date || '', r.type || '', cls, r.shift_type || '', r.item || '', amt, r.server || '', r.authorized_by || '', r.reason || '']);
         if (type === 'void') totalVoids += amt;
         else if (type === 'comp') totalComps += amt;
         const mgr = r.authorized_by || '(none recorded)';
         byMgr[mgr] = (byMgr[mgr] || 0) + amt;
         const rea = r.reason || '(none recorded)';
         byReason[rea] = (byReason[rea] || 0) + amt;
-        if (cat) byCategory[cat] = (byCategory[cat] || 0) + amt;
+        if (cls) byClass[cls] = (byClass[cls] || 0) + amt;
       });
     }
 
@@ -768,11 +768,11 @@ S.HubBooks = {
     rows.push(['  Total Comps',  '', '', '', '', totalComps, '', '', '']);
     rows.push(['  Combined',     '', '', '', '', totalVoids + totalComps, '', '', '']);
 
-    if (Object.keys(byCategory).length) {
+    if (Object.keys(byClass).length) {
       rows.push(blank());
-      rows.push(['Subtotal by Comp Category (loss vs policy expense)', '', '', '', '', 'Amount', '', '', '']);
-      Object.keys(byCategory).sort().forEach(cat => {
-        rows.push(['  ' + cat, '', '', '', '', byCategory[cat], '', '', '']);
+      rows.push(['Subtotal by Comp Class (loss vs policy expense)', '', '', '', '', 'Amount', '', '', '']);
+      Object.keys(byClass).sort().forEach(cls => {
+        rows.push(['  ' + cls, '', '', '', '', byClass[cls], '', '', '']);
       });
     }
 
@@ -793,7 +793,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Shift Control void and comp log. Used for sales tax reconciliation and internal controls documentation. Staff Meal and Shift Drink categories are policy expense, not loss.',
+      'Source: Shift Control void and comp log. Used for sales tax reconciliation and internal controls documentation. Staff Meal and Shift Drink reasons are policy expense, not loss.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
