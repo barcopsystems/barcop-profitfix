@@ -15,20 +15,15 @@ S.TheftRisk = {
     { label: 'Some concern',     score: 60 },
     { label: 'Serious concern',  score: 90 }
   ],
-  // Comp categories that count as loss for theft scoring. Staff Meal and
-  // Shift Drink are policy expense — they should NOT inflate the void/comp
-  // signal. Voids always count (a voided drink could still have been poured).
-  LOSS_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery'],
-
   spotChecks() { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
-  // Only loss-bearing voids/comps. Filters out Staff Meal + Shift Drink
-  // policy expenses so the score reflects actual exposure.
+  // Only loss-bearing voids/comps. A comp's reason carries its classification:
+  // Staff Meal and Shift Drink are policy expense and do NOT inflate the signal;
+  // every customer-facing comp counts as loss. Voids always count (a voided
+  // drink could still have been poured). Single source: App.compReasonIsLoss.
   voidComps() {
     return ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => {
       if (r.type === 'Void') return true;
-      // For comps, treat missing/legacy category as Customer Comp (loss).
-      const cat = r.category || 'Customer Comp';
-      return this.LOSS_COMP_CATEGORIES.includes(cat);
+      return App.compReasonIsLoss(r.reason || r.category);
     });
   },
   variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
