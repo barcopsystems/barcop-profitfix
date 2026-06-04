@@ -126,8 +126,7 @@ S.ShiftSafeLog = {
         + App.showOlderBar('sc', 'safe_log', ordered, false);
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.filterCard(stats) + listHtml
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Read-only. Log, edit, or delete safe activity on the Cash Board.</div></div>';
+    this.container.innerHTML = '<div class="screen">' + this.filterCard(stats) + listHtml + '</div>';
 
     document.getElementById('sl-export')?.addEventListener('click', () => App.exportPDF({ title: 'Safe Log History', root: this.container }));
     document.getElementById('sl-f-from')?.addEventListener('change', e => { this.fFrom = e.target.value || ''; this.renderList(); });
