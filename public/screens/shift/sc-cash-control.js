@@ -1,16 +1,17 @@
 'use strict';
 
-/* ── Shift Control — Cash Board (the cash command center) ─────────────────────
-   One screen for everything cash. The Safe up top shows the running balance and
-   the safe actions (deposit, issue a bank, other activity, count the safe).
-   Register tiles show each drawer's bank, drops this window, and last close, with
-   Log a Drop / Count Drawer on each. The activity list below merges every safe
-   move, drawer reconcile, and safe count, filtered by date range.
+/* ── Shift Control — Cash Board (the one place to do cash) ────────────────────
+   Everything cash happens here. Top to bottom: the Safe (balance + safe
+   actions), the Registers (a tile per drawer with Log a Drop / Count Drawer),
+   then Cash Activity (the full log, tap a row to edit). Entry and editing run
+   through pop-ups + the shared bill counter, so there is one door.
 
-   The three log screens (Cash Drop, Safe Log, Variance Log) stay as the full
-   history/edit doors. The board's pop-up actions write the SAME records through
-   the same persistence path (S.ShiftCashDrop.persistDrop / S.ShiftSafeLog
-   .persistEntry / putRecord safe_count) so there is one source of truth. */
+   Cash Drop / Safe Log / Variance Log are now read-only HISTORY views (their own
+   filterable list + Export). The board writes and edits through their shared
+   persist/remove helpers (S.ShiftCashDrop.persistDrop/removeDrop, S.ShiftSafeLog
+   .persistEntry/removeEntry, S.ShiftVarianceLog.persistVariance/removeVariance,
+   putRecord/removeRecord safe_count) so a record behaves the same wherever it is
+   read. */
 
 S.ShiftCashControl = {
   range: '30',   // '7' | '30' | '90' | '365' | 'all'
@@ -32,6 +33,9 @@ S.ShiftCashControl = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  _nowHHMM() { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); },
+  _today() { return new Date().toISOString().slice(0, 10); },
+  _mgr() { return App.activeManagerId ? App.activeManagerId() : ''; },
 
   startDate() {
     if (this.range === 'all') return '';
@@ -41,7 +45,6 @@ S.ShiftCashControl = {
     return d.toISOString().slice(0, 10);
   },
 
-  // Running safe balance from EVERY safe log entry on file (lifetime, not window).
   currentSafeBalance() {
     return this.safeLog().reduce((bal, e) => {
       const amt = parseFloat(e.amount) || 0;
@@ -49,7 +52,6 @@ S.ShiftCashControl = {
     }, 0);
   },
 
-  // Net safe movement inside the active date range.
   netInWindow() {
     const start = this.startDate();
     return this.safeLog().reduce((sum, e) => {
@@ -69,7 +71,6 @@ S.ShiftCashControl = {
     })[0];
   },
 
-  // Per-drawer rollup: drops this window + the most recent close (variance).
   drawerStats(d) {
     const start = this.startDate();
     const inWin = dt => !start || (dt || '') >= start;
@@ -82,26 +83,28 @@ S.ShiftCashControl = {
   },
 
   // Merge safe entries + variances + safe counts into one chronological stream,
-  // filtered to the active range, newest first.
+  // filtered to the active range, newest first. editCat/editId route a row click
+  // to the right edit pop-up.
   activityStream() {
     const start = this.startDate();
     const out = [];
 
     this.safeLog().forEach(e => {
       if (start && e.date < start) return;
+      const isDrop = e.source === 'cash-drop';
       out.push({
         date: e.date, time: e.time || '',
         sortKey: (e.date || '') + 'T' + (e.time || '00:00') + '|' + (e.created_at || ''),
         type: e.txn_type || 'Safe Activity',
         category: 'safe',
-        is_drop: e.source === 'cash-drop',
+        is_drop: isDrop,
         ref: e.reference || '',
         by: e.performed_by || '',
         amount: parseFloat(e.amount) || 0,
         direction: e.direction || 'in',
         status: '',
-        source_screen: e.source === 'cash-drop' ? 'sc-cash-drop' : 'sc-safe-log',
-        source_id: e.source === 'cash-drop' ? e.source_id : e.id
+        editCat: isDrop ? 'safe_drop' : 'safe',
+        editId: isDrop ? e.source_id : e.id
       });
     });
 
@@ -120,8 +123,8 @@ S.ShiftCashControl = {
         direction: 'none',
         variance,
         status: v.status || (Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over'),
-        source_screen: 'sc-variance-log',
-        source_id: v.id
+        editCat: 'variance',
+        editId: v.id
       });
     });
 
@@ -139,8 +142,8 @@ S.ShiftCashControl = {
         direction: 'none',
         variance,
         status: c.status || (Math.abs(variance) <= this.tolerance() ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over'),
-        source_screen: '',
-        source_id: c.id
+        editCat: 'safe_count',
+        editId: c.id
       });
     });
 
@@ -154,10 +157,10 @@ S.ShiftCashControl = {
 
   showHowTo() {
     App.showHelpModal('How the Cash Board Works', [
-      { p: ['The Cash Board is one place for everything cash. The Safe up top shows what should be in your safe right now, built from every safe entry on file. Cash drops mirror into the safe automatically, so the balance stays honest with no double entry.'] },
-      { h: 'The Safe', p: ['Make a Deposit, Issue a Bank, or log other safe activity right here without leaving the board. Count the Safe lets you count what is physically in the safe and catch an over or short against what should be there. A safe count flags the gap, it does not change your running balance.'] },
-      { h: 'Registers', p: ['Each drawer shows its standard bank, the drops pulled this window, and how its last close came out. Log a Drop pulls cash from that register into the safe. Count Drawer opens the variance form to reconcile the counted drawer against the POS at close.'] },
-      { h: 'Cash Activity', p: ['Every drop, deposit, bank move, drawer reconcile, and safe count lands in the list below, filtered by the date range you pick. Tap a row to open it in its own log for a full edit.'] }
+      { p: ['The Cash Board is the one place for cash. The Safe up top shows what should be in your safe right now, built from every safe entry on file. Cash drops mirror into the safe automatically, so the balance stays honest with no double entry.'] },
+      { h: 'The Safe', p: ['Make a Deposit, Issue a Bank, or log other safe activity right here. Count the Safe lets you count what is physically in the safe and catch an over or short against what should be there. A safe count flags the gap, it does not change your running balance.'] },
+      { h: 'Registers', p: ['Each drawer shows its standard bank, the drops pulled this window, and how its last close came out. Log a Drop pulls cash from that register into the safe. Count Drawer reconciles the counted drawer against the POS at close.'] },
+      { h: 'Cash Activity', p: ['Every drop, deposit, bank move, drawer reconcile, and safe count lands in the list below, filtered by the date range you pick. Tap a row to edit or delete it. The Cash Drop, Safe Log, and Variance pages hold the full filterable history with Export.'] }
     ]);
   },
 
@@ -172,11 +175,9 @@ S.ShiftCashControl = {
   },
 
   draw() {
-    const stream  = this.activityStream();
-    const hasAny  = this.safeLog().length || this.variances().length || this.drops().length || this.safeCounts().length;
+    const stream = this.activityStream();
+    const hasAny = this.safeLog().length || this.variances().length || this.drops().length || this.safeCounts().length;
 
-    // Day-one: no drawers and nothing logged. Guide setup, then this becomes the
-    // live board the moment cash starts moving.
     if (!this.drawers().length && !hasAny) {
       App.setupCard(this.container, {
         title: 'Cash Board',
@@ -189,9 +190,8 @@ S.ShiftCashControl = {
       return;
     }
 
+    // ── 1. The Safe ──
     const balance = this.currentSafeBalance();
-
-    // ── Safe hero ──
     const lastCount = this.lastSafeCount();
     let countLine = '';
     if (lastCount) {
@@ -201,7 +201,7 @@ S.ShiftCashControl = {
       countLine = '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Last safe count ' + this.fmtDate(lastCount.date) + ': '
         + '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> ' + esc(st) + '</div>';
     }
-    const hero = '<div class="card" style="margin-bottom:16px;">'
+    const safeCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>The Safe</span>' + App.helpButton('cc-how') + '</div>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Current Safe Balance</div>'
       + '<div style="font-size:34px;font-weight:800;color:var(--gold);letter-spacing:0.5px;line-height:1;">' + App.fmtCurrency(balance) + '</div>'
@@ -214,40 +214,22 @@ S.ShiftCashControl = {
       +   '<button class="btn btn-ghost btn-sm" id="cc-count-safe">Count the Safe</button>'
       + '</div></div>';
 
-    // ── Range control + net-in-window ──
+    // ── Window selector (governs Registers + Activity) ──
     const netWin = this.netInWindow();
     const netColor = netWin > 0 ? 'var(--gold)' : netWin < 0 ? 'var(--red)' : 'var(--t3)';
     const netLabel = this.range === 'all' ? 'Net All Time' : 'Net In Window';
-    const controls = '<div class="form-row" style="margin-bottom:14px;align-items:center;gap:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Date Range</label>'
-      + '<select id="cc-range">' + this.rangeOptions() + '</select></div>'
-      + '<div style="font-size:11px;color:var(--t3);align-self:flex-end;padding-bottom:10px;flex:1;min-width:180px;">'
-        + (this.range === 'all' ? 'All cash activity on file.' : 'Activity from ' + this.fmtDate(this.startDate()) + ' to today.')
-      + '</div>'
+    const winWord = this.range === 'all' ? 'all time' : 'this window';
+    const windowBar = '<div class="form-row" style="margin-bottom:16px;align-items:center;gap:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Date Range</label><select id="cc-range">' + this.rangeOptions() + '</select></div>'
+      + '<div style="font-size:11px;color:var(--t3);align-self:flex-end;padding-bottom:10px;flex:1;min-width:160px;">'
+        + (this.range === 'all' ? 'All cash activity on file.' : 'Activity from ' + this.fmtDate(this.startDate()) + ' to today.') + '</div>'
       + '<div style="align-self:flex-end;padding-bottom:6px;text-align:right;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + netLabel + '</div>'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">'
-        + (netWin >= 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div>'
-      + '</div></div>';
+        + (netWin >= 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div></div>'
+      + '</div>';
 
-    // ── Window tiles ──
-    const drops     = stream.filter(s => s.category === 'safe' && s.is_drop);
-    const safeOut   = stream.filter(s => s.category === 'safe' && s.direction === 'out');
-    const variances = stream.filter(s => s.category === 'variance');
-    const flagged   = variances.filter(v => v.status === 'Over' || v.status === 'Short');
-    const netVar    = variances.reduce((s, v) => s + (v.variance || 0), 0);
-    const totDrops  = drops.reduce((s, d) => s + d.amount, 0);
-    const totOut    = safeOut.reduce((s, e) => s + e.amount, 0);
-    const winWord   = this.range === 'all' ? 'all time' : 'this window';
-
-    const tiles = '<div class="calc" style="margin-bottom:16px;">'
-      + '<div class="calc-item"><div class="calc-label">Drops In</div><div class="calc-val">' + App.fmtCurrency(totDrops) + '</div><div style="font-size:10px;color:var(--t3);">' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + ', ' + winWord + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Safe Out</div><div class="calc-val">' + App.fmtCurrency(totOut) + '</div><div style="font-size:10px;color:var(--t3);">deposits and banks, ' + winWord + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val ' + (flagged.length > 0 ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
-    + '</div>';
-
-    // ── Register tiles ──
+    // ── 2. Registers ──
     const tile = d => {
       const st = this.drawerStats(d);
       const bank = (d.default_opening_bank != null && d.default_opening_bank !== '') ? App.fmtCurrency(d.default_opening_bank) : '-';
@@ -272,19 +254,30 @@ S.ShiftCashControl = {
         +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Count Drawer</button>'
         + '</div></div>';
     };
-    const drawersCard = '<div class="card"><div class="card-title">Registers</div>'
+    const registersCard = '<div class="card" style="margin-bottom:16px;"><div class="card-title">Registers</div>'
       + (this.drawers().length
           ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">' + this.drawers().map(tile).join('') + '</div>'
           : '<div style="font-size:13px;color:var(--t3);">No drawers set up yet. Add your registers so each one tracks its drops and closes. <button class="btn btn-ghost btn-sm" id="cc-go-drawers">Set Up Drawers</button></div>')
       + '</div>';
 
-    // ── Activity table ──
-    let body;
-    if (stream.length === 0) {
-      body = '<div class="empty">'
-        + '<div class="empty-title">No cash activity in this range</div>'
-        + '<div class="empty-sub">Cash drops, drawer reconciliations, safe counts, and safe activity all show here once they are logged.</div>'
+    // ── 3. Cash Activity ──
+    const drops     = stream.filter(s => s.category === 'safe' && s.is_drop);
+    const safeOut   = stream.filter(s => s.category === 'safe' && s.direction === 'out');
+    const variances = stream.filter(s => s.category === 'variance');
+    const flagged   = variances.filter(v => v.status === 'Over' || v.status === 'Short');
+    const netVar    = variances.reduce((s, v) => s + (v.variance || 0), 0);
+    const totDrops  = drops.reduce((s, d) => s + d.amount, 0);
+    const totOut    = safeOut.reduce((s, e) => s + e.amount, 0);
+    const summary = '<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--t3);margin-bottom:12px;">'
+      + '<span>Drops in <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(totDrops) + '</span> (' + drops.length + ')</span>'
+      + '<span>Safe out <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(totOut) + '</span></span>'
+      + '<span>Drawer net <span style="color:' + (netVar < 0 ? 'var(--red)' : 'var(--t1)') + ';font-weight:700;">' + (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar) + '</span></span>'
+      + '<span>Flagged <span style="color:' + (flagged.length ? 'var(--red)' : 'var(--t1)') + ';font-weight:700;">' + flagged.length + '</span></span>'
       + '</div>';
+
+    let activityBody;
+    if (stream.length === 0) {
+      activityBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No cash activity in this range. Log a drop, deposit, or safe count to get started.</div>';
     } else {
       const rows = stream.map(s => {
         let amountCell, statusCell;
@@ -301,8 +294,7 @@ S.ShiftCashControl = {
             ? '<span style="font-weight:700;color:var(--t3);">Out</span>'
             : '<span style="font-weight:700;color:var(--gold);">In</span>';
         }
-        const clickable = !!s.source_screen;
-        return '<tr' + (clickable ? ' class="cc-row" data-screen="' + esc(s.source_screen) + '" style="cursor:pointer;"' : '') + '>'
+        return '<tr class="cc-row" data-cat="' + esc(s.editCat) + '" data-id="' + esc(s.editId || '') + '" style="cursor:pointer;">'
           + '<td>' + this.fmtDate(s.date) + (s.time ? '<div style="font-size:10px;color:var(--t3);">' + esc(s.time) + '</div>' : '') + '</td>'
           + '<td><div class="val">' + esc(s.type) + '</div></td>'
           + '<td>' + esc(s.ref || '-') + '</td>'
@@ -311,13 +303,14 @@ S.ShiftCashControl = {
           + '<td>' + statusCell + '</td>'
         + '</tr>';
       }).join('');
-      body = '<div class="sh" style="margin:6px 0 10px;">Cash Activity</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      activityBody = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Reference</th><th>By</th><th>Amount</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tap any row to edit or delete it.</div>';
     }
+    const activityCard = '<div class="card"><div class="card-title">Cash Activity</div>' + summary + activityBody + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + hero + controls + tiles + drawersCard + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + safeCard + windowBar + registersCard + activityCard + '</div>';
 
     document.getElementById('cc-range')?.addEventListener('change', e => { this.range = e.target.value; this.draw(); });
     document.getElementById('cc-how')?.addEventListener('click', () => this.showHowTo());
@@ -331,57 +324,80 @@ S.ShiftCashControl = {
       const drop = ev.target.closest('.cc-drop');
       const cd   = ev.target.closest('.cc-count-drawer');
       const row  = ev.target.closest('.cc-row');
-      if (drop) { this.openDrop(drop.dataset.id); return; }
-      if (cd)   { S.ShiftVarianceLog._openNew = { drawer_id: cd.dataset.id }; App.navigate('sc-variance-log'); return; }
-      if (row && row.dataset.screen) App.navigate(row.dataset.screen);
+      if (drop) { this.openDrop(null, drop.dataset.id); return; }
+      if (cd)   { this.openCountDrawer(null, cd.dataset.id); return; }
+      if (row) {
+        const cat = row.dataset.cat, id = row.dataset.id;
+        if (cat === 'safe_drop')      { const r = this.drops().find(x => x.id === id);      if (r) this.openDrop(r); }
+        else if (cat === 'safe')      { const r = this.safeLog().find(x => x.id === id);    if (r) this.openSafeMove(null, r); }
+        else if (cat === 'variance')  { const r = this.variances().find(x => x.id === id);  if (r) this.openCountDrawer(r); }
+        else if (cat === 'safe_count'){ const r = this.safeCounts().find(x => x.id === id); if (r) this.openSafeCount(r); }
+      }
     };
   },
 
-  _nowHHMM() {
-    const n = new Date();
-    return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+  // ── Shared delete confirm (a small modal above the form) ────────────────────
+  confirmDelete(label, onYes) {
+    const html = '<div class="card" style="margin:0;text-align:center;">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:8px;">Delete this ' + esc(label) + '?</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:18px;">This cannot be undone.</div>'
+      + '<div style="display:flex;gap:10px;justify-content:center;">'
+      +   '<button class="btn btn-ghost" id="ccx-cancel">Cancel</button>'
+      +   '<button class="btn btn-danger" id="ccx-yes">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'cc-confirm', maxWidth: 360, layer: 9100, noClose: true });
+    document.getElementById('ccx-cancel')?.addEventListener('click', () => App.closeModal('cc-confirm'));
+    document.getElementById('ccx-yes')?.addEventListener('click', async () => { App.closeModal('cc-confirm'); await onYes(); });
   },
-  _today() { return new Date().toISOString().slice(0, 10); },
-  _mgr() { return App.activeManagerId ? App.activeManagerId() : ''; },
 
-  // ── Log a Drop (pop-up, writes through S.ShiftCashDrop.persistDrop) ─────────
-  openDrop(drawerId) {
+  _delBtn(editing) {
+    return editing ? '<button class="btn btn-danger" id="ccm-del" style="margin-left:auto;">Delete</button>' : '';
+  },
+
+  // ── Log a Drop (new or edit) ────────────────────────────────────────────────
+  openDrop(rec, drawerId) {
+    const editing = !!rec;
     const active    = (App.activeShift && App.activeShift()) || null;
-    const dId       = drawerId || (active ? active.drawer_id || '' : '');
-    const shiftType = active ? active.shift_type || '' : '';
-    const byId      = active ? active.manager_id || '' : '';
+    const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
+    const shiftType = editing ? rec.shift_type : (active ? active.shift_type || '' : '');
+    const byId      = editing ? (rec.performed_by_id || rec.performed_by) : (active ? active.manager_id || '' : '');
+    const witId     = editing ? (rec.witness_id || rec.witness) : '';
     const typeOpts  = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    const v = x => (x != null && x !== '') ? x : '';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Log a Cash Drop</div>'
+    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Cash Drop' : 'Log a Cash Drop') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccd-date" value="' + this._today() + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccd-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="width:150px;min-width:0;"><label>Shift Type</label><select id="ccd-type" style="height:44px;">' + typeOpts + '</select></div>'
-      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccd-time" value="' + this._nowHHMM() + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccd-time" value="' + esc(v(rec && rec.drop_time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;">'
       +   '<div class="f" style="width:220px;min-width:0;"><label>Drawer / Register</label><select id="ccd-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select drawer...' }) + '</select></div>'
       +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccd-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccd-witness" style="height:44px;">' + App.staffOptions('', { placeholder: '(optional)' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccd-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
       + '<div class="sh" style="margin:16px 0 10px;">Count the Drop</div>'
-      + '<div id="ccd-counter">' + CashCounter.html({ prefix: 'ccdrop' }) + '</div>'
+      + '<div id="ccd-counter">' + CashCounter.html({ prefix: 'ccdrop', values: (rec && rec.denominations) || {} }) + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-top:14px;">'
-      +   '<div class="f" style="width:200px;min-width:0;"><label>Amount Dropped</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccd-amount" min="0" step="0.01" inputmode="decimal" style="height:48px;font-size:20px;"/></div></div>'
+      +   '<div class="f" style="width:200px;min-width:0;"><label>Amount Dropped</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccd-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '" style="height:48px;font-size:20px;"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:12px;">Counts auto-fill here. Edit directly if you are not counting by bill.</div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccd-save">Save Drop</button><button class="btn btn-ghost" id="ccd-cancel">Cancel</button>'
-      +   '<span id="ccd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div></div>';
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccd-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccd-save">' + (editing ? 'Update' : 'Save Drop') + '</button><button class="btn btn-ghost" id="ccd-cancel">Cancel</button>'
+      +   '<span id="ccd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 640 });
     const counter = CashCounter.mount(document.getElementById('ccd-counter'), {
       onChange: total => { const a = document.getElementById('ccd-amount'); if (a && total > 0) a.value = total.toFixed(2); }
     });
     document.getElementById('ccd-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
-    document.getElementById('ccd-save')?.addEventListener('click', () => this.saveDrop(counter));
+    document.getElementById('ccd-save')?.addEventListener('click', () => this.saveDrop(counter, editing ? rec.id : null));
+    document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('cash drop', async () => {
+      await S.ShiftCashDrop.removeDrop(rec.id); App.closeModal('cc-modal'); this.draw();
+    }));
   },
 
-  async saveDrop(counter) {
+  async saveDrop(counter, editId) {
     const err = document.getElementById('ccd-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('ccd-date')?.value;
@@ -389,11 +405,12 @@ S.ShiftCashControl = {
     const amount = parseFloat(document.getElementById('ccd-amount')?.value);
     if (isNaN(amount) || amount <= 0) { fail('Enter the amount dropped.'); return; }
 
+    const existing = editId ? this.drops().find(x => x.id === editId) : null;
     const drawerId = document.getElementById('ccd-drawer')?.value || '';
     const byId     = document.getElementById('ccd-by')?.value || '';
     const witId    = document.getElementById('ccd-witness')?.value || '';
     const rec = {
-      id: App.uid(),
+      id: editId || App.uid(),
       date,
       shift_type:      document.getElementById('ccd-type')?.value || '',
       drop_time:       document.getElementById('ccd-time')?.value || '',
@@ -406,44 +423,48 @@ S.ShiftCashControl = {
       amount,
       denominations:   counter ? counter.denoms() : {},
       notes:           document.getElementById('ccd-notes')?.value.trim() || '',
-      safe_log_id:     null,
-      created_at:      new Date().toISOString()
+      safe_log_id:     existing ? (existing.safe_log_id || null) : null,
+      created_at:      existing ? existing.created_at : new Date().toISOString()
     };
 
     const btn = document.getElementById('ccd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await S.ShiftCashDrop.persistDrop(rec);
     if (ok) { App.closeModal('cc-modal'); this.draw(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save Drop'; } fail('Save failed. Try again.'); }
+    else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Drop'; } fail('Save failed. Try again.'); }
   },
 
-  // ── Safe move (deposit / bank / paid-out) — pop-up, writes safe_log ─────────
-  openSafeMove(presetType) {
-    const typeOpts = S.ShiftSafeLog.TYPES.map(t => '<option' + (t.name === presetType ? ' selected' : '') + '>' + t.name + '</option>').join('');
+  // ── Safe move: deposit / bank / paid-out (new or edit) ──────────────────────
+  openSafeMove(presetType, rec) {
+    const editing = !!rec;
+    const curType = editing ? rec.txn_type : presetType;
+    const typeOpts = S.ShiftSafeLog.TYPES.map(t => '<option' + (t.name === curType ? ' selected' : '') + '>' + t.name + '</option>').join('');
     const titleMap = { 'Bank Deposit': 'Make a Deposit', 'Bank Issued': 'Issue a Bank' };
-    const title = titleMap[presetType] || 'Safe Activity';
-    const hint = presetType === 'Bank Deposit'
-      ? '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">Safe balance available: ' + App.fmtCurrency(this.currentSafeBalance()) + '</div>'
-      : '';
+    const title = editing ? 'Edit Safe Activity' : (titleMap[presetType] || 'Safe Activity');
+    const hint = (!editing && presetType === 'Bank Deposit')
+      ? '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">Safe balance available: ' + App.fmtCurrency(this.currentSafeBalance()) + '</div>' : '';
+    const v = x => (x != null && x !== '') ? x : '';
+    const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
+    const witId = editing ? (rec.witness_id || rec.witness) : '';
 
     const html = '<div class="card" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
       + '<div class="form-row" style="gap:14px;">'
-      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + this._today() + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + this._nowHHMM() + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="width:180px;min-width:0;"><label>Type</label><select id="ccs-type" style="height:44px;">' + typeOpts + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-      +   '<div class="f" style="width:150px;min-width:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccs-amount" min="0" step="0.01" inputmode="decimal" style="height:44px;"/></div></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccs-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '" style="height:44px;"/></div></div>'
       +   '<div class="f" style="width:140px;min-width:0;"><label>Direction</label><div class="f-display" id="ccs-dir" style="height:44px;display:flex;align-items:center;">-</div></div>'
-      +   '<div class="f" style="width:200px;min-width:0;"><label>Reference</label><input type="text" id="ccs-ref" placeholder="e.g. Deposit #, Bar 1"/></div>'
+      +   '<div class="f" style="width:200px;min-width:0;"><label>Reference</label><input type="text" id="ccs-ref" value="' + esc((rec && rec.reference) || '') + '" placeholder="e.g. Deposit #, Bar 1"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccs-by" style="height:44px;">' + App.staffOptions(this._mgr(), { placeholder: 'Select staff...' }) + '</select></div>'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccs-witness" style="height:44px;">' + App.staffOptions('', { placeholder: '(optional)' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccs-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccs-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccs-notes" rows="2" placeholder="Optional"></textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">Save</button><button class="btn btn-ghost" id="ccs-cancel">Cancel</button>'
-      +   '<span id="ccs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div></div>';
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccs-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">' + (editing ? 'Update' : 'Save') + '</button><button class="btn btn-ghost" id="ccs-cancel">Cancel</button>'
+      +   '<span id="ccs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 600 });
     const updateDir = () => {
@@ -453,11 +474,14 @@ S.ShiftCashControl = {
     };
     document.getElementById('ccs-type')?.addEventListener('change', updateDir);
     document.getElementById('ccs-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
-    document.getElementById('ccs-save')?.addEventListener('click', () => this.saveSafeMove());
+    document.getElementById('ccs-save')?.addEventListener('click', () => this.saveSafeMove(editing ? rec.id : null));
+    document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('safe entry', async () => {
+      await S.ShiftSafeLog.removeEntry(rec.id); App.closeModal('cc-modal'); this.draw();
+    }));
     updateDir();
   },
 
-  async saveSafeMove() {
+  async saveSafeMove(editId) {
     const err = document.getElementById('ccs-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('ccs-date')?.value;
@@ -465,11 +489,12 @@ S.ShiftCashControl = {
     const amount = parseFloat(document.getElementById('ccs-amount')?.value);
     if (isNaN(amount) || amount <= 0) { fail('Enter an amount.'); return; }
 
+    const existing = editId ? this.safeLog().find(x => x.id === editId) : null;
     const txnType = document.getElementById('ccs-type')?.value || '';
     const byId    = document.getElementById('ccs-by')?.value || '';
     const witId   = document.getElementById('ccs-witness')?.value || '';
     const rec = {
-      id: App.uid(),
+      id: editId || App.uid(),
       date,
       time:            document.getElementById('ccs-time')?.value || '',
       txn_type:        txnType,
@@ -481,30 +506,34 @@ S.ShiftCashControl = {
       witness_id:      witId,
       witness:         (App.staffById(witId) || {}).name || '',
       notes:           document.getElementById('ccs-notes')?.value.trim() || '',
-      created_at:      new Date().toISOString()
+      created_at:      existing ? existing.created_at : new Date().toISOString()
     };
 
     const btn = document.getElementById('ccs-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await S.ShiftSafeLog.persistEntry(rec);
     if (ok) { App.closeModal('cc-modal'); this.draw(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } fail('Save failed. Try again.'); }
+    else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save'; } fail('Save failed. Try again.'); }
   },
 
-  // ── Count the Safe (pop-up, writes safe_count) ──────────────────────────────
-  openSafeCount() {
-    const expected = this.currentSafeBalance();
+  // ── Count the Safe (new or edit) ────────────────────────────────────────────
+  openSafeCount(rec) {
+    const editing = !!rec;
+    const expected = editing ? (parseFloat(rec.expected) || 0) : this.currentSafeBalance();
     const tol = this.tolerance();
     this._safeExpected = expected;
+    const v = x => (x != null && x !== '') ? x : '';
+    const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
+    const witId = editing ? (rec.witness_id || rec.witness) : '';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Count the Safe</div>'
+    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Safe Count' : 'Count the Safe') + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Count everything in the safe right now. Bar Cop compares it to what the safe should hold and logs the over or short. This flags the gap, it does not change your running balance.</div>'
       + '<div class="form-row" style="gap:14px;">'
-      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccc-date" value="' + this._today() + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccc-time" value="' + this._nowHHMM() + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccc-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccc-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
       + '</div>'
       + '<div class="sh" style="margin:8px 0 10px;">Count the Safe</div>'
-      + '<div id="ccc-counter">' + CashCounter.html({ prefix: 'ccsafe' }) + '</div>'
+      + '<div id="ccc-counter">' + CashCounter.html({ prefix: 'ccsafe', values: (rec && rec.denominations) || {} }) + '</div>'
       + '<div class="calc" style="margin-top:14px;">'
       +   '<div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val" id="ccc-counted">$0</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Expected</div><div class="calc-val dim">' + App.fmtCurrency(expected) + '</div></div>'
@@ -512,12 +541,12 @@ S.ShiftCashControl = {
       +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccc-status">-</div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-top:6px;">'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccc-by" style="height:44px;">' + App.staffOptions(this._mgr(), { placeholder: 'Select staff...' }) + '</select></div>'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccc-witness" style="height:44px;">' + App.staffOptions('', { placeholder: '(optional)' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccc-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccc-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccc-notes" rows="2" placeholder="Optional"></textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccc-save">Save Count</button><button class="btn btn-ghost" id="ccc-cancel">Cancel</button>'
-      +   '<span id="ccc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div></div>';
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccc-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccc-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccc-cancel">Cancel</button>'
+      +   '<span id="ccc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 620 });
     const update = total => {
@@ -534,10 +563,13 @@ S.ShiftCashControl = {
     const counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
     update(counter ? counter.total() : 0);
     document.getElementById('ccc-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
-    document.getElementById('ccc-save')?.addEventListener('click', () => this.saveSafeCount(counter));
+    document.getElementById('ccc-save')?.addEventListener('click', () => this.saveSafeCount(counter, editing ? rec.id : null));
+    document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('safe count', async () => {
+      await App.removeRecord('sc', 'safe_count', rec.id); App.closeModal('cc-modal'); this.draw();
+    }));
   },
 
-  async saveSafeCount(counter) {
+  async saveSafeCount(counter, editId) {
     const err = document.getElementById('ccc-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('ccc-date')?.value;
@@ -545,6 +577,7 @@ S.ShiftCashControl = {
     const counted = counter ? counter.total() : 0;
     if (counted <= 0) { fail('Count the safe first.'); return; }
 
+    const existing = editId ? this.safeCounts().find(x => x.id === editId) : null;
     const expected = (this._safeExpected != null) ? this._safeExpected : this.currentSafeBalance();
     const variance = Math.round((counted - expected) * 100) / 100;
     const tol = this.tolerance();
@@ -552,7 +585,7 @@ S.ShiftCashControl = {
     const byId  = document.getElementById('ccc-by')?.value || '';
     const witId = document.getElementById('ccc-witness')?.value || '';
     const rec = {
-      id: App.uid(),
+      id: editId || App.uid(),
       date,
       time:            document.getElementById('ccc-time')?.value || '',
       counted, expected, variance, tolerance: tol, status,
@@ -562,13 +595,109 @@ S.ShiftCashControl = {
       witness_id:      witId,
       witness:         (App.staffById(witId) || {}).name || '',
       notes:           document.getElementById('ccc-notes')?.value.trim() || '',
-      created_at:      new Date().toISOString()
+      created_at:      existing ? existing.created_at : new Date().toISOString()
     };
 
     const btn = document.getElementById('ccc-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'safe_count', rec);
     if (ok) { App.closeModal('cc-modal'); this.draw(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save Count'; } fail('Save failed. Try again.'); }
+    else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Count'; } fail('Save failed. Try again.'); }
+  },
+
+  // ── Count Drawer (new or edit) — reconcile a drawer count vs POS ────────────
+  openCountDrawer(rec, drawerId) {
+    const editing = !!rec;
+    const active    = (App.activeShift && App.activeShift()) || null;
+    const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
+    const shiftType = editing ? rec.shift_type : (active ? active.shift_type || '' : '');
+    const cashId    = editing ? (rec.cashier_id || rec.cashier) : '';
+    const typeOpts  = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    const reasonOpts = '<option value="">Select reason...</option>'
+      + S.ShiftVarianceLog.REASONS.map(r => '<option' + (rec && rec.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
+    const v = x => (x != null && x !== '') ? x : '';
+
+    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Count' : 'Count Drawer') + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="width:200px;min-width:0;"><label>Drawer / Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select drawer...' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Expected Cash (POS)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '" style="height:44px;"/></div></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Counted Cash</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-counted" min="0" step="0.01" value="' + esc(v(rec && rec.counted_cash)) + '" style="height:44px;"/></div></div>'
+      +   '<div class="f" style="width:180px;min-width:0;"><label>Reason</label><select id="ccv-reason" style="height:44px;">' + reasonOpts + '</select></div>'
+      + '</div>'
+      + '<div class="calc">'
+      +   '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="ccv-c-variance">-</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim">&plusmn;' + App.fmtCurrency(this.tolerance()) + '</div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
+      +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
+
+    App.openModal(html, { id: 'cc-modal', maxWidth: 640 });
+    const calc = () => {
+      const exp = parseFloat(document.getElementById('ccv-expected')?.value);
+      const cnt = parseFloat(document.getElementById('ccv-counted')?.value);
+      const varEl = document.getElementById('ccv-c-variance');
+      const stEl = document.getElementById('ccv-c-status');
+      if (!varEl || !stEl) return;
+      if (isNaN(exp) || isNaN(cnt)) { varEl.textContent = '-'; varEl.className = 'calc-val'; stEl.textContent = '-'; stEl.className = 'calc-val'; return; }
+      const variance = Math.round((cnt - exp) * 100) / 100;
+      const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt);
+      const cls = 'calc-val ' + (status === 'Short' ? 'warn' : status === 'Not Counted' ? 'dim' : status === 'Over' ? 'dim' : 'good');
+      varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = cls;
+      stEl.textContent = status; stEl.className = cls;
+    };
+    document.getElementById('ccv-expected')?.addEventListener('input', calc);
+    document.getElementById('ccv-counted')?.addEventListener('input', calc);
+    document.getElementById('ccv-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
+    document.getElementById('ccv-save')?.addEventListener('click', () => this.saveCountDrawer(editing ? rec.id : null));
+    document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('drawer count', async () => {
+      await S.ShiftVarianceLog.removeVariance(rec.id); App.closeModal('cc-modal'); this.draw();
+    }));
+    calc();
+  },
+
+  async saveCountDrawer(editId) {
+    const err = document.getElementById('ccv-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date = document.getElementById('ccv-date')?.value;
+    if (!date) { fail('Date is required.'); return; }
+    const exp = parseFloat(document.getElementById('ccv-expected')?.value);
+    const cnt = parseFloat(document.getElementById('ccv-counted')?.value);
+    if (isNaN(exp) || isNaN(cnt)) { fail('Enter expected and counted cash.'); return; }
+    if (exp === 0 && cnt === 0) { fail('Both expected and counted are zero. Log the real numbers or cancel.'); return; }
+
+    const existing = editId ? this.variances().find(x => x.id === editId) : null;
+    const variance = Math.round((cnt - exp) * 100) / 100;
+    const drawerId = document.getElementById('ccv-drawer')?.value || '';
+    const cashId   = document.getElementById('ccv-cashier')?.value || '';
+    const rec = {
+      id: editId || App.uid(),
+      date,
+      shift_type:    document.getElementById('ccv-type')?.value || '',
+      drawer_id:     drawerId,
+      drawer:        (App.drawerById(drawerId) || {}).name || '',
+      cashier_id:    cashId,
+      cashier:       (App.staffById(cashId) || {}).name || '',
+      expected_cash: exp,
+      counted_cash:  cnt,
+      variance,
+      tolerance:     S.ShiftVarianceLog.tolerance(),
+      status:        S.ShiftVarianceLog.statusOf(variance, exp, cnt),
+      reason:        document.getElementById('ccv-reason')?.value || '',
+      notes:         document.getElementById('ccv-notes')?.value.trim() || '',
+      created_at:    existing ? existing.created_at : new Date().toISOString()
+    };
+
+    const btn = document.getElementById('ccv-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await S.ShiftVarianceLog.persistVariance(rec);
+    if (ok) { App.closeModal('cc-modal'); this.draw(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Count'; } fail('Save failed. Try again.'); }
   }
 };
