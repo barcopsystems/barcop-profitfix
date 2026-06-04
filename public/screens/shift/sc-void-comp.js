@@ -270,8 +270,9 @@ S.ShiftVoidComp = {
         const reason = line.querySelector('.vcl-reason');
         if (reason) reason.innerHTML = this.reasonOptions(ev.target.value, '');
       } else if (ev.target.classList.contains('vcl-item')) {
-        const uw = line.querySelector('.vcl-units-wrap');
-        if (uw) uw.style.display = (ev.target.value || '').startsWith('p:') ? '' : 'none';
+        const isProd = (ev.target.value || '').startsWith('p:');
+        const inp = line.querySelector('.vcl-units'); if (inp) inp.style.display = isProd ? '' : 'none';
+        const dash = line.querySelector('.vcl-dash'); if (dash) dash.style.display = isProd ? 'none' : '';
       }
     };
     document.getElementById('vc-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
@@ -391,39 +392,44 @@ S.ShiftVoidComp = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="vcb-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By <span style="color:var(--t4);font-weight:400;">(comps)</span></label><select id="vcb-auth">' + App.staffOptions('', { placeholder: 'Select manager...' }) + '</select></div>'
       + '</div>'
-      + '<div id="vcb-lines">' + this.lineHtml() + '</div>'
-      + '<div style="margin-top:2px;"><button class="btn btn-ghost btn-sm" id="vcb-add" type="button">+ Add Line</button></div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
+      + '<table class="ing-tbl"><thead><tr>'
+      + '<th style="width:104px;">Type</th><th style="width:108px;">Amount</th><th style="min-width:150px;">Server</th>'
+      + '<th style="width:160px;">Reason</th><th style="min-width:170px;">Item <span style="color:var(--t4);">(optional)</span></th>'
+      + '<th style="width:80px;">Units</th><th style="width:40px;"></th>'
+      + '</tr></thead><tbody id="vcb-rows">' + this.lineHtml() + '</tbody></table></div>'
+      + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
       + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div></div>';
   },
 
-  // One entry line. Type drives the Reason list; a tracked product reveals Units.
-  // The Item picker omits Custom here to keep lines lean (use a row's Edit for a
-  // custom item, a check number, or notes).
+  // One entry line = one table row. Type drives the Reason list; a tracked
+  // product reveals the Units input (else the cell shows a dash). The Item
+  // picker omits Custom here to keep lines lean (use a row's Edit for a custom
+  // item, a check number, or notes).
   lineHtml() {
     const typeOpts = ['Void', 'Comp'].map(t => '<option>' + t + '</option>').join('');
-    return '<div class="vc-line" style="border:1px solid var(--b1);border-radius:6px;padding:12px;margin-bottom:10px;">'
-      + '<div class="form-row" style="gap:10px;flex-wrap:wrap;margin-bottom:0;">'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Type</label><select class="vcl-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre vcl-amount" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select class="vcl-server">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Reason</label><select class="vcl-reason">' + this.reasonOptions('Void', '') + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Item <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select class="vcl-item">' + this.itemOptions('', false) + '</select></div>'
-      + '<div class="f vcl-units-wrap" style="width:90px;flex-shrink:0;display:none;"><label>Units</label><input class="vcl-units" type="number" min="0" step="0.01" placeholder="1"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm vcl-del" type="button" style="color:var(--red);">Remove</button></div>'
-      + '</div></div>';
+    return '<tr class="vc-line">'
+      + '<td><select class="form-input vcl-type" style="width:100%;">' + typeOpts + '</select></td>'
+      + '<td><input class="form-input vcl-amount" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></td>'
+      + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions('Void', '') + '</select></td>'
+      + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions('', false) + '</select></td>'
+      + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" placeholder="1" style="width:100%;display:none;"/><span class="vcl-dash" style="color:var(--t3);">-</span></td>'
+      + '<td><button class="btn btn-danger btn-sm vcl-del" type="button" style="padding:4px 8px;">&times;</button></td>'
+      + '</tr>';
   },
 
   addLine() {
-    const wrap = document.getElementById('vcb-lines');
+    const wrap = document.getElementById('vcb-rows');
     if (wrap) wrap.insertAdjacentHTML('beforeend', this.lineHtml());
   },
 
   removeLine(line) {
-    const wrap = document.getElementById('vcb-lines');
+    const wrap = document.getElementById('vcb-rows');
     if (!wrap || !line) return;
-    // Keep at least one line; clearing the last one just resets it.
+    // Keep at least one row; clearing the last one just resets it.
     if (wrap.querySelectorAll('.vc-line').length <= 1) wrap.innerHTML = this.lineHtml();
     else line.remove();
   },
