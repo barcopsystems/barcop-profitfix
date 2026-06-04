@@ -34,6 +34,16 @@ S.ShiftVoidComp = {
   },
   menuItems() { return (App.menuItems && App.menuItems()) || []; },
   menuItemById(id) { return this.menuItems().find(m => m.id === id) || null; },
+  // Sale price for the auto-fill: menu items carry .price, inventory products
+  // carry .menu_price (the per-serving sale price set in Product Setup). Returns
+  // a positive number, or null when the item has no price (then Amount is manual).
+  itemPrice(itemKey) {
+    if (!itemKey) return null;
+    let p = null;
+    if (itemKey.startsWith('m:')) { const m = this.menuItemById(itemKey.slice(2)); p = m && parseFloat(m.price); }
+    else if (itemKey.startsWith('p:')) { const pr = this.productById(itemKey.slice(2)); p = pr && parseFloat(pr.menu_price); }
+    return (p && p > 0) ? p : null;
+  },
   shiftTypes() { return App.SHIFT_TYPES; },
   fmtDate(str) {
     if (!str) return '-';
@@ -270,9 +280,20 @@ S.ShiftVoidComp = {
         const reason = line.querySelector('.vcl-reason');
         if (reason) reason.innerHTML = this.reasonOptions(ev.target.value, '');
       } else if (ev.target.classList.contains('vcl-item')) {
-        const isProd = (ev.target.value || '').startsWith('p:');
-        const inp = line.querySelector('.vcl-units'); if (inp) inp.style.display = isProd ? '' : 'none';
-        const dash = line.querySelector('.vcl-dash'); if (dash) dash.style.display = isProd ? 'none' : '';
+        // Pick a priced item -> default the qty to 1 and auto-fill the amount.
+        const price = this.itemPrice(ev.target.value);
+        const units = line.querySelector('.vcl-units');
+        const amt = line.querySelector('.vcl-amount');
+        if (price != null) {
+          if (units && !(parseFloat(units.value) > 0)) units.value = '1';
+          if (amt) amt.value = (price * (parseFloat(units && units.value) || 1)).toFixed(2);
+        }
+      } else if (ev.target.classList.contains('vcl-units')) {
+        // Recompute the amount when qty changes on a priced item.
+        const itemSel = line.querySelector('.vcl-item');
+        const price = this.itemPrice(itemSel ? itemSel.value : '');
+        const amt = line.querySelector('.vcl-amount');
+        if (price != null && amt) amt.value = (price * (parseFloat(ev.target.value) || 0)).toFixed(2);
       }
     };
     document.getElementById('vc-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
@@ -394,9 +415,9 @@ S.ShiftVoidComp = {
       + '</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
       + '<table class="ing-tbl"><thead><tr>'
-      + '<th style="width:104px;">Type</th><th style="width:108px;">Amount</th><th style="min-width:150px;">Server</th>'
-      + '<th style="width:160px;">Reason</th><th style="min-width:170px;">Item <span style="color:var(--t4);">(optional)</span></th>'
-      + '<th style="width:80px;">Units</th><th style="width:90px;"></th>'
+      + '<th style="width:104px;">Type</th><th style="min-width:180px;">Item <span style="color:var(--t4);">(optional)</span></th>'
+      + '<th style="width:108px;">Amount</th><th style="width:80px;">Units</th>'
+      + '<th style="min-width:150px;">Server</th><th style="width:160px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="vcb-rows">' + this.lineHtml() + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
@@ -412,11 +433,11 @@ S.ShiftVoidComp = {
     const typeOpts = ['Void', 'Comp'].map(t => '<option>' + t + '</option>').join('');
     return '<tr class="vc-line">'
       + '<td><select class="form-input vcl-type" style="width:100%;">' + typeOpts + '</select></td>'
+      + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions('', false) + '</select></td>'
       + '<td><input class="form-input vcl-amount" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" placeholder="1" style="width:100%;"/></td>'
       + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></td>'
       + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions('Void', '') + '</select></td>'
-      + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions('', false) + '</select></td>'
-      + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" placeholder="1" style="width:100%;display:none;"/><span class="vcl-dash" style="color:var(--t3);">-</span></td>'
       + '<td><button class="btn btn-danger btn-sm vcl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
