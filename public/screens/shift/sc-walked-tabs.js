@@ -185,7 +185,7 @@ S.ShiftWalkedTabs = {
       + '<span id="wte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="wte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 840, noClose: true });
     document.getElementById('wte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); });
     document.getElementById('wte-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('wte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); this.confirmDel(id); });
