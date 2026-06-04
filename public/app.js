@@ -1276,7 +1276,7 @@ const App = {
     // rolling window after the config blobs load. (Inventory: counts,
     // deliveries, orders, transfers, empties, adjustments, spot checks. Shift:
     // shifts, void/comps, cash drops, variances, safe log, 86 list,
-    // maintenance, walked tabs, incidents, waste, checklist runs.)
+    // maintenance, walked tabs, waste, checklist runs.)
     await this.loadEventStores('ic');
     await this.loadEventStores('sc');
     await this.loadEventStores('lc');
@@ -2384,7 +2384,7 @@ const App = {
         shift: 'sc_shifts', void_comp: 'sc_void_comps', cash_drop: 'sc_cash_drops',
         variance: 'sc_variances', safe_log: 'sc_safe_log', eighty_six: 'sc_86_list',
         maintenance: 'sc_maintenance', walked_tab: 'sc_walked_tabs',
-        incident: 'sc_incidents', waste: 'sc_waste', checklist: 'sc_checklists',
+        waste: 'sc_waste', checklist: 'sc_checklists',
         safe_count: 'sc_safe_counts'
       }
     },
@@ -2849,7 +2849,6 @@ const App = {
         'sc-waste':              ['Waste / Spill Log', 'Shift Control'],
         'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
         'sc-walked-tabs':        ['Walked Tabs', 'Shift Control'],
-        'sc-incident-log':       ['Incident Log', 'Shift Control'],
         'sc-opening-checklist':  ['Opening Checklist', 'Shift Control'],
         'sc-closing-checklist':  ['Closing Checklist', 'Shift Control'],
         'sc-checklist-templates':['Checklist Templates', 'Shift Control'],
@@ -2873,7 +2872,6 @@ const App = {
         'sc-waste': S.ShiftWaste,
         'sc-maintenance': S.ShiftMaintenance,
         'sc-walked-tabs': S.ShiftWalkedTabs,
-        'sc-incident-log': S.ShiftIncidentLog,
         'sc-opening-checklist': S.ShiftOpeningChecklist,
         'sc-closing-checklist': S.ShiftClosingChecklist,
         'sc-checklist-templates': S.ShiftChecklistTemplates,
