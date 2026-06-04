@@ -140,9 +140,11 @@ S.ShiftHistory = {
 
     let rowsBody;
     if (all.length === 0) {
-      rowsBody = '<div style="font-size:13px;color:var(--t3);padding:4px 2px;">No shifts logged yet. Log a past shift above, or run one in Active Shift and it lands here when you close it.</div>';
+      rowsBody = '<div class="empty"><div class="empty-title">No shifts logged yet</div>'
+        + '<div class="empty-sub">Log a past shift above, or run one in Active Shift and it lands here when you close it.</div></div>';
     } else if (rows.length === 0) {
-      rowsBody = '<div style="font-size:13px;color:var(--t3);padding:4px 2px;">No shifts match these filters. Adjust or clear them above.</div>';
+      rowsBody = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
+        + '<div class="empty-sub">Adjust or clear them above.</div></div>';
     } else {
       const displayRows = rows.slice(0, App.listLimit('sc', 'shift'));
       const trs = displayRows.map(s => {
@@ -171,12 +173,10 @@ S.ShiftHistory = {
         + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterStatus || this.filterFrom || this.filterTo));
     }
 
-    const rowsCard = '<div class="card"><div class="card-title">Shift History</div>' + rowsBody + '</div>';
-
     this.container.innerHTML = '<div class="screen">'
       + this.logFormCard()
       + this.filterCard(rows.length, totRev, totCov, avgChk)
-      + rowsCard
+      + rowsBody
       + '</div>';
     App.applyCollapsed(this.container);
     this.wireList();
