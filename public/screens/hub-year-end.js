@@ -895,13 +895,11 @@ S.HubYearEnd = {
     const voidComps = (App.shiftData?.sc_void_comps || []).filter(v => inYear(v.date));
     const voids = voidComps.filter(v => v.type === 'void' || v.type === 'Void');
     const comps = voidComps.filter(v => v.type === 'comp' || v.type === 'Comp');
-    // Split comps by category. Legacy/missing category defaults to Customer
-    // Comp (loss). Staff Meal and Shift Drink are policy expense, not loss.
-    const categoryOf = c => c.category || 'Customer Comp';
-    const customerComps = comps.filter(c => categoryOf(c) === 'Customer Comp');
-    const serviceRec   = comps.filter(c => categoryOf(c) === 'Service Recovery');
-    const staffMeals   = comps.filter(c => categoryOf(c) === 'Staff Meal');
-    const shiftDrinks  = comps.filter(c => categoryOf(c) === 'Shift Drink');
+    // Split comps by their reason's loss-vs-expense class. Customer-facing comps
+    // are loss; Staff Meal and Shift Drink are policy expense, not loss.
+    const lossComps   = comps.filter(c => App.compReasonIsLoss(c.reason || c.category));
+    const staffMeals  = comps.filter(c => (c.reason || c.category) === 'Staff Meal');
+    const shiftDrinks = comps.filter(c => (c.reason || c.category) === 'Shift Drink');
     const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
     const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
     const certs = (App.laborData?.lc_certs || []).filter(c => inYear(c.expiration_date));
@@ -911,8 +909,7 @@ S.HubYearEnd = {
     rows.push(['Counts and Totals for ' + year, '', '', '']);
     rows.push(['Event', 'Count', 'Total $', 'Notes']);
     rows.push(['Voids',                voids.length, sum(voids, 'amount'),         'Reversed sales']);
-    rows.push(['Customer Comps',       customerComps.length, sum(customerComps, 'amount'), 'Loss-bearing comps given to guests']);
-    rows.push(['Service Recovery',     serviceRec.length, sum(serviceRec, 'amount'),       'Loss-bearing comps to fix a service problem']);
+    rows.push(['Comps to Guests',      lossComps.length, sum(lossComps, 'amount'),  'Loss-bearing comps given to guests']);
     rows.push(['Staff Meals',          staffMeals.length, sum(staffMeals, 'amount'),       'Policy expense, not loss']);
     rows.push(['Shift Drinks',         shiftDrinks.length, sum(shiftDrinks, 'amount'),     'Policy expense, not loss']);
     rows.push(['Walked Tabs',          walked.length, sum(walked, 'amount'),         'Unpaid checks, mis-bills, lost tickets']);
