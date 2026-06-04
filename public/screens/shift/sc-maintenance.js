@@ -47,7 +47,7 @@ S.ShiftMaintenance = {
   statusText(s) {
     if (s === 'Resolved') return '<span style="color:var(--green);font-weight:700;">Resolved</span>';
     if (s === 'In Progress') return '<span style="color:var(--steel);font-weight:700;">In Progress</span>';
-    return '<span style="color:var(--amber);font-weight:700;">Open</span>';
+    return '<span style="color:var(--gold);font-weight:700;">Open</span>';
   },
   priorityText(p) {
     if (p === 'Urgent') return '<span style="color:var(--red);font-weight:700;">Urgent</span>';
@@ -63,12 +63,10 @@ S.ShiftMaintenance = {
     const v = val => (val != null && val !== '') ? val : '';
     const prioOpts = this.PRIORITIES.map(x => '<option' + ((r ? r.priority : 'Normal') === x ? ' selected' : '') + '>' + x + '</option>').join('');
     const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
-    const staffList = (App.laborData?.lc_staff || []).filter(s => s.status !== 'Inactive')
-      .map(s => '<option value="' + esc(s.name || '') + '"></option>').join('');
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
+      + '<div class="f" style="flex:1;min-width:200px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" autocomplete="off" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Issue</label>'
@@ -79,8 +77,7 @@ S.ShiftMaintenance = {
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
       + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:200px;"><label>Assigned To</label>'
-      + '<input type="text" id="' + p + 'assigned" list="' + p + 'assigned-list" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/>'
-      + '<datalist id="' + p + 'assigned-list">' + staffList + '</datalist></div>'
+      + '<input type="text" id="' + p + 'assigned" autocomplete="off" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
