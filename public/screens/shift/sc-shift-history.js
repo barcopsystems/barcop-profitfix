@@ -41,68 +41,19 @@ S.ShiftHistory = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    if (this._openDetailId) { const id = this._openDetailId; this._openDetailId = null; this.renderDetail(id); return; }
     this.renderList();
   },
 
   showHowTo() {
     App.showHelpModal('How Shift History Works', [
-      { p: ['Every shift lands here: the ones you close out in Active Shift and any you back-fill with the Log a Past Shift form at the top. Click a row, or View, to open the full recap: revenue, covers, cash reconciliation, tips, exceptions, and the notes from that night.'] },
-      { h: 'Logging a Past Shift', p: ['Missed a shift, or running shifts from before Bar Cop? Fill in the form at the top: date, type, manager, revenue, covers, and cash. It lands in the list like any other shift and feeds your weekly Profit and Revenue numbers.'] },
+      { p: ['Every shift lands here: the ones you close out in Active Shift and any you back-fill there with Log a Past Shift. This page is your read-only record. Click a row, or View, to open the full recap: revenue, covers, cash reconciliation, tips, exceptions, and the notes from that night.'] },
       { h: 'Filter and Export', p: ['Use the Filter card to pull up a shift type, a status, or a date range; the totals update to match. Export PDF saves the filtered list.'] },
-      { h: 'View, Edit, Delete', p: ['View opens the shift recap. Edit reopens that shift in the form. Delete removes it. Keep these accurate, because the revenue flows straight into Profit and Revenue Recovery.'] }
+      { h: 'Logging and editing', p: ['Logging a past shift, editing, and deleting all happen in Active Shift under Recent Shifts. Keeping that work there keeps your history a clean reference. The revenue flows straight into Profit and Revenue Recovery, so keep it accurate.'] }
     ]);
   },
 
-  // ── Card 1: inline Log a Past Shift form (collapsible) ──────────────────────
-  logFormCard() {
-    return '<div class="card no-print">'
-      + App.collapsibleCardTitle('sc-shift-history', 'Log a Past Shift', App.helpButton('sh-how'))
-      + '<div class="collapse-body">'
-      + this.formRows(null)
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="sf-save">Save Shift</button>'
-        + '<span id="sf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-  },
-
-  // Shared shift fields on two rows + the live calc + Notes. Pass a record for
-  // edit, or null for a new log.
-  formRows(s) {
-    const v = val => (val != null && val !== '') ? val : '';
-    const typeOpts = App.SHIFT_TYPES.map(t => '<option' + (s && s.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false);
-    const defaultBank = (firstDrawer && firstDrawer.default_opening_bank != null) ? firstDrawer.default_opening_bank : '';
-    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="sf-date" value="' + esc(s?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:130px;"><label>Shift Type</label><select id="sf-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Manager on Duty</label><select id="sf-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sf-bar" step="0.01" value="' + v(s?.bar_revenue) + '" oninput="S.ShiftHistory.calc()"/></div></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Floor Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sf-floor" step="0.01" value="' + v(s?.floor_revenue) + '" oninput="S.ShiftHistory.calc()"/></div></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:110px;"><label>Covers</label><input type="number" id="sf-covers" min="0" value="' + v(s?.covers) + '" oninput="S.ShiftHistory.calc()"/></div>'
-      + '<div class="f" style="flex:1;min-width:110px;"><label>Walkouts</label><input type="number" id="sf-walkouts" min="0" value="' + v(s?.walkouts) + '" placeholder="0"/></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Opening Bank</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sf-bank" step="0.01" value="' + v(s?.opening_bank != null ? s.opening_bank : defaultBank) + '"/></div></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Staff on Floor</label><input type="number" id="sf-staff" min="0" value="' + v(s?.staff_on_floor) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Status</label><select id="sf-status"><option' + (s && s.status === 'Open' ? ' selected' : '') + '>Open</option><option' + (!s || s.status !== 'Open' ? ' selected' : '') + '>Closed</option></select></div>'
-      + '</div>'
-      + '<div class="calc" style="margin-top:6px;">'
-        + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="sf-total">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="sf-checkavg">-</div></div>'
-      + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label><textarea id="sf-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div>';
-  },
-
-  calc() {
-    const num = id => parseFloat(document.getElementById(id)?.value) || 0;
-    const total = num('sf-bar') + num('sf-floor');
-    const covers = num('sf-covers');
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    set('sf-total', App.fmtCurrency(total));
-    set('sf-checkavg', covers > 0 ? App.fmtCurrency(total / covers) : '-');
-  },
-
-  // ── Card 2: Filter + totals ─────────────────────────────────────────────────
+  // ── Filter + totals ─────────────────────────────────────────────────────────
   filterCard(count, totRev, totCov, avgChk) {
     const typeOpts = '<option value="">All shift types</option>'
       + App.SHIFT_TYPES.map(t => '<option' + (this.filterType === t ? ' selected' : '') + '>' + t + '</option>').join('');
@@ -110,7 +61,7 @@ S.ShiftHistory = {
       '<option value="' + x + '"' + (this.filterStatus === x ? ' selected' : '') + '>' + (x === '' ? 'All statuses' : x) + '</option>').join('');
     return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Filter</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>'
+      + '<div style="display:flex;gap:8px;">' + App.helpButton('sh-how') + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
@@ -128,7 +79,6 @@ S.ShiftHistory = {
   },
 
   renderList() {
-    this.editId = null;
     this.actions.innerHTML = '';
 
     const all = this.shifts();
@@ -136,12 +86,11 @@ S.ShiftHistory = {
     const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);
     const totCov = rows.reduce((t, s) => t + (s.covers || 0), 0);
     const avgChk = totCov > 0 ? totRev / totCov : null;
-    const canEdit = App.canEdit && App.canEdit('sc-log-shift');
 
     let rowsBody;
     if (all.length === 0) {
       rowsBody = '<div class="empty"><div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Log a past shift above, or run one in Active Shift and it lands here when you close it.</div></div>';
+        + '<div class="empty-sub">Run a shift in Active Shift, or log a past one there under Recent Shifts. It lands here when closed.</div></div>';
     } else if (rows.length === 0) {
       rowsBody = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
         + '<div class="empty-sub">Adjust or clear them above.</div></div>';
@@ -160,11 +109,8 @@ S.ShiftHistory = {
           + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
           + '<td>' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + '</td>'
           + '<td>' + statusText + '</td>'
-          + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm sh-view" data-id="' + s.id + '">View</button>'
-          + (canEdit ? '<button class="btn btn-ghost btn-sm sh-edit" data-id="' + s.id + '">Edit</button>' : '')
-          + (canEdit ? '<button class="btn btn-danger btn-sm sh-del" data-id="' + s.id + '">Delete</button>' : '')
-          + '</div></td></tr>';
+          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm sh-view" data-id="' + s.id + '">View</button></div></td>'
+        + '</tr>';
       }).join('');
       rowsBody = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
@@ -174,35 +120,21 @@ S.ShiftHistory = {
     }
 
     this.container.innerHTML = '<div class="screen">'
-      + this.logFormCard()
       + this.filterCard(rows.length, totRev, totCov, avgChk)
       + rowsBody
       + '</div>';
-    App.applyCollapsed(this.container);
     this.wireList();
-    this.wireForm();
-  },
-
-  wireForm() {
-    document.getElementById('sh-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('sf-save')?.addEventListener('click', () => this.save());
-    const head = this.container.querySelector('.card-collapse-head');
-    if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
-    this.calc();
   },
 
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
-      const del = ev.target.closest('.sh-del');
-      const edit = ev.target.closest('.sh-edit');
       const view = ev.target.closest('.sh-view');
       const row = ev.target.closest('.sh-row');
-      if (del) { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
-      if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); return; }
       if (view) { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
       if (row) this.renderDetail(row.dataset.id);
     };
+    document.getElementById('sh-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-f-clear')?.addEventListener('click', () => {
       this.filterType = this.filterStatus = this.filterFrom = this.filterTo = '';
@@ -215,84 +147,9 @@ S.ShiftHistory = {
     bind('sh-f-to', 'filterTo');
   },
 
-  // Edit a shift on its own page (same two-row form). Cancel returns to the list.
-  showForm(id) {
-    if (id && App.canEdit && !App.canEdit('sc-log-shift')) return;
-    this.editId = id || null;
-    const s = id ? this.shifts().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
-      + this.formRows(s)
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="sf-save">' + (id ? 'Update' : 'Save Shift') + '</button>'
-        + '<button class="btn btn-ghost" id="sf-cancel">Cancel</button>'
-        + '<span id="sf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-    this.container.onclick = null;
-    document.getElementById('sf-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('sf-save')?.addEventListener('click', () => this.save());
-    this.calc();
-  },
-
-  async save() {
-    const err = document.getElementById('sf-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('sf-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
-    const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
-    const bar = num('sf-bar') || 0, floor = num('sf-floor') || 0;
-    const mgrId = document.getElementById('sf-mgr')?.value || '';
-
-    const rec = {
-      id:             this.editId || App.uid(),
-      date,
-      shift_type:     document.getElementById('sf-type')?.value || '',
-      manager_id:     mgrId,
-      manager:        (App.staffById(mgrId) || {}).name || '',
-      bar_revenue:    bar,
-      floor_revenue:  floor,
-      total_revenue:  bar + floor,
-      covers:         num('sf-covers'),
-      walkouts:       num('sf-walkouts'),
-      opening_bank:   num('sf-bank'),
-      staff_on_floor: num('sf-staff'),
-      status:         document.getElementById('sf-status')?.value || 'Closed',
-      notes:          document.getElementById('sf-notes')?.value.trim() || ''
-    };
-    if (!this.editId) rec.created_at = new Date().toISOString();
-
-    const list = this.shifts();
-    let saved = rec;
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
-    } else {
-      list.push(rec);
-    }
-
-    const btn = document.getElementById('sf-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'shift', saved);
-    this.editId = null;
-    if (ok) {
-      if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
-      this.renderList();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Shift'; }
-      fail('Save failed. Try again.');
-    }
-  },
-
-  async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this shift?', confirmText: 'Delete', cancelText: 'Cancel' });
-    if (!ok) return;
-    await App.removeRecord('sc', 'shift', id);
-    this.renderList();
-  },
-
-  // ── Detail (recap) ───────────────────────────────────────────────────────────
-  // Hero + KPI tiles + per-drawer cash + exceptions/notes. View opens it; Edit
-  // reopens the shift in the form. Back to the list is the sidebar.
+  // ── Detail (recap) — read-only ────────────────────────────────────────────────
+  // Hero + KPI tiles + per-drawer cash + exceptions/notes. Read-only: editing a
+  // shift happens in Active Shift (Recent Shifts). Back to the list is the sidebar.
   renderDetail(id) {
     const s = this.shifts().find(x => x.id === id);
     if (!s) { this.renderList(); return; }
@@ -426,7 +283,6 @@ S.ShiftHistory = {
       + '</div>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="sh-edit">Edit</button>'
       + '</div></div></div>'
 
       + '<div class="card"><div style="display:flex;gap:12px;flex-wrap:wrap;">'
@@ -445,7 +301,6 @@ S.ShiftHistory = {
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sh-handoff')) { if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id); return; }
-      if (ev.target.closest('#sh-edit')) { this.showForm(id); return; }
     };
   }
 };
