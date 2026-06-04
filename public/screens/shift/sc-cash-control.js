@@ -361,8 +361,11 @@ S.ShiftCashControl = {
   },
 
   // ── Log a Drop (new or edit) ────────────────────────────────────────────────
-  openDrop(rec, drawerId) {
+  // onDone (optional): called after a successful save instead of redrawing the
+  // board, so Active Shift can open this pop-up in place and refresh itself.
+  openDrop(rec, drawerId, onDone) {
     const editing = !!rec;
+    this._dropOnDone = onDone || null;
     const active    = (App.activeShift && App.activeShift()) || null;
     const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
     const shiftType = editing ? rec.shift_type : (active ? active.shift_type || '' : '');
@@ -396,7 +399,7 @@ S.ShiftCashControl = {
     const counter = CashCounter.mount(document.getElementById('ccd-counter'), {
       onChange: total => { const a = document.getElementById('ccd-amount'); if (a && total > 0) a.value = total.toFixed(2); }
     });
-    document.getElementById('ccd-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
+    document.getElementById('ccd-cancel')?.addEventListener('click', () => { this._dropOnDone = null; App.closeModal('cc-modal'); });
     document.getElementById('ccd-save')?.addEventListener('click', () => this.saveDrop(counter, editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('cash drop', async () => {
       await S.ShiftCashDrop.removeDrop(rec.id); App.closeModal('cc-modal'); this.draw();
@@ -436,8 +439,11 @@ S.ShiftCashControl = {
     const btn = document.getElementById('ccd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await S.ShiftCashDrop.persistDrop(rec);
-    if (ok) { App.closeModal('cc-modal'); this.draw(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Drop'; } fail('Save failed. Try again.'); }
+    if (ok) {
+      App.closeModal('cc-modal');
+      const cb = this._dropOnDone; this._dropOnDone = null;
+      if (cb) cb(); else this.draw();
+    } else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Drop'; } fail('Save failed. Try again.'); }
   },
 
   // ── Safe move: deposit / bank / paid-out (new or edit) ──────────────────────
