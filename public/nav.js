@@ -501,7 +501,7 @@ const Shift = {
         <span class="nav-label">Cash Control</span>
       </div>
       <div class="nav-item" data-screen="sc-cash-history" id="nav-sc-cash-history">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h10v12l-2-1.2-2 1.2-2-1.2-2 1.2v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 6h5M6 9h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
         <span class="nav-label">Cash History</span>
       </div>
       <div class="nav-section">Operations</div>
