@@ -53,8 +53,8 @@ S.ShiftWalkedTabs = {
     const reasonOpts = this.REASONS.map(rs => '<option' + (r && r.reason === rs ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
     return '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.1;min-width:0;"><label>Date</label><input type="date" id="wt-date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="flex:1.15;min-width:0;"><label>Time</label><input type="time" id="wt-time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
-      + '<div class="f" style="flex:1.1;min-width:0;"><label>Reason</label><select id="wt-reason">' + reasonOpts + '</select></div>'
+      + '<div class="f" style="flex:1.05;min-width:0;"><label>Time</label><input type="time" id="wt-time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
+      + '<div class="f" style="flex:1.45;min-width:0;"><label>Reason</label><select id="wt-reason">' + reasonOpts + '</select></div>'
       + '<div class="f" style="flex:1.5;min-width:0;"><label>Server</label><select id="wt-server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="flex:0.7;min-width:0;"><label>Check #</label><input type="text" id="wt-check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="flex:0.8;min-width:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="wt-amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'
