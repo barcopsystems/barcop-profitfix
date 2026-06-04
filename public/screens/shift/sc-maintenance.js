@@ -3,9 +3,10 @@
 /* ── Shift Control — Maintenance Log (writes sc_maintenance) ──────────────────
    A status tracker for equipment and facility issues: what broke, priority,
    status (Open → In Progress → Resolved), repair cost. Open and urgent items
-   feed the Hub alert strip so nothing gets lost between shifts. Filter/action
-   card with a status filter on top, bare list below, the issue form in a
-   focused pop-up. */
+   feed the Hub alert strip so nothing gets lost between shifts. Same page shape
+   as the other Shift logs: inline collapsible form on the landing, filter card
+   with a status filter, bare list, the issue form again in a focused pop-up to
+   edit a past one. */
 
 S.ShiftMaintenance = {
   editId: null,
@@ -55,6 +56,61 @@ S.ShiftMaintenance = {
     return '<span style="color:var(--t2);">' + esc(p || 'Normal') + '</span>';
   },
 
+  // ── Shared form fields (inline form p='mt-', edit pop-up p='mte-'). No Notes:
+  //    the Issue field carries the description. ────────────────────────────────
+  formFields(r, p) {
+    p = p || 'mt-';
+    const v = val => (val != null && val !== '') ? val : '';
+    const prioOpts = this.PRIORITIES.map(x => '<option' + ((r ? r.priority : 'Normal') === x ? ' selected' : '') + '>' + x + '</option>').join('');
+    const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
+    const staffList = (App.laborData?.lc_staff || []).filter(s => s.status !== 'Inactive')
+      .map(s => '<option value="' + esc(s.name || '') + '"></option>').join('');
+    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:200px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Issue</label>'
+      + '<textarea id="' + p + 'issue" rows="2" placeholder="Describe the problem">' + esc(r?.issue || '') + '</textarea></div></div>'
+
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Priority</label><select id="' + p + 'priority">' + prioOpts + '</select></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
+      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:200px;"><label>Assigned To</label>'
+      + '<input type="text" id="' + p + 'assigned" list="' + p + 'assigned-list" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/>'
+      + '<datalist id="' + p + 'assigned-list">' + staffList + '</datalist></div>'
+      + '</div>'
+
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="' + p + 'resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
+      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Repair Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cost" min="0" step="0.01" value="' + v(r?.cost) + '"/></div></div>'
+      + '</div>';
+  },
+
+  // Flipping status to Resolved auto-fills today's resolution date if blank.
+  wireResolvedAutofill(p) {
+    document.getElementById(p + 'status')?.addEventListener('change', e => {
+      if (e.target.value === 'Resolved') {
+        const resEl = document.getElementById(p + 'resolved');
+        if (resEl && !resEl.value) resEl.value = new Date().toISOString().slice(0, 10);
+      }
+    });
+  },
+
+  filterCard(stats) {
+    const statusOpts = ['', ...this.STATUSES].map(s => '<option value="' + esc(s) + '"' + (this.filterStatus === s ? ' selected' : '') + '>' + (s === '' ? 'All statuses' : esc(s)) + '</option>').join('');
+    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Filter</span><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button></div>'
+      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Status</label><select id="mt-f-status">' + statusOpts + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="mt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="mt-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mt-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+      + '</div>' + (stats || '') + '</div>';
+  },
+
   applyFilters(list) {
     return list.filter(r => {
       if (this.filterStatus && (r.status || 'Open') !== this.filterStatus) return false;
@@ -68,7 +124,6 @@ S.ShiftMaintenance = {
   renderList() {
     this.editId = null;
     const all = [...this.records()];
-    const hasData = all.length > 0;
     const filtered = this.applyFilters(all).sort((a, b) => {
       const ao = a.status !== 'Resolved', bo = b.status !== 'Resolved';
       if (ao !== bo) return ao ? -1 : 1;                          // open before resolved
@@ -76,16 +131,17 @@ S.ShiftMaintenance = {
       return new Date(b.created_at || b.date_reported).getTime() - new Date(a.created_at || a.date_reported).getTime();
     });
 
-    const titleRight = '<div style="display:flex;gap:8px;">'
-      + App.helpButton('mt-how')
-      + (hasData ? '<button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button>' : '')
-      + (App.canEdit('sc-maintenance') ? '<button class="btn btn-primary btn-sm" id="mt-add">Log Issue</button>' : '')
-      + '</div>';
+    const formCard = '<div class="card">'
+      + App.collapsibleCardTitle('sc-maintenance', 'Log Maintenance Issue', App.helpButton('mt-how'))
+      + '<div class="collapse-body">'
+      + this.formFields(null, 'mt-')
+      + '<div class="card-actions"><button class="btn btn-primary" id="mt-save">Save Issue</button>'
+      + '<span id="mt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
+      + '</div></div>';
 
-    let card;
-    if (!hasData) {
-      card = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Maintenance Log</span>' + titleRight + '</div>'
-        + '<div style="font-size:13px;color:var(--t3);padding:6px 2px;">No maintenance issues logged yet. Log broken equipment and facility issues here. Open and urgent items show up as alerts on the Hub so they carry across shifts.</div></div>';
+    let below;
+    if (all.length === 0) {
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No maintenance issues logged yet. Use the form above. Open and urgent items show up as alerts on the Hub so they carry across shifts.</div>';
     } else {
       const open = all.filter(r => r.status !== 'Resolved');
       const urgent = open.filter(r => r.priority === 'Urgent');
@@ -97,18 +153,8 @@ S.ShiftMaintenance = {
         + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val">' + resolved.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Repair Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div>';
-      const statusOpts = ['', ...this.STATUSES].map(s => '<option value="' + esc(s) + '"' + (this.filterStatus === s ? ' selected' : '') + '>' + (s === '' ? 'All statuses' : esc(s)) + '</option>').join('');
-      card = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Maintenance Log</span>' + titleRight + '</div>'
-        + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Status</label><select id="mt-f-status">' + statusOpts + '</select></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="mt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="mt-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mt-f-clear" style="margin-bottom:2px;">Clear</button></div>'
-        + '</div>' + stats + '</div>';
-    }
 
-    let listHtml = '';
-    if (hasData) {
+      let listHtml;
       if (!filtered.length) {
         listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No issues match the filters.</div>';
       } else {
@@ -130,134 +176,116 @@ S.ShiftMaintenance = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'maintenance', filtered, !!(this.filterStatus || this.filterFrom || this.filterTo));
       }
+      below = this.filterCard(stats) + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + card + listHtml + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
+    App.applyCollapsed(this.container);
     this.wireList();
   },
 
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('#mt-how')) { this.showHowTo(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#mt-export')) { App.exportPDF({ title: 'Maintenance Log', root: this.container }); return; }
-      if (ev.target.closest('#mt-add')) { this.openFormModal(null); return; }
+      if (ev.target.closest('#mt-save')) { this.saveNew(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const edit = ev.target.closest('.mt-edit');
       const del  = ev.target.closest('.mt-del');
       const row  = ev.target.closest('.mt-row');
       if (del)  { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
-      if (edit) { ev.stopPropagation(); this.openFormModal(edit.dataset.id); return; }
-      if (row && App.canEdit('sc-maintenance')) this.openFormModal(row.dataset.id);
+      if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
+      if (row && App.canEdit('sc-maintenance')) this.openEditModal(row.dataset.id);
     };
+    this.wireResolvedAutofill('mt-');
     document.getElementById('mt-f-status')?.addEventListener('change', e => { this.filterStatus = e.target.value || ''; this.renderList(); });
     document.getElementById('mt-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('mt-f-to')?.addEventListener('change',     e => { this.filterTo = e.target.value || ''; this.renderList(); });
     document.getElementById('mt-f-clear')?.addEventListener('click', () => { this.filterStatus = this.filterFrom = this.filterTo = ''; this.renderList(); });
   },
 
-  // ── Issue form (focused pop-up, new + edit). No Notes — the Issue field
-  //    carries the description. ────────────────────────────────────────────────
-  formFields(r) {
-    const v = val => (val != null && val !== '') ? val : '';
-    const prioOpts = this.PRIORITIES.map(p => '<option' + ((r ? r.priority : 'Normal') === p ? ' selected' : '') + '>' + p + '</option>').join('');
-    const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
-    const staffList = (App.laborData?.lc_staff || []).filter(s => s.status !== 'Inactive')
-      .map(s => '<option value="' + esc(s.name || '') + '"></option>').join('');
-    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="mt-date" value="' + esc(r?.date_reported || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Equipment / Item</label><input type="text" id="mt-equip" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Location</label><input type="text" id="mt-loc" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Issue</label>'
-      + '<textarea id="mt-issue" rows="2" placeholder="Describe the problem">' + esc(r?.issue || '') + '</textarea></div></div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Priority</label><select id="mt-priority">' + prioOpts + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="mt-status">' + statOpts + '</select></div>'
-      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reported By</label><select id="mt-by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Assigned To</label>'
-      + '<input type="text" id="mt-assigned" list="mt-assigned-list" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/>'
-      + '<datalist id="mt-assigned-list">' + staffList + '</datalist></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="mt-resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Repair Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="mt-cost" min="0" step="0.01" value="' + v(r?.cost) + '"/></div></div>'
-      + '</div>';
-  },
-
-  openFormModal(id) {
-    if (id && !App.canEdit('sc-maintenance')) return;
-    if (!id && !App.canEdit('sc-maintenance')) return;
-    this.editId = id || null;
-    const r = id ? this.records().find(x => x.id === id) : null;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (id ? 'Edit Maintenance Issue' : 'Log Maintenance Issue') + '</div>'
-      + this.formFields(r)
+  // Edit a logged issue in a focused pop-up (same fields, own mte- ids).
+  openEditModal(id) {
+    if (!App.canEdit('sc-maintenance')) return;
+    const r = this.records().find(x => x.id === id);
+    if (!r) return;
+    this.editId = id;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Maintenance Issue</div>'
+      + this.formFields(r, 'mte-')
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="mt-save">' + (id ? 'Update' : 'Save Issue') + '</button>'
-      + '<button class="btn btn-ghost" id="mt-cancel">Cancel</button>'
-      + '<span id="mt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + (id ? '<button class="btn btn-danger" id="mt-modal-del" style="margin-left:auto;">Delete</button>' : '')
+      + '<button class="btn btn-primary" id="mte-save">Update</button>'
+      + '<button class="btn btn-ghost" id="mte-cancel">Cancel</button>'
+      + '<span id="mte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-danger" id="mte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'mt-form-modal', maxWidth: 760, noClose: true });
-    document.getElementById('mt-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-form-modal'); });
-    document.getElementById('mt-save')?.addEventListener('click', () => this.save(id));
-    document.getElementById('mt-modal-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-form-modal'); this.confirmDel(id); });
-    // Flipping status to Resolved auto-fills today's resolution date if blank.
-    document.getElementById('mt-status')?.addEventListener('change', e => {
-      if (e.target.value === 'Resolved') {
-        const resEl = document.getElementById('mt-resolved');
-        if (resEl && !resEl.value) resEl.value = new Date().toISOString().slice(0, 10);
-      }
-    });
+    App.openModal(html, { id: 'mt-edit-modal', maxWidth: 760, noClose: true });
+    this.wireResolvedAutofill('mte-');
+    document.getElementById('mte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-edit-modal'); });
+    document.getElementById('mte-save')?.addEventListener('click', () => this.saveEdit(id));
+    document.getElementById('mte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-edit-modal'); this.confirmDel(id); });
   },
 
-  async save(id) {
-    const err = document.getElementById('mt-err');
+  // Collect the form (prefix p) into a record body, or null after an error.
+  _collect(p) {
+    const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('mt-date')?.value;
-    if (!date) { fail('Date reported is required.'); return; }
-    const equipment = document.getElementById('mt-equip')?.value.trim();
-    if (!equipment) { fail('Equipment / item is required.'); return; }
-    const status = document.getElementById('mt-status')?.value || 'Open';
-    const dateResolved = document.getElementById('mt-resolved')?.value || '';
-    if (status === 'Resolved' && !dateResolved) { fail('Resolved issues need a resolution date. Set Date Resolved or change the status.'); return; }
-    const cost = parseFloat(document.getElementById('mt-cost')?.value);
-    const byId = document.getElementById('mt-by')?.value || '';
-    const patch = {
+    const date = document.getElementById(p + 'date')?.value;
+    if (!date) { fail('Date reported is required.'); return null; }
+    const equipment = document.getElementById(p + 'equip')?.value.trim();
+    if (!equipment) { fail('Equipment / item is required.'); return null; }
+    const status = document.getElementById(p + 'status')?.value || 'Open';
+    const dateResolved = document.getElementById(p + 'resolved')?.value || '';
+    if (status === 'Resolved' && !dateResolved) { fail('Resolved issues need a resolution date. Set Date Resolved or change the status.'); return null; }
+    const cost = parseFloat(document.getElementById(p + 'cost')?.value);
+    const byId = document.getElementById(p + 'by')?.value || '';
+    return {
       date_reported: date,
       equipment,
-      location:       document.getElementById('mt-loc')?.value.trim() || '',
-      issue:          document.getElementById('mt-issue')?.value.trim() || '',
-      priority:       document.getElementById('mt-priority')?.value || 'Normal',
+      location:       document.getElementById(p + 'loc')?.value.trim() || '',
+      issue:          document.getElementById(p + 'issue')?.value.trim() || '',
+      priority:       document.getElementById(p + 'priority')?.value || 'Normal',
       status,
       reported_by_id: byId,
       reported_by:    (App.staffById(byId) || {}).name || '',
       // Assigned To stays free text — maintenance is often handed to an outside
       // vendor (HVAC, plumber) who is not on the staff roster.
-      assigned_to:    document.getElementById('mt-assigned')?.value.trim() || '',
+      assigned_to:    document.getElementById(p + 'assigned')?.value.trim() || '',
       date_resolved:  dateResolved,
       cost:           isNaN(cost) ? null : cost
     };
+  },
 
+  async saveNew() {
+    const body = this._collect('mt-');
+    if (!body) return;
+    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
     const list = this.records();
-    let saved;
-    if (id) {
-      const i = list.findIndex(x => x.id === id);
-      if (i < 0) { fail('Record not found.'); return; }
-      list[i] = { ...list[i], ...patch };
-      saved = list[i];
-    } else {
-      saved = { id: App.uid(), ...patch, created_at: new Date().toISOString() };
-      list.push(saved);
-    }
-
+    list.push(rec);
     const btn = document.getElementById('mt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'maintenance', saved);
-    if (ok) { this.editId = null; App.closeModal('mt-form-modal'); this.renderList(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = id ? 'Update' : 'Save Issue'; } fail('Save failed. Try again.'); }
+    const ok = await App.putRecord('sc', 'maintenance', rec);
+    if (ok) this.renderList();
+    else {
+      const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Issue'; }
+      const err = document.getElementById('mt-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+    }
+  },
+
+  async saveEdit(id) {
+    const body = this._collect('mte-');
+    if (!body) return;
+    const list = this.records();
+    const i = list.findIndex(x => x.id === id);
+    if (i < 0) { const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Record not found.'; err.style.display = 'inline'; } return; }
+    list[i] = { ...list[i], ...body };
+    const btn = document.getElementById('mte-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'maintenance', list[i]);
+    if (ok) { this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
   async confirmDel(id) {
