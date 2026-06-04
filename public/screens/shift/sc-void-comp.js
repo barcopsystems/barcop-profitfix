@@ -126,28 +126,22 @@ S.ShiftVoidComp = {
     const isProduct = itemKey.startsWith('p:');
 
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label><select id="' + p + 'shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:110px;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:90px;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:110px;"><label>Shift Type</label><select id="' + p + 'shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:95px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
 
+      // Authorized By / Reason / Check # / Item, with Units or Custom Name inline
+      // after Item only when relevant.
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By</label><select id="' + p + 'auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
-      + '</div>'
-
-      // Item optional. Units (tracked product) or Custom Name (custom) sit inline
-      // to its right, so neither ever lands alone on its own row.
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:240px;"><label>Item <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="' + p + 'item-sel">' + this.itemOptions(itemKey) + '</select></div>'
-      + '<div class="f" id="' + p + 'units-wrap" style="width:120px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="' + p + 'units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
-      + '<div class="f" id="' + p + 'custom-wrap" style="flex:1;min-width:200px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="' + p + 'custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Authorized By</label><select id="' + p + 'auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Reason</label><select id="' + p + 'reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:90px;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1;min-width:140px;"><label>Item <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="' + p + 'item-sel">' + this.itemOptions(itemKey) + '</select></div>'
+      + '<div class="f" id="' + p + 'units-wrap" style="width:90px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="' + p + 'units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
+      + '<div class="f" id="' + p + 'custom-wrap" style="flex:1;min-width:130px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="' + p + 'custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + 'notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
