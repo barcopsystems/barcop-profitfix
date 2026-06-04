@@ -18,11 +18,11 @@ S.ShiftLogShift = {
   },
 
   render(container, actions) {
-    this.container = container;
+    // The shift form now lives inline on Shift History (Log a Past Shift) plus the
+    // in-screen Edit there. This screen just forwards so any old link or the
+    // command palette lands on the right place instead of a dead-end form.
     if (actions) actions.innerHTML = '';
-    const openId = this._openEditId;
-    this._openEditId = null;
-    this.showForm(openId && this.shifts().some(x => x.id === openId) ? openId : null);
+    App.navigate('sc-shift-history');
   },
 
   back() { App.navigate('sc-shift-history'); },
