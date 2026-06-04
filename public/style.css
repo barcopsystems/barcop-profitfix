@@ -248,7 +248,7 @@ input,select,textarea{color-scheme:dark;}
 .btn-primary:hover{background:var(--gold-h);}
 .btn-ghost{background:transparent;border:1px solid var(--b1);color:var(--t2);}
 .btn-ghost:hover{border-color:rgba(255,255,255,0.28);color:var(--w);}
-.btn-danger{background:transparent;border:1px solid rgba(192,56,40,0.4);color:var(--red);}
+.btn-danger{background:transparent;border:1px solid var(--b1);color:var(--red);}
 .btn-danger:hover{background:var(--red-bg);}
 .btn-sm{padding:5px 12px;font-size:10px;}
 .btn-lg{padding:10px 24px;font-size:12px;}
