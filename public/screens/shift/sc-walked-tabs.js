@@ -59,8 +59,8 @@ S.ShiftWalkedTabs = {
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="wt-amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Reason</label><select id="wt-reason">' + reasonOpts + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Manager</label><select id="wt-mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reason</label><select id="wt-reason">' + reasonOpts + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Manager</label><select id="wt-mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="wt-notes" rows="2" placeholder="What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.">' + esc(r?.notes || '') + '</textarea></div></div>';
