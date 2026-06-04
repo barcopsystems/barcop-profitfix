@@ -396,7 +396,7 @@ S.ShiftVoidComp = {
       + '<table class="ing-tbl"><thead><tr>'
       + '<th style="width:104px;">Type</th><th style="width:108px;">Amount</th><th style="min-width:150px;">Server</th>'
       + '<th style="width:160px;">Reason</th><th style="min-width:170px;">Item <span style="color:var(--t4);">(optional)</span></th>'
-      + '<th style="width:80px;">Units</th><th style="width:40px;"></th>'
+      + '<th style="width:80px;">Units</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="vcb-rows">' + this.lineHtml() + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
@@ -417,7 +417,7 @@ S.ShiftVoidComp = {
       + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions('Void', '') + '</select></td>'
       + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions('', false) + '</select></td>'
       + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" placeholder="1" style="width:100%;display:none;"/><span class="vcl-dash" style="color:var(--t3);">-</span></td>'
-      + '<td><button class="btn btn-danger btn-sm vcl-del" type="button" style="padding:4px 8px;">&times;</button></td>'
+      + '<td><button class="btn btn-danger btn-sm vcl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
 
