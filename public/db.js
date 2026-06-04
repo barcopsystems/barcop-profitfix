@@ -259,14 +259,13 @@ const DB = {
     // Shift Control
     'sc-log-shift':'log-shift','sc-shift-history':'log-shift',
     'sc-active-shift':'active-shift',
-    'sc-cash-drop':'cash-mgmt','sc-safe-log':'cash-mgmt','sc-variance-log':'cash-mgmt',
+    'sc-cash-drop':'cash-mgmt','sc-safe-log':'cash-mgmt','sc-variance-log':'cash-mgmt','sc-cash-history':'cash-mgmt',
     'sc-opening-checklist':'checklists','sc-closing-checklist':'checklists','sc-checklist-templates':'checklists',
     'sc-86-list':'86-list',
     'sc-void-comp':'void-comp',
     'sc-comp-settings':'void-comp',
     'sc-maintenance':'maintenance',
     'sc-walked-tabs':'cash-mgmt',
-    'sc-incident-log':'maintenance',
     'sc-reports-shift':'shift-reports','sc-reports-cash':'shift-reports','sc-reports-ops':'shift-reports',
     'sc-dashboard':'shift-dashboard','sc-help':'_always',
     // Profit Recovery (root + profit module screens)
