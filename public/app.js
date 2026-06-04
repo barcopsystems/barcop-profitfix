@@ -3514,6 +3514,18 @@ const App = {
     });
   },
 
+  // ── Standard delete confirmation — ONE wording, identical on every delete box
+  //    across Bar Cop. Pass a subject for multi-select deletes (e.g. 'these 5
+  //    checks'); defaults to 'this' for a single record. Resolves true/false.
+  //    Always route a delete through this, never a bespoke confirm() or popup.
+  confirmDelete(subject) {
+    return this.confirm({
+      title: 'Delete ' + (subject || 'this') + '? This action is permanent and cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    });
+  },
+
   // ── Deliverable footer + disclaimer (legal protection helper) ───────────
   // Single source for the disclaimer text + workbook Subject metadata + PDF
   // footer HTML used across every Bar Cop deliverable: Books, Year-End,
