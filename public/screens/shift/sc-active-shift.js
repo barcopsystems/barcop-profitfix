@@ -794,12 +794,18 @@ S.ShiftActiveShift = {
     const idx  = this.WIZARD_STEPS.findIndex(x => x.key === step);
     const total = this.WIZARD_STEPS.length;
 
+    // Reached steps are gold; the step you have completed (behind the current
+    // one) is clickable with white text so you can jump straight back to it, no
+    // Back button. The current step keeps dark text as the "you are here" marker.
+    // Steps not yet reached stay greyed and locked.
     const stepper = '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">'
       + this.WIZARD_STEPS.map((s2, i) => {
           const done = i < idx, current = i === idx;
-          const bg = current ? 'var(--gold)' : done ? 'var(--gold)' : 'var(--b2)';
-          const color = current ? 'var(--bg)' : done ? 'var(--bg)' : 'var(--t3)';
-          return '<div style="flex:1;min-width:120px;padding:8px 10px;border-radius:3px;background:' + bg + ';color:' + color + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;text-align:center;">' + (i + 1) + '. ' + s2.label + '</div>';
+          const bg = (i <= idx) ? 'var(--gold)' : 'var(--b2)';
+          const color = current ? 'var(--bg)' : done ? 'var(--t1)' : 'var(--t3)';
+          const base = 'flex:1;min-width:120px;padding:8px 10px;border-radius:3px;background:' + bg + ';color:' + color + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;text-align:center;';
+          if (done) return '<div class="wiz-step" data-step="' + s2.key + '" style="' + base + 'cursor:pointer;">' + (i + 1) + '. ' + s2.label + '</div>';
+          return '<div style="' + base + '">' + (i + 1) + '. ' + s2.label + '</div>';
         }).join('')
     + '</div>';
 
@@ -887,7 +893,7 @@ S.ShiftActiveShift = {
     return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
       + '<div style="margin-top:4px;"></div>'
       + body
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -940,7 +946,7 @@ S.ShiftActiveShift = {
       + item('vc',  vc.length, 'Big Voids and Comps This Shift', vc.length === 0 ? 'No voids or comps over $' + vcThreshold + '.' : 'Over $' + vcThreshold + ' threshold &middot; ' + App.fmtCurrency(bigVcTotal) + ' total', 'sc-void-comp', 'var(--red)')
       + item('mt',  openMaint.length, 'Open Maintenance Issues', openMaint.length === 0 ? 'Nothing flagged.' : openMaint.slice(0, 3).map(m => m.issue || m.item || 'Issue').join(', ') + (openMaint.length > 3 ? '...' : ''), 'sc-maintenance', 'var(--red)')
       + item('cl',  checklistIncomplete ? 1 : 0, 'Closing Checklist', !closingCheck ? 'No closing checklist run yet for tonight.' : checklistIncomplete ? checklistDone + '% complete &middot; finish before closing' : 'Complete.', 'sc-closing-checklist', 'var(--red)')
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -1013,7 +1019,7 @@ S.ShiftActiveShift = {
         + '</div>'
       + '</div>'
 
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button><button class="btn btn-ghost" id="aw-back">Back</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
+      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
 
@@ -1214,7 +1220,6 @@ S.ShiftActiveShift = {
         + '<textarea id="aw-handoff" rows="5" placeholder="Restock priorities, equipment to watch, customer follow-ups, anything the opener will inherit...">' + esc(d.handoff_notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary btn-lg" id="aw-finalize">Close Shift</button>'
-        + '<button class="btn btn-ghost" id="aw-back">Back</button>'
         + '<button class="btn btn-ghost" id="aw-cancel">Return To Shift</button>'
         + '<span id="aw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
@@ -1290,12 +1295,13 @@ S.ShiftActiveShift = {
       d.step = this.WIZARD_STEPS[Math.min(idx + 1, this.WIZARD_STEPS.length - 1)].key;
       this.renderWizardStep(s);
     });
-    document.getElementById('aw-back')?.addEventListener('click', () => {
+    // Jump straight to any completed step by clicking its pill (syncs current
+    // inputs first so nothing entered is lost). Replaces the Back button.
+    this.container.querySelectorAll('.wiz-step').forEach(el => el.addEventListener('click', () => {
       this.syncWizardInputs();
-      const idx = this.WIZARD_STEPS.findIndex(x => x.key === d.step);
-      d.step = this.WIZARD_STEPS[Math.max(idx - 1, 0)].key;
+      d.step = el.dataset.step;
       this.renderWizardStep(s);
-    });
+    }));
     document.getElementById('aw-finalize')?.addEventListener('click', () => {
       this.syncWizardInputs();
       this.finalizeClose(s);
