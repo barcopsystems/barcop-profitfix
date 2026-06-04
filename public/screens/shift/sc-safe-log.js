@@ -216,18 +216,9 @@ S.ShiftSafeLog = {
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
 
-    const list = this.entries();
-    let saved = rec;
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
-    } else {
-      list.push(rec);
-    }
-
     const btn = document.getElementById('sl-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'safe_log', saved);
+    const ok = await this.persistEntry(rec);
     this.editId = null;
     if (ok) {
       this.renderList();
@@ -235,6 +226,16 @@ S.ShiftSafeLog = {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Entry'; }
       fail('Save failed. Try again.');
     }
+  },
+
+  // Persist a safe entry (upsert + one row). Shared by this screen and the Cash
+  // Board's pop-up actions so a safe move logged either door behaves the same.
+  async persistEntry(rec) {
+    const list = this.entries();
+    const i = list.findIndex(x => x.id === rec.id);
+    if (i > -1) list[i] = { ...list[i], ...rec }; else list.push(rec);
+    const saved = i > -1 ? list[i] : rec;
+    return await App.putRecord('sc', 'safe_log', saved);
   },
 
   confirmDel(id) {
