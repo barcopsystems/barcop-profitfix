@@ -463,7 +463,7 @@ S.ShiftActiveShift = {
       + this.renderShiftNotesCard(s)
 
       + '<div class="card"><div class="card-title">End of Shift</div>'
-      + '<div class="card-actions">'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button>'
       + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
       + '</div></div></div>';
