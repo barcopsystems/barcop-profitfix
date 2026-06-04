@@ -91,8 +91,7 @@ S.ShiftCashDrop = {
         + App.showOlderBar('sc', 'cash_drop', filtered, false);
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.filterCard(stats) + listHtml
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Read-only. Log, edit, or delete drops on the Cash Board.</div></div>';
+    this.container.innerHTML = '<div class="screen">' + this.filterCard(stats) + listHtml + '</div>';
 
     document.getElementById('cd-export')?.addEventListener('click', () => App.exportPDF({ title: 'Cash Drop History', root: this.container }));
     document.getElementById('cd-f-from')?.addEventListener('change', e => { this.fFrom = e.target.value || ''; this.renderList(); });
