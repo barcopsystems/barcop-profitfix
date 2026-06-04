@@ -115,9 +115,6 @@ S.ShiftVoidComp = {
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Type</label><select id="vc-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label><select id="vc-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vc-amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
-      + '</div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:280px;flex-shrink:0;"><label>Item</label><select id="vc-item-sel">' + this.itemOptions(itemKey) + '</select></div>'
       + '<div class="f" id="vc-custom-wrap" style="width:220px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="vc-custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
       + '<div class="f" id="vc-units-wrap" style="width:120px;flex-shrink:0;' + (isProduct ? '' : 'display:none;') + '"><label>Units</label><input type="number" id="vc-units" min="0" step="0.01" value="' + v(r?.units != null ? r.units : '') + '" placeholder="1"/></div>'
