@@ -802,7 +802,7 @@ S.ShiftActiveShift = {
       + this.WIZARD_STEPS.map((s2, i) => {
           const done = i < idx, current = i === idx;
           const bg = (i <= idx) ? 'var(--gold)' : 'var(--b2)';
-          const color = current ? 'var(--bg)' : done ? 'var(--t1)' : 'var(--t3)';
+          const color = current ? 'var(--bg)' : done ? 'var(--w)' : 'var(--t3)';
           const base = 'flex:1;min-width:120px;padding:8px 10px;border-radius:3px;background:' + bg + ';color:' + color + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;text-align:center;';
           if (done) return '<div class="wiz-step" data-step="' + s2.key + '" style="' + base + 'cursor:pointer;">' + (i + 1) + '. ' + s2.label + '</div>';
           return '<div style="' + base + '">' + (i + 1) + '. ' + s2.label + '</div>';
