@@ -2094,15 +2094,23 @@ S.HubSettings = {
       { kind:'menu',   name:'Pan-Seared Salmon',       reason:'Sent back',             amount:29 },
       { kind:'menu',   name:'Whiskey Sour',            reason:'Wrong item',            amount:15 }
     ];
+    // Comps. The reason carries the loss-vs-expense class (App.SC_COMP_REASONS):
+    // customer-facing reasons are loss, Staff Meal and Shift Drink are policy
+    // expense. kind:'none' is an amount-only comp (a whole-check give-away, no
+    // single item). Product comps carry units for the Variance Report.
     const COMP_SC = [
-      { kind:'product', name:'House Cabernet',               reason:'Regular / VIP',    category:'Customer Comp',    units:1, amount:13 },
-      { kind:'menu',    name:'Old Fashioned',                reason:'Service recovery', category:'Service Recovery', amount:16 },
-      { kind:'product', name:'Modelo',                       reason:'Manager comp',     category:'Shift Drink',      units:1, amount:6  },
-      { kind:'menu',    name:'Anchor Burger',                reason:'Service recovery', category:'Service Recovery', amount:18 },
-      { kind:'custom',  name:'Staff meal, Brisket Sandwich', reason:'Manager comp',     category:'Staff Meal',       amount:14 },
-      { kind:'product', name:"Tito's Handmade Vodka",        reason:'Service recovery', category:'Service Recovery', units:1, amount:12 },
-      { kind:'menu',    name:'Pan-Seared Salmon',            reason:'Regular / VIP',    category:'Customer Comp',    amount:29 },
-      { kind:'custom',  name:'Shift drink, Lone Star',       reason:'Manager comp',     category:'Shift Drink',      amount:5  }
+      { kind:'none',    name:'',                             reason:'Service Recovery',  amount:46 },
+      { kind:'menu',    name:'Old Fashioned',                reason:'Service Recovery',  amount:16 },
+      { kind:'menu',    name:'Anchor Burger',                reason:'Customer Goodwill', amount:18 },
+      { kind:'product', name:'House Cabernet',               reason:'Regular / VIP',     units:1, amount:13 },
+      { kind:'custom',  name:'Staff meal, Brisket Sandwich', reason:'Staff Meal',        amount:14 },
+      { kind:'menu',    name:'Pan-Seared Salmon',            reason:'Service Recovery',  amount:29 },
+      { kind:'none',    name:'',                             reason:'Manager Comp',      amount:24 },
+      { kind:'product', name:'Modelo',                       reason:'Marketing / Promo', units:1, amount:6  },
+      { kind:'custom',  name:'Shift drink, Lone Star',       reason:'Shift Drink',       amount:5  },
+      { kind:'product', name:"Tito's Handmade Vodka",        reason:'Regular / VIP',     units:1, amount:12 },
+      { kind:'menu',    name:'Anchor Burger',                reason:'Customer Goodwill', amount:18 },
+      { kind:'custom',  name:'Staff meal, Cobb Salad',       reason:'Staff Meal',        amount:13 }
     ];
     const VC_THRESHOLD = 25;
     const scVoidComps = [];
@@ -2121,7 +2129,7 @@ S.HubSettings = {
           product_id:'', product_name:'', units:null, amount:s.amount,
           server:vcServers[(a.wk + j) % vcServers.length], staff_id:'',
           authorized_by:improving ? mgrs[(a.wk + j) % 3] : (j === 0 ? '' : mgrs[j % 3]),
-          check_number:'', category:'', reason:s.reason, notes:'', auth_threshold_override:false,
+          check_number:'', reason:s.reason, notes:'', auth_threshold_override:false,
           created_at:new Date().toISOString()
         });
       }
@@ -2133,11 +2141,11 @@ S.HubSettings = {
         const noAuth = !improving && ((a.wk + j) % 2 === 0);
         scVoidComps.push({
           id:uid(), date:dateStr(baseAgo + vcDay++), type:'Comp', shift_type:vcShifts[(a.wk + j + 1) % vcShifts.length],
-          item:s.name, menu_item_id:(s.kind === 'menu' ? findMenuId(s.name) : ''),
+          item:(s.kind === 'none' ? '' : s.name), menu_item_id:(s.kind === 'menu' ? findMenuId(s.name) : ''),
           product_id:pid, product_name:(pid ? s.name : ''), units:(pid ? (s.units || 1) : null),
           amount:s.amount, server:server, staff_id:'',
           authorized_by:noAuth ? '' : mgrs[(a.wk + j) % 3],
-          check_number:'', category:s.category, reason:s.reason, notes:'',
+          check_number:'', reason:s.reason, notes:'',
           auth_threshold_override:(noAuth && s.amount > VC_THRESHOLD),
           created_at:new Date().toISOString()
         });
