@@ -393,7 +393,7 @@ S.ShiftWaste = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this entry?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('sc', 'waste', id);
     this.renderList();

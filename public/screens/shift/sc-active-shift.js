@@ -316,7 +316,7 @@ S.ShiftActiveShift = {
 
   async confirmDeleteShift(id) {
     if (!id) return;
-    const ok = await App.confirm({ title: 'Delete this shift?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('sc', 'shift', id);
     this._shiftFormId = null;
@@ -713,7 +713,7 @@ S.ShiftActiveShift = {
   },
 
   async removeShiftNote(s, noteId) {
-    const ok = await App.confirm({ title: 'Delete this shift note?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     const list = this.shifts();
     const i = list.findIndex(x => x.id === s.id);

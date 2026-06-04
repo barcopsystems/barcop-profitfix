@@ -286,7 +286,7 @@ S.ShiftMaintenance = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this issue?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('sc', 'maintenance', id);
     this.renderList();
