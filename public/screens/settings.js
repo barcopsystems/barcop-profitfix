@@ -2476,7 +2476,7 @@ S.HubSettings = {
     });
     App.shiftData.sc_void_comps = scVoidComps;
 
-    // ── Shift Control staff-linked logs (Walked Tabs, Incidents, Waste) ──
+    // ── Shift Control staff-linked logs (Walked Tabs, Waste) ──
     // Seeded here, after the roster exists, because each form requires a real
     // staff member (server / manager / recorded_by) for its open->save round
     // trip. icProducts is in scope for the waste cost, which mirrors the
@@ -2503,24 +2503,6 @@ S.HubSettings = {
       }
     });
     App.shiftData.sc_walked_tabs = scWalkedTabs;
-
-    // Incident Log — the manager's insurance / legal logbook. A realistic spread
-    // over the quarter; nothing routine, each one is a real event.
-    const scIncidentSeed = [
-      { type:'Slip / Fall',            severity:'Medium', daysAgo:33, time:'20:15', mgr:'Carlos P.', location:'Dining room near the server station', people:'One guest (declined medical care)', desc:'Guest slipped on a wet patch by the server station. Sat with ice, declined an ambulance, left under their own power.', witnesses:'Jessica M., Marcus T.', action:'Cleaned the spill, put out a wet-floor sign, logged a maintenance note on the ice-well drip.', notes:'Followed up by phone the next day, guest was fine.', follow:false },
-      { type:'Customer Altercation',   severity:'High',   daysAgo:26, time:'23:40', mgr:'Maria G.',  location:'Main Bar', people:'Two guests', desc:'Verbal argument between two guests at the bar escalated to shoving. Staff separated them, both asked to leave. No injuries, no property damage.', witnesses:'Jake T.', action:'Cut both off, walked them out separately, comped the surrounding tables a round.', notes:'', follow:false },
-      { type:'Refusal of Service',     severity:'Low',    daysAgo:19, time:'22:10', mgr:'Jake T.',   location:'Main Bar', people:'One guest', desc:'Guest showing clear signs of intoxication. Refused further service and helped arrange a rideshare.', witnesses:'Ashley B.', action:'Refused service, got the guest water, confirmed the rideshare pickup.', notes:'', follow:false },
-      { type:'Employee Injury',        severity:'Medium', daysAgo:12, time:'18:30', mgr:'Renee K.',  location:'Kitchen line', people:'One line cook', desc:'Line cook caught a finger on the slicer guard, minor laceration. First aid on site, did not need stitches.', witnesses:'Luis V.', action:'First aid, bandaged, sent home early. Filed the injury note for workers comp records.', notes:'Re-trained the line on slicer-guard use.', follow:true },
-      { type:'Health Inspector Visit', severity:'Low',    daysAgo:40, time:'14:00', mgr:'Carlos P.', location:'Whole house', people:'County health inspector', desc:'Routine inspection. Passed with two minor notes: date-label the walk-in containers and recaulk one prep sink.', witnesses:'', action:'Corrected the labeling the same day, scheduled the caulk repair.', notes:'Copy of the report is in the office binder.', follow:true },
-      { type:'Property Damage',        severity:'Low',    daysAgo:54, time:'21:00', mgr:'Maria G.',  location:'Patio', people:'', desc:'Wind knocked over a patio umbrella and cracked one tabletop. No one was hurt.', witnesses:'Owen L.', action:'Removed the broken table, secured the remaining umbrellas.', notes:'', follow:false },
-    ];
-    App.shiftData.sc_incidents = scIncidentSeed.map(x => ({
-      id:uid(), date:dateStr(x.daysAgo), time:x.time, type:x.type, severity:x.severity,
-      manager_id:staffIdByName(x.mgr), manager:x.mgr, location:x.location,
-      people_involved:x.people, description:x.desc, witnesses:x.witnesses,
-      action_taken:x.action, notes:x.notes, follow_up_needed:x.follow,
-      created_at:new Date().toISOString()
-    }));
 
     // Waste / Spill Log — products pulled from the real inventory; cost mirrors
     // sc-waste.js costFor()/unitLabel() exactly so the Total Cost is honest.
