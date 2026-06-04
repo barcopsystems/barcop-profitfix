@@ -8,14 +8,7 @@
 S.ShiftCashDrop = {
   editId: null,
   _pendingDelId: null,
-  DENOMS: [
-    { key: 'h100', label: '$100', val: 100 },
-    { key: 'h50',  label: '$50',  val: 50 },
-    { key: 'h20',  label: '$20',  val: 20 },
-    { key: 'h10',  label: '$10',  val: 10 },
-    { key: 'h5',   label: '$5',   val: 5 },
-    { key: 'h1',   label: '$1',   val: 1 }
-  ],
+  _counter: null,
 
   drops() {
     if (!App.shiftData) App.shiftData = {};
@@ -112,17 +105,6 @@ S.ShiftCashDrop = {
     const v = val => (val != null && val !== '') ? val : '';
     const den = d && d.denominations ? d.denominations : {};
 
-    const denomRows = this.DENOMS.map(dn =>
-      '<div class="form-row" style="gap:14px;align-items:center;margin-bottom:10px;">'
-      + '<div style="width:64px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">' + dn.label + '</div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Count</label>'
-      + '<input type="number" class="cd-denom" data-key="' + dn.key + '" data-val="' + dn.val + '" '
-      + 'min="0" step="1" inputmode="numeric" value="' + v(den[dn.key]) + '" '
-      + 'style="height:44px;font-size:16px;" oninput="S.ShiftCashDrop.calc()"/></div>'
-      + '<div class="f" style="flex:1;"><label>Subtotal</label>'
-      + '<div class="f-display cd-sub" data-key="' + dn.key + '" style="font-size:15px;">$0</div></div>'
-      + '</div>').join('');
-
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title">' + (id ? 'Edit' : 'Log') + ' Cash Drop</div>'
 
@@ -145,14 +127,7 @@ S.ShiftCashDrop = {
       + '</div></div>'
 
       + '<div class="card"><div class="card-title">Count the Drop</div>'
-      + denomRows
-      + '<div class="form-row" style="gap:14px;align-items:center;margin-bottom:0;">'
-      + '<div style="width:64px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">Coins</div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Amount</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="cd-coins" min="0" step="0.01" '
-      + 'inputmode="decimal" value="' + v(den.coins) + '" style="height:44px;font-size:16px;" oninput="S.ShiftCashDrop.calc()"/></div></div>'
-      + '<div class="f" style="flex:1;"></div>'
-      + '</div></div>'
+      + '<div id="cd-counter">' + CashCounter.html({ prefix: 'cddrop', values: den }) + '</div></div>'
 
       + '<div class="card"><div class="card-title">Amount Dropped</div>'
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:0;">'
@@ -175,29 +150,9 @@ S.ShiftCashDrop = {
     this.container.onclick = null;
     document.getElementById('cd-cancel')?.addEventListener('click', () => this.renderList());
     document.getElementById('cd-save')?.addEventListener('click', () => this.save());
-    this._countedEntered = false;
-    this.calc();
-  },
-
-  calc() {
-    let counted = 0, anyDenom = false;
-    document.querySelectorAll('.cd-denom').forEach(inp => {
-      const count = parseInt(inp.value, 10) || 0;
-      const val = parseFloat(inp.dataset.val) || 0;
-      const sub = count * val;
-      if (count > 0) anyDenom = true;
-      const subEl = document.querySelector('.cd-sub[data-key="' + inp.dataset.key + '"]');
-      if (subEl) subEl.textContent = App.fmtCurrency(sub);
-      counted += sub;
+    this._counter = CashCounter.mount(document.getElementById('cd-counter'), {
+      onChange: total => { const a = document.getElementById('cd-amount'); if (a && total > 0) a.value = total.toFixed(2); }
     });
-    const coins = parseFloat(document.getElementById('cd-coins')?.value) || 0;
-    if (coins > 0) anyDenom = true;
-    counted += coins;
-
-    if (anyDenom) {
-      const amtEl = document.getElementById('cd-amount');
-      if (amtEl) amtEl.value = counted.toFixed(2);
-    }
   },
 
   async save() {
@@ -208,67 +163,60 @@ S.ShiftCashDrop = {
     const amount = parseFloat(document.getElementById('cd-amount')?.value);
     if (isNaN(amount) || amount <= 0) { fail('Enter the amount dropped.'); return; }
 
-    const denominations = {};
-    document.querySelectorAll('.cd-denom').forEach(inp => {
-      const c = parseInt(inp.value, 10);
-      if (!isNaN(c) && c > 0) denominations[inp.dataset.key] = c;
-    });
-    const coins = parseFloat(document.getElementById('cd-coins')?.value);
-    if (!isNaN(coins) && coins > 0) denominations.coins = coins;
-
-    const editing = !!this.editId;
-    const list = this.drops();
-    const existing = editing ? list.find(x => x.id === this.editId) : null;
-    const oldSafeLogId = existing ? existing.safe_log_id : null;
+    const denominations = this._counter ? this._counter.denoms() : {};
+    const editing  = !!this.editId;
+    const existing = editing ? this.drops().find(x => x.id === this.editId) : null;
+    const drawerId = document.getElementById('cd-drawer')?.value || '';
+    const byId     = document.getElementById('cd-by')?.value || '';
+    const witId    = document.getElementById('cd-witness')?.value || '';
 
     const rec = {
-      id:            this.editId || App.uid(),
+      id:              this.editId || App.uid(),
       date,
-      shift_type:    document.getElementById('cd-type')?.value || '',
-      drop_time:     document.getElementById('cd-time')?.value || '',
-      drawer_id:     document.getElementById('cd-drawer')?.value || '',
-      drawer:        (App.drawerById(document.getElementById('cd-drawer')?.value) || {}).name || '',
-      performed_by_id: document.getElementById('cd-by')?.value || '',
-      performed_by:    (App.staffById(document.getElementById('cd-by')?.value) || {}).name || '',
-      witness_id:      document.getElementById('cd-witness')?.value || '',
-      witness:         (App.staffById(document.getElementById('cd-witness')?.value) || {}).name || '',
+      shift_type:      document.getElementById('cd-type')?.value || '',
+      drop_time:       document.getElementById('cd-time')?.value || '',
+      drawer_id:       drawerId,
+      drawer:          (App.drawerById(drawerId) || {}).name || '',
+      performed_by_id: byId,
+      performed_by:    (App.staffById(byId) || {}).name || '',
+      witness_id:      witId,
+      witness:         (App.staffById(witId) || {}).name || '',
       amount,
       denominations,
-      notes:         document.getElementById('cd-notes')?.value.trim() || '',
-      safe_log_id:   oldSafeLogId || null
+      notes:           document.getElementById('cd-notes')?.value.trim() || '',
+      safe_log_id:     existing ? (existing.safe_log_id || null) : null
     };
     if (!editing) rec.created_at = new Date().toISOString();
 
-    let saved = rec;
-    if (editing) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
-    } else {
-      list.push(rec);
-    }
-
-    // Auto-feed Safe Log: a cash drop physically moves money INTO the safe,
-    // so the safe ledger must reflect it. Without this link the safe running
-    // balance is wrong and the safe screen feels orphaned. On edit, update
-    // the linked entry in place; on new, create it and store the id back on
-    // the cash drop record. Both the drop and its safe entry persist as their
-    // own event rows.
-    const safeEntry = this._syncSafeLog(rec);
-    rec.safe_log_id = safeEntry ? safeEntry.id : null;
-    saved.safe_log_id = rec.safe_log_id;
-
     const btn = document.getElementById('cd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'cash_drop', saved);
-    if (safeEntry) await App.putRecord('sc', 'safe_log', safeEntry);
+    const ok = await this.persistDrop(rec);
     this.editId = null;
     if (ok) {
-      App.markSetupDone('gs_sc_cash');
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Drop'; }
       fail('Save failed. Try again.');
     }
+  },
+
+  // Persist a drop + mirror it into the safe log in one write path. Shared by
+  // this screen's save() and the Cash Board's Log a Drop pop-up so a drop logged
+  // either door behaves identically. A drop physically moves money INTO the safe,
+  // so the safe ledger must reflect it: on edit, update the linked entry in
+  // place; on new, create it and store its id back on the drop. Both persist as
+  // their own event rows.
+  async persistDrop(rec) {
+    const list = this.drops();
+    const safeEntry = this._syncSafeLog(rec);
+    rec.safe_log_id = safeEntry ? safeEntry.id : null;
+    const i = list.findIndex(x => x.id === rec.id);
+    if (i > -1) list[i] = { ...list[i], ...rec }; else list.push(rec);
+    const saved = i > -1 ? list[i] : rec;
+    const ok = await App.putRecord('sc', 'cash_drop', saved);
+    if (safeEntry) await App.putRecord('sc', 'safe_log', safeEntry);
+    if (ok) App.markSetupDone('gs_sc_cash');
+    return ok;
   },
 
   // Mirror this cash drop into sc_safe_log as a Cash Drop entry. Returns the
