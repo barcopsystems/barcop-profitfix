@@ -389,7 +389,7 @@ S.RevenueServerCheck = {
     document.getElementById('rsc-del-sel')?.addEventListener('click', async () => {
       const ids = [...container.querySelectorAll('.rsc-chk:checked')].map(c => c.dataset.id);
       if (!ids.length) return;
-      const ok = await App.confirm({ title: 'Delete ' + ids.length + ' check' + (ids.length > 1 ? 's' : '') + '?', confirmText: 'Delete', cancelText: 'Cancel' });
+      const ok = await App.confirmDelete(ids.length + ' check' + (ids.length > 1 ? 's' : ''));
       if (!ok) return;
       for (const id of ids) await App.removeRecord('core', 'revenue_server_check', id);
       this.render(container, actions);

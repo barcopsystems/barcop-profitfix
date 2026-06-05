@@ -165,7 +165,7 @@ S.RevenueEvents = {
     container.querySelectorAll('.rev-del').forEach(b => {
       b.addEventListener('click', async ev => {
         ev.stopPropagation();
-        const ok = await App.confirm({ title: 'Delete this event?', confirmText: 'Delete', cancelText: 'Cancel' });
+        const ok = await App.confirmDelete();
         if (!ok) return;
         await App.removeRecord('core', 'revenue_event', b.dataset.id);
         this.render(container, actions);
@@ -322,7 +322,7 @@ S.RevenueEvents = {
     });
     container.querySelectorAll('.rrc-del').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const ok = await App.confirm({ title: 'Delete this package?', confirmText: 'Delete', cancelText: 'Cancel' });
+        const ok = await App.confirmDelete();
         if (!ok) return;
         App.data.revenue_rate_cards = this.rateCards().filter(r => r.id !== btn.dataset.id);
         await App.saveKey('revenue_rate_cards');

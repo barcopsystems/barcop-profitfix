@@ -317,7 +317,7 @@ S.RevenueMenuItems = {
     });
     this.container.querySelectorAll('.ri-del').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const ok = await App.confirm({ title: 'Delete this item?', confirmText: 'Delete', cancelText: 'Cancel' });
+        const ok = await App.confirmDelete();
         if (!ok) return;
         App.data.menu_items = this.items().filter(i => i.id !== btn.dataset.id);
         await App.saveKey('menu_items');
@@ -343,7 +343,7 @@ S.RevenueMenuItems = {
     document.getElementById('ri-del-sel')?.addEventListener('click', async () => {
       const ids = [...this.container.querySelectorAll('.ri-chk:checked')].map(c => c.dataset.id);
       if (!ids.length) return;
-      const ok = await App.confirm({ title: 'Delete ' + ids.length + ' item' + (ids.length > 1 ? 's' : '') + '?', confirmText: 'Delete', cancelText: 'Cancel' });
+      const ok = await App.confirmDelete(ids.length + ' item' + (ids.length > 1 ? 's' : ''));
       if (!ok) return;
       App.data.menu_items = this.items().filter(i => !ids.includes(i.id));
       await App.saveKey('menu_items');

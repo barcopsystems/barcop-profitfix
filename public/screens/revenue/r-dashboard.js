@@ -218,7 +218,7 @@ S.RevenueDashboard = {
     });
     container.querySelectorAll('.init-del').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const ok = await App.confirm({ title: 'Delete this initiative?', confirmText: 'Delete', cancelText: 'Cancel' });
+        const ok = await App.confirmDelete();
         if (!ok) return;
         App.data.initiatives = this.initiatives().filter(x => x.id !== btn.dataset.id);
         await App.saveKey('initiatives');

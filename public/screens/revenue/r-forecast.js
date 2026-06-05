@@ -366,12 +366,7 @@ S.RevenueForecast = {
 
   confirmDelete() {
     if (!this.savedId) return;
-    App.confirm({
-      title: 'Delete this forecast?',
-      message: 'The schedule builder and weekly screens will fall back to a guess for this week.',
-      confirmText: 'Delete',
-      cancelText: 'Keep It'
-    }).then(ok => { if (ok) this.doDelete(); });
+    App.confirmDelete().then(ok => { if (ok) this.doDelete(); });
   },
 
   async doDelete() {
