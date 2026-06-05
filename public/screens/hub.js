@@ -676,7 +676,6 @@ S.Hub = {
       // switcher) instead of a sidebar entry, so it stays accessible from
       // module screens too.
       + App.sectionSelectorHTML('hub')
-      + navItem('hub-home', 'Dashboard', 'hubhome', [])
       + '<div class="nav-section">Analysis</div>'
       + navItem('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
       + '<div class="nav-section">Recovery</div>'
