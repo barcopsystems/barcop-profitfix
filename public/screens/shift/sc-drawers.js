@@ -72,11 +72,11 @@ S.ShiftDrawers = {
     const header = '<div class="page-head">'
       + '<div>'
       + '<h1 class="page-title">Drawers &amp; Registers</h1>'
-      + '<div class="page-desc">Every drawer or register in your operation. Cash Drop and the Variance Log pull from this list so every cash event lands on the same name instead of "Bar 1" one night and "Front Bar" the next.</div>'
+      + '<div class="page-sub">Every register you run cash through.</div>'
       + '</div>'
       + '<div class="page-head-actions">'
       + App.helpButton('dr-how')
-      + '<button class="btn btn-primary" id="dr-add">Add Drawer</button>'
+      + '<button class="btn btn-primary btn-lg" id="dr-add">Add Drawer</button>'
       + '</div></div>';
 
     let body;
@@ -93,14 +93,18 @@ S.ShiftDrawers = {
           + '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>'
         + '</div></td></tr>';
 
-      body = '<div class="data-table"><table class="tbl"><thead><tr>'
+      const countLabel = active.length + (active.length === 1 ? ' register' : ' registers');
+      body = '<div class="page-panel">'
+        + '<div class="zone-shelf"><span class="zone-count">' + countLabel + '</span></div>'
+        + '<div class="data-table"><table class="tbl"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
-        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>'
+        + '</div>';
 
       if (archived.length) {
         body += '<div class="canvas-sub">Archived</div>'
           + '<div class="canvas-hint">Restore any to bring them back into the dropdowns.</div>'
-          + '<div class="data-table"><table class="tbl"><tbody>'
+          + '<div class="data-table data-table-recessed"><table class="tbl"><tbody>'
           + archived.map(d => '<tr style="opacity:0.55;">'
               + '<td style="font-weight:700;color:var(--t2);">' + esc(d.name) + '</td>'
               + '<td>' + esc(d.location || '-') + '</td>'
