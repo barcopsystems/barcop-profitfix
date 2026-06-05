@@ -254,7 +254,7 @@ S.HubSettings = {
       const safe = (backup.bar_name || 'bar-cop').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'bar-cop';
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'barcop-backup-' + safe + '-' + new Date().toISOString().slice(0, 10) + '.json';
+      a.download = 'barcop-backup-' + safe + '-' + App.todayLocal() + '.json';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -317,7 +317,7 @@ S.HubSettings = {
 
     const uid = () => App.uid();
     const today = new Date();
-    const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return d.toISOString().slice(0,10); };
+    const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return App.ymdLocal(d); };
 
     // ── Settings ──
     App.data.settings.bar_name           = 'The Anchor Bar & Kitchen';
@@ -780,7 +780,7 @@ S.HubSettings = {
       const d = new Date(dStr + 'T00:00:00');
       const wd = (d.getDay() + 6) % 7;
       d.setDate(d.getDate() - wd);
-      return d.toISOString().slice(0,10);
+      return App.ymdLocal(d);
     };
     // Covers forecast derives from the revenue forecast at the Anchor's blended
     // check average. Active Shift reads covers_per_day for its Cover Goal.
@@ -818,7 +818,7 @@ S.HubSettings = {
         const d = new Date();
         const wd = (d.getDay() + 6) % 7;
         d.setDate(d.getDate() - wd + offsetWeeks * 7);
-        return d.toISOString().slice(0,10);
+        return App.ymdLocal(d);
       };
       const per_day = {};
       fcDays.forEach(d => { per_day[d] = Math.round(ref * fcDayWeights[d]); });
@@ -2497,7 +2497,7 @@ S.HubSettings = {
       }));
       const delDate = new Date(del.date + 'T00:00:00');
       const ordDate = new Date(delDate); ordDate.setDate(ordDate.getDate() - lead);
-      return { id:uid(), vendor:del.vendor, date:ordDate.toISOString().slice(0, 10), status:'Received',
+      return { id:uid(), vendor:del.vendor, date:App.ymdLocal(ordDate), status:'Received',
         line_items:lineItems, item_count:lineItems.length, total:del.total, custom:true,
         created_at:ordDate.toISOString(), received_at:delDate.toISOString() };
     };
@@ -2675,7 +2675,7 @@ S.HubSettings = {
       const d = new Date(today); d.setDate(d.getDate() - daysBack);
       const day = d.getDay();
       d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-      return d.toISOString().slice(0, 10);
+      return App.ymdLocal(d);
     };
     const buildSchedule = (weekStart, forecast) => {
       const shifts = [];
@@ -2857,7 +2857,7 @@ S.HubSettings = {
     // in range, mirroring lc-pay-periods closePeriod().
     const buildClosedPeriod = (weekStart, closedDaysAgo) => {
       const dd = new Date(weekStart + 'T00:00:00'); dd.setDate(dd.getDate() + 6);
-      const weekEnd = dd.toISOString().slice(0, 10);
+      const weekEnd = App.ymdLocal(dd);
       const periodId = uid();
       const byStaff = {};
       lcActuals.filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd).forEach(a => {
