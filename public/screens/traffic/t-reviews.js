@@ -176,7 +176,7 @@ S.TrafficReviews = {
 
   replyForm() {
     const r = this.editId ? this.replies().find(x => x.id === this.editId) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const sourceOpts = this.SOURCES.map(s =>
       '<option' + (r && r.source === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const actionOpts = '<option value="">-</option>' + this.ACTIONS.map(a =>

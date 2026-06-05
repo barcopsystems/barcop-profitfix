@@ -189,7 +189,7 @@ S.TrafficEmail = {
 
   campaignForm() {
     const c = this.editId ? this.campaigns().find(x => x.id === this.editId) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const typeOpts = '<option value="">-</option>' + this.CAMPAIGN_TYPES.map(t =>
       '<option' + (c && c.type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     return '<div style="background:var(--input);border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:14px;">'

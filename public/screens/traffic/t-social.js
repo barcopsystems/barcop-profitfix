@@ -181,7 +181,7 @@ S.TrafficSocial = {
 
   postForm() {
     const p = this.editId ? this.socialPosts().find(x => x.id === this.editId) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const platOpts = this.PLATFORMS.map(pl =>
       '<option' + (p && p.platform === pl ? ' selected' : '') + '>' + esc(pl) + '</option>').join('');
     const typeOpts = '<option value="">-</option>' + this.CONTENT_TYPES.map(c =>

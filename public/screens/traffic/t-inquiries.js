@@ -155,7 +155,7 @@ S.TrafficInquiries = {
   showForm(id) {
     this.editId = id || null;
     const i = id ? this.inquiries().find(x => x.id === id) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const typeOpts   = '<option value="">-</option>' + this.EVENT_TYPES.map(t =>
       '<option' + (i && i.event_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const sourceOpts = '<option value="">-</option>' + this.SOURCES.map(s =>

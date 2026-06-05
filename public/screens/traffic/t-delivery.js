@@ -169,7 +169,7 @@ S.TrafficDelivery = {
       const v = parseFloat(inp.value);
       prof[inp.dataset.key + '_rating'] = isNaN(v) ? null : v;
     });
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = App.todayLocal();
     this.container.querySelectorAll('.dl-tog-sync').forEach(cb => {
       const k = cb.dataset.key + '_menu_synced_at';
       if (cb.checked) {

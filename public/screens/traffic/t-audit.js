@@ -888,7 +888,7 @@ S.TrafficAudit = {
       setStatus('Saving audit...', 'var(--t2)');
       const d = data.auditData || {};
       const newAudit = {
-        date:          new Date().toISOString().slice(0,10),
+        date:          App.todayLocal(),
         overall_score: d.OVERALL_SCORE || 0,
         bar_name:      d.BAR_NAME      || App.data.settings?.bar_name || '',
         audit_id:      d.AUDIT_ID      || '',

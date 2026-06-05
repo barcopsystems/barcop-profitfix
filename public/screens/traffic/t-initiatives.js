@@ -143,7 +143,7 @@ S.TrafficInitiatives = {
       '<option' + (r && r.weekday === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
     const statusOpts = this.STATUSES.map(s =>
       '<option' + ((r && r.status === s) || (!r && s === 'Active') ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
 
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">' + (id ? 'Edit Initiative' : 'Start a Slow-Night Initiative') + '</div>'
