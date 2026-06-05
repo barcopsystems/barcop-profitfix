@@ -476,6 +476,16 @@ const App = {
     if (tnCollapse) tnCollapse.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
+    // Proto top-nav: mobile menu burger opens the off-canvas sidebar; the two
+    // utility icon buttons open the Hub Settings / Help views.
+    const tnBurger = document.getElementById('tn-mobile-burger');
+    if (tnBurger) tnBurger.onclick = () => {
+      document.getElementById('app').classList.toggle('sidebar-open');
+    };
+    const tnSettings = document.getElementById('tn-settings');
+    if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettings) S.HubSettings.open(); };
+    const tnHelp = document.getElementById('tn-help');
+    if (tnHelp) tnHelp.onclick = () => { if (window.S && S.HubHelp) S.HubHelp.open(); };
     // Mobile sidebar: hamburger button in the topbar opens the off-canvas
     // sidebar below the 768px breakpoint. Backdrop click closes it. Module
     // nav clicks also close it (wired in _renderNav). No-op on desktop where
@@ -1183,37 +1193,52 @@ const App = {
   // Adds the .proto class to #app and fills #proto-topnav with the logo + flat
   // section tabs; clears it for every other section. Reorg/visual only, no new
   // features. Tabs reuse jumpToSection, the same hop the section switcher does.
-  // The new full-width top nav. Renders for every module shell; the active tab is
-  // the current section. The shell DOM (collapse toggle, logo, tabs slot, right
-  // slot) is static in index.html so the relocated account-switcher nodes survive
-  // re-renders; we only refill the tabs + (once) move the switcher up. The Hub is
-  // its own wrapper and keeps its current look for now.
-  _PROTO_TABS: [['hub','Hub'],['profit','Profit'],['revenue','Revenue'],['traffic','Traffic'],['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
+  // The new two-row top nav. Renders for every module shell. The shell DOM (rows,
+  // logo, slots, icon buttons) is static in index.html so the relocated account-
+  // switcher nodes survive re-renders; we refill the global links + section pills
+  // and (once) move the switcher up. The Hub is still its own wrapper for now.
+  _PROTO_GLOBAL:   [['hub','The Hub'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations']],
+  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
+  _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _MODULE_KEYS: ['profit', 'revenue', 'traffic', 'inventory', 'labor', 'shift'],
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
   _CONVERTED: new Set(['sc-drawers']),
+  _protoGlobalClick(g) {
+    if (g === 'hub')   return this.showHub();
+    if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
+    if (g === 'books') return (window.S && S.HubBooks)       ? S.HubBooks.open()       : null;
+    if (g === 'ops')   return (window.S && S.HubPermits)     ? S.HubPermits.open()     : null;
+  },
   _renderProtoTopnav(module) {
     const app = document.getElementById('app');
     if (!app) return;
     const on = this._MODULE_KEYS.includes(module);
     app.classList.toggle('proto', on);
     if (!on) return;
-    const tabsEl = document.getElementById('tn-tabs');
-    if (tabsEl) {
-      tabsEl.innerHTML = this._PROTO_TABS.map(([k, l]) =>
-        '<div class="tn-tab' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
-      ).join('');
-      tabsEl.querySelectorAll('.tn-tab[data-sec]').forEach(el =>
+    const globalEl = document.getElementById('tn-global');
+    if (globalEl) {
+      globalEl.innerHTML = this._PROTO_GLOBAL.map(([k, l]) =>
+        '<div class="tn-glink" data-g="' + k + '">' + esc(l) + '</div>').join('');
+      globalEl.querySelectorAll('.tn-glink[data-g]').forEach(el =>
+        el.addEventListener('click', () => App._protoGlobalClick(el.dataset.g)));
+    }
+    const secEl = document.getElementById('tn-sections');
+    if (secEl) {
+      const pill = ([k, l]) => '<div class="tn-sec' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
+      secEl.innerHTML = this._PROTO_RECOVERY.map(pill).join('')
+        + '<div class="tn-divider"></div>'
+        + this._PROTO_CONTROL.map(pill).join('');
+      secEl.querySelectorAll('.tn-sec[data-sec]').forEach(el =>
         el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
     }
     // Relocate the account/location switcher + group dashboard into the top nav
     // (once). renderAccountSwitcher fills them by id, so moving the nodes is safe.
-    const right = document.getElementById('tn-right');
-    if (right) {
+    const acct = document.getElementById('tn-acct');
+    if (acct) {
       ['topbar-account-switcher', 'topbar-group-dashboard'].forEach(id => {
         const node = document.getElementById(id);
-        if (node && node.parentElement !== right) right.appendChild(node);
+        if (node && node.parentElement !== acct) acct.appendChild(node);
       });
     }
   },
