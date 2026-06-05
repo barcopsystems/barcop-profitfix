@@ -48,7 +48,7 @@ S.ShiftReports = {
     this.container.innerHTML = '<div class="screen">'
       + App.reportTabBar(this.TABS, this.tab)
       + App.reportPanel(this.TABS, this.tab, 'rpt-export', parts.panel)
-      + (parts.below ? '<div style="margin-top:4px;">' + parts.below + '</div>' : '')
+      + (parts.below ? '<div style="margin-top:16px;">' + parts.below + '</div>' : '')
       + '</div>';
     this.wire();
   },
@@ -202,8 +202,7 @@ S.ShiftReports = {
         + '<td class="' + (x.net < 0 ? 'neg' : '') + '">' + (x.net >= 0 ? '+' : '') + App.fmtCurrency(x.net) + '</td>'
         + '<td class="' + (x.short ? 'neg' : '') + '">' + x.short + '</td><td>' + x.over + '</td></tr>';
     }).join('');
-    return this.bareTable(['Cashier', 'Variances', 'Net Over/Short', 'Times Short', 'Times Over'], rows)
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Repeated shortages from one cashier are worth a closer look in Theft Risk.</div>';
+    return this.bareTable(['Cashier', 'Variances', 'Net Over/Short', 'Times Short', 'Times Over'], rows);
   },
 
   // ── Operations tab ──────────────────────────────────────────────────────────
@@ -281,8 +280,7 @@ S.ShiftReports = {
     const rows = Object.values(g).sort((a, b) => b.count - a.count).slice(0, 15).map(x =>
       '<tr><td><div class="val">' + esc(x.name) + '</div></td><td>' + esc(x.category) + '</td>'
       + '<td>' + x.count + (x.count > 1 ? ' <span style="color:var(--amber);font-weight:700;">Repeat</span>' : '') + '</td></tr>').join('');
-    return this.bareTable(['Item', 'Category', 'Times 86\'d'], rows)
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Repeat 86s point to par levels that are set too low. Review them in Inventory Control.</div>';
+    return this.bareTable(['Item', 'Category', 'Times 86\'d'], rows);
   },
 
   maintByPriority(maint) {
