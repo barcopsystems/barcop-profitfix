@@ -599,7 +599,7 @@ S.LaborStaffRoster = {
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label>'
           + '<select id="note-cat">' + catOpts + '</select></div>'
         + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager</label>'
-          + '<select id="note-mgr">' + App.staffOptions(n?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...' }) + '</select></div>'
+          + '<select id="note-mgr">' + App.staffOptions(n?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Note</label>'
         + '<textarea id="note-text" rows="5" placeholder="What happened, when, who was around, what was said. Specifics matter if this becomes a personnel matter later.">' + esc(n?.text || '') + '</textarea></div>'
