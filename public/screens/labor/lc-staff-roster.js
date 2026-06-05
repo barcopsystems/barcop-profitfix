@@ -123,22 +123,24 @@ S.LaborStaffRoster = {
       + '<div class="f" style="flex:1 1 110px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-pay" min="0" step="0.01" '
       + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Phone</label>'
-      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
-      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
       + '</div>'
-      // Shift Lead: an hourly staff member who can run shifts and authorize like
-      // a manager. Drives the Manager / Authorized By / Manager-on-Duty pickers
-      // (Management staff are supervisors automatically, so this is for the key
-      // hourly people). See App.isSupervisor.
-      + '<div class="form-row" style="gap:8px;margin-top:-2px;">'
-      + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
-      + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>'
-      + 'Shift Lead <span style="color:var(--t3);font-size:11px;">(can run shifts and authorize, even if hourly. Management is always a supervisor.)</span></label></div>';
+      // Row 2: Phone, Email, then Shift Lead. Pulling Phone/Email off row 1 gives
+      // Name and Position room. Shift Lead = an hourly staff member who can run
+      // shifts and authorize like a manager (Management is a supervisor
+      // automatically). See App.isSupervisor.
+      + '<div class="form-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Phone</label>'
+      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
+      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:2 1 240px;min-width:0;"><label>Shift Lead</label>'
+      + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
+      + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
+      + '<span style="color:var(--t3);font-size:11px;line-height:1.3;">Can run shifts and authorize, even if hourly. Management is always a supervisor.</span></label></div>'
+      + '</div>';
   },
 
   // Wire the Pay Type + pay field for whichever form is mounted (add or edit).
