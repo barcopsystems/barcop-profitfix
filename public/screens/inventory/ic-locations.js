@@ -390,30 +390,11 @@ S.InventoryLocations = {
   },
 
   // ── Delete / archive / defaults ────────────────────────────────────────────
-  confirmDelete(id) {
+  async confirmDelete(id) {
     const l = this.locations().find(x => x.id === id);
     if (!l) return;
-    const n = this.productCount(l.name);
-    const m = document.createElement('div');
-    m.id = 'il-del-modal';
-    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
-    const productNote = n > 0
-      ? '<div style="font-size:12px;color:var(--gold);line-height:1.7;margin-bottom:18px;background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:10px 12px;">'
-        + n + ' product' + (n === 1 ? ' is' : 's are') + ' assigned to this location. Their assignment stays in place but the location is hidden from new flows (Take Inventory, Set Locations). Restore anytime.'
-        + '</div>'
-      : '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">No products are assigned here. Restore anytime from the Deleted section if you change your mind.</div>';
-    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:480px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
-      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;">Delete ' + esc(l.name) + '?</div>'
-      + productNote
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
-        + '<button type="button" id="il-del-cancel" class="btn btn-ghost">Cancel</button>'
-        + '<button type="button" id="il-del-confirm" class="btn btn-danger">Delete</button>'
-      + '</div></div>';
-    document.body.appendChild(m);
-    const close = () => m.remove();
-    m.addEventListener('click', ev => { if (ev.target === m) close(); });
-    document.getElementById('il-del-cancel').addEventListener('click', close);
-    document.getElementById('il-del-confirm').addEventListener('click', () => { close(); this.setArchived(id, true); });
+    if (!(await App.confirmDelete())) return;
+    this.setArchived(id, true);
   },
 
   async _persistLocationOrder(newActiveOrderIds) {

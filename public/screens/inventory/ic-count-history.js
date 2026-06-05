@@ -159,29 +159,12 @@ S.InventoryCountHistory = {
   // Guarded delete: a count is a finalized record, so removing one is behind
   // the edit permission and an honest confirm because it moves COGS, usage,
   // and variance. The correction path matters more than strict immutability.
-  confirmDelete(id) {
+  async confirmDelete(id) {
     if (!App.canEdit('ic-count-history')) return;
-    const rec = this.counts().find(c => c.id === id);
-    const label = rec ? (esc((rec.type || 'Inventory') + ' count, ' + this.fmtDate(rec.date))) : 'this count';
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:440px;width:100%;padding:24px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Delete Count</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:20px;">Delete the ' + label + '? This count feeds your COGS, usage, and variance numbers, so deleting it will change those reports. This cannot be undone.</div>'
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
-        + '<button type="button" class="btn btn-ghost" id="ch-del-cancel">Cancel</button>'
-        + '<button type="button" class="btn btn-danger" id="ch-del-confirm">Delete Count</button>'
-      + '</div></div>';
-    document.body.appendChild(m);
-    const close = () => m.remove();
-    m.addEventListener('click', ev => { if (ev.target === m) close(); });
-    document.getElementById('ch-del-cancel').addEventListener('click', close);
-    document.getElementById('ch-del-confirm').addEventListener('click', async () => {
-      close();
-      if (!App.canEdit('ic-count-history') || !App.inventoryData) return;
-      await App.removeRecord('ic', 'count', id);
-      this.renderList();
-    });
+    if (!(await App.confirmDelete())) return;
+    if (!App.inventoryData) return;
+    await App.removeRecord('ic', 'count', id);
+    this.renderList();
   },
 
   // ── Detail ────────────────────────────────────────────────────────────────

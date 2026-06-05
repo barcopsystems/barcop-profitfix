@@ -91,15 +91,7 @@ S.InventoryVendors = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    const modal = '<div id="iv-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:360px;width:90%;text-align:center;">'
-      + '<div id="iv-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this vendor?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="iv-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="iv-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>';
     this.wireList();
   },
 
@@ -282,26 +274,11 @@ S.InventoryVendors = {
   },
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  confirmDel(id) {
-    const v = this.vendors().find(x => x.id === id);
-    if (!v) return;
-    this._pendingDelId = id;
-    const n = this.vendorProducts(v.name).length;
-    const modal = document.getElementById('iv-del-modal');
-    const msgEl = document.getElementById('iv-del-msg');
-    if (msgEl) msgEl.innerHTML = 'Delete <strong>' + esc(v.name) + '</strong>?'
-      + (n ? '<div style="font-size:11px;font-weight:600;color:var(--t3);margin-top:6px;">'
-        + n + ' product' + (n === 1 ? '' : 's') + ' reference this vendor and will keep the vendor name.</div>' : '');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('iv-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('iv-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      App.inventoryData.ic_vendors = this.vendors().filter(x => x.id !== delId);
-      await App.saveInventory();
-      this.renderList();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    App.inventoryData.ic_vendors = this.vendors().filter(x => x.id !== id);
+    await App.saveInventory();
+    this.renderList();
   },
 
 };

@@ -366,20 +366,12 @@ S.InventoryProducts = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    const modal = '<div id="ip-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div id="ip-del-msg" style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this product?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="ip-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="ip-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
     // When an upload is active, the lower area becomes the in-place import
     // panel (drop zone -> column mapper) instead of the product list. The list
     // sits in an .rpt-panel so the active category tab connects into it cleanly
     // (same connected look as the report tabs) and the header row gets padding.
     const lower = this._import ? this.importPanelHTML() : (tabs + '<div class="rpt-panel">' + body + '</div>');
-    this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>';
     this.wireLanding();
   },
 
@@ -954,21 +946,11 @@ S.InventoryProducts = {
   },
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  confirmDel(ids, msg) {
-    this._pendingDelIds = ids;
-    const modal = document.getElementById('ip-del-modal');
-    const msgEl = document.getElementById('ip-del-msg');
-    if (msgEl) msgEl.textContent = msg;
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('ip-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelIds = null; };
-    document.getElementById('ip-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const ids = this._pendingDelIds || [];
-      App.inventoryData.ic_products = this.products().filter(p => !ids.includes(p.id));
-      this._pendingDelIds = null;
-      await App.saveInventory();
-      this.renderLanding();
-    };
+  async confirmDel(ids, msg) {
+    if (!(await App.confirmDelete(ids.length > 1 ? ids.length + ' products' : null))) return;
+    App.inventoryData.ic_products = this.products().filter(p => !ids.includes(p.id));
+    await App.saveInventory();
+    this.renderLanding();
   },
 
   // ── Import (category-scoped CSV / Excel with column mapping) ──────────────

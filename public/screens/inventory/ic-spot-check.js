@@ -204,8 +204,7 @@ S.InventorySpotCheck = {
       + '<span id="sp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + setup + productsCard + this.historyCard() + '</div>'
-      + this.delModal();
+    this.container.innerHTML = '<div class="screen">' + setup + productsCard + this.historyCard() + '</div>';
 
     const lines = document.getElementById('sp-lines');
     const onInput = ev => {
@@ -515,27 +514,9 @@ S.InventorySpotCheck = {
     App.navigate('theft-risk');
   },
 
-  delModal() {
-    return '<div id="sp-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this spot check?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="sp-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="sp-del-confirm">Delete</button>'
-      + '</div></div></div>';
-  },
-
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('sp-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('sp-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('sp-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      await App.removeRecord('ic', 'spot_check', delId);
-      this.renderMain();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('ic', 'spot_check', id);
+    this.renderMain();
   }
 };
