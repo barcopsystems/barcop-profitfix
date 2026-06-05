@@ -80,12 +80,16 @@ S.ShiftReports = {
   filterWrap(controls, stats) {
     return '<div class="no-print"><div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">' + controls + '</div>' + stats + '</div>';
   },
+  // Each breakdown sits in its own card; title may carry HTML entities so it is
+  // not escaped (all titles are hardcoded).
   section(title, tableHtml) {
-    return '<div style="margin-top:18px;"><div class="sh" style="margin-bottom:8px;">' + esc(title) + '</div>' + tableHtml + '</div>';
+    return '<div class="card"><div class="card-title">' + title + '</div>' + tableHtml + '</div>';
   },
+  // No .tbl-wrap: the section card is the container, so the table drops its
+  // outer border/box and shows only the horizontal lines between rows.
   bareTable(headers, rows) {
     const ths = headers.map(h => '<th>' + h + '</th>').join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>' + ths
+    return '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>' + ths
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
   noRange(noun) {
