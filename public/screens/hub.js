@@ -675,8 +675,8 @@ S.Hub = {
       // get the Group Dashboard as a topbar button (next to the location
       // switcher) instead of a sidebar entry, so it stays accessible from
       // module screens too.
-      + '<div class="nav-section">Overview</div>'
-      + navItem('hub-home', 'The Hub', 'hubhome', [])
+      + App.sectionSelectorHTML('hub')
+      + navItem('hub-home', 'Dashboard', 'hubhome', [])
       + '<div class="nav-section">Analysis</div>'
       + navItem('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
       + '<div class="nav-section">Recovery</div>'
