@@ -370,7 +370,7 @@ S.InventoryOrderSheet = {
     const rec = {
       id:         App.uid(),
       vendor,
-      date:       new Date().toISOString().slice(0, 10),
+      date:       App.todayLocal(),
       status:     'Open',
       line_items: lineItems,
       item_count: lineItems.length,
@@ -617,7 +617,7 @@ S.InventoryOrderSheet = {
     const rec = {
       id:         App.uid(),
       vendor,
-      date:       new Date().toISOString().slice(0, 10),
+      date:       App.todayLocal(),
       status:     'Open',
       line_items: lineItems,
       item_count: lineItems.length,

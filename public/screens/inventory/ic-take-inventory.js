@@ -526,7 +526,7 @@ S.InventoryTakeInventory = {
     });
     const record = {
       id:          App.uid(),
-      date:        new Date().toISOString().slice(0, 10),
+      date:        App.todayLocal(),
       type:        this.draft.type,
       counted_by_id: this.draft.counted_by_id || '',
       counted_by:  this.draft.counted_by || (App.staffById(this.draft.counted_by_id) || {}).name || '',

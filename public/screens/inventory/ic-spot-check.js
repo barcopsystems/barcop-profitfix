@@ -169,7 +169,7 @@ S.InventorySpotCheck = {
     }
 
     this._seq = 0;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
 
     // Pre-fill from the active shift when one is running — that's the most
     // common case for a mid-service spot check. Operator can still pick a
@@ -502,7 +502,7 @@ S.InventorySpotCheck = {
         id: App.uid(),
         product_id: productId,
         sku: productName,
-        opened_date: new Date().toISOString().slice(0, 10),
+        opened_date: App.todayLocal(),
         created_at: new Date().toISOString(),
         status: 'open',
         steps,

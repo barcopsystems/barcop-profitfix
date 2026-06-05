@@ -126,7 +126,7 @@ S.InventoryReceiveDelivery = {
     this._seq = 0;
     const vendorOpts = '<option value="">Select vendor...</option>'
       + this.vendors().map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -373,7 +373,7 @@ S.InventoryReceiveDelivery = {
   openDiscrepancyModal(line) {
     if (!line) return;
     const vendor = document.getElementById('rd-vendor')?.value || '';
-    const date   = document.getElementById('rd-date')?.value || new Date().toISOString().slice(0, 10);
+    const date   = document.getElementById('rd-date')?.value || App.todayLocal();
     const invoice = document.getElementById('rd-invoice')?.value.trim() || '';
 
     const productId = line.querySelector('.rd-prod')?.value || '';
@@ -563,7 +563,7 @@ S.InventoryReceiveDelivery = {
     const record = {
       id:             App.uid(),
       vendor,
-      date:           document.getElementById('rd-date')?.value || new Date().toISOString().slice(0, 10),
+      date:           document.getElementById('rd-date')?.value || App.todayLocal(),
       invoice_number: document.getElementById('rd-invoice')?.value.trim() || '',
       driver:         document.getElementById('rd-driver')?.value.trim() || '',
       received_by_id: document.getElementById('rd-by')?.value || '',

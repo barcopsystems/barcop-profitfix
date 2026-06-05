@@ -149,7 +149,7 @@ S.InventoryEmpties = {
 
     return '<div class="form-row" style="gap:10px;flex-wrap:wrap;">'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label>'
-          + '<input type="date" id="em-date" value="' + esc(e?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+          + '<input type="date" id="em-date" value="' + esc(e?.date || App.todayLocal()) + '"/></div>'
         + '<div class="f" style="flex:1.4;min-width:150px;"><label>Product</label>'
           + '<select id="em-prod">' + this.productOptions(initialProdId) + '</select></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Qty ' + tt('em-qty') + '</label>'
