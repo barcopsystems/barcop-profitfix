@@ -263,7 +263,7 @@ S.RevenueMenuEngineering = {
       const newCM2  = newPrice - item.cost;
       const covers2 = item.weekly_covers || 0;
       const predWk  = (newCM2 * (covers2 * (1 + volChg2/100))) - (oldCM2 * covers2);
-      const entry = { id:App.uid(), date:new Date().toISOString().slice(0,10),
+      const entry = { id:App.uid(), date:App.todayLocal(),
         item_id:item.id, item_name:item.name, old_price:item.price, new_price:newPrice, cost:item.cost,
         reason, margin_impact:newPrice-item.price, covers_at_change:covers2,
         predicted_vol_pct:volChg2, predicted_weekly_impact:predWk, saved_at:new Date().toISOString() };
@@ -279,7 +279,7 @@ S.RevenueMenuEngineering = {
         module:    'revenue',
         gap_id:    'pricing',
         gap_name:  'Pricing',
-        date:      new Date().toISOString().slice(0, 10),
+        date:      App.todayLocal(),
         source:    'price-change',
         source_id: entry.id,
         note:      'Price change logged: ' + (item.name || '') + ' ' + App.fmtCurrency(item.price) + ' to ' + App.fmtCurrency(newPrice)

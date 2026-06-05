@@ -76,7 +76,7 @@ S.RevenueReports = {
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const windowDays = 90;
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - windowDays);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = App.ymdLocal(cutoff);
 
     const checks = (App.data.revenue_server_checks || []).filter(c => (c.date || '') >= cutoffStr && c.staff_id);
     const voids  = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.type === 'Comp' && (r.date || '') >= cutoffStr);
@@ -167,7 +167,7 @@ S.RevenueReports = {
       const periodEnd = (() => {
         const d = new Date(f.week_start + 'T00:00:00');
         d.setDate(d.getDate() + 6);
-        return d.toISOString().slice(0, 10);
+        return App.ymdLocal(d);
       })();
       const actual = weeks.find(w => w.period_end && w.period_end.slice(0, 10) === periodEnd);
       if (!actual) return;

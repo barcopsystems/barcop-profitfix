@@ -857,7 +857,7 @@ S.RevenueMenuItems = {
     if (priceChanged) {
       priceLogRec = {
         id: App.uid(),
-        date: new Date().toISOString().slice(0, 10),
+        date: App.todayLocal(),
         item_id: entry.id,
         item_name: entry.name,
         old_price: existing.price,
@@ -876,7 +876,7 @@ S.RevenueMenuItems = {
         module: 'revenue',
         gap_id: 'pricing',
         gap_name: 'Pricing',
-        date: new Date().toISOString().slice(0, 10),
+        date: App.todayLocal(),
         source: 'price-change',
         note: 'Price change on ' + entry.name + ': ' + App.fmtCurrency(existing.price) + ' to ' + App.fmtCurrency(price)
       };

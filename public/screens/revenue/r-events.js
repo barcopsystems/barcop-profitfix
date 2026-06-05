@@ -387,7 +387,7 @@ S.RevenueEvents = {
     const statusOpts = App.EVENT_STATUSES.map(s =>
       '<option' + (e && e.status === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const v = val => (val != null && val !== '') ? val : '';
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
 
     container.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="sh">' + (id ? 'Edit Event' : 'Log Event') + '</div>'

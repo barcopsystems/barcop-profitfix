@@ -20,7 +20,7 @@ S.RevenueThisWeek = {
     const startD = new Date(periodEnd + 'T00:00:00');
     if (isNaN(startD.getTime())) return null;
     startD.setDate(startD.getDate() - 6);
-    const start = startD.toISOString().slice(0, 10);
+    const start = App.ymdLocal(startD);
     let bar = 0, floor = 0, covers = 0, any = false;
     shifts.forEach(s => {
       if (!s.date || s.date < start || s.date > periodEnd) return;
@@ -42,7 +42,7 @@ S.RevenueThisWeek = {
     const startD = new Date(periodEnd + 'T00:00:00');
     if (isNaN(startD.getTime())) return null;
     startD.setDate(startD.getDate() - 6);
-    const start = startD.toISOString().slice(0, 10);
+    const start = App.ymdLocal(startD);
     let cost = 0, hours = 0, any = false;
     actuals.forEach(a => {
       if (!a.date || a.date < start || a.date > periodEnd) return;
@@ -70,7 +70,7 @@ S.RevenueThisWeek = {
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) saved = JSON.parse(r); } catch (e) {}
     const weeks = App.data.revenue_weeks || [];
     const lastWeek = weeks.length ? weeks[weeks.length - 1] : null;
-    const periodEnd = (saved && saved.period_end) || (App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0, 10));
+    const periodEnd = (saved && saved.period_end) || (App.nextSunday ? App.nextSunday() : App.todayLocal());
     if (saved) {
       return {
         week_num: saved.week_num || ((lastWeek && lastWeek.week_num || 0) + 1),

@@ -33,7 +33,7 @@ S.RevenueForecast = {
     const monday = new Date(today.getTime());
     monday.setDate(monday.getDate() - wd);
     if (wd >= 4) monday.setDate(monday.getDate() + 7);
-    return monday.toISOString().slice(0, 10);
+    return App.ymdLocal(monday);
   },
 
   // Same-weekday cover defaults pulled from sc_shifts last 8 weeks. Parallel
@@ -118,7 +118,7 @@ S.RevenueForecast = {
     const priorEnd = (() => {
       const d = new Date(this.weekStart + 'T00:00:00');
       d.setDate(d.getDate() - 1);
-      return d.toISOString().slice(0, 10);
+      return App.ymdLocal(d);
     })();
     const weeks = (App.data.revenue_weeks || []).filter(w => w.period_end);
     // last week whose period_end is on or before priorEnd
@@ -282,7 +282,7 @@ S.RevenueForecast = {
   shiftWeek(days) {
     const d = new Date(this.weekStart + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    this.hydrate(d.toISOString().slice(0, 10));
+    this.hydrate(App.ymdLocal(d));
     this.draw();
   },
 

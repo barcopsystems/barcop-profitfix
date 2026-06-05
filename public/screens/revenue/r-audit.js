@@ -907,7 +907,7 @@ S.RevenueAudit = {
 
       const auditRecord = {
         id:            App.uid(),
-        date:          new Date().toISOString().slice(0,10),
+        date:          App.todayLocal(),
         bar_name:      d.BAR_NAME || App.data.settings?.bar_name || '',
         overall_score: d.OVERALL_SCORE || 0,
         grade:         d.DATA_TIER_LABEL || '',

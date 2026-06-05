@@ -73,7 +73,7 @@ S.RevenueServerCheck = {
   //   lc_tips                (raw tip log — fallback for shifts with no pool)
   computeScorecard(windowDays) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (windowDays || 30));
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = App.ymdLocal(cutoff);
     const checks = (App.data.revenue_server_checks || []).filter(c => (c.date || '') >= cutoffStr);
     const voids  = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.type === 'Comp' && (r.date || '') >= cutoffStr);
     const pools  = ((App.laborData && App.laborData.lc_tip_pools)  || []).filter(p => (p.date || '') >= cutoffStr);
@@ -174,7 +174,7 @@ S.RevenueServerCheck = {
 
     const t        = App.data.revenue_settings?.targets || {};
     const targetCA = t.check_avg || 35;
-    const today    = new Date().toISOString().slice(0, 10);
+    const today    = App.todayLocal();
     // Default shift type from active shift if one is running, otherwise infer
     // from clock-hour using the canonical App.SHIFT_TYPES list.
     const active   = (App.activeShift && App.activeShift()) || null;

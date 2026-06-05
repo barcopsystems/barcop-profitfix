@@ -43,7 +43,7 @@ S.RevenueDogTest = {
         const wc = m.weekly_covers != null ? (' (current weekly: ' + Math.round(m.weekly_covers) + ')') : '';
         return '<option value="' + esc(m.id) + '">' + esc(m.name) + wc + '</option>';
       }).join('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
 
     const form = '<div class="card"><div class="card-title">Start a 90-Day Dog Test</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'

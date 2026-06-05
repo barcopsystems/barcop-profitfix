@@ -230,7 +230,7 @@ S.RevenueDashboard = {
   showInitiativeForm() {
     const typeOpts = this.INITIATIVE_TYPES.map(t => '<option>' + esc(t) + '</option>').join('');
     const metricOpts = this.INITIATIVE_METRICS.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + '</option>').join('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const m = document.createElement('div');
     m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
     m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:540px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
