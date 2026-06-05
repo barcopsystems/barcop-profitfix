@@ -141,7 +141,7 @@ S.ShiftDashboard = {
       + actionBtn('sc-log-shift', 'Log a Shift')
       + actionBtn('sc-cash-drop', 'Cash Drop')
       + actionBtn('sc-86-list', '86 List')
-      + actionBtn('sc-reports-shift', 'Shift Reports')
+      + actionBtn('sc-reports', 'Reports')
       + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
