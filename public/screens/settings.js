@@ -782,6 +782,11 @@ S.HubSettings = {
       d.setDate(d.getDate() - wd);
       return d.toISOString().slice(0,10);
     };
+    // Covers forecast derives from the revenue forecast at the Anchor's blended
+    // check average. Active Shift reads covers_per_day for its Cover Goal.
+    const AVG_CHECK = 38;
+    const coversFor = (pd) => { const c = {}; fcDays.forEach(d => { c[d] = Math.round((pd[d] || 0) / AVG_CHECK); }); return c; };
+    const totalCoversOf = (cpd) => fcDays.reduce((t, d) => t + (cpd[d] || 0), 0);
     const lastSix = App.data.revenue_weeks.slice(-6);
     App.data.revenue_forecasts = lastSix.map((wk, i) => {
       // Forecast was set the Saturday BEFORE the week, so it's a forward
@@ -789,12 +794,15 @@ S.HubSettings = {
       const total = (wk.bar_revenue + wk.floor_revenue) * (i % 2 === 0 ? 0.96 : 1.04);
       const per_day = {};
       fcDays.forEach(d => { per_day[d] = Math.round(total * fcDayWeights[d]); });
+      const covers_per_day = coversFor(per_day);
       const week_start = monStartFor(wk.period_end);
       return {
         id: uid(),
         week_start,
         per_day,
+        covers_per_day,
         total: +total.toFixed(2),
+        total_covers: totalCoversOf(covers_per_day),
         method: 'manual',
         notes: '',
         created_at: new Date(week_start + 'T18:00:00').toISOString(),
@@ -806,24 +814,25 @@ S.HubSettings = {
     (() => {
       const last = App.data.revenue_weeks[App.data.revenue_weeks.length - 1];
       const ref  = (last.bar_revenue + last.floor_revenue) * 1.02;
-      const nextMon = (() => {
+      const monAt = (offsetWeeks) => {
         const d = new Date();
         const wd = (d.getDay() + 6) % 7;
-        d.setDate(d.getDate() + (7 - wd));
+        d.setDate(d.getDate() - wd + offsetWeeks * 7);
         return d.toISOString().slice(0,10);
-      })();
+      };
       const per_day = {};
       fcDays.forEach(d => { per_day[d] = Math.round(ref * fcDayWeights[d]); });
-      App.data.revenue_forecasts.push({
-        id: uid(),
-        week_start: nextMon,
-        per_day,
-        total: +ref.toFixed(2),
-        method: 'manual',
-        notes: 'Coming week. Adjust per event or weather.',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      const covers_per_day = coversFor(per_day);
+      const mk = (week_start, notes) => ({
+        id: uid(), week_start, per_day: { ...per_day }, covers_per_day: { ...covers_per_day },
+        total: +ref.toFixed(2), total_covers: totalCoversOf(covers_per_day),
+        method: 'manual', notes,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
       });
+      // Current week feeds Active Shift's Cover Goal; the coming week feeds the
+      // schedule builder.
+      App.data.revenue_forecasts.push(mk(monAt(0), 'Current week.'));
+      App.data.revenue_forecasts.push(mk(monAt(1), 'Coming week. Adjust per event or weather.'));
     })();
 
     // ── Menu — the Anchor's full card, costed for Menu Engineering ──
