@@ -136,10 +136,10 @@ S.LaborStaffRoster = {
       + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
       + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:2 1 240px;min-width:0;"><label>Shift Lead</label>'
+      + '<div class="f" style="flex:1 1 200px;min-width:0;"><label>Shift Lead</label>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
-      + '<span style="color:var(--t3);font-size:11px;line-height:1.3;">Can run shifts and authorize, even if hourly. Management is always a supervisor.</span></label></div>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize, even if hourly</span></label></div>'
       + '</div>';
   },
 
