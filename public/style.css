@@ -420,6 +420,31 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
+/* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
+   Scoped entirely to .page so the rest of the app (.screen) is byte-for-byte
+   unchanged. The content sits on the page bg with whitespace + hairline row
+   dividers instead of a bordered card box. Page header carries the big title,
+   a one-line description, and the primary action top-right. */
+.page{padding:30px 36px 64px;width:100%;}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:26px;}
+.page-title{font-size:23px;font-weight:800;color:var(--w);letter-spacing:-0.2px;line-height:1.2;margin:0;}
+.page-desc{font-size:13px;color:var(--t3);margin-top:8px;max-width:600px;line-height:1.55;}
+.page-head-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.data-table{overflow-x:auto;}
+/* Table on the canvas: drop the surface header band, flush the outer columns
+   to the page edge so the first column lines up under the title. */
+.page .tbl th{background:transparent;padding-top:0;padding-bottom:12px;}
+.page .tbl th:first-child,.page .tbl td:first-child{padding-left:0;}
+.page .tbl th:last-child,.page .tbl td:last-child{padding-right:0;}
+.canvas-sub{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin:34px 0 4px;}
+.canvas-hint{font-size:12px;color:var(--t4);margin-bottom:12px;}
+.page-empty{font-size:14px;color:var(--t3);padding:48px 0;line-height:1.6;max-width:540px;}
+@media (max-width:768px){
+  .page{padding:16px 14px 72px;}
+  .page-head{flex-direction:column;gap:14px;}
+  .page-head-actions{width:100%;}
+}
+
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
