@@ -470,6 +470,12 @@ const App = {
     if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
+    // Proto top-nav collapse toggle (same behavior as the sidebar-logo toggle,
+    // which is hidden in the proto shell).
+    const tnCollapse = document.getElementById('tn-collapse');
+    if (tnCollapse) tnCollapse.onclick = () => {
+      document.getElementById('app').classList.toggle('sidebar-collapsed');
+    };
     // Mobile sidebar: hamburger button in the topbar opens the off-canvas
     // sidebar below the 768px breakpoint. Backdrop click closes it. Module
     // nav clicks also close it (wired in _renderNav). No-op on desktop where
@@ -1177,24 +1183,36 @@ const App = {
   // Adds the .proto class to #app and fills #proto-topnav with the logo + flat
   // section tabs; clears it for every other section. Reorg/visual only, no new
   // features. Tabs reuse jumpToSection, the same hop the section switcher does.
-  // The new full-width top nav (design prototype), scoped to Shift only so the
-  // other six sections render unchanged. Logo + the 7 sections as flat tabs; the
-  // tab reuses jumpToSection, the same hop the old section switcher made.
+  // The new full-width top nav. Renders for every module shell; the active tab is
+  // the current section. The shell DOM (collapse toggle, logo, tabs slot, right
+  // slot) is static in index.html so the relocated account-switcher nodes survive
+  // re-renders; we only refill the tabs + (once) move the switcher up. The Hub is
+  // its own wrapper and keeps its current look for now.
   _PROTO_TABS: [['hub','Hub'],['profit','Profit'],['revenue','Revenue'],['traffic','Traffic'],['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
+  _MODULE_KEYS: ['profit', 'revenue', 'traffic', 'inventory', 'labor', 'shift'],
   _renderProtoTopnav(module) {
     const app = document.getElementById('app');
-    const bar = document.getElementById('proto-topnav');
-    if (!app || !bar) return;
-    const on = (module === 'shift');
+    if (!app) return;
+    const on = this._MODULE_KEYS.includes(module);
     app.classList.toggle('proto', on);
-    if (!on) { bar.innerHTML = ''; return; }
-    const tabs = this._PROTO_TABS.map(([k, l]) =>
-      '<div class="tn-tab' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
-    ).join('');
-    bar.innerHTML = '<img src="assets/logo.png" alt="Bar Cop" class="tn-logo"/>'
-      + '<div class="tn-tabs">' + tabs + '</div>';
-    bar.querySelectorAll('.tn-tab[data-sec]').forEach(el =>
-      el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
+    if (!on) return;
+    const tabsEl = document.getElementById('tn-tabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = this._PROTO_TABS.map(([k, l]) =>
+        '<div class="tn-tab' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
+      ).join('');
+      tabsEl.querySelectorAll('.tn-tab[data-sec]').forEach(el =>
+        el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
+    }
+    // Relocate the account/location switcher + group dashboard into the top nav
+    // (once). renderAccountSwitcher fills them by id, so moving the nodes is safe.
+    const right = document.getElementById('tn-right');
+    if (right) {
+      ['topbar-account-switcher', 'topbar-group-dashboard'].forEach(id => {
+        const node = document.getElementById(id);
+        if (node && node.parentElement !== right) right.appendChild(node);
+      });
+    }
   },
 
   // Which module a screen id belongs to (by prefix; profit screens have none)
