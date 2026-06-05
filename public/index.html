@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Bar Cop</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=62"/>
+<link rel="stylesheet" href="style.css?v=63"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -79,11 +79,9 @@
   </div>
 </div>
 
-<!-- APP -->
-<div id="app" class="app hidden">
-  <!-- PROTO: two-row full-width top nav (module sections), filled by App._renderProtoTopnav.
-       Static children so the relocated account-switcher nodes survive re-renders. -->
-  <div id="proto-topnav">
+<!-- PROTO: shared two-row top nav (body-level, above #app and #hub-wrapper).
+     Static children so the relocated account-switcher nodes survive re-renders. -->
+<div id="proto-topnav">
     <div class="tn-row1">
       <button class="tn-mobile-burger" id="tn-mobile-burger" type="button" title="Menu">
         <svg viewBox="0 0 17 17" fill="none"><rect x="2" y="4" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="8" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="12" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
@@ -106,7 +104,10 @@
       </button>
       <div class="tn-sections" id="tn-sections"></div>
     </div>
-  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
   <aside class="sidebar">
     <div class="sidebar-logo">
       <img src="assets/logo.png" alt="Bar Cop" class="sidebar-logo-full"/>
@@ -294,6 +295,6 @@
 <script src="screens/labor/lc-dashboard.js?v=11"></script>
 <script src="components/onboarding.js?v=17"></script>
 <script src="db.js?v=50"></script>
-<script src="app.js?v=232"></script>
+<script src="app.js?v=233"></script>
 </body>
 </html>
