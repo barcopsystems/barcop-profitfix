@@ -2268,7 +2268,7 @@ const App = {
     'email-loyalty':  'Email and Loyalty'
   },
   emitTrafficFix(gap_id, note) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this.todayLocal();
     const rec = {
       id: this.uid(),
       module: 'traffic',
@@ -3296,6 +3296,21 @@ const App = {
   // Monday-first because most independent operators set their week that way.
   DAYS_MON_FIRST: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
 
+  // Local calendar date as 'YYYY-MM-DD'. ALWAYS use this for a date stamp,
+  // never toISOString().slice(0,10) — that returns the UTC date, which rolls
+  // to tomorrow on any evening west of UTC (Austin is UTC-5/6), so a shift
+  // opened Thursday night would stamp Friday. Pass a Date, or omit for now.
+  ymdLocal(d) {
+    d = d || new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  },
+
+  // Today's local date as 'YYYY-MM-DD'. The single source for every "today"
+  // stamp in Bar Cop.
+  todayLocal() { return this.ymdLocal(new Date()); },
+
   // Resolve the Monday of the week containing a given date string. Forecast
   // records are keyed by week_start (Monday) so every screen converts a
   // period_end (Sunday) or any in-week date to the canonical Monday key.
@@ -3305,7 +3320,7 @@ const App = {
     if (isNaN(d.getTime())) return '';
     const wd = (d.getDay() + 6) % 7;
     d.setDate(d.getDate() - wd);
-    return d.toISOString().slice(0, 10);
+    return this.ymdLocal(d);
   },
 
   // Convert a Monday week_start to the Sunday period_end of the same week.
@@ -3314,7 +3329,7 @@ const App = {
     const d = new Date(weekStart + 'T00:00:00');
     if (isNaN(d.getTime())) return '';
     d.setDate(d.getDate() + 6);
-    return d.toISOString().slice(0, 10);
+    return this.ymdLocal(d);
   },
 
   // Return the saved revenue_forecasts record for a given week_start (Monday),
@@ -3354,7 +3369,7 @@ const App = {
       for (let back = 1; back <= 8; back++) {
         const probe = new Date(target.getTime());
         probe.setDate(probe.getDate() - back * 7);
-        const key = probe.toISOString().slice(0, 10);
+        const key = this.ymdLocal(probe);
         if (revByDate[key] != null) samples.push(revByDate[key]);
       }
       let avg = 0;
@@ -3681,7 +3696,7 @@ const App = {
     const d = new Date();
     const diff = (7 - d.getDay()) % 7 || 7;
     d.setDate(d.getDate() + diff);
-    return d.toISOString().slice(0, 10);
+    return this.ymdLocal(d);
   },
 
   // Newest event record by date. Event logs load date-desc from the events
