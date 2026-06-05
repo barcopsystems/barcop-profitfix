@@ -525,6 +525,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .tn-collapse{display:none;}
   .tn-tabs{overflow-x:auto;}
 }
+/* Converted pages carry their own page header, so hide the old topbar title bar
+   for them on desktop. Kept on mobile so the sidebar hamburger stays reachable. */
+.app.topbar-hidden .topbar{display:none;}
+@media (max-width:768px){.app.topbar-hidden .topbar{display:flex;}}
 
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
