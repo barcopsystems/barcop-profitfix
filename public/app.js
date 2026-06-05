@@ -962,7 +962,7 @@ const App = {
     { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
     { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
     { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
-    { group:'shift-reports',       label:'Shift Reports',            module:'shift',     screen:'sc-reports-shift',     moduleName:'Shift Control' },
+    { group:'shift-reports',       label:'Reports',                  module:'shift',     screen:'sc-reports',           moduleName:'Shift Control' },
     // Recovery
     { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
     { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
@@ -2956,9 +2956,7 @@ const App = {
         'sc-drawers':            ['Drawers / Registers', 'Shift Control'],
         'sc-cash-settings':      ['Cash Tolerances', 'Shift Control'],
         'sc-comp-settings':      ['Comp Authorization', 'Shift Control'],
-        'sc-reports-shift':      ['Shift Reports', 'Shift Control'],
-        'sc-reports-cash':       ['Cash Reports', 'Shift Control'],
-        'sc-reports-ops':        ['Operations Reports', 'Shift Control'],
+        'sc-reports':            ['Reports', 'Shift Control'],
         'sc-help':               ['Help and FAQ', 'Shift Control'],
       };
       const scScreens = {
@@ -2980,9 +2978,7 @@ const App = {
         'sc-drawers': S.ShiftDrawers,
         'sc-cash-settings': S.ShiftCashSettings,
         'sc-comp-settings': S.ShiftCompSettings,
-        'sc-reports-shift': S.ShiftReportsShift,
-        'sc-reports-cash': S.ShiftReportsCash,
-        'sc-reports-ops': S.ShiftReportsOps,
+        'sc-reports': S.ShiftReports,
         'sc-help': S.ShiftHelp,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
@@ -3109,8 +3105,7 @@ const App = {
     // here (no duplicate topbar button): the four Inventory reports, plus the
     // swept Labor reports (lc-reports / lc-overtime-watch export from the card;
     // lc-callout-log needs no export).
-    'reports': 1, 'r-reports': 1, 't-reports': 1,
-    'sc-reports-shift': 1, 'sc-reports-cash': 1, 'sc-reports-ops': 1
+    'reports': 1, 'r-reports': 1, 't-reports': 1
   },
   _exportBtn(id, actions) {
     if (!this._REPORT_SCREENS[id] || !actions) return;
