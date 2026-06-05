@@ -660,7 +660,11 @@ const DB = {
   _windowStartDate() {
     const d = new Date();
     d.setMonth(d.getMonth() - this._WINDOW_MONTHS);
-    return d.toISOString().slice(0, 10);
+    // Local calendar date (not UTC) so the window edge matches the local
+    // date stamps every record is written with (App.ymdLocal).
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
   },
   // Business date (YYYY-MM-DD) for the windowing index, pulled from the record.
   _eventDate(rec) {
