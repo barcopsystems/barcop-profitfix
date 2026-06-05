@@ -1177,28 +1177,10 @@ const App = {
   // Adds the .proto class to #app and fills #proto-topnav with the logo + flat
   // section tabs; clears it for every other section. Reorg/visual only, no new
   // features. Tabs reuse jumpToSection, the same hop the section switcher does.
-  // Flat mode: all 7 sections as one row of tabs.
+  // The new full-width top nav (design prototype), scoped to Shift only so the
+  // other six sections render unchanged. Logo + the 7 sections as flat tabs; the
+  // tab reuses jumpToSection, the same hop the old section switcher made.
   _PROTO_TABS: [['hub','Hub'],['profit','Profit'],['revenue','Revenue'],['traffic','Traffic'],['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
-  // Grouped mode: a shorter top row of groups; the active group's modules show
-  // on a second row. Books/Operations carry no modules in the prototype (they
-  // live in the Hub), so their tab routes to the Hub for now.
-  _PROTO_GROUPS: [
-    ['hub',        'Hub',        ['hub']],
-    ['recovery',   'Recovery',   ['profit', 'revenue', 'traffic']],
-    ['control',    'Control',    ['inventory', 'labor', 'shift']],
-    ['books',      'Books',      []],
-    ['operations', 'Operations', []],
-  ],
-  _protoNavMode() { try { return localStorage.getItem('barcop_proto_nav') || 'flat'; } catch (e) { return 'flat'; } },
-  _setProtoNavMode(m) { try { localStorage.setItem('barcop_proto_nav', m); } catch (e) {} },
-  _protoGroupOf(module) { const g = this._PROTO_GROUPS.find(x => x[2].includes(module)); return g ? g[0] : 'hub'; },
-  _protoModLabel(mk) { const t = this._PROTO_TABS.find(x => x[0] === mk); return t ? t[1] : mk; },
-  _protoGroupClick(grp) {
-    const g = this._PROTO_GROUPS.find(x => x[0] === grp);
-    if (!g) return;
-    if (grp === 'hub' || g[2].length === 0) { this.jumpToSection('hub'); return; }
-    this.jumpToSection(g[2][0]);   // land on the group's first module
-  },
   _renderProtoTopnav(module) {
     const app = document.getElementById('app');
     const bar = document.getElementById('proto-topnav');
@@ -1206,45 +1188,13 @@ const App = {
     const on = (module === 'shift');
     app.classList.toggle('proto', on);
     if (!on) { bar.innerHTML = ''; return; }
-
-    const mode = this._protoNavMode();
-    let row1, row2 = '';
-    if (mode === 'grouped') {
-      const curGroup = this._protoGroupOf(module);
-      row1 = this._PROTO_GROUPS.map(([k, l]) =>
-        '<div class="tn-tab' + (k === curGroup ? ' active' : '') + '" data-grp="' + k + '">' + esc(l) + '</div>'
-      ).join('');
-      const grp = this._PROTO_GROUPS.find(g => g[0] === curGroup);
-      if (grp && grp[2].length > 1) {
-        const subs = grp[2].map(mk =>
-          '<div class="tn-subtab' + (mk === module ? ' active' : '') + '" data-sec="' + mk + '">' + esc(this._protoModLabel(mk)) + '</div>'
-        ).join('');
-        row2 = '<div class="tn-row2"><div class="tn-sub">' + subs + '</div></div>';
-      }
-    } else {
-      row1 = this._PROTO_TABS.map(([k, l]) =>
-        '<div class="tn-tab' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
-      ).join('');
-    }
-
-    const toggle = '<div class="tn-right"><div class="tn-toggle">'
-      + '<button class="tn-toggle-btn' + (mode === 'flat' ? ' active' : '') + '" data-mode="flat">Flat</button>'
-      + '<button class="tn-toggle-btn' + (mode === 'grouped' ? ' active' : '') + '" data-mode="grouped">Grouped</button>'
-      + '</div></div>';
-
-    bar.innerHTML = '<div class="tn-row1">'
-      + '<img src="assets/logo.png" alt="Bar Cop" class="tn-logo"/>'
-      + '<div class="tn-tabs">' + row1 + '</div>'
-      + toggle
-      + '</div>'
-      + row2;
-
-    bar.querySelectorAll('.tn-tab[data-sec],.tn-subtab[data-sec]').forEach(el =>
+    const tabs = this._PROTO_TABS.map(([k, l]) =>
+      '<div class="tn-tab' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
+    ).join('');
+    bar.innerHTML = '<img src="assets/logo.png" alt="Bar Cop" class="tn-logo"/>'
+      + '<div class="tn-tabs">' + tabs + '</div>';
+    bar.querySelectorAll('.tn-tab[data-sec]').forEach(el =>
       el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
-    bar.querySelectorAll('.tn-tab[data-grp]').forEach(el =>
-      el.addEventListener('click', () => App._protoGroupClick(el.dataset.grp)));
-    bar.querySelectorAll('.tn-toggle-btn[data-mode]').forEach(el =>
-      el.addEventListener('click', () => { App._setProtoNavMode(el.dataset.mode); App._renderProtoTopnav(App._activeModule); }));
   },
 
   // Which module a screen id belongs to (by prefix; profit screens have none)
