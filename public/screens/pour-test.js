@@ -295,12 +295,7 @@ S.PourTest = {
   },
 
   confirmDel(id) {
-    App.confirm({
-      title: 'Delete pour test?',
-      message: 'This removes the record from history. Cannot be undone.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel'
-    }).then(ok => {
+    App.confirmDelete().then(ok => {
       if (!ok) return;
       App.data.pour_tests = this.list().filter(x => x.id !== id);
       App.saveKey('pour_tests').then(() => this.renderList());

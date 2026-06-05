@@ -310,12 +310,7 @@ S.YieldTest = {
   },
 
   confirmDel(id) {
-    App.confirm({
-      title: 'Delete yield test?',
-      message: 'This removes the record from history. Cannot be undone.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel'
-    }).then(ok => {
+    App.confirmDelete().then(ok => {
       if (!ok) return;
       App.data.yield_tests = this.list().filter(x => x.id !== id);
       App.saveKey('yield_tests').then(() => this.renderList());
