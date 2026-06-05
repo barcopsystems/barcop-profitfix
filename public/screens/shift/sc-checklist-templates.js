@@ -90,9 +90,9 @@ S.ShiftChecklistTemplates = {
       + '<button class="btn btn-ghost btn-sm ct-edit" data-id="' + t.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="card-title" style="margin-top:24px;">' + type + ' Templates</div>'
+    return '<div class="card"><div class="card-title">' + type + ' Templates</div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
   renderList() {
