@@ -1093,11 +1093,16 @@ const App = {
     const rows = this.SECTIONS.map(([k, l]) =>
       '<div class="sec-switch-item' + (k === cur ? ' current' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
     ).join('');
-    return '<div class="sec-switch">'
-      + '<button type="button" class="sec-switch-btn">'
-      +   '<svg class="sec-switch-icon nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 5h11M3 8.5h11M3 12h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+    // The 4-box dashboard icon in front of the section name is a direct link to
+    // this section's dashboard (it replaces the old standalone Dashboard nav
+    // row). Clicking the icon goes to the dashboard; clicking the rest of the
+    // selector opens the switcher. Collapsed, only the icon shows.
+    const dashIcon = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>';
+    return '<div class="sec-switch" data-cur="' + cur + '">'
+      + '<div class="sec-switch-btn">'
+      +   '<span class="sec-switch-dash" title="' + esc(label) + ' dashboard">' + dashIcon + '</span>'
       +   '<span class="sec-switch-label">' + esc(label) + '</span>'
-      + '</button>'
+      + '</div>'
       + '<div class="sec-switch-menu" hidden>' + rows + '</div>'
       + '</div>';
   },
@@ -3926,6 +3931,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const m = sw.querySelector('.sec-switch-menu'); if (m) m.hidden = true;
   });
   document.addEventListener('click', e => {
+    // The dashboard icon jumps straight to the current section's dashboard.
+    const dash = e.target.closest('.sec-switch-dash');
+    if (dash) {
+      const sw = dash.closest('.sec-switch');
+      closeSwitchers();
+      if (sw) App.jumpToSection(sw.dataset.cur);
+      return;
+    }
+    // The rest of the selector opens the section switcher.
     const btn = e.target.closest('.sec-switch-btn');
     if (btn) {
       const sw = btn.closest('.sec-switch');
