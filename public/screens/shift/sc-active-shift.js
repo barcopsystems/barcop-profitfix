@@ -643,11 +643,13 @@ S.ShiftActiveShift = {
 
   // Cover goal for the active shift's daypart. Anchored to this week's Revenue
   // Forecast whole-day cover number for the weekday, then sliced by this
-  // daypart's historical share of that weekday's covers (from sc_shifts, the
-  // same 8-week lookback the forecast uses). The dayparts sum back to the
-  // forecast, so nothing is invented or double-counted. Until enough daypart
-  // history exists it falls back to the whole-day number. Returns
-  // { goal, daily, daypart } where daypart=true means the slice was applied.
+  // daypart's historical share of a day's covers (last 8 weeks of sc_shifts).
+  // Prefers the SAME weekday; if the daypart never runs on this weekday (e.g. a
+  // Lunch shift on a weekend, where the bar runs Brunch instead) it uses the
+  // daypart's typical share across the days it DOES run, so it still breaks
+  // down rather than showing the whole-day number. A daypart with no history at
+  // all (e.g. "Full Day") keeps the whole-day number, which is correct for it.
+  // Returns { goal, daily, daypart } where daypart=true means a slice was used.
   coverGoalFor(s) {
     const out = { goal: 0, daily: 0, daypart: false };
     if (!s || !s.date || !App.weekStartFor || !App.DAYS_MON_FIRST) return out;
@@ -660,28 +662,42 @@ S.ShiftActiveShift = {
     out.daily = daily;
     if (daily <= 0) return out;
 
-    // This daypart's share of the weekday's covers, last 8 weeks of sc_shifts.
+    // Build two share estimates from the last 8 weeks of sc_shifts: the same
+    // weekday (primary), and per-date totals for an any-weekday fallback.
     const refMs = dt.getTime();
+    const myType = s.shift_type || '';
     const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
-    let dayTotal = 0, partTotal = 0;
+    let sameWkPart = 0, sameWkTotal = 0;
+    const byDate = {};   // date -> { total, part }
     shifts.forEach(h => {
       if (!h || !h.date || h.id === s.id) return;       // skip the open shift itself
       const hd = new Date(String(h.date).length <= 10 ? h.date + 'T00:00:00' : h.date);
       if (isNaN(hd.getTime())) return;
       const daysBack = Math.round((refMs - hd.getTime()) / 86400000);
       if (daysBack < 0 || daysBack > 56) return;        // within the last 8 weeks
-      if (((hd.getDay() + 6) % 7) !== wdIdx) return;     // same weekday only
       const c = parseFloat(h.covers) || 0;
       if (c <= 0) return;
-      dayTotal += c;
-      if ((h.shift_type || '') === (s.shift_type || '')) partTotal += c;
+      const isMine = (h.shift_type || '') === myType;
+      if (((hd.getDay() + 6) % 7) === wdIdx) { sameWkTotal += c; if (isMine) sameWkPart += c; }
+      const d = byDate[h.date] || (byDate[h.date] = { total: 0, part: 0 });
+      d.total += c; if (isMine) d.part += c;
     });
 
-    if (dayTotal > 0 && partTotal > 0) {
-      out.goal = Math.round(daily * (partTotal / dayTotal));
+    let share = null;
+    if (sameWkTotal > 0 && sameWkPart > 0) {
+      share = sameWkPart / sameWkTotal;                  // same weekday (best)
+    } else {
+      // Any-weekday fallback: this daypart's share across the days it ran.
+      let anyPart = 0, anyTotal = 0;
+      Object.keys(byDate).forEach(k => { const d = byDate[k]; if (d.part > 0) { anyPart += d.part; anyTotal += d.total; } });
+      if (anyTotal > 0 && anyPart > 0) share = anyPart / anyTotal;
+    }
+
+    if (share != null) {
+      out.goal = Math.round(daily * share);
       out.daypart = true;
     } else {
-      out.goal = Math.round(daily);                      // day-one fallback
+      out.goal = Math.round(daily);                      // no daypart history (e.g. Full Day)
     }
     return out;
   },
