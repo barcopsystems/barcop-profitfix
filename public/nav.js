@@ -5,10 +5,6 @@ const ProfitNav = {
   html() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-item" data-screen="dashboard" id="nav-dashboard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </div>
       <div class="nav-section">Analysis</div>
       <div class="nav-item" data-screen="audit-tracker" id="nav-audit-tracker">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -85,10 +81,6 @@ const Revenue = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-item" data-screen="r-dashboard" id="nav-r-dashboard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </div>
       <div class="nav-section">Analysis</div>
       <div class="nav-item" data-screen="r-audit" id="nav-r-audit">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -157,10 +149,6 @@ const Traffic = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-item" data-screen="t-dashboard" id="nav-t-dashboard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </div>
       <div class="nav-section">Analysis</div>
       <div class="nav-item" data-screen="t-audit" id="nav-t-audit">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -241,10 +229,6 @@ const Inventory = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-item" data-screen="ic-dashboard" id="nav-ic-dashboard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </div>
       <div class="nav-section">Counts</div>
       <div class="nav-item" data-screen="ic-take-inventory" id="nav-ic-take-inventory">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3.5" y="3" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3V1.7h4V3M6 7.5h5M6 10.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -345,10 +329,6 @@ const Labor = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-item" data-screen="lc-dashboard" id="nav-lc-dashboard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </div>
       <div class="nav-section">Scheduling</div>
       <div class="nav-item" data-screen="lc-build-schedule" id="nav-lc-build-schedule">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -441,10 +421,6 @@ const Shift = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-item" data-screen="sc-dashboard" id="nav-sc-dashboard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </div>
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-screen="sc-drawers" id="nav-sc-drawers">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="5" width="13" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M5.5 9h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
