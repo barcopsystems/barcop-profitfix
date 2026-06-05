@@ -131,11 +131,11 @@ input,select,textarea{color-scheme:dark;}
 .sec-switch{position:relative;margin:6px 8px 8px;}
 .sec-switch-btn{
   display:flex;align-items:center;gap:9px;cursor:pointer;
-  border:1px solid var(--b1);border-radius:var(--r2);background:transparent;
+  border:1px solid var(--b2);border-radius:var(--r2);background:transparent;
   color:var(--t2);font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;
   letter-spacing:0.2px;padding:8px 12px;transition:background 0.12s,border-color 0.12s,color 0.12s;
 }
-.sec-switch-btn:hover,.sec-switch.open .sec-switch-btn{background:var(--surface);border-color:var(--b2);color:var(--t1);}
+.sec-switch-btn:hover,.sec-switch.open .sec-switch-btn{background:var(--surface);border-color:var(--b1);color:var(--t1);}
 .sec-switch-dash{display:flex;flex-shrink:0;color:var(--t3);transition:color 0.12s;}
 .sec-switch-dash:hover{color:var(--gold);}
 .sec-switch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
