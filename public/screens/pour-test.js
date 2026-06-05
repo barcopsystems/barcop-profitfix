@@ -174,9 +174,9 @@ S.PourTest = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="pt-date" value="' + esc(r?.date || today) + '" style="height:44px;"/></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Bartender</label>'
-      + '<select id="pt-bartender" style="height:44px;">' + App.staffOptions(r?.bartender_id, { placeholder: 'Select bartender...' }) + '</select></div>'
+      + '<select id="pt-bartender" style="height:44px;">' + App.staffOptions(r?.bartender_id, { placeholder: 'Select bartender...', audience: 'service' }) + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager Observing</label>'
-      + '<select id="pt-manager" style="height:44px;">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...' }) + '</select></div>'
+      + '<select id="pt-manager" style="height:44px;">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
