@@ -24,7 +24,7 @@ S.LaborScheduleTemplates = {
     const bs = this.bs();
     let hours = 0, cost = 0;
     const salIds = new Set();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     (t.shifts || []).forEach(s => {
       const h = bs.hoursOf(s.start, s.end);
       hours += h;
@@ -101,7 +101,7 @@ S.LaborScheduleTemplates = {
     const t = this.templates().find(x => x.id === id);
     if (!t || !this.bs()) return;
     const draft = {
-      week_start: this.bs().mondayOf(new Date().toISOString().slice(0, 10)),
+      week_start: this.bs().mondayOf(App.todayLocal()),
       shifts: (t.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end })),
       notes: '',
       from_template_name: t.name

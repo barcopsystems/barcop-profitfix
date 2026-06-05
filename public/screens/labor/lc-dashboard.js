@@ -22,18 +22,18 @@ S.LaborDashboard = {
   },
   weekAgo() {
     const d = new Date(); d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
   mondayOf(d) {
     const date = new Date(d);
     const day = date.getDay();
     date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
-    return date.toISOString().slice(0, 10);
+    return App.ymdLocal(date);
   },
   addDays(dateStr, n) {
     const d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
 
   // ── Shared bits (match the Inventory dashboard's design language) ────────────
@@ -123,7 +123,7 @@ S.LaborDashboard = {
   // ── Populated dashboard ──────────────────────────────────────────────────────
   renderFull() {
     const cutoff = this.weekAgo();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const wkActuals = this.actuals().filter(a => (a.date || '') >= cutoff);
     const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
     const salWeek = App.salariedCost(cutoff, today).total;
@@ -237,7 +237,7 @@ S.LaborDashboard = {
 
     // ── Labor Watch (leaks-style, tappable) ──
     const uncovered = this.callouts().filter(c => (c.date || '') >= cutoff && !c.covered).length;
-    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
+    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
     const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
     const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
     const expiring = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;

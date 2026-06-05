@@ -17,12 +17,12 @@ S.LaborOvertimeWatch = {
     const date = new Date(d);
     const day = date.getDay();
     date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
-    return date.toISOString().slice(0, 10);
+    return App.ymdLocal(date);
   },
   addDays(dateStr, n) {
     const d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
   fmtDate(str) {
     const d = new Date(str + 'T00:00:00');

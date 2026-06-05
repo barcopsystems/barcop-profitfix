@@ -32,7 +32,7 @@ S.LaborLogHours = {
   normDate(raw) {
     if (!raw) return '';
     const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
-    return isNaN(d.getTime()) ? String(raw) : d.toISOString().slice(0, 10);
+    return isNaN(d.getTime()) ? String(raw) : App.ymdLocal(d);
   },
 
   render(container, actions) {
@@ -50,7 +50,7 @@ S.LaborLogHours = {
       '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
     return '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
-      + '<input type="date" id="lo-date" value="' + esc(a?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<input type="date" id="lo-date" value="' + esc(a?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1 1 200px;min-width:0;"><label>Staff</label>'
       + '<select id="lo-staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
       + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Shift</label>'

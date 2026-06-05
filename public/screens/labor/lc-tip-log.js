@@ -71,7 +71,7 @@ S.LaborTipLog = {
   normDate(raw) {
     if (!raw) return '';
     const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
-    return isNaN(d.getTime()) ? String(raw) : d.toISOString().slice(0, 10);
+    return isNaN(d.getTime()) ? String(raw) : App.ymdLocal(d);
   },
 
   render(container, actions) {
@@ -110,7 +110,7 @@ S.LaborTipLog = {
     const initialShiftId = this.initialShiftIdFor(x);
     const isManual = initialShiftId === '__manual';
     const initialShift = initialShiftId && initialShiftId !== '__manual' ? this.shiftById(initialShiftId) : null;
-    const defaultDate = x?.date || initialShift?.date || new Date().toISOString().slice(0, 10);
+    const defaultDate = x?.date || initialShift?.date || App.todayLocal();
     const defaultShiftType = x?.shift_type || initialShift?.shift_type || '';
 
     return '<div class="form-row data-row" style="gap:12px;">'
@@ -500,7 +500,7 @@ S.LaborTipLog = {
       const s = this.shiftById(shiftPick);
       if (!s) { fail('Shift not found.'); return; }
       shiftId   = s.id;
-      date      = s.date || new Date().toISOString().slice(0, 10);
+      date      = s.date || App.todayLocal();
       shiftType = s.shift_type || '';
       managerId = s.manager_id || '';
     }

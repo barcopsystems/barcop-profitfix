@@ -57,7 +57,7 @@ S.LaborBuildSchedule = {
     if (isNaN(d.getTime())) return '';
     const wd = (d.getDay() + 6) % 7; // 0 = Monday
     d.setDate(d.getDate() - wd);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
   // Date label for a given day column, derived from the (Monday) week_start.
   dayDate(weekStart, dayIdx) {
@@ -81,7 +81,7 @@ S.LaborBuildSchedule = {
       }
     }
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
-    return { week_start: this.mondayOf(new Date().toISOString().slice(0, 10)), shifts: [], notes: '' };
+    return { week_start: this.mondayOf(App.todayLocal()), shifts: [], notes: '' };
   },
   saveDraft() { if (this.editId) return; try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
   clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} },
@@ -107,7 +107,7 @@ S.LaborBuildSchedule = {
   shiftCalc(sh) {
     const staff = this.staffById(sh.staff_id);
     const hours = this.hoursOf(sh.start, sh.end);
-    const wkDate = this.draft.week_start || new Date().toISOString().slice(0, 10);
+    const wkDate = this.draft.week_start || App.todayLocal();
     if (staff && App.isSalaried(staff)) return { staff, hours, wage: 0, cost: 0, salaried: true };
     const wage = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, wkDate) : (staff.wage || 0)) : 0;
     return { staff, hours, wage, cost: hours * wage };
@@ -117,7 +117,7 @@ S.LaborBuildSchedule = {
     const we = new Date(weekStart + 'T00:00:00');
     if (isNaN(we.getTime())) return 0;
     we.setDate(we.getDate() + 6);
-    return App.salariedCost(weekStart, we.toISOString().slice(0, 10)).total;
+    return App.salariedCost(weekStart, App.ymdLocal(we)).total;
   },
   _min(t) { const [h, m] = (t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); },
   // True if this shift overlaps another shift for the same staff on the same day.
@@ -308,7 +308,7 @@ S.LaborBuildSchedule = {
         if (!ok) return;
       }
       this.editId = null;
-      this.draft = { week_start: this.draft.week_start || this.mondayOf(new Date().toISOString().slice(0, 10)), shifts: [], notes: '' };
+      this.draft = { week_start: this.draft.week_start || this.mondayOf(App.todayLocal()), shifts: [], notes: '' };
       this.saveDraft(); this.draw();
     });
     document.getElementById('bs-cancel')?.addEventListener('click', () => { this.editId = null; App.navigate('lc-schedule-history'); });

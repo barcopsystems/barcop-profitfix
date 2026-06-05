@@ -162,7 +162,7 @@ S.LaborScheduleHistory = {
     if (!src) return;
     const start = new Date((src.week_start || '') + 'T00:00:00');
     if (!isNaN(start.getTime())) start.setDate(start.getDate() + 7);
-    const nextWeek = isNaN(start.getTime()) ? '' : start.toISOString().slice(0, 10);
+    const nextWeek = isNaN(start.getTime()) ? '' : App.ymdLocal(start);
     const draft = {
       week_start: nextWeek,
       shifts: (src.shifts || []).map(sh => ({

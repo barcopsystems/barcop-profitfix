@@ -61,7 +61,7 @@ S.LaborCalloutLog = {
       '<option value="' + s + '"' + (c && c.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
     return '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Date</label>'
-        + '<input type="date" id="co-date" value="' + esc(c?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+        + '<input type="date" id="co-date" value="' + esc(c?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
         + '<select id="co-staff">' + staffOpts + '</select></div>'
       + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Type</label>'

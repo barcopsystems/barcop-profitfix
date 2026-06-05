@@ -42,10 +42,10 @@ S.LaborStaffRoster = {
   },
   certStatus(cert) {
     if (!cert || !cert.expiration_date) return 'ok';
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     if (cert.expiration_date < today) return 'expired';
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 30);
-    if (cert.expiration_date <= cutoff.toISOString().slice(0, 10)) return 'expiring';
+    if (cert.expiration_date <= App.ymdLocal(cutoff)) return 'expiring';
     return 'ok';
   },
   // Roster-row rollup across all of a staff member's certs: any expired wins,
@@ -556,7 +556,7 @@ S.LaborStaffRoster = {
 
   renderNoteForm(staffId) {
     const n = this.noteEditId ? this.notes().find(x => x.id === this.noteEditId) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const catOpts = this.NOTE_CATEGORIES.map(c =>
       '<option' + (n && n.category === c ? ' selected' : (!n && c === 'Coaching' ? ' selected' : '')) + '>' + esc(c) + '</option>').join('');
 
@@ -594,7 +594,7 @@ S.LaborStaffRoster = {
     const rec = {
       id:           this.noteEditId || App.uid(),
       staff_id:     staffId,
-      date:         document.getElementById('note-date')?.value || new Date().toISOString().slice(0, 10),
+      date:         document.getElementById('note-date')?.value || App.todayLocal(),
       category:     document.getElementById('note-cat')?.value || 'Coaching',
       manager_id:   managerId,
       manager_name: managerName,
@@ -647,7 +647,7 @@ S.LaborStaffRoster = {
     // dated entries cost out at the wage in effect on that date. (Salaried pay
     // is a fixed weekly cost, so it carries no hourly wage history.)
     const existing = staffId ? this.staff().find(x => x.id === staffId) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     let wageHistory = Array.isArray(existing?.wage_history) ? existing.wage_history.slice() : [];
     if (existing && existing.wage != null && newWage != null && existing.wage !== newWage) {
       wageHistory.push({ prior_wage: existing.wage, new_wage: newWage, effective_date: today, changed_at: new Date().toISOString() });

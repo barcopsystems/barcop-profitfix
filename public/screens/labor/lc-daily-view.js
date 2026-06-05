@@ -23,7 +23,7 @@ S.LaborDailyView = {
   addDays(dateStr, n) {
     const d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
 
   // the schedule covering a date, and that day's scheduled shifts
@@ -57,7 +57,7 @@ S.LaborDailyView = {
       });
       return;
     }
-    if (!this.date) this.date = new Date().toISOString().slice(0, 10);
+    if (!this.date) this.date = App.todayLocal();
     this.draw();
   },
 

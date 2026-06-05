@@ -16,12 +16,12 @@ S.LaborWeeklySummary = {
     const day = date.getDay();
     const diff = (day === 0 ? -6 : 1 - day);
     date.setDate(date.getDate() + diff);
-    return date.toISOString().slice(0, 10);
+    return App.ymdLocal(date);
   },
   addDays(dateStr, n) {
     const d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
   fmtDay(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');

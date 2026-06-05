@@ -35,12 +35,12 @@ S.LaborPayPeriods = {
     if (isNaN(date.getTime())) return d;
     const day = date.getDay();
     date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
-    return date.toISOString().slice(0, 10);
+    return App.ymdLocal(date);
   },
   addDays(d, n) {
     const date = new Date(d + 'T00:00:00');
     date.setDate(date.getDate() + n);
-    return date.toISOString().slice(0, 10);
+    return App.ymdLocal(date);
   },
   fmtDate(str) {
     if (!str) return '-';
@@ -155,7 +155,7 @@ S.LaborPayPeriods = {
     this.actions.innerHTML = '';
 
     // Build the last 12 weeks ending with the current week
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const thisMon = this.mondayOf(today);
     const weeks = [];
     for (let i = 0; i < 12; i++) {

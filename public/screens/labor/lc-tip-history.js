@@ -26,7 +26,7 @@ S.LaborTipHistory = {
     if (isNaN(d.getTime())) return dateStr;
     const day = d.getDay();
     d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
   fmtDate(str) {
     if (!str) return '-';

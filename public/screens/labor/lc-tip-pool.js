@@ -33,7 +33,7 @@ S.LaborTipPool = {
     this.actions = actions;
     // Fresh form on every entry from the sidebar — a loaded pool never sticks
     // around. Working state only persists across the in-screen re-renders.
-    this.date = new Date().toISOString().slice(0, 10);
+    this.date = App.todayLocal();
     this.pool = '';
     this.rows = [];
     this.method = 'hours';
