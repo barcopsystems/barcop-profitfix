@@ -554,22 +554,13 @@ S.ShiftActiveShift = {
         ? labor.hours.toFixed(1) + ' hrs scheduled'
         : 'No hours yet';
 
-    // Cover Goal vs Covers So Far. Goal comes from this week's Revenue Forecast
-    // covers_per_day for today's weekday. So-far covers come from the shift's
-    // running cover total (typed during shift close, or pulled from any
-    // matching server_check entries logged during shift so the floor manager
-    // sees a live read).
-    const goalForToday = (() => {
-      if (!s.date || !App.weekStartFor || !App.DAYS_MON_FIRST) return 0;
-      const ws = App.weekStartFor(s.date);
-      const f = App.forecastForWeek ? App.forecastForWeek(ws) : null;
-      if (!f || !f.covers_per_day) return 0;
-      const dt = new Date(s.date + 'T00:00:00');
-      if (isNaN(dt.getTime())) return 0;
-      const idx = (dt.getDay() + 6) % 7;
-      const key = App.DAYS_MON_FIRST[idx];
-      return parseFloat(f.covers_per_day[key]) || 0;
-    })();
+    // Cover Goal vs Covers So Far. The goal is THIS daypart's slice of the
+    // Revenue Forecast's whole-day cover number (see coverGoalFor). So-far
+    // covers come from the shift's running cover total (typed during close, or
+    // pulled from matching server_check entries logged during the shift for a
+    // live read).
+    const cg = this.coverGoalFor(s);
+    const goalForToday = cg.goal;
     const coversSoFar = (() => {
       // Prefer the operator-typed running cover number on the shift record.
       if (s.covers != null && s.covers > 0) return parseFloat(s.covers) || 0;
@@ -581,7 +572,9 @@ S.ShiftActiveShift = {
       return checks.reduce((sum, c) => sum + (parseFloat(c.covers) || 0), 0);
     })();
     const coverProgressLabel = goalForToday > 0
-      ? coversSoFar.toFixed(0) + ' of ' + goalForToday + (coversSoFar >= goalForToday ? ' (hit)' : ' (' + (goalForToday - coversSoFar).toFixed(0) + ' to goal)')
+      ? (cg.daypart
+          ? coversSoFar.toFixed(0) + ' of ' + goalForToday + (coversSoFar >= goalForToday ? ' (hit)' : ' (' + (goalForToday - coversSoFar).toFixed(0) + ' to goal)')
+          : coversSoFar.toFixed(0) + ' this shift &middot; whole-day goal')
       : (coversSoFar > 0 ? coversSoFar.toFixed(0) + ' so far' : 'Set in Revenue Forecast');
 
     const stat = (label, val, sub) =>
@@ -650,11 +643,56 @@ S.ShiftActiveShift = {
     };
   },
 
+  // Cover goal for the active shift's daypart. Anchored to this week's Revenue
+  // Forecast whole-day cover number for the weekday, then sliced by this
+  // daypart's historical share of that weekday's covers (from sc_shifts, the
+  // same 8-week lookback the forecast uses). The dayparts sum back to the
+  // forecast, so nothing is invented or double-counted. Until enough daypart
+  // history exists it falls back to the whole-day number. Returns
+  // { goal, daily, daypart } where daypart=true means the slice was applied.
+  coverGoalFor(s) {
+    const out = { goal: 0, daily: 0, daypart: false };
+    if (!s || !s.date || !App.weekStartFor || !App.DAYS_MON_FIRST) return out;
+    const f = App.forecastForWeek ? App.forecastForWeek(App.weekStartFor(s.date)) : null;
+    if (!f || !f.covers_per_day) return out;
+    const dt = new Date(s.date + 'T00:00:00');
+    if (isNaN(dt.getTime())) return out;
+    const wdIdx = (dt.getDay() + 6) % 7;
+    const daily = parseFloat(f.covers_per_day[App.DAYS_MON_FIRST[wdIdx]]) || 0;
+    out.daily = daily;
+    if (daily <= 0) return out;
+
+    // This daypart's share of the weekday's covers, last 8 weeks of sc_shifts.
+    const refMs = dt.getTime();
+    const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
+    let dayTotal = 0, partTotal = 0;
+    shifts.forEach(h => {
+      if (!h || !h.date || h.id === s.id) return;       // skip the open shift itself
+      const hd = new Date(String(h.date).length <= 10 ? h.date + 'T00:00:00' : h.date);
+      if (isNaN(hd.getTime())) return;
+      const daysBack = Math.round((refMs - hd.getTime()) / 86400000);
+      if (daysBack < 0 || daysBack > 56) return;        // within the last 8 weeks
+      if (((hd.getDay() + 6) % 7) !== wdIdx) return;     // same weekday only
+      const c = parseFloat(h.covers) || 0;
+      if (c <= 0) return;
+      dayTotal += c;
+      if ((h.shift_type || '') === (s.shift_type || '')) partTotal += c;
+    });
+
+    if (dayTotal > 0 && partTotal > 0) {
+      out.goal = Math.round(daily * (partTotal / dayTotal));
+      out.daypart = true;
+    } else {
+      out.goal = Math.round(daily);                      // day-one fallback
+    }
+    return out;
+  },
+
   showHowToActive() {
     App.showHelpModal('How the Running Shift Works', [
       { p: ['This is your command center while the shift is live. Everything you log during service lands on the shift and rolls into the close.'] },
       { h: 'Registers', p: ['The registers you opened sit up top with their bank and what has been dropped from each so far.'] },
-      { h: 'This Shift', p: ['Live counts as the night runs: cover goal, labor so far, cash drops, voids and comps, 86\'d items, and open maintenance. The Cover Goal comes from the covers you set per day in Revenue Recovery, Revenue Forecast. Set it there and it shows here.'] },
+      { h: 'This Shift', p: ['Live counts as the night runs: cover goal, labor so far, cash drops, voids and comps, 86\'d items, and open maintenance. The Cover Goal is the day\'s number from Revenue Recovery, Revenue Forecast, split to this shift\'s part of the day based on how your covers normally land across dayparts. Set the day\'s number there and it shows here.'] },
       { h: 'Log During This Shift', p: ['Tap any of these to log it the moment it happens: a cash drop, a void or comp, waste or a spill, an 86, or a maintenance issue. Cash Drop opens right here so you never leave the shift. Each feeds its own log and the shift exceptions.'] },
       { h: 'Shift Notes', p: ['Drop timestamped notes through the night for the closer or the next manager. They flow into the Handoff Report at close.'] },
       { h: 'Ending the Shift', p: ['End Shift runs the close wizard: revenue and covers, cash count per register, exceptions, tips, and handoff notes. Cancel Shift discards the shift without saving if you opened it by mistake.'] }
