@@ -91,7 +91,7 @@ S.ShiftDrawers = {
         + '</div></td></tr>';
 
       listHtml = '<div class="card"><div class="card-title">Drawers / Registers</div>'
-        + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<div style="overflow-x:auto;"><table class="tbl tbl-flush"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
         + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
 
