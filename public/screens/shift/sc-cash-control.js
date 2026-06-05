@@ -625,7 +625,7 @@ S.ShiftCashControl = {
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Drawer / Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select drawer...' }) + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Expected Cash (POS) ' + tt('cc-pos-expected') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '" style="height:44px;"/></div></div>'
