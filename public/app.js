@@ -3836,4 +3836,28 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
     }
   });
+
+  // Kill the browser's native autofill / saved-value dropdowns app-wide. The
+  // operator types other people's data (staff phones, vendor contacts), so the
+  // browser's "previously entered value" suggestions are noise that pops over
+  // the form. Set autocomplete="off" on every text field as it enters the DOM.
+  // Screens re-render via innerHTML and modals are injected, so one observer
+  // covers them all with no per-form work. Login email/password and any field
+  // that already declares an autocomplete value are left alone (so password
+  // managers and saved logins keep working).
+  const killAutofill = el => {
+    if (!el || el.getAttribute('autocomplete')) return;
+    const t = (el.getAttribute('type') || 'text').toLowerCase();
+    if (t === 'password' || t === 'email' || t === 'number' || t === 'date') return;
+    el.setAttribute('autocomplete', 'off');
+  };
+  const sweepAutofill = root => {
+    if (!root || root.nodeType !== 1) return;
+    if (root.tagName === 'INPUT' || root.tagName === 'TEXTAREA') killAutofill(root);
+    if (root.querySelectorAll) root.querySelectorAll('input, textarea').forEach(killAutofill);
+  };
+  sweepAutofill(document.body);
+  new MutationObserver(muts => {
+    for (const m of muts) for (const n of m.addedNodes) sweepAutofill(n);
+  }).observe(document.body, { childList: true, subtree: true });
 });
