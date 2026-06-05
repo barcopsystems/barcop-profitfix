@@ -185,9 +185,9 @@ S.YieldTest = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="yt-date" value="' + esc(r?.date || today) + '" style="height:44px;"/></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Cook</label>'
-      + '<select id="yt-cook" style="height:44px;">' + App.staffOptions(r?.cook_id, { placeholder: 'Select cook...' }) + '</select></div>'
+      + '<select id="yt-cook" style="height:44px;">' + App.staffOptions(r?.cook_id, { placeholder: 'Select cook...', audience: 'kitchen' }) + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager Observing</label>'
-      + '<select id="yt-manager" style="height:44px;">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...' }) + '</select></div>'
+      + '<select id="yt-manager" style="height:44px;">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'
