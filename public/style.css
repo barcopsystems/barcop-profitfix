@@ -462,6 +462,54 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .page-head-actions{width:100%;}
 }
 
+/* ══ PROTO SHELL — full-width top nav + restyled sidebar (Shift section only) ══
+   Activated by the .proto class on #app (added in showApp ONLY for Shift). The
+   shell becomes a grid: a full-width top nav across the top, then sidebar +
+   content beneath it. Everything is scoped to .app.proto, so the other six
+   sections keep the existing flex shell, byte-for-byte. Reorg/visual only. */
+#proto-topnav{display:none;}
+.app.proto{
+  display:grid;
+  grid-template-columns:var(--sidebar-w) 1fr;
+  grid-template-rows:54px 1fr;
+  grid-template-areas:"topnav topnav" "sidebar main";
+  height:100vh;overflow:hidden;
+}
+.app.proto #proto-topnav{
+  grid-area:topnav;display:flex;align-items:center;gap:30px;
+  background:var(--surface);border-bottom:1px solid var(--b-edge);
+  padding:0 22px;overflow:hidden;
+}
+.app.proto .sidebar{grid-area:sidebar;height:100%;min-height:0;border-right:1px solid var(--b2);}
+.app.proto .main{grid-area:main;min-width:0;}
+
+/* Top nav: logo + flat section tabs, gold underline marks the active section. */
+.tn-logo{height:23px;width:auto;display:block;flex-shrink:0;}
+.tn-tabs{display:flex;align-items:center;gap:2px;height:100%;}
+.tn-tab{
+  display:flex;align-items:center;height:100%;padding:0 15px;
+  font-size:14px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;transition:color .12s,border-color .12s;
+}
+.tn-tab:hover{color:var(--t1);}
+.tn-tab.active{color:var(--w);border-bottom-color:var(--gold);}
+
+/* Sidebar in proto: hide the logo + in-sidebar switcher (the top nav owns those),
+   bigger readable labels, more room, a clean gold rail on the active row. */
+.app.proto .sidebar-logo{display:none;}
+.app.proto .sec-switch{display:none;}
+.app.proto .sidebar-nav{padding:12px 0;}
+.app.proto .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
+.app.proto .nav-section:first-child{padding-top:6px;}
+.app.proto .nav-item{padding:10px 20px;gap:13px;}
+.app.proto .nav-item .nav-label{font-size:13.5px;text-transform:none;letter-spacing:0;}
+.app.proto .nav-item:hover{background:var(--hover);}
+.app.proto .nav-item.active{background:rgba(255,255,255,0.022);box-shadow:inset 3px 0 0 var(--gold);}
+@media (max-width:768px){
+  .app.proto{display:flex;flex-direction:column;height:100vh;}
+  .app.proto #proto-topnav{flex-shrink:0;}
+}
+
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
