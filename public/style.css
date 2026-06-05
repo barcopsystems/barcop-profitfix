@@ -496,13 +496,13 @@ body.demo.chrome-on #hub-wrapper{top:calc(40px + var(--navh)) !important;}
 .app.proto .main{grid-area:main;min-width:0;}
 .app.proto.sidebar-collapsed{grid-template-columns:var(--sidebar-w-coll) 1fr;}
 
-/* Hub under the shared nav: no sidebar, no own topbar, full-width dashboard.
-   Desktop only — on mobile the Hub keeps its own sidebar/topbar so it stays
-   navigable (the shared nav row 2 is hidden there). */
+/* Hub under the shared nav: no own topbar (the shared nav replaces it) and, on
+   desktop, no sidebar either (full-width dashboard). On mobile the Hub keeps its
+   sidebar as the off-canvas drawer, opened by the shared nav burger. */
 body.chrome-on .hub-app{height:100%;}
+body.chrome-on .hub-app .topbar{display:none;}
 @media (min-width:769px){
   body.chrome-on .hub-app .sidebar{display:none;}
-  body.chrome-on .hub-app .topbar{display:none;}
 }
 
 /* Row 1 — brand + global destinations + utility. */
@@ -549,11 +549,13 @@ body.chrome-on .hub-app{height:100%;}
   .tn-mobile-burger{display:flex;}
   .app.proto .sec-switch{display:block;}
   #tn-acct #topbar-group-dashboard{display:none !important;}
+  /* The shared nav replaces the old header on mobile and the burger opens the
+     drawer, so hide the old topbar everywhere so it does not double up. */
+  body.chrome-on .topbar{display:none;}
 }
 /* Converted pages carry their own page header, so hide the old topbar title bar
-   for them on desktop. Kept on mobile so the sidebar hamburger stays reachable. */
+   for them. */
 .app.topbar-hidden .topbar{display:none;}
-@media (max-width:768px){.app.topbar-hidden .topbar{display:flex;}}
 
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
