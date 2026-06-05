@@ -483,17 +483,9 @@ const Shift = {
         <span class="nav-label">Checklist Templates</span>
       </div>
       <div class="nav-section">Reports</div>
-      <div class="nav-item" data-screen="sc-reports-shift" id="nav-sc-reports-shift">
+      <div class="nav-item" data-screen="sc-reports" id="nav-sc-reports">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Shift Reports</span>
-      </div>
-      <div class="nav-item" data-screen="sc-reports-cash" id="nav-sc-reports-cash">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Cash Reports</span>
-      </div>
-      <div class="nav-item" data-screen="sc-reports-ops" id="nav-sc-reports-ops">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="8" width="3" height="5" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="4" width="3" height="9" stroke="currentColor" stroke-width="1.3"/><rect x="11.5" y="10" width="3" height="3" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Operations Reports</span>
+        <span class="nav-label">Reports</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="sc-help" id="nav-sc-help">
