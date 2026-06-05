@@ -5,7 +5,8 @@
   --surface:   #08131A;
   --input:     #070E15;
   --panel:     #08131A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
-  --zone:      #0C1A26;                /* Un-box language: lifted content zone that holds a table/section on the page canvas, one gentle navy step above --bg so content reads as a zone, not a hard box */
+  --zone:      #0C1A26;                /* Un-box language: data ROW fill, one gentle navy step above --bg so rows read as a distinct band on the page canvas, no card border needed */
+  --zone-head: #15293A;                /* Un-box language: table HEADER band, a clearly lighter navy than the rows so headers are one color and rows another (the look in the reference apps) */
   --hover:     rgba(255,255,255,0.02);
   --nav-act:   #162C3C;
 
@@ -422,46 +423,42 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
-   Scoped entirely to .page so the rest of the app (.screen) is byte-for-byte
-   unchanged. Depth comes from TONE, not borders: page canvas (--bg, darkest),
-   a gently lifted content zone (--zone) that holds the table, and a slightly
-   lighter row hover. Header = big title + short subtitle + a loud gold primary
-   action top-right; real instruction lives in How it works + tooltips. */
+   Scoped to .page so the rest of the app (.screen) is byte-for-byte unchanged.
+   NO card wrapper. The structure is carried by COLOR across three tones: the
+   page gutter (--bg, darkest), the data rows (--zone), and a distinctly lighter
+   header band (--zone-head). The table bleeds full-width with no border and no
+   rounding, so it reads as a styled table, not a boxed card. */
 .page{padding:30px 36px 64px;width:100%;}
-.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:22px;}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;}
 .page-title{font-size:24px;font-weight:800;color:var(--w);letter-spacing:-0.3px;line-height:1.2;margin:0;}
 .page-sub{font-size:13px;color:var(--t3);margin-top:6px;}
 .page-head-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
-/* The loud action: bigger than a standard button + a soft gold lift so it is
-   clearly the one thing to do on the page. Secondary actions stay ghost/small. */
+/* The loud action: bigger + a soft gold lift so it is clearly the one thing to
+   do on the page. Secondary actions stay ghost/small for hierarchy. */
 .page-head-actions .btn-primary{padding:12px 28px;font-size:12px;box-shadow:0 2px 16px rgba(219,171,70,0.20);}
 .page-head-actions .btn-primary:hover{box-shadow:0 2px 20px rgba(219,171,70,0.30);}
 
-/* The lifted content zone (tone, soft hairline, rounded — a zone, not a box). */
-.page-panel{background:var(--zone);border:1px solid var(--b2);border-radius:7px;padding:4px 22px 6px;}
-.zone-shelf{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--b2);}
-.zone-count{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);}
+/* Count caption sits on the canvas above the table, not inside any box. */
+.table-caption{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin:0 0 9px 2px;}
 .data-table{overflow-x:auto;}
-/* Table sits on the zone: transparent header, flush outer columns, airier rows,
-   a slightly stronger hover so a row reads as live. */
-.page .tbl th{background:transparent;padding-top:14px;padding-bottom:13px;}
-.page .tbl td{padding-top:13px;padding-bottom:13px;}
-.page .tbl th:first-child,.page .tbl td:first-child{padding-left:0;}
-.page .tbl th:last-child,.page .tbl td:last-child{padding-right:0;}
-.page .tbl tr:hover td{background:rgba(255,255,255,0.025);}
+/* Header band one tone, rows another. Cells keep horizontal padding so the row
+   fill + hover extend past the text instead of cutting off at it. */
+.page .tbl thead th{background:var(--zone-head);color:var(--t2);padding:12px 16px;border-bottom:none;white-space:nowrap;}
+.page .tbl tbody td{background:var(--zone);padding:14px 16px;border-bottom:1px solid var(--b2);}
+.page .tbl tbody tr:last-child td{border-bottom:none;}
+.page .tbl tbody tr:hover td{background:var(--zone-head);}
 
-/* Archived = recessed on the bare canvas, aligned to the zone gutter so its
-   columns line up with the active table above it. */
+/* Archived = flat on the bare canvas (no row fill) + dim, so it reads as
+   secondary against the filled active table above it. */
 .canvas-sub{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin:34px 0 4px;}
 .canvas-hint{font-size:12px;color:var(--t4);margin-bottom:10px;}
-.data-table-recessed{padding:0 22px;opacity:0.78;}
+.data-table-archived .tbl tbody td{background:transparent;padding:12px 16px;}
+.data-table-archived .tbl tbody tr:hover td{background:var(--hover);}
 .page-empty{font-size:14px;color:var(--t3);padding:48px 0;line-height:1.6;max-width:540px;}
 @media (max-width:768px){
   .page{padding:16px 14px 72px;}
   .page-head{flex-direction:column;gap:14px;}
   .page-head-actions{width:100%;}
-  .page-panel{padding:2px 14px 4px;}
-  .data-table-recessed{padding:0 14px;}
 }
 
 /* ══ SUMMARY TABLE ══ */
