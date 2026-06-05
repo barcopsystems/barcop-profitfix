@@ -476,16 +476,25 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   height:100vh;overflow:hidden;
 }
 .app.proto #proto-topnav{
-  grid-area:topnav;display:flex;align-items:center;gap:28px;
+  grid-area:topnav;display:flex;align-items:center;gap:16px;
   background:var(--surface);border-bottom:1px solid var(--b-edge);
-  padding:0 22px;overflow:hidden;
+  padding:0 18px;overflow:hidden;
 }
 .app.proto .sidebar{grid-area:sidebar;height:100%;min-height:0;border-right:1px solid var(--b2);}
 .app.proto .main{grid-area:main;min-width:0;}
+.app.proto.sidebar-collapsed{grid-template-columns:var(--sidebar-w-coll) 1fr;}
 
-/* Top nav: logo + the section tabs, gold underline marks the active section. */
+/* Top nav: collapse toggle + logo + section tabs + the account/location switcher
+   (moved up from the old topbar) on the right. Gold underline marks the active. */
+.tn-collapse{
+  display:flex;align-items:center;justify-content:center;width:30px;height:30px;
+  background:transparent;border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--t3);cursor:pointer;flex-shrink:0;transition:border-color .12s,color .12s;
+}
+.tn-collapse:hover{border-color:rgba(255,255,255,0.28);color:var(--t1);}
 .tn-logo{height:23px;width:auto;display:block;flex-shrink:0;}
 .tn-tabs{display:flex;align-items:center;gap:2px;height:100%;}
+.tn-right{margin-left:auto;display:flex;align-items:center;flex-shrink:0;}
 .tn-tab{
   display:flex;align-items:center;height:100%;padding:0 15px;
   font-size:14px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap;
@@ -505,9 +514,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .app.proto .nav-item .nav-label{font-size:13.5px;text-transform:none;letter-spacing:0;}
 .app.proto .nav-item:hover{background:var(--hover);}
 .app.proto .nav-item.active{background:rgba(255,255,255,0.022);box-shadow:inset 3px 0 0 var(--gold);}
+/* Collapsed: narrow rail, centered icons, section headers hidden (the proto nav
+   rules above otherwise override the global collapsed rules by source order). */
+.app.proto.sidebar-collapsed .nav-item{padding:8px 0;justify-content:center;}
+.app.proto.sidebar-collapsed .nav-section{opacity:0;height:0;padding:0;margin:0;}
+.app.proto.sidebar-collapsed .nav-item.active{box-shadow:inset 3px 0 0 var(--gold);}
 @media (max-width:768px){
   .app.proto{display:flex;flex-direction:column;height:100vh;}
   .app.proto #proto-topnav{flex-shrink:0;}
+  .tn-collapse{display:none;}
+  .tn-tabs{overflow-x:auto;}
 }
 
 /* ══ SUMMARY TABLE ══ */
