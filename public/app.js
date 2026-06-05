@@ -671,6 +671,8 @@ const App = {
     hubWrap.style.filter = '';
     hubWrap.style.pointerEvents = '';
     S.Hub.render(hubWrap);
+    document.body.classList.add('chrome-on');     // shared top nav sits above the Hub too
+    this._renderProtoTopnav('hub');               // Hub link active, no section active
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
   },
@@ -1003,6 +1005,7 @@ const App = {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('ob-overlay').classList.add('hidden');
     document.getElementById('app').classList.add('hidden');
+    document.body.classList.remove('chrome-on');
     let wrap = document.getElementById('hub-wrapper');
     if (!wrap) {
       wrap = document.createElement('div');
@@ -1063,7 +1066,10 @@ const App = {
       module = land.module;
       this._pendingStaffRedirect = land.screen;
     }
-    document.getElementById('app').classList.remove('hidden');
+    const appEl = document.getElementById('app');
+    appEl.classList.remove('hidden');
+    appEl.classList.add('proto');                 // module shell uses the new grid layout
+    document.body.classList.add('chrome-on');      // show the shared top nav
     document.getElementById('ob-overlay').classList.add('hidden');
     document.getElementById('auth-screen').style.display = 'none';
     const hw = document.getElementById('hub-wrapper');
@@ -1193,14 +1199,14 @@ const App = {
   // Adds the .proto class to #app and fills #proto-topnav with the logo + flat
   // section tabs; clears it for every other section. Reorg/visual only, no new
   // features. Tabs reuse jumpToSection, the same hop the section switcher does.
-  // The new two-row top nav. Renders for every module shell. The shell DOM (rows,
-  // logo, slots, icon buttons) is static in index.html so the relocated account-
-  // switcher nodes survive re-renders; we refill the global links + section pills
-  // and (once) move the switcher up. The Hub is still its own wrapper for now.
+  // The shared two-row top nav (body-level, above #app and #hub-wrapper). Called
+  // by showApp (context = the active module) and showHub (context = 'hub'). The
+  // shell DOM is static in index.html so the relocated account-switcher nodes
+  // survive re-renders; we refill the global links + section pills and (once)
+  // move the switcher up. body.chrome-on (set by the callers) shows the bar.
   _PROTO_GLOBAL:   [['hub','The Hub'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
-  _MODULE_KEYS: ['profit', 'revenue', 'traffic', 'inventory', 'labor', 'shift'],
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
   _CONVERTED: new Set(['sc-drawers']),
@@ -1210,22 +1216,17 @@ const App = {
     if (g === 'books') return (window.S && S.HubBooks)       ? S.HubBooks.open()       : null;
     if (g === 'ops')   return (window.S && S.HubPermits)     ? S.HubPermits.open()     : null;
   },
-  _renderProtoTopnav(module) {
-    const app = document.getElementById('app');
-    if (!app) return;
-    const on = this._MODULE_KEYS.includes(module);
-    app.classList.toggle('proto', on);
-    if (!on) return;
+  _renderProtoTopnav(context) {
     const globalEl = document.getElementById('tn-global');
     if (globalEl) {
       globalEl.innerHTML = this._PROTO_GLOBAL.map(([k, l]) =>
-        '<div class="tn-glink" data-g="' + k + '">' + esc(l) + '</div>').join('');
+        '<div class="tn-glink' + (context === 'hub' && k === 'hub' ? ' active' : '') + '" data-g="' + k + '">' + esc(l) + '</div>').join('');
       globalEl.querySelectorAll('.tn-glink[data-g]').forEach(el =>
         el.addEventListener('click', () => App._protoGlobalClick(el.dataset.g)));
     }
     const secEl = document.getElementById('tn-sections');
     if (secEl) {
-      const pill = ([k, l]) => '<div class="tn-sec' + (k === module ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
+      const pill = ([k, l]) => '<div class="tn-sec' + (k === context ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
       secEl.innerHTML = this._PROTO_RECOVERY.map(pill).join('')
         + '<div class="tn-divider"></div>'
         + this._PROTO_CONTROL.map(pill).join('');
@@ -1329,6 +1330,7 @@ const App = {
   showAuth() {
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('app').classList.add('hidden');
+    document.body.classList.remove('chrome-on');
     document.getElementById('ob-overlay').classList.add('hidden');
     const hw = document.getElementById('hub-wrapper');
     if (hw) hw.style.display = 'none';
