@@ -90,8 +90,8 @@ S.ShiftDrawers = {
           + '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>'
         + '</div></td></tr>';
 
-      listHtml = '<div class="card"><div class="card-title">Drawers / Registers</div>'
-        + '<div style="overflow-x:auto;"><table class="tbl tbl-flush"><thead><tr>'
+      listHtml = '<div class="card card-bleed"><div class="card-title">Drawers / Registers</div>'
+        + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
         + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
 
