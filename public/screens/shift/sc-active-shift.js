@@ -512,7 +512,7 @@ S.ShiftActiveShift = {
   // record and drops back onto Open the Floor with the picks rebuilt, so the
   // manager fixes the one thing and re-opens instead of logging + deleting.
   async cancelShift(s) {
-    const ok = await App.confirm({ title: 'Discard this shift and go back? It will not be saved to history.', confirmText: 'Discard', cancelText: 'Keep Running' });
+    const ok = await App.confirm({ titleHtml: 'Cancel this shift? <span style="font-weight:400;">If you cancel this shift, it will not be saved and you will go back to open the floor. Cancel with caution.</span>', confirmText: 'Cancel Shift', cancelText: 'Keep Running' });
     if (!ok) return;
     const srcDrawers = (Array.isArray(s.drawers) && s.drawers.length)
       ? s.drawers
