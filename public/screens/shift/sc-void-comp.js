@@ -265,31 +265,8 @@ S.ShiftVoidComp = {
       if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
       if (row && App.canEdit('sc-void-comp')) this.openEditModal(row.dataset.id);
     };
-    // Per-line conditional fields: Type drives the Reason list, a tracked
-    // product reveals Units. Delegated so new lines work without rewiring.
-    this.container.onchange = ev => {
-      const line = ev.target.closest('.vc-line');
-      if (!line) return;
-      if (ev.target.classList.contains('vcl-type')) {
-        const reason = line.querySelector('.vcl-reason');
-        if (reason) reason.innerHTML = this.reasonOptions(ev.target.value, '');
-      } else if (ev.target.classList.contains('vcl-item')) {
-        // Pick a priced item -> default the qty to 1 and auto-fill the amount.
-        const price = this.itemPrice(ev.target.value);
-        const units = line.querySelector('.vcl-units');
-        const amt = line.querySelector('.vcl-amount');
-        if (price != null) {
-          if (units && !(parseFloat(units.value) > 0)) units.value = '1';
-          if (amt) amt.value = (price * (parseFloat(units && units.value) || 1)).toFixed(2);
-        }
-      } else if (ev.target.classList.contains('vcl-units')) {
-        // Recompute the amount when qty changes on a priced item.
-        const itemSel = line.querySelector('.vcl-item');
-        const price = this.itemPrice(itemSel ? itemSel.value : '');
-        const amt = line.querySelector('.vcl-amount');
-        if (price != null && amt) amt.value = (price * (parseFloat(ev.target.value) || 0)).toFixed(2);
-      }
-    };
+    // Per-line conditional fields (delegated so new lines work without rewiring).
+    this.container.onchange = ev => this.onLineChange(ev);
     document.getElementById('vc-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('vc-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     document.getElementById('vc-f-type')?.addEventListener('change',   e => { this.filterType = e.target.value || ''; this.renderList(); });
@@ -298,6 +275,31 @@ S.ShiftVoidComp = {
       this.filterFrom = this.filterTo = this.filterType = this.filterServerId = '';
       this.renderList();
     });
+  },
+
+  // Per-line conditional handler for the batch builder, shared by the landing
+  // and the running-shift log pop-up. Type drives the Reason list; a priced
+  // item auto-fills Amount; changing Units recomputes Amount.
+  onLineChange(ev) {
+    const line = ev.target.closest('.vc-line');
+    if (!line) return;
+    if (ev.target.classList.contains('vcl-type')) {
+      const reason = line.querySelector('.vcl-reason');
+      if (reason) reason.innerHTML = this.reasonOptions(ev.target.value, '');
+    } else if (ev.target.classList.contains('vcl-item')) {
+      const price = this.itemPrice(ev.target.value);
+      const units = line.querySelector('.vcl-units');
+      const amt = line.querySelector('.vcl-amount');
+      if (price != null) {
+        if (units && !(parseFloat(units.value) > 0)) units.value = '1';
+        if (amt) amt.value = (price * (parseFloat(units && units.value) || 1)).toFixed(2);
+      }
+    } else if (ev.target.classList.contains('vcl-units')) {
+      const itemSel = line.querySelector('.vcl-item');
+      const price = this.itemPrice(itemSel ? itemSel.value : '');
+      const amt = line.querySelector('.vcl-amount');
+      if (price != null && amt) amt.value = (price * (parseFloat(ev.target.value) || 0)).toFixed(2);
+    }
   },
 
   // ── Edit in a focused pop-up (same unified form as the landing) ─────────────
@@ -321,34 +323,30 @@ S.ShiftVoidComp = {
     document.getElementById('vce-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); this.confirmDel(id); });
   },
 
-  // Log one void/comp from the running shift in a focused pop-up (no nav away).
-  // Reuses the unified form + _collect; onDone re-renders the active shift.
-  // preset pre-fills date/shift from the open shift so it lands on the shift.
+  // Log voids/comps from the running shift in a focused pop-up using the SAME
+  // multi-line batch builder as the landing (header + lines + Save All), so a
+  // manager can enter several at once. onDone re-renders the active shift.
+  // preset pre-fills date/shift from the open shift.
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-void-comp')) return;
     this.editId = null;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Void / Comp</div>'
-      + this.formFields(preset || {}, 'vce-')
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Voids / Comps</div>'
+      + this.builderInner(preset)
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="vce-save">Save</button>'
-      + '<button class="btn btn-ghost" id="vce-cancel">Cancel</button>'
-      + '<span id="vce-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
+      + '<button class="btn btn-ghost" id="vcb-cancel">Cancel</button>'
+      + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 700, noClose: true });
-    this.wireFormFields('vce-');
-    document.getElementById('vce-cancel')?.addEventListener('click', () => App.closeModal('vc-edit-modal'));
-    document.getElementById('vce-save')?.addEventListener('click', () => this.saveLog(onDone));
-  },
-
-  async saveLog(onDone) {
-    const body = await this._collect('vce-');
-    if (!body) return;
-    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
-    const btn = document.getElementById('vce-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'void_comp', rec);
-    if (ok) { App.closeModal('vc-edit-modal'); if (typeof onDone === 'function') onDone(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('vce-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
+    const modal = App.openModal(html, { id: 'vc-log-modal', maxWidth: 880, noClose: true });
+    if (!modal) return;
+    modal.addEventListener('change', ev => this.onLineChange(ev));
+    modal.addEventListener('click', ev => {
+      if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
+      const rm = ev.target.closest('.vcl-del');
+      if (rm) { this.removeLine(rm.closest('.vc-line')); return; }
+      if (ev.target.closest('#vcb-cancel')) { App.closeModal('vc-log-modal'); return; }
+      if (ev.target.closest('#vcb-save')) { this.saveBatch(() => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); }); return; }
+    });
   },
 
   // Collect the form (prefix p) into a record body, or null after an error.
@@ -426,14 +424,14 @@ S.ShiftVoidComp = {
   // and comps at close, off a written sheet or a POS list, instead of one at a
   // time. Each saved line is its own record, so the list, edits, Variance, and
   // Theft Risk all keep working unchanged.
-  builderCard() {
-    const today = App.todayLocal();
-    const shiftOpts = this.shiftTypes().map(t => '<option>' + esc(t) + '</option>').join('');
-    return '<div class="card">'
-      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))
-      + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="vcb-date" value="' + today + '"/></div>'
+  // The builder body (header + line table + Add Line), shared by the landing
+  // card and the running-shift log pop-up. preset pre-fills date / shift.
+  builderInner(preset) {
+    const date = (preset && preset.date) || App.todayLocal();
+    const shiftSel = (preset && preset.shift_type) || '';
+    const shiftOpts = this.shiftTypes().map(t => '<option' + (shiftSel === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="vcb-date" value="' + esc(date) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="vcb-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By <span style="color:var(--t4);font-weight:400;">(comps)</span></label><select id="vcb-auth">' + App.staffOptions('', { placeholder: 'Select manager...' }) + '</select></div>'
       + '</div>'
@@ -443,7 +441,14 @@ S.ShiftVoidComp = {
       + '<th style="width:108px;">Amount</th><th style="width:80px;">Units</th>'
       + '<th style="min-width:150px;">Server</th><th style="width:160px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="vcb-rows">' + this.lineHtml() + '</tbody></table></div>'
-      + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
+      + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>';
+  },
+
+  builderCard() {
+    return '<div class="card">'
+      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))
+      + '<div class="collapse-body">'
+      + this.builderInner(null)
       + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
       + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div></div>';
@@ -479,7 +484,7 @@ S.ShiftVoidComp = {
     else line.remove();
   },
 
-  async saveBatch() {
+  async saveBatch(after) {
     const err = document.getElementById('vcb-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('vcb-date')?.value;
@@ -491,7 +496,8 @@ S.ShiftVoidComp = {
     const thresholdActive = !isNaN(threshold) && threshold > 0;
 
     const recs = [];
-    for (const line of [...this.container.querySelectorAll('.vc-line')]) {
+    const rowsWrap = document.getElementById('vcb-rows');
+    for (const line of (rowsWrap ? [...rowsWrap.querySelectorAll('.vc-line')] : [])) {
       const amtRaw   = line.querySelector('.vcl-amount')?.value;
       const itemKey  = line.querySelector('.vcl-item')?.value || '';
       const serverId = line.querySelector('.vcl-server')?.value || '';
@@ -526,7 +532,7 @@ S.ShiftVoidComp = {
     const list = this.records();
     let ok = true;
     for (const r of recs) { list.push(r); ok = (await App.putRecord('sc', 'void_comp', r)) && ok; }
-    if (ok) this.renderList();
+    if (ok) (typeof after === 'function' ? after : () => this.renderList())();
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
   },
 
