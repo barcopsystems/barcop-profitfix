@@ -3520,7 +3520,7 @@ const App = {
   //    Always route a delete through this, never a bespoke confirm() or popup.
   confirmDelete(subject) {
     return this.confirm({
-      titleHtml: 'Delete ' + esc(subject || 'this') + '? <span style="font-weight:400;">This action is permanent and cannot be undone.</span>',
+      titleHtml: 'Delete ' + esc(subject || 'this') + '? <span style="font-weight:400;">Deleting this data is a permanent action and cannot be undone. Delete with caution.</span>',
       confirmText: 'Delete',
       cancelText: 'Cancel'
     });
