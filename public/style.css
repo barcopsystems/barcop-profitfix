@@ -410,11 +410,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--b2);color:var(--t2);vertical-align:middle;}
 .tbl tr:last-child td{border-bottom:none;}
 .tbl tr:hover td{background:var(--hover);}
-/* Report-card tables: drop the outer cell padding so the row data lines up
-   flush with the card title and the ends of the row rules. Screen only — the
-   PDF export re-lays-out tables with its own spacing, so this never affects it. */
-.tbl-flush th:first-child,.tbl-flush td:first-child{padding-left:0;}
-.tbl-flush th:last-child,.tbl-flush td:last-child{padding-right:0;}
+/* Full-bleed dividers: the card title rule and the table's row separators run
+   edge-to-edge of the card, while the content between them stays padded. Put
+   .card-bleed on the card and wrap the table in .card-bleed-tbl. (.card padding
+   is 20px.) Screen only — the PDF export re-lays-out tables, so it's unaffected. */
+.card-bleed > .card-title{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px;}
+.card-bleed-tbl{margin-left:-20px;margin-right:-20px;overflow-x:auto;}
+.card-bleed-tbl .tbl th:first-child,.card-bleed-tbl .tbl td:first-child{padding-left:20px;}
+.card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
 /* ══ SUMMARY TABLE ══ */
