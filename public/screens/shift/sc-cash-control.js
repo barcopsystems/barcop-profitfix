@@ -343,17 +343,9 @@ S.ShiftCashControl = {
   },
 
   // ── Shared delete confirm (a small modal above the form) ────────────────────
+  // label kept for call-site compatibility; the wording is now the standard box.
   confirmDelete(label, onYes) {
-    const html = '<div class="card" style="margin:0;text-align:center;">'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:8px;">Delete this ' + esc(label) + '?</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:18px;">This cannot be undone.</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      +   '<button class="btn btn-ghost" id="ccx-cancel">Cancel</button>'
-      +   '<button class="btn btn-danger" id="ccx-yes">Delete</button>'
-      + '</div></div>';
-    App.openModal(html, { id: 'cc-confirm', maxWidth: 360, layer: 9100, noClose: true });
-    document.getElementById('ccx-cancel')?.addEventListener('click', () => App.closeModal('cc-confirm'));
-    document.getElementById('ccx-yes')?.addEventListener('click', async () => { App.closeModal('cc-confirm'); await onYes(); });
+    App.confirmDelete().then(async ok => { if (ok) await onYes(); });
   },
 
   _delBtn(editing) {

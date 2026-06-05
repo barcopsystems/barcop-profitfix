@@ -413,15 +413,7 @@ S.Shift86List = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    const modal = '<div id="ei-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this 86 entry?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="ei-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="ei-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + this.entryFormHTML() + activeCards + backCard + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + this.entryFormHTML() + activeCards + backCard + '</div>';
     App.applyCollapsed(this.container);
     this.wireMain();
     this.recomputeCrossRef();
@@ -622,19 +614,11 @@ S.Shift86List = {
     this.renderMain();
   },
 
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('ei-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('ei-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('ei-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      if (this.editId === delId) { this.editId = null; this.customMode = false; this.alsoIds = {}; }
-      await App.removeRecord('sc', 'eighty_six', delId);
-      this.renderMain();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    if (this.editId === id) { this.editId = null; this.customMode = false; this.alsoIds = {}; }
+    await App.removeRecord('sc', 'eighty_six', id);
+    this.renderMain();
   },
 
   // Edit a logged 86 in a focused pop-up (just this item's info, no pickers).
