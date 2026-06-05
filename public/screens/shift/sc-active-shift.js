@@ -583,9 +583,6 @@ S.ShiftActiveShift = {
       + '<div style="font-family:\'Barlow Condensed\';font-size:30px;font-weight:600;color:var(--w);line-height:1.1;">' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);">' + sub + '</div></div>';
 
-    const action = (id, label) =>
-      '<button class="btn btn-ghost as-go" data-go="' + id + '" style="height:52px;flex:1;min-width:120px;">' + label + '</button>';
-
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
@@ -617,10 +614,10 @@ S.ShiftActiveShift = {
       + '<div class="card"><div class="card-title">Log During This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost" id="ld-cash" style="height:52px;flex:1;min-width:120px;">Cash Drop</button>'
-      + action('sc-void-comp', 'Void / Comp')
-      + action('sc-waste', 'Waste / Spill')
-      + action('sc-86-list', '86 an Item')
-      + action('sc-maintenance', 'Maintenance')
+      + '<button class="btn btn-ghost" id="ld-vc" style="height:52px;flex:1;min-width:120px;">Void / Comp</button>'
+      + '<button class="btn btn-ghost" id="ld-waste" style="height:52px;flex:1;min-width:120px;">Waste / Spill</button>'
+      + '<button class="btn btn-ghost" id="ld-86" style="height:52px;flex:1;min-width:120px;">86 an Item</button>'
+      + '<button class="btn btn-ghost" id="ld-maint" style="height:52px;flex:1;min-width:120px;">Maintenance</button>'
       + '</div></div>'
 
       + this.renderShiftNotesCard(s)
@@ -631,11 +628,17 @@ S.ShiftActiveShift = {
       + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
       + '</div></div></div>';
 
+    // Log-During buttons open each module's entry form as a pop-up with an
+    // onDone that re-renders the running shift, so the manager never leaves it.
+    // Date / shift are preset from this shift so the entry lands on it.
     this.container.onclick = ev => {
-      if (ev.target.closest('#ld-cash')) { S.ShiftCashControl.openDrop(null, '', () => this.renderActive(s)); return; }
-      const go = ev.target.closest('.as-go');
-      if (go) App.navigate(go.dataset.go);
-      else if (ev.target.closest('#as-how')) this.showHowToActive();
+      const done = () => this.renderActive(s);
+      if (ev.target.closest('#ld-cash'))  { S.ShiftCashControl.openDrop(null, '', done); return; }
+      if (ev.target.closest('#ld-vc'))    { S.ShiftVoidComp.openLogModal(done, { date: s.date, shift_type: s.shift_type }); return; }
+      if (ev.target.closest('#ld-waste')) { S.ShiftWaste.openLogModal(done, { date: s.date, shift_type: s.shift_type }); return; }
+      if (ev.target.closest('#ld-86'))    { S.Shift86List.openLogModal(done, { date_86: s.date }); return; }
+      if (ev.target.closest('#ld-maint')) { S.ShiftMaintenance.openLogModal(done, { date_reported: s.date }); return; }
+      if (ev.target.closest('#as-how')) this.showHowToActive();
       else if (ev.target.closest('#as-cancel')) this.cancelShift(s);
       else if (ev.target.closest('#as-end')) this.renderEnd(s);
       else if (ev.target.closest('#sn-add')) this.addShiftNote(s);

@@ -360,36 +360,75 @@ S.ShiftWaste = {
     document.getElementById('wle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wl-edit-modal'); this.confirmDel(id); });
   },
 
-  async saveEdit(id) {
+  // Collect the edit / log pop-up form (wle- ids) into a record body, or null
+  // after an error. Shared by saveEdit and the running-shift saveLog.
+  _collect() {
     const err = document.getElementById('wle-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('wle-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
+    if (!date) { fail('Date is required.'); return null; }
     const product_id = document.getElementById('wle-product')?.value || '';
-    if (!product_id) { fail('Pick a product.'); return; }
+    if (!product_id) { fail('Pick a product.'); return null; }
     const units = parseFloat(document.getElementById('wle-units')?.value);
-    if (isNaN(units) || units <= 0) { fail('Enter the units lost.'); return; }
+    if (isNaN(units) || units <= 0) { fail('Enter the units lost.'); return null; }
     const reason = document.getElementById('wle-reason')?.value || '';
-    if (!reason) { fail('Pick a reason.'); return; }
+    if (!reason) { fail('Pick a reason.'); return null; }
     const p = this.productById(product_id);
     const byId = document.getElementById('wle-by')?.value || '';
-    const patch = {
+    return {
       date, shift_type: document.getElementById('wle-shift')?.value || '',
       product_id, product_name: p?.name || '', product_category: p?.category || '',
       unit: this.unitLabel(p), units, cost: this.costFor(p, units), reason,
       recorded_by_id: byId, recorded_by: (App.staffById(byId) || {}).name || '',
       notes: document.getElementById('wle-notes')?.value.trim() || ''
     };
+  },
+
+  async saveEdit(id) {
+    const body = this._collect();
+    if (!body) return;
+    const err = document.getElementById('wle-err');
     const list = this.records();
     const i = list.findIndex(x => x.id === id);
-    if (i < 0) { fail('Record not found.'); return; }
-    list[i] = { ...list[i], ...patch };
-
+    if (i < 0) { if (err) { err.textContent = 'Record not found.'; err.style.display = 'inline'; } return; }
+    list[i] = { ...list[i], ...body };
     const btn = document.getElementById('wle-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'waste', list[i]);
     if (ok) { this.editId = null; App.closeModal('wl-edit-modal'); this.renderList(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
+  },
+
+  // Log one waste line from the running shift in a focused pop-up (no nav away).
+  // preset pre-fills date/shift from the open shift.
+  openLogModal(onDone, preset) {
+    if (!App.canEdit('sc-waste')) return;
+    this.editId = null;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Waste / Spill</div>'
+      + this.editFields(preset || {})
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="wle-save">Save</button>'
+      + '<button class="btn btn-ghost" id="wle-cancel">Cancel</button>'
+      + '<span id="wle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'wl-edit-modal', maxWidth: 700, noClose: true });
+    document.getElementById('wle-product')?.addEventListener('change', e => {
+      const lbl = document.getElementById('wle-unit-label');
+      if (lbl) lbl.textContent = this.unitLabel(this.productById(e.target.value));
+    });
+    document.getElementById('wle-cancel')?.addEventListener('click', () => App.closeModal('wl-edit-modal'));
+    document.getElementById('wle-save')?.addEventListener('click', () => this.saveLog(onDone));
+  },
+
+  async saveLog(onDone) {
+    const body = this._collect();
+    if (!body) return;
+    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
+    const btn = document.getElementById('wle-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'waste', rec);
+    if (ok) { App.closeModal('wl-edit-modal'); if (typeof onDone === 'function') onDone(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('wle-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
   async confirmDel(id) {

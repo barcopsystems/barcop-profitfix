@@ -224,6 +224,35 @@ S.ShiftMaintenance = {
     document.getElementById('mte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-edit-modal'); this.confirmDel(id); });
   },
 
+  // Log a maintenance issue from the running shift in a focused pop-up (no nav
+  // away). preset pre-fills the reported date from the open shift.
+  openLogModal(onDone, preset) {
+    if (!App.canEdit('sc-maintenance')) return;
+    this.editId = null;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Maintenance Issue</div>'
+      + this.formFields(preset || null, 'mte-')
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="mte-save">Save</button>'
+      + '<button class="btn btn-ghost" id="mte-cancel">Cancel</button>'
+      + '<span id="mte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'mt-edit-modal', maxWidth: 760, noClose: true });
+    this.wireResolvedAutofill('mte-');
+    document.getElementById('mte-cancel')?.addEventListener('click', () => App.closeModal('mt-edit-modal'));
+    document.getElementById('mte-save')?.addEventListener('click', () => this.saveLog(onDone));
+  },
+
+  async saveLog(onDone) {
+    const body = this._collect('mte-');
+    if (!body) return;
+    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
+    const btn = document.getElementById('mte-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'maintenance', rec);
+    if (ok) { App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
+  },
+
   // Collect the form (prefix p) into a record body, or null after an error.
   _collect(p) {
     const err = document.getElementById(p + 'err');

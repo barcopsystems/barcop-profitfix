@@ -321,6 +321,36 @@ S.ShiftVoidComp = {
     document.getElementById('vce-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); this.confirmDel(id); });
   },
 
+  // Log one void/comp from the running shift in a focused pop-up (no nav away).
+  // Reuses the unified form + _collect; onDone re-renders the active shift.
+  // preset pre-fills date/shift from the open shift so it lands on the shift.
+  openLogModal(onDone, preset) {
+    if (!App.canEdit('sc-void-comp')) return;
+    this.editId = null;
+    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Void / Comp</div>'
+      + this.formFields(preset || {}, 'vce-')
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="vce-save">Save</button>'
+      + '<button class="btn btn-ghost" id="vce-cancel">Cancel</button>'
+      + '<span id="vce-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 700, noClose: true });
+    this.wireFormFields('vce-');
+    document.getElementById('vce-cancel')?.addEventListener('click', () => App.closeModal('vc-edit-modal'));
+    document.getElementById('vce-save')?.addEventListener('click', () => this.saveLog(onDone));
+  },
+
+  async saveLog(onDone) {
+    const body = await this._collect('vce-');
+    if (!body) return;
+    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
+    const btn = document.getElementById('vce-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('sc', 'void_comp', rec);
+    if (ok) { App.closeModal('vc-edit-modal'); if (typeof onDone === 'function') onDone(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('vce-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
+  },
+
   // Collect the form (prefix p) into a record body, or null after an error.
   // One place so the log form and the edit pop-up never drift apart.
   async _collect(p) {

@@ -200,9 +200,11 @@ S.Shift86List = {
   },
 
   // ── Entry form ─────────────────────────────────────────────────────────
-  entryFormHTML() {
-    const editing = false;   // edits open in a pop-up; this form is always a new 86
-    const i = null;
+  // Shared 86 field body (pickers, custom toggle, cross-ref slot, when/who,
+  // reason, notes). Used by the landing card and the running-shift log pop-up.
+  // i = a record/preset for defaults, or null for a blank new 86.
+  entryFields(i) {
+    const editing = !!(i && i.id);
     const activeMgr = (this.activeShift() || {}).manager_id || '';
 
     // Resolve saved record back to picker state.
@@ -219,9 +221,7 @@ S.Shift86List = {
     const timeVal = i?.time_86 || this.nowTime();
     const reportedBy = i?.reported_by_id || i?.reported_by || activeMgr;
 
-    return '<div class="card">'
-      + App.collapsibleCardTitle('sc-86-list', '86 An Item', App.helpButton('el-how'))
-      + '<div class="collapse-body">'
+    return ''
 
       // Row 1: Menu Item + Inventory Item side by side
       + '<div class="form-row" style="gap:14px;align-items:flex-end;">'
@@ -263,8 +263,14 @@ S.Shift86List = {
         + '<input type="text" id="qa-reason" value="' + esc(i?.reason || '') + '" placeholder="Ran the case, delivery short, equipment down, etc."/></div></div>'
 
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-        + '<textarea id="qa-notes" rows="2" placeholder="Anything the next shift needs to know">' + esc(i?.notes || '') + '</textarea></div></div>'
+        + '<textarea id="qa-notes" rows="2" placeholder="Anything the next shift needs to know">' + esc(i?.notes || '') + '</textarea></div></div>';
+  },
 
+  entryFormHTML() {
+    return '<div class="card">'
+      + App.collapsibleCardTitle('sc-86-list', '86 An Item', App.helpButton('el-how'))
+      + '<div class="collapse-body">'
+      + this.entryFields(null)
       + '<div class="card-actions">'
         + '<button class="btn btn-primary btn-lg" id="qa-go">86 It</button>'
         + '<span id="qa-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
@@ -439,7 +445,12 @@ S.Shift86List = {
       else if (del)  this.confirmDel(del.dataset.id);
     };
 
-    // Mutex between Menu Item and Inventory Item pickers + cross-ref refresh
+    this.wireFormInputs();
+  },
+
+  // Picker mutex (Menu vs Inventory) + cross-ref refresh. Shared by the landing
+  // form and the running-shift log pop-up.
+  wireFormInputs() {
     document.getElementById('qa-menu')?.addEventListener('change', e => {
       if (e.target.value) {
         // Clear inventory picker
@@ -494,7 +505,9 @@ S.Shift86List = {
   },
 
   // ── Save ────────────────────────────────────────────────────────────────
-  async save() {
+  // after() runs on success (defaults to re-rendering the landing). The
+  // running-shift log pop-up passes a callback that closes the modal instead.
+  async save(after) {
     const err = document.getElementById('qa-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
@@ -585,11 +598,34 @@ S.Shift86List = {
     this.editId = null;
     this.customMode = false;
     this.alsoIds = {};
-    if (ok) this.renderMain();
+    if (ok) { (typeof after === 'function' ? after : () => this.renderMain())(); }
     else {
       if (btn) { btn.disabled = false; btn.textContent = '86 It'; }
       fail('Save failed. Try again.');
     }
+  },
+
+  // Log an 86 from the running shift in a focused pop-up (full picker + cross-
+  // reference, no nav away). preset pre-fills the 86 date from the open shift.
+  openLogModal(onDone, preset) {
+    if (!App.canEdit('sc-86-list')) return;
+    this.editId = null; this.customMode = false; this.alsoIds = {};
+    const html = '<div class="card" style="margin:0;"><div class="card-title">86 An Item</div>'
+      + this.entryFields(preset || null)
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="qa-go">86 It</button>'
+      + '<button class="btn btn-ghost" id="qa-cancel">Cancel</button>'
+      + '<span id="qa-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    const modal = App.openModal(html, { id: 'el-log-modal', maxWidth: 820, noClose: true });
+    this.wireFormInputs();
+    this.recomputeCrossRef();
+    if (modal) modal.addEventListener('click', ev => {
+      if (ev.target.closest('#qa-go')) this.save(() => { App.closeModal('el-log-modal'); if (typeof onDone === 'function') onDone(); });
+      else if (ev.target.closest('#qa-cancel')) App.closeModal('el-log-modal');
+      else if (ev.target.closest('#qa-custom-toggle')) { ev.preventDefault(); this.toggleCustom(true); }
+      else if (ev.target.closest('#qa-custom-cancel'))  { ev.preventDefault(); this.toggleCustom(false); }
+    });
   },
 
   async markBack(id) {
