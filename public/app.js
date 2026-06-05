@@ -3495,7 +3495,7 @@ const App = {
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
       overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + esc(title) + '</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + (opts.titleHtml || esc(title)) + '</div>'
         + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
         + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
           + '<button class="btn btn-ghost" data-act="cancel">' + esc(cancelText) + '</button>'
@@ -3520,7 +3520,7 @@ const App = {
   //    Always route a delete through this, never a bespoke confirm() or popup.
   confirmDelete(subject) {
     return this.confirm({
-      title: 'Delete ' + (subject || 'this') + '? This action is permanent and cannot be undone.',
+      titleHtml: 'Delete ' + esc(subject || 'this') + '? <span style="font-weight:400;">This action is permanent and cannot be undone.</span>',
       confirmText: 'Delete',
       cancelText: 'Cancel'
     });
