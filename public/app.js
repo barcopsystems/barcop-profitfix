@@ -480,7 +480,15 @@ const App = {
     // utility icon buttons open the Hub Settings / Help views.
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => {
-      document.getElementById('app').classList.toggle('sidebar-open');
+      // Open the drawer for whichever shell is visible: the Hub's own sidebar on
+      // the Hub, the module sidebar otherwise (the module shell is hidden on the
+      // Hub, so toggling it there would do nothing).
+      const hubWrap = document.getElementById('hub-wrapper');
+      if (hubWrap && hubWrap.style.display !== 'none') {
+        hubWrap.querySelector('.hub-app')?.classList.toggle('sidebar-open');
+      } else {
+        document.getElementById('app').classList.toggle('sidebar-open');
+      }
     };
     const tnSettings = document.getElementById('tn-settings');
     if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettings) S.HubSettings.open(); };
