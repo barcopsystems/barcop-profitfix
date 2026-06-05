@@ -124,19 +124,21 @@ input,select,textarea{color-scheme:dark;}
 .sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 0;scrollbar-width:none;}
 .sidebar-nav::-webkit-scrollbar{display:none;}
 
-/* ══ Section switcher — the dropdown at the top of every section sidebar.
-   Jumps between the Hub and the 6 main sections without routing back. Text
-   only when expanded (no chevron); a menu icon when the sidebar is collapsed. */
-.sec-switch{position:relative;margin:4px 8px 8px;}
+/* ══ Section switcher — the bordered control at the top of every section
+   sidebar. Jumps between the Hub and the 6 main sections without routing back.
+   The 4-box dashboard icon in front of the name links to that section's
+   dashboard; clicking the rest opens the switcher. Collapsed = icon only. */
+.sec-switch{position:relative;margin:6px 8px 8px;}
 .sec-switch-btn{
-  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
-  background:transparent;border:1px solid transparent;cursor:pointer;color:var(--t1);
-  font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.2px;
-  padding:9px 12px;border-radius:var(--r2);transition:background 0.12s,border-color 0.12s;
+  display:flex;align-items:center;gap:9px;cursor:pointer;
+  border:1px solid var(--b1);border-radius:var(--r2);background:transparent;
+  color:var(--t2);font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;
+  letter-spacing:0.2px;padding:8px 12px;transition:background 0.12s,border-color 0.12s,color 0.12s;
 }
-.sec-switch-btn:hover,.sec-switch.open .sec-switch-btn{background:var(--surface);border-color:var(--b1);}
-.sec-switch-icon{display:none;flex-shrink:0;color:var(--t2);}
-.sec-switch-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sec-switch-btn:hover,.sec-switch.open .sec-switch-btn{background:var(--surface);border-color:var(--b2);color:var(--t1);}
+.sec-switch-dash{display:flex;flex-shrink:0;color:var(--t3);transition:color 0.12s;}
+.sec-switch-dash:hover{color:var(--gold);}
+.sec-switch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sec-switch-menu{
   position:absolute;top:100%;left:0;right:0;z-index:120;margin-top:4px;
   background:var(--surface);border:1px solid var(--b1);border-radius:var(--r2);
@@ -145,11 +147,10 @@ input,select,textarea{color-scheme:dark;}
 .sec-switch-item{padding:8px 12px;font-size:13px;color:var(--t2);cursor:pointer;border-radius:var(--r2);white-space:nowrap;font-family:'Barlow',sans-serif;}
 .sec-switch-item:hover{background:var(--input);color:var(--t1);}
 .sec-switch-item.current{color:var(--gold);font-weight:700;}
-/* Collapsed sidebar: only the menu icon shows; the flyout opens to the right. */
-.app.sidebar-collapsed .sec-switch,.hub-app.sidebar-collapsed .sec-switch{margin:4px 0 8px;}
-.app.sidebar-collapsed .sec-switch-btn,.hub-app.sidebar-collapsed .sec-switch-btn{justify-content:center;padding:9px 0;}
+/* Collapsed sidebar: only the dashboard icon shows (click = dashboard). */
+.app.sidebar-collapsed .sec-switch,.hub-app.sidebar-collapsed .sec-switch{margin:6px 0 8px;}
+.app.sidebar-collapsed .sec-switch-btn,.hub-app.sidebar-collapsed .sec-switch-btn{justify-content:center;padding:8px 0;}
 .app.sidebar-collapsed .sec-switch-label,.hub-app.sidebar-collapsed .sec-switch-label{display:none;}
-.app.sidebar-collapsed .sec-switch-icon,.hub-app.sidebar-collapsed .sec-switch-icon{display:block;}
 .app.sidebar-collapsed .sec-switch-menu,.hub-app.sidebar-collapsed .sec-switch-menu{left:100%;right:auto;top:0;margin:0 0 0 8px;min-width:185px;}
 
 .nav-section{
