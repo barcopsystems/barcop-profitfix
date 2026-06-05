@@ -219,7 +219,7 @@ S.TrafficReviews = {
     this.container.querySelectorAll('.rrl-del').forEach(btn => {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
-        if (!(await App.confirm({ title: 'Delete this reply entry?', confirmText: 'Delete' }))) return;
+        if (!(await App.confirmDelete())) return;
         await App.removeRecord('core', 'traffic_review_reply', btn.dataset.id);
         this.draw();
       });

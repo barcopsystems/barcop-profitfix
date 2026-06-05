@@ -240,7 +240,7 @@ S.TrafficInitiatives = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this initiative?', confirmText: 'Delete' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     App.data.traffic_initiatives = this.initiatives().filter(x => x.id !== id);
     await App.saveKey('traffic_initiatives');

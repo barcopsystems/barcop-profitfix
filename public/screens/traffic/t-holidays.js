@@ -279,7 +279,7 @@ S.TrafficHolidays = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this date?', confirmText: 'Delete' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     App.data.traffic_holidays = this.holidays().filter(x => x.id !== id);
     await App.saveKey('traffic_holidays');

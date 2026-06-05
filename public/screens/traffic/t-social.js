@@ -225,7 +225,7 @@ S.TrafficSocial = {
     this.container.querySelectorAll('.spl-del').forEach(btn => {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
-        if (!(await App.confirm({ title: 'Delete this social post entry?', confirmText: 'Delete' }))) return;
+        if (!(await App.confirmDelete())) return;
         await App.removeRecord('core', 'traffic_social_post', btn.dataset.id);
         this.draw();
       });

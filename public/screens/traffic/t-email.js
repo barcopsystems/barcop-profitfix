@@ -232,7 +232,7 @@ S.TrafficEmail = {
     this.container.querySelectorAll('.ecl-del').forEach(btn => {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
-        if (!(await App.confirm({ title: 'Delete this campaign entry?', confirmText: 'Delete' }))) return;
+        if (!(await App.confirmDelete())) return;
         await App.removeRecord('core', 'traffic_email_campaign', btn.dataset.id);
         this.draw();
       });
