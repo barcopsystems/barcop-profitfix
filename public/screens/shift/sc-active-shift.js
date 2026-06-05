@@ -947,7 +947,7 @@ S.ShiftActiveShift = {
       + item('e86', eighty6.length, '86\'d Items Still Out', eighty6.length === 0 ? 'Nothing 86\'d.' : eighty6.slice(0, 3).map(i => i.item).join(', ') + (eighty6.length > 3 ? '...' : ''), 'sc-86-list', 'var(--red)')
       + item('vc',  vc.length, 'Big Voids and Comps This Shift', vc.length === 0 ? 'No voids or comps over $' + vcThreshold + '.' : 'Over $' + vcThreshold + ' threshold &middot; ' + App.fmtCurrency(bigVcTotal) + ' total', 'sc-void-comp', 'var(--red)')
       + item('mt',  openMaint.length, 'Open Maintenance Issues', openMaint.length === 0 ? 'Nothing flagged.' : openMaint.slice(0, 3).map(m => m.issue || m.item || 'Issue').join(', ') + (openMaint.length > 3 ? '...' : ''), 'sc-maintenance', 'var(--red)')
-      + item('cl',  checklistIncomplete ? 1 : 0, 'Closing Checklist', !closingCheck ? 'No closing checklist run yet for tonight.' : checklistIncomplete ? checklistDone + '% complete &middot; finish before closing' : 'Complete.', 'sc-closing-checklist', 'var(--red)')
+      + item('cl',  checklistIncomplete ? 1 : 0, 'Closing Checklist', !closingCheck ? 'No closing checklist run yet for tonight.' : checklistIncomplete ? checklistDone + '% complete &middot; finish before closing' : 'Complete.', 'sc-checklists', 'var(--red)')
       + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
     + '</div>';
   },
