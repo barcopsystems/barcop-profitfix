@@ -103,9 +103,14 @@ S.LaborStaffRoster = {
   // Annual Salary; salaried = exempt (fixed weekly cost, no overtime).
   profileFormCells(s) {
     const positions = this.positions();
+    // Shorten the option so long roles fit the dropdown (e.g. "Assistant
+    // Manager, Management" -> "Asst. Manager, Mgmt"). Display-only; the stored
+    // position name and department are unchanged.
+    const deptShort = { 'Management': 'Mgmt', 'Front of House': 'FOH' };
+    const posLabel = p => (p.name || '').replace(/\bAssistant\b/gi, 'Asst.') + ', ' + (deptShort[p.department] || p.department || '');
     const posOpts = positions.map(p =>
       '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
-      + esc(p.name) + ', ' + esc(p.department || '') + '</option>').join('');
+      + esc(posLabel(p)) + '</option>').join('');
     const defaultPos = s ? this.positionById(s.position_id) : positions[0];
     const isSal = !!(s && s.pay_type === 'Salary');
     const hourly = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
@@ -145,28 +150,37 @@ S.LaborStaffRoster = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
-      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize, even if hourly</span></label></div>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly. Management is always a supervisor.</span></label></div>'
       + '</div>';
   },
 
   // Wire the Pay Type + pay field for whichever form is mounted (add or edit).
   // Position change fills the default hourly wage; switching Pay Type swaps the
   // label and clears the amount so an hourly wage is never stored as a salary.
-  wirePayFields() {
+  wirePayFields(editing) {
     const posEl = document.getElementById('sr-pos');
     const payEl = document.getElementById('sr-pay');
     const typeEl = document.getElementById('sr-paytype');
     const labelEl = document.getElementById('sr-pay-label');
     if (!posEl || !payEl || !typeEl) return;
+    // The wage field follows the picked position's default wage until the
+    // operator types their own number. On a NEW staff member it starts
+    // untouched, so changing position updates the wage (the old code only
+    // filled an empty field, so the first position's $X stuck for everyone).
+    // On EDIT it starts "touched" so a real wage is never silently overwritten.
+    let wageTouched = !!editing;
+    payEl.addEventListener('input', () => { wageTouched = true; });
     posEl.addEventListener('change', e => {
       if (typeEl.value === 'Salary') return; // salary is not position-derived
+      if (wageTouched) return;               // keep a wage the operator typed
       const p = this.positionById(e.target.value);
-      if (p && !payEl.value) payEl.value = p.default_wage != null ? p.default_wage : '';
+      payEl.value = (p && p.default_wage != null) ? p.default_wage : '';
     });
     typeEl.addEventListener('change', () => {
       const sal = typeEl.value === 'Salary';
       if (labelEl) labelEl.textContent = sal ? 'Annual Salary' : 'Wage';
       payEl.value = '';
+      wageTouched = false;                   // let the new type's default fill
       if (!sal) {
         const p = this.positionById(posEl.value);
         if (p && p.default_wage != null) payEl.value = p.default_wage;
@@ -264,7 +278,7 @@ S.LaborStaffRoster = {
       else if (edit)  { ev.stopPropagation(); this.renderUnified(edit.dataset.id); }
       else if (row)   this.renderUnified(row.dataset.id);
     };
-    this.wirePayFields();
+    this.wirePayFields(false);
     this.mountImporter();
     App.applyCollapsed(this.container);
   },
@@ -400,7 +414,7 @@ S.LaborStaffRoster = {
 
   wireUnified(staffId) {
     this.container.onclick = null;
-    this.wirePayFields();
+    this.wirePayFields(true);
     document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
     document.getElementById('sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
     // Certifications
