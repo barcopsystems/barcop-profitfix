@@ -130,13 +130,13 @@ S.ShiftVoidComp = {
       + '<div class="f" style="flex:1;min-width:90px;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Shift Type</label><select id="' + p + 'shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:95px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
       + '</div>'
 
       // Authorized By / Reason / Check # / Item, with Units or Custom Name inline
       // after Item only when relevant.
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Authorized By</label><select id="' + p + 'auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:120px;"><label>Authorized By</label><select id="' + p + 'auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Reason</label><select id="' + p + 'reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:90px;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
       + '<div class="f" style="flex:1;min-width:140px;"><label>Item <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="' + p + 'item-sel">' + this.itemOptions(itemKey) + '</select></div>'
@@ -178,7 +178,7 @@ S.ShiftVoidComp = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="vc-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="vc-f-to" value="' + esc(this.filterTo) + '"/></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Type</label><select id="vc-f-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="vc-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers' }) + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="vc-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vc-f-clear" style="margin-bottom:2px;">Clear</button></div>'
       + '</div>' + (stats || '') + '</div>';
   },
@@ -433,7 +433,7 @@ S.ShiftVoidComp = {
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="vcb-date" value="' + esc(date) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="vcb-shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By <span style="color:var(--t4);font-weight:400;">(comps)</span></label><select id="vcb-auth">' + App.staffOptions('', { placeholder: 'Select manager...' }) + '</select></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By <span style="color:var(--t4);font-weight:400;">(comps)</span></label><select id="vcb-auth">' + App.staffOptions('', { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
       + '<table class="ing-tbl"><thead><tr>'
@@ -465,7 +465,7 @@ S.ShiftVoidComp = {
       + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions('', false) + '</select></td>'
       + '<td><input class="form-input vcl-amount" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" placeholder="1" style="width:100%;"/></td>'
-      + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></td>'
+      + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions('', { placeholder: 'Select staff...', audience: 'service' }) + '</select></td>'
       + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions('Void', '') + '</select></td>'
       + '<td><button class="btn btn-danger btn-sm vcl-del" type="button">Delete</button></td>'
       + '</tr>';

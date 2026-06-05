@@ -43,7 +43,7 @@ S.ShiftLogShift = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="ls-date" value="' + esc(s?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f w-md"><label>Shift Type</label><select id="ls-type">' + typeOpts + '</select></div>'
-      + '<div class="f w-md"><label>Manager on Duty</label><select id="ls-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f w-md"><label>Manager on Duty</label><select id="ls-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:16px;">'

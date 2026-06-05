@@ -248,7 +248,7 @@ S.ShiftActiveShift = {
       + '<div class="f" style="flex:1;min-width:120px;"><label>Floor Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-floor" step="0.01" value="' + v(s?.floor_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Manager on Duty</label><select id="asf-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Manager on Duty</label><select id="asf-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Covers</label><input type="number" id="asf-covers" min="0" value="' + v(s?.covers) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Walkouts</label><input type="number" id="asf-walkouts" min="0" value="' + v(s?.walkouts) + '" placeholder="0"/></div>'
       + '</div>'
@@ -353,17 +353,12 @@ S.ShiftActiveShift = {
     return want;
   },
 
-  // Manager-on-duty pool: staff in Management positions plus bartenders (who
-  // commonly run a bar shift). Falls back to all active staff if nothing matches
-  // so the picker is never empty. (A per-position "can run a shift" flag is the
-  // planned upgrade.)
+  // Manager-on-duty pool: the supervisor audience (Management department + staff
+  // flagged Shift Lead on the roster — see App.isSupervisor). Falls back to all
+  // active staff if nothing qualifies so the picker is never empty.
   modStaff() {
-    const positions = (App.laborData && App.laborData.lc_positions) || [];
-    const eligible = new Set(positions.filter(p =>
-      (p.department || '') === 'Management' || /manager|bartender/i.test(p.name || '')
-    ).map(p => p.id));
-    const all = ((App.laborData && App.laborData.lc_staff) || []).filter(st => st.active !== false);
-    const list = all.filter(st => eligible.has(st.position_id));
+    const all = ((App.laborData && App.laborData.lc_staff) || []).filter(st => st.status !== 'Inactive');
+    const list = all.filter(st => App.isSupervisor(st));
     return list.length ? list : all;
   },
 
