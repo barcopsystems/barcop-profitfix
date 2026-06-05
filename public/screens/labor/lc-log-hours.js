@@ -181,15 +181,7 @@ S.LaborLogHours = {
         + App.showOlderBar('lc', 'actual', filtered, !!(this.filterFrom || this.filterTo || this.filterStaff)) + '</div>';
     }
 
-    const modal = '<div id="lo-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this hours entry?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="lo-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="lo-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + addCard + importCard + filterCardHtml + listCard + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addCard + importCard + filterCardHtml + listCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
       if (ev.target.closest('#lo-imp-how')) { this.showImportHelp(); return; }
@@ -437,7 +429,7 @@ S.LaborLogHours = {
           + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or missing hours).</span>' : '') + '</div>';
   },
 
-  confirmDel(id) {
+  async confirmDel(id) {
     const rec = this.actuals().find(x => x.id === id);
     if (rec && rec.locked) {
       App.confirm({
@@ -447,16 +439,8 @@ S.LaborLogHours = {
       });
       return;
     }
-    this._pendingDelId = id;
-    const modal = document.getElementById('lo-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('lo-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('lo-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      await App.removeRecord('lc', 'actual', delId);
-      this.renderList();
-    };
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('lc', 'actual', id);
+    this.renderList();
   }
 };

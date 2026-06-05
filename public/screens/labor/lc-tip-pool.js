@@ -112,8 +112,7 @@ S.LaborTipPool = {
       + '</div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + this.historyCard() + '</div>'
-      + this.delModal();
+    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + this.historyCard() + '</div>';
 
     const rowsEl = document.getElementById('tp-rows');
     rowsEl.addEventListener('input', () => { this.collect(); this.recalc(); });
@@ -365,27 +364,9 @@ S.LaborTipPool = {
     document.getElementById('tp-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: this.container }));
   },
 
-  delModal() {
-    return '<div id="tp-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this tip pool?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="tp-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="tp-del-confirm">Delete</button>'
-      + '</div></div></div>';
-  },
-
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('tp-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('tp-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('tp-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      await App.removeRecord('lc', 'tip_pool', delId);
-      this.renderMain();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('lc', 'tip_pool', id);
+    this.renderMain();
   }
 };

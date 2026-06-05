@@ -75,15 +75,7 @@ S.LaborScheduleHistory = {
         + '</div>';
     }
 
-    const modal = '<div id="lh-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this schedule?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="lh-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="lh-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + html + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#lh-how')) { this.showHowTo(); return; }
@@ -188,17 +180,9 @@ S.LaborScheduleHistory = {
     App.navigate('lc-build-schedule');
   },
 
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('lh-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('lh-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('lh-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      await App.removeRecord('lc', 'schedule', delId);
-      this.renderList();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('lc', 'schedule', id);
+    this.renderList();
   }
 };

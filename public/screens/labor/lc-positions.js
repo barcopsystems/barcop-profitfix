@@ -84,15 +84,7 @@ S.LaborPositions = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    const modal = '<div id="lp-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this position?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="lp-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="lp-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + addForm + listCard + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addForm + listCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#lp-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
@@ -173,18 +165,10 @@ S.LaborPositions = {
     ]);
   },
 
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('lp-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('lp-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('lp-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      App.laborData.lc_positions = this.positions().filter(x => x.id !== delId);
-      await App.saveLabor();
-      this.renderList();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    App.laborData.lc_positions = this.positions().filter(x => x.id !== id);
+    await App.saveLabor();
+    this.renderList();
   }
 };

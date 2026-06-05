@@ -138,15 +138,7 @@ S.LaborCalloutLog = {
         + App.showOlderBar('lc', 'callout', list, false) + '</div>';
     }
 
-    const modal = '<div id="co-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:340px;width:90%;text-align:center;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:18px;">Delete this call-out?</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center;">'
-      + '<button class="btn btn-ghost" id="co-del-cancel">Cancel</button>'
-      + '<button class="btn btn-danger" id="co-del-confirm">Delete</button>'
-      + '</div></div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + addCard + listCard + '</div>' + modal;
+    this.container.innerHTML = '<div class="screen">' + addCard + listCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#co-how'))  { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
@@ -226,17 +218,9 @@ S.LaborCalloutLog = {
     }
   },
 
-  confirmDel(id) {
-    this._pendingDelId = id;
-    const modal = document.getElementById('co-del-modal');
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('co-del-cancel').onclick = () => { modal.style.display = 'none'; this._pendingDelId = null; };
-    document.getElementById('co-del-confirm').onclick = async () => {
-      modal.style.display = 'none';
-      const delId = this._pendingDelId;
-      this._pendingDelId = null;
-      await App.removeRecord('lc', 'callout', delId);
-      this.renderList();
-    };
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('lc', 'callout', id);
+    this.renderList();
   }
 };
