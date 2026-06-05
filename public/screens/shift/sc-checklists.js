@@ -125,9 +125,9 @@ S.ShiftChecklists = {
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="cl-save">Save Completed Checklist</button>'
-      + '<button class="btn btn-ghost" id="cl-worksheet">Worksheet</button>'
       + '<button class="btn btn-ghost" id="cl-reset">Reset</button>'
       + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-ghost" id="cl-worksheet" style="margin-left:auto;">Worksheet</button>'
       + '</div></div>';
 
     const histRuns = [...this.typeRuns()].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
@@ -148,11 +148,11 @@ S.ShiftChecklists = {
           + '<button class="btn btn-danger btn-sm cl-hdel" data-id="' + r.id + '">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      histCard = '<div class="card"><div class="card-title">Completed ' + this.TYPE + ' Checklists</div>'
+      histCard = '<div class="card-title" style="margin-top:24px;">Completed ' + this.TYPE + ' Checklists</div>'
         + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('sc', 'checklist', histRuns, true) + '</div>';
+        + App.showOlderBar('sc', 'checklist', histRuns, true);
     }
 
     this.container.innerHTML = '<div class="screen">' + runner + histCard + '</div>';
@@ -233,18 +233,18 @@ S.ShiftChecklists = {
       + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? 'var(--gold)' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="cl-back">&laquo; Back to Checklists</button></div>'
-      + '<div class="card"><div class="card-title">' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</div>'
+      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
       + '</div>'
       + itemRows
       + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
-      + '<div class="card-actions"><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div></div>';
+      + '</div></div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#cl-back')) this.renderMain();
-      else if (ev.target.closest('#cl-print')) this.exportPDF(r);
+      if (ev.target.closest('#cl-print')) this.exportPDF(r);
     };
   },
 
