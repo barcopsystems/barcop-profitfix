@@ -334,7 +334,7 @@ S.InventoryEmpties = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this empties entry?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('ic', 'empty', id);
     this.renderList();

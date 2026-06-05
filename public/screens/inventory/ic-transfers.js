@@ -378,7 +378,7 @@ S.InventoryTransfers = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this transfer entry?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('ic', 'transfer', id);
     this.renderList();

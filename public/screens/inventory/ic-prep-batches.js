@@ -441,12 +441,7 @@ S.PrepBatches = {
   async deleteBatch(id) {
     const b = this.byId(id);
     if (!b) return;
-    const ok = await App.confirm({
-      title: 'Delete "' + b.name + '"?',
-      message: 'Menu item recipes that use it will fall back to ingredient-only cost.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel'
-    });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     App.inventoryData.ic_prep_batches = this.list().filter(x => x.id !== id);
     await App.saveInventory();
