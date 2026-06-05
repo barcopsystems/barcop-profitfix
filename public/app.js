@@ -1477,59 +1477,69 @@ const App = {
   // opts:
   //   placeholder   First-option label. Default: "Select staff..."
   //   optional      If true, placeholder reads as the empty pick.
-  //   filter        Function(staff) returning bool. Limit to a subset
-  //                 (e.g., only managers, only tipped staff).
+  //   filter        Function(staff) returning bool. Limit to a custom subset.
+  //   audience      'supervisor' | 'service' | 'all' (default). The named
+  //                 audience for this picker: supervisor = Management dept or
+  //                 Shift Lead (Manager / Authorized By / MOD pickers); service
+  //                 = Bar or Front of House (Server pickers); all = everyone.
   //
   // App.staffById(id) resolves an id back to the staff record at save time.
   staffOptions(selectedId, opts) {
     opts = opts || {};
     const roster = ((this.laborData && this.laborData.lc_staff) || []);
-    const all = roster.filter(s => s.status !== 'Inactive');
-    const filtered = opts.filter ? all.filter(opts.filter) : all;
+    let pool = roster.filter(s => s.status !== 'Inactive');
+    // Narrow to the people who belong in this kind of picker.
+    if (opts.audience === 'supervisor') pool = pool.filter(s => this.isSupervisor(s));
+    else if (opts.audience === 'service') pool = pool.filter(s => this.isService(s));
+    if (opts.filter) pool = pool.filter(opts.filter);
 
-    const positions = ((this.laborData && this.laborData.lc_positions) || []);
-    const posNameOf = pid => (positions.find(p => p.id === pid) || {}).name || 'Other';
-
-    // Resolve legacy name → id so old records preselect correctly.
+    // Resolve a legacy name → id so old records preselect correctly.
     let resolvedId = selectedId || '';
-    if (resolvedId && !filtered.some(s => s.id === resolvedId)) {
-      const byName = filtered.find(s => s.name === resolvedId);
+    if (resolvedId && !pool.some(s => s.id === resolvedId)) {
+      const byName = pool.find(s => s.name === resolvedId);
       if (byName) resolvedId = byName.id;
     }
 
-    const groups = {};
-    filtered.forEach(s => {
-      const p = posNameOf(s.position_id);
-      if (!groups[p]) groups[p] = [];
-      groups[p].push(s);
-    });
-    const order = ['Manager', 'Bartender', 'Barback', 'Server', 'Host', 'Line Cook', 'Prep Cook'];
-    const groupKeys = Object.keys(groups).sort((a, b) => {
-      const ai = order.indexOf(a), bi = order.indexOf(b);
-      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-    });
-
+    // One consistent shape for every staff picker: a flat list, alphabetical by
+    // name (no position optgroups — the audience already narrows who shows up).
+    const sorted = pool.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     let h = '<option value="">' + esc(opts.placeholder || 'Select staff...') + '</option>';
-    groupKeys.forEach(g => {
-      h += '<optgroup label="' + esc(g) + '">';
-      groups[g].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
-        h += '<option value="' + esc(s.id) + '"' + (resolvedId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>';
-      });
-      h += '</optgroup>';
+    sorted.forEach(s => {
+      h += '<option value="' + esc(s.id) + '"' + (resolvedId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>';
     });
 
-    // Preserve a selected value that isn't in the active/filtered list so the
-    // operator never loses the record's staff link on edit: an inactive (or
-    // otherwise off-list) staff member shows their real name + "(inactive)"; a
-    // true legacy free-text value shows "(not on roster)". A legacy name that
-    // resolves to a real staff member is normalized to that id on the option.
-    if (selectedId && !filtered.some(s => s.id === selectedId) && !filtered.some(s => s.name === selectedId)) {
+    // Preserve a selected value that isn't in the (filtered) pool so an edit
+    // never silently drops the record's staff link: an inactive or off-audience
+    // staff member shows their real name (+ "(inactive)" when inactive); a true
+    // legacy free-text value shows "(not on roster)".
+    if (selectedId && !pool.some(s => s.id === selectedId) && !pool.some(s => s.name === selectedId)) {
       const off = roster.find(s => s.id === selectedId || s.name === selectedId);
       const label = off ? (off.name + (off.status === 'Inactive' ? ' (inactive)' : '')) : (selectedId + ' (not on roster)');
       h += '<option value="' + esc(off ? off.id : selectedId) + '" selected>' + esc(label) + '</option>';
     }
 
     return h;
+  },
+
+  // A staff member who can run a shift and authorize as a manager: anyone in the
+  // Management department, plus hourly staff flagged Shift Lead on the roster.
+  // Drives the Manager / Authorized By / Manager-on-Duty pickers.
+  isSupervisor(s) {
+    if (!s) return false;
+    if (s.shift_lead) return true;
+    const positions = (this.laborData && this.laborData.lc_positions) || [];
+    const p = positions.find(x => x.id === s.position_id);
+    return !!(p && (p.department || '') === 'Management');
+  },
+
+  // Front-of-house service staff who ring sales and own tabs: anyone in the Bar
+  // or Front of House department. Drives the Server pickers.
+  isService(s) {
+    if (!s) return false;
+    const positions = (this.laborData && this.laborData.lc_positions) || [];
+    const p = positions.find(x => x.id === s.position_id);
+    const d = (p && p.department) || '';
+    return d === 'Bar' || d === 'Front of House';
   },
 
   // Resolve a staff_id (or legacy name) to the staff record. Save handlers
