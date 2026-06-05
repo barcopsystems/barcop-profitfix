@@ -94,17 +94,15 @@ S.ShiftDrawers = {
         + '</div></td></tr>';
 
       const countLabel = active.length + (active.length === 1 ? ' register' : ' registers');
-      body = '<div class="page-panel">'
-        + '<div class="zone-shelf"><span class="zone-count">' + countLabel + '</span></div>'
+      body = '<div class="table-caption">' + countLabel + '</div>'
         + '<div class="data-table"><table class="tbl"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
-        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>'
-        + '</div>';
+        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>';
 
       if (archived.length) {
         body += '<div class="canvas-sub">Archived</div>'
           + '<div class="canvas-hint">Restore any to bring them back into the dropdowns.</div>'
-          + '<div class="data-table data-table-recessed"><table class="tbl"><tbody>'
+          + '<div class="data-table data-table-archived"><table class="tbl"><tbody>'
           + archived.map(d => '<tr style="opacity:0.55;">'
               + '<td style="font-weight:700;color:var(--t2);">' + esc(d.name) + '</td>'
               + '<td>' + esc(d.location || '-') + '</td>'
