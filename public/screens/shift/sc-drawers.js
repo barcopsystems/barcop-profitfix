@@ -90,9 +90,10 @@ S.ShiftDrawers = {
           + '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>'
         + '</div></td></tr>';
 
-      listHtml = '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      listHtml = '<div class="card"><div class="card-title">Drawers / Registers</div>'
+        + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
-        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
 
       if (archived.length) {
         listHtml += '<div class="sh" style="margin:24px 0 8px;">Archived</div>'
