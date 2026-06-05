@@ -1065,6 +1065,53 @@ const App = {
 
   _activeModule: 'profit',
 
+  // The Hub + the 6 main sections, in Hub-sidebar order. Drives the section
+  // switcher (the dark dropdown at the top of every section sidebar) so the
+  // operator jumps straight between sections without routing back through the
+  // Hub. Bar Cop Audit / Accounting / Operations / Setup / Support are not
+  // here on purpose — they live inside the Hub, reached via "The Hub".
+  SECTIONS: [
+    ['hub',       'The Hub'],
+    ['profit',    'Profit Recovery'],
+    ['revenue',   'Revenue Recovery'],
+    ['traffic',   'Traffic Recovery'],
+    ['inventory', 'Inventory Control'],
+    ['labor',     'Labor Control'],
+    ['shift',     'Shift Control'],
+  ],
+
+  // The dashboard screen each module lands on when entered.
+  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', traffic: 't-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
+
+  // Markup for the section switcher. currentKey defaults to the active module
+  // (set before the module nav renders); the Hub sidebar passes 'hub'. Text
+  // only, no chevron. The menu lists all sections; the current one is marked.
+  sectionSelectorHTML(currentKey) {
+    const cur = currentKey || this._activeModule || 'hub';
+    const found = this.SECTIONS.find(s => s[0] === cur);
+    const label = found ? found[1] : 'The Hub';
+    const rows = this.SECTIONS.map(([k, l]) =>
+      '<div class="sec-switch-item' + (k === cur ? ' current' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
+    ).join('');
+    return '<div class="sec-switch">'
+      + '<button type="button" class="sec-switch-btn">'
+      +   '<svg class="sec-switch-icon nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 5h11M3 8.5h11M3 12h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+      +   '<span class="sec-switch-label">' + esc(label) + '</span>'
+      + '</button>'
+      + '<div class="sec-switch-menu" hidden>' + rows + '</div>'
+      + '</div>';
+  },
+
+  // Jump to a section's dashboard (or the Hub) from the switcher. showApp hides
+  // the Hub wrapper and shows the module shell, so this works from anywhere.
+  jumpToSection(key) {
+    if (key === 'hub') { this.showHub(); return; }
+    const screen = this._SECTION_DASH[key];
+    if (!screen) return;
+    this.showApp(key);
+    this.navigate(screen);
+  },
+
   _renderNav(module) {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
@@ -3870,4 +3917,25 @@ document.addEventListener('DOMContentLoaded', () => {
   new MutationObserver(muts => {
     for (const m of muts) for (const n of m.addedNodes) sweepAutofill(n);
   }).observe(document.body, { childList: true, subtree: true });
+
+  // Section switcher (the dropdown at the top of every section sidebar). One
+  // delegated handler so it works in both the module shell (#sidebar-nav) and
+  // the Hub's own sidebar, and survives every nav re-render.
+  const closeSwitchers = () => document.querySelectorAll('.sec-switch.open').forEach(sw => {
+    sw.classList.remove('open');
+    const m = sw.querySelector('.sec-switch-menu'); if (m) m.hidden = true;
+  });
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.sec-switch-btn');
+    if (btn) {
+      const sw = btn.closest('.sec-switch');
+      const wasOpen = sw && sw.classList.contains('open');
+      closeSwitchers();
+      if (sw && !wasOpen) { sw.classList.add('open'); const m = sw.querySelector('.sec-switch-menu'); if (m) m.hidden = false; }
+      return;
+    }
+    const item = e.target.closest('.sec-switch-item');
+    if (item) { closeSwitchers(); App.jumpToSection(item.dataset.sec); return; }
+    closeSwitchers();
+  });
 });
