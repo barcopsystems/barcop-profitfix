@@ -130,7 +130,15 @@ S.LaborStaffRoster = {
       + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
-      + '</div>';
+      + '</div>'
+      // Shift Lead: an hourly staff member who can run shifts and authorize like
+      // a manager. Drives the Manager / Authorized By / Manager-on-Duty pickers
+      // (Management staff are supervisors automatically, so this is for the key
+      // hourly people). See App.isSupervisor.
+      + '<div class="form-row" style="gap:8px;margin-top:-2px;">'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
+      + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>'
+      + 'Shift Lead <span style="color:var(--t3);font-size:11px;">(can run shifts and authorize, even if hourly. Management is always a supervisor.)</span></label></div>';
   },
 
   // Wire the Pay Type + pay field for whichever form is mounted (add or edit).
@@ -213,7 +221,8 @@ S.LaborStaffRoster = {
                        : roll === 'ok'       ? '<span style="color:var(--blue);font-weight:700;">Current</span>'
                        : '<span style="color:var(--t3);">&mdash;</span>';
         return '<tr class="sr-row" data-id="' + s.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + esc(s.name || '-') + '</div></td>'
+          + '<td><div class="val">' + esc(s.name || '-')
+            + (s.shift_lead ? ' <span style="color:var(--gold);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Lead</span>' : '') + '</div></td>'
           + '<td>' + esc(pos ? pos.name : '-') + '</td>'
           + '<td>' + esc(pos ? (pos.department || '-') : '-') + '</td>'
           + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr'
@@ -662,6 +671,7 @@ S.LaborStaffRoster = {
       annual_salary: annualSalary,
       wage_history:  wageHistory,
       status:        document.getElementById('sr-status')?.value || 'Active',
+      shift_lead:    !!document.getElementById('sr-lead')?.checked,
       phone:         document.getElementById('sr-phone')?.value.trim() || '',
       email:         document.getElementById('sr-email')?.value.trim() || '',
       notes:         document.getElementById('sr-notes')?.value.trim() || ''
