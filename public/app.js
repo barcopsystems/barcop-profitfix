@@ -1478,10 +1478,11 @@ const App = {
   //   placeholder   First-option label. Default: "Select staff..."
   //   optional      If true, placeholder reads as the empty pick.
   //   filter        Function(staff) returning bool. Limit to a custom subset.
-  //   audience      'supervisor' | 'service' | 'all' (default). The named
-  //                 audience for this picker: supervisor = Management dept or
-  //                 Shift Lead (Manager / Authorized By / MOD pickers); service
-  //                 = Bar or Front of House (Server pickers); all = everyone.
+  //   audience      'supervisor' | 'service' | 'kitchen' | 'all' (default). The
+  //                 named audience for this picker: supervisor = Management dept
+  //                 or Shift Lead (Manager / Authorized By / MOD); service = Bar
+  //                 or Front of House (Server / bartender / cashier); kitchen =
+  //                 Kitchen dept (cook pickers); all = everyone.
   //
   // App.staffById(id) resolves an id back to the staff record at save time.
   staffOptions(selectedId, opts) {
@@ -1491,6 +1492,7 @@ const App = {
     // Narrow to the people who belong in this kind of picker.
     if (opts.audience === 'supervisor') pool = pool.filter(s => this.isSupervisor(s));
     else if (opts.audience === 'service') pool = pool.filter(s => this.isService(s));
+    else if (opts.audience === 'kitchen') pool = pool.filter(s => this.isKitchen(s));
     if (opts.filter) pool = pool.filter(opts.filter);
 
     // Resolve a legacy name → id so old records preselect correctly.
@@ -1540,6 +1542,14 @@ const App = {
     const p = positions.find(x => x.id === s.position_id);
     const d = (p && p.department) || '';
     return d === 'Bar' || d === 'Front of House';
+  },
+
+  // Back-of-house staff: anyone in the Kitchen department. Drives cook pickers.
+  isKitchen(s) {
+    if (!s) return false;
+    const positions = (this.laborData && this.laborData.lc_positions) || [];
+    const p = positions.find(x => x.id === s.position_id);
+    return ((p && p.department) || '') === 'Kitchen';
   },
 
   // Resolve a staff_id (or legacy name) to the staff record. Save handlers
