@@ -1,14 +1,16 @@
 'use strict';
 
 /* ── Shift Control — Checklist Templates (writes sc_checklist_templates) ───────
-   Builds reusable Opening and Closing checklist templates. The Opening and
-   Closing Checklist screens load these templates; when none exist they fall
-   back to their built-in defaults. */
+   Builds reusable Opening and Closing checklist templates. The Checklists
+   screen loads these; when none exist it falls back to the built-in defaults.
+   Inline new-template form on the landing, saved templates below, edit on its
+   own page. */
 
 S.ShiftChecklistTemplates = {
   editId: null,
+  _name: '',
+  _type: 'Opening',
   _items: [],
-  _pendingDelId: null,
   TYPES: ['Opening', 'Closing'],
 
   templates() {
@@ -24,53 +26,92 @@ S.ShiftChecklistTemplates = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    this._resetForm();
     this.renderList();
   },
 
+  _resetForm() {
+    this.editId = null;
+    this._name = '';
+    this._items = [];
+    if (this._type == null) this._type = 'Opening';
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Checklist Templates Work', [
+      { p: ['A template is a saved checklist: your standard opening or closing task list. Build one here and it loads on the Checklists screen so the manager just checks it off.'] },
+      { h: 'Build it', p: ['Name it, pick Opening or Closing, and add your items. Load the default to start from Bar Cop\'s built-in list, then add, remove, or drag the handle to reorder. The order here is the order it runs in.'] },
+      { h: 'Using it', p: ['Saved templates show up in the Template picker on the Checklists screen. With no template built, Checklists falls back to the built-in default list.'] }
+    ]);
+  },
+
+  // ── The template form (used inline for new, on its own page for edit) ───────
+  formBlock(isEdit) {
+    const typeOpts = this.TYPES.map(ty => '<option' + (this._type === ty ? ' selected' : '') + '>' + ty + '</option>').join('');
+    const itemRows = this._items.map((it, idx) =>
+      '<div class="ct-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
+      + DragReorder.handleDivHTML()
+      + '<input type="text" class="ct-item-input" data-idx="' + idx + '" value="' + esc(it) + '" placeholder="Checklist item" style="flex:1;"/>'
+      + '<button type="button" class="btn btn-danger btn-sm ct-remove" data-idx="' + idx + '">Remove</button>'
+      + '</div>').join('');
+    const itemsBlock = this._items.length === 0
+      ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No items yet. Add items below or load the default list.</div>'
+      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the &#x2630; handle on the left to reorder. The checklist runs in this order.</div>' + itemRows;
+
+    return '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>' + (isEdit ? 'Edit' : 'New') + ' Checklist Template</span>' + App.helpButton('ct-how') + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:260px;flex-shrink:0;"><label>Template Name</label>'
+      + '<input type="text" id="ct-name" value="' + esc(this._name) + '" placeholder="e.g. Weekend Bar Open"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label><select id="ct-type">' + typeOpts + '</select></div>'
+      + '</div></div>'
+
+      + '<div class="card"><div class="card-title">Checklist Items</div>'
+      + '<div id="ct-items">' + itemsBlock + '</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ct-add-item">+ Add Item</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ct-load-default">Load default ' + this._type + ' items</button>'
+      + '</div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="ct-save">' + (isEdit ? 'Update Template' : 'Save Template') + '</button>'
+      + (isEdit ? '<button class="btn btn-ghost" id="ct-cancel">Cancel</button>' : '')
+      + '<span id="ct-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  savedSection(type) {
+    const list = this.templates().filter(t => t.type === type);
+    if (list.length === 0) return '';
+    const rows = list.map(t => '<tr class="ct-row" data-id="' + t.id + '" style="cursor:pointer;">'
+      + '<td><div class="val">' + esc(t.name) + '</div></td>'
+      + '<td>' + (t.items ? t.items.length : 0) + ' items</td>'
+      + '<td><div class="row-actions">'
+      + '<button class="btn btn-ghost btn-sm ct-edit" data-id="' + t.id + '">Edit</button>'
+      + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
+      + '</div></td></tr>').join('');
+    return '<div class="card-title" style="margin-top:24px;">' + type + ' Templates</div>'
+      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  },
+
   renderList() {
-    this.actions.innerHTML = '';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-primary btn-sm';
-    addBtn.textContent = 'New Template';
-    addBtn.addEventListener('click', () => this.showForm());
-    this.actions.appendChild(addBtn);
-
+    if (this.actions) this.actions.innerHTML = '';
     const all = this.templates();
-    let html;
-    if (all.length === 0) {
-      html = '<div class="empty"><div class="empty-title">No checklist templates yet</div>'
-        + '<div class="empty-sub">Build Opening and Closing checklist templates here. Until you do, the '
-        + 'Opening and Closing Checklist screens use a built-in default list.</div>'
-        + '<button class="btn btn-primary" id="ct-add-first">New Template</button></div>';
-    } else {
-      const section = type => {
-        const list = all.filter(t => t.type === type);
-        if (list.length === 0) return '';
-        const rows = list.map(t => '<tr class="ct-row" data-id="' + t.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + esc(t.name) + '</div></td>'
-          + '<td>' + (t.items ? t.items.length : 0) + ' items</td>'
-          + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm ct-edit" data-id="' + t.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
-          + '</div></td></tr>').join('');
-        return '<div class="card"><div class="card-title">' + type + ' Templates</div>'
-          + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-          + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-      };
-      html = section('Opening') + section('Closing');
-    }
+    const saved = all.length
+      ? (this.savedSection('Opening') + this.savedSection('Closing'))
+      : '<div style="font-size:13px;color:var(--t3);padding:10px 2px;">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</div>';
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.formBlock(false) + saved + '</div>';
     this.container.onclick = ev => {
       const row = ev.target.closest('.ct-row');
       const edit = ev.target.closest('.ct-edit');
       const del = ev.target.closest('.ct-del');
-      const addF = ev.target.closest('#ct-add-first');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
+      if (del) { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
-      else if (addF) this.showForm();
+      else if (row) this.showForm(row.dataset.id);
     };
+    this._bindForm(() => this.renderList());
   },
 
   showForm(id) {
@@ -83,47 +124,12 @@ S.ShiftChecklistTemplates = {
   },
 
   renderForm() {
-    const typeOpts = this.TYPES.map(ty =>
-      '<option' + (this._type === ty ? ' selected' : '') + '>' + ty + '</option>').join('');
-
-    const itemRows = this._items.map((it, idx) =>
-      '<div class="ct-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
-      + DragReorder.handleDivHTML()
-      + '<input type="text" class="ct-item-input" data-idx="' + idx + '" value="' + esc(it) + '" '
-      + 'placeholder="Checklist item" style="flex:1;"/>'
-      + '<button type="button" class="btn btn-danger btn-sm ct-remove" data-idx="' + idx + '">Remove</button>'
-      + '</div>').join('');
-
-    const itemsBlock = this._items.length === 0
-      ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No items yet. Add items below or load the default list.</div>'
-      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the &#x2630; handle on the left to reorder. Take this template into a shift and the checklist runs in this order.</div>' + itemRows;
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (this.editId ? 'Edit' : 'New') + ' Checklist Template</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:260px;flex-shrink:0;"><label>Template Name</label>'
-      + '<input type="text" id="ct-name" value="' + esc(this._name) + '" placeholder="e.g. Weekend Bar Open"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label>'
-      + '<select id="ct-type">' + typeOpts + '</select></div>'
-      + '</div></div>'
-
-      + '<div class="card"><div class="card-title">Checklist Items</div>'
-      + '<div id="ct-items">' + itemsBlock + '</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="ct-add-item">+ Add Item</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ct-load-default">Load default ' + this._type + ' items</button>'
-      + '</div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="ct-save">' + (this.editId ? 'Update Template' : 'Save Template') + '</button>'
-      + '<button class="btn btn-ghost" id="ct-cancel">Cancel</button>'
-      + '<span id="ct-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
+    this.container.innerHTML = '<div class="screen">' + this.formBlock(true) + '</div>';
     this.container.onclick = null;
-    this._bindForm();
+    this._bindForm(() => this.renderForm());
   },
 
-  // pull current values from the DOM into state
+  // Pull current values from the DOM into state.
   syncItems() {
     this._name = document.getElementById('ct-name')?.value || '';
     this._type = document.getElementById('ct-type')?.value || 'Opening';
@@ -131,47 +137,30 @@ S.ShiftChecklistTemplates = {
     if (inputs.length) this._items = inputs.map(i => i.value);
   },
 
-  _bindForm() {
-    document.getElementById('ct-type')?.addEventListener('change', () => {
-      this.syncItems();
-      this.renderForm();
-    });
-    document.getElementById('ct-add-item')?.addEventListener('click', () => {
-      this.syncItems();
-      this._items.push('');
-      this.renderForm();
-    });
-    document.getElementById('ct-load-default')?.addEventListener('click', () => {
-      this.syncItems();
-      this._items = this.defaultItems(this._type).slice();
-      this.renderForm();
-    });
+  _bindForm(reRender) {
+    document.getElementById('ct-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('ct-type')?.addEventListener('change', () => { this.syncItems(); reRender(); });
+    document.getElementById('ct-add-item')?.addEventListener('click', () => { this.syncItems(); this._items.push(''); reRender(); });
+    document.getElementById('ct-load-default')?.addEventListener('click', () => { this.syncItems(); this._items = this.defaultItems(this._type).slice(); reRender(); });
     document.getElementById('ct-items')?.addEventListener('click', ev => {
       const rm = ev.target.closest('.ct-remove');
       if (!rm) return;
       this.syncItems();
-      const idx = parseInt(rm.dataset.idx, 10);
-      this._items.splice(idx, 1);
-      this.renderForm();
+      this._items.splice(parseInt(rm.dataset.idx, 10), 1);
+      reRender();
     });
     const itemsHost = document.getElementById('ct-items');
     if (itemsHost) {
       DragReorder.wire({
-        container:      itemsHost,
-        rowSelector:    '.ct-line',
-        handleSelector: '.dr-handle',
-        onCommit:       (newOrderIds) => {
+        container: itemsHost, rowSelector: '.ct-line', handleSelector: '.dr-handle',
+        onCommit: (newOrderIds) => {
           this.syncItems();
-          const newItems = newOrderIds
-            .map(id => parseInt(id, 10))
-            .filter(i => !isNaN(i))
-            .map(i => this._items[i]);
-          this._items = newItems;
-          this.renderForm();
+          this._items = newOrderIds.map(id => parseInt(id, 10)).filter(i => !isNaN(i)).map(i => this._items[i]);
+          reRender();
         }
       });
     }
-    document.getElementById('ct-cancel')?.addEventListener('click', () => this.renderList());
+    document.getElementById('ct-cancel')?.addEventListener('click', () => { this._resetForm(); this.renderList(); });
     document.getElementById('ct-save')?.addEventListener('click', () => this.save());
   },
 
@@ -184,14 +173,8 @@ S.ShiftChecklistTemplates = {
     const items = this._items.map(i => i.trim()).filter(Boolean);
     if (items.length === 0) { fail('Add at least one checklist item.'); return; }
 
-    const rec = {
-      id:    this.editId || App.uid(),
-      name,
-      type:  this._type || 'Opening',
-      items
-    };
+    const rec = { id: this.editId || App.uid(), name, type: this._type || 'Opening', items };
     if (!this.editId) rec.created_at = new Date().toISOString();
-
     const list = this.templates();
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
@@ -203,12 +186,12 @@ S.ShiftChecklistTemplates = {
     const btn = document.getElementById('ct-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveShift();
-    this.editId = null;
     if (ok) {
       App.markSetupDone('gs_sc_checklists');
+      this._resetForm();
       this.renderList();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Template'; }
+      if (btn) { btn.disabled = false; btn.textContent = this.editId ? 'Update Template' : 'Save Template'; }
       fail('Save failed. Try again.');
     }
   },
