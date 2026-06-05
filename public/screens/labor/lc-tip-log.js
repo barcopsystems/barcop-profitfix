@@ -550,7 +550,7 @@ S.LaborTipLog = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirm({ title: 'Delete this tip entry?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('lc', 'tip', id);
     this.renderList();

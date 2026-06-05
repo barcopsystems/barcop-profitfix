@@ -509,7 +509,7 @@ S.LaborStaffRoster = {
   },
 
   async confirmDelCert(id, staffId) {
-    const ok = await App.confirm({ title: 'Delete this certification?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     App.laborData.lc_certs = this.certs().filter(x => x.id !== id);
     await App.saveLabor();
@@ -625,7 +625,7 @@ S.LaborStaffRoster = {
   },
 
   async confirmDelNote(id, staffId) {
-    const ok = await App.confirm({ title: 'Delete this note?', confirmText: 'Delete', cancelText: 'Cancel' });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     App.laborData.lc_staff_notes = this.notes().filter(x => x.id !== id);
     await App.saveLabor();
