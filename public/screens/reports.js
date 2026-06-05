@@ -199,7 +199,7 @@ S.Reports={
         });
         return;
       }
-      const today=new Date().toISOString().slice(0,10);
+      const today=App.todayLocal();
       this._buildAndDownloadXlsx(filtered, today);
     });
   },

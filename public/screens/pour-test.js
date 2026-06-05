@@ -161,7 +161,7 @@ S.PourTest = {
   showForm(id) {
     this._editId = id || null;
     const r = id ? this.list().find(x => x.id === id) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const prods = this.barProducts().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const productOpts = '<option value="">Select product...</option>'
       + prods.map(p => '<option value="' + esc(p.id) + '"' + (r && r.product_id === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.pour_size_oz ? ' (spec ' + p.pour_size_oz + ' oz)' : '') + '</option>').join('');

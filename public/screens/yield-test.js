@@ -169,7 +169,7 @@ S.YieldTest = {
   showForm(id) {
     this._editId = id || null;
     const r = id ? this.list().find(x => x.id === id) : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const items = this.foodMenuItems().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const itemOpts = '<option value="">Select dish...</option>'
       + items.map(i => '<option value="' + esc(i.id) + '"' + (r && r.dish_id === i.id ? ' selected' : '') + '>' + esc(i.name) + '</option>').join('');

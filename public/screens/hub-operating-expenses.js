@@ -386,7 +386,7 @@ S.HubOperatingExpenses = {
     const isEdit = !!record;
     const rec = record || {
       id:    '',
-      date:  new Date().toISOString().slice(0, 10),
+      date:  App.todayLocal(),
       category: this.CATEGORIES[0],
       vendor: '',
       amount: '',
@@ -479,7 +479,7 @@ S.HubOperatingExpenses = {
     if (!src) return;
     arr.push({
       id:         App.uid ? App.uid() : ('oex-' + Date.now()),
-      date:       new Date().toISOString().slice(0, 10),
+      date:       App.todayLocal(),
       category:   src.category,
       vendor:     src.vendor,
       amount:     src.amount,

@@ -977,7 +977,7 @@ S.Hub = {
   forwardAlerts() {
     const data = App.data || {};
     const out = [];
-    const iso = d => d.toISOString().slice(0, 10);
+    const iso = d => App.ymdLocal(d);
     const mondayOf = d => { const x = new Date(d); const day = x.getDay();
       x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return iso(x); };
 

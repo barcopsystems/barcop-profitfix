@@ -627,7 +627,7 @@ S.HubYearEnd = {
     const diff = (day + 6) % 7; // shift Sunday=0 to 6
     const ws = new Date(d);
     ws.setDate(d.getDate() - diff);
-    return ws.toISOString().slice(0, 10);
+    return App.ymdLocal(ws);
   },
 
   // ── Sheet 5 — Tip Allocation (Form 8027 Worksheet, annual) ───────────────

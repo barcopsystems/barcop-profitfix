@@ -56,7 +56,7 @@ S.ThisWeek = {
     const startD = new Date(periodEnd + 'T00:00:00');
     if (isNaN(startD.getTime())) return null;
     startD.setDate(startD.getDate() - 6);
-    const start = startD.toISOString().slice(0, 10);
+    const start = App.ymdLocal(startD);
     let bar = 0, food = 0, any = false;
     shifts.forEach(s => {
       if (!s.date || s.date < start || s.date > periodEnd) return;
@@ -78,7 +78,7 @@ S.ThisWeek = {
     const startD = new Date(periodEnd + 'T00:00:00');
     if (isNaN(startD.getTime())) return null;
     startD.setDate(startD.getDate() - 6);
-    const start = startD.toISOString().slice(0, 10);
+    const start = App.ymdLocal(startD);
     const posDept = {};
     ((App.laborData && App.laborData.lc_positions) || []).forEach(p => { posDept[p.id] = p.department; });
     let bar = 0, food = 0, any = false;
@@ -99,7 +99,7 @@ S.ThisWeek = {
   loadDraft() {
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
-    const periodEnd = App.nextSunday ? App.nextSunday() : new Date().toISOString().slice(0, 10);
+    const periodEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
     const sr = this.shiftRevenue(periodEnd);
     const lc = this.laborCost(periodEnd);
     return {

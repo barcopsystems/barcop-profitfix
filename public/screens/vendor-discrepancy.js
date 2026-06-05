@@ -322,7 +322,7 @@ S.VendorDiscrepancy = {
       if (showBtn) showBtn.style.display = 'none';
       // Default the date to today and scroll the form into view.
       const dateInp = document.getElementById('vd-date');
-      if (dateInp && !dateInp.value) dateInp.value = new Date().toISOString().slice(0, 10);
+      if (dateInp && !dateInp.value) dateInp.value = App.todayLocal();
       wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
       wrap.style.display = 'none';

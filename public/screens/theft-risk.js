@@ -107,7 +107,7 @@ S.TheftRisk = {
     const all = ((App.shiftData && App.shiftData.sc_void_comps) || []);
     if (all.length === 0) return { score: null, count: 0, total: 0 };
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = App.ymdLocal(cutoff);
     const flagged = all.filter(r =>
       r.auth_threshold_override === true && (r.date || '') >= cutoffStr);
     const total = flagged.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
@@ -127,7 +127,7 @@ S.TheftRisk = {
     const all = this.adjustments();
     if (all.length === 0) return { score: null, count: 0 };
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = App.ymdLocal(cutoff);
     const recent = all.filter(a => {
       if (a.reason !== 'Theft') return false;
       const date = (a.date_time || '').slice(0, 10);
@@ -182,7 +182,7 @@ S.TheftRisk = {
 
     // 90-day window for the brief — same window the confirmed-theft signal uses.
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = App.ymdLocal(cutoff);
     const inWindow = (d) => d && String(d).slice(0, 10) >= cutoffStr;
 
     const recentVCs = this.voidComps().filter(r => inWindow(r.date));
@@ -608,7 +608,7 @@ S.TheftRisk = {
         id: App.uid(),
         product_id: productId,
         sku,
-        opened_date: new Date().toISOString().slice(0, 10),
+        opened_date: App.todayLocal(),
         created_at: new Date().toISOString(),
         status: 'open',
         steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })),
@@ -639,7 +639,7 @@ S.TheftRisk = {
       const ta = this.container.querySelector('.vi-resolution[data-inv="' + inv.id + '"]');
       if (ta) inv.resolution = ta.value;
       inv.status = 'resolved';
-      inv.resolved_date = new Date().toISOString().slice(0, 10);
+      inv.resolved_date = App.todayLocal();
       App.putRecord('core', 'variance_investigation', inv);
       this.renderMain();
     }));

@@ -1374,7 +1374,7 @@ S.HubBooks = {
     const m = parseInt(monthKey.slice(5, 7), 10);
     // last day of month
     const d = new Date(y, m, 0);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
 
   // ── Data aggregation — sum the data for a given month ─────────────────────

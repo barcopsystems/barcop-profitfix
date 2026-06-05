@@ -30,7 +30,7 @@ S.VendorScorecard = {
     const days = parseInt(this.range, 10) || 90;
     const d = new Date();
     d.setDate(d.getDate() - days);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
 
   // Pull one vendor's roll-up for the active range.

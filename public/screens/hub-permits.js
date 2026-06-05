@@ -91,7 +91,7 @@ S.HubPermits = {
     else if (recurrence === 'Quarterly') d.setMonth(d.getMonth() + 3);
     else if (recurrence === 'Monthly')   d.setMonth(d.getMonth() + 1);
     else return null; // One-Time / Other
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
 
   // ── Filtered list ──────────────────────────────────────────────────────
@@ -340,7 +340,7 @@ S.HubPermits = {
   // recurrence and auto-create an Operating Expenses entry under
   // 'Licenses and Permits' so the bookkeeper sees it in Books.
   _openRenewModal(rec) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const suggestedNext = this._nextRenewal(today, rec.recurrence) || rec.renewal_date || '';
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
