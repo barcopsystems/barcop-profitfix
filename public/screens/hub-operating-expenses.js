@@ -495,12 +495,7 @@ S.HubOperatingExpenses = {
     const arr = this.records();
     const rec = arr.find(r => r.id === id);
     if (!rec) return;
-    const ok = await App.confirm({
-      title: 'Delete this expense?',
-      message: rec.category + (rec.vendor ? ' — ' + rec.vendor : '') + ' for ' + App.fmtCurrency(rec.amount || 0, 0) + ' on ' + (rec.date || '') + '. Once deleted, it is gone from the log and the Books rollup.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel'
-    });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     const idx = arr.findIndex(r => r.id === id);
     if (idx >= 0) arr.splice(idx, 1);

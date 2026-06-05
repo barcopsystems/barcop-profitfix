@@ -416,12 +416,7 @@ S.HubPermits = {
     const arr = this.records();
     const rec = arr.find(r => r.id === id);
     if (!rec) return;
-    const ok = await App.confirm({
-      title: 'Delete this permit?',
-      message: (rec.name || 'This permit') + (rec.type ? ' (' + rec.type + ')' : '') + ' will be removed from the log. Operating Expenses entries already logged for past renewals stay where they are.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel'
-    });
+    const ok = await App.confirmDelete();
     if (!ok) return;
     const idx = arr.findIndex(r => r.id === id);
     if (idx >= 0) arr.splice(idx, 1);
