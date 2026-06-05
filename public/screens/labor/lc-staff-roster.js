@@ -132,11 +132,17 @@ S.LaborStaffRoster = {
       // shifts and authorize like a manager (Management is a supervisor
       // automatically). See App.isSupervisor.
       + '<div class="form-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Phone</label>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Phone</label>'
       + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Email</label>'
       + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1 1 200px;min-width:0;"><label>Shift Lead</label>'
+      // Shift Lead lives OUTSIDE a .f wrapper on purpose: the global `.f input`
+      // rule forces appearance:none + input-box styling, which kills the native
+      // checkbox (it renders as an empty box and clicking only shows the focus
+      // border). A plain div keeps the checkbox rendering normally (gold via
+      // accent-color), and the label still toggles it.
+      + '<div style="flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
       + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize, even if hourly</span></label></div>'
