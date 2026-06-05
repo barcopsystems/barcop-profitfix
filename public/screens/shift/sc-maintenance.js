@@ -64,7 +64,7 @@ S.ShiftMaintenance = {
     const prioOpts = this.PRIORITIES.map(x => '<option' + ((r ? r.priority : 'Normal') === x ? ' selected' : '') + '>' + x + '</option>').join('');
     const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:200px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" autocomplete="off" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
       + '</div>'
@@ -91,7 +91,7 @@ S.ShiftMaintenance = {
     document.getElementById(p + 'status')?.addEventListener('change', e => {
       if (e.target.value === 'Resolved') {
         const resEl = document.getElementById(p + 'resolved');
-        if (resEl && !resEl.value) resEl.value = new Date().toISOString().slice(0, 10);
+        if (resEl && !resEl.value) resEl.value = App.todayLocal();
       }
     });
   },

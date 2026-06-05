@@ -215,7 +215,7 @@ S.Shift86List = {
     const isCustomItem = editing && !initialMenuItemId && !initialInventoryKey && !!savedItemName;
     if (editing) this.customMode = isCustomItem;
 
-    const dateVal = i?.date_86 || new Date().toISOString().slice(0, 10);
+    const dateVal = i?.date_86 || App.todayLocal();
     const timeVal = i?.time_86 || this.nowTime();
     const reportedBy = i?.reported_by_id || i?.reported_by || activeMgr;
 
@@ -498,7 +498,7 @@ S.Shift86List = {
     const err = document.getElementById('qa-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
-    const date = document.getElementById('qa-date')?.value || new Date().toISOString().slice(0, 10);
+    const date = document.getElementById('qa-date')?.value || App.todayLocal();
     const time = document.getElementById('qa-time')?.value || this.nowTime();
     const reportedById = document.getElementById('qa-by')?.value || '';
     const reportedBy   = (App.staffById(reportedById) || {}).name || '';
@@ -596,7 +596,7 @@ S.Shift86List = {
     const it = this.items().find(x => x.id === id);
     if (!it) return;
     it.status = 'Back';
-    it.date_back = new Date().toISOString().slice(0, 10);
+    it.date_back = App.todayLocal();
     it.time_back = this.nowTime();
     await App.putRecord('sc', 'eighty_six', it);
     this.renderMain();
@@ -606,7 +606,7 @@ S.Shift86List = {
     const it = this.items().find(x => x.id === id);
     if (!it) return;
     it.status = '86';
-    it.date_86 = new Date().toISOString().slice(0, 10);
+    it.date_86 = App.todayLocal();
     it.time_86 = this.nowTime();
     it.date_back = '';
     it.time_back = '';

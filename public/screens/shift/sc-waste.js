@@ -104,7 +104,7 @@ S.ShiftWaste = {
 
   // ── Batch entry builder (mirrors the Void/Comp log) ─────────────────────────
   builderCard() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const shiftOpts = '<option value="">Select shift...</option>'
       + this.shiftTypes().map(t => '<option>' + esc(t) + '</option>').join('');
     return '<div class="card">'

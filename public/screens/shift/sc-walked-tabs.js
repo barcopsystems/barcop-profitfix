@@ -55,7 +55,7 @@ S.ShiftWalkedTabs = {
     const v = val => (val != null && val !== '') ? val : '';
     const reasonOpts = this.REASONS.map(rs => '<option' + (r && r.reason === rs ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...' }) + '</select></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'

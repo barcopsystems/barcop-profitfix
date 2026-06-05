@@ -34,7 +34,7 @@ S.ShiftCashControl = {
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   _nowHHMM() { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); },
-  _today() { return new Date().toISOString().slice(0, 10); },
+  _today() { return App.todayLocal(); },
   _mgr() { return App.activeManagerId ? App.activeManagerId() : ''; },
 
   startDate() {
@@ -42,7 +42,7 @@ S.ShiftCashControl = {
     const days = parseInt(this.range, 10) || 30;
     const d = new Date();
     d.setDate(d.getDate() - days);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
 
   currentSafeBalance() {

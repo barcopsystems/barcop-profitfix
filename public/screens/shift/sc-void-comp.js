@@ -126,7 +126,7 @@ S.ShiftVoidComp = {
     const isProduct = itemKey.startsWith('p:');
 
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:110px;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:110px;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:90px;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Shift Type</label><select id="' + p + 'shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:95px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
@@ -397,7 +397,7 @@ S.ShiftVoidComp = {
   // time. Each saved line is its own record, so the list, edits, Variance, and
   // Theft Risk all keep working unchanged.
   builderCard() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = App.todayLocal();
     const shiftOpts = this.shiftTypes().map(t => '<option>' + esc(t) + '</option>').join('');
     return '<div class="card">'
       + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))

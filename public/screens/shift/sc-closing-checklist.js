@@ -61,7 +61,7 @@ S.ShiftClosingChecklist = {
     const tid = templateId != null ? templateId : (tpls[0] ? tpls[0].id : '');
     this._run = {
       templateId: tid,
-      date: new Date().toISOString().slice(0, 10),
+      date: App.todayLocal(),
       completed_by: '',
       notes: '',
       items: this.itemsFor(tid)

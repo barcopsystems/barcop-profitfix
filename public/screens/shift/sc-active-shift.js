@@ -242,7 +242,7 @@ S.ShiftActiveShift = {
     const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false);
     const defaultBank = (firstDrawer && firstDrawer.default_opening_bank != null) ? firstDrawer.default_opening_bank : '';
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="asf-date" value="' + esc(s?.date || new Date().toISOString().slice(0, 10)) + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="asf-date" value="' + esc(s?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:130px;"><label>Shift Type</label><select id="asf-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-bar" step="0.01" value="' + v(s?.bar_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Floor Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-floor" step="0.01" value="' + v(s?.floor_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
@@ -343,7 +343,7 @@ S.ShiftActiveShift = {
     ((App.shiftData && App.shiftData.sc_drawers) || []).filter(x => x.active !== false).forEach(dr => {
       drawers[dr.id] = { on: true, bank: dr.default_opening_bank != null ? dr.default_opening_bank : '' };
     });
-    return { date: new Date().toISOString().slice(0, 10), shift_type: defType, manager_id: '', drawers, staff_on_floor: '', cash_tolerance: this._defaultToleranceFor(defType) };
+    return { date: App.todayLocal(), shift_type: defType, manager_id: '', drawers, staff_on_floor: '', cash_tolerance: this._defaultToleranceFor(defType) };
   },
 
   _daypartByTime(types) {

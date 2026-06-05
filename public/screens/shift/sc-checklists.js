@@ -65,7 +65,7 @@ S.ShiftChecklists = {
     const mgrId = this.activeManagerId();
     this._run = {
       templateId: tid,
-      date: new Date().toISOString().slice(0, 10),
+      date: App.todayLocal(),
       completed_by_id: mgrId,
       completed_by: (App.staffById(mgrId) || {}).name || '',
       notes: '',

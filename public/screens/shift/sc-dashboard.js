@@ -12,14 +12,14 @@ S.ShiftDashboard = {
   maint()     { return ((App.shiftData && App.shiftData.sc_maintenance) || []); },
 
   fmtDate(str) {
-    if (!str) return '—';
+    if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   weekAgo() {
     const d = new Date();
     d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
+    return App.ymdLocal(d);
   },
   activeShift() {
     return [...this.shifts()]
@@ -48,11 +48,11 @@ S.ShiftDashboard = {
     const val = (txt, cls) => '<div class="metric-val ' + (cls || '') + '">' + txt + '</div>';
 
     const cards =
-        card('Revenue — Last 7 Days', val(App.fmtCurrency(wkRevenue)),
+        card('Revenue, Last 7 Days', val(App.fmtCurrency(wkRevenue)),
              wkShifts.length + ' shift' + (wkShifts.length === 1 ? '' : 's') + ' logged')
-      + card('Covers — Last 7 Days', val(String(wkCovers)),
+      + card('Covers, Last 7 Days', val(String(wkCovers)),
              wkCovers > 0 ? App.fmtCurrency(wkRevenue / wkCovers) + ' avg check' : 'No covers logged')
-      + card('Cash Over/Short — 7d', val((netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'over-target' : 'on-target'),
+      + card('Cash Over/Short, 7d', val((netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'over-target' : 'on-target'),
              wkVar.length + ' variance' + (wkVar.length === 1 ? '' : 's') + ' logged')
       + card('Open Items', val(String(active86.length + openMaint.length), (active86.length + openMaint.length) ? 'over-target' : 'on-target'),
              active86.length + ' 86\'d · ' + openMaint.length + ' maintenance');
@@ -83,7 +83,7 @@ S.ShiftDashboard = {
     }));
     wkVar.filter(v => v.status === 'Short').forEach(v => alerts.push({
       sev: 'red', text: 'Cash short ' + App.fmtCurrency(Math.abs(v.variance || 0))
-        + (v.cashier ? ' — ' + v.cashier : '') + (v.drawer ? ' (' + v.drawer + ')' : ''),
+        + (v.cashier ? ', ' + v.cashier : '') + (v.drawer ? ' (' + v.drawer + ')' : ''),
       go: 'sc-variance-log'
     }));
     if (active86.length) alerts.push({
@@ -99,7 +99,7 @@ S.ShiftDashboard = {
     let alertCard;
     if (alerts.length === 0) {
       alertCard = '<div class="card"><div class="card-title">Alerts</div>'
-        + '<div style="font-size:13px;color:var(--gold);">All clear — no open shift issues.</div></div>';
+        + '<div style="font-size:13px;color:var(--gold);">All clear. No open shift issues.</div></div>';
     } else {
       alertCard = '<div class="card"><div class="card-title">Alerts</div>'
         + alerts.map((a, i) => '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
@@ -121,9 +121,9 @@ S.ShiftDashboard = {
     } else {
       const rows = recent.map(s => '<tr class="sd-srow" data-id="' + s.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-        + '<td>' + esc(s.shift_type || '—') + '</td>'
+        + '<td>' + esc(s.shift_type || '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-        + '<td>' + (s.covers != null ? s.covers : '—') + '</td>'
+        + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
         + '<td>' + (s.status === 'Open'
             ? '<span class="badge badge-ok">Open</span>'
             : '<span class="badge badge-dim">Closed</span>') + '</td></tr>').join('');
