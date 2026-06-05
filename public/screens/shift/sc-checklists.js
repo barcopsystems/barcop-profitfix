@@ -148,8 +148,7 @@ S.ShiftChecklists = {
           + '<button class="btn btn-danger btn-sm cl-hdel" data-id="' + r.id + '">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      histCard = '<div class="card-title" style="margin-top:24px;">Completed ' + this.TYPE + ' Checklists</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      histCard = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:24px;"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('sc', 'checklist', histRuns, true);
