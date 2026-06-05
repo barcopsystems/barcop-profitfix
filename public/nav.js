@@ -482,10 +482,6 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 8.5l1.5 1.5L11 7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Comp Authorization</span>
       </div>
-      <div class="nav-item" data-screen="sc-checklist-templates" id="nav-sc-checklist-templates">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Checklist Templates</span>
-      </div>
       <div class="nav-section">Shifts</div>
       <div class="nav-item" data-screen="sc-active-shift" id="nav-sc-active-shift">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 5.5l4.5 3-4.5 3z" fill="currentColor"/></svg>
@@ -526,13 +522,13 @@ const Shift = {
         <span class="nav-label">Maintenance Log</span>
       </div>
       <div class="nav-section">Checklists</div>
-      <div class="nav-item" data-screen="sc-opening-checklist" id="nav-sc-opening-checklist">
+      <div class="nav-item" data-screen="sc-checklists" id="nav-sc-checklists">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Opening Checklist</span>
+        <span class="nav-label">Checklists</span>
       </div>
-      <div class="nav-item" data-screen="sc-closing-checklist" id="nav-sc-closing-checklist">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="7.5" width="11" height="7" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.3 7.5V5.5a3.2 3.2 0 0 1 6.4 0v2" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Closing Checklist</span>
+      <div class="nav-item" data-screen="sc-checklist-templates" id="nav-sc-checklist-templates">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Checklist Templates</span>
       </div>
       <div class="nav-section">Reports</div>
       <div class="nav-item" data-screen="sc-reports-shift" id="nav-sc-reports-shift">
