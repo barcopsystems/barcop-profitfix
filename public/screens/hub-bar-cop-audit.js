@@ -525,14 +525,14 @@ S.HubBarCopAudit = {
     }
 
     // Skipped procedures: opening or closing checklist completion rate below 70%.
-    const wkOpens   = checklists.filter(c => c.type === 'open'    && this._withinWindow(c.date, 30));
-    const wkCloses  = checklists.filter(c => c.type === 'closing' && this._withinWindow(c.date, 30));
+    const wkOpens   = checklists.filter(c => (c.type || '').toLowerCase().indexOf('open') === 0 && this._withinWindow(c.date, 30));
+    const wkCloses  = checklists.filter(c => (c.type || '').toLowerCase().indexOf('clos') === 0 && this._withinWindow(c.date, 30));
     if (wkOpens.length < 20) {
       out.push({
         label:    'Opening checklist run only ' + wkOpens.length + ' times in last 30 days',
         detail:   'Below 20 of an expected 30 runs. Day starts without the opening sweep can mean missed restock or setup issues.',
         severity: 'warn',
-        screen:   'sc-opening-checklist'
+        screen:   'sc-checklists'
       });
     }
     if (wkCloses.length < 20) {
@@ -540,7 +540,7 @@ S.HubBarCopAudit = {
         label:    'Closing checklist run only ' + wkCloses.length + ' times in last 30 days',
         detail:   'Below 20 of an expected 30 runs. Missed closes invite cash-handling and clean-up gaps.',
         severity: 'warn',
-        screen:   'sc-closing-checklist'
+        screen:   'sc-checklists'
       });
     }
 
