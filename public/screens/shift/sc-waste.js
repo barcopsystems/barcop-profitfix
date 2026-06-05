@@ -103,15 +103,15 @@ S.ShiftWaste = {
   },
 
   // ── Batch entry builder (mirrors the Void/Comp log) ─────────────────────────
-  builderCard() {
-    const today = App.todayLocal();
+  // The builder body (header + line table + Add Line), shared by the landing
+  // card and the running-shift log pop-up. preset pre-fills date / shift.
+  builderInner(preset) {
+    const date = (preset && preset.date) || App.todayLocal();
+    const shiftSel = (preset && preset.shift_type) || '';
     const shiftOpts = '<option value="">Select shift...</option>'
-      + this.shiftTypes().map(t => '<option>' + esc(t) + '</option>').join('');
-    return '<div class="card">'
-      + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill', App.helpButton('wl-how'))
-      + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="wlb-date" value="' + today + '"/></div>'
+      + this.shiftTypes().map(t => '<option' + (shiftSel === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="wlb-date" value="' + esc(date) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="wlb-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Recorded By</label><select id="wlb-by">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
@@ -120,7 +120,14 @@ S.ShiftWaste = {
       + '<th style="min-width:200px;">Product</th><th style="width:90px;">Units</th><th style="width:70px;">Unit</th>'
       + '<th style="width:90px;">Cost</th><th style="min-width:180px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="wlb-rows">' + this.lineHtml() + '</tbody></table></div>'
-      + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
+      + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>';
+  },
+
+  builderCard() {
+    return '<div class="card">'
+      + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill', App.helpButton('wl-how'))
+      + '<div class="collapse-body">'
+      + this.builderInner(null)
       + '<div class="card-actions"><button class="btn btn-primary" id="wlb-save">Save All</button>'
       + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div></div>';
@@ -164,7 +171,16 @@ S.ShiftWaste = {
     }
   },
 
-  async saveBatch() {
+  // Per-line conditional handler for the batch builder, shared by the landing
+  // and the running-shift log pop-up. Product drives the Unit label; product +
+  // units drive the read-only Cost cell.
+  onLineChange(ev) {
+    const line = ev.target.closest('.wl-line');
+    if (!line) return;
+    if (ev.target.classList.contains('wll-prod') || ev.target.classList.contains('wll-units')) this.refreshLineCalc(line);
+  },
+
+  async saveBatch(after) {
     const err = document.getElementById('wlb-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('wlb-date')?.value;
@@ -174,7 +190,8 @@ S.ShiftWaste = {
     const byName = (App.staffById(byId) || {}).name || '';
 
     const recs = [];
-    for (const line of [...this.container.querySelectorAll('.wl-line')]) {
+    const rowsWrap = document.getElementById('wlb-rows');
+    for (const line of (rowsWrap ? [...rowsWrap.querySelectorAll('.wl-line')] : [])) {
       const product_id = line.querySelector('.wll-prod')?.value || '';
       const unitsRaw   = line.querySelector('.wll-units')?.value;
       const reason     = line.querySelector('.wll-reason')?.value || '';
@@ -200,7 +217,7 @@ S.ShiftWaste = {
     const list = this.records();
     let ok = true;
     for (const r of recs) { list.push(r); ok = (await App.putRecord('sc', 'waste', r)) && ok; }
-    if (ok) this.renderList();
+    if (ok) (typeof after === 'function' ? after : () => this.renderList())();
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
   },
 
@@ -303,11 +320,7 @@ S.ShiftWaste = {
       if (row && App.canEdit('sc-waste')) this.openEditModal(row.dataset.id);
     };
     // Per-line: product drives the Unit label, product + units drive Cost.
-    this.container.onchange = ev => {
-      const line = ev.target.closest('.wl-line');
-      if (!line) return;
-      if (ev.target.classList.contains('wll-prod') || ev.target.classList.contains('wll-units')) this.refreshLineCalc(line);
-    };
+    this.container.onchange = ev => this.onLineChange(ev);
     document.getElementById('wl-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('wl-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     document.getElementById('wl-f-reason')?.addEventListener('change', e => { this.filterReason = e.target.value || ''; this.renderList(); });
@@ -360,8 +373,9 @@ S.ShiftWaste = {
     document.getElementById('wle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wl-edit-modal'); this.confirmDel(id); });
   },
 
-  // Collect the edit / log pop-up form (wle- ids) into a record body, or null
-  // after an error. Shared by saveEdit and the running-shift saveLog.
+  // Collect the single-record edit pop-up form (wle- ids) into a record body,
+  // or null after an error. Used by saveEdit (the running-shift log pop-up uses
+  // the batch builder + saveBatch instead).
   _collect() {
     const err = document.getElementById('wle-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
@@ -399,36 +413,30 @@ S.ShiftWaste = {
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
-  // Log one waste line from the running shift in a focused pop-up (no nav away).
-  // preset pre-fills date/shift from the open shift.
+  // Log waste from the running shift in a focused pop-up using the SAME multi-
+  // line batch builder as the landing (header + lines + Save All), so a manager
+  // can enter several at once. onDone re-renders the active shift. preset pre-
+  // fills date / shift from the open shift.
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-waste')) return;
     this.editId = null;
     const html = '<div class="card" style="margin:0;"><div class="card-title">Log Waste / Spill</div>'
-      + this.editFields(preset || {})
+      + this.builderInner(preset)
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="wle-save">Save</button>'
-      + '<button class="btn btn-ghost" id="wle-cancel">Cancel</button>'
-      + '<span id="wle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-primary" id="wlb-save">Save All</button>'
+      + '<button class="btn btn-ghost" id="wlb-cancel">Cancel</button>'
+      + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'wl-edit-modal', maxWidth: 700, noClose: true });
-    document.getElementById('wle-product')?.addEventListener('change', e => {
-      const lbl = document.getElementById('wle-unit-label');
-      if (lbl) lbl.textContent = this.unitLabel(this.productById(e.target.value));
+    const modal = App.openModal(html, { id: 'wl-log-modal', maxWidth: 860, noClose: true });
+    if (!modal) return;
+    modal.addEventListener('change', ev => this.onLineChange(ev));
+    modal.addEventListener('click', ev => {
+      if (ev.target.closest('#wlb-add')) { this.addLine(); return; }
+      const rm = ev.target.closest('.wll-del');
+      if (rm) { this.removeLine(rm.closest('.wl-line')); return; }
+      if (ev.target.closest('#wlb-cancel')) { App.closeModal('wl-log-modal'); return; }
+      if (ev.target.closest('#wlb-save')) { this.saveBatch(() => { App.closeModal('wl-log-modal'); if (typeof onDone === 'function') onDone(); }); return; }
     });
-    document.getElementById('wle-cancel')?.addEventListener('click', () => App.closeModal('wl-edit-modal'));
-    document.getElementById('wle-save')?.addEventListener('click', () => this.saveLog(onDone));
-  },
-
-  async saveLog(onDone) {
-    const body = this._collect();
-    if (!body) return;
-    const rec = { id: App.uid(), ...body, created_at: new Date().toISOString() };
-    const btn = document.getElementById('wle-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('sc', 'waste', rec);
-    if (ok) { App.closeModal('wl-edit-modal'); if (typeof onDone === 'function') onDone(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('wle-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
   async confirmDel(id) {
