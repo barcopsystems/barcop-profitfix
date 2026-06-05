@@ -1,0 +1,293 @@
+'use strict';
+
+/* ── Shift Control — Checklists (writes sc_checklists) ────────────────────────
+   One screen for both the Opening and Closing checklist. Toggle the type up
+   top (defaults to the one that fits the time of day), the items load from
+   your saved template (or the built-in default), check them off, Save. A
+   printable Worksheet prints the same list blank for the clipboard. Completed
+   runs save to sc_checklists for Operations Reports and the audit trail.
+
+   The default item lists still live on the old per-type modules
+   (S.ShiftOpeningChecklist / S.ShiftClosingChecklist), which stay loaded as the
+   source of those arrays (and for the seed). This screen reuses them. */
+
+S.ShiftChecklists = {
+  TYPES: ['Opening', 'Closing'],
+  TYPE: 'Opening',
+  _typePicked: false,
+  _run: null,
+
+  defaultItems(type) {
+    return type === 'Closing'
+      ? ((S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || [])
+      : ((S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || []);
+  },
+  runs() {
+    if (!App.shiftData) App.shiftData = {};
+    if (!Array.isArray(App.shiftData.sc_checklists)) App.shiftData.sc_checklists = [];
+    return App.shiftData.sc_checklists;
+  },
+  typeRuns() { return this.runs().filter(r => r.type === this.TYPE); },
+  templates() {
+    return ((App.shiftData && App.shiftData.sc_checklist_templates) || []).filter(x => x.type === this.TYPE);
+  },
+  fmtDate(str) {
+    if (!str) return '-';
+    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  },
+  // Manager on the open shift, to pre-fill Completed By.
+  activeManagerId() {
+    const open = ((App.shiftData && App.shiftData.sc_shifts) || [])
+      .filter(s => s.status === 'Open')
+      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())[0];
+    return open ? (open.manager_id || '') : '';
+  },
+
+  render(container, actions) {
+    this.container = container;
+    if (actions) actions.innerHTML = '';
+    // Default the toggle to the checklist that fits the time of day, once.
+    if (!this._typePicked) { this.TYPE = new Date().getHours() < 15 ? 'Opening' : 'Closing'; this._typePicked = true; }
+    this.startRun();
+    this.renderMain();
+  },
+
+  itemsFor(templateId) {
+    const tpl = this.templates().find(t => t.id === templateId);
+    const src = tpl ? (tpl.items || []) : this.defaultItems(this.TYPE);
+    return src.map(text => ({ text, done: false }));
+  },
+
+  startRun(templateId) {
+    const tpls = this.templates();
+    const tid = templateId != null ? templateId : (tpls[0] ? tpls[0].id : '');
+    const mgrId = this.activeManagerId();
+    this._run = {
+      templateId: tid,
+      date: new Date().toISOString().slice(0, 10),
+      completed_by_id: mgrId,
+      completed_by: (App.staffById(mgrId) || {}).name || '',
+      notes: '',
+      items: this.itemsFor(tid)
+    };
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Checklists Work', [
+      { p: ['One screen for your opening and closing routines. Flip between Opening and Closing up top (it starts on the one that fits the time of day), check the items off as you go, and Save when you are done. The Save is your record that the checklist got run.'] },
+      { h: 'Run it on paper', p: ['Tap Worksheet to print the list blank for a clipboard at the bar. Mark it off by hand during the shift, then enter it here after, or just keep the paper.'] },
+      { h: 'Templates', p: ['The items come from your saved Opening and Closing templates (set them up on Checklist Templates). Until you build one, Bar Cop uses a sensible built-in default list.'] }
+    ]);
+  },
+
+  renderMain() {
+    const tpls = this.templates();
+    const showPicker = tpls.length > 1;
+    const items = this._run.items;
+    const done = items.filter(i => i.done).length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+
+    const toggle = '<div style="display:flex;gap:8px;margin-bottom:18px;">'
+      + this.TYPES.map(t =>
+        '<button type="button" class="cl-toggle" data-type="' + t + '" style="padding:8px 18px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
+        + (this.TYPE === t ? 'background:var(--gold-bg);border:1px solid var(--gold);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+        + '">' + t + '</button>').join('')
+      + '</div>';
+
+    const tplField = showPicker
+      ? '<div class="f" style="width:230px;flex-shrink:0;"><label>Template</label><select id="cl-tpl">'
+        + tpls.map(t => '<option value="' + t.id + '"' + (this._run.templateId === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('')
+        + '</select></div>'
+      : '';
+
+    const itemRows = items.map((it, idx) =>
+      '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
+      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? 'var(--gold)' : 'var(--b1)') + ';'
+      + 'border-radius:4px;background:' + (it.done ? 'var(--gold)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
+      + (it.done ? '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5l2.5 2.5 5-5.5" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
+      + '</span>'
+      + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
+      + '</div>').join('');
+
+    const runner = '<div class="card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Checklists</span>' + App.helpButton('cl-how') + '</div>'
+      + toggle
+      + '<div class="form-row" style="gap:16px;">'
+      + tplField
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="cl-date" value="' + esc(this._run.date) + '"/></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Completed By</label><select id="cl-by">' + App.staffOptions(this._run.completed_by_id || this._run.completed_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '</div>'
+      + '<div style="margin:8px 0 14px;">'
+      + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;"><span>' + done + ' of ' + items.length + ' complete</span><span>' + pct + '%</span></div>'
+      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
+      + '<div id="cl-items">' + itemRows + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="cl-save">Save Completed Checklist</button>'
+      + '<button class="btn btn-ghost" id="cl-worksheet">Worksheet</button>'
+      + '<button class="btn btn-ghost" id="cl-reset">Reset</button>'
+      + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+
+    const histRuns = [...this.typeRuns()].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    let histCard = '';
+    if (histRuns.length) {
+      const rows = histRuns.slice(0, App.listLimit('sc', 'checklist')).map(r => {
+        const full = (r.done_count || 0) >= (r.total_count || 0) && (r.total_count || 0) > 0;
+        const status = full
+          ? '<span style="color:var(--green);font-weight:700;">Complete</span>'
+          : '<span style="color:var(--amber);font-weight:700;">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</span>';
+        return '<tr class="cl-hrow" data-id="' + r.id + '" style="cursor:pointer;">'
+          + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
+          + '<td>' + esc(r.template_name || (this.TYPE + ' Checklist')) + '</td>'
+          + '<td>' + esc(r.completed_by || '-') + '</td>'
+          + '<td>' + status + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm cl-hview" data-id="' + r.id + '">View</button>'
+          + '<button class="btn btn-danger btn-sm cl-hdel" data-id="' + r.id + '">Delete</button>'
+          + '</div></td></tr>';
+      }).join('');
+      histCard = '<div class="card"><div class="card-title">Completed ' + this.TYPE + ' Checklists</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('sc', 'checklist', histRuns, true) + '</div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + runner + histCard + '</div>';
+    this._bindRunner();
+    this.container.onclick = ev => {
+      const tog = ev.target.closest('.cl-toggle');
+      if (tog) { this.TYPE = tog.dataset.type; this.startRun(); this.renderMain(); return; }
+      if (ev.target.closest('#cl-how')) { this.showHowTo(); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
+      const hrow = ev.target.closest('.cl-hrow');
+      const hview = ev.target.closest('.cl-hview');
+      const hdel = ev.target.closest('.cl-hdel');
+      if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
+      else if (hrow) this.renderDetail(hrow.dataset.id);
+    };
+  },
+
+  _bindRunner() {
+    const sync = () => {
+      this._run.date = document.getElementById('cl-date')?.value || this._run.date;
+      this._run.completed_by_id = document.getElementById('cl-by')?.value || '';
+      this._run.completed_by = (App.staffById(this._run.completed_by_id) || {}).name || '';
+      this._run.notes = document.getElementById('cl-notes')?.value || '';
+    };
+    document.getElementById('cl-items')?.addEventListener('click', ev => {
+      const row = ev.target.closest('.cl-item');
+      if (!row) return;
+      sync();
+      const idx = parseInt(row.dataset.idx, 10);
+      this._run.items[idx].done = !this._run.items[idx].done;
+      this.renderMain();
+    });
+    document.getElementById('cl-tpl')?.addEventListener('change', e => { sync(); this.startRun(e.target.value); this.renderMain(); });
+    document.getElementById('cl-reset')?.addEventListener('click', () => { this.startRun(this._run.templateId); this.renderMain(); });
+    document.getElementById('cl-worksheet')?.addEventListener('click', () => { sync(); this.worksheet(); });
+    document.getElementById('cl-save')?.addEventListener('click', () => { sync(); this.save(); });
+  },
+
+  async save() {
+    const err = document.getElementById('cl-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (!this._run.completed_by_id) { fail('Pick who completed the checklist.'); return; }
+    const tpl = this.templates().find(t => t.id === this._run.templateId);
+    const items = this._run.items;
+    const rec = {
+      id:            App.uid(),
+      type:          this.TYPE,
+      template_id:   this._run.templateId || '',
+      template_name: tpl ? tpl.name : ('Default ' + this.TYPE + ' Checklist'),
+      date:          this._run.date,
+      completed_by_id: this._run.completed_by_id || '',
+      completed_by:    this._run.completed_by || '',
+      items:         items.map(i => ({ text: i.text, done: !!i.done })),
+      done_count:    items.filter(i => i.done).length,
+      total_count:   items.length,
+      notes:         this._run.notes.trim(),
+      completed_at:  new Date().toISOString(),
+      created_at:    new Date().toISOString()
+    };
+    const btn = document.getElementById('cl-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    this.runs().push(rec);
+    const ok = await App.putRecord('sc', 'checklist', rec);
+    if (ok) { this.startRun(this._run.templateId); this.renderMain(); }
+    else {
+      this.runs().pop();
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Completed Checklist'; }
+      fail('Save failed. Try again.');
+    }
+  },
+
+  renderDetail(id) {
+    const r = this.runs().find(x => x.id === id);
+    if (!r) { this.renderMain(); return; }
+    const itemRows = (r.items || []).map(it =>
+      '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--b2);">'
+      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? 'var(--gold)' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
+      + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
+    this.container.innerHTML = '<div class="screen">'
+      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="cl-back">&laquo; Back to Checklists</button></div>'
+      + '<div class="card"><div class="card-title">' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</div>'
+      + '<div class="calc" style="margin-bottom:14px;">'
+      + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
+      + '</div>'
+      + itemRows
+      + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
+      + '<div class="card-actions"><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div></div>';
+    this.container.onclick = ev => {
+      if (ev.target.closest('#cl-back')) this.renderMain();
+      else if (ev.target.closest('#cl-print')) this.exportPDF(r);
+    };
+  },
+
+  async exportPDF(r) {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+    const type = r.type || this.TYPE;
+    const b = App._pdfBuilder(type + ' Checklist');
+    b.header({ right: type + ' Checklist', meta: this.fmtDate(r.date) });
+    b.kv('Template', r.template_name || (type + ' Checklist'));
+    b.kv('Completed By', r.completed_by || '-');
+    b.kv('Items Done', (r.done_count || 0) + ' of ' + (r.total_count || 0));
+    b.spacer(6);
+    b.sectionTitle('Checklist Items');
+    b.table(['Status', 'Item'], (r.items || []).map(it => [it.done ? 'DONE' : '-', it.text]), { columnStyles: { 0: { cellWidth: 60 } } });
+    if (r.notes) { b.sectionTitle('Notes'); b.paragraph(r.notes); }
+    const ds = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date.replace(/-/g, '') : App._pdfDateStamp();
+    await b.save('BarCop_' + type + 'Checklist_' + ds + '.pdf');
+  },
+
+  // Blank printable checklist for the clipboard: the current list with empty
+  // check boxes and lines to fill in by hand.
+  async worksheet() {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+    const type = this.TYPE;
+    const items = this.itemsFor(this._run.templateId).map(i => i.text);
+    const b = App._pdfBuilder(type + ' Checklist Worksheet');
+    b.header({ right: type + ' Checklist', meta: 'Worksheet' });
+    b.kv('Date', '________________');
+    b.kv('Completed By', '________________');
+    b.spacer(6);
+    b.sectionTitle('Check off each item as you complete it');
+    b.table(['Done', 'Item'], items.map(t => ['[   ]', t]), { columnStyles: { 0: { cellWidth: 55 } } });
+    b.spacer(8);
+    b.sectionTitle('Notes');
+    b.paragraph(' ');
+    await b.save('BarCop_' + type + 'ChecklistWorksheet.pdf');
+  },
+
+  async confirmDel(id) {
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('sc', 'checklist', id);
+    this.renderMain();
+  }
+};
