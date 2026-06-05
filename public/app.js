@@ -1190,6 +1190,9 @@ const App = {
   // its own wrapper and keeps its current look for now.
   _PROTO_TABS: [['hub','Hub'],['profit','Profit'],['revenue','Revenue'],['traffic','Traffic'],['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _MODULE_KEYS: ['profit', 'revenue', 'traffic', 'inventory', 'labor', 'shift'],
+  // Pages rebuilt in the un-box language carry their own page header, so the old
+  // topbar title bar is hidden for them (see navigate). Grows page by page.
+  _CONVERTED: new Set(['sc-drawers']),
   _renderProtoTopnav(module) {
     const app = document.getElementById('app');
     if (!app) return;
@@ -2814,6 +2817,9 @@ const App = {
     }
     try {
     this.updateNav(id);
+    // Hide the old topbar title bar on pages converted to the un-box language
+    // (they carry their own page header); un-converted pages keep it.
+    document.getElementById('app')?.classList.toggle('topbar-hidden', this._CONVERTED.has(id));
     const content = document.getElementById('content-area');
     const actions = document.getElementById('topbar-actions');
     actions.innerHTML = '';
