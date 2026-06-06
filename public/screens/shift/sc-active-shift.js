@@ -1565,11 +1565,11 @@ S.ShiftActiveShift = {
       },
       tip_recon: {
         logged_total: ((App.laborData && App.laborData.lc_tips) || [])
-          .filter(t => t.shift_id === s.id || t.date === s.date)
+          .filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date))
           .reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0),
         pos_reported: d.tips_pos_reported,
         variance:     d.tips_pos_reported != null ? (d.tips_pos_reported - ((App.laborData && App.laborData.lc_tips) || [])
-          .filter(t => t.shift_id === s.id || t.date === s.date)
+          .filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date))
           .reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0)) : null
       },
       exception_ack: d.ack || {},
