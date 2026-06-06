@@ -100,7 +100,7 @@ S.ShiftActiveShift = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="page"><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
       + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
@@ -504,8 +504,8 @@ S.ShiftActiveShift = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Dropped <span style="color:var(--gold);font-weight:700;float:right;">' + App.fmtCurrency(dropped) + '</span></div>'
         + '</div>';
     }).join('');
-    return '<div class="canvas-sub">Registers</div>'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + tiles + '</div>';
+    return '<div class="card"><div class="card-title">Registers</div>'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + tiles + '</div></div>';
   },
 
   // Discard a just-opened shift (mistake on the opener). Removes the open shift
@@ -578,24 +578,25 @@ S.ShiftActiveShift = {
       + '<div style="font-family:\'Barlow Condensed\';font-size:30px;font-weight:600;color:var(--w);line-height:1.1;">' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);">' + sub + '</div></div>';
 
-    this.container.innerHTML = '<div class="page">'
-      + '<div class="page-head"><div>'
-      + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">'
+    this.container.innerHTML = '<div class="screen">'
+      + '<div class="card">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
       + '<span style="width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);"></span>'
       + '<span style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Shift Running</span></div>'
-      + '<h1 class="page-title">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</h1>'
-      + '<div class="page-sub">'
+      + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">'
       + (s.manager ? 'Manager: ' + esc(s.manager) + ' &middot; ' : '')
       + (s.started_at ? 'Running ' + this.elapsed(s.started_at) : '')
       + (s.opening_bank != null ? ' &middot; Opening bank ' + App.fmtCurrency(s.opening_bank) : '') + '</div>'
       + '</div>'
-      + '<div class="page-head-actions">' + App.helpButton('as-how')
-      + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button></div>'
+      + App.helpButton('as-how')
+      + '</div>'
       + '</div>'
 
       + this.registersCard(s)
 
-      + '<div class="canvas-sub">This Shift</div>'
+      + '<div class="card"><div class="card-title">This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverProgressLabel)
       + stat('Labor So Far', App.fmtCurrency(labor.cost), laborSub)
@@ -603,21 +604,24 @@ S.ShiftActiveShift = {
       + stat('Voids &amp; Comps', vc.length, App.fmtCurrency(vcTotal) + ' total')
       + stat('86\'d Items', active86, active86 === 1 ? 'item out' : 'items out')
       + stat('Open Maint.', openMaint, openMaint === 1 ? 'issue' : 'issues')
-      + '</div>'
+      + '</div></div>'
 
-      + '<div class="canvas-sub">Log During This Shift</div>'
+      + '<div class="card"><div class="card-title">Log During This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost" id="ld-cash" style="height:52px;flex:1;min-width:120px;">Cash Drop</button>'
       + '<button class="btn btn-ghost" id="ld-vc" style="height:52px;flex:1;min-width:120px;">Void / Comp</button>'
       + '<button class="btn btn-ghost" id="ld-waste" style="height:52px;flex:1;min-width:120px;">Waste / Spill</button>'
       + '<button class="btn btn-ghost" id="ld-86" style="height:52px;flex:1;min-width:120px;">86 an Item</button>'
       + '<button class="btn btn-ghost" id="ld-maint" style="height:52px;flex:1;min-width:120px;">Maintenance</button>'
-      + '</div>'
+      + '</div></div>'
 
       + this.renderShiftNotesCard(s)
 
-      + '<div style="margin-top:34px;"><button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button></div>'
-      + '</div>';
+      + '<div class="card"><div class="card-title">End of Shift</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button>'
+      + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
+      + '</div></div></div>';
 
     // Log-During buttons open each module's entry form as a pop-up with an
     // onDone that re-renders the running shift, so the manager never leaves it.
@@ -729,13 +733,14 @@ S.ShiftActiveShift = {
           + '<button class="btn btn-ghost btn-sm sn-del" data-id="' + esc(n.id) + '" style="font-size:10px;padding:2px 8px;color:var(--red);">Delete</button>'
           + '</div>').join('')
       + '</div>';
-    return '<div class="canvas-sub">Shift Notes</div>'
+    return '<div class="card"><div class="card-title">Shift Notes</div>'
       + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:10px;">'
         + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add a Note</label>'
           + '<textarea id="sn-text" rows="2" placeholder="VIP at 9pm, delivery short on bourbon, weather slowing us down..."></textarea></div>'
         + '<div style="flex-shrink:0;"><button class="btn btn-primary" id="sn-add" style="height:48px;">Add Note</button></div>'
       + '</div>'
-      + list;
+      + list
+      + '</div>';
   },
 
   async addShiftNote(s) {
@@ -877,7 +882,7 @@ S.ShiftActiveShift = {
     else if (step === 'tips')       body = this.stepTips(s);
     else                            body = this.stepHandoff(s);
 
-    this.container.innerHTML = '<div class="page">' + header + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + header + body + '</div>';
     this.wireWizard(s);
   },
 
@@ -1591,7 +1596,7 @@ S.ShiftActiveShift = {
     const cashLine = (cv == null) ? ''
       : '<div style="font-size:11px;color:' + (Math.abs(cv) <= App.cashToleranceForShift(s) ? 'var(--gold)' : 'var(--red)') + ';font-weight:700;margin-top:6px;">'
         + 'Cash variance ' + (cv >= 0 ? '+' : '') + App.fmtCurrency(cv) + ' &middot; auto-logged to Variance Log</div>';
-    this.container.innerHTML = '<div class="page"><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
       + '<circle cx="20" cy="20" r="17" stroke="var(--gold)" stroke-width="1.8"/>'
