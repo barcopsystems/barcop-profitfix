@@ -100,7 +100,7 @@ S.ShiftActiveShift = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen"><div class="card">'
+    this.container.innerHTML = '<div class="screen"><div class="card form-card">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
       + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
@@ -125,9 +125,10 @@ S.ShiftActiveShift = {
       + '<div class="fw" style="width:130px;"><span class="pre">$</span><input class="pre" type="number" id="of-tol" min="0" step="0.5" inputmode="decimal" value="' + esc(String(d.cash_tolerance != null ? d.cash_tolerance : '')) + '" oninput="S.ShiftActiveShift.setTol(this.value)"/></div></div>'
       + '</div>'
 
-      + '<div class="card-actions" style="margin-top:24px;">'
+      + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="as-start">Open the Floor</button>'
       + '<span id="as-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-ghost" id="rs-log" style="margin-left:auto;">Log a Past Shift</button>'
       + '</div></div>'
       + this.recentShiftsCard()
       + '</div>';
@@ -143,7 +144,7 @@ S.ShiftActiveShift = {
       if (rsEdit) { this.showShiftForm(rsEdit.dataset.id); return; }
       const rsView = ev.target.closest('.rs-view');
       if (rsView) { S.ShiftHistory._openDetailId = rsView.dataset.id; App.navigate('sc-shift-history'); return; }
-      if (ev.target.closest('#rs-clear')) { this._rsFrom = this._rsTo = ''; this.renderStart(); return; }
+      if (ev.target.closest('#rs-clear')) { this._rsFrom = this._rsTo = this._rsShift = this._rsMgr = ''; this.renderStart(); return; }
       if (chip) { d.shift_type = chip.dataset.type; d.cash_tolerance = this._defaultToleranceFor(d.shift_type); this.renderStart(); return; }
       if (mod) { d.manager_id = (d.manager_id === mod.dataset.mgr) ? '' : mod.dataset.mgr; this.renderStart(); return; }
       if (ev.target.closest('#of-staff-minus')) { d.staff_on_floor = Math.max(0, (parseInt(d.staff_on_floor) || 0) - 1); this.renderStart(); return; }
@@ -163,51 +164,79 @@ S.ShiftActiveShift = {
     };
     document.getElementById('rs-from')?.addEventListener('change', e => { this._rsFrom = e.target.value || ''; this.renderStart(); });
     document.getElementById('rs-to')?.addEventListener('change', e => { this._rsTo = e.target.value || ''; this.renderStart(); });
+    document.getElementById('rs-shift')?.addEventListener('change', e => { this._rsShift = e.target.value || ''; this.renderStart(); });
+    document.getElementById('rs-mgr')?.addEventListener('change', e => { this._rsMgr = e.target.value || ''; this.renderStart(); });
   },
 
   // ── Recent Shifts (opener-state command center: view/edit/log past shifts) ──
-  // The filter card holds the title + Log a Past Shift + a light date filter;
-  // the rows sit OUTSIDE the card. Shift History stays the read-only archive.
+  // A Filter card (date range + shift + manager + Clear) sits above a "Recent
+  // Shifts" .sh heading and the .data-card rows. Log a Past Shift lives in the
+  // Open the Floor footer row. Shift History stays the read-only archive.
   _rsFrom: '',
   _rsTo: '',
+  _rsShift: '',
+  _rsMgr: '',
   recentShiftsCard() {
     const all = [...this.shifts()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    const from = this._rsFrom || '', to = this._rsTo || '';
+    const from = this._rsFrom || '', to = this._rsTo || '', fShift = this._rsShift || '', fMgr = this._rsMgr || '';
+
+    // Manager filter options pulled from the shifts themselves (value = manager_id or name).
+    const mgrMap = {};
+    all.forEach(s => {
+      const id = s.manager_id || s.manager || '';
+      if (id && !mgrMap[id]) mgrMap[id] = s.manager || (App.staffById ? (App.staffById(s.manager_id) || {}).name : '') || String(id);
+    });
+    const shiftOpts = '<option value="">All shifts</option>'
+      + App.SHIFT_TYPES.map(t => '<option value="' + esc(t) + '"' + (fShift === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const mgrOpts = '<option value="">All managers</option>'
+      + Object.keys(mgrMap).map(id => '<option value="' + esc(id) + '"' + (fMgr === id ? ' selected' : '') + '>' + esc(mgrMap[id]) + '</option>').join('');
+
     const list = all.filter(s => {
       if (from && (s.date || '') < from) return false;
       if (to && (s.date || '') > to) return false;
+      if (fShift && (s.shift_type || '') !== fShift) return false;
+      if (fMgr && (s.manager_id || s.manager || '') !== fMgr) return false;
       return true;
     });
-    const limited = (from || to) ? list : list.slice(0, 10);
+    const anyFilter = !!(from || to || fShift || fMgr);
+    const limited = anyFilter ? list : list.slice(0, 10);
+
     const card = '<div class="card" style="margin-top:16px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Recent Shifts</span><button class="btn btn-primary btn-sm" id="rs-log">Log a Past Shift</button></div>'
+      + '<div class="card-title">Filter</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(from) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="rs-to" value="' + esc(to) + '"/></div>'
-      + ((from || to) ? '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="rs-clear">Clear</button></div>' : '')
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="rs-shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="rs-mgr">' + mgrOpts + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="rs-clear">Clear</button></div>'
       + '</div></div>';
+
     let below;
-    if (!all.length) below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts yet. Open the floor above, or log a past shift.</div>';
-    else if (!limited.length) below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts in that range.</div>';
-    else {
-      const trs = limited.map(s => {
-        const statusText = s.status === 'Open'
-          ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
-          : '<span style="color:var(--t3);font-weight:700;">Closed</span>';
-        return '<tr>'
-          + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-          + '<td>' + esc(s.shift_type || '-') + '</td>'
-          + '<td>' + esc(s.manager || '-') + '</td>'
-          + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-          + '<td>' + statusText + '</td>'
-          + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm rs-view" data-id="' + s.id + '">View</button>'
-          + '<button class="btn btn-ghost btn-sm rs-edit" data-id="' + s.id + '">Edit</button></div></td></tr>';
-      }).join('');
-      below = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:12px;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+    if (!all.length) {
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts yet. Open the floor above, or log a past shift.</div>';
+    } else {
+      below = '<div class="sh" style="margin-top:24px;">Recent Shifts</div>';
+      if (!limited.length) {
+        below += '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts match the filter.</div>';
+      } else {
+        const trs = limited.map(s => {
+          const statusText = s.status === 'Open'
+            ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
+            : '<span style="color:var(--t3);font-weight:700;">Closed</span>';
+          return '<tr>'
+            + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
+            + '<td>' + esc(s.shift_type || '-') + '</td>'
+            + '<td>' + esc(s.manager || '-') + '</td>'
+            + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
+            + '<td>' + statusText + '</td>'
+            + '<td><div class="row-actions">'
+            + '<button class="btn btn-ghost btn-sm rs-view" data-id="' + s.id + '">View</button>'
+            + '<button class="btn btn-ghost btn-sm rs-edit" data-id="' + s.id + '">Edit</button></div></td></tr>';
+        }).join('');
+        below += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Status</th><th></th>'
+          + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
+      }
     }
     return card + below;
   },
@@ -221,7 +250,7 @@ S.ShiftActiveShift = {
     if (id && App.canEdit && !App.canEdit('sc-active-shift')) return;
     this._shiftFormId = id || null;
     const s = id ? this.shifts().find(x => x.id === id) : null;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
       + this.shiftFormRows(s)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="asf-save">' + (id ? 'Update' : 'Save Shift') + '</button>'
@@ -261,7 +290,7 @@ S.ShiftActiveShift = {
       + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="asf-total">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="asf-checkavg">-</div></div>'
       + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label><textarea id="asf-notes" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div>';
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label><textarea id="asf-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div>';
   },
 
   calcShiftForm() {
