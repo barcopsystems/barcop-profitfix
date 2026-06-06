@@ -424,9 +424,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
 /* Drawers/Registers card — data-row color experiment (header stays --surface). */
 .sc-dr-card .tbl tbody td{background:#0D181E;}
-/* Add Drawer card — full-width dividers, centered header/action bars, roomier form (experiment). */
-.sc-dr-form > .card-title{margin:-20px -20px 0;padding:13px 20px;border-bottom:1px solid var(--b2);}
-.sc-dr-form .collapse-body{padding-top:18px;}
+/* Add/Edit Drawer card — full-width dividers, centered header/action bars, roomier form (experiment).
+   Works for both the collapsible on-page card and the plain edit-modal card: the title's bottom
+   margin carries the gap to the form in both (no .collapse-body in the modal). */
+.sc-dr-form > .card-title{margin:-20px -20px 18px;padding:13px 20px;border-bottom:1px solid var(--b2);}
 .sc-dr-form .card-actions{margin:18px -20px -20px;padding:13px 20px;border-top:1px solid var(--b2);}
 .f textarea.dr-notes-ta{min-height:0;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
