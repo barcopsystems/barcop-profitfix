@@ -199,7 +199,7 @@ S.ShiftCashControl = {
       countLine = '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Last safe count ' + this.fmtDate(lastCount.date) + ': '
         + '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> ' + esc(st) + '</div>';
     }
-    const safeCard = '<div class="card no-print" style="margin-bottom:16px;">'
+    const safeCard = '<div class="card form-card no-print" style="margin-bottom:16px;">'
       + App.collapsibleCardTitle('sc-cash-safe', 'The Safe', App.helpButton('cc-how'))
       + '<div class="collapse-body">'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Current Safe Balance</div>'
@@ -239,7 +239,7 @@ S.ShiftCashControl = {
         +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Count Drawer</button>'
         + '</div></div>';
     };
-    const registersCard = '<div class="card no-print" data-collapse-group="sc-cash-safe" style="margin-bottom:16px;"><div class="card-title">Registers</div>'
+    const registersCard = '<div class="card form-card no-print" data-collapse-group="sc-cash-safe" style="margin-bottom:16px;"><div class="card-title">Registers</div>'
       + (this.drawers().length
           ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">' + this.drawers().map(tile).join('') + '</div>'
           : '<div style="font-size:13px;color:var(--t3);">No drawers set up yet. Add your registers so each one tracks its drops and closes. <button class="btn btn-ghost btn-sm" id="cc-go-drawers">Set Up Drawers</button></div>')
@@ -261,19 +261,19 @@ S.ShiftCashControl = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + netLabel + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">' + (netWin >= 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div></div>';
 
-    const statBoxes = '<div class="calc" style="margin-bottom:0;">'
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Drops In</div><div class="calc-val">' + App.fmtCurrency(totDrops) + '</div><div style="font-size:10px;color:var(--t3);">' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Safe Out</div><div class="calc-val">' + App.fmtCurrency(totOut) + '</div><div style="font-size:10px;color:var(--t3);">deposits and banks</div></div>'
       + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val ' + (flagged.length ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
       + netBox
-      + '</div>';
+      + '</div></div>';
 
-    const filterCard = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span><button class="btn btn-ghost btn-sm" id="cc-export">Export PDF</button></div>'
-      + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">'
+    const filterCard = '<div class="card no-print">'
+      + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       +   '<div class="f" style="width:200px;flex-shrink:0;"><label>Date Range</label><select id="cc-range">' + this.rangeOptions() + '</select></div>'
-      + '</div>' + statBoxes + '</div>';
+      +   '<button class="btn btn-ghost btn-sm" id="cc-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
+      + '</div></div>';
 
     // ── 4. Cash Activity (bare list under the filter card) ──
     let activityBody;
@@ -305,11 +305,13 @@ S.ShiftCashControl = {
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm cc-edit" data-cat="' + esc(s.editCat) + '" data-id="' + esc(s.editId || '') + '">Edit</button></div></td>'
         + '</tr>';
       }).join('');
-      activityBody = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      activityBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Reference</th><th>By</th><th>Amount</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
-    this.container.innerHTML = '<div class="screen">' + safeCard + registersCard + filterCard + activityBody + '</div>';
+    this.container.innerHTML = '<div class="screen">' + safeCard + registersCard + statsCard
+      + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Cash Activity</div>'
+      + filterCard + activityBody + '</div>';
     App.applyCollapsed(this.container);
 
     document.getElementById('cc-range')?.addEventListener('change', e => { this.range = e.target.value; this.draw(); });
@@ -366,7 +368,7 @@ S.ShiftCashControl = {
     const typeOpts  = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Cash Drop' : 'Log a Cash Drop') + '</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Cash Drop' : 'Log a Cash Drop') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccd-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccd-type" style="height:44px;">' + typeOpts + '</select></div>'
@@ -383,7 +385,7 @@ S.ShiftCashControl = {
       +   '<div class="f" style="width:200px;min-width:0;"><label>Amount Dropped</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccd-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '" style="height:48px;font-size:20px;"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:12px;">Counts auto-fill here. Edit directly if you are not counting by bill.</div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccd-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccd-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="ccd-save">' + (editing ? 'Update' : 'Save Drop') + '</button><button class="btn btn-ghost" id="ccd-cancel">Cancel</button>'
       +   '<span id="ccd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
@@ -451,7 +453,7 @@ S.ShiftCashControl = {
     const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
     const witId = editing ? (rec.witness_id || rec.witness) : '';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
       + '<div class="form-row" style="gap:14px;">'
       +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
@@ -466,7 +468,7 @@ S.ShiftCashControl = {
       +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccs-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
       +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccs-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccs-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">' + (editing ? 'Update' : 'Save') + '</button><button class="btn btn-ghost" id="ccs-cancel">Cancel</button>'
       +   '<span id="ccs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
@@ -530,7 +532,7 @@ S.ShiftCashControl = {
     const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
     const witId = editing ? (rec.witness_id || rec.witness) : '';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Safe Count' : 'Count the Safe') + '</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Safe Count' : 'Count the Safe') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
       +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccc-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccc-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
@@ -547,7 +549,7 @@ S.ShiftCashControl = {
       +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccc-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
       +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccc-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccc-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccc-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="ccc-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccc-cancel">Cancel</button>'
       +   '<span id="ccc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
@@ -620,7 +622,7 @@ S.ShiftCashControl = {
       + S.ShiftVarianceLog.REASONS.map(r => '<option' + (rec && rec.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Count' : 'Count Drawer') + '</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Count' : 'Count Drawer') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
@@ -637,7 +639,7 @@ S.ShiftCashControl = {
       +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim">&plusmn;' + App.fmtCurrency(this.tolerance()) + '</div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
       +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
