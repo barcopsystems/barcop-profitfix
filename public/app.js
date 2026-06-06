@@ -212,6 +212,7 @@ const TT = {
     'sp-restock-keg': {t:'Restocked Mid-Shift',b:'Fresh kegs you tapped after the pre-shift count. Bar Cop adds them to the keg you started with so the pour count stays honest across a keg change.',e:'Started near empty, blew the keg and tapped a fresh one, count the fresh keg here'},
     'dr-bank':        {t:'Default Opening Bank',b:'The starting cash this drawer normally opens with. Bar Cop pre-fills the opening bank when you start a shift on this drawer, so you are not retyping it every day. Leave it blank if the bank varies.',e:'Main bar opens with $300 every night'},
     'cs-tolerance':   {t:'Cash Variance Tolerance',b:'The most a drawer can be off before Bar Cop flags it. A count under this stays green; over it flags the shift on the Variance Log, Cash Reconciliation, and the Handoff Report.',e:'$10 tolerance: a drawer $7 short is fine, $14 short flags'},
+    'ccs-threshold':  {t:'Comp Authorization Threshold',b:'Comps above this dollar amount require a manager in the Authorized By field on the Void and Comp Log. Default $25. Set it to 0 to disable the warning entirely.'},
     'sp-pos-pours':   {t:'POS Pours Sold',b:'Pours your POS rang in for this product this shift. Bar Cop compares it to what your pre and post counts say you poured. A large gap points to overpouring, give-aways, or theft.',e:'Counts say 40 pours left the bottle, POS rang 33, that is 7 pours unaccounted for'},
     'sp-pos-btl':     {t:'POS Bottles Sold',b:'Bottles your POS rang in for this beer this shift. Bar Cop compares it to the bottles your counts say left the cooler. A gap is give-aways, walk-offs, or theft.',e:'Counts say 48 bottles left the cooler, POS rang 44, that is 4 bottles unaccounted for'},
     'rd-qty':         {t:'Qty Received',b:'How many you actually counted off the truck, not what the invoice claims. If it comes up short of what you ordered, Bar Cop flags the line so you can claim the credit. Bottle beer is counted in cases.',e:'Ordered 6, only 5 showed up, enter 5'},
@@ -1224,7 +1225,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings']),
+  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings', 'sc-comp-settings']),
   _protoGlobalClick(g) {
     if (g === 'hub')   return this.showHub();
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
