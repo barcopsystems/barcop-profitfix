@@ -433,7 +433,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .sc-dr-card .tbl tbody td{background:#0D181E;}
 /* Row hover: a hair lighter than #0D181E (the generic --hover lands on the same
    color now that rows are #0D181E), so hover is a very slight lift. */
-.sc-dr-card .tbl tbody tr:hover td{background:#111D24;}
+.sc-dr-card .tbl tbody tr:hover td{background:#0F1A21;}
 /* Add/Edit Drawer card — full-width dividers, centered header/action bars, roomier form (experiment).
    Works for both the collapsible on-page card and the plain edit-modal card: the title's bottom
    margin carries the gap to the form in both (no .collapse-body in the modal). */
