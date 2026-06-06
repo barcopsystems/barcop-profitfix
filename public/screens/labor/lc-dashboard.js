@@ -1,10 +1,11 @@
 'use strict';
 
 /* ── Labor Control — Dashboard (landing screen) ───────────────────────────────
-   At-a-glance labor health: last-7-day labor cost and hours, overtime risk for
-   the current week, roster size, plus alerts and recent activity. Day-one state
-   mirrors the Inventory dashboard: a Get Started strip, placeholder tiles, and
-   guided panels until hours are logged. */
+   Last-7-day labor cost and hours, overtime risk for the current week, roster
+   size, plus alerts and recent activity. Same layout and card standard as the
+   Shift dashboard: KPI tiles, a full-width banded hero, two equal-height rows of
+   heading-outside panels, a data-card for the recent list, then Quick Actions,
+   with a day-one Get Started state until hours are logged. */
 
 S.LaborDashboard = {
   actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
@@ -36,17 +37,28 @@ S.LaborDashboard = {
     return App.ymdLocal(d);
   },
 
-  // ── Shared bits (match the Inventory dashboard's design language) ────────────
+  // ── Shared bits (match the Shift dashboard card standard) ────────────────────
   metricCard(label, valHtml, target, cls) {
     return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
       + '<div class="metric-val ' + (cls || '') + '">' + valHtml + '</div>'
       + '<div class="metric-target">' + target + '</div><div class="metric-trend"> </div></div>';
   },
+  // Full-width hero: a .form-card with a banded title (optional right action).
+  panelCard(title, bodyHtml, titleRight) {
+    return '<div class="card form-card" style="height:100%;">'
+      + '<div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '>'
+      + '<span>' + title + '</span>' + (titleRight || '') + '</div>'
+      + bodyHtml + '</div>';
+  },
+  // Grid panel: title OUTSIDE the card as a .sh heading so side-by-side panels
+  // line up on top; the card flexes to fill its row column for equal height.
+  shPanel(title, bodyHtml) {
+    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
+      + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
+  },
   actionBtn(id, label) {
     return '<button class="btn btn-primary ld-act" data-go="' + id + '" style="flex:1;min-width:150px;">' + label + '</button>';
   },
-  // Quick Actions — no card box: label, divider, bare buttons on the background
-  // (identical treatment to the Inventory dashboard).
   quickActions() {
     return '<div style="margin-top:20px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
@@ -57,11 +69,18 @@ S.LaborDashboard = {
       + this.actionBtn('lc-reports', 'Labor Reports')
       + '</div></div>';
   },
+  // Two equal-height columns: each column is a flex-column so the card inside
+  // (flex:1) grows to match its row-mate even with the .sh heading outside.
+  row(a, b) {
+    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
+      + '<div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
+      + '<div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
+  },
 
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    actions.innerHTML = '';
+    if (actions) actions.innerHTML = '';
     if (this.actuals().length === 0) this.renderDayOne();
     else this.renderFull();
     this.container.onclick = ev => {
@@ -70,7 +89,7 @@ S.LaborDashboard = {
     };
   },
 
-  // ── Day-one: the real dashboard layout in placeholder form + Get Started ─────
+  // ── Day-one: the real layout in placeholder form + Get Started ────────────────
   renderDayOne() {
     const hasPos = this.positions().length > 0;
     const totalStaff = this.staff().length;
@@ -83,7 +102,7 @@ S.LaborDashboard = {
       + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : '') + '</span>'
       + '<span style="font-size:12px;font-weight:600;color:' + (current ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</span></div>';
 
-    const startStrip = '<div class="card" style="margin-bottom:16px;">'
+    const startStrip = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Get Started</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps and this dashboard fills in with your labor cost, overtime risk, and coverage alerts.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
@@ -98,25 +117,17 @@ S.LaborDashboard = {
       + this.metricCard('Overtime Risk', '&mdash;', 'After you build a schedule')
       + this.metricCard('Active Staff', String(activeStaff), totalStaff + ' on the roster');
 
-    const emptyPanel = (title, msg, btns) =>
-      '<div class="card" style="height:100%;"><div class="card-title">' + title + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>'
-      + (btns || '') + '</div>';
-    const row = (a, b) =>
-      '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<div style="flex:1 1 300px;min-width:0;">' + a + '</div>'
-      + '<div style="flex:1 1 280px;min-width:0;">' + b + '</div></div>';
-
-    const alertsPanel = emptyPanel('Alerts', 'Overtime risk, uncovered call-outs, and expiring certifications surface here once you build a schedule and log hours.');
-    const recentPanel = emptyPanel('Recent Hours', 'The hours you log show up here.',
-      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
+    const emptyBody = msg => '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
+    const alertsPanel = this.shPanel('Alerts', emptyBody('Overtime risk, uncovered call-outs, and expiring certifications surface here once you build a schedule and log hours.'));
+    const recentPanel = this.shPanel('Recent Hours', emptyBody('The hours you log show up here.')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
         + this.actionBtn('lc-log-hours', 'Log Hours')
         + this.actionBtn('lc-staff-roster', 'Staff Roster') + '</div>');
 
     this.container.innerHTML = '<div class="screen">'
       + startStrip
       + '<div class="metric-grid">' + cards + '</div>'
-      + row(alertsPanel, recentPanel)
+      + this.row(alertsPanel, recentPanel)
       + '</div>';
   },
 
@@ -160,22 +171,19 @@ S.LaborDashboard = {
              over + ' over &middot; ' + approaching + ' approaching', (over + approaching) ? 'over-target' : 'on-target')
       + this.metricCard('Active Staff', String(activeStaff), this.staff().length + ' on the roster');
 
-    // ── This Week (scheduled plan vs logged so far) — full-width hero ──
+    // ── This Week hero (full width) ──
     let weekCard;
     if (!sched) {
-      weekCard = '<div class="card"><div class="card-title">This Week</div>'
-        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-        + '<div style="font-size:13px;color:var(--t2);">No schedule built for this week yet. Build one to set a labor budget and project overtime.</div>'
-        + '<button class="btn btn-primary btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">Build Schedule</button></div></div>';
+      weekCard = this.panelCard('This Week',
+        '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No schedule built for this week yet. Build one to set a labor budget and project overtime.</div>',
+        '<button class="btn btn-primary btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">Build Schedule</button>');
     } else {
       const loggedHours = curWeek.reduce((t, a) => t + (a.hours || 0), 0);
       const loggedCost = curWeek.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(wkStart, today).total;
       const fc = sched.revenue_forecast || 0;
       const planPct = fc > 0 ? (sched.total_cost || 0) / fc * 100 : null;
-      weekCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>This Week</span>'
-        + '<button class="btn btn-ghost btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">View Schedule</button></div>'
-        + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
+      weekCard = this.panelCard('This Week',
+        '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Scheduled</div>'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--t1);line-height:1;">' + App.fmtCurrency(sched.total_cost || 0) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sched.total_hours || 0).toFixed(1) + ' hrs'
@@ -183,7 +191,8 @@ S.LaborDashboard = {
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Logged So Far</div>'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--gold);line-height:1;">' + App.fmtCurrency(loggedCost) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + loggedHours.toFixed(1) + ' hrs logged</div></div>'
-        + '</div></div>';
+        + '</div>',
+        '<button class="btn btn-ghost btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">View Schedule</button>');
     }
 
     // ── Labor Cost by Department (last 7 days) — bar chart ──
@@ -192,18 +201,17 @@ S.LaborDashboard = {
     if (salWeek > 0) deptCost['Salaried'] = (deptCost['Salaried'] || 0) + salWeek;
     const deptRows = Object.entries(deptCost).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
     const deptMax = deptRows.length ? deptRows[0][1] : 1;
-    const deptCard = '<div class="card" style="height:100%;"><div class="card-title">Labor Cost by Department</div>'
-      + (deptRows.length
-          ? deptRows.map(([d, c]) => {
-              const pct = Math.max(2, Math.round(c / deptMax * 100));
-              return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
-                + '<span style="color:var(--t2);">' + esc(d) + '</span><span style="color:var(--t1);font-weight:600;">' + App.fmtCurrency(c) + '</span></div>'
-                + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
-            }).join('')
-          : '<div style="font-size:12px;color:var(--t3);">No labor cost in the last 7 days.</div>')
-      + '</div>';
+    const deptCard = this.shPanel('Labor Cost by Department',
+      (deptRows.length
+        ? deptRows.map(([d, c]) => {
+            const pct = Math.max(2, Math.round(c / deptMax * 100));
+            return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
+              + '<span style="color:var(--t2);">' + esc(d) + '</span><span style="color:var(--t1);font-weight:600;">' + App.fmtCurrency(c) + '</span></div>'
+              + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
+          }).join('')
+        : '<div style="font-size:12px;color:var(--t3);">No labor cost in the last 7 days.</div>'));
 
-    // ── Hours This Week (per-staff projection, Movement-style) ──
+    // ── Hours This Week (per-staff projection) ──
     const hLine = (r) => {
       const col = r.status === 'over' ? 'var(--red)' : r.status === 'approaching' ? 'var(--amber)' : 'var(--t3)';
       const word = r.status === 'over' ? 'Over' : r.status === 'approaching' ? 'Approaching' : 'OK';
@@ -212,28 +220,24 @@ S.LaborDashboard = {
         + '<div style="font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;">' + r.projected.toFixed(1) + ' hrs</div>'
         + '<span style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap;width:84px;text-align:right;">' + word + '</span></div>';
     };
-    const hoursCard = '<div class="card" style="height:100%;"><div class="card-title">Hours This Week</div>'
-      + (projRows.length
-          ? projRows.slice(0, 6).map(hLine).join('')
-            + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Projected is the greater of logged and scheduled hours. Threshold ' + App.OT_THRESHOLD + ' hrs/week.</div>'
-          : '<div style="font-size:12px;color:var(--t3);">No hourly staff logged or scheduled this week.</div>')
-      + '</div>';
+    const hoursCard = this.shPanel('Hours This Week',
+      (projRows.length
+        ? projRows.slice(0, 6).map(hLine).join('')
+          + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Projected is the greater of logged and scheduled hours. Threshold ' + App.OT_THRESHOLD + ' hrs/week.</div>'
+        : '<div style="font-size:12px;color:var(--t3);">No hourly staff logged or scheduled this week.</div>'));
 
-    // ── Recent Hours ──
+    // ── Recent Hours (data-card table + .sh heading) ──
     const recent = [...this.actuals()]
       .sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime())
-      .slice(0, 5);
-    const recentCard = '<div class="card" style="height:100%;"><div class="card-title">Recent Hours</div>'
-      + (recent.length
-          ? '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-            + '<th>Date</th><th>Staff</th><th>Hours</th><th>Cost</th></tr></thead><tbody>'
-            + recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
-                + '<td>' + esc(a.name || '-') + '</td>'
-                + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-                + '<td class="val">' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('')
-            + '</tbody></table></div>'
-          : '<div style="font-size:12px;color:var(--t3);">The hours you log show up here.</div>')
-      + '</div>';
+      .slice(0, 6);
+    const recentRows = recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
+      + '<td>' + esc(a.name || '-') + '</td>'
+      + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
+      + '<td class="val">' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('');
+    const recentBlock = '<div class="sh" style="margin:0 0 10px;">Recent Hours</div>'
+      + '<div class="card card-bleed data-card" style="flex:1;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Staff</th><th>Hours</th><th>Cost</th>'
+      + '</tr></thead><tbody>' + recentRows + '</tbody></table></div></div>';
 
     // ── Labor Watch (leaks-style, tappable) ──
     const uncovered = this.callouts().filter(c => (c.date || '') >= cutoff && !c.covered).length;
@@ -246,25 +250,19 @@ S.LaborDashboard = {
       + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
       + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
     const anyWatch = otPremium > 0 || uncovered > 0 || expired > 0 || expiring > 0;
-    const watchCard = '<div class="card" style="height:100%;"><div class="card-title">Labor Watch</div>'
-      + watchRow('Projected OT premium (this week)', App.fmtCurrency(otPremium), 'lc-overtime-watch', otPremium > 0)
+    const watchCard = this.shPanel('Labor Watch',
+      watchRow('Projected OT premium (this week)', App.fmtCurrency(otPremium), 'lc-overtime-watch', otPremium > 0)
       + watchRow('Uncovered call-outs (7d)', String(uncovered), 'lc-callout-log', uncovered > 0)
       + watchRow('Certifications expired (active staff)', String(expired), 'lc-staff-roster', expired > 0)
       + watchRow('Certifications expiring (30d)', String(expiring), 'lc-staff-roster', expiring > 0)
       + (anyWatch ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
-                  : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">All clear. No labor issues flagged.</div>')
-      + '</div>';
-
-    const row = (a, b) =>
-      '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<div style="flex:1 1 300px;min-width:0;">' + a + '</div>'
-      + '<div style="flex:1 1 280px;min-width:0;">' + b + '</div></div>';
+                  : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">All clear. No labor issues flagged.</div>'));
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
       + '<div style="margin-bottom:16px;">' + weekCard + '</div>'
-      + row(deptCard, hoursCard)
-      + row(recentCard, watchCard)
+      + this.row(deptCard, hoursCard)
+      + this.row(recentBlock, watchCard)
       + this.quickActions()
       + '</div>';
   }
