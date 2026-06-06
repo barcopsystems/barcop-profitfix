@@ -193,7 +193,7 @@ S.Hub = {
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
       + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
-             recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any module to start')
+             recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any recovery system to start')
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit');
@@ -251,7 +251,7 @@ S.Hub = {
       } else {
         scoreBlock = '<div style="display:flex;align-items:baseline;gap:12px;">'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--t4);line-height:1;">--</div>'
-          + '<div style="flex:1;font-size:11px;color:var(--t3);">Run the first audit to score this module.</div>'
+          + '<div style="flex:1;font-size:11px;color:var(--t3);">Run the first audit to score this recovery system.</div>'
           + '</div>';
       }
 
@@ -336,7 +336,7 @@ S.Hub = {
         ${recoveryTotal.dollars > 0
           ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-0.01em;">${App.fmtCurrency(recoveryTotal.dollars, 0)}<span style="font-size:14px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>
              <div style="font-size:11px;color:var(--t3);">across ${recoveryTotal.fixes} measured fix${recoveryTotal.fixes === 1 ? '' : 'es'} in Profit, Revenue, and Traffic${sinceTxt}</div>`
-          : `<div style="font-size:12px;color:var(--t3);line-height:1.55;">Mark fixes implemented in any Recovery module and the running total recovered shows here.</div>`
+          : `<div style="font-size:12px;color:var(--t3);line-height:1.55;">Mark fixes implemented in any recovery system and the running total recovered shows here.</div>`
         }
       </div></div>`;
 
