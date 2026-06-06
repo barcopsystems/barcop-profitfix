@@ -177,22 +177,25 @@ S.Hub = {
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
       </div>`;
 
-    const bcA     = last(data.bar_cop_audits || []);
-    const bcScore = bcA ? bcA.overall_score : null;
+    // Top row answers the three owner questions: money available, money gotten
+    // back, operation health. Opportunity (white) · Recovered (gold = the hero,
+    // proven dollars) · Bar Cop Audit (the operation-health score). The recovery
+    // scores + trend now live only in the Audit Scores panel below.
+    const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
+    const bcA      = last(data.bar_cop_audits || []);
+    const bcScore  = bcA ? bcA.overall_score : null;
+    const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
+    const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
     const tiles =
-        tile('Overall Recovery Score', overall != null ? overall : 'None',
-             overall != null ? softScore(overall) : 'var(--t4)',
-             overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
-      + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
+        tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
-             anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this',
-             undefined, 'background:var(--c3);border:1px solid var(--c4);')
+             anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
+      + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
+             recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
+             recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any module to start')
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
-             bcScore != null ? App.scoreLabel(bcScore) : 'Not run yet')
-      + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
-             netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
-             netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit');
+             bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit');
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
@@ -301,10 +304,9 @@ S.Hub = {
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
       </div></div>`;
 
-    // Recovery Scoreboard panel — cross-module headline number, sized to be
-    // the visual hero of the dashboard. The receipt for the platform: total $
-    // recovered across Profit, Revenue, and Traffic from every measured fix.
-    const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
+    // recoveryTotal is computed above the tiles now (used by the Recovery
+    // Scoreboard top card). The old recoveryPanel/middleColumn vars below are
+    // left defined but no longer rendered in the grid.
 
     // Setup catch-up banner — shows above the dashboard whenever the Hub
     // Getting Started checklist is incomplete. One click opens the checklist
@@ -783,10 +785,10 @@ S.Hub = {
           </header>
           <main class="content">
             ${catchupBanner}
-            <div class="hub-grid" style="display:grid;grid-template-rows:auto 470px 510px;gap:18px;padding-bottom:18px;">
-              <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">${tiles}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${middleColumn}${readoutPanel}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${actionPanel}</div>
+            <div class="hub-grid" style="display:grid;grid-template-rows:auto 510px 470px;gap:18px;padding-bottom:18px;">
+              <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${alertsPanel}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${chartPanel}${metricsPanel}</div>
             </div>
           </main>
         </div>
