@@ -59,7 +59,7 @@ S.ShiftDrawers = {
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" class="dr-notes-ta" rows="2" placeholder="Optional">' + esc(d?.notes || '') + '</textarea></div></div>';
+      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d?.notes || '') + '</textarea></div></div>';
   },
 
   renderList() {
@@ -68,7 +68,7 @@ S.ShiftDrawers = {
     const active   = all.filter(d => d.active !== false);
     const archived = all.filter(d => d.active === false);
 
-    const formCard = '<div class="card sc-dr-form">'
+    const formCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-drawers', 'Add Drawer', App.helpButton('dr-how'))
       + '<div class="collapse-body">'
       + this.fieldsHtml(null)
@@ -91,7 +91,7 @@ S.ShiftDrawers = {
         + '</div></td></tr>';
 
       listHtml = '<div class="sh" style="margin-top:24px;">Drawers / Registers</div>'
-        + '<div class="card card-bleed sc-dr-card">'
+        + '<div class="card card-bleed data-card">'
         + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
         + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
@@ -140,7 +140,7 @@ S.ShiftDrawers = {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
     this.editId = id;
-    const html = '<div class="card sc-dr-form" style="margin:0;"><div class="card-title">Edit Drawer</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Drawer</div>'
       + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dre-save">Update</button>'
