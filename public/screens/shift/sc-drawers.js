@@ -98,7 +98,6 @@ S.ShiftDrawers = {
 
       if (archived.length) {
         listHtml += '<div class="sh" style="margin:24px 0 8px;">Archived</div>'
-          + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Restore any to bring them back into the dropdowns.</div>'
           + '<div class="tbl-wrap"><table class="tbl"><tbody>'
           + archived.map(d => '<tr style="opacity:0.55;">'
               + '<td style="font-weight:700;color:var(--t2);">' + esc(d.name) + '</td>'
