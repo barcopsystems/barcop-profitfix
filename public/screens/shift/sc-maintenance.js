@@ -10,9 +10,10 @@
 
 S.ShiftMaintenance = {
   editId: null,
-  filterStatus: '',
   filterFrom: '',
   filterTo: '',
+  filterLocation: '',
+  filterAssigned: '',
   PRIORITIES: ['Urgent', 'High', 'Normal', 'Low'],
   STATUSES: ['Open', 'In Progress', 'Resolved'],
 
@@ -45,9 +46,10 @@ S.ShiftMaintenance = {
 
   // Status + priority render as colored text, never badges.
   statusText(s) {
+    // Resolved = green (done); Open / In Progress stay neutral (the Priority
+    // column carries urgency). No gold/blue category colors.
     if (s === 'Resolved') return '<span style="color:var(--green);font-weight:700;">Resolved</span>';
-    if (s === 'In Progress') return '<span style="color:var(--steel);font-weight:700;">In Progress</span>';
-    return '<span style="color:var(--gold);font-weight:700;">Open</span>';
+    return '<span style="color:var(--t2);font-weight:700;">' + esc(s || 'Open') + '</span>';
   },
   priorityText(p) {
     if (p === 'Urgent') return '<span style="color:var(--red);font-weight:700;">Urgent</span>';
@@ -63,22 +65,20 @@ S.ShiftMaintenance = {
     const v = val => (val != null && val !== '') ? val : '';
     const prioOpts = this.PRIORITIES.map(x => '<option' + ((r ? r.priority : 'Normal') === x ? ' selected' : '') + '>' + x + '</option>').join('');
     const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
+    // Row 1: the metadata (date, equipment, location, priority, status, who).
+    // Row 2: the Issue description, two rows tall. Row 3: the resolution.
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" autocomplete="off" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" autocomplete="off" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Priority</label><select id="' + p + 'priority">' + prioOpts + '</select></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Assigned To</label><input type="text" id="' + p + 'assigned" autocomplete="off" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Issue</label>'
-      + '<textarea id="' + p + 'issue" rows="2" placeholder="Describe the problem">' + esc(r?.issue || '') + '</textarea></div></div>'
-
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Priority</label><select id="' + p + 'priority">' + prioOpts + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
-      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:200px;"><label>Assigned To</label>'
-      + '<input type="text" id="' + p + 'assigned" autocomplete="off" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/></div>'
-      + '</div>'
+      + '<textarea id="' + p + 'issue" class="notes-ta" rows="2" placeholder="Describe the problem">' + esc(r?.issue || '') + '</textarea></div></div>'
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="' + p + 'resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
@@ -96,24 +96,31 @@ S.ShiftMaintenance = {
     });
   },
 
-  filterCard(stats) {
-    const statusOpts = ['', ...this.STATUSES].map(s => '<option value="' + esc(s) + '"' + (this.filterStatus === s ? ' selected' : '') + '>' + (s === '' ? 'All statuses' : esc(s)) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Status</label><select id="mt-f-status">' + statusOpts + '</select></div>'
+  filterCard() {
+    const locs = [...new Set(this.records().map(r => r.location).filter(Boolean))].sort();
+    const locOpts = '<option value="">All locations</option>'
+      + locs.map(l => '<option value="' + esc(l) + '"' + (this.filterLocation === l ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
+    const assignees = [...new Set(this.records().map(r => r.assigned_to).filter(Boolean))].sort();
+    const assignOpts = '<option value="">All assignees</option>'
+      + assignees.map(a => '<option value="' + esc(a) + '"' + (this.filterAssigned === a ? ' selected' : '') + '>' + esc(a) + '</option>').join('');
+    return '<div class="card no-print">'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="mt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="mt-f-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mt-f-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div>' + (stats || '') + '</div>';
+      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Location</label><select id="mt-f-location">' + locOpts + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Assigned To</label><select id="mt-f-assigned">' + assignOpts + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mt-f-clear">Clear</button></div>'
+      + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="mt-print-blank">Worksheet</button></div>'
+      + '</div></div>';
   },
 
   applyFilters(list) {
     return list.filter(r => {
-      if (this.filterStatus && (r.status || 'Open') !== this.filterStatus) return false;
       const d = r.date_reported || '';
       if (this.filterFrom && d < this.filterFrom) return false;
       if (this.filterTo && d > this.filterTo) return false;
+      if (this.filterLocation && (r.location || '') !== this.filterLocation) return false;
+      if (this.filterAssigned && (r.assigned_to || '') !== this.filterAssigned) return false;
       return true;
     });
   },
@@ -128,7 +135,7 @@ S.ShiftMaintenance = {
       return new Date(b.created_at || b.date_reported).getTime() - new Date(a.created_at || a.date_reported).getTime();
     });
 
-    const formCard = '<div class="card">'
+    const formCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-maintenance', 'Log Maintenance Issue', App.helpButton('mt-how'))
       + '<div class="collapse-body">'
       + this.formFields(null, 'mt-')
@@ -144,12 +151,12 @@ S.ShiftMaintenance = {
       const urgent = open.filter(r => r.priority === 'Urgent');
       const resolved = all.filter(r => r.status === 'Resolved');
       const totCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
-      const stats = '<div class="calc" style="margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val ' + (open.length ? 'warn' : '') + '">' + open.length + '</div></div>'
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val">' + open.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Urgent</div><div class="calc-val ' + (urgent.length ? 'warn' : '') + '">' + urgent.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val">' + resolved.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Repair Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
-        + '</div>';
+        + '</div></div>';
 
       let listHtml;
       if (!filtered.length) {
@@ -168,12 +175,12 @@ S.ShiftMaintenance = {
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-ghost btn-sm mt-edit" data-id="' + r.id + '">Edit</button>' : '')
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-danger btn-sm mt-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>').join('');
-        listHtml = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:16px;"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-          + App.showOlderBar('sc', 'maintenance', filtered, !!(this.filterStatus || this.filterFrom || this.filterTo));
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + App.showOlderBar('sc', 'maintenance', filtered, !!(this.filterFrom || this.filterTo || this.filterLocation || this.filterAssigned));
       }
-      below = this.filterCard(stats) + listHtml;
+      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Maintenance Log</div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -187,6 +194,7 @@ S.ShiftMaintenance = {
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#mt-export')) { App.exportPDF({ title: 'Maintenance Log', root: this.container }); return; }
+      if (ev.target.closest('#mt-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#mt-save')) { this.saveNew(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const edit = ev.target.closest('.mt-edit');
@@ -197,10 +205,28 @@ S.ShiftMaintenance = {
       if (row && App.canEdit('sc-maintenance')) this.openEditModal(row.dataset.id);
     };
     this.wireResolvedAutofill('mt-');
-    document.getElementById('mt-f-status')?.addEventListener('change', e => { this.filterStatus = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-to')?.addEventListener('change',     e => { this.filterTo = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-clear')?.addEventListener('click', () => { this.filterStatus = this.filterFrom = this.filterTo = ''; this.renderList(); });
+    document.getElementById('mt-f-from')?.addEventListener('change',     e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('mt-f-to')?.addEventListener('change',       e => { this.filterTo = e.target.value || ''; this.renderList(); });
+    document.getElementById('mt-f-location')?.addEventListener('change', e => { this.filterLocation = e.target.value || ''; this.renderList(); });
+    document.getElementById('mt-f-assigned')?.addEventListener('change', e => { this.filterAssigned = e.target.value || ''; this.renderList(); });
+    document.getElementById('mt-f-clear')?.addEventListener('click', () => { this.filterFrom = this.filterTo = this.filterLocation = this.filterAssigned = ''; this.renderList(); });
+  },
+
+  // Paper-at-bar workflow: print a blank sheet to mark issues during the shift.
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Maintenance Log',
+      subtitle: 'Log equipment and facility issues during the shift. Manager enters each row into Bar Cop after close.',
+      columns: [
+        { label: 'Date',        width: '12%' },
+        { label: 'Equipment',   width: '22%' },
+        { label: 'Location',    width: '14%' },
+        { label: 'Priority',    width: '12%' },
+        { label: 'Issue',       width: '26%' },
+        { label: 'Assigned To', width: '14%' }
+      ],
+      rows: 16
+    });
   },
 
   // Edit a logged issue in a focused pop-up (same fields, own mte- ids).
@@ -209,7 +235,7 @@ S.ShiftMaintenance = {
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Maintenance Issue</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Maintenance Issue</div>'
       + this.formFields(r, 'mte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="mte-save">Update</button>'
@@ -229,7 +255,7 @@ S.ShiftMaintenance = {
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-maintenance')) return;
     this.editId = null;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Maintenance Issue</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Maintenance Issue</div>'
       + this.formFields(preset || null, 'mte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="mte-save">Save</button>'
