@@ -81,7 +81,7 @@ S.Hub = {
     // visual weight than the supporting status data.
     // Color = problem, not category. On-target metrics stay neutral white so the
     // few amber/red flags carry all the weight. Scores still use softScore.
-    const bandColor = b => b === 'good' ? 'var(--w)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red-soft)' : 'var(--t4)';
+    const bandColor = b => b === 'good' ? 'var(--t1)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red-soft)' : 'var(--t4)';
     const softScore = s => { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red-soft)'; };
 
     const pourT = pt.bar_pour_cost_pct ?? 22;
@@ -184,7 +184,7 @@ S.Hub = {
              overall != null ? softScore(overall) : 'var(--t4)',
              overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
-             anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
+             anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
@@ -206,9 +206,9 @@ S.Hub = {
     };
     const auditRow = (name, audit, trend, screen, mod, isFirst, indAvg) => {
       const score      = audit?.overall_score ?? null;
-      // Number stays neutral white; the score bar + marker below carry the
+      // Number stays a quiet neutral; the score bar + marker below carry the
       // red/amber/green so the color is not doubled up on the number.
-      const scoreColor = score != null ? 'var(--w)' : 'var(--t4)';
+      const scoreColor = score != null ? 'var(--t1)' : 'var(--t4)';
       const daysLeft   = auditDaysLeft(audit);
       const canRun     = daysLeft <= 0;
       const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
@@ -265,9 +265,9 @@ S.Hub = {
           // no dollar line for Traffic — deficits live in the audit itself
         } else if (weekly > 0) {
           if (mod === 'revenue') {
-            parts.push('<span style="color:var(--t3);">Opportunity <span style="color:var(--gold);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
+            parts.push('<span style="color:var(--t3);">Opportunity <span style="color:var(--t2);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
           } else {
-            parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--red-soft);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
+            parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--t2);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
           }
         } else {
           parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
@@ -374,16 +374,7 @@ S.Hub = {
         +   'item' + (alerts.length===1?'':'s') + ' to address'
         +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Worst first.</div>'
         + '</div></div>';
-      // Holding-the-line counter: metrics tracked minus metrics flagged as
-      // alerts. Quiet positive counterpoint, fills the panel's empty space
-      // with productive context instead of dead air.
-      const holdingCount = metrics.length - metricAlerts.length;
-      const holdingHtml = holdingCount > 0
-        ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-          + '<span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;"></span>'
-          + '<div style="font-size:10px;color:var(--t3);line-height:1.4;">' + holdingCount + ' metric' + (holdingCount === 1 ? '' : 's') + ' holding the line.</div>'
-          + '</div>'
-        : '';
+      const holdingHtml = '';   // removed: the "N metrics holding the line" counter
       alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${alertHead}
         <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div>${holdingHtml}</div>`;
     } else {
@@ -558,7 +549,7 @@ S.Hub = {
             + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
             + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
             + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
-            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--w);line-height:1;">' + dollar + '</span>'
+            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--t1);line-height:1;">' + dollar + '</span>'
             +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
             + '</div>'
             + '<div style="flex:1;min-width:0;font-size:11px;line-height:1.45;">'
@@ -617,7 +608,7 @@ S.Hub = {
           + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
           + modBadge(it.module)
           + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.label) + '</div>'
-          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + (it.kind === 'cost' ? 'var(--red-soft)' : 'var(--gold)') + ';">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
+          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
           + '</div>';
       }).join('');
       // Split hero: recoverable cost leak (red) and projected revenue
