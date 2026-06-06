@@ -166,23 +166,25 @@ S.LaborBuildSchedule = {
     const pct = fc > 0 ? T.cost / fc * 100 : null;
     const rplh = T.hours > 0 && fc > 0 ? fc / T.hours : null;
 
-    // Forecast / labor-budget bar
-    let budgetBar;
+    // Week-control prompt (shown in the Week card while there is no usable
+    // budget yet) and the budget numbers as their OWN standalone stats card once
+    // a forecast is set, matching the Shift History stats-in-their-own-card look.
+    let weekPrompt = '', budgetStatsCard = '';
     if (!d.week_start) {
-      budgetBar = '<div style="font-size:12px;color:var(--t3);">Pick the week starting date to set a forecast and labor budget.</div>';
+      weekPrompt = '<div style="font-size:12px;color:var(--t3);">Pick the week starting date to set a forecast and labor budget.</div>';
     } else if (fc <= 0) {
-      budgetBar = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      weekPrompt = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
         + '<div style="font-size:12px;color:var(--t2);">Set this week\'s revenue forecast to schedule against a labor budget.</div>'
         + '<button class="btn btn-primary btn-sm" id="bs-fc">Set Forecast</button></div>';
     } else {
       const leftCls = left >= 0 ? 'good' : 'warn';
-      budgetBar = '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      budgetStatsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val lg">' + App.fmtCurrency(budget) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
-        + '</div>';
+        + '</div></div>';
     }
 
     // Grid
@@ -277,7 +279,8 @@ S.LaborBuildSchedule = {
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:14px;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
       + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'
-      + '</div>' + budgetBar + '</div>'
+      + '</div>' + weekPrompt + '</div>'
+      + budgetStatsCard
       + gridCard + totalsCard + actionsCard
       + '</div>'
       + this._modalHtml();
