@@ -26,8 +26,6 @@ S.LaborBuildSchedule = {
   staffById(id) { return this.staff().find(s => s.id === id); },
   positionById(id) { return ((App.laborData && App.laborData.lc_positions) || []).find(p => p.id === id); },
   deptOf(staffId) { const p = this.positionById((this.staffById(staffId) || {}).position_id); return (p && p.department) || 'Other'; },
-  // Still used by the Schedule Templates form.
-  dayOptions(sel) { return this.DAYS.map(d => '<option' + (d === sel ? ' selected' : '') + '>' + d + '</option>').join(''); },
 
   laborTarget() {
     const t = (App.data && App.data.settings && App.data.settings.targets) || {};
@@ -282,6 +280,7 @@ S.LaborBuildSchedule = {
       + '</div>' + weekPrompt + '</div>'
       + budgetStatsCard
       + gridCard + totalsCard + actionsCard
+      + this.templatesSection()
       + '</div>'
       + this._modalHtml();
 
@@ -325,6 +324,11 @@ S.LaborBuildSchedule = {
         this.openShiftModal(cell.dataset.staff, cell.dataset.day, null);
       });
     });
+
+    // Saved-template rows: load (click row or Load), or delete.
+    this.container.querySelectorAll('.bs-tmpl-load').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.loadTemplate(b.dataset.id); }));
+    this.container.querySelectorAll('.bs-tmpl-del').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.confirmDelTemplate(b.dataset.id); }));
+    this.container.querySelectorAll('.bs-tmpl-row').forEach(r => r.addEventListener('click', ev => { if (!ev.target.closest('.btn')) this.loadTemplate(r.dataset.id); }));
   },
 
   // ── Shift add/edit modal ────────────────────────────────────────────────────
@@ -443,10 +447,72 @@ S.LaborBuildSchedule = {
       { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
       { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
       { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast) and shows, live, what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
-      { h: 'Templates', p: ['To start from a typical week, Load a template from the Saved Templates page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
+      { h: 'Templates', p: ['To start from a typical week, Load one of your Saved Templates listed at the bottom of this page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
       { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched.'] },
       { h: 'Salaried Staff', p: ['Salaried managers show their shift times in the grid, but their pay is a fixed weekly salary, not an hourly cost, so it counts toward the budget as a flat amount no matter how many hours you schedule.'] }
     ]);
+  },
+
+  // ── Saved templates (load / delete, inline under the Save box) ───────────────
+  templateStats(t) {
+    let hours = 0, cost = 0;
+    const salIds = new Set();
+    const today = App.todayLocal();
+    (t.shifts || []).forEach(s => {
+      const h = this.hoursOf(s.start, s.end);
+      hours += h;
+      const staff = this.staffById(s.staff_id);
+      if (staff && App.isSalaried(staff)) salIds.add(staff.id);
+      else { const wage = App.wageForStaffOn ? App.wageForStaffOn(s.staff_id, today) : ((staff && staff.wage) || 0); cost += h * (wage || 0); }
+    });
+    salIds.forEach(id => { cost += App.staffWeeklySalary ? App.staffWeeklySalary(id) : 0; });
+    return { count: (t.shifts || []).length, hours, cost };
+  },
+
+  templatesSection() {
+    const list = this.templates();
+    const heading = '<div class="sh" style="margin:24px 0 10px;">Saved Templates</div>';
+    if (!list.length) {
+      return heading + '<div style="font-size:13px;color:var(--t3);padding:4px 2px;">Name a schedule in the Save box above to save it as a reusable template. Your saved templates show up here to load any time.</div>';
+    }
+    const rows = list.map(t => {
+      const st = this.templateStats(t);
+      return '<tr class="bs-tmpl-row" data-id="' + esc(t.id) + '" style="cursor:pointer;">'
+        + '<td><div class="val">' + esc(t.name) + '</div></td>'
+        + '<td>' + st.count + '</td>'
+        + '<td>' + st.hours.toFixed(1) + '</td>'
+        + '<td class="val">~' + App.fmtCurrency(st.cost) + '</td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm bs-tmpl-load" data-id="' + esc(t.id) + '">Load</button>'
+        + '<button class="btn btn-danger btn-sm bs-tmpl-del" data-id="' + esc(t.id) + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('');
+    return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Template</th><th>Shifts</th><th>Hours</th><th>Est. Cost / wk</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  },
+
+  // Load a template's shifts onto the current week, in place. Confirms first if
+  // the grid already has unsaved shifts.
+  async loadTemplate(id) {
+    const t = this.templates().find(x => x.id === id);
+    if (!t) return;
+    if (this.draft.shifts.length) {
+      const ok = await App.confirm({ title: 'Load this template?', message: 'This replaces the shifts in the current grid with the template. The week and forecast stay the same. Your saved schedules and templates are not affected.', confirmText: 'Load Template', cancelText: 'Cancel' });
+      if (!ok) return;
+    }
+    this.editId = null;
+    this.draft.shifts = (t.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
+    this.draft.from_template_name = t.name;
+    this.saveDraft();
+    this.draw();
+  },
+
+  async confirmDelTemplate(id) {
+    if (!(await App.confirmDelete())) return;
+    App.laborData.lc_schedule_templates = this.templates().filter(x => x.id !== id);
+    await App.saveLabor();
+    this.draw();
   },
 
   // ── Save schedule ────────────────────────────────────────────────────────────
