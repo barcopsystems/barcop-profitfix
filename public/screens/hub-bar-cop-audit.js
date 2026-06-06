@@ -520,7 +520,7 @@ S.HubBarCopAudit = {
         label:    bigVar.length + ' cash variances over $20 in last 30 days',
         detail:   'Pattern suggests a drawer or close-out process gap. Review who counted and when.',
         severity: 'warn',
-        screen:   'sc-variance-log'
+        screen:   'sc-cash-control'
       });
     }
 
@@ -595,18 +595,18 @@ S.HubBarCopAudit = {
     const wkVar = variances.filter(v => since90(v.date));
     const byManager = {};
     wkVar.forEach(v => {
-      const id = v.counted_by_id || v.counted_by || 'unknown';
+      const id = v.cashier_id || v.cashier || 'unknown';
       if (!byManager[id]) byManager[id] = [];
       byManager[id].push(v);
     });
     Object.keys(byManager).forEach(id => {
       const list = byManager[id];
       if (list.length >= 3 && id !== 'unknown') {
-        const name = list[0].counted_by || id;
+        const name = list[0].cashier || id;
         out.push({
           label: 'Recurring cash variance: ' + name,
           detail: list.length + ' variance events in last 90 days. Coach or rotate the close.',
-          screen: 'sc-variance-log'
+          screen: 'sc-cash-control'
         });
       }
     });
