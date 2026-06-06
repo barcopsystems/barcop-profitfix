@@ -69,6 +69,7 @@ S.ShiftHistory = {
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
+        + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
   },
 
@@ -119,10 +120,7 @@ S.ShiftHistory = {
 
     this.container.innerHTML = '<div class="screen">'
       + this.statsStrip(rows.length, totRev, totCov, avgChk)
-      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Filter Shift History</div>'
-        + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>'
-      + '</div>'
+      + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Shift History</div>'
       + this.filterCard()
       + rowsBody
       + '</div>';
@@ -193,8 +191,8 @@ S.ShiftHistory = {
           + '<td>' + fmt(cr.expected) + '</td>'
           + '<td>' + (cr.counted_cash != null ? fmt(cr.counted_cash) : '-') + '</td>'
           + '<td>' + vCell(cr.variance, cr.skipped, cr.counted_cash) + '</td><td></td></tr>';
-        cashCard = '<div class="card form-card"><div class="card-title">Cash Reconciliation</div>'
-          + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        cashCard = '<div class="sh" style="margin-top:24px;">Cash Reconciliation</div>'
+          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Drawer</th><th>Opening</th><th>Drops</th><th>POS Cash</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
           + '</tr></thead><tbody>' + rows + totalRow + '</tbody></table></div></div>';
       } else {
@@ -202,8 +200,8 @@ S.ShiftHistory = {
         const variance = cr.variance;
         const statusColor = skipped ? 'var(--t3)' : (variance == null ? 'var(--t3)' : (Math.abs(variance) <= tol ? 'var(--gold)' : 'var(--red)'));
         const statusText = skipped ? 'SKIPPED' : (variance == null ? 'NOT COUNTED' : (Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER'));
-        cashCard = '<div class="card form-card"><div class="card-title">Cash Reconciliation</div>'
-          + '<div class="calc" style="margin-bottom:0;">'
+        cashCard = '<div class="sh" style="margin-top:24px;">Cash Reconciliation</div>'
+          + '<div class="calc" style="margin-bottom:16px;">'
           + meta('Opening Bank', fmt(cr.opening_bank))
           + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
           + meta('Drops Out', fmt(cr.drops_total))
@@ -211,7 +209,7 @@ S.ShiftHistory = {
           + meta('Counted', cr.counted_cash != null ? App.fmtCurrency(cr.counted_cash) : '-')
           + meta('Variance', skipped ? '-' : (variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
           + meta('Status', '<span style="color:' + statusColor + ';font-weight:700;">' + statusText + '</span>')
-          + '</div></div>';
+          + '</div>';
       }
     }
 
