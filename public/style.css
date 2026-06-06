@@ -273,7 +273,7 @@ input,select,textarea{color-scheme:dark;}
 
 /* ══ CONTENT ══ */
 .content{flex:1;overflow-y:auto;background:var(--bg);}
-.screen{padding:24px var(--sp) 56px;max-width:1200px;width:100%;margin:0 auto;}
+.screen{padding:var(--sp) var(--sp) 56px;max-width:1200px;width:100%;margin:0 auto;}
 
 /* ══ BUTTONS ══ */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;padding:8px 18px;line-height:1;white-space:nowrap;transition:background 0.12s,color 0.12s,border-color 0.12s;}
