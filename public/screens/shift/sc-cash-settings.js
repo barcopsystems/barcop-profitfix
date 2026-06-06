@@ -52,7 +52,7 @@ S.ShiftCashSettings = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card sc-dr-form">'
+      + '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Default Cash Variance Tolerance</span>'
       + App.helpButton('cs-how') + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:center;">'
@@ -61,7 +61,7 @@ S.ShiftCashSettings = {
       + '</div>'
       + '</div>'
 
-      + '<div class="card sc-dr-form">'
+      + '<div class="card form-card">'
       + '<div class="card-title">Per Shift-Type Defaults</div>'
       + typeRows
       + '<div class="card-actions">'
