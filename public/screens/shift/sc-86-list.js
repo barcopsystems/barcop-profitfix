@@ -263,11 +263,11 @@ S.Shift86List = {
         + '<input type="text" id="qa-reason" value="' + esc(i?.reason || '') + '" placeholder="Ran the case, delivery short, equipment down, etc."/></div></div>'
 
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-        + '<textarea id="qa-notes" rows="2" placeholder="Anything the next shift needs to know">' + esc(i?.notes || '') + '</textarea></div></div>';
+        + '<textarea id="qa-notes" class="notes-ta" rows="2" placeholder="Anything the next shift needs to know">' + esc(i?.notes || '') + '</textarea></div></div>';
   },
 
   entryFormHTML() {
-    return '<div class="card">'
+    return '<div class="card form-card no-print">'
       + App.collapsibleCardTitle('sc-86-list', '86 An Item', App.helpButton('el-how'))
       + '<div class="collapse-body">'
       + this.entryFields(null)
@@ -371,40 +371,37 @@ S.Shift86List = {
       .sort((a, b) => new Date(b.date_back || b.created_at || 0).getTime() - new Date(a.date_back || a.created_at || 0).getTime())
       .slice(0, 50);
 
+    const canEdit = App.canEdit('sc-86-list');
     const ew = '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="el-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="el-print-blank">Worksheet</button></div>';
-    const activeTitle = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Currently 86\'d' + (active.length ? ' &middot; ' + active.length : '') + '</span>' + ew + '</div>';
+    const activeHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Currently 86\'d' + (active.length ? ' &middot; ' + active.length : '') + '</div>' + ew + '</div>';
 
-    let activeCards;
+    let activeBody;
     if (active.length === 0) {
-      activeCards = '<div class="card">' + activeTitle
-        + '<div style="font-size:13px;color:var(--t3);padding:6px 0;">Nothing is 86\'d right now. The full bar and kitchen are available.</div></div>';
+      activeBody = '<div style="font-size:13px;color:var(--t3);padding:6px 2px;">Nothing is 86\'d right now. The full bar and kitchen are available.</div>';
     } else {
-      activeCards = '<div class="card">' + activeTitle
-        + active.map(i => {
-          const reps = this.repeatCount(i.item);
-          const repText = reps > 1 ? '<span style="color:var(--amber);font-size:11px;font-weight:700;margin-left:4px;">86\'d ' + reps + '&times; / 30d</span>' : '';
-          const srcTxt = this.srcText(i.source_type);
-          return '<div class="ei-86" data-id="' + i.id + '" style="border:1px solid var(--b1);border-radius:6px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
-            + '<div style="flex:1;min-width:200px;">'
-            + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
-            + '<span style="font-size:16px;font-weight:700;color:var(--t1);">' + esc(i.item) + '</span>'
-            + this.catText(i.category) + (srcTxt || '') + repText
-            + '</div>'
-            + '<div style="font-size:12px;color:var(--t3);">86\'d ' + this.fmtDate(i.date_86)
-            + (i.time_86 ? ' at ' + esc(i.time_86) : '')
-            + (i.reason ? ' &middot; ' + esc(i.reason) : '')
-            + (i.reported_by ? ' &middot; by ' + esc(i.reported_by) : '') + '</div>'
-            + '</div>'
-            + '<div class="row-actions" style="flex-shrink:0;">'
-            + '<button class="btn btn-primary btn-sm ei-back" data-id="' + i.id + '">Back In Stock</button>'
-            + (App.canEdit('sc-86-list') ? '<button class="btn btn-ghost btn-sm ei-edit" data-id="' + i.id + '">Edit</button>' : '')
-            + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
-            + '</div></div>';
-        }).join('') + '</div>';
+      const rows = active.map(i => {
+        const reps = this.repeatCount(i.item);
+        const repText = reps > 1 ? ' <span style="color:var(--amber);font-size:11px;font-weight:700;">86\'d ' + reps + '&times;/30d</span>' : '';
+        const srcTxt = this.srcText(i.source_type);
+        return '<tr>'
+          + '<td><div class="val">' + esc(i.item) + repText + '</div>' + (srcTxt ? '<div>' + srcTxt + '</div>' : '') + '</td>'
+          + '<td>' + esc(i.category || '-') + '</td>'
+          + '<td>' + this.fmtDate(i.date_86) + (i.time_86 ? '<div style="font-size:10px;color:var(--t3);">' + esc(i.time_86) + '</div>' : '') + '</td>'
+          + '<td>' + esc(i.reported_by || '-') + '</td>'
+          + '<td>' + esc(i.reason || '-') + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-primary btn-sm ei-back" data-id="' + i.id + '">Back In Stock</button>'
+          + (canEdit ? '<button class="btn btn-ghost btn-sm ei-edit" data-id="' + i.id + '">Edit</button>' : '')
+          + (canEdit ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
+      }).join('');
+      activeBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Item</th><th>Category</th><th>86\'d</th><th>Reported By</th><th>Reason</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    let backCard = '';
+    let backBody = '';
     if (back.length > 0) {
       const rows = back.map(i => '<tr><td><div class="val">' + esc(i.item) + '</div></td>'
         + '<td>' + esc(i.category || '-') + '</td>'
@@ -412,14 +409,15 @@ S.Shift86List = {
         + '<td>' + this.fmtDate(i.date_back) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm ei-re86" data-id="' + i.id + '">Re-86</button>'
-        + (App.canEdit('sc-86-list') ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
+        + (canEdit ? '<button class="btn btn-danger btn-sm ei-del" data-id="' + i.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      backCard = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:16px;"><table class="tbl"><thead><tr>'
+      backBody = '<div class="sh" style="margin:24px 0 10px;">Back In Stock</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Item</th><th>Category</th><th>86\'d</th><th>Back</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.entryFormHTML() + activeCards + backCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.entryFormHTML() + activeHeading + activeBody + backBody + '</div>';
     App.applyCollapsed(this.container);
     this.wireMain();
     this.recomputeCrossRef();
@@ -610,7 +608,7 @@ S.Shift86List = {
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-86-list')) return;
     this.editId = null; this.customMode = false; this.alsoIds = {};
-    const html = '<div class="card" style="margin:0;"><div class="card-title">86 An Item</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">86 An Item</div>'
       + this.entryFields(preset || null)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="qa-go">86 It</button>'
@@ -669,7 +667,7 @@ S.Shift86List = {
       ? '<div class="f" style="flex:1;min-width:200px;"><label>Item</label><input type="text" id="qe-item" value="' + esc(it.item || '') + '" style="height:44px;"/></div>'
       : '<div class="f" style="flex:1;min-width:200px;"><label>Item</label><div class="f-display" style="height:44px;display:flex;align-items:center;gap:8px;">' + esc(it.item || '') + (srcTxt || '') + '</div></div>';
 
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit 86 Item</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit 86 Item</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + itemField
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Category</label><select id="qe-cat" style="height:44px;">' + catOpts + '</select></div>'
@@ -680,7 +678,7 @@ S.Shift86List = {
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reported By</label><select id="qe-by" style="height:44px;">' + App.staffOptions(it.reported_by_id || it.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Reason</label><input type="text" id="qe-reason" value="' + esc(it.reason || '') + '" placeholder="Optional"/></div></div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="qe-notes" rows="2" placeholder="Optional">' + esc(it.notes || '') + '</textarea></div></div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="qe-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(it.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="qe-save">Update</button><button class="btn btn-ghost" id="qe-cancel">Cancel</button>'
       + '<span id="qe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="qe-del" style="margin-left:auto;">Delete</button></div></div>';
