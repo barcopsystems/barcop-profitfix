@@ -165,8 +165,8 @@ S.ShiftCashControl = {
   },
 
   showHowTo() {
-    App.showHelpModal('How the Cash Board Works', [
-      { p: ['The Cash Board is the one place you handle cash. Everything is logged and edited right here, top to bottom: the safe, your registers, then the full activity list.'] },
+    App.showHelpModal('How Cash Control Works', [
+      { p: ['Cash Control is the one place you handle cash. Everything is logged and edited right here, top to bottom: the safe, your registers, then the full activity list.'] },
       { h: 'The Safe', p: ['The big number is what should be in your safe right now, built from every safe entry on file. Cash drops mirror into the safe automatically, so the balance stays honest with no double entry.', 'Make a Deposit, Issue a Bank, or log other safe activity (cash added, paid out) with the buttons here. Count the Safe lets you count what is physically in the safe and catch an over or short against what should be there. A safe count flags the gap, it does not change your running balance.'] },
       { h: 'Registers', p: ['Each drawer shows its standard bank, the drops pulled in the date range you picked, and how its last close came out. Log a Drop pulls cash from that register into the safe. Count Drawer reconciles the counted drawer against the POS at close and logs the over or short.'] },
       { h: 'Filter and Activity', p: ['Pick a date range in the Filter card. It drives the four totals there (drops in, safe out, drawer net, flagged variances), the drops shown on each register, and the activity list below.', 'Every drop, deposit, bank move, drawer reconcile, and safe count lands in Cash Activity. Hit Edit on any row to change or delete it. Export PDF on the Filter card prints the range you are viewing.'] },
@@ -187,7 +187,7 @@ S.ShiftCashControl = {
 
     if (!this.drawers().length && !hasAny) {
       App.setupCard(this.container, {
-        title: 'Cash Board',
+        title: 'Cash Control',
         lead: 'Track the safe, your drawers, and every cash move in one place. Set up your registers, then open the floor to start logging drops and closes.',
         steps: [
           { title: 'Add your drawers and registers', desc: 'Every register you run cash through. Each one gets its own tile here.', btn: 'Set Up Drawers', screen: 'sc-drawers' },

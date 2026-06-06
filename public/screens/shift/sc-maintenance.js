@@ -144,7 +144,7 @@ S.ShiftMaintenance = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No maintenance issues logged yet. Use the form above. Open and urgent items show up as alerts on the Hub so they carry across shifts.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No maintenance issues logged yet. Use the form above to log the first one.</div>';
     } else {
       const open = all.filter(r => r.status !== 'Resolved');
       const urgent = open.filter(r => r.priority === 'Urgent');

@@ -199,7 +199,7 @@ S.ShiftVoidComp = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No voids or comps logged yet. Use the form above. These exception transactions feed your Theft Risk score and exception analysis in Profit Recovery.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No voids or comps logged yet. Use the form above to log the first one.</div>';
     } else {
       const voids = filtered.filter(r => r.type === 'Void');
       const comps = filtered.filter(r => r.type === 'Comp');

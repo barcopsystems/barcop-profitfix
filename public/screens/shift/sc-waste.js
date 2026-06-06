@@ -263,7 +263,7 @@ S.ShiftWaste = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No waste logged yet. Use the form above. Logged waste is subtracted from inventory variance so a real loss does not read as theft.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No waste logged yet. Use the form above to log the first one.</div>';
     } else {
       const totalCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
       // No "Total Units" tile — waste rows mix unit types (bottles, ounces, food

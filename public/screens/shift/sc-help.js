@@ -37,9 +37,9 @@ S.ShiftHelp = {
     ]},
     { t: 'Cash Control', qa: [
       { q: 'Where do I enter cash activity?',
-        a: 'On the Cash Board, which is the Cash Control screen. It is the one place you log drops, safe moves, and drawer counts, with a shared bill counter that totals the denominations for you. Past entries are read-only on Cash History, split into Cash Drops, Safe Log, and Variances tabs. Enter on the board, review on the history.' },
+        a: 'On Cash Control. It is the one place you log drops, safe moves, and drawer counts, with a shared bill counter that totals the denominations for you. Past entries are read-only on Cash History, split into Cash Drops, Safe Log, and Variances tabs. Enter on Cash Control, review on Cash History.' },
       { q: 'What is a cash drop?',
-        a: 'Cash pulled from a register and moved to the safe during or at the end of a shift. Log each one on the Cash Board with the register, who pulled it, and the amount. The denomination grid counts the bills and coins and fills the amount for you, so the count is documented along with the total. Drops feed Profit Recovery Cash Reconciliation as the running picture of cash control for the period.' },
+        a: 'Cash pulled from a register and moved to the safe during or at the end of a shift. Log each one on Cash Control with the register, who pulled it, and the amount. The denomination grid counts the bills and coins and fills the amount for you, so the count is documented along with the total. Drops feed Profit Recovery Cash Reconciliation as the running picture of cash control for the period.' },
       { q: 'How does the Safe Log work?',
         a: 'A running ledger of cash moving in and out of the safe: drops in, banks issued and returned, deposits prepared, paid-outs. Every entry carries a running balance, so at any moment you know what the safe should hold. Count the safe against that balance at least daily. A safe that does not balance against the log is a problem the log surfaces immediately.' },
       { q: 'What is a variance, and where does it come from?',

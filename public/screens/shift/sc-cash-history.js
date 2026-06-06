@@ -25,6 +25,18 @@ S.ShiftCashHistory = {
   },
 
   draw() {
+    if (!(S.ShiftCashDrop.drops().length || S.ShiftSafeLog.chrono().length || S.ShiftVarianceLog.variances().length)) {
+      const hasRegisters = ((App.shiftData && App.shiftData.sc_drawers) || []).some(d => d.active !== false);
+      App.setupCard(this.container, {
+        title: 'Cash History',
+        lead: 'Cash History is the read-only record of every drop, safe move, and drawer count. Log cash in Cash Control and it shows up here.',
+        steps: [
+          { title: 'Set up registers', desc: 'Add your drawers and registers so you can log drops and count drawers.', btn: 'Set Up Registers', screen: 'sc-drawers', done: hasRegisters },
+          { title: 'Log cash in Cash Control', desc: 'Log a drop, a safe move, or count a drawer. Every entry lands here.', btn: 'Go to Cash Control', screen: 'sc-cash-control', done: false }
+        ]
+      });
+      return;
+    }
     const parts = this.tab === 'drops' ? this.bodyDrops()
       : this.tab === 'safe' ? this.bodySafe()
       : this.bodyVariances();
@@ -92,13 +104,13 @@ S.ShiftCashHistory = {
   },
   emptyTab(line1, line2) {
     return '<div style="padding:18px 4px;font-size:13px;color:var(--t3);">' + esc(line1) + ' ' + esc(line2)
-      + ' <button class="btn btn-ghost btn-sm" id="ch-go-board" style="margin-left:8px;">Go to Cash Board</button></div>';
+      + ' <button class="btn btn-ghost btn-sm" id="ch-go-board" style="margin-left:8px;">Go to Cash Control</button></div>';
   },
 
   // ── Cash Drops tab ──────────────────────────────────────────────────────────
   bodyDrops() {
     const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on the Cash Board.') };
+    if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on Cash Control.') };
     const drawerNames = [...new Set(all.map(d => d.drawer).filter(Boolean))].sort();
     const byNames = [...new Set(all.map(d => d.performed_by).filter(Boolean))].sort();
     const filtered = all.filter(d => {
@@ -127,7 +139,7 @@ S.ShiftCashHistory = {
   // ── Safe Log tab ────────────────────────────────────────────────────────────
   bodySafe() {
     const chrono = S.ShiftSafeLog.chrono();
-    if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.') };
+    if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on Cash Control.') };
     const byNames = [...new Set(chrono.map(e => e.performed_by).filter(Boolean))].sort();
     let bal = 0;
     const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
@@ -170,7 +182,7 @@ S.ShiftCashHistory = {
   // ── Variances tab ───────────────────────────────────────────────────────────
   bodyVariances() {
     const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.') };
+    if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on Cash Control.') };
     const drawerNames = [...new Set(all.map(v => v.drawer).filter(Boolean))].sort();
     const cashierNames = [...new Set(all.map(v => v.cashier).filter(Boolean))].sort();
     const filtered = all.filter(v => {

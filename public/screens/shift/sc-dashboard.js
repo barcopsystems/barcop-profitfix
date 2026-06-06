@@ -62,7 +62,7 @@ S.ShiftDashboard = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
       + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
       + this.actionBtn('sc-active-shift', 'Open the Floor')
-      + this.actionBtn('sc-cash-control', 'Cash Board')
+      + this.actionBtn('sc-cash-control', 'Cash Control')
       + this.actionBtn('sc-86-list', '86 List')
       + this.actionBtn('sc-reports', 'Reports')
       + '</div></div>';

@@ -82,9 +82,13 @@ S.ShiftHistory = {
 
     const all = this.shifts();
     if (all.length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty"><div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Run a shift in Active Shift, or log a past one there under Recent Shifts. It lands here when closed.</div></div></div>';
-      this.wireList();
+      App.setupCard(this.container, {
+        title: 'Shift History',
+        lead: 'Every shift you run lands here, newest first, with the full close detail.',
+        steps: [
+          { title: 'Open the floor', desc: 'Run a shift live in Active Shift, or log a past one there under Recent Shifts. It shows up here when it closes.', btn: 'Go to Active Shift', screen: 'sc-active-shift', done: false }
+        ]
+      });
       return;
     }
 

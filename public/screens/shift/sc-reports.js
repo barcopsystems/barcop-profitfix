@@ -41,6 +41,16 @@ S.ShiftReports = {
   },
 
   draw() {
+    if (!(this.shifts().length || this.drops().length || this.variances().length || this.voidComps().length || this.list86().length || this.maint().length || this.checklists().length)) {
+      App.setupCard(this.container, {
+        title: 'Shift Reports',
+        lead: 'Reports roll up your shifts, cash, and operations across any date range. Run a shift and log a little activity and these fill in.',
+        steps: [
+          { title: 'Open the floor', desc: 'Run a shift in Active Shift to feed the Shift and Cash reports. Voids, 86s, and checklists feed the Operations report.', btn: 'Go to Active Shift', screen: 'sc-active-shift', done: false }
+        ]
+      });
+      return;
+    }
     const parts = this.tab === 'shift' ? this.bodyShift()
       : this.tab === 'cash' ? this.bodyCash()
       : this.bodyOps();
@@ -167,7 +177,7 @@ S.ShiftReports = {
   // ── Cash tab ────────────────────────────────────────────────────────────────
   bodyCash() {
     if (!this.drops().length && !this.variances().length) {
-      return { empty: this.emptyPanel('No cash data yet.', 'Log cash drops and count drawers on the Cash Board and this report will summarize drops by drawer, variances by cashier, and net over/short.', 'sc-cash-control', 'Go to Cash Board') };
+      return { empty: this.emptyPanel('No cash data yet.', 'Log cash drops and count drawers in Cash Control and this report will summarize drops by drawer, variances by cashier, and net over/short.', 'sc-cash-control', 'Go to Cash Control') };
     }
     const drops = this.drops().filter(d => this.inRange(d.date));
     const vars = this.variances().filter(v => this.inRange(v.date));

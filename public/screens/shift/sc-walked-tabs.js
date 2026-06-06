@@ -121,7 +121,7 @@ S.ShiftWalkedTabs = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs logged yet. Use the form above to log one. The log attributes each loss to the right server and shift instead of disappearing into the weekly total.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs logged yet. Use the form above to log the first one.</div>';
     } else {
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
