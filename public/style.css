@@ -453,6 +453,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
 .data-card .tbl tbody td{background:#0D181E;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
+/* Void/Comp batch-builder line rows use the data-row fill; the header row stays. */
+.vc-line td{background:#0D181E;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
