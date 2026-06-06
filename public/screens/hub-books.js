@@ -1410,7 +1410,7 @@ S.HubBooks = {
     // Comps and maintenance for the whole YTD window.
     const vcs = (App.shiftData?.sc_void_comps || []).filter(v => inYearThroughMonth(v.date));
     agg.comps = vcs.filter(v => (v.type === 'comp' || v.type === 'Comp')).reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
-    const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inYearThroughMonth(m.date));
+    const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inYearThroughMonth(m.date_reported || m.date));
     agg.maintenance = mnts.reduce((s, m) => s + (parseFloat(m.cost || m.amount) || 0), 0);
     return agg;
   },
@@ -1454,7 +1454,7 @@ S.HubBooks = {
 
   _sumMaintenance(monthKey) {
     const inMonth = (dateStr) => dateStr && String(dateStr).slice(0, 7) === monthKey;
-    const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inMonth(m.date));
+    const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inMonth(m.date_reported || m.date));
     return mnts.reduce((s, m) => s + (parseFloat(m.cost || m.amount) || 0), 0);
   },
 
