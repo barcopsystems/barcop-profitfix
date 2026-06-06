@@ -184,7 +184,7 @@ S.ShiftChecklists = {
         const rows = filtered.slice(0, App.listLimit('sc', 'checklist')).map(r => {
           const full = (r.done_count || 0) >= (r.total_count || 0) && (r.total_count || 0) > 0;
           const status = full
-            ? '<span style="color:var(--green);font-weight:700;">Complete</span>'
+            ? '<span style="color:var(--t2);font-weight:700;">Complete</span>'
             : '<span style="color:var(--amber);font-weight:700;">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</span>';
           return '<tr class="cl-hrow" data-id="' + r.id + '" style="cursor:pointer;">'
             + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
