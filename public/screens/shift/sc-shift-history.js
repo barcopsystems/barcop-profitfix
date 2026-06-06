@@ -177,7 +177,7 @@ S.ShiftHistory = {
       const vCell = (vr, sk, ct) => {
         if (sk || vr == null || ct == null) return '<span style="color:var(--t4);">-</span>';
         const col = Math.abs(vr) <= tol ? 'var(--green)' : (vr < 0 ? 'var(--red)' : 'var(--amber)');
-        return '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>';
+        return '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>';
       };
       const statusCell = st => {
         const col = st === 'Short' ? 'var(--red)' : st === 'Over' ? 'var(--amber)' : st === 'Not Counted' ? 'var(--t3)' : 'var(--green)';
@@ -215,7 +215,7 @@ S.ShiftHistory = {
           + meta('Drops Out', fmt(cr.drops_total))
           + meta('Expected', fmt(cr.expected))
           + meta('Counted', cr.counted_cash != null ? App.fmtCurrency(cr.counted_cash) : '-')
-          + meta('Variance', skipped ? '-' : (variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
+          + meta('Variance', skipped ? '-' : (variance != null ? ((variance > 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
           + meta('Status', '<span style="color:' + statusColor + ';font-weight:700;">' + statusText + '</span>')
           + '</div>';
       }
@@ -246,7 +246,7 @@ S.ShiftHistory = {
         + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
         + meta('Logged in Labor Control', tr.logged_total != null ? App.fmtCurrency(tr.logged_total) : '-')
         + meta('POS Reported', tr.pos_reported != null ? App.fmtCurrency(tr.pos_reported) : '-')
-        + (tr.variance != null ? meta('Variance', (tr.variance >= 0 ? '+' : '') + App.fmtCurrency(tr.variance)) : '')
+        + (tr.variance != null ? meta('Variance', (tr.variance > 0 ? '+' : '') + App.fmtCurrency(tr.variance)) : '')
         + '</div></div>';
     }
 
@@ -309,10 +309,10 @@ S.ShiftHistory = {
       const tol = App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10;
       if (cr.skipped) { cashVarSub = 'Skipped'; cashVarColor = 'var(--t3)'; }
       else if (cr.variance == null) { cashVarSub = 'Not counted'; cashVarColor = 'var(--t3)'; }
-      else { cashVar = (cr.variance >= 0 ? '+' : '') + App.fmtCurrency(cr.variance); cashVarColor = Math.abs(cr.variance) <= tol ? 'var(--green)' : cr.variance < 0 ? 'var(--red)' : 'var(--amber)'; cashVarSub = Math.abs(cr.variance) <= tol ? 'Within tolerance' : cr.variance < 0 ? 'Short' : 'Over'; }
+      else { cashVar = (cr.variance > 0 ? '+' : '') + App.fmtCurrency(cr.variance); cashVarColor = Math.abs(cr.variance) <= tol ? 'var(--green)' : cr.variance < 0 ? 'var(--red)' : 'var(--amber)'; cashVarSub = Math.abs(cr.variance) <= tol ? 'Within tolerance' : cr.variance < 0 ? 'Short' : 'Over'; }
     }
     const tipsVal = (s.tip_recon && s.tip_recon.logged_total != null) ? App.fmtCurrency(s.tip_recon.logged_total) : '-';
-    const tipsSub = (s.tip_recon && s.tip_recon.variance != null) ? ((s.tip_recon.variance >= 0 ? '+' : '') + App.fmtCurrency(s.tip_recon.variance) + ' vs POS') : 'logged tips';
+    const tipsSub = (s.tip_recon && s.tip_recon.variance != null) ? ((s.tip_recon.variance > 0 ? '+' : '') + App.fmtCurrency(s.tip_recon.variance) + ' vs POS') : 'logged tips';
     const statusPill = s.status === 'Open'
       ? '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:2px 7px;">Open</span>'
       : '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:2px 7px;">Closed</span>';

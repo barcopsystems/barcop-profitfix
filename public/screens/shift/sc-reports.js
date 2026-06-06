@@ -190,7 +190,7 @@ S.ShiftReports = {
     const stats = this.statsCard(
       this.statItem('Cash Drops', drops.length)
       + this.statItem('Total Dropped', App.fmtCurrency(dropTotal))
-      + this.statItem('Net Over/Short', (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
+      + this.statItem('Net Over/Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
       + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : '')
       + this.statItem('Safe Balance', App.fmtCurrency(safeBal), 'good'));
 
@@ -224,7 +224,7 @@ S.ShiftReports = {
     const rows = Object.keys(g).sort((a, b) => g[a].net - g[b].net).map(k => {
       const x = g[k];
       return '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + x.count + '</td>'
-        + '<td class="' + (x.net < 0 ? 'neg' : '') + '">' + (x.net >= 0 ? '+' : '') + App.fmtCurrency(x.net) + '</td>'
+        + '<td class="' + (x.net < 0 ? 'neg' : '') + '">' + (x.net > 0 ? '+' : '') + App.fmtCurrency(x.net) + '</td>'
         + '<td class="' + (x.short ? 'neg' : '') + '">' + x.short + '</td><td>' + x.over + '</td></tr>';
     }).join('');
     return this.bareTable(['Cashier', 'Variances', 'Net Over/Short', 'Times Short', 'Times Over'], rows);

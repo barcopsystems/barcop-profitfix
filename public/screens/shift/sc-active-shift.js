@@ -1438,7 +1438,7 @@ S.ShiftActiveShift = {
           const varEl = this.container.querySelector('.aw-var[data-i="' + i + '"]');
           if (varEl) {
             if (skipped || !countedEntered) { varEl.textContent = '-'; varEl.style.color = 'var(--t4)'; }
-            else { varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.style.color = Math.abs(variance) <= tol ? 'var(--green)' : (variance < 0 ? 'var(--red)' : 'var(--amber)'); }
+            else { varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.style.color = Math.abs(variance) <= tol ? 'var(--green)' : (variance < 0 ? 'var(--red)' : 'var(--amber)'); }
           }
           tExp += expected;
           if (countedEntered) { tCnt += counted; tVar += variance; anyCounted = true; }
@@ -1449,7 +1449,7 @@ S.ShiftActiveShift = {
         const tvEl = document.getElementById('aw-t-variance');
         if (tvEl) {
           if (skipped || !anyCounted) { tvEl.textContent = '-'; tvEl.style.color = ''; }
-          else { tvEl.textContent = (tVar >= 0 ? '+' : '') + App.fmtCurrency(tVar); tvEl.style.color = Math.abs(tVar) <= tol ? 'var(--green)' : (tVar < 0 ? 'var(--red)' : 'var(--amber)'); }
+          else { tvEl.textContent = (tVar > 0 ? '+' : '') + App.fmtCurrency(tVar); tvEl.style.color = Math.abs(tVar) <= tol ? 'var(--green)' : (tVar < 0 ? 'var(--red)' : 'var(--amber)'); }
         }
       };
       this.container.querySelectorAll('.aw-sales, .aw-counted-d').forEach(el => el.addEventListener('input', recalc));
@@ -1475,7 +1475,7 @@ S.ShiftActiveShift = {
         const variance = pos - tipsTotal;
         const el = document.getElementById('aw-tip-var');
         if (el) {
-          el.textContent = pos > 0 ? (variance >= 0 ? '+' : '') + App.fmtCurrency(variance) : '-';
+          el.textContent = pos > 0 ? (variance > 0 ? '+' : '') + App.fmtCurrency(variance) : '-';
           el.style.color = pos > 0 ? (Math.abs(variance) < 5 ? 'var(--green)' : 'var(--red)') : '';
         }
       };
@@ -1634,7 +1634,7 @@ S.ShiftActiveShift = {
     const cv = s.cash_recon ? s.cash_recon.variance : null;
     const cashLine = (cv == null) ? ''
       : '<div style="font-size:11px;color:' + (Math.abs(cv) <= App.cashToleranceForShift(s) ? 'var(--green)' : (cv < 0 ? 'var(--red)' : 'var(--amber)')) + ';font-weight:700;margin-top:6px;">'
-        + 'Cash variance ' + (cv >= 0 ? '+' : '') + App.fmtCurrency(cv) + ' &middot; auto-logged to Variance Log</div>';
+        + 'Cash variance ' + (cv > 0 ? '+' : '') + App.fmtCurrency(cv) + ' &middot; auto-logged to Variance Log</div>';
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'

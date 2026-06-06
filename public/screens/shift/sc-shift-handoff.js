@@ -76,7 +76,7 @@ S.ShiftHandoff = {
       const okTotal = cr.variance == null ? true : Math.abs(cr.variance) <= tol;
       const statusTotal = cr.variance == null ? '' : okTotal ? 'Within Tolerance' : cr.variance < 0 ? 'Short' : 'Over';
       b.sectionTitle('Cash Reconciliation' + (statusTotal ? ' (' + statusTotal + ')' : ''));
-      const vstr = vr => vr != null ? ((vr >= 0 ? '+' : '') + fmt$(vr)) : '-';
+      const vstr = vr => vr != null ? ((vr > 0 ? '+' : '') + fmt$(vr)) : '-';
       const rows = cr.drawers.map(c => [
         c.name || 'Register', fmt$(c.opening_bank), fmt$(c.drops_total),
         c.sales_cash != null ? fmt$(c.sales_cash) : '-', fmt$(c.expected),
@@ -97,7 +97,7 @@ S.ShiftHandoff = {
         ['- Drops Out', fmt$(cr.drops_total)],
         ['Expected in Drawer', fmt$(cr.expected)],
         ['Counted in Drawer', fmt$(cr.counted_cash)],
-        ['Variance', (cr.variance != null && cr.variance >= 0 ? '+' : '') + fmt$(cr.variance)]
+        ['Variance', (cr.variance != null && cr.variance > 0 ? '+' : '') + fmt$(cr.variance)]
       ], { columnStyles: { 1: { halign: 'right' } } });
     }
 
@@ -108,7 +108,7 @@ S.ShiftHandoff = {
         ['Logged in Labor Control', fmt$(tr.logged_total)],
         ['POS Reported', fmt$(tr.pos_reported)]
       ];
-      if (tr.variance != null) tipRows.push(['Variance', (tr.variance >= 0 ? '+' : '') + fmt$(tr.variance)]);
+      if (tr.variance != null) tipRows.push(['Variance', (tr.variance > 0 ? '+' : '') + fmt$(tr.variance)]);
       b.table(null, tipRows, { columnStyles: { 1: { halign: 'right' } } });
     }
 
@@ -224,13 +224,13 @@ S.ShiftHandoff = {
       lines.push('CASH RECONCILIATION - ' + status);
       lines.push('  Opening Bank: ' + fmt$(cr.opening_bank) + '   Drops Out: ' + fmt$(cr.drops_total));
       lines.push('  POS Cash Sales: ' + fmt$(cr.sales_cash) + '   Counted: ' + fmt$(cr.counted_cash));
-      lines.push('  Expected: ' + fmt$(cr.expected) + '   Variance: ' + (cr.variance >= 0 ? '+' : '') + fmt$(cr.variance));
+      lines.push('  Expected: ' + fmt$(cr.expected) + '   Variance: ' + (cr.variance > 0 ? '+' : '') + fmt$(cr.variance));
     }
     lines.push('');
     if (tr.logged_total != null || tr.pos_reported != null) {
       lines.push('TIPS');
       lines.push('  Logged: ' + fmt$(tr.logged_total) + '   POS Reported: ' + fmt$(tr.pos_reported)
-        + (tr.variance != null ? '   Variance: ' + (tr.variance >= 0 ? '+' : '') + fmt$(tr.variance) : ''));
+        + (tr.variance != null ? '   Variance: ' + (tr.variance > 0 ? '+' : '') + fmt$(tr.variance) : ''));
       lines.push('');
     }
     lines.push('OPEN FOR THE NEXT SHIFT');

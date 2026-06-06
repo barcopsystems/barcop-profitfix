@@ -206,7 +206,7 @@ S.ShiftCashControl = {
       const st = lastCount.status || '';
       const col = this.statusColor(st);
       countLine = '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Last safe count ' + this.fmtDate(lastCount.date) + ': '
-        + '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> ' + esc(st) + '</div>';
+        + '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> ' + esc(st) + '</div>';
     }
     const safeCard = '<div class="card form-card no-print" style="margin-bottom:16px;">'
       + App.collapsibleCardTitle('sc-cash-safe', 'The Safe', App.helpButton('cc-how'))
@@ -232,7 +232,7 @@ S.ShiftCashControl = {
         const vr = parseFloat(st.lastVar.variance) || 0;
         const status = st.lastVar.status || '';
         const col = this.statusColor(status);
-        closeLine = '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> '
+        closeLine = '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> '
           + '<span style="color:var(--t3);">' + esc(status) + ' (' + this.fmtDate(st.lastVar.date) + ')</span>';
       } else {
         closeLine = '<span style="color:var(--t4);">No close logged yet</span>';
@@ -268,12 +268,12 @@ S.ShiftCashControl = {
 
     const netBox = '<div style="margin-left:auto;text-align:right;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + netLabel + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">' + (netWin >= 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div></div>';
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">' + (netWin > 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div></div>';
 
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Drops In</div><div class="calc-val lg">' + App.fmtCurrency(totDrops) + '</div><div style="font-size:10px;color:var(--t3);">' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Safe Out</div><div class="calc-val lg">' + App.fmtCurrency(totOut) + '</div><div style="font-size:10px;color:var(--t3);">deposits and banks</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val lg ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val lg ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val lg ' + (flagged.length ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
       + netBox
       + '</div></div>';
@@ -568,7 +568,7 @@ S.ShiftCashControl = {
       const variance = Math.round((total - expected) * 100) / 100;
       const status = Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over';
       const col = this.statusColor(status);
-      if (varEl) { varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col; }
+      if (varEl) { varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col; }
       if (stEl) { stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col; }
     };
     const counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
@@ -660,7 +660,7 @@ S.ShiftCashControl = {
       const variance = Math.round((cnt - exp) * 100) / 100;
       const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt);
       const col = this.statusColor(status);
-      varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
+      varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
       stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col;
     };
     document.getElementById('ccv-expected')?.addEventListener('input', calc);

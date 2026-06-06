@@ -197,7 +197,7 @@ S.ShiftCashHistory = {
     const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Cashier', 'All cashiers', cashierNames) + this.clearBtn();
     const stats = this.statsCard(
       this.statItem('Variances', filtered.length)
-      + this.statItem('Net Over/Short', (net >= 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
+      + this.statItem('Net Over/Short', (net > 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
       + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : ''));
     let rows;
     if (!filtered.length) rows = this.noMatchRow(8);
@@ -205,7 +205,7 @@ S.ShiftCashHistory = {
       const vr = v.variance || 0;
       const nc = v.status === 'Not Counted';
       const cls = nc ? '' : v.status === 'Short' ? 'neg' : v.status === 'Over' ? '' : 'pos';
-      const vc = nc ? '-' : (vr >= 0 ? '+' : '') + App.fmtCurrency(vr);
+      const vc = nc ? '-' : (vr > 0 ? '+' : '') + App.fmtCurrency(vr);
       return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
         + '<td>' + esc(v.shift_type || '-') + '</td><td>' + esc(v.drawer || '-') + '</td>'
         + '<td>' + esc(v.cashier || '-') + '</td><td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
