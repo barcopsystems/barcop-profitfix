@@ -253,7 +253,7 @@ S.Shift86List = {
       + '</div>'
 
       // Cross-reference panel — populated by recomputeCrossRef()
-      + '<div id="qa-xref" style="margin-top:14px;"></div>'
+      + '<div id="qa-xref" style="margin:14px 0;"></div>'
 
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Reason <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
         + '<input type="text" id="qa-reason" value="' + esc(i?.reason || '') + '" placeholder="Ran the case, delivery short, equipment down, etc."/></div></div>'
