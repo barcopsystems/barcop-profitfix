@@ -69,16 +69,15 @@ S.LaborScheduleHistory = {
       const avgCost = list.length ? list.reduce((t, x) => t + (x.total_cost || 0), 0) / list.length : 0;
       const withRplh = list.filter(x => x.rplh != null);
       const avgRplh = withRplh.length ? withRplh.reduce((t, x) => t + x.rplh, 0) / withRplh.length : null;
-      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;flex:1;min-width:0;">'
         + '<div class="calc-item"><div class="calc-label">Schedules</div><div class="calc-val lg">' + list.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg Labor Cost</div><div class="calc-val lg">' + App.fmtCurrency(avgCost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg Labor %</div><div class="calc-val lg ' + (avgPct != null ? (avgPct > target ? 'warn' : 'good') : '') + '">' + (avgPct != null ? App.fmtPct(avgPct) : '-') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg RPLH</div><div class="calc-val lg">' + (avgRplh != null ? App.fmtCurrency(avgRplh) : '-') + '</div></div>'
-        + '</div></div>';
+        + '</div>' + App.helpButton('lh-how') + '</div></div>';
       html = statsCard
-        + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Schedule History</div>'
-        + App.helpButton('lh-how') + '</div>'
+        + '<div class="sh" style="margin:24px 0 10px;">Schedule History</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
