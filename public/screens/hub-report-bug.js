@@ -27,7 +27,7 @@ S.HubReportBug = {
     this._modal = true;
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Report a Bug</div>'
       + '<div id="hrb-modal-body">' + this._renderForm() + '</div></div>';
-    App.openModal(html, { id: 'hrb-modal', maxWidth: 640 });
+    App.openModal(html, { id: 'hrb-modal', maxWidth: 640, noClose: true });
     this._wireModal();
   },
 
@@ -76,41 +76,46 @@ S.HubReportBug = {
     const labelStyle = 'font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:7px;';
     const reqStar    = '<span style="color:var(--red);margin-left:2px;">*</span>';
 
-    return '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">'
+    const explainer = '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">'
       + 'Found a bug, a glitch, or something that just does not work the way it should? Tell the team what happened so we can find it and fix it fast. The more detail you give, the quicker we can get on it.'
-      + '</div>'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
-      +   '<div style="margin-bottom:18px;">'
-      +     '<label style="' + labelStyle + '">Short Title' + reqStar + '</label>'
-      +     '<input type="text" id="hrb-title" placeholder="One line summary of the problem" style="' + inputStyle + '"/>'
-      +   '</div>'
-      +   '<div style="margin-bottom:18px;">'
-      +     '<label style="' + labelStyle + '">Severity' + reqStar + '</label>'
-      +     '<select id="hrb-severity" style="' + inputStyle + 'cursor:pointer;">'
-      +       '<option value="minor">Minor (small glitch or visual issue)</option>'
-      +       '<option value="moderate" selected>Moderate (feature works but has bugs)</option>'
-      +       '<option value="major">Major (feature is broken)</option>'
-      +       '<option value="critical">Critical (Bar Cop unusable or data at risk)</option>'
-      +     '</select>'
-      +   '</div>'
-      +   '<div style="margin-bottom:18px;">'
-      +     '<label style="' + labelStyle + '">What Happened' + reqStar + '</label>'
-      +     '<textarea id="hrb-what" placeholder="Describe what you saw. Be specific about which page, which button, what data you were working with, and what went wrong." style="' + taStyle + '"></textarea>'
-      +   '</div>'
-      +   '<div style="margin-bottom:18px;">'
-      +     '<label style="' + labelStyle + '">Steps to Reproduce</label>'
-      +     '<textarea id="hrb-steps" placeholder="Number the steps to make the bug happen again. Example: 1. Open Profit Recovery. 2. Click This Week. 3. Enter $1,200. 4. The save button does not respond." style="' + taStyle + '"></textarea>'
-      +   '</div>'
-      +   '<div style="margin-bottom:18px;">'
-      +     '<label style="' + labelStyle + '">What Did You Expect to Happen</label>'
-      +     '<textarea id="hrb-expected" placeholder="Describe what should have happened instead. This helps us know if it is a bug or a misunderstanding of how the feature works." style="' + taStyle + '"></textarea>'
-      +   '</div>'
-      +   '<div id="hrb-status" style="font-size:11px;font-weight:700;letter-spacing:0.04em;margin-bottom:12px;display:none;"></div>'
-      +   '<div style="display:flex;gap:10px;align-items:center;">'
-      +     '<button class="btn btn-primary" id="hrb-submit">Submit Report</button>'
-      +     '<button class="btn btn-ghost" id="hrb-cancel">Cancel</button>'
-      +   '</div>'
       + '</div>';
+    const fields =
+        '<div style="margin-bottom:18px;">'
+      +   '<label style="' + labelStyle + '">Short Title' + reqStar + '</label>'
+      +   '<input type="text" id="hrb-title" placeholder="One line summary of the problem" style="' + inputStyle + '"/>'
+      + '</div>'
+      + '<div style="margin-bottom:18px;">'
+      +   '<label style="' + labelStyle + '">Severity' + reqStar + '</label>'
+      +   '<select id="hrb-severity" style="' + inputStyle + 'cursor:pointer;">'
+      +     '<option value="minor">Minor (small glitch or visual issue)</option>'
+      +     '<option value="moderate" selected>Moderate (feature works but has bugs)</option>'
+      +     '<option value="major">Major (feature is broken)</option>'
+      +     '<option value="critical">Critical (Bar Cop unusable or data at risk)</option>'
+      +   '</select>'
+      + '</div>'
+      + '<div style="margin-bottom:18px;">'
+      +   '<label style="' + labelStyle + '">What Happened' + reqStar + '</label>'
+      +   '<textarea id="hrb-what" placeholder="Describe what you saw. Be specific about which page, which button, what data you were working with, and what went wrong." style="' + taStyle + '"></textarea>'
+      + '</div>'
+      + '<div style="margin-bottom:18px;">'
+      +   '<label style="' + labelStyle + '">Steps to Reproduce</label>'
+      +   '<textarea id="hrb-steps" placeholder="Number the steps to make the bug happen again. Example: 1. Open Profit Recovery. 2. Click This Week. 3. Enter $1,200. 4. The save button does not respond." style="' + taStyle + '"></textarea>'
+      + '</div>'
+      + '<div style="margin-bottom:18px;">'
+      +   '<label style="' + labelStyle + '">What Did You Expect to Happen</label>'
+      +   '<textarea id="hrb-expected" placeholder="Describe what should have happened instead. This helps us know if it is a bug or a misunderstanding of how the feature works." style="' + taStyle + '"></textarea>'
+      + '</div>'
+      + '<div id="hrb-status" style="font-size:11px;font-weight:700;letter-spacing:0.04em;margin-bottom:12px;display:none;"></div>'
+      + '<div style="display:flex;gap:10px;align-items:center;">'
+      +   '<button class="btn btn-primary" id="hrb-submit">Submit Report</button>'
+      +   '<button class="btn btn-ghost" id="hrb-cancel">Cancel</button>'
+      + '</div>';
+
+    // In the popup the modal card already provides the chrome, so skip the
+    // intro line and the bordered wrapper. The full-page Hub view keeps both.
+    if (this._modal) return fields;
+    return explainer
+      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">' + fields + '</div>';
   },
 
   _renderSuccess() {
