@@ -170,8 +170,8 @@ S.Hub = {
     // Stat tiles — center-aligned to match the 4-stat tile pattern used
     // throughout the rest of the app (module dashboards, etc.). Big number in
     // Barlow Condensed, colored by status (green for good, red for bad).
-    const tile = (label, big, bigColor, sub, subColor) => `
-      <div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+    const tile = (label, big, bigColor, sub, subColor, box) => `
+      <div style="${box || 'background:var(--surface);border:1px solid var(--b-edge);'}border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">${label}</div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;line-height:1;color:${bigColor};">${big}</div>
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
@@ -185,7 +185,8 @@ S.Hub = {
              overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
-             anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
+             anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this',
+             undefined, 'background:var(--c3);border:1px solid var(--c4);')
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) : 'Not run yet')
