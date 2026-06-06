@@ -767,6 +767,7 @@ const App = {
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
     document.body.classList.remove('hub-dashboard'); // a sub-page is open → show the sidebar
+    this._renderProtoTopnav(this._GLOBAL_OF_ACTION[activeAction] || '');  // highlight this page's global link
     const content = document.querySelector('.hub-app .content');
     if (!content) {
       this.openHubOverlay(renderFn);
@@ -887,8 +888,10 @@ const App = {
         slot.innerHTML = '';
         return;
       }
-      slot.style.cssText = 'display:flex;align-items:center;margin-right:14px;';
-      slot.innerHTML = '<button class="btn btn-ghost btn-sm" id="' + slotId + '-btn" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Group Dashboard</button>';
+      slot.style.cssText = 'display:flex;align-items:center;';
+      slot.innerHTML = '<button class="tn-grp-btn" id="' + slotId + '-btn" title="Group Dashboard">'
+        + '<svg viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>'
+        + '<span>Group</span></button>';
       slot.querySelector('button')?.addEventListener('click', () => {
         if (window.S && S.HubGroupDashboard) S.HubGroupDashboard.open();
       });
@@ -1217,6 +1220,8 @@ const App = {
   _PROTO_GLOBAL:   [['hub','The Hub'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
+  // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
   _CONVERTED: new Set(['sc-drawers', 'sc-active-shift']),
@@ -1230,15 +1235,16 @@ const App = {
     const globalEl = document.getElementById('tn-global');
     if (globalEl) {
       globalEl.innerHTML = this._PROTO_GLOBAL.map(([k, l]) =>
-        '<div class="tn-glink' + (context === 'hub' && k === 'hub' ? ' active' : '') + '" data-g="' + k + '">' + esc(l) + '</div>').join('');
+        '<div class="tn-glink' + (k === context ? ' active' : '') + '" data-g="' + k + '">' + esc(l) + '</div>').join('');
       globalEl.querySelectorAll('.tn-glink[data-g]').forEach(el =>
         el.addEventListener('click', () => App._protoGlobalClick(el.dataset.g)));
     }
     const secEl = document.getElementById('tn-sections');
     if (secEl) {
       const pill = ([k, l]) => '<div class="tn-sec' + (k === context ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
-      secEl.innerHTML = this._PROTO_RECOVERY.map(pill).join('')
-        + '<div class="tn-divider"></div>'
+      secEl.innerHTML = '<span class="tn-grp-label">Recovery:</span>'
+        + this._PROTO_RECOVERY.map(pill).join('')
+        + '<span class="tn-grp-label">Control:</span>'
         + this._PROTO_CONTROL.map(pill).join('');
       secEl.querySelectorAll('.tn-sec[data-sec]').forEach(el =>
         el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
