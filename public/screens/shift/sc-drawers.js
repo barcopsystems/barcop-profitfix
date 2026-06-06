@@ -140,7 +140,7 @@ S.ShiftDrawers = {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
     this.editId = id;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Drawer</div>'
+    const html = '<div class="card sc-dr-form" style="margin:0;"><div class="card-title">Edit Drawer</div>'
       + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dre-save">Update</button>'
