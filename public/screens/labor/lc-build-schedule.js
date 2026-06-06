@@ -427,9 +427,9 @@ S.LaborBuildSchedule = {
       + '<div class="f" style="width:200px;"><label>' + (sug > 0 ? 'Or enter your own ($)' : 'Expected Revenue ($)') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div>'
       + (hasDetail ? '<div style="font-size:10px;color:var(--amber);margin-top:8px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
       + '<div id="bs-fc-err" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>'
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">'
-      + '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
-      + '<button class="btn btn-primary" data-act="save">Save Forecast</button></div></div>';
+      + '<div style="display:flex;gap:10px;margin-top:18px;">'
+      + '<button class="btn btn-primary" data-act="save">Save Forecast</button>'
+      + '<button class="btn btn-ghost" data-act="cancel">Cancel</button></div></div>';
     document.body.appendChild(overlay);
     const close = () => document.body.removeChild(overlay);
     overlay.addEventListener('click', async ev => {
