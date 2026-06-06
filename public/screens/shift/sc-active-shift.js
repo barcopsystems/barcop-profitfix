@@ -72,13 +72,13 @@ S.ShiftActiveShift = {
 
     const chips = types.map(t =>
       '<button class="of-chip" data-type="' + esc(t) + '" style="padding:9px 16px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
-      + (d.shift_type === t ? 'background:var(--gold-bg);border:1px solid var(--gold);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+      + (d.shift_type === t ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
       + '">' + esc(t) + '</button>').join('');
 
     const modChips = mods.length
       ? mods.map(st =>
           '<button class="of-mod" data-mgr="' + esc(st.id) + '" style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
-          + (d.manager_id === st.id ? 'background:var(--gold-bg);border:1px solid var(--gold);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+          + (d.manager_id === st.id ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
           + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);font-size:10px;font-weight:800;">'
           + esc(initials(st.name)) + '</span>' + esc(st.name) + '</button>').join('')
       : '<div style="font-size:12px;color:var(--t3);">No manager-eligible staff yet. Add staff and positions in Labor Control.</div>';
@@ -94,7 +94,7 @@ S.ShiftActiveShift = {
             const st = d.drawers[dr.id] || { on: false, bank: '' };
             const on = !!st.on;
             return '<div class="reg-tile" data-drawer="' + esc(dr.id) + '" style="width:150px;min-height:90px;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;'
-              + (on ? 'border:1.5px solid var(--gold);background:var(--gold-bg);' : 'border:1px solid var(--b1);background:var(--input);opacity:0.6;') + '">'
+              + (on ? 'border:1px solid var(--gold-tint-bord);background:var(--gold-tint);' : 'border:1px solid var(--b1);background:var(--input);opacity:0.6;') + '">'
               + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">'
               + '<div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(dr.name) + '</div>'
               + (on ? '<span style="color:var(--gold);font-size:14px;font-weight:800;">&#10003;</span>' : '') + '</div>'
