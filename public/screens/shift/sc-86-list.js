@@ -300,7 +300,7 @@ S.Shift86List = {
         + esc(g.name) + ' <span style="color:var(--t4);font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-left:4px;">' + (g.kind === 'batch' ? 'batch' : 'product') + '</span>'
         + '</span>'
       ).join('');
-      wrap.innerHTML = '<div style="font-size:11px;color:var(--t3);padding:12px 14px;background:rgba(218,171,70,0.06);border:1px solid rgba(218,171,70,0.3);border-radius:4px;line-height:1.6;">'
+      wrap.innerHTML = '<div style="font-size:11px;color:var(--t3);padding:12px 14px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:4px;line-height:1.6;">'
         + '<div style="font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:1px;font-size:9px;margin-bottom:6px;">Recipe references</div>'
         + '<div>' + chips + '</div>'
         + '<div style="margin-top:6px;color:var(--t3);">These stay available for other menu items. 86 them separately if any of them ran out.</div>'
