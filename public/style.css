@@ -422,7 +422,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-bleed-tbl{margin-left:-20px;margin-right:-20px;overflow-x:auto;}
 .card-bleed-tbl .tbl th:first-child,.card-bleed-tbl .tbl td:first-child{padding-left:20px;}
 .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
-/* Drawers/Registers card — data-row color experiment (header stays --surface). */
+/* Drawers/Registers card — data-row color experiment (header stays --surface).
+   Title moved to a background .sh heading; the column-header row is the card's
+   first row (flush top, text centered), and the table fills to the card border
+   top and bottom (no card padding gap). overflow:hidden clips the now edge-to-
+   edge table to the card's rounded corners. */
+.sc-dr-card{overflow:hidden;}
+.sc-dr-card .card-bleed-tbl{margin-top:-20px;margin-bottom:-20px;}
+.sc-dr-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
 .sc-dr-card .tbl tbody td{background:#0D181E;}
 /* Add/Edit Drawer card — full-width dividers, centered header/action bars, roomier form (experiment).
    Works for both the collapsible on-page card and the plain edit-modal card: the title's bottom
