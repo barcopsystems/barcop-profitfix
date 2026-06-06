@@ -165,6 +165,7 @@ S.Hub = {
     };
 
     const panelTitle = (t) => `<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;flex-shrink:0;">${t}</div>`;
+    const titleWithSub = (t, sub) => `<div style="margin-bottom:10px;flex-shrink:0;"><div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">${t}</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">${sub}</div></div>`;
     const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
     // Stat tiles — center-aligned to match the 4-stat tile pattern used
@@ -348,7 +349,7 @@ S.Hub = {
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
-    const metricsPanel = `<div style="${PANEL}">
+    const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div></div>`;
 
     // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
@@ -570,7 +571,7 @@ S.Hub = {
     const overflowFooter = overflowItems > 0
       ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
       : '';
-    const actionPanel = `<div style="${PANEL}">${panelTitle('Priority Action Items')}
+    const actionPanel = `<div style="${PANEL}">${titleWithSub('Priority Action Items', 'From your audits')}
       <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}</div>`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
@@ -636,7 +637,7 @@ S.Hub = {
         + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
-    const readoutPanel = `<div style="${PANEL}">${panelTitle('Weekly Gaps')}${readoutBody}</div>`;
+    const readoutPanel = `<div style="${PANEL}">${titleWithSub('Weekly Gaps', 'From this week\'s numbers')}${readoutBody}</div>`;
 
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
@@ -792,7 +793,7 @@ S.Hub = {
             <div class="hub-grid" style="display:grid;grid-template-rows:auto 510px 470px;gap:18px;padding-bottom:18px;">
               <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
               <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
             </div>
           </main>
         </div>
