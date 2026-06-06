@@ -54,39 +54,44 @@ S.ShiftWalkedTabs = {
     p = p || 'wt-';
     const v = val => (val != null && val !== '') ? val : '';
     const reasonOpts = this.REASONS.map(rs => '<option' + (r && r.reason === rs ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
-    // The main log form (wt-) puts Check # on row 1 so the Server dropdown is not
-    // stretched wide; the edit pop-up (wte-) keeps it on row 2 as before.
     const inline = p === 'wt-';
-    const checkCell = '<div class="f" style="width:140px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>';
+    const dateCell   = '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>';
+    const timeCell   = '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>';
+    const serverCell = '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>';
+    const amountCell = '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>';
+    const checkCell  = '<div class="f" style="width:140px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>';
+    const reasonCell = '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>';
+    const mgrCell    = '<div class="f" style="width:190px;flex-shrink:0;"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>';
+    const notesRow   = '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.">' + esc(r?.notes || '') + '</textarea></div></div>';
+    // Inline log form: every data cell on one row (wraps when narrow). The edit
+    // pop-up is a narrower modal, so it keeps a two-row split.
+    if (inline) {
+      return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+        + dateCell + timeCell + serverCell + amountCell + checkCell + reasonCell + mgrCell
+        + '</div>' + notesRow;
+    }
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>'
-      + (inline ? checkCell : '')
+      + dateCell + timeCell + serverCell + amountCell
       + '</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + (inline ? '' : checkCell)
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" rows="2" placeholder="What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + checkCell + reasonCell + mgrCell
+      + '</div>' + notesRow;
   },
 
-  filterCard(stats) {
+  filterCard() {
     const reasonOpts = '<option value="">All reasons</option>'
       + this.REASONS.map(r => '<option value="' + esc(r) + '"' + (this.filterReason === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span><button class="btn btn-ghost btn-sm" id="wt-export">Export PDF</button></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+    return '<div class="card no-print">'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="wt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="wt-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label>'
           + '<select id="wt-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="wt-f-reason">' + reasonOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wt-f-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div>' + (stats || '') + '</div>';
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wt-f-clear">Clear</button></div>'
+        + '<button class="btn btn-ghost btn-sm" id="wt-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
+      + '</div></div>';
   },
 
   applyFilters(list) {
@@ -107,7 +112,7 @@ S.ShiftWalkedTabs = {
     filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || ''));
     const totalLoss = filtered.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
-    const formCard = '<div class="card">'
+    const formCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-walked-tabs', 'Log a Walked Tab', App.helpButton('wt-how'))
       + '<div class="collapse-body">'
       + this.formFields(null)
@@ -119,10 +124,10 @@ S.ShiftWalkedTabs = {
     if (all.length === 0) {
       below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs logged yet. Use the form above to log one. The log attributes each loss to the right server and shift instead of disappearing into the weekly total.</div>';
     } else {
-      const stats = '<div class="calc" style="margin-bottom:0;">'
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Loss</div><div class="calc-val warn">' + App.fmtCurrency(totalLoss) + '</div></div>'
-        + '</div>';
+        + '</div></div>';
       let listHtml;
       if (filtered.length === 0) {
         listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No entries match the filters.</div>';
@@ -139,12 +144,12 @@ S.ShiftWalkedTabs = {
           + '<button class="btn btn-ghost btn-sm wt-edit" data-id="' + r.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm wt-del" data-id="' + r.id + '">Delete</button>'
           + '</div></td></tr>').join('');
-        listHtml = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:16px;"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>When</th><th>Server</th><th>Check #</th><th>Amount</th><th>Reason</th><th>Manager</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'walked_tab', filtered, !!(this.filterFrom || this.filterTo || this.filterServerId || this.filterReason));
       }
-      below = this.filterCard(stats) + listHtml;
+      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Walked Tabs</div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -182,7 +187,7 @@ S.ShiftWalkedTabs = {
     const r = this.tabs().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Walked Tab</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Walked Tab</div>'
       + this.formFields(r, 'wte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wte-save">Update</button>'
