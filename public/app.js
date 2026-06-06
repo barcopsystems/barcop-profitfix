@@ -1224,7 +1224,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift']),
+  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings']),
   _protoGlobalClick(g) {
     if (g === 'hub')   return this.showHub();
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
