@@ -65,6 +65,16 @@ S.LaborBuildSchedule = {
     d.setDate(d.getDate() + dayIdx);
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
   },
+  // Jump the schedule a week back/forward from the arrow buttons.
+  shiftWeek(days) {
+    const base = this.draft.week_start || this.mondayOf(App.todayLocal());
+    const d = new Date(base + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    d.setDate(d.getDate() + days);
+    this.draft.week_start = this.mondayOf(App.ymdLocal(d));
+    this.saveDraft();
+    this.draw();
+  },
 
   // ── Draft lifecycle ─────────────────────────────────────────────────────────
   loadDraft() {
@@ -274,9 +284,12 @@ S.LaborBuildSchedule = {
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Week and Labor Budget</span>'
       + App.helpButton('bs-how') + '</div>'
-      + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:14px;">'
+      + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
       + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week">&lsaquo;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="bs-week-next" title="Next week">&rsaquo;</button></div></div>'
       + '</div>' + weekPrompt + '</div>'
       + budgetStatsCard
       + gridCard + totalsCard + actionsCard
@@ -301,6 +314,8 @@ S.LaborBuildSchedule = {
       this.draft.week_start = this.mondayOf(e.target.value) || '';
       this.saveDraft(); this.draw();
     });
+    document.getElementById('bs-week-prev')?.addEventListener('click', () => this.shiftWeek(-7));
+    document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
     document.getElementById('bs-notes')?.addEventListener('input', e => { this.draft.notes = e.target.value || ''; this.saveDraft(); });
     document.getElementById('bs-fc')?.addEventListener('click', () => this.openForecastModal());
     document.getElementById('bs-how')?.addEventListener('click', () => this.showHowTo());
