@@ -1144,7 +1144,7 @@ S.Hub = {
     // (Shift Control sc_variances, the owner of cash data).
     const variances = (App.shiftData || {}).sc_variances || [];
     if (variances.length >= 2) {
-      const recent = variances.slice(-6);
+      const recent = variances.slice(0, 6);
       const shorts = recent.filter(r => r.status === 'Short').length;
       if (shorts >= 2) out.push({
         sev: shorts >= 3 ? 'bad' : 'warn',
