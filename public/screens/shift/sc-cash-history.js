@@ -129,6 +129,7 @@ S.ShiftCashHistory = {
   bodySafe() {
     const chrono = S.ShiftSafeLog.chrono();
     if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.') };
+    const byNames = [...new Set(chrono.map(e => e.performed_by).filter(Boolean))].sort();
     let bal = 0;
     const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
     const lifetime = bal;
@@ -136,12 +137,13 @@ S.ShiftCashHistory = {
       if (this.f.from && (e.date || '') < this.f.from) return false;
       if (this.f.to && (e.date || '') > this.f.to) return false;
       if (this.f.a && (e.txn_type || '') !== this.f.a) return false;
+      if (this.f.b && (e.performed_by || '') !== this.f.b) return false;
       return true;
     };
     const shown = withBal.filter(r => match(r.e));
     const totalIn = shown.filter(r => r.signed > 0).reduce((t, r) => t + r.signed, 0);
     const totalOut = shown.filter(r => r.signed < 0).reduce((t, r) => t - r.signed, 0);
-    const controls = this.dateInputs() + this.selInput('a', 'Type', 'All types', S.ShiftSafeLog.TYPES.map(t => t.name)) + this.clearBtn();
+    const controls = this.dateInputs() + this.selInput('a', 'Type', 'All types', S.ShiftSafeLog.TYPES.map(t => t.name)) + this.selInput('b', 'Performed By', 'All staff', byNames) + this.clearBtn();
     const stats = this.statsCard(
       this.statItem('Safe Balance', App.fmtCurrency(lifetime), 'good')
       + this.statItem('Total In', App.fmtCurrency(totalIn))
@@ -171,16 +173,17 @@ S.ShiftCashHistory = {
     const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
     if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.') };
     const drawerNames = [...new Set(all.map(v => v.drawer).filter(Boolean))].sort();
+    const cashierNames = [...new Set(all.map(v => v.cashier).filter(Boolean))].sort();
     const filtered = all.filter(v => {
       if (this.f.from && (v.date || '') < this.f.from) return false;
       if (this.f.to && (v.date || '') > this.f.to) return false;
       if (this.f.a && (v.drawer || '') !== this.f.a) return false;
-      if (this.f.b && (v.status || '') !== this.f.b) return false;
+      if (this.f.b && (v.cashier || '') !== this.f.b) return false;
       return true;
     });
     const net = filtered.reduce((t, v) => t + (v.variance || 0), 0);
     const flagged = filtered.filter(v => v.status === 'Over' || v.status === 'Short').length;
-    const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Status', 'All statuses', S.ShiftVarianceLog.STATUSES) + this.clearBtn();
+    const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Cashier', 'All cashiers', cashierNames) + this.clearBtn();
     const stats = this.statsCard(
       this.statItem('Variances', filtered.length)
       + this.statItem('Net Over/Short', (net >= 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
