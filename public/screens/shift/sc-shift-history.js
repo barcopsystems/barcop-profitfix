@@ -213,17 +213,53 @@ S.ShiftHistory = {
       }
     }
 
-    // ── Exception Review acknowledgments ─────────────────────────────────
-    let exCard = '';
-    if (s.exception_ack && Object.keys(s.exception_ack).length) {
-      const labels = { e86: '86\'d Items', vc: 'Big Voids & Comps', mt: 'Open Maintenance', cl: 'Closing Checklist' };
-      const ackRows = Object.entries(s.exception_ack)
-        .filter(([, v]) => v === true)
-        .map(([k]) => '<div style="font-size:12px;color:var(--t1);padding:6px 0;border-bottom:1px solid var(--b2);">&#10003; ' + esc(labels[k] || k) + ' acknowledged</div>')
-        .join('');
-      if (ackRows) {
-        exCard = '<div class="card form-card"><div class="card-title">Exception Review</div>' + ackRows + '</div>';
-      }
+    // ── Recap sections mirroring the Shift Handoff (screen == the PDF) ───────
+    // Reuse the handoff's exception gather: open 86s + open maintenance are
+    // current state (matches the handoff, which is generated at close); voids /
+    // comps and the closing checklist are scoped to this shift's date.
+    const ex = (S.ShiftHandoff && S.ShiftHandoff._gatherExceptions)
+      ? S.ShiftHandoff._gatherExceptions(s)
+      : { eighty6: [], vc: [], openMaint: [], closingCheck: null };
+
+    const dataSection = (title, headers, rows) => {
+      if (!rows.length) return '';
+      return '<div class="sh" style="margin-top:24px;">' + title + '</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + headers.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
+        + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('')
+        + '</tbody></table></div></div>';
+    };
+
+    // Tip Reconciliation
+    let tipCard = '';
+    if (s.tip_recon && (s.tip_recon.logged_total != null || s.tip_recon.pos_reported != null)) {
+      const tr = s.tip_recon;
+      tipCard = '<div class="card form-card"><div class="card-title">Tip Reconciliation</div>'
+        + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
+        + meta('Logged in Labor Control', tr.logged_total != null ? App.fmtCurrency(tr.logged_total) : '-')
+        + meta('POS Reported', tr.pos_reported != null ? App.fmtCurrency(tr.pos_reported) : '-')
+        + (tr.variance != null ? meta('Variance', (tr.variance >= 0 ? '+' : '') + App.fmtCurrency(tr.variance)) : '')
+        + '</div></div>';
+    }
+
+    // Open for the Next Shift — 86s still out + open maintenance (current state)
+    const sixCard = dataSection("86'd Items Still Out", ['Item', 'Reason', 'Since'],
+      ex.eighty6.map(i => [esc(i.item || '(unnamed)'), esc(i.reason || '-'), esc(i.date_86 || '-')]));
+    const maintCard = dataSection('Open Maintenance', ['Issue', 'Priority', 'Location', 'Notes'],
+      ex.openMaint.map(m => [esc(m.issue || m.item || 'Issue'), esc(m.priority || '-'), esc(m.location || '-'), esc(m.notes || '-')]));
+
+    // Notable Voids and Comps (this shift's date, >= $30)
+    const vcCard = dataSection('Notable Voids and Comps', ['Type', 'Item', 'Amount', 'Server', 'Reason'],
+      ex.vc.map(v => [esc(v.type || '-'), esc(v.item || '-'), App.fmtCurrency(v.amount || 0), esc(v.server || '-'), esc(v.reason || '-')]));
+
+    // Closing Checklist
+    let checklistCard = '';
+    if (ex.closingCheck) {
+      const pct = ex.closingCheck.total_count ? Math.round((ex.closingCheck.done_count || 0) / ex.closingCheck.total_count * 100) : 0;
+      checklistCard = '<div class="card form-card"><div class="card-title">Closing Checklist</div>'
+        + '<div style="font-size:13px;color:var(--t1);">' + pct + '% complete'
+        + (ex.closingCheck.completed_by ? ' <span style="color:var(--t3);">&middot; ' + esc(ex.closingCheck.completed_by) + '</span>' : '')
+        + '</div></div>';
     }
 
     // ── Mid-shift notes ──────────────────────────────────────────────────
@@ -293,7 +329,11 @@ S.ShiftHistory = {
       + '</div></div>'
 
       + cashCard
-      + exCard
+      + tipCard
+      + sixCard
+      + maintCard
+      + vcCard
+      + checklistCard
       + midNotesCard
       + notesCard
       + handoffCard
