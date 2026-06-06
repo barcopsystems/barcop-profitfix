@@ -959,3 +959,31 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ── Mobile / tablet: stack data tables + batch-builder rows ───────────────────
+   Below 900px (phones + portrait tablets) every .data-card list and every
+   .ing-tbl batch builder reflows from a wide table into stacked label/value
+   rows, so nothing needs sideways scrolling. The column label comes from the
+   header, stamped onto each cell as data-label by the boot table sweep in app.js. */
+@media (max-width: 900px) {
+  /* Data-card lists -> stacked row cards. */
+  .data-card .card-bleed-tbl{overflow-x:visible;margin:0;}
+  .data-card .tbl thead{display:none;}
+  .data-card .tbl tbody tr{display:block;border-top:7px solid var(--surface);}
+  .data-card .tbl tbody tr:first-child{border-top:none;}
+  .data-card .tbl tbody td{display:flex;justify-content:space-between;align-items:center;gap:14px;text-align:right;padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .data-card .tbl tbody tr td:last-child{border-bottom:none;}
+  .data-card .tbl tbody td::before{content:attr(data-label);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-align:left;white-space:nowrap;flex-shrink:0;}
+  .data-card .tbl tbody td[data-label=""]{justify-content:flex-end;}
+  .data-card .tbl tbody td[data-label=""]::before{content:none;}
+  .data-card .tbl tbody td .row-actions{justify-content:flex-end;}
+
+  /* Batch builders (Void/Comp, Waste) -> stacked full-width inputs per line. */
+  .ing-tbl thead{display:none;}
+  .ing-tbl tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:6px 12px 12px;margin:10px;}
+  .ing-tbl tbody td{display:block;background:transparent;padding:6px 0;border:none;}
+  .ing-tbl tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .ing-tbl tbody td[data-label=""]::before{content:none;}
+  .ing-tbl tbody td .form-input{width:100%;}
+  .ing-tbl tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
+}
