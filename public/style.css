@@ -496,14 +496,10 @@ body.demo.chrome-on #hub-wrapper{top:calc(40px + var(--navh)) !important;}
 .app.proto .main{grid-area:main;min-width:0;}
 .app.proto.sidebar-collapsed{grid-template-columns:var(--sidebar-w-coll) 1fr;}
 
-/* Hub under the shared nav: no own topbar (the shared nav replaces it) and, on
-   desktop, no sidebar either (full-width dashboard). On mobile the Hub keeps its
-   sidebar as the off-canvas drawer, opened by the shared nav burger. */
+/* Hub under the shared nav: its own topbar is hidden (the shared nav replaces
+   it), but the sidebar stays (Kyle will decide its contents later). */
 body.chrome-on .hub-app{height:100%;}
 body.chrome-on .hub-app .topbar{display:none;}
-@media (min-width:769px){
-  body.chrome-on .hub-app .sidebar{display:none;}
-}
 
 /* Row 1 — brand + global destinations + utility. */
 .tn-row1{display:flex;align-items:center;gap:16px;height:52px;padding:0 16px;background:var(--bg);}
