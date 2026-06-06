@@ -250,7 +250,7 @@ const DB = {
     'lc-log-hours':'log-hours','lc-daily-view':'log-hours',
     'lc-tip-log':'log-tips','lc-tip-history':'log-tips','lc-tip-pool':'log-tips',
     'lc-schedule-history':'view-schedule',
-    'lc-build-schedule':'manage-schedule','lc-schedule-templates':'manage-schedule',
+    'lc-build-schedule':'manage-schedule',
     'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
     'lc-wage-settings':'manage-staff',
     'lc-callout-log':'call-out-log',
