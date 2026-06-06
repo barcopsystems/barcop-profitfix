@@ -350,7 +350,7 @@ S.Hub = {
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
     const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div></div>`;
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;margin-top:9px;">${metricCells}</div></div>`;
 
     // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
     // 50/50 split so the metric tiles get a usable but compact footprint.
