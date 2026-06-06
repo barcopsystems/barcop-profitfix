@@ -144,7 +144,8 @@ S.ShiftActiveShift = {
       if (rsEdit) { this.showShiftForm(rsEdit.dataset.id); return; }
       const rsView = ev.target.closest('.rs-view');
       if (rsView) { S.ShiftHistory._openDetailId = rsView.dataset.id; App.navigate('sc-shift-history'); return; }
-      if (ev.target.closest('#rs-clear')) { this._rsFrom = this._rsTo = this._rsShift = this._rsMgr = ''; this.renderStart(); return; }
+      if (ev.target.closest('#rs-older')) { this._rsShow = (this._rsShow || this.RS_PAGE) + this.RS_PAGE; this.renderStart(); return; }
+      if (ev.target.closest('#rs-clear')) { this._rsFrom = this._rsTo = this._rsShift = this._rsMgr = ''; this._rsShow = this.RS_PAGE; this.renderStart(); return; }
       if (chip) { d.shift_type = chip.dataset.type; d.cash_tolerance = this._defaultToleranceFor(d.shift_type); this.renderStart(); return; }
       if (mod) { d.manager_id = (d.manager_id === mod.dataset.mgr) ? '' : mod.dataset.mgr; this.renderStart(); return; }
       if (ev.target.closest('#of-staff-minus')) { d.staff_on_floor = Math.max(0, (parseInt(d.staff_on_floor) || 0) - 1); this.renderStart(); return; }
@@ -162,10 +163,10 @@ S.ShiftActiveShift = {
       }
       if (ev.target.closest('#as-start')) this.startShift();
     };
-    document.getElementById('rs-from')?.addEventListener('change', e => { this._rsFrom = e.target.value || ''; this.renderStart(); });
-    document.getElementById('rs-to')?.addEventListener('change', e => { this._rsTo = e.target.value || ''; this.renderStart(); });
-    document.getElementById('rs-shift')?.addEventListener('change', e => { this._rsShift = e.target.value || ''; this.renderStart(); });
-    document.getElementById('rs-mgr')?.addEventListener('change', e => { this._rsMgr = e.target.value || ''; this.renderStart(); });
+    document.getElementById('rs-from')?.addEventListener('change', e => { this._rsFrom = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
+    document.getElementById('rs-to')?.addEventListener('change', e => { this._rsTo = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
+    document.getElementById('rs-shift')?.addEventListener('change', e => { this._rsShift = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
+    document.getElementById('rs-mgr')?.addEventListener('change', e => { this._rsMgr = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
   },
 
   // ── Recent Shifts (opener-state command center: view/edit/log past shifts) ──
@@ -177,6 +178,8 @@ S.ShiftActiveShift = {
   _rsTo: '',
   _rsShift: '',
   _rsMgr: '',
+  RS_PAGE: 50,
+  _rsShow: 50,
   recentShiftsCard() {
     const all = [...this.shifts()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
     const from = this._rsFrom || '', to = this._rsTo || '', fShift = this._rsShift || '', fMgr = this._rsMgr || '';
@@ -199,8 +202,10 @@ S.ShiftActiveShift = {
       if (fMgr && (s.manager_id || s.manager || '') !== fMgr) return false;
       return true;
     });
-    const anyFilter = !!(from || to || fShift || fMgr);
-    const limited = anyFilter ? list : list.slice(0, 10);
+    // Paginate the whole list (filtered or not) so every view is consistent:
+    // show the most recent RS_PAGE, then a Show older button reveals RS_PAGE more.
+    const show = this._rsShow || this.RS_PAGE;
+    const limited = list.slice(0, show);
 
     const card = '<div class="sh" style="margin-top:24px;">Filter Recent Shifts</div>'
       + '<div class="card">'
@@ -235,6 +240,9 @@ S.ShiftActiveShift = {
       below = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
+      if (list.length > limited.length) {
+        below += '<div style="text-align:center;padding:14px 0 4px;"><button class="btn btn-ghost btn-sm" id="rs-older">Show older</button></div>';
+      }
     }
     return card + below;
   },
