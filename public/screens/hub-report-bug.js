@@ -9,12 +9,43 @@ S.HubReportBug = {
 
   _state: 'form',     // 'form' | 'success'
   _submitting: false,
+  _modal: false,      // true when opened as a popup from a module sidebar
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows "REPORT A BUG | Back to Dashboard".
   open() {
     this._state = 'form';
+    this._modal = false;
     App.openHubFullPage('Report a Bug', (mount) => this.render(mount), 'report-bug');
+  },
+
+  // Open as a popup from a module sidebar so the operator never leaves the
+  // section they are working in. Same form, submit, and success states,
+  // rendered into a modal instead of the Hub full page.
+  openModal() {
+    this._state = 'form';
+    this._modal = true;
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Report a Bug</div>'
+      + '<div id="hrb-modal-body">' + this._renderForm() + '</div></div>';
+    App.openModal(html, { id: 'hrb-modal', maxWidth: 640 });
+    this._wireModal();
+  },
+
+  _rerenderModalBody() {
+    const body = document.getElementById('hrb-modal-body');
+    if (!body) return;
+    body.innerHTML = this._state === 'success' ? this._renderSuccess() : this._renderForm();
+    this._wireModal();
+  },
+
+  _wireModal() {
+    if (this._state === 'form') {
+      document.getElementById('hrb-submit')?.addEventListener('click', () => this.submit());
+      document.getElementById('hrb-cancel')?.addEventListener('click', () => App.closeModal('hrb-modal'));
+    } else {
+      document.getElementById('hrb-done')?.addEventListener('click', () => App.closeModal('hrb-modal'));
+      document.getElementById('hrb-another')?.addEventListener('click', () => { this._state = 'form'; this._rerenderModalBody(); });
+    }
   },
 
   render(container) {
@@ -91,7 +122,7 @@ S.HubReportBug = {
       + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;margin-top:18px;text-transform:uppercase;">Report Submitted</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-top:14px;max-width:460px;margin-left:auto;margin-right:auto;">Got it. Your report is in the queue and the team is on it. A fix will land in the next update. Keep running your operation in the meantime.</div>'
       + '<div style="margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'
-      +   '<button class="btn btn-primary" id="hrb-done">Back to Hub</button>'
+      +   '<button class="btn btn-primary" id="hrb-done">' + (this._modal ? 'Close' : 'Back to Hub') + '</button>'
       +   '<button class="btn btn-ghost" id="hrb-another">Submit Another</button>'
       + '</div>'
       + '</div>';
@@ -158,6 +189,7 @@ S.HubReportBug = {
 
     this._submitting = false;
     this._state = 'success';
-    this.render(this._container);
+    if (this._modal) this._rerenderModalBody();
+    else this.render(this._container);
   }
 };
