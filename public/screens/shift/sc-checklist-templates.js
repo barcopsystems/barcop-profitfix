@@ -58,7 +58,7 @@ S.ShiftChecklistTemplates = {
       ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No items yet. Add items below or load the default list.</div>'
       : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the &#x2630; handle on the left to reorder. The checklist runs in this order.</div>' + itemRows;
 
-    return '<div class="card">'
+    return '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>' + (isEdit ? 'Edit' : 'New') + ' Checklist Template</span>' + App.helpButton('ct-how') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
@@ -67,7 +67,7 @@ S.ShiftChecklistTemplates = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label><select id="ct-type">' + typeOpts + '</select></div>'
       + '</div></div>'
 
-      + '<div class="card"><div class="card-title">Checklist Items</div>'
+      + '<div class="card form-card"><div class="card-title">Checklist Items</div>'
       + '<div id="ct-items">' + itemsBlock + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">'
       + '<button class="btn btn-ghost btn-sm" id="ct-add-item">+ Add Item</button>'
@@ -90,8 +90,8 @@ S.ShiftChecklistTemplates = {
       + '<button class="btn btn-ghost btn-sm ct-edit" data-id="' + t.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="card"><div class="card-title">' + type + ' Templates</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="sh" style="margin:24px 0 10px;">' + type + ' Templates</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
