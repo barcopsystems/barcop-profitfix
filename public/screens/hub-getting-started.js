@@ -55,9 +55,9 @@ S.HubGettingStarted = {
       label:'Log a week of actual hours in Log Hours.' },
     { group:'capture', id:'gs_sc_checklists', screen:'sc-checklist-templates',
       label:'Set your opening and closing checklist templates in Shift Control.' },
-    { group:'capture', id:'gs_sc_shift', screen:'sc-log-shift',
+    { group:'capture', id:'gs_sc_shift', screen:'sc-active-shift',
       label:'Log your first shift. Shift revenue and covers feed Profit and Revenue Recovery.' },
-    { group:'capture', id:'gs_sc_cash', screen:'sc-cash-drop',
+    { group:'capture', id:'gs_sc_cash', screen:'sc-cash-control',
       label:'Record a cash drop and a drawer count so cash data starts flowing.' },
 
     // ── Phase 4: Weekly Work — the operational rhythm from week one onward
