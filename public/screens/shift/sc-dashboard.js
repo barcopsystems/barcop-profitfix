@@ -166,7 +166,7 @@ S.ShiftDashboard = {
              wkShifts.length + ' shift' + (wkShifts.length === 1 ? '' : 's') + ' logged')
       + this.metricCard('Covers, Last 7 Days', String(wkCovers),
              wkCovers > 0 ? App.fmtCurrency(wkRevenue / wkCovers) + ' avg check' : 'No covers logged')
-      + this.metricCard('Cash Over/Short, 7d', (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar),
+      + this.metricCard('Cash Over/Short, 7d', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar),
              wkVar.length + ' variance' + (wkVar.length === 1 ? '' : 's') + ' logged', netVar < 0 ? 'over-target' : 'on-target')
       + this.metricCard('Open Items', String(active86.length + openMaint.length),
              active86.length + ' 86\'d &middot; ' + openMaint.length + ' maintenance', (active86.length + openMaint.length) ? 'over-target' : 'on-target');
