@@ -1,351 +1,205 @@
 'use strict';
 
-/* ── Shift Control — Shift History (writes sc_shifts) ─────────────────────────
-   The one home for every shift. Card 1 is the inline Log a Past Shift form
-   (collapsible), Card 2 is the filter + totals, Card 3 is the list. Live-closed
-   shifts from Active Shift and back-filled past shifts both land here. View
-   opens the full recap; Edit reopens the shift in the form. Mirrors the
-   Inventory Transfer Log layout. */
+/* ── Shift Control — Cash History (read-only reference) ───────────────────────
+   One page, three connected tabs (Cash Drops / Safe Log / Variances), the same
+   shell as the Inventory reports. Read-only: filter, view, export. All logging
+   and editing happens on the Cash Board (Cash Control), which writes through the
+   shared helpers on S.ShiftCashDrop / S.ShiftSafeLog / S.ShiftVarianceLog. This
+   screen just reads those stores. */
 
-S.ShiftHistory = {
-  filterType: '',
-  filterManager: '',
-  filterFrom: '',
-  filterTo: '',
-  editId: null,
+S.ShiftCashHistory = {
+  tab: 'drops',
+  f: {},
+  TABS: [['drops', 'Cash Drops'], ['safe', 'Safe Log'], ['variances', 'Variances']],
 
-  shifts() {
-    if (!App.shiftData) App.shiftData = {};
-    if (!Array.isArray(App.shiftData.sc_shifts)) App.shiftData.sc_shifts = [];
-    return App.shiftData.sc_shifts;
-  },
-  sorted() {
-    return [...this.shifts()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-  },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
-    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  },
-  filtered() {
-    return this.sorted().filter(s => {
-      if (this.filterType && s.shift_type !== this.filterType) return false;
-      if (this.filterManager && (s.manager_id || s.manager || '') !== this.filterManager) return false;
-      if (this.filterFrom && (s.date || '') < this.filterFrom) return false;
-      if (this.filterTo && (s.date || '') > this.filterTo) return false;
-      return true;
-    });
+    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
   render(container, actions) {
     this.container = container;
-    this.actions = actions;
-    if (this._openDetailId) { const id = this._openDetailId; this._openDetailId = null; this.renderDetail(id); return; }
-    this.renderList();
+    if (actions) actions.innerHTML = '';
+    this.draw();
   },
 
-  // ── Stats strip (top, card background) ──────────────────────────────────────
-  statsStrip(count, totRev, totCov, avgChk) {
-    const item = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val" style="font-size:30px;font-weight:700;">' + val + '</div></div>';
-    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + item('Shifts', count)
-      + item('Total Revenue', App.fmtCurrency(totRev))
-      + item('Total Covers', totCov)
-      + item('Avg Check', avgChk != null ? App.fmtCurrency(avgChk) : '-')
-      + '</div></div>';
-  },
-
-  // ── Filter (controls only; the heading + Export sit above it in renderList) ──
-  filterCard() {
-    const typeOpts = '<option value="">All shift types</option>'
-      + App.SHIFT_TYPES.map(t => '<option' + (this.filterType === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const mgrMap = {};
-    this.shifts().forEach(s => {
-      const id = s.manager_id || s.manager || '';
-      if (id && !mgrMap[id]) mgrMap[id] = s.manager || (App.staffById ? (App.staffById(s.manager_id) || {}).name : '') || String(id);
-    });
-    const mgrOpts = '<option value="">All managers</option>'
-      + Object.keys(mgrMap).map(id => '<option value="' + esc(id) + '"' + (this.filterManager === id ? ' selected' : '') + '>' + esc(mgrMap[id]) + '</option>').join('');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
-        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="sh-f-mgr">' + mgrOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
-        + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
-      + '</div></div>';
-  },
-
-  renderList() {
-    this.actions.innerHTML = '';
-
-    const all = this.shifts();
-    if (all.length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty"><div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Run a shift in Active Shift, or log a past one there under Recent Shifts. It lands here when closed.</div></div></div>';
-      this.wireList();
-      return;
-    }
-
-    const rows = this.filtered();
-    const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);
-    const totCov = rows.reduce((t, s) => t + (s.covers || 0), 0);
-    const avgChk = totCov > 0 ? totRev / totCov : null;
-
-    let rowsBody;
-    if (rows.length === 0) {
-      rowsBody = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
-        + '<div class="empty-sub">Adjust or clear them above.</div></div>';
+  draw() {
+    const parts = this.tab === 'drops' ? this.bodyDrops()
+      : this.tab === 'safe' ? this.bodySafe()
+      : this.bodyVariances();
+    const tabLabel = (this.TABS.find(t => t[0] === this.tab) || ['', ''])[1];
+    // Tabs are a plain switcher; under them the page follows the standard stack:
+    // stats card, a Filter heading, the controls-only filter card, then the data card.
+    let body;
+    if (parts.empty) {
+      body = parts.empty;
     } else {
-      const displayRows = rows.slice(0, App.listLimit('sc', 'shift'));
-      const trs = displayRows.map(s => {
-        const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
-        const statusText = (s.status === 'Open')
-          ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
-          : '<span style="color:var(--t3);font-weight:700;">Closed</span>';
-        return '<tr class="sh-row" data-id="' + s.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-          + '<td>' + esc(s.shift_type || '-') + '</td>'
-          + '<td>' + esc(s.manager || '-') + '</td>'
-          + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-          + '<td>' + (s.covers != null ? s.covers : '-') + '</td>'
-          + '<td>' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + '</td>'
-          + '<td>' + statusText + '</td>'
-          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm sh-view" data-id="' + s.id + '">View</button></div></td>'
-        + '</tr>';
-      }).join('');
-      rowsBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
-        + '<th>Covers</th><th>Check Avg</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>'
-        + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterManager || this.filterFrom || this.filterTo));
+      body = parts.stats
+        + '<div class="sh no-print" style="margin:24px 0 10px;">Filter ' + esc(tabLabel) + '</div>'
+        + '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
+          + parts.controls
+          + '<button class="btn btn-ghost btn-sm" id="ch-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
+        + '</div></div>'
+        + parts.table;
     }
-
-    this.container.innerHTML = '<div class="screen">'
-      + this.statsStrip(rows.length, totRev, totCov, avgChk)
-      + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Shift History</div>'
-      + this.filterCard()
-      + rowsBody
-      + '</div>';
-    this.wireList();
+    this.container.innerHTML = '<div class="screen">' + this.tabBar() + body + '</div>';
+    this.wire();
   },
 
-  wireList() {
+  wire() {
     this.container.onclick = ev => {
-      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
-      const view = ev.target.closest('.sh-view');
-      const row = ev.target.closest('.sh-row');
-      if (view) { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
-      if (row) this.renderDetail(row.dataset.id);
+      const tab = ev.target.closest('.ch-tab');
+      if (tab) { this.tab = tab.dataset.tab; this.f = {}; this.draw(); return; }
+      if (ev.target.closest('#ch-export')) { App.exportPDF({ title: 'Cash History', root: this.container }); return; }
+      if (ev.target.closest('#ch-go-board')) { App.navigate('sc-cash-control'); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.draw()); return; }
     };
-    document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
-    document.getElementById('sh-f-clear')?.addEventListener('click', () => {
-      this.filterType = this.filterManager = this.filterFrom = this.filterTo = '';
-      this.renderList();
+    const bind = (id, key) => { const el = document.getElementById(id); if (el) el.addEventListener('change', e => { this.f[key] = e.target.value || ''; this.draw(); }); };
+    bind('ch-from', 'from'); bind('ch-to', 'to'); bind('ch-a', 'a'); bind('ch-b', 'b');
+    document.getElementById('ch-clear')?.addEventListener('click', () => { this.f = {}; this.draw(); });
+  },
+
+  // ── shared markup helpers ───────────────────────────────────────────────────
+  dateInputs() {
+    return '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.f.from || '') + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.f.to || '') + '"/></div>';
+  },
+  selInput(key, label, allLabel, names) {
+    const opts = '<option value="">' + esc(allLabel) + '</option>'
+      + names.map(n => '<option' + ((this.f[key] || '') === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
+    return '<div class="f" style="width:180px;flex-shrink:0;"><label>' + esc(label) + '</label><select id="ch-' + esc(key) + '">' + opts + '</select></div>';
+  },
+  clearBtn() {
+    return '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="ch-clear" style="margin-bottom:2px;">Clear</button></div>';
+  },
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  tabBar() {
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
+      + '</div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  noMatchRow(cols) {
+    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">No records match the filter.</td></tr>';
+  },
+  emptyTab(line1, line2) {
+    return '<div style="padding:18px 4px;font-size:13px;color:var(--t3);">' + esc(line1) + ' ' + esc(line2)
+      + ' <button class="btn btn-ghost btn-sm" id="ch-go-board" style="margin-left:8px;">Go to Cash Board</button></div>';
+  },
+
+  // ── Cash Drops tab ──────────────────────────────────────────────────────────
+  bodyDrops() {
+    const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+    if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on the Cash Board.') };
+    const drawerNames = [...new Set(all.map(d => d.drawer).filter(Boolean))].sort();
+    const byNames = [...new Set(all.map(d => d.performed_by).filter(Boolean))].sort();
+    const filtered = all.filter(d => {
+      if (this.f.from && (d.date || '') < this.f.from) return false;
+      if (this.f.to && (d.date || '') > this.f.to) return false;
+      if (this.f.a && (d.drawer || '') !== this.f.a) return false;
+      if (this.f.b && (d.performed_by || '') !== this.f.b) return false;
+      return true;
     });
-    const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => { this[prop] = e.target.value || ''; this.renderList(); });
-    bind('sh-f-type', 'filterType');
-    bind('sh-f-mgr', 'filterManager');
-    bind('sh-f-from', 'filterFrom');
-    bind('sh-f-to', 'filterTo');
+    const total = filtered.reduce((t, d) => t + (d.amount || 0), 0);
+    const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Performed By', 'All staff', byNames) + this.clearBtn();
+    const stats = this.statsCard(this.statItem('Drops', filtered.length) + this.statItem('Total Dropped', App.fmtCurrency(total)));
+    const rows = filtered.length
+      ? filtered.slice(0, App.listLimit('sc', 'cash_drop')).map(d => '<tr>'
+          + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
+          + '<td>' + esc(d.shift_type || '-') + '</td>'
+          + '<td>' + esc(d.drawer || '-') + '</td>'
+          + '<td>' + esc(d.performed_by || '-') + '</td>'
+          + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td></tr>').join('')
+      : this.noMatchRow(5);
+    const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', rows)
+      + App.showOlderBar('sc', 'cash_drop', filtered, false);
+    return { stats, controls, table };
   },
 
-  // ── Detail (recap) — read-only ────────────────────────────────────────────────
-  // Hero + KPI tiles + per-drawer cash + exceptions/notes. Read-only: editing a
-  // shift happens in Active Shift (Recent Shifts). Back to the list is the sidebar.
-  renderDetail(id) {
-    const s = this.shifts().find(x => x.id === id);
-    if (!s) { this.renderList(); return; }
-
-    this.actions.innerHTML = '';
-
-    const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
-    const meta = (label, val) =>
-      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
-
-    // ── Cash Reconciliation card ─────────────────────────────────────────
-    let cashCard = '';
-    if (s.cash_recon) {
-      const cr = s.cash_recon;
-      const tol = App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10;
-      const fmt = x => x != null ? App.fmtCurrency(x) : '-';
-      const vCell = (vr, sk, ct) => {
-        if (sk || vr == null || ct == null) return '<span style="color:var(--t4);">-</span>';
-        const col = Math.abs(vr) <= tol ? 'var(--gold)' : 'var(--red)';
-        return '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>';
-      };
-      const statusCell = st => {
-        const col = st === 'Within Tolerance' ? 'var(--gold)' : (st === 'Short' || st === 'Over') ? 'var(--red)' : 'var(--t3)';
-        return '<span style="color:' + col + ';font-weight:700;">' + esc(st || '-') + '</span>';
-      };
-      if (Array.isArray(cr.drawers) && cr.drawers.length) {
-        const rows = cr.drawers.map(c => '<tr>'
-          + '<td><div class="val">' + esc(c.name || 'Register') + '</div></td>'
-          + '<td>' + fmt(c.opening_bank) + '</td><td>' + fmt(c.drops_total) + '</td>'
-          + '<td>' + (c.sales_cash != null ? fmt(c.sales_cash) : '-') + '</td>'
-          + '<td>' + fmt(c.expected) + '</td>'
-          + '<td>' + (c.counted_cash != null ? fmt(c.counted_cash) : '-') + '</td>'
-          + '<td>' + vCell(c.variance, cr.skipped, c.counted_cash) + '</td>'
-          + '<td>' + statusCell(c.status) + '</td></tr>').join('');
-        const totalRow = '<tr>'
-          + '<td><div class="val" style="font-weight:800;">Total</div></td>'
-          + '<td>' + fmt(cr.opening_bank) + '</td><td>' + fmt(cr.drops_total) + '</td>'
-          + '<td>' + (cr.sales_cash != null ? fmt(cr.sales_cash) : '-') + '</td>'
-          + '<td>' + fmt(cr.expected) + '</td>'
-          + '<td>' + (cr.counted_cash != null ? fmt(cr.counted_cash) : '-') + '</td>'
-          + '<td>' + vCell(cr.variance, cr.skipped, cr.counted_cash) + '</td><td></td></tr>';
-        cashCard = '<div class="sh" style="margin-top:24px;">Cash Reconciliation</div>'
-          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th>Drawer</th><th>Opening</th><th>Drops</th><th>POS Cash</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
-          + '</tr></thead><tbody>' + rows + totalRow + '</tbody></table></div></div>';
-      } else {
-        const skipped = cr.skipped;
-        const variance = cr.variance;
-        const statusColor = skipped ? 'var(--t3)' : (variance == null ? 'var(--t3)' : (Math.abs(variance) <= tol ? 'var(--gold)' : 'var(--red)'));
-        const statusText = skipped ? 'SKIPPED' : (variance == null ? 'NOT COUNTED' : (Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER'));
-        cashCard = '<div class="sh" style="margin-top:24px;">Cash Reconciliation</div>'
-          + '<div class="calc" style="margin-bottom:16px;">'
-          + meta('Opening Bank', fmt(cr.opening_bank))
-          + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
-          + meta('Drops Out', fmt(cr.drops_total))
-          + meta('Expected', fmt(cr.expected))
-          + meta('Counted', cr.counted_cash != null ? App.fmtCurrency(cr.counted_cash) : '-')
-          + meta('Variance', skipped ? '-' : (variance != null ? ((variance >= 0 ? '+' : '') + App.fmtCurrency(variance)) : '-'))
-          + meta('Status', '<span style="color:' + statusColor + ';font-weight:700;">' + statusText + '</span>')
-          + '</div>';
-      }
-    }
-
-    // ── Recap sections mirroring the Shift Handoff (screen == the PDF) ───────
-    // Reuse the handoff's exception gather: open 86s + open maintenance are
-    // current state (matches the handoff, which is generated at close); voids /
-    // comps and the closing checklist are scoped to this shift's date.
-    const ex = (S.ShiftHandoff && S.ShiftHandoff._gatherExceptions)
-      ? S.ShiftHandoff._gatherExceptions(s)
-      : { eighty6: [], vc: [], openMaint: [], closingCheck: null };
-
-    const dataSection = (title, headers, rows) => {
-      if (!rows.length) return '';
-      return '<div class="sh" style="margin-top:24px;">' + title + '</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + headers.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
-        + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('')
-        + '</tbody></table></div></div>';
+  // ── Safe Log tab ────────────────────────────────────────────────────────────
+  bodySafe() {
+    const chrono = S.ShiftSafeLog.chrono();
+    if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.') };
+    let bal = 0;
+    const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
+    const lifetime = bal;
+    const match = e => {
+      if (this.f.from && (e.date || '') < this.f.from) return false;
+      if (this.f.to && (e.date || '') > this.f.to) return false;
+      if (this.f.a && (e.txn_type || '') !== this.f.a) return false;
+      return true;
     };
-
-    // Tip Reconciliation
-    let tipCard = '';
-    if (s.tip_recon && (s.tip_recon.logged_total != null || s.tip_recon.pos_reported != null)) {
-      const tr = s.tip_recon;
-      tipCard = '<div class="card form-card"><div class="card-title">Tip Reconciliation</div>'
-        + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
-        + meta('Logged in Labor Control', tr.logged_total != null ? App.fmtCurrency(tr.logged_total) : '-')
-        + meta('POS Reported', tr.pos_reported != null ? App.fmtCurrency(tr.pos_reported) : '-')
-        + (tr.variance != null ? meta('Variance', (tr.variance >= 0 ? '+' : '') + App.fmtCurrency(tr.variance)) : '')
-        + '</div></div>';
+    const shown = withBal.filter(r => match(r.e));
+    const totalIn = shown.filter(r => r.signed > 0).reduce((t, r) => t + r.signed, 0);
+    const totalOut = shown.filter(r => r.signed < 0).reduce((t, r) => t - r.signed, 0);
+    const controls = this.dateInputs() + this.selInput('a', 'Type', 'All types', S.ShiftSafeLog.TYPES.map(t => t.name)) + this.clearBtn();
+    const stats = this.statsCard(
+      this.statItem('Safe Balance', App.fmtCurrency(lifetime), 'good')
+      + this.statItem('Total In', App.fmtCurrency(totalIn))
+      + this.statItem('Total Out', App.fmtCurrency(totalOut))
+      + this.statItem('Entries', shown.length));
+    let rows;
+    if (!shown.length) rows = this.noMatchRow(6);
+    else {
+      const ordered = shown.slice().reverse();
+      rows = ordered.slice(0, App.listLimit('sc', 'safe_log')).map(r => {
+        const e = r.e;
+        const amt = r.signed < 0 ? '<span class="neg">' + App.fmtCurrency(r.signed) + '</span>' : '<span class="pos">+' + App.fmtCurrency(r.signed) + '</span>';
+        return '<tr><td><div class="val">' + this.fmtDate(e.date) + '</div>'
+          + (e.time ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.time) + '</div>' : '') + '</td>'
+          + '<td>' + esc(e.txn_type || '-') + '</td><td>' + esc(e.performed_by || '-') + '</td>'
+          + '<td>' + esc(e.reference || '-') + '</td><td>' + amt + '</td>'
+          + '<td class="val">' + App.fmtCurrency(r.bal) + '</td></tr>';
+      }).join('');
     }
+    const table = this.dataCard('<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th><th>Amount</th><th>Balance</th>', rows)
+      + (shown.length ? App.showOlderBar('sc', 'safe_log', shown, false) : '');
+    return { stats, controls, table };
+  },
 
-    // Open for the Next Shift — 86s still out + open maintenance (current state)
-    const sixCard = dataSection("86'd Items Still Out", ['Item', 'Reason', 'Since'],
-      ex.eighty6.map(i => [esc(i.item || '(unnamed)'), esc(i.reason || '-'), esc(i.date_86 || '-')]));
-    const maintCard = dataSection('Open Maintenance', ['Issue', 'Priority', 'Location', 'Notes'],
-      ex.openMaint.map(m => [esc(m.issue || m.item || 'Issue'), esc(m.priority || '-'), esc(m.location || '-'), esc(m.notes || '-')]));
-
-    // Notable Voids and Comps (this shift's date, >= $30)
-    const vcCard = dataSection('Notable Voids and Comps', ['Type', 'Item', 'Amount', 'Server', 'Reason'],
-      ex.vc.map(v => [esc(v.type || '-'), esc(v.item || '-'), App.fmtCurrency(v.amount || 0), esc(v.server || '-'), esc(v.reason || '-')]));
-
-    // Closing Checklist
-    let checklistCard = '';
-    if (ex.closingCheck) {
-      const pct = ex.closingCheck.total_count ? Math.round((ex.closingCheck.done_count || 0) / ex.closingCheck.total_count * 100) : 0;
-      checklistCard = '<div class="card form-card"><div class="card-title">Closing Checklist</div>'
-        + '<div style="font-size:13px;color:var(--t1);">' + pct + '% complete'
-        + (ex.closingCheck.completed_by ? ' <span style="color:var(--t3);">&middot; ' + esc(ex.closingCheck.completed_by) + '</span>' : '')
-        + '</div></div>';
-    }
-
-    // ── Mid-shift notes ──────────────────────────────────────────────────
-    let midNotesCard = '';
-    if (Array.isArray(s.shift_notes) && s.shift_notes.length) {
-      const fmtTime = iso => {
-        if (!iso) return '';
-        const d = new Date(iso);
-        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      };
-      midNotesCard = '<div class="card form-card"><div class="card-title">Shift Notes</div>'
-        + s.shift_notes.slice().reverse().map(n =>
-            '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--b2);">'
-            + '<div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;min-width:55px;padding-top:2px;">' + esc(fmtTime(n.at)) + '</div>'
-            + '<div style="flex:1;font-size:13px;color:var(--t1);line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
-            + '</div>').join('')
-        + '</div>';
-    }
-
-    // ── Closing notes and handoff ────────────────────────────────────────
-    const notesCard = s.notes
-      ? '<div class="card form-card"><div class="card-title">Notes</div>'
-        + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.notes) + '</div></div>'
-      : '';
-    const handoffCard = s.handoff_notes
-      ? '<div class="card form-card"><div class="card-title">Handoff Notes for the Opener</div>'
-        + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.handoff_notes) + '</div></div>'
-      : '';
-
-    const statTile = (label, val, sub, color) =>
-      '<div style="flex:1;min-width:150px;background:var(--input);border:1px solid var(--b2);border-radius:8px;padding:14px 16px;text-align:center;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1.15;color:' + (color || 'var(--t1)') + ';">' + val + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sub || '') + '</div></div>';
-
-    let cashVar = '-', cashVarColor = 'var(--t1)', cashVarSub = 'No registers';
-    if (s.cash_recon) {
-      const cr = s.cash_recon;
-      const tol = App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10;
-      if (cr.skipped) { cashVarSub = 'Skipped'; cashVarColor = 'var(--t3)'; }
-      else if (cr.variance == null) { cashVarSub = 'Not counted'; cashVarColor = 'var(--t3)'; }
-      else { cashVar = (cr.variance >= 0 ? '+' : '') + App.fmtCurrency(cr.variance); cashVarColor = Math.abs(cr.variance) <= tol ? 'var(--gold)' : 'var(--red)'; cashVarSub = Math.abs(cr.variance) <= tol ? 'Within tolerance' : cr.variance < 0 ? 'Short' : 'Over'; }
-    }
-    const tipsVal = (s.tip_recon && s.tip_recon.logged_total != null) ? App.fmtCurrency(s.tip_recon.logged_total) : '-';
-    const tipsSub = (s.tip_recon && s.tip_recon.variance != null) ? ((s.tip_recon.variance >= 0 ? '+' : '') + App.fmtCurrency(s.tip_recon.variance) + ' vs POS') : 'logged tips';
-    const statusPill = s.status === 'Open'
-      ? '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:2px 7px;">Open</span>'
-      : '<span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:2px 7px;">Closed</span>';
-    const heroMeta = [];
-    if (s.manager) heroMeta.push('Manager: ' + esc(s.manager));
-    if (s.staff_on_floor != null) heroMeta.push(s.staff_on_floor + ' on floor');
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
-      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</span>' + statusPill + '</div>'
-      + (heroMeta.length ? '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + heroMeta.join(' &middot; ') + '</div>' : '')
-      + '</div>'
-      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>'
-      + '</div></div></div>'
-
-      + '<div class="card"><div style="display:flex;gap:12px;flex-wrap:wrap;">'
-      + statTile('Revenue', App.fmtCurrency(s.total_revenue || 0), App.fmtCurrency(s.bar_revenue || 0) + ' bar &middot; ' + App.fmtCurrency(s.floor_revenue || 0) + ' floor')
-      + statTile('Covers', s.covers != null ? s.covers : '-', checkAvg != null ? App.fmtCurrency(checkAvg) + ' check avg' : 'No covers')
-      + statTile('Cash Variance', cashVar, cashVarSub, cashVarColor)
-      + statTile('Tips', tipsVal, tipsSub)
-      + '</div></div>'
-
-      + cashCard
-      + tipCard
-      + sixCard
-      + maintCard
-      + vcCard
-      + checklistCard
-      + midNotesCard
-      + notesCard
-      + handoffCard
-      + '</div>';
-
-    this.container.onclick = ev => {
-      if (ev.target.closest('#sh-handoff')) { if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(id); return; }
-    };
+  // ── Variances tab ───────────────────────────────────────────────────────────
+  bodyVariances() {
+    const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+    if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.') };
+    const drawerNames = [...new Set(all.map(v => v.drawer).filter(Boolean))].sort();
+    const filtered = all.filter(v => {
+      if (this.f.from && (v.date || '') < this.f.from) return false;
+      if (this.f.to && (v.date || '') > this.f.to) return false;
+      if (this.f.a && (v.drawer || '') !== this.f.a) return false;
+      if (this.f.b && (v.status || '') !== this.f.b) return false;
+      return true;
+    });
+    const net = filtered.reduce((t, v) => t + (v.variance || 0), 0);
+    const flagged = filtered.filter(v => v.status === 'Over' || v.status === 'Short').length;
+    const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Status', 'All statuses', S.ShiftVarianceLog.STATUSES) + this.clearBtn();
+    const stats = this.statsCard(
+      this.statItem('Variances', filtered.length)
+      + this.statItem('Net Over/Short', (net >= 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
+      + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : ''));
+    let rows;
+    if (!filtered.length) rows = this.noMatchRow(8);
+    else rows = filtered.slice(0, App.listLimit('sc', 'variance')).map(v => {
+      const vr = v.variance || 0;
+      const nc = v.status === 'Not Counted';
+      const cls = nc ? '' : v.status === 'Short' ? 'neg' : v.status === 'Over' ? '' : 'pos';
+      const vc = nc ? '-' : (vr >= 0 ? '+' : '') + App.fmtCurrency(vr);
+      return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
+        + '<td>' + esc(v.shift_type || '-') + '</td><td>' + esc(v.drawer || '-') + '</td>'
+        + '<td>' + esc(v.cashier || '-') + '</td><td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
+        + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td><td class="' + cls + '">' + vc + '</td>'
+        + '<td>' + S.ShiftVarianceLog.statusBadge(v.status) + '</td></tr>';
+    }).join('');
+    const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)
+      + App.showOlderBar('sc', 'variance', filtered, false);
+    return { stats, controls, table };
   }
 };
