@@ -279,7 +279,7 @@ S.ShiftChecklists = {
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-back">Back</button><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div>'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
@@ -288,6 +288,7 @@ S.ShiftChecklists = {
       + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
       + '</div></div>';
     this.container.onclick = ev => {
+      if (ev.target.closest('#cl-back')) { this.renderMain(); return; }
       if (ev.target.closest('#cl-print')) this.exportPDF(r);
     };
   },
