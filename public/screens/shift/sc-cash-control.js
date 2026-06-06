@@ -28,6 +28,15 @@ S.ShiftCashControl = {
     return (t != null && !isNaN(t)) ? Number(t) : 10;
   },
 
+  // One cash-status color scheme used everywhere a count/variance status shows:
+  // green = within tolerance (clean), red = short, amber = over, grey = not counted.
+  statusColor(status) {
+    return status === 'Short' ? 'var(--red)'
+      : status === 'Over' ? 'var(--amber)'
+      : status === 'Not Counted' ? 'var(--t3)'
+      : 'var(--green)';
+  },
+
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -195,7 +204,7 @@ S.ShiftCashControl = {
     if (lastCount) {
       const vr = parseFloat(lastCount.variance) || 0;
       const st = lastCount.status || '';
-      const col = st === 'Short' ? 'var(--red)' : st === 'Over' ? 'var(--amber)' : 'var(--green)';
+      const col = this.statusColor(st);
       countLine = '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Last safe count ' + this.fmtDate(lastCount.date) + ': '
         + '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> ' + esc(st) + '</div>';
     }
@@ -222,7 +231,7 @@ S.ShiftCashControl = {
       if (st.lastVar) {
         const vr = parseFloat(st.lastVar.variance) || 0;
         const status = st.lastVar.status || '';
-        const col = status === 'Short' ? 'var(--red)' : status === 'Over' ? 'var(--amber)' : status === 'Not Counted' ? 'var(--t3)' : 'var(--green)';
+        const col = this.statusColor(status);
         closeLine = '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> '
           + '<span style="color:var(--t3);">' + esc(status) + ' (' + this.fmtDate(st.lastVar.date) + ')</span>';
       } else {
@@ -283,17 +292,15 @@ S.ShiftCashControl = {
       const rows = stream.map(s => {
         let amountCell, statusCell;
         if (s.category === 'variance' || s.category === 'safe_count') {
-          const isFlag = s.status === 'Over' || s.status === 'Short';
           const sign = s.variance > 0 ? '+' : s.variance < 0 ? '-' : '';
-          amountCell = '<span class="' + (isFlag ? 'neg' : 'pos') + '">' + sign + App.fmtCurrency(Math.abs(s.variance || 0)) + '</span>';
-          const sColor = s.status === 'Short' ? 'var(--red)' : s.status === 'Over' ? 'var(--amber)' : s.status === 'Not Counted' ? 'var(--t3)' : 'var(--green)';
+          const sColor = this.statusColor(s.status);
+          amountCell = '<span style="color:' + sColor + ';">' + sign + App.fmtCurrency(Math.abs(s.variance || 0)) + '</span>';
           statusCell = '<span style="font-weight:700;color:' + sColor + ';">' + esc(s.status || '') + '</span>';
         } else {
+          // Direction is shown by the sign + the In/Out word, not by color.
           const sign = s.direction === 'out' ? '-' : '+';
-          amountCell = '<span class="' + (s.direction === 'out' ? 'neg' : 'pos') + '">' + sign + App.fmtCurrency(s.amount) + '</span>';
-          statusCell = s.direction === 'out'
-            ? '<span style="font-weight:700;color:var(--t3);">Out</span>'
-            : '<span style="font-weight:700;color:var(--gold);">In</span>';
+          amountCell = '<span style="color:var(--t1);">' + sign + App.fmtCurrency(s.amount) + '</span>';
+          statusCell = '<span style="font-weight:700;color:var(--t2);">' + (s.direction === 'out' ? 'Out' : 'In') + '</span>';
         }
         return '<tr class="cc-row" data-cat="' + esc(s.editCat) + '" data-id="' + esc(s.editId || '') + '" style="cursor:pointer;">'
           + '<td>' + this.fmtDate(s.date) + (s.time ? '<div style="font-size:10px;color:var(--t3);">' + esc(s.time) + '</div>' : '') + '</td>'
@@ -561,9 +568,9 @@ S.ShiftCashControl = {
       if (cEl) cEl.textContent = App.fmtCurrency(total);
       const variance = Math.round((total - expected) * 100) / 100;
       const status = Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over';
-      const cls = 'calc-val ' + (status === 'Short' ? 'warn' : status === 'Over' ? 'dim' : 'good');
-      if (varEl) { varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = cls; }
-      if (stEl) { stEl.textContent = status; stEl.className = cls; }
+      const col = this.statusColor(status);
+      if (varEl) { varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col; }
+      if (stEl) { stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col; }
     };
     const counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
     update(counter ? counter.total() : 0);
@@ -653,9 +660,9 @@ S.ShiftCashControl = {
       if (isNaN(exp) || isNaN(cnt)) { varEl.textContent = '-'; varEl.className = 'calc-val'; stEl.textContent = '-'; stEl.className = 'calc-val'; return; }
       const variance = Math.round((cnt - exp) * 100) / 100;
       const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt);
-      const cls = 'calc-val ' + (status === 'Short' ? 'warn' : status === 'Not Counted' ? 'dim' : status === 'Over' ? 'dim' : 'good');
-      varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = cls;
-      stEl.textContent = status; stEl.className = cls;
+      const col = this.statusColor(status);
+      varEl.textContent = (variance >= 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
+      stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col;
     };
     document.getElementById('ccv-expected')?.addEventListener('input', calc);
     document.getElementById('ccv-counted')?.addEventListener('input', calc);
