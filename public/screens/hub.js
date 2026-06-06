@@ -361,16 +361,20 @@ S.Hub = {
     // panel so the two list cards feel like a pair.
     let alertsPanel;
     if (alerts.length) {
-      const alertRows = alerts.map((a,i) => {
-        const isLast = i === alerts.length - 1;
-        const dotCol = a.sev === 'bad' ? 'var(--red)' : 'var(--amber)';
-        return '<div class="hd-row" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
-          + 'style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
-          + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-          + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
-          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
-          + '</div>';
-      }).join('');
+      // Triage: split into Critical (bad) and Watch (warn) under their own
+      // headers so the operator instantly sees what matters today.
+      const rowOf = (a, isLast, dotCol) => '<div class="hd-row" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
+        + 'style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
+        + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+        + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
+        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
+        + '</div>';
+      const groupHead = (label, col) => '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + col + ';padding:12px 4px 5px;">' + label + '</div>';
+      const critical = alerts.filter(a => a.sev === 'bad');
+      const watch    = alerts.filter(a => a.sev === 'warn');
+      const alertRows =
+          (critical.length ? groupHead('Critical', 'var(--red)') + critical.map((a, i) => rowOf(a, i === critical.length - 1, 'var(--red)')).join('') : '')
+        + (watch.length    ? groupHead('Watch', 'var(--amber)')  + watch.map((a, i) => rowOf(a, i === watch.length - 1, 'var(--amber)')).join('') : '');
       const alertHead = '<div style="display:flex;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.35;">'
@@ -787,8 +791,8 @@ S.Hub = {
             ${catchupBanner}
             <div class="hub-grid" style="display:grid;grid-template-rows:auto 510px 470px;gap:18px;padding-bottom:18px;">
               <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${alertsPanel}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${auditPanel}${chartPanel}${metricsPanel}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
+              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
             </div>
           </main>
         </div>
