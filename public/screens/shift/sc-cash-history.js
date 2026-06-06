@@ -28,19 +28,28 @@ S.ShiftCashHistory = {
     const parts = this.tab === 'drops' ? this.bodyDrops()
       : this.tab === 'safe' ? this.bodySafe()
       : this.bodyVariances();
-    // The tab box wraps only the filters + stats; the data table sits OUTSIDE it
-    // (no rows inside a card), with background space between.
-    this.container.innerHTML = '<div class="screen">'
-      + App.reportTabBar(this.TABS, this.tab)
-      + App.reportPanel(this.TABS, this.tab, 'ch-export', parts.panel)
-      + (parts.table ? '<div style="margin-top:16px;">' + parts.table + '</div>' : '')
-      + '</div>';
+    const tabLabel = (this.TABS.find(t => t[0] === this.tab) || ['', ''])[1];
+    // Tabs are a plain switcher; under them the page follows the standard stack:
+    // stats card, a Filter heading, the controls-only filter card, then the data card.
+    let body;
+    if (parts.empty) {
+      body = parts.empty;
+    } else {
+      body = parts.stats
+        + '<div class="sh no-print" style="margin:24px 0 10px;">Filter ' + esc(tabLabel) + '</div>'
+        + '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
+          + parts.controls
+          + '<button class="btn btn-ghost btn-sm" id="ch-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
+        + '</div></div>'
+        + parts.table;
+    }
+    this.container.innerHTML = '<div class="screen">' + this.tabBar() + body + '</div>';
     this.wire();
   },
 
   wire() {
     this.container.onclick = ev => {
-      const tab = ev.target.closest('.rpt-tab');
+      const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.f = {}; this.draw(); return; }
       if (ev.target.closest('#ch-export')) { App.exportPDF({ title: 'Cash History', root: this.container }); return; }
       if (ev.target.closest('#ch-go-board')) { App.navigate('sc-cash-control'); return; }
@@ -67,8 +76,17 @@ S.ShiftCashHistory = {
   statItem(label, val, cls) {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val ' + (cls || '') + '">' + val + '</div></div>';
   },
-  filterWrap(controls, stats) {
-    return '<div class="no-print"><div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">' + controls + '</div>' + stats + '</div>';
+  tabBar() {
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
+      + '</div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
   noMatchRow(cols) {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">No records match the filter.</td></tr>';
@@ -81,7 +99,7 @@ S.ShiftCashHistory = {
   // ── Cash Drops tab ──────────────────────────────────────────────────────────
   bodyDrops() {
     const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return { panel: this.emptyTab('No cash drops logged yet.', 'Log a drop on the Cash Board.'), table: '' };
+    if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on the Cash Board.') };
     const drawerNames = [...new Set(all.map(d => d.drawer).filter(Boolean))].sort();
     const byNames = [...new Set(all.map(d => d.performed_by).filter(Boolean))].sort();
     const filtered = all.filter(d => {
@@ -93,7 +111,7 @@ S.ShiftCashHistory = {
     });
     const total = filtered.reduce((t, d) => t + (d.amount || 0), 0);
     const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Performed By', 'All staff', byNames) + this.clearBtn();
-    const stats = '<div class="calc" style="margin-bottom:0;">' + this.statItem('Drops', filtered.length) + this.statItem('Total Dropped', App.fmtCurrency(total)) + '</div>';
+    const stats = this.statsCard(this.statItem('Drops', filtered.length) + this.statItem('Total Dropped', App.fmtCurrency(total)));
     const rows = filtered.length
       ? filtered.slice(0, App.listLimit('sc', 'cash_drop')).map(d => '<tr>'
           + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
@@ -102,17 +120,15 @@ S.ShiftCashHistory = {
           + '<td>' + esc(d.performed_by || '-') + '</td>'
           + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td></tr>').join('')
       : this.noMatchRow(5);
-    const table = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', rows)
       + App.showOlderBar('sc', 'cash_drop', filtered, false);
-    return { panel: this.filterWrap(controls, stats), table: table };
+    return { stats, controls, table };
   },
 
   // ── Safe Log tab ────────────────────────────────────────────────────────────
   bodySafe() {
     const chrono = S.ShiftSafeLog.chrono();
-    if (!chrono.length) return { panel: this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.'), table: '' };
+    if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on the Cash Board.') };
     let bal = 0;
     const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
     const lifetime = bal;
@@ -126,11 +142,11 @@ S.ShiftCashHistory = {
     const totalIn = shown.filter(r => r.signed > 0).reduce((t, r) => t + r.signed, 0);
     const totalOut = shown.filter(r => r.signed < 0).reduce((t, r) => t - r.signed, 0);
     const controls = this.dateInputs() + this.selInput('a', 'Type', 'All types', S.ShiftSafeLog.TYPES.map(t => t.name)) + this.clearBtn();
-    const stats = '<div class="calc" style="margin-bottom:0;">'
-      + this.statItem('Safe Balance', App.fmtCurrency(lifetime), 'good')
+    const stats = this.statsCard(
+      this.statItem('Safe Balance', App.fmtCurrency(lifetime), 'good')
       + this.statItem('Total In', App.fmtCurrency(totalIn))
       + this.statItem('Total Out', App.fmtCurrency(totalOut))
-      + this.statItem('Entries', shown.length) + '</div>';
+      + this.statItem('Entries', shown.length));
     let rows;
     if (!shown.length) rows = this.noMatchRow(6);
     else {
@@ -145,17 +161,15 @@ S.ShiftCashHistory = {
           + '<td class="val">' + App.fmtCurrency(r.bal) + '</td></tr>';
       }).join('');
     }
-    const table = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th><th>Amount</th><th>Balance</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    const table = this.dataCard('<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th><th>Amount</th><th>Balance</th>', rows)
       + (shown.length ? App.showOlderBar('sc', 'safe_log', shown, false) : '');
-    return { panel: this.filterWrap(controls, stats), table: table };
+    return { stats, controls, table };
   },
 
   // ── Variances tab ───────────────────────────────────────────────────────────
   bodyVariances() {
     const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return { panel: this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.'), table: '' };
+    if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on the Cash Board.') };
     const drawerNames = [...new Set(all.map(v => v.drawer).filter(Boolean))].sort();
     const filtered = all.filter(v => {
       if (this.f.from && (v.date || '') < this.f.from) return false;
@@ -167,10 +181,10 @@ S.ShiftCashHistory = {
     const net = filtered.reduce((t, v) => t + (v.variance || 0), 0);
     const flagged = filtered.filter(v => v.status === 'Over' || v.status === 'Short').length;
     const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Status', 'All statuses', S.ShiftVarianceLog.STATUSES) + this.clearBtn();
-    const stats = '<div class="calc" style="margin-bottom:0;">'
-      + this.statItem('Variances', filtered.length)
+    const stats = this.statsCard(
+      this.statItem('Variances', filtered.length)
       + this.statItem('Net Over/Short', (net >= 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
-      + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : '') + '</div>';
+      + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : ''));
     let rows;
     if (!filtered.length) rows = this.noMatchRow(8);
     else rows = filtered.slice(0, App.listLimit('sc', 'variance')).map(v => {
@@ -184,10 +198,8 @@ S.ShiftCashHistory = {
         + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td><td class="' + cls + '">' + vc + '</td>'
         + '<td>' + S.ShiftVarianceLog.statusBadge(v.status) + '</td></tr>';
     }).join('');
-    const table = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)
       + App.showOlderBar('sc', 'variance', filtered, false);
-    return { panel: this.filterWrap(controls, stats), table: table };
+    return { stats, controls, table };
   }
 };
