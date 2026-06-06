@@ -422,6 +422,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-bleed-tbl{margin-left:-20px;margin-right:-20px;overflow-x:auto;}
 .card-bleed-tbl .tbl th:first-child,.card-bleed-tbl .tbl td:first-child{padding-left:20px;}
 .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
+/* Drawers/Registers card — data-row color experiment (header stays --surface). */
+.sc-dr-card .tbl tbody td{background:#0D181E;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
