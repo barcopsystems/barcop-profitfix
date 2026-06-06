@@ -175,7 +175,6 @@ S.ShiftVoidComp = {
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Type</label><select id="vc-f-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="vc-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vc-f-clear">Clear</button></div>'
-      + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div>'
       + '</div></div>';
   },
 
@@ -234,7 +233,7 @@ S.ShiftVoidComp = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'void_comp', filtered, !!(this.filterFrom || this.filterTo || this.filterType || this.filterServerId));
       }
-      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Void and Comp Log</div>' + this.filterCard() + listHtml;
+      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Void and Comp Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -437,7 +436,8 @@ S.ShiftVoidComp = {
       + '<th style="width:108px;">Amount</th><th style="width:80px;">Units</th>'
       + '<th style="min-width:150px;">Server</th><th style="width:160px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="vcb-rows">' + this.lineHtml() + '</tbody></table></div>'
-      + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>';
+      + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vcb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
   },
 
   builderCard() {
@@ -488,6 +488,7 @@ S.ShiftVoidComp = {
     const shift = document.getElementById('vcb-shift')?.value || '';
     const authBy = document.getElementById('vcb-auth')?.value || '';
     const authName = (App.staffById(authBy) || {}).name || '';
+    const batchNotes = document.getElementById('vcb-notes')?.value.trim() || '';
     const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
     const thresholdActive = !isNaN(threshold) && threshold > 0;
 
@@ -517,7 +518,7 @@ S.ShiftVoidComp = {
         product_id: productId, product_name: productName, menu_item_id: menuItemId, units,
         staff_id: serverId, server: (App.staffById(serverId) || {}).name || '',
         authorized_by_id: isComp ? authBy : '', authorized_by: isComp ? authName : '',
-        check_number: '', reason, notes: '', auth_threshold_override: override,
+        check_number: '', reason, notes: batchNotes, auth_threshold_override: override,
         created_at: new Date().toISOString()
       });
     }

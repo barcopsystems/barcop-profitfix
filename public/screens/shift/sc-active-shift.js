@@ -217,7 +217,7 @@ S.ShiftActiveShift = {
     const show = this._rsShow || this.RS_PAGE;
     const limited = list.slice(0, show);
 
-    const card = '<div class="sh no-print" style="margin-top:24px;">Filter Recent Shifts</div>'
+    const card = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Recent Shifts</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="rs-export">Export PDF</button></div></div>'
       + '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(from) + '"/></div>'
@@ -225,7 +225,6 @@ S.ShiftActiveShift = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="rs-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="rs-mgr">' + mgrOpts + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="rs-clear">Clear</button></div>'
-      + '<button class="btn btn-ghost btn-sm" id="rs-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
 
     let below;

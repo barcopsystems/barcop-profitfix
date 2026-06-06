@@ -73,10 +73,6 @@ S.ShiftChecklists = {
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="cl-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:220px;flex-shrink:0;"><label>Completed By</label><select id="cl-f-by">' + this.filterByOptions() + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="cl-f-clear">Clear</button></div>'
-        + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;">'
-          + '<button class="btn btn-ghost btn-sm" id="cl-export">Export PDF</button>'
-          + '<button class="btn btn-ghost btn-sm" id="cl-worksheet">Worksheet</button>'
-        + '</div>'
       + '</div></div>';
   },
 
@@ -201,7 +197,7 @@ S.ShiftChecklists = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'checklist', filtered, !!(this.filterFrom || this.filterTo || this.filterById));
       }
-      histSection = '<div class="sh no-print" style="margin:24px 0 10px;">Filter Checklists</div>' + this.filterCard() + listHtml;
+      histSection = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Checklists</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="cl-worksheet">Worksheet</button></div></div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + runner + histSection + '</div>';

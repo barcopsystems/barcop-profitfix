@@ -281,7 +281,6 @@ S.ShiftCashControl = {
     const filterCard = '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       +   '<div class="f" style="width:200px;flex-shrink:0;"><label>Date Range</label><select id="cc-range">' + this.rangeOptions() + '</select></div>'
-      +   '<button class="btn btn-ghost btn-sm" id="cc-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
 
     // ── 4. Cash Activity (bare list under the filter card) ──
@@ -317,7 +316,7 @@ S.ShiftCashControl = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
     this.container.innerHTML = '<div class="screen">' + safeCard + registersCard + statsCard
-      + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Cash Activity</div>'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Cash Activity</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cc-export">Export PDF</button></div></div>'
       + filterCard + activityBody + '</div>';
     App.applyCollapsed(this.container);
 

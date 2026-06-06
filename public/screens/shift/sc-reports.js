@@ -53,10 +53,9 @@ S.ShiftReports = {
       body = parts.empty;
     } else {
       body = (parts.stats || '')
-        + '<div class="sh no-print" style="margin:24px 0 10px;">Filter ' + esc(tabLabel) + '</div>'
+        + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter ' + esc(tabLabel) + '</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="rpt-export">Export PDF</button></div></div>'
         + '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
           + parts.controls
-          + '<button class="btn btn-ghost btn-sm" id="rpt-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
         + '</div></div>'
         + (parts.below || '');
     }

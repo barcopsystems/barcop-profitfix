@@ -90,7 +90,6 @@ S.ShiftWalkedTabs = {
           + '<select id="wt-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="wt-f-reason">' + reasonOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wt-f-clear">Clear</button></div>'
-        + '<button class="btn btn-ghost btn-sm" id="wt-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
   },
 
@@ -149,7 +148,7 @@ S.ShiftWalkedTabs = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'walked_tab', filtered, !!(this.filterFrom || this.filterTo || this.filterServerId || this.filterReason));
       }
-      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Walked Tabs</div>' + this.filterCard() + listHtml;
+      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Walked Tabs</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="wt-export">Export PDF</button></div></div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';

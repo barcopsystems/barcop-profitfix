@@ -74,7 +74,6 @@ S.ShiftHistory = {
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
         + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="sh-f-mgr">' + mgrOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
-        + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
   },
 
@@ -125,7 +124,7 @@ S.ShiftHistory = {
 
     this.container.innerHTML = '<div class="screen">'
       + this.statsStrip(rows.length, totRev, totCov, avgChk)
-      + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Shift History</div>'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Shift History</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button></div></div>'
       + this.filterCard()
       + rowsBody
       + '</div>';

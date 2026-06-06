@@ -121,7 +121,8 @@ S.ShiftWaste = {
       + '<th style="min-width:200px;">Product</th><th style="width:90px;">Units</th><th style="width:70px;">Unit</th>'
       + '<th style="width:90px;">Cost</th><th style="min-width:180px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="wlb-rows">' + this.lineHtml() + '</tbody></table></div>'
-      + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>';
+      + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="wlb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
   },
 
   builderCard() {
@@ -189,6 +190,7 @@ S.ShiftWaste = {
     const shift = document.getElementById('wlb-shift')?.value || '';
     const byId = document.getElementById('wlb-by')?.value || '';
     const byName = (App.staffById(byId) || {}).name || '';
+    const batchNotes = document.getElementById('wlb-notes')?.value.trim() || '';
 
     const recs = [];
     const rowsWrap = document.getElementById('wlb-rows');
@@ -207,7 +209,7 @@ S.ShiftWaste = {
         id: App.uid(), date, shift_type: shift,
         product_id, product_name: p?.name || '', product_category: p?.category || '',
         unit: this.unitLabel(p), units, cost: this.costFor(p, units), reason,
-        recorded_by_id: byId, recorded_by: byName, notes: '',
+        recorded_by_id: byId, recorded_by: byName, notes: batchNotes,
         created_at: new Date().toISOString()
       });
     }
@@ -237,7 +239,6 @@ S.ShiftWaste = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="wl-f-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wl-f-by">' + byOpts + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wl-f-clear">Clear</button></div>'
-      + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div>'
       + '</div></div>';
   },
 
@@ -297,7 +298,7 @@ S.ShiftWaste = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'waste', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterRecordedBy));
       }
-      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Waste and Spill Log</div>' + this.filterCard() + listHtml;
+      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Waste and Spill Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';

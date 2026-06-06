@@ -110,7 +110,6 @@ S.ShiftMaintenance = {
       + '<div class="f" style="width:180px;flex-shrink:0;"><label>Location</label><select id="mt-f-location">' + locOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Assigned To</label><select id="mt-f-assigned">' + assignOpts + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mt-f-clear">Clear</button></div>'
-      + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="mt-print-blank">Worksheet</button></div>'
       + '</div></div>';
   },
 
@@ -180,7 +179,7 @@ S.ShiftMaintenance = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'maintenance', filtered, !!(this.filterFrom || this.filterTo || this.filterLocation || this.filterAssigned));
       }
-      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Maintenance Log</div>' + this.filterCard() + listHtml;
+      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Maintenance Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="mt-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
