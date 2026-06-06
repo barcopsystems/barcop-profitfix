@@ -47,7 +47,7 @@ S.ShiftHistory = {
 
   // ── Stats strip (top, card background) ──────────────────────────────────────
   statsStrip(count, totRev, totCov, avgChk) {
-    const item = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
+    const item = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val" style="font-size:30px;font-weight:700;">' + val + '</div></div>';
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + item('Shifts', count)
       + item('Total Revenue', App.fmtCurrency(totRev))
@@ -184,7 +184,7 @@ S.ShiftHistory = {
           + '<td>' + (c.counted_cash != null ? fmt(c.counted_cash) : '-') + '</td>'
           + '<td>' + vCell(c.variance, cr.skipped, c.counted_cash) + '</td>'
           + '<td>' + statusCell(c.status) + '</td></tr>').join('');
-        const totalRow = '<tr style="border-top:2px solid var(--b1);">'
+        const totalRow = '<tr>'
           + '<td><div class="val" style="font-weight:800;">Total</div></td>'
           + '<td>' + fmt(cr.opening_bank) + '</td><td>' + fmt(cr.drops_total) + '</td>'
           + '<td>' + (cr.sales_cash != null ? fmt(cr.sales_cash) : '-') + '</td>'
@@ -290,7 +290,7 @@ S.ShiftHistory = {
       : '';
 
     const statTile = (label, val, sub, color) =>
-      '<div style="flex:1;min-width:150px;background:var(--input);border:1px solid var(--b2);border-radius:8px;padding:14px 16px;">'
+      '<div style="flex:1;min-width:150px;background:var(--input);border:1px solid var(--b2);border-radius:8px;padding:14px 16px;text-align:center;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1.15;color:' + (color || 'var(--t1)') + ';">' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sub || '') + '</div></div>';
