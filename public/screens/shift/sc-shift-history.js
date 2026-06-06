@@ -9,7 +9,7 @@
 
 S.ShiftHistory = {
   filterType: '',
-  filterStatus: '',
+  filterManager: '',
   filterFrom: '',
   filterTo: '',
   editId: null,
@@ -31,7 +31,7 @@ S.ShiftHistory = {
   filtered() {
     return this.sorted().filter(s => {
       if (this.filterType && s.shift_type !== this.filterType) return false;
-      if (this.filterStatus && (s.status || 'Closed') !== this.filterStatus) return false;
+      if (this.filterManager && (s.manager_id || s.manager || '') !== this.filterManager) return false;
       if (this.filterFrom && (s.date || '') < this.filterFrom) return false;
       if (this.filterTo && (s.date || '') > this.filterTo) return false;
       return true;
@@ -60,14 +60,19 @@ S.ShiftHistory = {
   filterCard() {
     const typeOpts = '<option value="">All shift types</option>'
       + App.SHIFT_TYPES.map(t => '<option' + (this.filterType === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const statusOpts = ['', 'Open', 'Closed'].map(x =>
-      '<option value="' + x + '"' + (this.filterStatus === x ? ' selected' : '') + '>' + (x === '' ? 'All statuses' : x) + '</option>').join('');
+    const mgrMap = {};
+    this.shifts().forEach(s => {
+      const id = s.manager_id || s.manager || '';
+      if (id && !mgrMap[id]) mgrMap[id] = s.manager || (App.staffById ? (App.staffById(s.manager_id) || {}).name : '') || String(id);
+    });
+    const mgrOpts = '<option value="">All managers</option>'
+      + Object.keys(mgrMap).map(id => '<option value="' + esc(id) + '"' + (this.filterManager === id ? ' selected' : '') + '>' + esc(mgrMap[id]) + '</option>').join('');
     return '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="sh-f-status">' + statusOpts + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
+        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="sh-f-mgr">' + mgrOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
         + '<button class="btn btn-ghost btn-sm" id="sh-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
@@ -115,7 +120,7 @@ S.ShiftHistory = {
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
         + '<th>Covers</th><th>Check Avg</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>'
-        + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterStatus || this.filterFrom || this.filterTo));
+        + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterManager || this.filterFrom || this.filterTo));
     }
 
     this.container.innerHTML = '<div class="screen">'
@@ -137,12 +142,12 @@ S.ShiftHistory = {
     };
     document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-f-clear')?.addEventListener('click', () => {
-      this.filterType = this.filterStatus = this.filterFrom = this.filterTo = '';
+      this.filterType = this.filterManager = this.filterFrom = this.filterTo = '';
       this.renderList();
     });
     const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => { this[prop] = e.target.value || ''; this.renderList(); });
     bind('sh-f-type', 'filterType');
-    bind('sh-f-status', 'filterStatus');
+    bind('sh-f-mgr', 'filterManager');
     bind('sh-f-from', 'filterFrom');
     bind('sh-f-to', 'filterTo');
   },
