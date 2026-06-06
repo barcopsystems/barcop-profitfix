@@ -571,7 +571,26 @@ S.Hub = {
     const overflowFooter = overflowItems > 0
       ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
       : '';
-    const actionPanel = `<div style="${PANEL}">${titleWithSub('Priority Action Items', 'From your audits')}
+    // First-run guide: with no audit run yet, the Priority Action Items panel
+    // becomes a welcoming "Start Here" with the three steps to a first recovery
+    // number, so a brand-new operator is never left wondering what to do.
+    const ghStep = (n, t, d, btn, onclick) =>
+        '<div style="display:flex;gap:13px;align-items:flex-start;padding:15px 2px;' + (n === 1 ? '' : 'border-top:1px solid var(--b2);') + '">'
+      +   '<div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--gold-bg);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">' + n + '</div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + t + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:10px;">' + d + '</div>'
+      +     '<button class="hd-btn" onclick="' + onclick + '" style="color:var(--gold);border-color:rgba(219,171,70,0.4);">' + btn + '</button>'
+      +   '</div>'
+      + '</div>';
+    const startHereGuide =
+        '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;padding:2px 2px 8px;">Welcome to Bar Cop. It finds the money leaking out of your operation and tells you exactly how to plug it. Three steps to your first recovery number:</div>'
+      + ghStep(1, 'Finish your setup', 'Add your bar\'s basics so the audits have real numbers to measure against.', 'Continue Setup', 'if(window.S&&S.HubGettingStarted)S.HubGettingStarted.open()')
+      + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Traffic. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
+      + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
+    const actionPanel = !anyAudit
+      ? `<div style="${PANEL}">${panelTitle('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div></div>`
+      : `<div style="${PANEL}">${titleWithSub('Priority Action Items', 'From your audits')}
       <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}</div>`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
@@ -599,6 +618,7 @@ S.Hub = {
       readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 16px;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">-- / wk</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:240px;">Enter this week\'s numbers in Profit and Revenue to see what is leaking and where.</div>'
+        + '<button class="hd-btn" onclick="S.Hub._enter(\'this-week\',\'profit\')" style="color:var(--gold);border-color:rgba(219,171,70,0.4);margin-top:4px;">Enter This Week</button>'
         + '</div>';
     } else if (readout.items.length === 0) {
       readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;">'
