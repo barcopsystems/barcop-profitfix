@@ -422,24 +422,29 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-bleed-tbl{margin-left:-20px;margin-right:-20px;overflow-x:auto;}
 .card-bleed-tbl .tbl th:first-child,.card-bleed-tbl .tbl td:first-child{padding-left:20px;}
 .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
-/* Drawers/Registers card — data-row color experiment (header stays --surface).
-   Title moved to a background .sh heading; the column-header row is the card's
-   first row (flush top, text centered), and the table fills to the card border
-   top and bottom (no card padding gap). overflow:hidden clips the now edge-to-
-   edge table to the card's rounded corners. */
-.sc-dr-card{overflow:hidden;}
-.sc-dr-card .card-bleed-tbl{margin-top:-20px;margin-bottom:-20px;}
-.sc-dr-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
-.sc-dr-card .tbl tbody td{background:#0D181E;}
-/* Row hover: a hair lighter than #0D181E (the generic --hover lands on the same
-   color now that rows are #0D181E), so hover is a very slight lift. */
-.sc-dr-card .tbl tbody tr:hover td{background:#0F1A21;}
-/* Add/Edit Drawer card — full-width dividers, centered header/action bars, roomier form (experiment).
-   Works for both the collapsible on-page card and the plain edit-modal card: the title's bottom
-   margin carries the gap to the form in both (no .collapse-body in the modal). */
-.sc-dr-form > .card-title{margin:-20px -20px 18px;padding:13px 20px;border-bottom:1px solid var(--b2);}
-.sc-dr-form .card-actions{margin:18px -20px -20px;padding:13px 20px;border-top:1px solid var(--b2);}
-.f textarea.dr-notes-ta{min-height:0;}
+/* ── STANDARD form card + data table (app-wide) ───────────────────────────────
+   The Drawers page is the design base; every page is brought to these two classes
+   page by page, so a look change here is one CSS edit everywhere they're used.
+   .form-card = on-page forms, settings cards, and popup/modal forms.
+   .data-card  = data-list tables. (See the form-table-standard note.) */
+
+/* Form card: full-width header/action divider bands, content vertically centered,
+   roomier form. The title's bottom margin carries the gap to the form, so it works
+   for BOTH a collapsible on-page card and a plain modal card (no .collapse-body in
+   the modal). Chevron is optional (a plain .card-title = no chevron). */
+.form-card > .card-title{margin:-20px -20px 18px;padding:13px 20px;border-bottom:1px solid var(--b2);}
+.form-card .card-actions{margin:18px -20px -20px;padding:13px 20px;border-top:1px solid var(--b2);}
+.f textarea.notes-ta{min-height:0;}   /* 2-row notes-style textarea */
+
+/* Data table: title lives on the background as a .sh heading; the column-header row
+   is the card's first row (table flush to the card border top and bottom, header
+   text centered, header band stays --surface). Data rows #0D181E, hover a hair
+   lighter. overflow:hidden clips the edge-to-edge table to the rounded corners. */
+.data-card{overflow:hidden;}
+.data-card .card-bleed-tbl{margin-top:-20px;margin-bottom:-20px;}
+.data-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
+.data-card .tbl tbody td{background:#0D181E;}
+.data-card .tbl tbody tr:hover td{background:#0F1A21;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
