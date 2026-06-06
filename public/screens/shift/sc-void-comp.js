@@ -162,9 +162,7 @@ S.ShiftVoidComp = {
   },
 
   statusText(type) {
-    return type === 'Void'
-      ? '<span style="color:var(--amber);font-weight:700;">Void</span>'
-      : '<span style="color:var(--steel);font-weight:700;">Comp</span>';
+    return '<span style="color:var(--t1);font-weight:700;">' + esc(type || '-') + '</span>';
   },
 
   // ── Filter ──────────────────────────────────────────────────────────────────
