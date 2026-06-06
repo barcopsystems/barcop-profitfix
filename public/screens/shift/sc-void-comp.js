@@ -144,7 +144,7 @@ S.ShiftVoidComp = {
       + '<div class="f" id="' + p + 'custom-wrap" style="flex:1;min-width:130px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="' + p + 'custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
       + '</div>'
 
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + 'notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
   },
 
   // Type + item change handlers. p = id prefix ('vc-' inline form, 'vce-' modal).
@@ -168,19 +168,17 @@ S.ShiftVoidComp = {
   },
 
   // ── Filter ──────────────────────────────────────────────────────────────────
-  filterCard(stats) {
+  filterCard() {
     const typeOpts = ['', 'Void', 'Comp'].map(x => '<option value="' + x + '"' + (this.filterType === x ? ' selected' : '') + '>' + (x === '' ? 'All types' : x) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span><div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+    return '<div class="card no-print">'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="vc-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="vc-f-to" value="' + esc(this.filterTo) + '"/></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Type</label><select id="vc-f-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="vc-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vc-f-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div>' + (stats || '') + '</div>';
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vc-f-clear">Clear</button></div>'
+      + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div>'
+      + '</div></div>';
   },
 
   applyFilters(list) {
@@ -210,12 +208,12 @@ S.ShiftVoidComp = {
       const comps = filtered.filter(r => r.type === 'Comp');
       const voidTot = voids.reduce((t, r) => t + (r.amount || 0), 0);
       const compTot = comps.reduce((t, r) => t + (r.amount || 0), 0);
-      const stats = '<div class="calc" style="margin-bottom:0;">'
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Voids</div><div class="calc-val">' + voids.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Void Total</div><div class="calc-val warn">' + App.fmtCurrency(voidTot) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Comps</div><div class="calc-val">' + comps.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Comp Total</div><div class="calc-val warn">' + App.fmtCurrency(compTot) + '</div></div>'
-        + '</div>';
+        + '</div></div>';
 
       let listHtml;
       if (filtered.length === 0) {
@@ -233,12 +231,12 @@ S.ShiftVoidComp = {
           + (App.canEdit('sc-void-comp') ? '<button class="btn btn-ghost btn-sm vc-edit" data-id="' + r.id + '">Edit</button>' : '')
           + (App.canEdit('sc-void-comp') ? '<button class="btn btn-danger btn-sm vc-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>').join('');
-        listHtml = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:16px;"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th><th>Authorized By</th><th>Reason</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'void_comp', filtered, !!(this.filterFrom || this.filterTo || this.filterType || this.filterServerId));
       }
-      below = this.filterCard(stats) + listHtml;
+      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Void and Comp Log</div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -308,7 +306,7 @@ S.ShiftVoidComp = {
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Void / Comp</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Void / Comp</div>'
       + this.formFields(r, 'vce-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vce-save">Update</button>'
@@ -330,7 +328,7 @@ S.ShiftVoidComp = {
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-void-comp')) return;
     this.editId = null;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Voids / Comps</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Voids / Comps</div>'
       + this.builderInner(preset)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
@@ -445,7 +443,7 @@ S.ShiftVoidComp = {
   },
 
   builderCard() {
-    return '<div class="card">'
+    return '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))
       + '<div class="collapse-body">'
       + this.builderInner(null)
