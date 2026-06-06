@@ -592,28 +592,15 @@ S.ShiftActiveShift = {
         ? labor.hours.toFixed(1) + ' hrs scheduled'
         : 'No hours yet';
 
-    // Cover Goal vs Covers So Far. The goal is THIS daypart's slice of the
-    // Revenue Forecast's whole-day cover number (see coverGoalFor). So-far
-    // covers come from the shift's running cover total (typed during close, or
-    // pulled from matching server_check entries logged during the shift for a
-    // live read).
+    // Cover Goal: this shift's target from the Revenue Forecast (the daypart's
+    // slice of the day's cover number, or the whole-day number when there's no
+    // daypart history). Shown as a static target, not a live tracker: covers are
+    // only entered at close, so there is no live "covers so far" to count up.
     const cg = this.coverGoalFor(s);
     const goalForToday = cg.goal;
-    const coversSoFar = (() => {
-      // Prefer the operator-typed running cover number on the shift record.
-      if (s.covers != null && s.covers > 0) return parseFloat(s.covers) || 0;
-      // Fall back to summing today's logged server_check entries for this
-      // shift_type (live read during service when servers are logging shift
-      // checks but cover total hasn't been typed on the shift yet).
-      const checks = (App.data.revenue_server_checks || [])
-        .filter(c => c.date === s.date && c.shift === s.shift_type);
-      return checks.reduce((sum, c) => sum + (parseFloat(c.covers) || 0), 0);
-    })();
-    const coverProgressLabel = goalForToday > 0
-      ? (cg.daypart
-          ? coversSoFar.toFixed(0) + ' of ' + goalForToday + (coversSoFar >= goalForToday ? ' (hit)' : ' (' + (goalForToday - coversSoFar).toFixed(0) + ' to goal)')
-          : coversSoFar.toFixed(0) + ' this shift &middot; whole-day goal')
-      : (coversSoFar > 0 ? coversSoFar.toFixed(0) + ' so far' : 'Set in Revenue Forecast');
+    const coverGoalLabel = goalForToday > 0
+      ? (cg.daypart ? 'This shift\'s target' : 'Whole-day goal')
+      : 'Set in Revenue Forecast';
 
     const stat = (label, val, sub) =>
       '<div style="flex:1;min-width:130px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:14px;">'
@@ -641,7 +628,7 @@ S.ShiftActiveShift = {
       + '</div>';
 
     const statsRow = '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverProgressLabel)
+      + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverGoalLabel)
       + stat('Labor So Far', App.fmtCurrency(labor.cost), laborSub)
       + stat('Cash Drops', drops.length, App.fmtCurrency(dropTotal) + ' dropped')
       + stat('Voids &amp; Comps', vc.length, App.fmtCurrency(vcTotal) + ' total')
