@@ -45,28 +45,30 @@ S.ShiftHistory = {
     this.renderList();
   },
 
-  // ── Filter + totals ─────────────────────────────────────────────────────────
-  filterCard(count, totRev, totCov, avgChk) {
+  // ── Stats strip (top, card background) ──────────────────────────────────────
+  statsStrip(count, totRev, totCov, avgChk) {
+    const item = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + item('Shifts', count)
+      + item('Total Revenue', App.fmtCurrency(totRev))
+      + item('Total Covers', totCov)
+      + item('Avg Check', avgChk != null ? App.fmtCurrency(avgChk) : '-')
+      + '</div></div>';
+  },
+
+  // ── Filter (controls only; the heading + Export sit above it in renderList) ──
+  filterCard() {
     const typeOpts = '<option value="">All shift types</option>'
       + App.SHIFT_TYPES.map(t => '<option' + (this.filterType === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const statusOpts = ['', 'Open', 'Closed'].map(x =>
       '<option value="' + x + '"' + (this.filterStatus === x ? ' selected' : '') + '>' + (x === '' ? 'All statuses' : x) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+    return '<div class="card no-print">'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Status</label><select id="sh-f-status">' + statusOpts + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
-      + '</div>'
-      + '<div class="calc" style="margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Shifts</div><div class="calc-val">' + count + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val">' + App.fmtCurrency(totRev) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Covers</div><div class="calc-val">' + totCov + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Avg Check</div><div class="calc-val">' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</div></div>'
       + '</div></div>';
   },
 
@@ -74,16 +76,20 @@ S.ShiftHistory = {
     this.actions.innerHTML = '';
 
     const all = this.shifts();
+    if (all.length === 0) {
+      this.container.innerHTML = '<div class="screen"><div class="empty"><div class="empty-title">No shifts logged yet</div>'
+        + '<div class="empty-sub">Run a shift in Active Shift, or log a past one there under Recent Shifts. It lands here when closed.</div></div></div>';
+      this.wireList();
+      return;
+    }
+
     const rows = this.filtered();
     const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);
     const totCov = rows.reduce((t, s) => t + (s.covers || 0), 0);
     const avgChk = totCov > 0 ? totRev / totCov : null;
 
     let rowsBody;
-    if (all.length === 0) {
-      rowsBody = '<div class="empty"><div class="empty-title">No shifts logged yet</div>'
-        + '<div class="empty-sub">Run a shift in Active Shift, or log a past one there under Recent Shifts. It lands here when closed.</div></div>';
-    } else if (rows.length === 0) {
+    if (rows.length === 0) {
       rowsBody = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
         + '<div class="empty-sub">Adjust or clear them above.</div></div>';
     } else {
@@ -104,15 +110,20 @@ S.ShiftHistory = {
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm sh-view" data-id="' + s.id + '">View</button></div></td>'
         + '</tr>';
       }).join('');
-      rowsBody = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      rowsBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
         + '<th>Covers</th><th>Check Avg</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
+        + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>'
         + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterStatus || this.filterFrom || this.filterTo));
     }
 
     this.container.innerHTML = '<div class="screen">'
-      + this.filterCard(rows.length, totRev, totCov, avgChk)
+      + this.statsStrip(rows.length, totRev, totCov, avgChk)
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+        + '<div class="sh" style="margin:0;">Filter Shift History</div>'
+        + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button>'
+      + '</div>'
+      + this.filterCard()
       + rowsBody
       + '</div>';
     this.wireList();
@@ -182,7 +193,7 @@ S.ShiftHistory = {
           + '<td>' + fmt(cr.expected) + '</td>'
           + '<td>' + (cr.counted_cash != null ? fmt(cr.counted_cash) : '-') + '</td>'
           + '<td>' + vCell(cr.variance, cr.skipped, cr.counted_cash) + '</td><td></td></tr>';
-        cashCard = '<div class="card"><div class="card-title">Cash Reconciliation</div>'
+        cashCard = '<div class="card form-card"><div class="card-title">Cash Reconciliation</div>'
           + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
           + '<th>Drawer</th><th>Opening</th><th>Drops</th><th>POS Cash</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
           + '</tr></thead><tbody>' + rows + totalRow + '</tbody></table></div></div>';
@@ -191,7 +202,7 @@ S.ShiftHistory = {
         const variance = cr.variance;
         const statusColor = skipped ? 'var(--t3)' : (variance == null ? 'var(--t3)' : (Math.abs(variance) <= tol ? 'var(--gold)' : 'var(--red)'));
         const statusText = skipped ? 'SKIPPED' : (variance == null ? 'NOT COUNTED' : (Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER'));
-        cashCard = '<div class="card"><div class="card-title">Cash Reconciliation</div>'
+        cashCard = '<div class="card form-card"><div class="card-title">Cash Reconciliation</div>'
           + '<div class="calc" style="margin-bottom:0;">'
           + meta('Opening Bank', fmt(cr.opening_bank))
           + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
@@ -213,7 +224,7 @@ S.ShiftHistory = {
         .map(([k]) => '<div style="font-size:12px;color:var(--t1);padding:6px 0;border-bottom:1px solid var(--b2);">&#10003; ' + esc(labels[k] || k) + ' acknowledged</div>')
         .join('');
       if (ackRows) {
-        exCard = '<div class="card"><div class="card-title">Exception Review</div>' + ackRows + '</div>';
+        exCard = '<div class="card form-card"><div class="card-title">Exception Review</div>' + ackRows + '</div>';
       }
     }
 
@@ -225,7 +236,7 @@ S.ShiftHistory = {
         const d = new Date(iso);
         return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       };
-      midNotesCard = '<div class="card"><div class="card-title">Shift Notes</div>'
+      midNotesCard = '<div class="card form-card"><div class="card-title">Shift Notes</div>'
         + s.shift_notes.slice().reverse().map(n =>
             '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--b2);">'
             + '<div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;min-width:55px;padding-top:2px;">' + esc(fmtTime(n.at)) + '</div>'
@@ -236,11 +247,11 @@ S.ShiftHistory = {
 
     // ── Closing notes and handoff ────────────────────────────────────────
     const notesCard = s.notes
-      ? '<div class="card"><div class="card-title">Notes</div>'
+      ? '<div class="card form-card"><div class="card-title">Notes</div>'
         + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.notes) + '</div></div>'
       : '';
     const handoffCard = s.handoff_notes
-      ? '<div class="card"><div class="card-title">Handoff Notes for the Opener</div>'
+      ? '<div class="card form-card"><div class="card-title">Handoff Notes for the Opener</div>'
         + '<div style="font-size:13px;color:var(--t1);white-space:pre-wrap;">' + esc(s.handoff_notes) + '</div></div>'
       : '';
 
