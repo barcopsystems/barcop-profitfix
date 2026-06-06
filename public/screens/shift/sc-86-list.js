@@ -226,9 +226,9 @@ S.Shift86List = {
       // Row 1: Menu Item + Inventory Item side by side
       + '<div class="form-row" style="gap:14px;align-items:flex-end;">'
         + '<div class="f" style="flex:1;min-width:220px;"><label>Menu Item</label>'
-          + '<select id="qa-menu" style="height:48px;font-size:15px;">' + this.menuItemOptions(initialMenuItemId) + '</select></div>'
+          + '<select id="qa-menu">' + this.menuItemOptions(initialMenuItemId) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:220px;"><label>Inventory Item</label>'
-          + '<select id="qa-inv" style="height:48px;font-size:15px;">' + this.inventoryItemOptions(initialInventoryKey) + '</select></div>'
+          + '<select id="qa-inv">' + this.inventoryItemOptions(initialInventoryKey) + '</select></div>'
       + '</div>'
 
       // Custom escape link + reveal panel
@@ -239,9 +239,9 @@ S.Shift86List = {
       + '</div>'
       + '<div id="qa-custom-wrap" class="form-row" style="gap:14px;margin-top:10px;' + (isCustomItem ? '' : 'display:none;') + '">'
         + '<div class="f" style="flex:1;min-width:240px;"><label>Custom Item Name</label>'
-          + '<input type="text" id="qa-custom" value="' + esc(isCustomItem ? savedItemName : '') + '" placeholder="What ran out?" style="height:48px;font-size:15px;"/></div>'
+          + '<input type="text" id="qa-custom" value="' + esc(isCustomItem ? savedItemName : '') + '" placeholder="What ran out?"/></div>'
         + '<div class="f" style="width:170px;flex-shrink:0;"><label>Category</label>'
-          + '<select id="qa-custom-cat" style="height:48px;">'
+          + '<select id="qa-custom-cat">'
             + this.categories().map(c => '<option' + ((isCustomItem && i?.category === c) ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
           + '</select></div>'
       + '</div>'
@@ -252,11 +252,11 @@ S.Shift86List = {
       // Row 2: when / who
       + '<div class="form-row" style="gap:14px;margin-top:14px;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
-          + '<input type="date" id="qa-date" value="' + esc(dateVal) + '" style="height:48px;"/></div>'
+          + '<input type="date" id="qa-date" value="' + esc(dateVal) + '"/></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Time</label>'
-          + '<input type="time" id="qa-time" value="' + esc(timeVal) + '" style="height:48px;"/></div>'
+          + '<input type="time" id="qa-time" value="' + esc(timeVal) + '"/></div>'
         + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reported By</label>'
-          + '<select id="qa-by" style="height:48px;">' + App.staffOptions(reportedBy, { placeholder: 'Select staff...' }) + '</select></div>'
+          + '<select id="qa-by">' + App.staffOptions(reportedBy, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Reason <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
