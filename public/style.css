@@ -497,9 +497,26 @@ body.demo.chrome-on #hub-wrapper{top:calc(40px + var(--navh)) !important;}
 .app.proto.sidebar-collapsed{grid-template-columns:var(--sidebar-w-coll) 1fr;}
 
 /* Hub under the shared nav: its own topbar is hidden (the shared nav replaces
-   it), but the sidebar stays (Kyle will decide its contents later). */
+   it). The sidebar shows on the Hub SUB-PAGES (Audit, Books, Operations, Setup,
+   Support) but NOT on the dashboard, which stays full-width (body.hub-dashboard
+   flags the dashboard view). Mobile keeps the sidebar as the drawer regardless.
+   The sidebar is restyled to match the module sidebars: no own logo/switcher,
+   bigger Title-Case labels, --c4 active row, --c3 border. */
 body.chrome-on .hub-app{height:100%;}
 body.chrome-on .hub-app .topbar{display:none;}
+@media (min-width:769px){
+  body.chrome-on.hub-dashboard .hub-app .sidebar{display:none;}
+}
+body.chrome-on .hub-app .sidebar{border-right:1px solid var(--c3);}
+body.chrome-on .hub-app .sidebar-logo{display:none;}
+body.chrome-on .hub-app .sec-switch{display:none;}
+body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
+body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
+body.chrome-on .hub-app .nav-section:first-child{padding-top:6px;}
+body.chrome-on .hub-app .nav-item{padding:10px 20px;gap:13px;}
+body.chrome-on .hub-app .nav-item .nav-label{font-size:13.5px;text-transform:none;letter-spacing:0;}
+body.chrome-on .hub-app .nav-item:hover{background:var(--c3);}
+body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* Row 1 — brand + global destinations + utility. */
 .tn-row1{display:flex;align-items:center;gap:16px;height:52px;padding:0 16px;background:var(--bg);}
