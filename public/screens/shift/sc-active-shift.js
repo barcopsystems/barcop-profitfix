@@ -30,11 +30,20 @@ S.ShiftActiveShift = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   },
-  elapsed(iso) {
+  fmtClock(iso) {
     if (!iso) return '';
-    const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-    const h = Math.floor(mins / 60), m = mins % 60;
-    return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  },
+
+  // In-card section helpers for the running-shift view: one card holds several
+  // labeled sub-sections separated by full-bleed dividers (less cardy than one
+  // card per section). Divider uses -20px to reach the card edges (card pad 20).
+  subLabel(text) {
+    return '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + text + '</div>';
+  },
+  sectionDivider() {
+    return '<div style="border-top:1px solid var(--b2);margin:20px -20px;"></div>';
   },
 
   render(container, actions) {
@@ -521,7 +530,8 @@ S.ShiftActiveShift = {
   // The registers running this shift, shown live during service: each drawer's
   // opening bank and what has been dropped from it so far. Reads s.drawers[]
   // (multi-register), falling back to the single legacy drawer for old shifts.
-  registersCard(s) {
+  // Register tiles (sub-section content; the card wrapper + label live in renderActive).
+  registersTiles(s) {
     const drawers = (Array.isArray(s.drawers) && s.drawers.length)
       ? s.drawers
       : (s.drawer_id || s.drawer ? [{ drawer_id: s.drawer_id || '', name: s.drawer || 'Register', opening_bank: s.opening_bank }] : []);
@@ -531,7 +541,7 @@ S.ShiftActiveShift = {
       const k = dp.drawer_id || '';
       dropsByDrawer[k] = (dropsByDrawer[k] || 0) + (parseFloat(dp.amount) || 0);
     });
-    const tiles = drawers.map(dr => {
+    return drawers.map(dr => {
       const dropped = dropsByDrawer[dr.drawer_id] || 0;
       return '<div style="width:165px;border:1px solid var(--b2);background:var(--input);border-radius:10px;padding:12px 14px;">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(dr.name || 'Register') + '</div>'
@@ -539,8 +549,6 @@ S.ShiftActiveShift = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Dropped <span style="color:var(--gold);font-weight:700;float:right;">' + App.fmtCurrency(dropped) + '</span></div>'
         + '</div>';
     }).join('');
-    return '<div class="card form-card"><div class="card-title">Registers</div>'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + tiles + '</div></div>';
   },
 
   // Discard a just-opened shift (mistake on the opener). Removes the open shift
@@ -613,50 +621,59 @@ S.ShiftActiveShift = {
       + '<div style="font-family:\'Barlow Condensed\';font-size:30px;font-weight:600;color:var(--w);line-height:1.1;">' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);">' + sub + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
+    const regTiles = this.registersTiles(s);
+    const regSection = regTiles
+      ? this.sectionDivider() + this.subLabel('Registers')
+        + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + regTiles + '</div>'
+      : '';
+
+    const header = '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
       + '<span style="width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);"></span>'
       + '<span style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Shift Running</span></div>'
       + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">'
       + (s.manager ? 'Manager: ' + esc(s.manager) + ' &middot; ' : '')
-      + (s.started_at ? 'Running ' + this.elapsed(s.started_at) : '')
+      + (s.started_at ? 'Opened ' + this.fmtClock(s.started_at) : '')
       + (s.opening_bank != null ? ' &middot; Opening bank ' + App.fmtCurrency(s.opening_bank) : '') + '</div>'
       + '</div>'
       + App.helpButton('as-how')
-      + '</div>'
-      + '</div>'
+      + '</div>';
 
-      + this.registersCard(s)
-
-      + '<div class="card form-card"><div class="card-title">This Shift</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    const statsRow = '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverProgressLabel)
       + stat('Labor So Far', App.fmtCurrency(labor.cost), laborSub)
       + stat('Cash Drops', drops.length, App.fmtCurrency(dropTotal) + ' dropped')
       + stat('Voids &amp; Comps', vc.length, App.fmtCurrency(vcTotal) + ' total')
       + stat('86\'d Items', active86, active86 === 1 ? 'item out' : 'items out')
       + stat('Open Maint.', openMaint, openMaint === 1 ? 'issue' : 'issues')
-      + '</div></div>'
+      + '</div>';
 
-      + '<div class="card form-card"><div class="card-title">Log During This Shift</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    const logButtons = '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost" id="ld-cash" style="height:52px;flex:1;min-width:120px;">Cash Drop</button>'
       + '<button class="btn btn-ghost" id="ld-vc" style="height:52px;flex:1;min-width:120px;">Void / Comp</button>'
       + '<button class="btn btn-ghost" id="ld-waste" style="height:52px;flex:1;min-width:120px;">Waste / Spill</button>'
       + '<button class="btn btn-ghost" id="ld-86" style="height:52px;flex:1;min-width:120px;">86 an Item</button>'
       + '<button class="btn btn-ghost" id="ld-maint" style="height:52px;flex:1;min-width:120px;">Maintenance</button>'
-      + '</div></div>'
+      + '</div>';
 
-      + this.renderShiftNotesCard(s)
-
-      + '<div class="card form-card"><div class="card-title">End of Shift</div>'
-      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    this.container.innerHTML = '<div class="screen">'
+      // Card 1 — The Shift: header + Registers + This Shift
+      + '<div class="card">'
+      + header
+      + regSection
+      + this.sectionDivider() + this.subLabel('This Shift') + statsRow
+      + '</div>'
+      // Card 2 — During the Shift: Log During + Shift Notes, End/Cancel in the footer band
+      + '<div class="card form-card">'
+      + this.subLabel('Log During This Shift') + logButtons
+      + this.sectionDivider() + this.shiftNotesInner(s)
+      + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button>'
       + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
-      + '</div></div></div>';
+      + '</div>'
+      + '</div>'
+      + '</div>';
 
     // Log-During buttons open each module's entry form as a pop-up with an
     // onDone that re-renders the running shift, so the manager never leaves it.
@@ -752,7 +769,8 @@ S.ShiftActiveShift = {
   // Operator-pain fix: the handoff_notes field only captures things at close.
   // This adds a running timestamped notebook the manager can drop notes into
   // throughout the shift. Notes flow into the Shift Handoff Report at close.
-  renderShiftNotesCard(s) {
+  // Shift Notes sub-section content (label + add form + list; no card wrapper).
+  shiftNotesInner(s) {
     const notes = Array.isArray(s.shift_notes) ? s.shift_notes : [];
     const fmtTime = iso => {
       if (!iso) return '';
@@ -768,14 +786,13 @@ S.ShiftActiveShift = {
           + '<button class="btn btn-ghost btn-sm sn-del" data-id="' + esc(n.id) + '" style="font-size:10px;padding:2px 8px;color:var(--red);">Delete</button>'
           + '</div>').join('')
       + '</div>';
-    return '<div class="card form-card"><div class="card-title">Shift Notes</div>'
+    return this.subLabel('Shift Notes')
       + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:10px;">'
         + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add a Note</label>'
           + '<textarea id="sn-text" rows="2" placeholder="VIP at 9pm, delivery short on bourbon, weather slowing us down..."></textarea></div>'
         + '<div style="flex-shrink:0;"><button class="btn btn-primary" id="sn-add" style="height:48px;">Add Note</button></div>'
       + '</div>'
-      + list
-      + '</div>';
+      + list;
   },
 
   async addShiftNote(s) {
