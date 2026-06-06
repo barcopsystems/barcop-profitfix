@@ -1981,6 +1981,62 @@ S.HubSettings = {
     // bar_rev / food_rev / covers, so the weekly revenue feed is unchanged but
     // Shift Reports (by type) and the per-type cash tolerances demo realistically.
     // Weekends open with Brunch, weekdays with Lunch, and Dinner anchors the day.
+    // ── Close-out seed helpers (cash recon / tip recon / handoff) ────────────
+    // The recap reads the close-wizard blocks; the seed predated them, so closed
+    // sample shifts had empty recaps. Cash is ~15% of revenue, dropped toward the
+    // bank through service; drawers end within tolerance except a deterministic
+    // handful with a real over/short to demo the catch. Registers vary by daypart.
+    const REG_BANKS = { 'Main Bar Register': 300, 'Service Bar Register': 200, 'Floor Register 1': 250, 'Floor Register 2': 250 };
+    const DAYPART_REGS = {
+      Brunch: ['Main Bar Register', 'Floor Register 1'],
+      Lunch: ['Main Bar Register', 'Floor Register 1'],
+      Dinner: ['Main Bar Register', 'Service Bar Register', 'Floor Register 1', 'Floor Register 2'],
+      'Late Night': ['Main Bar Register', 'Service Bar Register']
+    };
+    const CASH_MISS = [0, 0, 0, 4, 0, -3, 0, 0, -18, 0, 5, 0, 16, -2, 0];
+    const seedCashRecon = (shiftType, totalRev, idx) => {
+      const regs = DAYPART_REGS[shiftType] || ['Main Bar Register'];
+      const cashTotal = Math.round(totalRev * 0.15);
+      const miss = CASH_MISS[idx % CASH_MISS.length];
+      const drawers = regs.map((name, di) => {
+        const opening = REG_BANKS[name] || 200;
+        const sales_cash = Math.round(cashTotal / regs.length);
+        const drops_total = Math.max(0, Math.floor(sales_cash / 20) * 20);
+        const expected = opening + sales_cash - drops_total;
+        const counted_cash = expected + (di === 0 ? miss : 0);
+        const variance = counted_cash - expected;
+        const status = Math.abs(variance) <= 10 ? 'Within Tolerance' : (variance < 0 ? 'Short' : 'Over');
+        return { drawer_id: '', name, opening_bank: opening, drops_total, sales_cash, expected, counted_cash, variance, status };
+      });
+      const sum = k => drawers.reduce((t, d) => t + d[k], 0);
+      const expected = sum('expected'), counted_cash = sum('counted_cash');
+      return { drawers, opening_bank: sum('opening_bank'), drops_total: sum('drops_total'),
+        sales_cash: sum('sales_cash'), expected, counted_cash, variance: counted_cash - expected, skipped: false };
+    };
+    const TIP_MISS = [0, 0, 6, 0, -4, 0, 9, 0, -3, 0];
+    const seedTipRecon = (totalRev, idx) => {
+      const logged = Math.round(totalRev * 0.18);
+      const pos = logged + TIP_MISS[idx % TIP_MISS.length];
+      return { logged_total: logged, pos_reported: pos, variance: logged - pos };
+    };
+    const SEED_HANDOFFS = [
+      'Slow start, picked up after seven. Walk-in running a touch warm, flagged it to maintenance.',
+      'Busy all night. Down to the last case of the house red, get an order in before tomorrow.',
+      'Smooth shift. Comped a birthday round for a regular, approved.',
+      'Short a server, the team covered well. Bourbon delivery came up light, check the invoice.',
+      'Steady night. Floor 2 card reader glitched twice, give it a restart at open.',
+      ''
+    ];
+    const SEED_SHIFT_NOTES = [
+      'VIP four-top at nine, comped dessert.',
+      'Delivery short on limes, ran to the store.',
+      'Large party walk-in, watched the door the rest of the night.',
+      'Server sent home sick after first turn, covered the section.'
+    ];
+    const seedShiftNotes = (date, idx) => idx % 6 === 0
+      ? [{ id: uid(), at: date + 'T20:30:00', text: SEED_SHIFT_NOTES[idx % SEED_SHIFT_NOTES.length], manager_id: '' }]
+      : [];
+
     const scShifts = [];
     const scDays   = [];   // one entry per operating day, drives the checklists
     ANCHS.weeks.forEach(a => {
@@ -2011,11 +2067,15 @@ S.HubSettings = {
           // ops. Salted onto the Dinner service of a couple of days.
           const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'live music' : '';
           const weatherTag = (a.wk === 10 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
+          const sIdx = scShifts.length;
+          const cashRecon = seedCashRecon(p[0], bar + floor, sIdx);
           scShifts.push({
             id:uid(), date:date, shift_type:p[0],
             manager:mgrs[(di + pi) % 3], bar_revenue:bar, floor_revenue:floor,
-            total_revenue:bar + floor, covers:cov, opening_bank:300,
+            total_revenue:bar + floor, covers:cov, opening_bank:cashRecon.opening_bank,
             staff_on_floor:p[2], status:'Closed', notes:'',
+            cash_recon:cashRecon, tip_recon:seedTipRecon(bar + floor, sIdx),
+            handoff_notes:SEED_HANDOFFS[sIdx % SEED_HANDOFFS.length], shift_notes:seedShiftNotes(date, sIdx),
             event_tag:eventTag, weather_tag:weatherTag,
             created_at:new Date().toISOString()
           });
