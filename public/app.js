@@ -2710,7 +2710,7 @@ const App = {
   // the next older page pulled from the events table on demand for a rare
   // multi-year tax / insurance lookback. State is per module+kind, reset on a
   // fresh window load (login / reseed) by loadEventStores.
-  LIST_PAGE: 200,
+  LIST_PAGE: 50,
   _listState: {},
   _listKey(mod, kind) { return mod + '.' + kind; },
 
