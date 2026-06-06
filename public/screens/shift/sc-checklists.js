@@ -147,8 +147,8 @@ S.ShiftChecklists = {
 
     const itemRows = items.map((it, idx) =>
       '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? '#394E5D' : 'var(--b1)') + ';'
-      + 'border-radius:4px;background:' + (it.done ? '#394E5D' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
+      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? '#304A5C' : 'var(--b1)') + ';'
+      + 'border-radius:4px;background:' + (it.done ? '#304A5C' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
       + (it.done ? '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5l2.5 2.5 5-5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
       + '</span>'
       + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
@@ -164,7 +164,7 @@ S.ShiftChecklists = {
       + '</div>'
       + '<div style="margin:8px 0 14px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;"><span>' + done + ' of ' + items.length + ' complete</span><span>' + pct + '%</span></div>'
-      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:#394E5D;transition:width 0.2s;"></div></div></div>'
+      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:#304A5C;transition:width 0.2s;"></div></div></div>'
       + '<div id="cl-items">' + itemRows + '</div>'
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
       + '<div class="card-actions">'
@@ -278,7 +278,7 @@ S.ShiftChecklists = {
     if (!r) { this.renderMain(); return; }
     const itemRows = (r.items || []).map(it =>
       '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--b2);">'
-      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? '#394E5D' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
+      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? '#304A5C' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
