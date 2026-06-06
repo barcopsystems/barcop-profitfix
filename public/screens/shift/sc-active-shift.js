@@ -169,9 +169,10 @@ S.ShiftActiveShift = {
   },
 
   // ── Recent Shifts (opener-state command center: view/edit/log past shifts) ──
-  // A Filter card (date range + shift + manager + Clear) sits above a "Recent
-  // Shifts" .sh heading and the .data-card rows. Log a Past Shift lives in the
-  // Open the Floor footer row. Shift History stays the read-only archive.
+  // A "Filter Recent Shifts" .sh heading sits above the filter card (date range +
+  // shift + manager + Clear), then the .data-card rows (no heading of their own).
+  // Log a Past Shift lives in the Open the Floor footer row. Shift History stays
+  // the read-only archive.
   _rsFrom: '',
   _rsTo: '',
   _rsShift: '',
@@ -201,8 +202,8 @@ S.ShiftActiveShift = {
     const anyFilter = !!(from || to || fShift || fMgr);
     const limited = anyFilter ? list : list.slice(0, 10);
 
-    const card = '<div class="card form-card" style="margin-top:16px;">'
-      + '<div class="card-title">Filter</div>'
+    const card = '<div class="sh" style="margin-top:24px;">Filter Recent Shifts</div>'
+      + '<div class="card">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(from) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="rs-to" value="' + esc(to) + '"/></div>'
@@ -214,29 +215,26 @@ S.ShiftActiveShift = {
     let below;
     if (!all.length) {
       below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts yet. Open the floor above, or log a past shift.</div>';
+    } else if (!limited.length) {
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts match the filter.</div>';
     } else {
-      below = '<div class="sh" style="margin-top:24px;">Recent Shifts</div>';
-      if (!limited.length) {
-        below += '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts match the filter.</div>';
-      } else {
-        const trs = limited.map(s => {
-          const statusText = s.status === 'Open'
-            ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
-            : '<span style="color:var(--t3);font-weight:700;">Closed</span>';
-          return '<tr>'
-            + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
-            + '<td>' + esc(s.shift_type || '-') + '</td>'
-            + '<td>' + esc(s.manager || '-') + '</td>'
-            + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
-            + '<td>' + statusText + '</td>'
-            + '<td><div class="row-actions">'
-            + '<button class="btn btn-ghost btn-sm rs-view" data-id="' + s.id + '">View</button>'
-            + '<button class="btn btn-ghost btn-sm rs-edit" data-id="' + s.id + '">Edit</button></div></td></tr>';
-        }).join('');
-        below += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Status</th><th></th>'
-          + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
-      }
+      const trs = limited.map(s => {
+        const statusText = s.status === 'Open'
+          ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
+          : '<span style="color:var(--t3);font-weight:700;">Closed</span>';
+        return '<tr>'
+          + '<td><div class="val">' + this.fmtDate(s.date) + '</div></td>'
+          + '<td>' + esc(s.shift_type || '-') + '</td>'
+          + '<td>' + esc(s.manager || '-') + '</td>'
+          + '<td class="val">' + App.fmtCurrency(s.total_revenue || 0) + '</td>'
+          + '<td>' + statusText + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm rs-view" data-id="' + s.id + '">View</button>'
+          + '<button class="btn btn-ghost btn-sm rs-edit" data-id="' + s.id + '">Edit</button></div></td></tr>';
+      }).join('');
+      below = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
     }
     return card + below;
   },
