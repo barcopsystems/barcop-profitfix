@@ -173,11 +173,11 @@ S.ShiftHistory = {
       const fmt = x => x != null ? App.fmtCurrency(x) : '-';
       const vCell = (vr, sk, ct) => {
         if (sk || vr == null || ct == null) return '<span style="color:var(--t4);">-</span>';
-        const col = Math.abs(vr) <= tol ? 'var(--gold)' : 'var(--red)';
+        const col = Math.abs(vr) <= tol ? 'var(--green)' : (vr < 0 ? 'var(--red)' : 'var(--amber)');
         return '<span style="color:' + col + ';font-weight:700;">' + (vr >= 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>';
       };
       const statusCell = st => {
-        const col = st === 'Within Tolerance' ? 'var(--gold)' : (st === 'Short' || st === 'Over') ? 'var(--red)' : 'var(--t3)';
+        const col = st === 'Short' ? 'var(--red)' : st === 'Over' ? 'var(--amber)' : st === 'Not Counted' ? 'var(--t3)' : 'var(--green)';
         return '<span style="color:' + col + ';font-weight:700;">' + esc(st || '-') + '</span>';
       };
       if (Array.isArray(cr.drawers) && cr.drawers.length) {
@@ -306,7 +306,7 @@ S.ShiftHistory = {
       const tol = App.cashToleranceForShift ? App.cashToleranceForShift(s) : 10;
       if (cr.skipped) { cashVarSub = 'Skipped'; cashVarColor = 'var(--t3)'; }
       else if (cr.variance == null) { cashVarSub = 'Not counted'; cashVarColor = 'var(--t3)'; }
-      else { cashVar = (cr.variance >= 0 ? '+' : '') + App.fmtCurrency(cr.variance); cashVarColor = Math.abs(cr.variance) <= tol ? 'var(--gold)' : 'var(--red)'; cashVarSub = Math.abs(cr.variance) <= tol ? 'Within tolerance' : cr.variance < 0 ? 'Short' : 'Over'; }
+      else { cashVar = (cr.variance >= 0 ? '+' : '') + App.fmtCurrency(cr.variance); cashVarColor = Math.abs(cr.variance) <= tol ? 'var(--green)' : cr.variance < 0 ? 'var(--red)' : 'var(--amber)'; cashVarSub = Math.abs(cr.variance) <= tol ? 'Within tolerance' : cr.variance < 0 ? 'Short' : 'Over'; }
     }
     const tipsVal = (s.tip_recon && s.tip_recon.logged_total != null) ? App.fmtCurrency(s.tip_recon.logged_total) : '-';
     const tipsSub = (s.tip_recon && s.tip_recon.variance != null) ? ((s.tip_recon.variance >= 0 ? '+' : '') + App.fmtCurrency(s.tip_recon.variance) + ' vs POS') : 'logged tips';
