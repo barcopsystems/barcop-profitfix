@@ -2721,14 +2721,37 @@ S.HubSettings = {
     App.laborData.lc_actuals   = lcActuals;
 
     // ── Schedules — the two most recent weeks, built from the roster ──
+    // Each position holds a few real daypart shifts (brunch, lunch, dinner,
+    // late). Staff in a position are staggered across them (person 1 opens,
+    // person 2 closes, etc.) so the grid reads like a human-built week covering
+    // brunch through last call, not one identical block per role.
     const SCHED_PLAN = {
-      'Bartender': { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'23:00', hours:7 },
-      'Barback':   { days:['Thu','Fri','Sat','Sun'],       start:'18:00', end:'23:00', hours:5 },
-      'Line Cook': { days:['Tue','Wed','Thu','Fri','Sat'], start:'15:00', end:'22:00', hours:7 },
-      'Prep Cook': { days:['Mon','Tue','Wed','Thu'],       start:'09:00', end:'15:00', hours:6 },
-      'Server':    { days:['Wed','Thu','Fri','Sat','Sun'], start:'17:00', end:'22:00', hours:5 },
-      'Host':      { days:['Thu','Fri','Sat','Sun'],       start:'18:00', end:'22:00', hours:4 },
-      'Manager':   { days:['Tue','Wed','Thu','Fri','Sat'], start:'14:00', end:'22:00', hours:8 },
+      'Bartender': [
+        { days:['Tue','Wed','Thu','Fri'],       start:'11:00', end:'17:00', hours:6 },   // day / lunch bar
+        { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'00:00', hours:8 },   // dinner into late
+        { days:['Fri','Sat','Sun'],             start:'17:00', end:'01:00', hours:8 },   // late bar / last call
+      ],
+      'Barback':   [ { days:['Thu','Fri','Sat','Sun'], start:'17:00', end:'01:00', hours:8 } ],
+      'Line Cook': [
+        { days:['Tue','Wed','Thu','Fri'],       start:'09:00', end:'16:00', hours:7 },   // brunch / lunch line
+        { days:['Wed','Thu','Fri','Sat'],       start:'15:00', end:'23:00', hours:8 },   // dinner line
+        { days:['Sat','Sun'],                   start:'09:00', end:'16:00', hours:7 },   // weekend brunch line
+      ],
+      'Prep Cook': [ { days:['Mon','Tue','Wed','Thu','Fri'], start:'08:00', end:'14:00', hours:6 } ],
+      'Server':    [
+        { days:['Mon','Tue','Wed','Thu','Fri'], start:'11:00', end:'15:30', hours:4.5 }, // weekday lunch
+        { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'22:00', hours:6 },   // dinner
+        { days:['Sat','Sun'],                   start:'09:30', end:'15:00', hours:5.5 }, // weekend brunch
+        { days:['Fri','Sat','Sun'],             start:'17:00', end:'23:00', hours:6 },   // dinner into late
+      ],
+      'Host':      [
+        { days:['Sat','Sun'],                   start:'09:30', end:'15:00', hours:5.5 }, // brunch host
+        { days:['Wed','Thu','Fri','Sat'],       start:'17:00', end:'22:30', hours:5.5 },// dinner host
+      ],
+      'Manager':   [
+        { days:['Mon','Tue','Wed','Fri'],       start:'09:00', end:'17:00', hours:8 },   // opener
+        { days:['Thu','Fri','Sat','Sun'],       start:'15:00', end:'23:00', hours:8 },   // closer
+      ],
     };
     const posNameOf = id => (lcPositions.find(p => p.id === id) || {}).name;
     const mondayISO = (daysBack) => {
@@ -2737,17 +2760,26 @@ S.HubSettings = {
       d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
       return App.ymdLocal(d);
     };
-    const buildSchedule = (weekStart, forecast) => {
-      const shifts = [];
-      lcStaff.forEach(st => {
-        const plan = SCHED_PLAN[posNameOf(st.position_id)];
-        if (!plan) return;
-        plan.days.forEach(day => {
-          shifts.push({ staff_id:st.id, name:st.name, position_id:st.position_id, day:day,
-            start:plan.start, end:plan.end, hours:plan.hours, wage:st.wage,
-            cost:+(plan.hours * st.wage).toFixed(2) });
+    // Expand a plan map into per-staff day assignments. Staff within a position
+    // are staggered across that position's shift patterns (i % patterns) so the
+    // week covers all dayparts instead of cloning one shift onto everyone.
+    const expandPlan = (planMap) => {
+      const out = [], byPos = {};
+      lcStaff.forEach(st => { const pos = posNameOf(st.position_id); (byPos[pos] = byPos[pos] || []).push(st); });
+      Object.keys(byPos).forEach(pos => {
+        const patterns = planMap[pos]; if (!patterns) return;
+        byPos[pos].forEach((st, i) => {
+          const plan = patterns[i % patterns.length];
+          plan.days.forEach(day => out.push({ st, day, plan }));
         });
       });
+      return out;
+    };
+    const buildSchedule = (weekStart, forecast) => {
+      const shifts = expandPlan(SCHED_PLAN).map(({ st, day, plan }) => ({
+        staff_id:st.id, name:st.name, position_id:st.position_id, day:day,
+        start:plan.start, end:plan.end, hours:plan.hours, wage:st.wage,
+        cost:+(plan.hours * st.wage).toFixed(2) }));
       const total_hours = shifts.reduce((s, x) => s + x.hours, 0);
       const total_cost  = +shifts.reduce((s, x) => s + x.cost, 0).toFixed(2);
       return { id:uid(), week_start:weekStart, revenue_forecast:forecast, shifts:shifts,
@@ -2827,31 +2859,23 @@ S.HubSettings = {
     // ── Schedule templates — three reusable week patterns the operator applies
     // in Build Schedule. Shifts are {staff_id, day, start, end}; Build Schedule
     // computes hours + cost on apply.
-    const tmplShifts = (planMap) => {
-      const out = [];
-      lcStaff.forEach(st => {
-        const plan = planMap[posNameOf(st.position_id)];
-        if (!plan) return;
-        plan.days.forEach(day => out.push({ staff_id:st.id, day:day, start:plan.start, end:plan.end }));
-      });
-      return out;
-    };
+    const tmplShifts = (planMap) => expandPlan(planMap).map(({ st, day, plan }) => ({ staff_id:st.id, day:day, start:plan.start, end:plan.end }));
     const BUSY_PLAN = {
-      'Bartender':{days:['Wed','Thu','Fri','Sat','Sun'],start:'15:00',end:'00:00'},
-      'Barback':  {days:['Thu','Fri','Sat','Sun'],      start:'17:00',end:'00:00'},
-      'Line Cook':{days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'14:00',end:'22:00'},
-      'Prep Cook':{days:['Mon','Tue','Wed','Thu','Fri'],start:'09:00',end:'15:00'},
-      'Server':   {days:['Wed','Thu','Fri','Sat','Sun'],start:'16:00',end:'23:00'},
-      'Host':     {days:['Wed','Thu','Fri','Sat','Sun'],start:'17:00',end:'23:00'},
-      'Manager':  {days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'13:00',end:'22:00'},
+      'Bartender':[ {days:['Wed','Thu','Fri','Sat','Sun'],start:'15:00',end:'01:00'}, {days:['Fri','Sat','Sun'],start:'18:00',end:'02:00'} ],
+      'Barback':  [ {days:['Wed','Thu','Fri','Sat','Sun'],start:'16:00',end:'01:00'} ],
+      'Line Cook':[ {days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'14:00',end:'22:00'}, {days:['Fri','Sat','Sun'],start:'09:00',end:'16:00'} ],
+      'Prep Cook':[ {days:['Mon','Tue','Wed','Thu','Fri'],start:'08:00',end:'15:00'} ],
+      'Server':   [ {days:['Wed','Thu','Fri','Sat','Sun'],start:'16:00',end:'23:00'}, {days:['Sat','Sun'],start:'09:30',end:'15:30'}, {days:['Fri','Sat','Sun'],start:'17:00',end:'00:00'} ],
+      'Host':     [ {days:['Wed','Thu','Fri','Sat','Sun'],start:'16:30',end:'23:00'}, {days:['Sat','Sun'],start:'09:30',end:'15:30'} ],
+      'Manager':  [ {days:['Tue','Wed','Thu','Fri','Sat','Sun'],start:'13:00',end:'22:00'} ],
     };
     const SLOW_PLAN = {
-      'Bartender':{days:['Thu','Fri','Sat'],      start:'17:00',end:'23:00'},
-      'Line Cook':{days:['Wed','Thu','Fri','Sat'],start:'16:00',end:'22:00'},
-      'Prep Cook':{days:['Tue','Wed','Thu'],      start:'10:00',end:'15:00'},
-      'Server':   {days:['Thu','Fri','Sat'],      start:'17:00',end:'22:00'},
-      'Host':     {days:['Fri','Sat'],            start:'18:00',end:'22:00'},
-      'Manager':  {days:['Wed','Thu','Fri','Sat'],start:'15:00',end:'22:00'},
+      'Bartender':[ {days:['Thu','Fri','Sat'],start:'16:00',end:'23:00'} ],
+      'Line Cook':[ {days:['Wed','Thu','Fri','Sat'],start:'15:00',end:'22:00'}, {days:['Sat','Sun'],start:'09:00',end:'15:00'} ],
+      'Prep Cook':[ {days:['Tue','Wed','Thu'],start:'09:00',end:'14:00'} ],
+      'Server':   [ {days:['Thu','Fri','Sat'],start:'17:00',end:'22:00'}, {days:['Sat','Sun'],start:'10:00',end:'15:00'} ],
+      'Host':     [ {days:['Fri','Sat'],start:'17:30',end:'22:00'} ],
+      'Manager':  [ {days:['Wed','Thu','Fri','Sat'],start:'14:00',end:'22:00'} ],
     };
     App.laborData.lc_schedule_templates = [
       { id:uid(), name:'Standard Week',       shifts:tmplShifts(SCHED_PLAN), created_at:daysAgoISO(64) },
