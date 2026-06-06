@@ -223,12 +223,18 @@ S.Shift86List = {
 
     return ''
 
-      // Row 1: Menu Item + Inventory Item side by side
+      // Row 1: Menu Item, Inventory Item, Date, Time, Reported By
       + '<div class="form-row" style="gap:14px;align-items:flex-end;">'
-        + '<div class="f" style="flex:1;min-width:220px;"><label>Menu Item</label>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Menu Item</label>'
           + '<select id="qa-menu">' + this.menuItemOptions(initialMenuItemId) + '</select></div>'
-        + '<div class="f" style="flex:1;min-width:220px;"><label>Inventory Item</label>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Inventory Item</label>'
           + '<select id="qa-inv">' + this.inventoryItemOptions(initialInventoryKey) + '</select></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
+          + '<input type="date" id="qa-date" value="' + esc(dateVal) + '"/></div>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Time</label>'
+          + '<input type="time" id="qa-time" value="' + esc(timeVal) + '"/></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Reported By</label>'
+          + '<select id="qa-by">' + App.staffOptions(reportedBy, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
 
       // Custom escape link + reveal panel
@@ -248,16 +254,6 @@ S.Shift86List = {
 
       // Cross-reference panel — populated by recomputeCrossRef()
       + '<div id="qa-xref" style="margin-top:14px;"></div>'
-
-      // Row 2: when / who
-      + '<div class="form-row" style="gap:14px;margin-top:14px;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
-          + '<input type="date" id="qa-date" value="' + esc(dateVal) + '"/></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Time</label>'
-          + '<input type="time" id="qa-time" value="' + esc(timeVal) + '"/></div>'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reported By</label>'
-          + '<select id="qa-by">' + App.staffOptions(reportedBy, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '</div>'
 
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Reason <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
         + '<input type="text" id="qa-reason" value="' + esc(i?.reason || '') + '" placeholder="Ran the case, delivery short, equipment down, etc."/></div></div>'
