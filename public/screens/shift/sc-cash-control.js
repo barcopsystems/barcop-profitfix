@@ -271,10 +271,10 @@ S.ShiftCashControl = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">' + (netWin >= 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div></div>';
 
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Drops In</div><div class="calc-val">' + App.fmtCurrency(totDrops) + '</div><div style="font-size:10px;color:var(--t3);">' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Safe Out</div><div class="calc-val">' + App.fmtCurrency(totOut) + '</div><div style="font-size:10px;color:var(--t3);">deposits and banks</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val ' + (flagged.length ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Drops In</div><div class="calc-val lg">' + App.fmtCurrency(totDrops) + '</div><div style="font-size:10px;color:var(--t3);">' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Safe Out</div><div class="calc-val lg">' + App.fmtCurrency(totOut) + '</div><div style="font-size:10px;color:var(--t3);">deposits and banks</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val lg ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar >= 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val lg ' + (flagged.length ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
       + netBox
       + '</div></div>';
 

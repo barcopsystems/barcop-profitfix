@@ -152,10 +152,10 @@ S.ShiftMaintenance = {
       const resolved = all.filter(r => r.status === 'Resolved');
       const totCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val">' + open.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Urgent</div><div class="calc-val ' + (urgent.length ? 'warn' : '') + '">' + urgent.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val">' + resolved.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Repair Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val lg">' + open.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Urgent</div><div class="calc-val lg ' + (urgent.length ? 'warn' : '') + '">' + urgent.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val lg">' + resolved.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Repair Cost</div><div class="calc-val lg">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div></div>';
 
       let listHtml;

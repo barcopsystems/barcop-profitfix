@@ -74,7 +74,7 @@ S.ShiftCashHistory = {
     return '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="ch-clear" style="margin-bottom:2px;">Clear</button></div>';
   },
   statItem(label, val, cls) {
-    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val ' + (cls || '') + '">' + val + '</div></div>';
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
   },
   tabBar() {
     return '<div class="ch-tabs no-print">'

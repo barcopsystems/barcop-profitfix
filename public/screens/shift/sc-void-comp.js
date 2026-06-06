@@ -207,10 +207,10 @@ S.ShiftVoidComp = {
       const voidTot = voids.reduce((t, r) => t + (r.amount || 0), 0);
       const compTot = comps.reduce((t, r) => t + (r.amount || 0), 0);
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Voids</div><div class="calc-val">' + voids.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Void Total</div><div class="calc-val warn">' + App.fmtCurrency(voidTot) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Comps</div><div class="calc-val">' + comps.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Comp Total</div><div class="calc-val warn">' + App.fmtCurrency(compTot) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Voids</div><div class="calc-val lg">' + voids.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Void Total</div><div class="calc-val lg warn">' + App.fmtCurrency(voidTot) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Comps</div><div class="calc-val lg">' + comps.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Comp Total</div><div class="calc-val lg warn">' + App.fmtCurrency(compTot) + '</div></div>'
         + '</div></div>';
 
       let listHtml;

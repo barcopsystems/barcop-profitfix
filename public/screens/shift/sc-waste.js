@@ -268,8 +268,8 @@ S.ShiftWaste = {
       // No "Total Units" tile — waste rows mix unit types (bottles, ounces, food
       // units), so summing them is apples-to-oranges. Cost is the honest total.
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Cost</div><div class="calc-val warn">' + App.fmtCurrency(totalCost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Cost</div><div class="calc-val lg warn">' + App.fmtCurrency(totalCost) + '</div></div>'
         + '</div></div>';
 
       let listHtml;

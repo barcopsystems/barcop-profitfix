@@ -47,7 +47,7 @@ S.ShiftHistory = {
 
   // ── Stats strip (top, card background) ──────────────────────────────────────
   statsStrip(count, totRev, totCov, avgChk) {
-    const item = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val" style="font-size:30px;font-weight:700;">' + val + '</div></div>';
+    const item = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + item('Shifts', count)
       + item('Total Revenue', App.fmtCurrency(totRev))
