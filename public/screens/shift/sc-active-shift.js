@@ -1022,7 +1022,7 @@ S.ShiftActiveShift = {
 
     const item = (key, count, title, sub, target, color) => {
       const ack = d.ack[key];
-      const bg = count === 0 ? 'var(--input)' : ack ? 'var(--input)' : 'rgba(199,125,125,0.08)';
+      const bg = count === 0 ? 'var(--input)' : ack ? 'var(--input)' : '#0D181E';
       const cntColor = count === 0 ? 'var(--t4)' : color;
       const ackHTML = count === 0
         ? '<span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;">CLEAR</span>'
