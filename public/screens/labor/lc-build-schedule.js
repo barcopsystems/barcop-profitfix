@@ -176,12 +176,12 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-primary btn-sm" id="bs-fc">Set Forecast</button></div>';
     } else {
       const leftCls = left >= 0 ? 'good' : 'warn';
-      budgetBar = '<div class="calc" style="margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val">' + App.fmtCurrency(fc)
+      budgetBar = '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
-        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val">' + App.fmtCurrency(budget) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val">' + App.fmtCurrency(T.cost) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val lg">' + App.fmtCurrency(budget) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
         + '</div>';
     }
 
@@ -214,9 +214,10 @@ S.LaborBuildSchedule = {
           items.forEach(({ sh, i }) => {
             const c = this.shiftCalc(sh);
             const conflict = this.isConflict(sh, i);
-            const border = conflict ? 'var(--red)' : 'var(--gold)';
+            const border = conflict ? 'var(--red)' : 'var(--gold-tint-bord)';
+            const blockBg = conflict ? 'var(--surface)' : 'var(--gold-tint)';
             cellInner += '<div class="bs-block" data-idx="' + i + '" title="Click to edit"'
-              + ' style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:3px 5px;margin-bottom:3px;background:var(--surface);">'
+              + ' style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:3px 5px;margin-bottom:3px;background:' + blockBg + ';">'
               + '<div style="font-size:11px;color:var(--t1);font-weight:600;">' + esc(this._fmtTime(sh.start)) + '–' + esc(this._fmtTime(sh.end)) + '</div>'
               + '<div style="font-size:9px;color:var(--t3);">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + (conflict ? ' · overlap' : '') + '</div>'
               + '</div>';
@@ -239,7 +240,7 @@ S.LaborBuildSchedule = {
     });
     footer += '</tr>';
 
-    const gridCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    const gridCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Weekly Grid</span>'
       + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button></div>'
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
@@ -249,21 +250,21 @@ S.LaborBuildSchedule = {
       + '</div>';
 
     // Totals strip
-    const totalsCard = '<div class="card"><div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val">' + T.hours.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val">' + App.fmtCurrency(T.cost) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val ' + (pct != null ? (pct > target ? 'warn' : 'good') : '') + '">' + (pct != null ? App.fmtPct(pct) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + App.fmtPct(target) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">' + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
+    const totalsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val lg">' + T.hours.toFixed(1) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val lg ' + (pct != null ? (pct > target ? 'warn' : 'good') : '') + '">' + (pct != null ? App.fmtPct(pct) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val lg dim">' + App.fmtPct(target) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val lg">' + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
       + '</div></div>';
 
     // Save card — name it to also save a reusable template (optional).
-    const actionsCard = '<div class="card"><div class="card-title">Save</div>'
+    const actionsCard = '<div class="card form-card"><div class="card-title">Save</div>'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">'
       + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name ' + tt('bs-tmpl-name') + '</label>'
       + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional, name it to save as a template"/></div>'
       + '</div>'
-      + '<div class="f" style="margin-bottom:14px;"><label>Notes</label><textarea id="bs-notes" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
+      + '<div class="f" style="margin-bottom:14px;"><label>Notes</label><textarea id="bs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-lg" id="bs-save">' + (this.editId ? 'Update Schedule' : 'Save Schedule') + '</button>'
       + (this.editId ? '<button class="btn btn-ghost" id="bs-cancel">Cancel Edit</button>' : '')
@@ -271,7 +272,7 @@ S.LaborBuildSchedule = {
       + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Week and Labor Budget</span>'
+      + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Week and Labor Budget</span>'
       + App.helpButton('bs-how') + '</div>'
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:14px;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
