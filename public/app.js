@@ -1191,7 +1191,7 @@ const App = {
     nav.querySelectorAll('.nav-item[data-nav="report-bug"]').forEach(el => {
       el.addEventListener('click', () => {
         document.getElementById('app')?.classList.remove('sidebar-open');
-        if (window.S && S.HubReportBug && S.HubReportBug.open) S.HubReportBug.open();
+        if (window.S && S.HubReportBug && S.HubReportBug.openModal) S.HubReportBug.openModal();
       });
     });
     // Hide section headers with no visible items below them
