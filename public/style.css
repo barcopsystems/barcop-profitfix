@@ -508,10 +508,7 @@ body.chrome-on .hub-app .topbar{display:none;}
   body.chrome-on.hub-dashboard .hub-app .sidebar{display:none;}
 }
 body.chrome-on .hub-app .sidebar{border-right:1px solid var(--c3);}
-body.chrome-on .hub-app .sidebar-logo{height:auto;padding:7px 10px 0;border-bottom:none;justify-content:flex-end;}
-body.chrome-on .hub-app .sidebar-logo-full,body.chrome-on .hub-app .sidebar-logo-icon{display:none;}
-body.chrome-on .hub-app .sidebar-logo-toggle{width:22px;height:22px;border-color:var(--b2);color:var(--t4);}
-body.chrome-on .hub-app .sidebar-logo-toggle:hover{border-color:var(--b1);color:var(--t2);}
+body.chrome-on .hub-app .sidebar-logo{display:none;}
 body.chrome-on .hub-app .sec-switch{display:none;}
 body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
@@ -550,12 +547,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* Sidebar in proto: hide the logo + in-sidebar switcher (the top nav owns those),
    bigger readable labels, more room, active row = the --c4 accent fill. */
-/* Collapse toggle lives in the sidebar's top-right corner now (small + subtle),
-   not in the top nav. The duplicate logo is hidden; only the toggle shows. */
-.app.proto .sidebar-logo{height:auto;padding:7px 10px 0;border-bottom:none;justify-content:flex-end;}
-.app.proto .sidebar-logo-full,.app.proto .sidebar-logo-icon{display:none;}
-.app.proto .sidebar-logo-toggle{width:22px;height:22px;border-color:var(--b2);color:var(--t4);}
-.app.proto .sidebar-logo-toggle:hover{border-color:var(--b1);color:var(--t2);}
+/* No sidebar collapse toggle (removed): the sidebar logo + switcher are hidden,
+   the nav starts clean at the top. Mobile still auto-tucks it behind the burger. */
+.app.proto .sidebar-logo{display:none;}
 .app.proto .sec-switch{display:none;}
 .app.proto .sidebar-nav{padding:12px 0;}
 .app.proto .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
