@@ -110,6 +110,7 @@ S.ShiftWalkedTabs = {
     const all = this.tabs();
     const filtered = this.applyFilters(all);
     filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || ''));
+    const totalLoss = filtered.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
     const formCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-walked-tabs', 'Log a Walked Tab', App.helpButton('wt-how'))
@@ -123,6 +124,10 @@ S.ShiftWalkedTabs = {
     if (all.length === 0) {
       below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs logged yet. Use the form above to log one. The log attributes each loss to the right server and shift instead of disappearing into the weekly total.</div>';
     } else {
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Loss</div><div class="calc-val warn">' + App.fmtCurrency(totalLoss) + '</div></div>'
+        + '</div></div>';
       let listHtml;
       if (filtered.length === 0) {
         listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No entries match the filters.</div>';
@@ -144,7 +149,7 @@ S.ShiftWalkedTabs = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('sc', 'walked_tab', filtered, !!(this.filterFrom || this.filterTo || this.filterServerId || this.filterReason));
       }
-      below = '<div class="sh no-print" style="margin:24px 0 10px;">Filter Walked Tabs</div>' + this.filterCard() + listHtml;
+      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Walked Tabs</div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
