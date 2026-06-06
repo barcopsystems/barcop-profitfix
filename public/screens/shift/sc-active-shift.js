@@ -786,8 +786,7 @@ S.ShiftActiveShift = {
           + '<button class="btn btn-ghost btn-sm sn-del" data-id="' + esc(n.id) + '" style="font-size:10px;padding:2px 8px;color:var(--red);">Delete</button>'
           + '</div>').join('')
       + '</div>';
-    return this.subLabel('Shift Notes')
-      + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:10px;">'
+    return '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:10px;">'
         + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add a Note</label>'
           + '<textarea id="sn-text" rows="2" placeholder="VIP at 9pm, delivery short on bourbon, weather slowing us down..."></textarea></div>'
         + '<div style="flex-shrink:0;"><button class="btn btn-primary" id="sn-add" style="height:48px;">Add Note</button></div>'
