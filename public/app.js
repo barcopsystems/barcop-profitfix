@@ -680,6 +680,7 @@ const App = {
     hubWrap.style.pointerEvents = '';
     S.Hub.render(hubWrap);
     document.body.classList.add('chrome-on');     // shared top nav sits above the Hub too
+    document.body.classList.add('hub-dashboard'); // dashboard view = no sidebar (full-width)
     this._renderProtoTopnav('hub');               // Hub link active, no section active
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
@@ -765,6 +766,7 @@ const App = {
     const wrap = document.getElementById('hub-wrapper');
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
+    document.body.classList.remove('hub-dashboard'); // a sub-page is open → show the sidebar
     const content = document.querySelector('.hub-app .content');
     if (!content) {
       this.openHubOverlay(renderFn);
