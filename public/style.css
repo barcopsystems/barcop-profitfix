@@ -508,7 +508,10 @@ body.chrome-on .hub-app .topbar{display:none;}
   body.chrome-on.hub-dashboard .hub-app .sidebar{display:none;}
 }
 body.chrome-on .hub-app .sidebar{border-right:1px solid var(--c3);}
-body.chrome-on .hub-app .sidebar-logo{display:none;}
+body.chrome-on .hub-app .sidebar-logo{height:auto;padding:7px 10px 0;border-bottom:none;justify-content:flex-end;}
+body.chrome-on .hub-app .sidebar-logo-full,body.chrome-on .hub-app .sidebar-logo-icon{display:none;}
+body.chrome-on .hub-app .sidebar-logo-toggle{width:22px;height:22px;border-color:var(--b2);color:var(--t4);}
+body.chrome-on .hub-app .sidebar-logo-toggle:hover{border-color:var(--b1);color:var(--t2);}
 body.chrome-on .hub-app .sec-switch{display:none;}
 body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
@@ -533,20 +536,26 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-collapse{width:33px;height:33px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--c3);border-radius:var(--r2);color:var(--t3);cursor:pointer;flex-shrink:0;transition:background .12s,color .12s;}
 .tn-collapse:hover{background:var(--c3);color:var(--t1);}
 .tn-sections{display:flex;align-items:center;gap:4px;height:100%;min-width:0;overflow:hidden;}
-.tn-sec{display:flex;align-items:center;height:38px;padding:0 16px;border-radius:var(--r2);font-size:14.5px;font-weight:700;letter-spacing:0.2px;color:var(--t2);background:transparent;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
+.tn-sec{display:flex;align-items:center;height:38px;padding:0 16px;border-radius:var(--r2);font-size:14px;font-weight:700;letter-spacing:0.2px;color:var(--t2);background:transparent;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
 .tn-sec:hover{background:var(--c3);color:var(--t1);}
 .tn-sec.active{background:var(--c4);color:var(--w);}
-.tn-grp-label{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--c4);flex-shrink:0;margin:0 8px 0 4px;}
+.tn-grp-label{font-size:14px;font-weight:700;letter-spacing:0.2px;color:#485C6A;flex-shrink:0;margin:0 8px 0 4px;}
 .tn-row2-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.tn-grp-btn{display:inline-flex;align-items:center;gap:7px;height:33px;padding:0 12px;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;font-family:'Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;transition:background .12s,color .12s;}
+#tn-acct{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
+.tn-grp-btn{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;font-family:'Barlow',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;transition:background .12s,color .12s;}
 .tn-grp-btn:hover{background:var(--c4);color:var(--w);}
-.tn-grp-btn svg{width:15px;height:15px;}
+.tn-grp-btn svg{width:13px;height:13px;}
 .tn-mobile-burger{display:none;width:33px;height:33px;align-items:center;justify-content:center;background:transparent;border:1px solid var(--c3);border-radius:var(--r2);color:var(--t2);cursor:pointer;flex-shrink:0;}
 .tn-iconbtn svg,.tn-collapse svg,.tn-mobile-burger svg{width:16px;height:16px;}
 
 /* Sidebar in proto: hide the logo + in-sidebar switcher (the top nav owns those),
    bigger readable labels, more room, active row = the --c4 accent fill. */
-.app.proto .sidebar-logo{display:none;}
+/* Collapse toggle lives in the sidebar's top-right corner now (small + subtle),
+   not in the top nav. The duplicate logo is hidden; only the toggle shows. */
+.app.proto .sidebar-logo{height:auto;padding:7px 10px 0;border-bottom:none;justify-content:flex-end;}
+.app.proto .sidebar-logo-full,.app.proto .sidebar-logo-icon{display:none;}
+.app.proto .sidebar-logo-toggle{width:22px;height:22px;border-color:var(--b2);color:var(--t4);}
+.app.proto .sidebar-logo-toggle:hover{border-color:var(--b1);color:var(--t2);}
 .app.proto .sec-switch{display:none;}
 .app.proto .sidebar-nav{padding:12px 0;}
 .app.proto .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
