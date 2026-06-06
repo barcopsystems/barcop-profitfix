@@ -19,7 +19,8 @@ S.ShiftWaste = {
   editId: null,
   filterFrom: '',
   filterTo: '',
-  filterReason: '',
+  filterShift: '',
+  filterRecordedBy: '',
   REASONS: ['Spill', 'Broken', 'Bad Pour / Customer Dissatisfied', 'Dumped / Tasted Bad', 'Expired / Past Date', 'Training', 'Other'],
 
   records() {
@@ -124,7 +125,7 @@ S.ShiftWaste = {
   },
 
   builderCard() {
-    return '<div class="card">'
+    return '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill', App.helpButton('wl-how'))
       + '<div class="collapse-body">'
       + this.builderInner(null)
@@ -222,19 +223,22 @@ S.ShiftWaste = {
   },
 
   // ── Filter ──────────────────────────────────────────────────────────────────
-  filterCard(stats) {
-    const reasonOpts = '<option value="">All reasons</option>'
-      + this.REASONS.map(r => '<option value="' + esc(r) + '"' + (this.filterReason === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span><div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+  filterCard() {
+    const shiftOpts = '<option value="">All shifts</option>'
+      + this.shiftTypes().map(t => '<option value="' + esc(t) + '"' + (this.filterShift === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const byMap = {};
+    this.records().forEach(r => { const id = r.recorded_by_id || r.recorded_by || ''; if (id && !byMap[id]) byMap[id] = r.recorded_by || (App.staffById ? (App.staffById(r.recorded_by_id) || {}).name : '') || String(id); });
+    const byOpts = '<option value="">All staff</option>'
+      + Object.keys(byMap).map(id => '<option value="' + esc(id) + '"' + (this.filterRecordedBy === id ? ' selected' : '') + '>' + esc(byMap[id]) + '</option>').join('');
+    return '<div class="card no-print">'
+      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="wl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="wl-f-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="wl-f-reason">' + reasonOpts + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wl-f-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div>' + (stats || '') + '</div>';
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="wl-f-shift">' + shiftOpts + '</select></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wl-f-by">' + byOpts + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wl-f-clear">Clear</button></div>'
+      + '<div style="margin-left:auto;align-self:center;display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div>'
+      + '</div></div>';
   },
 
   applyFilters(list) {
@@ -242,7 +246,8 @@ S.ShiftWaste = {
       const date = r.date || '';
       if (this.filterFrom && date < this.filterFrom) return false;
       if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterReason && r.reason !== this.filterReason) return false;
+      if (this.filterShift && (r.shift_type || '') !== this.filterShift) return false;
+      if (this.filterRecordedBy && (r.recorded_by_id || r.recorded_by || '') !== this.filterRecordedBy) return false;
       return true;
     });
   },
@@ -262,10 +267,10 @@ S.ShiftWaste = {
       const totalCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
       // No "Total Units" tile — waste rows mix unit types (bottles, ounces, food
       // units), so summing them is apples-to-oranges. Cost is the honest total.
-      const stats = '<div class="calc" style="margin-bottom:0;">'
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + filtered.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Cost</div><div class="calc-val warn">' + App.fmtCurrency(totalCost) + '</div></div>'
-        + '</div>';
+        + '</div></div>';
 
       let listHtml;
       if (filtered.length === 0) {
@@ -287,12 +292,12 @@ S.ShiftWaste = {
             + (App.canEdit('sc-waste') ? '<button class="btn btn-danger btn-sm wl-del" data-id="' + r.id + '">Delete</button>' : '')
             + '</div></td></tr>';
         }).join('');
-        listHtml = '<div class="tbl-wrap" style="overflow-x:auto;margin-top:16px;"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-          + App.showOlderBar('sc', 'waste', filtered, !!(this.filterFrom || this.filterTo || this.filterReason));
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + App.showOlderBar('sc', 'waste', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterRecordedBy));
       }
-      below = this.filterCard(stats) + listHtml;
+      below = statsCard + '<div class="sh no-print" style="margin:24px 0 10px;">Filter Waste and Spill Log</div>' + this.filterCard() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -323,9 +328,10 @@ S.ShiftWaste = {
     this.container.onchange = ev => this.onLineChange(ev);
     document.getElementById('wl-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('wl-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('wl-f-reason')?.addEventListener('change', e => { this.filterReason = e.target.value || ''; this.renderList(); });
+    document.getElementById('wl-f-shift')?.addEventListener('change',  e => { this.filterShift = e.target.value || ''; this.renderList(); });
+    document.getElementById('wl-f-by')?.addEventListener('change',     e => { this.filterRecordedBy = e.target.value || ''; this.renderList(); });
     document.getElementById('wl-f-clear')?.addEventListener('click', () => {
-      this.filterFrom = this.filterTo = this.filterReason = '';
+      this.filterFrom = this.filterTo = this.filterShift = this.filterRecordedBy = '';
       this.renderList();
     });
   },
@@ -347,7 +353,7 @@ S.ShiftWaste = {
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="wle-reason">' + this.reasonOptions(r?.reason) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wle-by">' + App.staffOptions(r?.recorded_by_id || r?.recorded_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="wle-notes" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="wle-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
   },
 
   openEditModal(id) {
@@ -355,7 +361,7 @@ S.ShiftWaste = {
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Edit Waste / Spill</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Waste / Spill</div>'
       + this.editFields(r)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wle-save">Update</button>'
@@ -420,7 +426,7 @@ S.ShiftWaste = {
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-waste')) return;
     this.editId = null;
-    const html = '<div class="card" style="margin:0;"><div class="card-title">Log Waste / Spill</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Waste / Spill</div>'
       + this.builderInner(preset)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wlb-save">Save All</button>'
