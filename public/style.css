@@ -384,6 +384,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .rpt-tab:hover{color:var(--t2);}
 .rpt-tab.on{background:var(--surface);color:var(--t1);border-color:var(--b1);border-top:2px solid var(--gold);border-bottom:1px solid var(--surface);padding-top:8px;}
 .rpt-panel{background:var(--surface);border:1px solid var(--b1);border-top:none;border-radius:0 0 6px 6px;padding:18px;}
+/* Cash History tabs — clean underline switcher (no connected panel box). */
+.ch-tabs{display:flex;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--b-edge);margin-bottom:20px;}
+.ch-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--t3);padding:10px 2px;margin-bottom:-1px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;}
+.ch-tab:hover{color:var(--t2);}
+.ch-tab.on{color:var(--t1);border-bottom-color:#496477;}
 
 /* ══ METRIC CARDS ══ */
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
