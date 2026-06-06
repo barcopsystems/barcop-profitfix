@@ -59,7 +59,7 @@ S.ShiftDrawers = {
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<input type="text" id="' + p + 'notes" value="' + esc(d?.notes || '') + '" placeholder="Optional"/></div></div>';
+      + '<textarea id="' + p + 'notes" class="dr-notes-ta" rows="2" placeholder="Optional">' + esc(d?.notes || '') + '</textarea></div></div>';
   },
 
   renderList() {
@@ -68,7 +68,7 @@ S.ShiftDrawers = {
     const active   = all.filter(d => d.active !== false);
     const archived = all.filter(d => d.active === false);
 
-    const formCard = '<div class="card">'
+    const formCard = '<div class="card sc-dr-form">'
       + App.collapsibleCardTitle('sc-drawers', 'Add Drawer', App.helpButton('dr-how'))
       + '<div class="collapse-body">'
       + this.fieldsHtml(null)
