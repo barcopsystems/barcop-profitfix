@@ -986,10 +986,10 @@ const App = {
     { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
     // Shift Control
     { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
-    { group:'log-shift',           label:'Log Shift',                module:'shift',     screen:'sc-log-shift',         moduleName:'Shift Control' },
+    { group:'log-shift',           label:'Shift History',            module:'shift',     screen:'sc-shift-history',     moduleName:'Shift Control' },
     { group:'active-shift',        label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
-    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-drop',         moduleName:'Shift Control' },
-    { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-opening-checklist', moduleName:'Shift Control' },
+    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
+    { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
     { group:'86-list',             label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
     { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
     { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
