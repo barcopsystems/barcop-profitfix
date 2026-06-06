@@ -40,13 +40,19 @@ S.ShiftDashboard = {
       + '<div class="metric-val ' + (cls || '') + '">' + valHtml + '</div>'
       + '<div class="metric-target">' + target + '</div><div class="metric-trend"> </div></div>';
   },
-  // A standard panel: a .form-card with a banded title (optionally a right-aligned
-  // action in the title bar).
+  // The full-width hero: a .form-card with a banded title (optionally a
+  // right-aligned action in the title bar).
   panelCard(title, bodyHtml, titleRight) {
     return '<div class="card form-card" style="height:100%;">'
       + '<div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '>'
       + '<span>' + title + '</span>' + (titleRight || '') + '</div>'
       + bodyHtml + '</div>';
+  },
+  // Grid panel: the title lives OUTSIDE the card as a .sh heading (same as the
+  // Recent Shifts data-card), so side-by-side panels line up on their top edge.
+  shPanel(title, bodyHtml) {
+    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
+      + '<div class="card">' + bodyHtml + '</div>';
   },
   actionBtn(id, label) {
     return '<button class="btn btn-primary sd-act" data-go="' + id + '" style="flex:1;min-width:150px;">' + label + '</button>';
@@ -112,10 +118,10 @@ S.ShiftDashboard = {
     const hero = this.panelCard('Active Shift', heroBody);
 
     const emptyBody = msg => '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
-    const revCard   = this.panelCard('Revenue by Daypart', emptyBody('Once shifts are logged, your revenue splits by daypart here.'));
-    const excCard   = this.panelCard('Exceptions This Week', emptyBody('Voids, comps, and walked tabs roll up here as you log them.'));
-    const recent    = this.panelCard('Recent Shifts', emptyBody('Every shift you run lands here, newest first.'));
-    const watchCard = this.panelCard('Shift Watch', emptyBody('Cash shorts, out-of-tolerance drawers, urgent maintenance, and 86\'d items surface here.'));
+    const revCard   = this.shPanel('Revenue by Daypart', emptyBody('Once shifts are logged, your revenue splits by daypart here.'));
+    const excCard   = this.shPanel('Exceptions This Week', emptyBody('Voids, comps, and walked tabs roll up here as you log them.'));
+    const recent    = this.shPanel('Recent Shifts', emptyBody('Every shift you run lands here, newest first.'));
+    const watchCard = this.shPanel('Shift Watch', emptyBody('Cash shorts, out-of-tolerance drawers, urgent maintenance, and 86\'d items surface here.'));
 
     this.container.innerHTML = '<div class="screen">'
       + startStrip
@@ -191,7 +197,7 @@ S.ShiftDashboard = {
             + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
         }).join('')
       : '<div style="font-size:12px;color:var(--t3);">No revenue logged in the last 7 days.</div>';
-    const revCard = this.panelCard('Revenue by Daypart', revBody);
+    const revCard = this.shPanel('Revenue by Daypart', revBody);
 
     // ── Exceptions This Week (info list) ──
     const excLine = (label, val, sub) =>
@@ -204,7 +210,7 @@ S.ShiftDashboard = {
         + excLine('Comps', App.fmtCurrency(compTot), comps.length + ' logged')
         + excLine('Walked Tabs', App.fmtCurrency(walkedTot), wkWalked.length + ' logged')
       : '<div style="font-size:12px;color:var(--gold);">No voids, comps, or walked tabs this week. Clean.</div>';
-    const excCard = this.panelCard('Exceptions This Week', excBody);
+    const excCard = this.shPanel('Exceptions This Week', excBody);
 
     // ── Recent Shifts (data-card table + .sh heading) ──
     const recent = [...this.shifts()]
@@ -236,7 +242,7 @@ S.ShiftDashboard = {
       + watchRow('Currently 86\'d', String(active86.length), 'sc-86-list', active86.length > 0)
       + (anyWatch ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
                   : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">All clear. No open shift issues.</div>');
-    const watchCard = this.panelCard('Shift Watch', watchBody);
+    const watchCard = this.shPanel('Shift Watch', watchBody);
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="metric-grid">' + cards + '</div>'
