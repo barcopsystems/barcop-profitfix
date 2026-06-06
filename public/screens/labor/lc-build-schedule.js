@@ -295,8 +295,7 @@ S.LaborBuildSchedule = {
       + budgetCard
       + gridCard + totalsCard + actionsCard
       + this.templatesSection()
-      + '</div>'
-      + this._modalHtml();
+      + '</div>';
 
     this._wire();
   },
@@ -347,43 +346,30 @@ S.LaborBuildSchedule = {
     this.container.querySelectorAll('.bs-tmpl-row').forEach(r => r.addEventListener('click', ev => { if (!ev.target.closest('.btn')) this.loadTemplate(r.dataset.id); }));
   },
 
-  // ── Shift add/edit modal ────────────────────────────────────────────────────
-  _modalHtml() {
-    return '<div id="bs-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;align-items:center;justify-content:center;padding:20px;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
-      + '<div id="bs-m-title" style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;"></div>'
-      + '<div class="form-row" style="gap:14px;">'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Start</label><input type="time" id="bs-m-start"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>End</label><input type="time" id="bs-m-end"/></div>'
-      + '</div>'
-      + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
-      + '<div id="bs-m-err" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>'
-      + '<div style="display:flex;justify-content:space-between;gap:10px;margin-top:18px;">'
-      + '<div><button class="btn btn-ghost" id="bs-m-remove" style="color:var(--red);display:none;">Remove</button></div>'
-      + '<div style="display:flex;gap:10px;"><button class="btn btn-ghost" id="bs-m-cancel">Cancel</button>'
-      + '<button class="btn btn-primary" id="bs-m-save">Save Shift</button></div>'
-      + '</div></div></div>';
-  },
-
+  // ── Shift add/edit modal (standard App.openModal + form-card) ───────────────
   openShiftModal(staffId, day, idx) {
     const staff = this.staffById(staffId);
     if (!staff) return;
     const editing = idx != null && this.draft.shifts[idx];
     const sh = editing ? this.draft.shifts[idx] : { staff_id: staffId, day, start: '', end: '' };
-    const modal = document.getElementById('bs-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    document.getElementById('bs-m-title').textContent = (staff.name || 'Staff') + ' · ' + day;
+    const sal = App.isSalaried(staff);
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Start</label><input type="time" id="bs-m-start" value="' + esc(sh.start || '') + '"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>End</label><input type="time" id="bs-m-end" value="' + esc(sh.end || '') + '"/></div>'
+      + '</div>'
+      + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="bs-m-save">Save Shift</button>'
+      + '<button class="btn btn-ghost" id="bs-m-cancel">Cancel</button>'
+      + '<span id="bs-m-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + (editing ? '<button class="btn btn-danger" id="bs-m-remove" style="margin-left:auto;">Remove</button>' : '')
+      + '</div></div>';
+    App.openModal(html, { id: 'bs-shift-modal', maxWidth: 420, noClose: true });
     const startEl = document.getElementById('bs-m-start');
     const endEl = document.getElementById('bs-m-end');
     const calcEl = document.getElementById('bs-m-calc');
     const errEl = document.getElementById('bs-m-err');
-    const removeBtn = document.getElementById('bs-m-remove');
-    startEl.value = sh.start || '';
-    endEl.value = sh.end || '';
-    errEl.style.display = 'none';
-    removeBtn.style.display = editing ? 'inline-block' : 'none';
-    const sal = App.isSalaried(staff);
     const updateCalc = () => {
       const h = this.hoursOf(startEl.value, endEl.value);
       if (!startEl.value || !endEl.value) { calcEl.textContent = ''; return; }
@@ -392,19 +378,20 @@ S.LaborBuildSchedule = {
       calcEl.textContent = h.toFixed(1) + ' hrs · ' + App.fmtCurrency(h * wage) + (wage ? ' @ ' + App.fmtCurrency(wage) + '/hr' : '');
     };
     updateCalc();
-    startEl.oninput = updateCalc;
-    endEl.oninput = updateCalc;
-    const close = () => { modal.style.display = 'none'; startEl.oninput = null; endEl.oninput = null; };
-    document.getElementById('bs-m-cancel').onclick = close;
-    modal.onclick = ev => { if (ev.target === modal) close(); };
-    removeBtn.onclick = () => { if (editing) { this.draft.shifts.splice(idx, 1); this.saveDraft(); } close(); this.draw(); };
-    document.getElementById('bs-m-save').onclick = () => {
+    startEl.addEventListener('input', updateCalc);
+    endEl.addEventListener('input', updateCalc);
+    document.getElementById('bs-m-cancel')?.addEventListener('click', () => App.closeModal('bs-shift-modal'));
+    document.getElementById('bs-m-remove')?.addEventListener('click', () => {
+      if (editing) { this.draft.shifts.splice(idx, 1); this.saveDraft(); }
+      App.closeModal('bs-shift-modal'); this.draw();
+    });
+    document.getElementById('bs-m-save')?.addEventListener('click', () => {
       const start = startEl.value, end = endEl.value;
-      if (!start || !end) { errEl.textContent = 'Set a start and end time.'; errEl.style.display = 'block'; return; }
+      if (!start || !end) { errEl.textContent = 'Set a start and end time.'; errEl.style.display = 'inline'; return; }
       if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end }; }
       else { this.draft.shifts.push({ staff_id: staffId, day, start, end }); }
-      this.saveDraft(); close(); this.draw();
-    };
+      this.saveDraft(); App.closeModal('bs-shift-modal'); this.draw();
+    });
   },
 
   // ── Forecast modal (writes revenue_forecasts) ────────────────────────────────
@@ -414,47 +401,46 @@ S.LaborBuildSchedule = {
     const cur = rec && rec.total != null ? rec.total : '';
     const sug = App.forecastDefaultsFor ? (App.forecastDefaultsFor(this.draft.week_start).total || 0) : 0;
     const hasDetail = !!(rec && rec.per_day && Object.values(rec.per_day).some(v => Number(v) > 0));
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:460px;width:100%;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Revenue Forecast</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Your expected sales for this week. Bar Cop turns it into a labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast) so you can see if the schedule fits before you post it.</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Revenue Forecast</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Your expected sales for this week. Bar Cop turns it into a labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast) so you can see if the schedule fits before you post it.</div>'
       + (sug > 0
-          ? '<div style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+          ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
             + '<div style="font-size:12px;color:var(--t2);">From your recent weeks: <span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(sug) + '</span></div>'
-            + '<button class="btn btn-ghost btn-sm" data-act="use-sug">Use this</button></div>'
-          : '<div style="font-size:11px;color:var(--t4);line-height:1.5;margin-bottom:14px;">Not enough sales history yet for a suggestion. Enter your own number to get a labor budget today; Bar Cop starts suggesting once you have a few weeks logged.</div>')
-      + '<div class="f" style="width:200px;"><label>' + (sug > 0 ? 'Or enter your own ($)' : 'Expected Revenue ($)') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div>'
-      + (hasDetail ? '<div style="font-size:10px;color:var(--amber);margin-top:8px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
-      + '<div id="bs-fc-err" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>'
-      + '<div style="display:flex;gap:10px;margin-top:18px;">'
-      + '<button class="btn btn-primary" data-act="save">Save Forecast</button>'
-      + '<button class="btn btn-ghost" data-act="cancel">Cancel</button></div></div>';
-    document.body.appendChild(overlay);
-    const close = () => document.body.removeChild(overlay);
-    overlay.addEventListener('click', async ev => {
-      const act = ev.target.closest('[data-act]')?.dataset.act;
-      if (!act) { if (ev.target === overlay) close(); return; }
-      if (act === 'cancel') { close(); return; }
-      if (act === 'use-sug') { const i = document.getElementById('bs-fc-val'); if (i) i.value = sug; return; }
-      const raw = document.getElementById('bs-fc-val')?.value;
-      const val = parseFloat(raw);
-      const errEl = document.getElementById('bs-fc-err');
-      if (isNaN(val) || val < 0) { errEl.textContent = 'Enter the expected revenue for the week.'; errEl.style.display = 'block'; return; }
-      if (hasDetail) {
-        const okOv = await App.confirm({ title: 'Replace day-by-day forecast?', message: 'This week has a detailed day-by-day forecast. Saving a single weekly total replaces it. You can rebuild the detailed version later in Revenue Recovery.', confirmText: 'Replace', cancelText: 'Cancel' });
-        if (!okOv) return;
-      }
-      if (!Array.isArray(App.data.revenue_forecasts)) App.data.revenue_forecasts = [];
-      const list = App.data.revenue_forecasts;
-      const ws = this.draft.week_start;
-      const tv = Math.round(val * 100) / 100;
-      const existing = list.find(f => f.week_start === ws);
-      if (existing) { existing.total = tv; existing.per_day = {}; existing.method = 'total'; existing.updated_at = new Date().toISOString(); }
-      else list.push({ id: App.uid(), week_start: ws, total: tv, per_day: {}, method: 'total', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-      await App.saveKey('revenue_forecasts');
-      close(); this.draw();
-    });
+            + '<button class="btn btn-ghost btn-sm" id="bs-fc-use">Use this</button></div>'
+          : '<div style="font-size:11px;color:var(--t4);line-height:1.5;margin-bottom:16px;">Not enough sales history yet for a suggestion. Enter your own number to get a labor budget today; Bar Cop starts suggesting once you have a few weeks logged.</div>')
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:200px;"><label>' + (sug > 0 ? 'Or enter your own' : 'Expected Revenue') + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div></div>'
+      + (hasDetail ? '<div style="font-size:11px;color:var(--amber);margin-top:6px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="bs-fc-save">Save Forecast</button>'
+      + '<button class="btn btn-ghost" id="bs-fc-cancel">Cancel</button>'
+      + '<span id="bs-fc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'bs-fc-modal', maxWidth: 460, noClose: true });
+    document.getElementById('bs-fc-use')?.addEventListener('click', () => { const i = document.getElementById('bs-fc-val'); if (i) i.value = sug; });
+    document.getElementById('bs-fc-cancel')?.addEventListener('click', () => App.closeModal('bs-fc-modal'));
+    document.getElementById('bs-fc-save')?.addEventListener('click', () => this.saveForecast(hasDetail));
+  },
+
+  async saveForecast(hasDetail) {
+    const errEl = document.getElementById('bs-fc-err');
+    const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
+    const val = parseFloat(document.getElementById('bs-fc-val')?.value);
+    if (isNaN(val) || val < 0) { fail('Enter the expected revenue for the week.'); return; }
+    if (hasDetail) {
+      const okOv = await App.confirm({ title: 'Replace day-by-day forecast?', message: 'This week has a detailed day-by-day forecast. Saving a single weekly total replaces it. You can rebuild the detailed version later in Revenue Recovery.', confirmText: 'Replace', cancelText: 'Cancel' });
+      if (!okOv) return;
+    }
+    if (!Array.isArray(App.data.revenue_forecasts)) App.data.revenue_forecasts = [];
+    const list = App.data.revenue_forecasts;
+    const ws = this.draft.week_start;
+    const tv = Math.round(val * 100) / 100;
+    const existing = list.find(f => f.week_start === ws);
+    if (existing) { existing.total = tv; existing.per_day = {}; existing.method = 'total'; existing.updated_at = new Date().toISOString(); }
+    else list.push({ id: App.uid(), week_start: ws, total: tv, per_day: {}, method: 'total', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await App.saveKey('revenue_forecasts');
+    App.closeModal('bs-fc-modal');
+    this.draw();
   },
 
   // ── How This Works ──────────────────────────────────────────────────────────
