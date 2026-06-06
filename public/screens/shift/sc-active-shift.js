@@ -201,7 +201,7 @@ S.ShiftActiveShift = {
     const anyFilter = !!(from || to || fShift || fMgr);
     const limited = anyFilter ? list : list.slice(0, 10);
 
-    const card = '<div class="card" style="margin-top:16px;">'
+    const card = '<div class="card form-card" style="margin-top:16px;">'
       + '<div class="card-title">Filter</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(from) + '"/></div>'
@@ -533,7 +533,7 @@ S.ShiftActiveShift = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Dropped <span style="color:var(--gold);font-weight:700;float:right;">' + App.fmtCurrency(dropped) + '</span></div>'
         + '</div>';
     }).join('');
-    return '<div class="card"><div class="card-title">Registers</div>'
+    return '<div class="card form-card"><div class="card-title">Registers</div>'
       + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + tiles + '</div></div>';
   },
 
@@ -625,7 +625,7 @@ S.ShiftActiveShift = {
 
       + this.registersCard(s)
 
-      + '<div class="card"><div class="card-title">This Shift</div>'
+      + '<div class="card form-card"><div class="card-title">This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverProgressLabel)
       + stat('Labor So Far', App.fmtCurrency(labor.cost), laborSub)
@@ -635,7 +635,7 @@ S.ShiftActiveShift = {
       + stat('Open Maint.', openMaint, openMaint === 1 ? 'issue' : 'issues')
       + '</div></div>'
 
-      + '<div class="card"><div class="card-title">Log During This Shift</div>'
+      + '<div class="card form-card"><div class="card-title">Log During This Shift</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost" id="ld-cash" style="height:52px;flex:1;min-width:120px;">Cash Drop</button>'
       + '<button class="btn btn-ghost" id="ld-vc" style="height:52px;flex:1;min-width:120px;">Void / Comp</button>'
@@ -646,7 +646,7 @@ S.ShiftActiveShift = {
 
       + this.renderShiftNotesCard(s)
 
-      + '<div class="card"><div class="card-title">End of Shift</div>'
+      + '<div class="card form-card"><div class="card-title">End of Shift</div>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button>'
       + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
@@ -762,7 +762,7 @@ S.ShiftActiveShift = {
           + '<button class="btn btn-ghost btn-sm sn-del" data-id="' + esc(n.id) + '" style="font-size:10px;padding:2px 8px;color:var(--red);">Delete</button>'
           + '</div>').join('')
       + '</div>';
-    return '<div class="card"><div class="card-title">Shift Notes</div>'
+    return '<div class="card form-card"><div class="card-title">Shift Notes</div>'
       + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:10px;">'
         + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add a Note</label>'
           + '<textarea id="sn-text" rows="2" placeholder="VIP at 9pm, delivery short on bourbon, weather slowing us down..."></textarea></div>'
@@ -919,7 +919,7 @@ S.ShiftActiveShift = {
   stepRevenue(s) {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
-    return '<div class="card"><div class="card-title">Step 1 of 5 &middot; Revenue and Covers</div>'
+    return '<div class="card form-card"><div class="card-title">Step 1 of 5 &middot; Revenue and Covers</div>'
       + '<div class="form-row" style="gap:16px;margin-top:4px;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Bar Revenue</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="aw-bar" min="0" step="0.01" inputmode="decimal" value="' + v(d.bar_revenue) + '" style="height:48px;font-size:16px;"/></div></div>'
@@ -973,7 +973,7 @@ S.ShiftActiveShift = {
           + 'Skip cash reconciliation (drawers not counted this shift)</label></div>';
     }
 
-    return '<div class="card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
+    return '<div class="card form-card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
       + '<div style="margin-top:4px;"></div>'
       + body
       + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
@@ -1023,7 +1023,7 @@ S.ShiftActiveShift = {
     };
 
     const bigVcTotal = vc.reduce((t, r) => t + (parseFloat(r.amount) || 0), 0);
-    return '<div class="card"><div class="card-title">Step 3 of 5 &middot; Exception Review</div>'
+    return '<div class="card form-card"><div class="card-title">Step 3 of 5 &middot; Exception Review</div>'
       + '<div style="margin-top:4px;"></div>'
       + item('e86', eighty6.length, '86\'d Items Still Out', eighty6.length === 0 ? 'Nothing 86\'d.' : eighty6.slice(0, 3).map(i => i.item).join(', ') + (eighty6.length > 3 ? '...' : ''), 'sc-86-list', 'var(--red)')
       + item('vc',  vc.length, 'Big Voids and Comps This Shift', vc.length === 0 ? 'No voids or comps over $' + vcThreshold + '.' : 'Over $' + vcThreshold + ' threshold &middot; ' + App.fmtCurrency(bigVcTotal) + ' total', 'sc-void-comp', 'var(--red)')
@@ -1053,7 +1053,7 @@ S.ShiftActiveShift = {
     const pool = d.pool;
     const savedExisting = !!pool.saved_id;
 
-    return '<div class="card"><div class="card-title">Step 4 of 5 &middot; Tip Reconciliation</div>'
+    return '<div class="card form-card"><div class="card-title">Step 4 of 5 &middot; Tip Reconciliation</div>'
       + '<div style="margin-top:4px;"></div>'
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Logged Cash Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCash) + '</div></div>'
@@ -1298,7 +1298,7 @@ S.ShiftActiveShift = {
   // ── Step 5: Handoff Notes + Final Close ───────────────────────────────────
   stepHandoff(s) {
     const d = this._closeDraft;
-    return '<div class="card"><div class="card-title">Step 5 of 5 &middot; Handoff Notes</div>'
+    return '<div class="card form-card"><div class="card-title">Step 5 of 5 &middot; Handoff Notes</div>'
       + '<div class="form-row" style="gap:14px;margin-top:4px;"><div class="f" style="width:100%;"><label>Notes for the Opener</label>'
         + '<textarea id="aw-handoff" rows="5" placeholder="Restock priorities, equipment to watch, customer follow-ups, anything the opener will inherit...">' + esc(d.handoff_notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
