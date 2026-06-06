@@ -14,6 +14,8 @@
   --gold:      #DBAB46;
   --gold-h:    #C29638;
   --gold-bg:   rgba(219,171,70,0.10);
+  --gold-tint: rgba(219,171,70,0.06);      /* subtle gold fill: recipe-ref panel + selected daypart/register */
+  --gold-tint-bord: rgba(219,171,70,0.3);  /* translucent gold border for the same */
   --red:       #C03828;
   --red-bg:    rgba(192,56,40,0.13);
   --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
