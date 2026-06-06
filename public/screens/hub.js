@@ -79,7 +79,9 @@ S.Hub = {
     // Hub uses tier-2 (soft) red for status indicators so the few real
     // attention reds (Leaking This Week headline, Alerts count) carry more
     // visual weight than the supporting status data.
-    const bandColor = b => b === 'good' ? 'var(--green)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red-soft)' : 'var(--t4)';
+    // Color = problem, not category. On-target metrics stay neutral white so the
+    // few amber/red flags carry all the weight. Scores still use softScore.
+    const bandColor = b => b === 'good' ? 'var(--w)' : b === 'warn' ? 'var(--amber)' : b === 'bad' ? 'var(--red-soft)' : 'var(--t4)';
     const softScore = s => { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red-soft)'; };
 
     const pourT = pt.bar_pour_cost_pct ?? 22;
@@ -175,20 +177,21 @@ S.Hub = {
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
       </div>`;
 
+    const bcA     = last(data.bar_cop_audits || []);
+    const bcScore = bcA ? bcA.overall_score : null;
     const tiles =
         tile('Overall Recovery Score', overall != null ? overall : 'None',
              overall != null ? softScore(overall) : 'var(--t4)',
              overall != null ? App.scoreLabel(overall) + ' · ' + sysScores.length + ' of 3 audited' : 'No audits run yet')
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
-             anyAudit && totalOpp > 0 ? 'var(--gold)' : 'var(--t4)',
+             anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
+      + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
+             bcScore != null ? softScore(bcScore) : 'var(--t4)',
+             bcScore != null ? App.scoreLabel(bcScore) : 'Not run yet')
       + tile('Score Trend', netTrend != null ? (netTrend>=0?'+':'') + netTrend + ' pts' : 'No data',
              netTrend == null ? 'var(--t4)' : netTrend >= 0 ? 'var(--green)' : 'var(--red)',
-             netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit')
-      + tile('Weekly Status', `${wkCount} / 3 <span style="font-family:'Barlow',sans-serif;font-size:11px;color:var(--t3);font-weight:600;">this week</span>`,
-             'var(--gold)',
-             wkOverdue.length ? wkOverdue.join(', ') + ' overdue' : 'All systems updated this week',
-             wkOverdue.length ? 'var(--red)' : 'var(--t3)');
+             netTrend != null ? 'Combined, vs last audit' : 'Needs a second audit');
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
@@ -203,7 +206,9 @@ S.Hub = {
     };
     const auditRow = (name, audit, trend, screen, mod, isFirst, indAvg) => {
       const score      = audit?.overall_score ?? null;
-      const scoreColor = score != null ? softScore(score) : 'var(--t4)';
+      // Number stays neutral white; the score bar + marker below carry the
+      // red/amber/green so the color is not doubled up on the number.
+      const scoreColor = score != null ? 'var(--w)' : 'var(--t4)';
       const daysLeft   = auditDaysLeft(audit);
       const canRun     = daysLeft <= 0;
       const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
@@ -355,7 +360,7 @@ S.Hub = {
     if (alerts.length) {
       const alertRows = alerts.map((a,i) => {
         const isLast = i === alerts.length - 1;
-        const dotCol = a.sev === 'bad' ? 'var(--red)' : 'var(--gold)';
+        const dotCol = a.sev === 'bad' ? 'var(--red)' : 'var(--amber)';
         return '<div class="hd-row" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
           + 'style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
           + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
@@ -544,16 +549,16 @@ S.Hub = {
           const isLast = i === topItems.length - 1;
           const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '—';
           const modBadgeColors = {
-            Profit:  { c: 'var(--gold)',  bg: 'var(--gold-bg)'  },
-            Revenue: { c: 'var(--green)', bg: 'var(--green-bg)' },
-            Traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
+            Profit:  { c: 'var(--t3)', bg: 'transparent' },
+            Revenue: { c: 'var(--t3)', bg: 'transparent' },
+            Traffic: { c: 'var(--t3)', bg: 'transparent' }
           };
           const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
           return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
             + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
             + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
             + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
-            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--gold);line-height:1;">' + dollar + '</span>'
+            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--w);line-height:1;">' + dollar + '</span>'
             +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
             + '</div>'
             + '<div style="flex:1;min-width:0;font-size:11px;line-height:1.45;">'
@@ -580,9 +585,9 @@ S.Hub = {
     // — adds visual variation per module on each row.
     const modBadge = (mod) => {
       const map = {
-        profit:  { c: 'var(--gold)',  bg: 'var(--gold-bg)'  },
-        revenue: { c: 'var(--green)', bg: 'var(--green-bg)' },
-        traffic: { c: 'var(--blue)',  bg: 'var(--blue-bg)'  }
+        profit:  { c: 'var(--t2)', bg: 'var(--c3)' },
+        revenue: { c: 'var(--t2)', bg: 'var(--c3)' },
+        traffic: { c: 'var(--t2)', bg: 'var(--c3)' }
       };
       const m = map[mod] || map.profit;
       return '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:'
