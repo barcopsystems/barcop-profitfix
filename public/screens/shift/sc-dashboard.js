@@ -52,7 +52,7 @@ S.ShiftDashboard = {
   // Recent Shifts data-card), so side-by-side panels line up on their top edge.
   shPanel(title, bodyHtml) {
     return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
-      + '<div class="card">' + bodyHtml + '</div>';
+      + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
   },
   actionBtn(id, label) {
     return '<button class="btn btn-primary sd-act" data-go="' + id + '" style="flex:1;min-width:150px;">' + label + '</button>';
@@ -67,10 +67,13 @@ S.ShiftDashboard = {
       + this.actionBtn('sc-reports', 'Reports')
       + '</div></div>';
   },
+  // Two equal-height columns: each column is a flex-column so the card inside
+  // (flex:1) grows to fill, matching its row-mate's height even though the .sh
+  // heading sits outside the card.
   row(a, b) {
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<div style="flex:1 1 300px;min-width:0;">' + a + '</div>'
-      + '<div style="flex:1 1 280px;min-width:0;">' + b + '</div></div>';
+    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
+      + '<div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
+      + '<div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
   },
 
   render(container, actions) {
@@ -225,7 +228,7 @@ S.ShiftDashboard = {
           ? '<span style="color:var(--gold);font-weight:700;">Open</span>'
           : '<span style="color:var(--t3);font-weight:700;">Closed</span>') + '</td></tr>').join('');
     const recentBlock = '<div class="sh" style="margin:0 0 10px;">Recent Shifts</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card card-bleed data-card" style="flex:1;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Shift</th><th>Revenue</th><th>Covers</th><th>Status</th>'
       + '</tr></thead><tbody>' + recentRows + '</tbody></table></div></div>';
 
