@@ -380,6 +380,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .calc-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:4px;white-space:nowrap;}
 .calc-val{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;color:var(--w);line-height:1;}
 .calc-val.good{color:var(--gold);} .calc-val.warn{color:var(--red);} .calc-val.dim{color:var(--t3);}
+.calc-val.lg{font-size:30px;font-weight:700;}   /* bigger top-of-page stat strip numbers (Shift History standard) */
 
 /* ══ REPORT TABS (connected folder style) ══ */
 .rpt-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--b1);}
