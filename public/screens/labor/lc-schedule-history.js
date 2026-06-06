@@ -64,15 +64,14 @@ S.LaborScheduleHistory = {
           + '<button class="btn btn-danger btn-sm lh-del" data-id="' + s.id + '">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Schedule History</span>'
+      html = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;">'
+        + '<div class="sh" style="margin:0;">Schedule History</div>'
         + App.helpButton('lh-how') + '</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('lc', 'schedule', list, false)
-        + '</div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + App.showOlderBar('lc', 'schedule', list, false);
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
@@ -129,26 +128,29 @@ S.LaborScheduleHistory = {
     const pct = s.labor_pct;
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Schedule &middot; Week of ' + this.fmtDate(s.week_start) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="lh-export">Export PDF</button></div>'
-      + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val">' + App.fmtCurrency(s.revenue_forecast || 0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val">' + (s.total_hours != null ? s.total_hours.toFixed(1) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val">' + App.fmtCurrency(s.total_cost || 0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val ' + (pct != null ? (pct > target ? 'warn' : 'good') : '') + '">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;">'
+      + '<div class="sh" style="margin:0;">Schedule &middot; Week of ' + this.fmtDate(s.week_start) + '</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="lh-back">Back</button><button class="btn btn-ghost btn-sm" id="lh-export">Export PDF</button></div></div>'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(s.revenue_forecast || 0) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val lg">' + (s.total_hours != null ? s.total_hours.toFixed(1) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val lg">' + App.fmtCurrency(s.total_cost || 0) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val lg ' + (pct != null ? (pct > target ? 'warn' : 'good') : '') + '">'
       + (pct != null ? App.fmtPct(pct) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val">' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '-') + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val lg">' + (s.rplh != null ? App.fmtCurrency(s.rplh) : '-') + '</div></div>'
+      + '</div></div>'
+      + '<div class="sh" style="margin:24px 0 10px;">Shifts</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Day</th><th>Start</th><th>End</th><th>Hours</th><th>Wage</th><th>Cost</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + (s.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(s.notes) + '</div>' : '')
-      + '<div class="card-actions">'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + (s.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:14px;">Notes: ' + esc(s.notes) + '</div>' : '')
+      + '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">'
       + '<button class="btn btn-primary" id="lh-edit-detail">Edit in Build Schedule</button>'
       + '<button class="btn btn-ghost" id="lh-copy">Copy to New Week</button>'
-      + '</div></div></div>';
+      + '</div></div>';
 
     this.container.onclick = ev => {
+      if (ev.target.closest('#lh-back')) { this.renderList(); return; }
       if (ev.target.closest('#lh-export')) { App.exportPDF({ title: 'Schedule History', root: this.container }); return; }
       if (ev.target.closest('#lh-edit-detail')) this.editSchedule(id);
       else if (ev.target.closest('#lh-copy')) this.copyToNewWeek(s);
