@@ -51,7 +51,7 @@ S.ShiftChecklistTemplates = {
     const itemRows = this._items.map((it, idx) =>
       '<div class="ct-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
       + DragReorder.handleDivHTML()
-      + '<input type="text" class="ct-item-input" data-idx="' + idx + '" value="' + esc(it) + '" placeholder="Checklist item" style="flex:1;"/>'
+      + '<input type="text" class="ct-item-input" data-idx="' + idx + '" value="' + esc(it) + '" placeholder="Checklist item" style="flex:1;padding:9px 11px;"/>'
       + '<button type="button" class="btn btn-danger btn-sm ct-remove" data-idx="' + idx + '">Remove</button>'
       + '</div>').join('');
     const itemsBlock = this._items.length === 0
@@ -153,9 +153,12 @@ S.ShiftChecklistTemplates = {
     if (itemsHost) {
       DragReorder.wire({
         container: itemsHost, rowSelector: '.ct-line', handleSelector: '.dr-handle',
-        onCommit: (newOrderIds) => {
+        onCommit: () => {
+          // The handle has already moved the row in the DOM, so syncItems reads
+          // the inputs in their new on-screen order. That IS the new order; do
+          // NOT remap by data-id again (that double-applies the move and snaps
+          // a one-row drag right back where it started).
           this.syncItems();
-          this._items = newOrderIds.map(id => parseInt(id, 10)).filter(i => !isNaN(i)).map(i => this._items[i]);
           reRender();
         }
       });
