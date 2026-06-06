@@ -109,7 +109,7 @@ S.ShiftActiveShift = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen"><div class="card form-card">'
+    this.container.innerHTML = '<div class="screen"><div class="card form-card no-print">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
       + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
@@ -149,6 +149,7 @@ S.ShiftActiveShift = {
       if (ev.target.closest('#of-how')) { this.showHowToOpen(); return; }
       if (ev.target.closest('#of-add-drawers')) { App.navigate('sc-drawers'); return; }
       if (ev.target.closest('#rs-log')) { this.showShiftForm(null); return; }
+      if (ev.target.closest('#rs-export')) { App.exportPDF({ title: 'Recent Shifts', root: this.container }); return; }
       const rsEdit = ev.target.closest('.rs-edit');
       if (rsEdit) { this.showShiftForm(rsEdit.dataset.id); return; }
       const rsView = ev.target.closest('.rs-view');
@@ -216,14 +217,15 @@ S.ShiftActiveShift = {
     const show = this._rsShow || this.RS_PAGE;
     const limited = list.slice(0, show);
 
-    const card = '<div class="sh" style="margin-top:24px;">Filter Recent Shifts</div>'
-      + '<div class="card">'
+    const card = '<div class="sh no-print" style="margin-top:24px;">Filter Recent Shifts</div>'
+      + '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(from) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="rs-to" value="' + esc(to) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="rs-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="rs-mgr">' + mgrOpts + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="rs-clear">Clear</button></div>'
+      + '<button class="btn btn-ghost btn-sm" id="rs-export" style="margin-left:auto;align-self:center;">Export PDF</button>'
       + '</div></div>';
 
     let below;
