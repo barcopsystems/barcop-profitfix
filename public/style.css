@@ -275,7 +275,7 @@ input,select,textarea{color-scheme:dark;}
 .hs-tab:hover{color:var(--t1) !important;}
 
 /* ══ CONTENT ══ */
-.content{flex:1;overflow-y:auto;background:var(--bg);}
+.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-gutter:stable;}
 .screen{padding:var(--sp) var(--sp) 56px;max-width:1200px;width:100%;margin:0 auto;}
 
 /* ══ BUTTONS ══ */
