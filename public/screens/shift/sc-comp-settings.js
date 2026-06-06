@@ -22,29 +22,34 @@ S.ShiftCompSettings = {
     this.draw();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Comp Authorization Works', [
+      { p: ['Comps above your threshold on the Void and Comp Log require a manager in the Authorized By field. Saving a comp over the threshold without a manager pops a soft warning the operator can override, and every override flags in Theft Risk under the Unauthorized Large Comps signal.'] },
+      { p: ['The bartender comping a $40 round of drinks without manager involvement is one of the most common bar-theft patterns, and this is how Bar Cop catches it.'] },
+      { h: 'Setting It', p: ['The default is $25. Set the threshold to 0 to disable the warning entirely.'] }
+    ]);
+  },
+
   draw() {
     const s = this.settings();
     const v = val => (val != null && val !== '') ? val : '';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card">'
-      + '<div class="card-title">Comp Authorization Threshold</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px;">'
-        + 'Comps above this dollar amount on the Void and Comp Log require a manager in the Authorized By field. Saving a comp over the threshold without a manager pops a soft warning the operator can override, and every override flags in Theft Risk under the Unauthorized Large Comps signal. The bartender comping a $40 round of drinks without manager involvement is one of the most common bar-theft patterns and this is how Bar Cop catches it.'
-      + '</div>'
+      + '<div class="card form-card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Comp Authorization Threshold</span>'
+      + App.helpButton('ccs-how') + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:center;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Threshold</label>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Threshold ' + tt('ccs-threshold') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccs-threshold" min="0" step="1" value="' + v(s.comp_auth_threshold != null ? s.comp_auth_threshold : 25) + '"/></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);padding-bottom:10px;">Default $25. Set to 0 to disable the warning entirely.</div>'
       + '</div>'
-      + '</div>'
-
-      + '<div class="card-actions" style="margin-top:6px;">'
+      + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="ccs-save">Save Comp Policies</button>'
       + '<span id="ccs-msg" style="font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
+      + '</div>'
       + '</div>';
 
+    document.getElementById('ccs-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ccs-save')?.addEventListener('click', () => this.save());
   },
 
