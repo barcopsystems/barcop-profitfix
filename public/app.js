@@ -4008,8 +4008,34 @@ document.addEventListener('DOMContentLoaded', () => {
     if (root.querySelectorAll) root.querySelectorAll('input, textarea').forEach(killAutofill);
   };
   sweepAutofill(document.body);
+
+  // Mobile/tablet: stamp every data-table + batch-builder cell with its column
+  // header (data-label) so the CSS at <=900px can stack each row into a
+  // label/value card. One sweep + the observer below cover every screen render,
+  // internal re-render, modal, and dynamically added "Add Line" row, with no
+  // per-table work. Idempotent: cells that already carry a label are skipped.
+  const stampRow = (tr, ths) => {
+    let i = 0;
+    for (const td of tr.children) { if (td.tagName === 'TD') { if (!td.hasAttribute('data-label')) td.setAttribute('data-label', ths[i] || ''); i++; } }
+  };
+  const stampTable = tbl => {
+    const ths = [...tbl.querySelectorAll('thead th')].map(th => th.textContent.trim());
+    if (!ths.length) return;
+    tbl.querySelectorAll('tbody tr').forEach(tr => stampRow(tr, ths));
+  };
+  const sweepTables = root => {
+    if (!root || root.nodeType !== 1) return;
+    if (root.matches && root.matches('.data-card .tbl, .ing-tbl')) stampTable(root);
+    if (root.querySelectorAll) root.querySelectorAll('.data-card .tbl, .ing-tbl').forEach(stampTable);
+    if (root.matches && root.matches('tr')) {            // a single "Add Line" row
+      const tbl = root.closest('.data-card .tbl, .ing-tbl');
+      if (tbl) stampRow(root, [...tbl.querySelectorAll('thead th')].map(th => th.textContent.trim()));
+    }
+  };
+  sweepTables(document.body);
+
   new MutationObserver(muts => {
-    for (const m of muts) for (const n of m.addedNodes) sweepAutofill(n);
+    for (const m of muts) for (const n of m.addedNodes) { sweepAutofill(n); sweepTables(n); }
   }).observe(document.body, { childList: true, subtree: true });
 
   // Section switcher (the dropdown at the top of every section sidebar). One
