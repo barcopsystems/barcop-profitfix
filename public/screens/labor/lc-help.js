@@ -22,7 +22,7 @@ S.LaborHelp = {
       { q: 'Do I have to follow this order?',
         a: 'Yes, with one exception. Positions must exist before Staff Roster (you cannot assign someone to a position that does not exist). Staff Roster must exist before Build Schedule (you cannot schedule an empty roster). Build Schedule and Log Hours can run independently once the first two are in place. Skipping the foundation just produces empty schedules and orphaned hour logs.' }
     ]},
-    { t: 'Positions & Roster', qa: [
+    { t: 'Roster', qa: [
       { q: 'What is the difference between Positions and Staff Roster?',
         a: 'Positions are the job roles you schedule: bartender, server, line cook, barback, dishwasher, manager. Each position has a name, a department (Bar, Front of House, Kitchen, Management, Other), a default wage, and a tipped flag. Staff Roster is the people: each staff member is assigned to a position, and their wage defaults from the position\'s default but is editable per person. Two layers because real bars hire one bartender at $16 and another at $18 for the same role.' },
       { q: 'What does the tipped flag on a position do?',
@@ -40,7 +40,7 @@ S.LaborHelp = {
       { q: 'How do I import a whole staff list?',
         a: 'On the Add Staff card, switch the toggle from Enter Manually to Import File and drop a CSV or Excel export. Map the columns once (only Name is required) and Bar Cop matches each person\'s position to your existing positions by name. Anything missing imports blank to fill in after. Set up your positions first for the cleanest import.' }
     ]},
-    { t: 'Certifications', qa: [
+    { t: 'Certs', qa: [
       { q: 'What is the Certifications card for?',
         a: 'Tracks every regulated certification your staff is required to hold: TABC or state liquor server permit, ServSafe, food handler card, RBS (Responsible Beverage Service), and anything else specific to your jurisdiction. Each entry captures the cert type, the holder, issue date, expiration date, certificate number, and notes. The expiration date is required so Bar Cop can flag it before it lapses.' },
       { q: 'How does the expiry alert work?',
@@ -48,7 +48,7 @@ S.LaborHelp = {
       { q: 'What if my state requires a cert Bar Cop does not list?',
         a: 'Pick Other on the cert type dropdown and put the specific name in the notes field. Bar Cop tracks it the same way: expiration date, alert at 30 days, expired flag past the date. The common defaults cover most US jurisdictions; Other covers the rest without forcing you to map your state\'s exact terminology.' }
     ]},
-    { t: 'Coaching Log', qa: [
+    { t: 'Coaching', qa: [
       { q: 'What is the Coaching Log?',
         a: 'A written record of staff conversations, kept on the staff member\'s detail page. Four categories: Praise, Coaching, Concern, Warning. Each note carries the date, the category, who delivered it (manager), and the detail of what was said and what was agreed. The record is what protects the operator when a tough HR moment lands.' },
       { q: 'Why bother with a coaching log in software instead of memory?',
@@ -72,7 +72,7 @@ S.LaborHelp = {
       { q: 'What does Schedule History show?',
         a: 'Every saved schedule, sorted newest first. Each row has View (full detail), Edit (reopen in Build Schedule), and Copy to New Week. The detail page shows hours, costs, and projected versus actual. Use the history to spot patterns: which weeks consistently come in over labor budget, which weeks underdeliver on revenue versus the forecast, which staff members get the heaviest schedule.' }
     ]},
-    { t: 'Hours & Actuals', qa: [
+    { t: 'Hours', qa: [
       { q: 'How do I log actual hours?',
         a: 'Log Hours records what actually happened, which can differ from what was scheduled. One card, two ways in: switch the toggle between Enter Manually (type a row per staff member and day) and Import File (drop a timeclock or POS hours export). Each logged hour is costed at the staff member\'s wage in effect on that date (using wage history). Actual hours are what flows to Revenue and Profit Recovery, not scheduled hours. The difference between scheduled and actual is the variance, which Daily Snapshot and Weekly Summary surface.' },
       { q: 'How does the import work?',
@@ -106,7 +106,7 @@ S.LaborHelp = {
       { q: 'What if my pay period is bi-weekly instead of weekly?',
         a: 'Pay Periods displays weekly by default because the week grain matches Bar Cop\'s shift and revenue rollups. For bi-weekly payroll, run Payroll Export for two consecutive weeks and combine them in Excel, or hand both files to your payroll provider. Closing weeks individually keeps the lock granularity tight (a single bad shift in week one does not unlock all of week two).' }
     ]},
-    { t: 'Reports & Overtime', qa: [
+    { t: 'Reports', qa: [
       { q: 'What is in Labor Reports?',
         a: 'A trend view of labor cost, hours, and tips over a date range, broken down By Department and By Staff on one page (no tabs, since both tables are short), with one Export PDF covering both. Salaried staff carry their fixed weekly salary across the range. Use it to spot drift: a department creeping up over several weeks is a structural problem worth a build review, not a one-week anomaly worth ignoring.' },
       { q: 'What is Overtime Watch?',
