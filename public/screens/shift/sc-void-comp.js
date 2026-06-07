@@ -134,11 +134,8 @@ S.ShiftVoidComp = {
       + '<div class="f" style="flex:1;min-width:110px;"><label>Shift Type</label><select id="' + p + 'shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:95px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '"/></div></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.staff_id || r?.server, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
-      + '</div>'
-
-      // Authorized By / Reason / Check # / Item, with Units or Custom Name inline
-      // after Item only when relevant.
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      // Authorized By / Reason / Check # / Item continue in the same row (the
+      // narrow pop-up reflows them 2-up); Units or Custom Name appear after Item.
       + '<div class="f" style="flex:1;min-width:120px;"><label>Authorized By</label><select id="' + p + 'auth">' + App.staffOptions(r?.authorized_by_id || r?.authorized_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Reason</label><select id="' + p + 'reason">' + this.reasonOptions(type, r?.reason) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:90px;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_number || '') + '" placeholder="Optional"/></div>'
