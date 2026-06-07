@@ -114,46 +114,41 @@ S.LaborOvertimeWatch = {
     const totalOtHours = rows.reduce((t, r) => t + r.otHours, 0);
     const totalOtCost = rows.reduce((t, r) => t + r.otCost, 0);
 
-    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Projected Over OT</div><div class="calc-val ' + (over.length ? 'warn' : 'good') + '">' + over.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Approaching</div><div class="calc-val ' + (approaching.length ? 'warn' : '') + '">' + approaching.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Projected OT Hours</div><div class="calc-val">' + totalOtHours.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Extra OT Cost</div><div class="calc-val ' + (totalOtCost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(totalOtCost) + '</div></div>'
-      + '</div>';
+    const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Projected Over OT</div><div class="calc-val lg ' + (over.length ? 'warn' : 'good') + '">' + over.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Approaching</div><div class="calc-val lg ' + (approaching.length ? 'warn' : '') + '">' + approaching.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Projected OT Hours</div><div class="calc-val lg">' + totalOtHours.toFixed(1) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Extra OT Cost</div><div class="calc-val lg ' + (totalOtCost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(totalOtCost) + '</div></div>'
+      + '</div></div>';
 
-    const dateCard = '<div class="card">'
+    const dateCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Week</span>'
+      + '<span>Overtime Watch</span>'
       + App.helpButton('ow-how') + '</div>'
-      + '<div class="form-row no-print" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
+      + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
       + '<input type="date" id="ow-start" value="' + esc(ws) + '"/></div>'
-      + '<div style="display:flex;gap:6px;padding-bottom:2px;">'
-      + '<button class="btn btn-ghost btn-sm" id="ow-prev" title="Previous week" aria-label="Previous week">&#8592;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ow-next" title="Next week" aria-label="Next week">&#8594;</button>'
-      + '</div>'
-      + '</div>'
-      + summary
-      + '</div>';
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ow-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ow-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
+      + '</div></div>';
 
-    let projCard;
+    let projHeading, projBody;
     if (rows.length === 0) {
-      projCard = '<div class="card"><div class="card-title">Hours Projection</div>'
-        + '<div class="empty"><div class="empty-title">No hours this week</div>'
-        + '<div class="empty-sub">Log hours or build a schedule for this week and Overtime Watch will '
-        + 'project who is heading into overtime.</div></div>'
-        + '<div style="margin-top:4px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div></div>';
+      projHeading = '<div class="sh" style="margin:24px 0 10px;">Hours Projection</div>';
+      projBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours this week. Log hours or build a schedule for this week and Overtime Watch will project who is heading into overtime.</div>'
+        + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     } else {
       const trs = rows.map(r => {
         const badge = r.status === 'Over' ? '<span style="color:var(--red);font-weight:700;">Over</span>'
           : r.status === 'Approaching' ? '<span style="color:var(--amber);font-weight:700;">Approaching</span>'
-          : '<span style="color:var(--gold);font-weight:700;">OK</span>';
+          : '<span style="color:var(--green);font-weight:700;">OK</span>';
         // Actionable suggestion: when over OT, tell the operator the exact
         // cut needed to clear the threshold. Saves them doing the math.
         const action = r.status === 'Over'
           ? '<span style="color:var(--red);font-weight:700;">Cut ' + r.cutHours.toFixed(1) + ' hr</span>'
           : r.status === 'Approaching'
-            ? '<span style="color:var(--gold);">Watch, ' + (App.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
+            ? '<span style="color:var(--amber);">Watch, ' + (App.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
             : '<span style="color:var(--t3);">-</span>';
         return '<tr>'
           + '<td><div class="val">' + esc(r.name) + '</div></td>'
@@ -165,17 +160,17 @@ S.LaborOvertimeWatch = {
           + '<td>' + badge + '</td>'
           + '<td>' + action + '</td></tr>';
       }).join('');
-      projCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Hours Projection</span>'
-        + '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button></div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      projHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+        + '<div class="sh" style="margin:0;">Hours Projection</div>'
+        + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button></div></div>';
+      projBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
         + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
-        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div></div>';
+        + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>'
+        + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + projCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + projHeading + projBody + '</div>';
     document.getElementById('ow-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ow-export')?.addEventListener('click', () => App.exportPDF({ title: 'Overtime Watch', root: this.container }));
     document.getElementById('ow-start')?.addEventListener('change', e => {
