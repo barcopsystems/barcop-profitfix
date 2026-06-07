@@ -266,7 +266,7 @@ S.ShiftActiveShift = {
     if (id && App.canEdit && !App.canEdit('sc-active-shift')) return;
     this._shiftFormId = id || null;
     const s = id ? this.shifts().find(x => x.id === id) : null;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + (id ? 'Edit Shift' : 'Log a Past Shift') + '</div>'
       + this.shiftFormRows(s)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="asf-save">' + (id ? 'Update' : 'Save Shift') + '</button>'
@@ -274,7 +274,7 @@ S.ShiftActiveShift = {
       + '<span id="asf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (id ? '<button class="btn btn-danger" id="asf-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
-    App.openModal(html, { id: 'as-shift-modal', maxWidth: 760, noClose: true });
+    App.openModal(html, { id: 'as-shift-modal', maxWidth: 540, noClose: true });
     document.getElementById('asf-cancel')?.addEventListener('click', () => { this._shiftFormId = null; App.closeModal('as-shift-modal'); });
     document.getElementById('asf-save')?.addEventListener('click', () => this.saveShiftForm());
     document.getElementById('asf-del')?.addEventListener('click', () => this.confirmDeleteShift(id));
