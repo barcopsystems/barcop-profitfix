@@ -12,6 +12,7 @@ S.LaborLogHours = {
   editId: null,
   filterFrom: '',
   filterTo: '',
+  filterShift: '',
   filterStaff: '',
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
@@ -49,7 +50,7 @@ S.LaborLogHours = {
     p = p || 'lo-';
     const v = val => (val != null && val !== '') ? val : '';
     const shiftOpts = this.SHIFTS.map(s =>
-      '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || '-') + '</option>').join('');
+      '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || 'Select shift...') + '</option>').join('');
     return '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
       + '<input type="date" id="' + p + 'date" value="' + esc(a?.date || App.todayLocal()) + '"/></div>'
@@ -82,6 +83,7 @@ S.LaborLogHours = {
       const date = a.date || '';
       if (this.filterFrom && date < this.filterFrom) return false;
       if (this.filterTo && date > this.filterTo) return false;
+      if (this.filterShift && (a.shift_type || '') !== this.filterShift) return false;
       if (this.filterStaff && (a.staff_id || '') !== this.filterStaff) return false;
       return true;
     });
@@ -93,10 +95,13 @@ S.LaborLogHours = {
     const staffOpts = '<option value="">All staff</option>'
       + this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+    const shiftOpts = '<option value="">All shifts</option>'
+      + (App.SHIFT_TYPES || []).map(s => '<option value="' + esc(s) + '"' + (this.filterShift === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     return '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lo-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="lo-f-to" value="' + esc(this.filterTo) + '"/></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="lo-f-shift">' + shiftOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="lo-f-staff">' + staffOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lo-f-clear">Clear</button></div>'
       + '</div></div>';
@@ -182,7 +187,7 @@ S.LaborLogHours = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('lc', 'actual', filtered, !!(this.filterFrom || this.filterTo || this.filterStaff));
+          + App.showOlderBar('lc', 'actual', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterStaff));
       }
 
       const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
@@ -199,7 +204,7 @@ S.LaborLogHours = {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
-      if (ev.target.closest('#lo-f-clear')) { this.filterFrom = this.filterTo = this.filterStaff = ''; this.renderList(); return; }
+      if (ev.target.closest('#lo-f-clear')) { this.filterFrom = this.filterTo = this.filterShift = this.filterStaff = ''; this.renderList(); return; }
       if (ev.target.closest('#lo-save'))    { this.save('lo-'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.lo-row');
@@ -213,6 +218,7 @@ S.LaborLogHours = {
     this.mountImporter();
     document.getElementById('lo-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+    document.getElementById('lo-f-shift')?.addEventListener('change', e => { this.filterShift = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-staff')?.addEventListener('change', e => { this.filterStaff = e.target.value || ''; this.renderList(); });
     App.applyCollapsed(this.container);
   },
