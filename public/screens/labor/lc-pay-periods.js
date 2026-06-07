@@ -282,10 +282,15 @@ S.LaborPayPeriods = {
         + '</tr>';
     }).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No hours logged this period.</td></tr>';
 
-    const backBar = '<div class="no-print" style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="pp-back">&lsaquo; Back to Pay Periods</button></div>';
+    // Close & Lock (open) or Reopen (closed) lives in the card title, top-right.
+    const titleAction = isClosed
+      ? '<button class="btn btn-ghost btn-sm" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
+      : (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : '');
 
     const periodCard = '<div class="card form-card">'
-      + '<div class="card-title">Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</span>'
+      + titleAction + '</div>'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + agg.totals.hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val lg ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
@@ -306,18 +311,9 @@ S.LaborPayPeriods = {
       + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
-    const actionRow = '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">'
-      + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Open Payroll Export</button>'
-      + (isClosed
-          ? '<button class="btn btn-ghost" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
-          : (agg.totalCount > 0 ? '<button class="btn btn-primary" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : ''))
-      + '</div>';
+    this.container.innerHTML = '<div class="screen">' + periodCard + warnLine + breakdownHeading + tableCard + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + backBar + periodCard + warnLine + breakdownHeading + tableCard + actionRow + '</div>';
-
-    document.getElementById('pp-back')?.addEventListener('click', () => this.renderList());
     document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Period', root: this.container }));
-    document.getElementById('pp-csv-detail')?.addEventListener('click', () => this.openPayrollExport(weekStart));
     document.getElementById('pp-close-detail')?.addEventListener('click', () => this.closePeriod(weekStart));
     document.getElementById('pp-reopen-detail')?.addEventListener('click', () => this.reopenPeriod(weekStart));
   },
