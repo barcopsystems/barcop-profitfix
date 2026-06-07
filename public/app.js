@@ -1225,7 +1225,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings', 'sc-comp-settings', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-daily-view', 'lc-weekly-summary', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings']),
+  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings', 'sc-comp-settings', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-daily-view', 'lc-weekly-summary', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')   return this.showHub();
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
