@@ -348,8 +348,6 @@ S.ShiftWaste = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="wle-date" value="' + esc(r?.date || '') + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="wle-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:240px;"><label>Product</label><select id="wle-product">' + this.productOptions(r?.product_id) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Units Lost</label><div class="fw"><input class="suf" type="number" id="wle-units" min="0" step="0.01" value="' + v(r?.units) + '" placeholder="0"/><span class="suf" id="wle-unit-label">' + esc(unit) + '</span></div></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="wle-reason">' + this.reasonOptions(r?.reason) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wle-by">' + App.staffOptions(r?.recorded_by_id || r?.recorded_by, { placeholder: 'Select staff...' }) + '</select></div>'
