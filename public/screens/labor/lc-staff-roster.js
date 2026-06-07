@@ -499,39 +499,37 @@ S.LaborStaffRoster = {
   },
 
   // ── Coaching Log section ─────────────────────────────────────────────
+  // Heading-outside + ONE card with the notes as divider-separated rows (no
+  // per-note bordered box, which read as a card inside a card).
   renderNotesCard(staffId) {
     const list = this.notesForStaff(staffId);
-
-    let body;
+    const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Coaching Log</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div></div>';
     if (list.length === 0) {
-      body = '<div style="font-size:12px;color:var(--t3);">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div>';
-    } else {
-      body = list.map(n => {
-        const catColor = n.category === 'Praise' ? 'var(--green)'
-                       : n.category === 'Coaching' ? 'var(--steel)'
-                       : n.category === 'Concern' ? 'var(--amber)'
-                       : 'var(--red)';
-        return '<div style="padding:14px;border:1px solid var(--b2);border-radius:4px;margin-bottom:8px;">'
-          + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px;">'
-            + '<div style="display:flex;align-items:center;gap:10px;">'
-              + '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + catColor + ';">' + esc(n.category || 'Note') + '</span>'
-              + '<span style="font-size:12px;color:var(--t2);">' + this.fmtDate(n.date) + '</span>'
-              + (n.manager_name ? '<span style="font-size:11px;color:var(--t3);">by ' + esc(n.manager_name) + '</span>' : '')
-            + '</div>'
-            + '<div class="row-actions">'
-              + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
-              + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
-            + '</div>'
-          + '</div>'
-          + '<div style="font-size:13px;color:var(--t1);line-height:1.6;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
-          + '</div>';
-      }).join('');
+      return heading + '<div style="font-size:12px;color:var(--t3);padding:4px 2px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div>';
     }
-
-    return '<div class="card form-card"><div class="card-title">Coaching Log</div>'
-      + body
-      + '<div class="card-actions"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div>'
-      + '</div>';
+    const rows = list.map((n, i) => {
+      const catColor = n.category === 'Praise' ? 'var(--green)'
+                     : n.category === 'Coaching' ? 'var(--steel)'
+                     : n.category === 'Concern' ? 'var(--amber)'
+                     : 'var(--red)';
+      return '<div style="padding:14px 0;' + (i ? 'border-top:1px solid var(--b2);' : '') + '">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px;">'
+          + '<div style="display:flex;align-items:center;gap:10px;">'
+            + '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + catColor + ';">' + esc(n.category || 'Note') + '</span>'
+            + '<span style="font-size:12px;color:var(--t2);">' + this.fmtDate(n.date) + '</span>'
+            + (n.manager_name ? '<span style="font-size:11px;color:var(--t3);">by ' + esc(n.manager_name) + '</span>' : '')
+          + '</div>'
+          + '<div class="row-actions">'
+            + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
+            + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
+          + '</div>'
+        + '</div>'
+        + '<div style="font-size:13px;color:var(--t1);line-height:1.6;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
+        + '</div>';
+    }).join('');
+    return heading + '<div class="card" style="padding:6px 20px;">' + rows + '</div>';
   },
 
   // Note add/edit in a focused pop-up (own note- ids; no collision with the
