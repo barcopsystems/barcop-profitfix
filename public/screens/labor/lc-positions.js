@@ -26,20 +26,23 @@ S.LaborPositions = {
   // Full form body (Name, Department, Default Wage, Type, Notes) shared by the
   // inline add form and the edit pop-up. p = element-id prefix ('lp-' inline,
   // 'lpe-' pop-up) so the modal's inputs never collide with the inline form.
-  formBody(item, p) {
+  // narrow=true lays the four cells out 2-per-row (for the taller, focused edit
+  // pop-up); the inline add form keeps the wide single-row layout.
+  formBody(item, p, narrow) {
     p = p || 'lp-';
     const deptOpts = this.DEPARTMENTS.map(d =>
       '<option' + ((item ? item.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
     const wageVal = (item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '';
+    const cs = w => narrow ? 'flex:1 1 45%;min-width:140px;' : 'width:' + w + 'px;flex-shrink:0;';
     return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Position Name</label>'
+      + '<div class="f" style="' + cs(200) + '"><label>Position Name</label>'
       + '<input type="text" id="' + p + 'name" value="' + esc(item?.name || '') + '" placeholder="e.g. Bartender"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Department</label>'
+      + '<div class="f" style="' + cs(170) + '"><label>Department</label>'
       + '<select id="' + p + 'dept">' + deptOpts + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Default Wage</label>'
+      + '<div class="f" style="' + cs(140) + '"><label>Default Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'wage" min="0" step="0.01" '
       + 'value="' + wageVal + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label>'
+      + '<div class="f" style="' + cs(150) + '"><label>Type</label>'
       + '<select id="' + p + 'tipped"><option value="no"' + (item && item.tipped ? '' : ' selected') + '>Non-Tipped</option>'
       + '<option value="yes"' + (item && item.tipped ? ' selected' : '') + '>Tipped</option></select></div>'
       + '</div>'
@@ -108,14 +111,14 @@ S.LaborPositions = {
     if (!item) return;
     this.editId = id;
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Position</div>'
-      + this.formBody(item, 'lpe-')
+      + this.formBody(item, 'lpe-', true)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lpe-save">Update</button>'
       + '<button class="btn btn-ghost" id="lpe-cancel">Cancel</button>'
       + '<span id="lpe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="lpe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'lp-edit-modal', maxWidth: 760, noClose: true });
+    App.openModal(html, { id: 'lp-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('lpe-save')?.addEventListener('click', () => this.save('lpe-'));
     document.getElementById('lpe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); });
     document.getElementById('lpe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); this.confirmDel(id); });
