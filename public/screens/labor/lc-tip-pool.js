@@ -72,11 +72,11 @@ S.LaborTipPool = {
       + '<input type="number" class="tp-hours" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"'
       + (equal ? ' disabled' : '') + '/></div>'
       + '<div class="f" style="flex:1;min-width:130px;"><label>&nbsp;</label>'
-      + '<div class="tp-share" style="font-size:15px;font-weight:600;font-family:\'Barlow Condensed\';color:var(--gold);padding-bottom:6px;">-</div></div>'
+      + '<div class="tp-share" style="font-size:15px;font-weight:600;font-family:\'Barlow Condensed\';color:var(--t1);padding-bottom:6px;">-</div></div>'
       + '<button class="btn btn-ghost btn-sm tp-remove" style="margin-bottom:6px;">Remove</button>'
       + '</div>').join('');
 
-    const setupCard = '<div class="card">'
+    const setupCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-pool', 'Tip Pool', App.helpButton('tp-how'))
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
@@ -92,7 +92,7 @@ S.LaborTipPool = {
       + '<button class="btn btn-ghost" id="tp-load" style="margin-bottom:2px;">Load from Tip Log</button></div>'
       + '</div></div></div>';
 
-    const participantsCard = '<div class="card" data-collapse-group="lc-tip-pool"><div class="card-title">Participants</div>'
+    const participantsCard = '<div class="card form-card" data-collapse-group="lc-tip-pool"><div class="card-title">Participants</div>'
       + '<div id="tp-rows">' + (rowHtml || '<div style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Add staff below or load from the Tip Log.</div>') + '</div>'
       + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
@@ -331,11 +331,11 @@ S.LaborTipPool = {
       + '<button class="btn btn-ghost btn-sm tp-hview" data-id="' + p.id + '">View</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="card"><div class="card-title">Saved Tip Pools</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    return '<div class="sh" style="margin:24px 0 10px;">Saved Tip Pools</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + App.showOlderBar('lc', 'tip_pool', list, false) + '</div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('lc', 'tip_pool', list, false);
   },
 
   renderDetail(id) {
@@ -349,15 +349,15 @@ S.LaborTipPool = {
       + '<td class="val">' + App.fmtCurrency(pt.share || 0) + '</td></tr>').join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Tip Pool &middot; ' + this.fmtDate(p.date) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button></div>'
-      + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + (p.total_hours || 0) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val lg">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val lg">' + App.fmtCurrency(p.pool_amount || 0) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + (p.total_hours || 0) + '</div></div>'
+      + '</div></div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button></div></div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
     this.container.onclick = null;
