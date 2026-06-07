@@ -2,7 +2,10 @@
 
 /* ── Labor Control — Labor Reports (reads lc_actuals) ─────────────────────────
    Labor analysis over a date range, connected-tab views: by staff and by
-   department, with tips context. Each tab exports its own PDF. */
+   department, with tips context. Read-only. Same tabbed shell as Cash History /
+   Tip History: a plain .ch-tabs switcher over a stats card, a Filter heading
+   with Export, the controls-only filter card, then the data card. The From/To
+   filter is global to the report, so it persists across tab switches. */
 
 S.LaborReports = {
   filterFrom: '',
@@ -30,8 +33,30 @@ S.LaborReports = {
     App.showHelpModal('How Labor Reports Work', [
       { p: ['Labor Reports total your labor over a date range, two ways: by staff and by department. Set the range and switch tabs to see each view.'] },
       { h: 'The Two Views', p: ['By Staff lists each person\'s hours, average wage, labor cost, and share of total labor, sorted by cost. By Department rolls the same up by department so you can see where the dollars go. Salaried staff carry their fixed weekly salary across the range; their logged hours are coverage only.'] },
-      { h: 'Export', p: ['Each tab has its own Export PDF, so you can hand off just the staff view or just the department view.'] }
+      { h: 'Export', p: ['Export PDF saves whichever tab you are on, so you can hand off just the staff view or just the department view.'] }
     ]);
+  },
+
+  // ── shared markup helpers (mirror Cash History / Tip History) ───────────────
+  tabBar() {
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
+      + '</div>';
+  },
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+      + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
+      + App.helpButton('lr-how') + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  noRow(cols, msg) {
+    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No hours match the filter.') + '</td></tr>';
   },
 
   renderReport() {
@@ -64,46 +89,35 @@ S.LaborReports = {
     const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total;
     const totTips = tips.reduce((t, x) => t + (x.total_tips || 0), 0);
 
-    let summaryHtml = '';
-    if (rows.length) {
-      summaryHtml = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Hours Entries</div><div class="calc-val">' + rows.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + totHours.toFixed(1) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val">' + App.fmtCurrency(totCost) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Avg Wage</div><div class="calc-val">' + App.fmtCurrency(totHours > 0 ? totCost / totHours : 0) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Tips Logged</div><div class="calc-val">' + App.fmtCurrency(totTips) + '</div></div>'
-        + '</div>';
-    }
+    const statsCard = this.statsCard(
+      this.statItem('Hours Entries', rows.length)
+      + this.statItem('Total Hours', totHours.toFixed(1))
+      + this.statItem('Labor Cost', App.fmtCurrency(totCost))
+      + this.statItem('Avg Wage', App.fmtCurrency(totHours > 0 ? totCost / totHours : 0))
+      + this.statItem('Tips Logged', App.fmtCurrency(totTips)));
 
-    const filterCard = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Date Range</span>'
-      + App.helpButton('lr-how') + '</div>'
-      + '<div class="form-row no-print" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label>'
-      + '<input type="date" id="lr-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label>'
-      + '<input type="date" id="lr-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="lr-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div>'
-      + summaryHtml
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Labor</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="lr-export">Export PDF</button></div></div>';
+
+    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lr-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="lr-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lr-clear">Clear</button></div>'
+      + '</div></div>';
+
+    this.container.innerHTML = '<div class="screen">'
+      + this.tabBar()
+      + statsCard
+      + filterHeading
+      + filterCard
+      + this.tabBody(rows, totCost, salWeeks)
       + '</div>';
-
-    if (rows.length === 0) {
-      this.container.innerHTML = '<div class="screen">' + filterCard
-        + '<div class="card"><div class="empty"><div class="empty-title">No hours in this range</div>'
-        + '<div class="empty-sub">Adjust or clear the date range above.</div></div></div></div>';
-    } else {
-      this.container.innerHTML = '<div class="screen">' + filterCard
-        + App.reportTabBar(this.TABS, this.tab)
-        + App.reportPanel(this.TABS, this.tab, 'lr-export', this.tabBody(rows, totCost, salWeeks)) + '</div>';
-    }
 
     this.container.onclick = ev => {
       if (ev.target.closest('#lr-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Reports', root: this.container }); return; }
-      const tab = ev.target.closest('.rpt-tab');
+      const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
       if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
     };
@@ -143,10 +157,8 @@ S.LaborReports = {
         + '<td>' + App.fmtCurrency(s.hours > 0 ? s.cost / s.hours : 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
         + '<td>' + (totCost > 0 ? App.fmtPct(s.cost / totCost * 100) : '-') + '</td></tr>';
-    }).join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Staff</th><th>Hours</th><th>Avg Wage</th><th>Labor Cost</th><th>% of Labor</th>'
-      + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+    }).join('') || this.noRow(5);
+    return this.dataCard('<th>Staff</th><th>Hours</th><th>Avg Wage</th><th>Labor Cost</th><th>% of Labor</th>', trs);
   },
 
   byDept(rows, totCost, salWeeks) {
@@ -172,9 +184,7 @@ S.LaborReports = {
       '<tr><td><div class="val">' + esc(k) + '</div></td>'
       + '<td>' + g[k].hours.toFixed(1) + '</td>'
       + '<td class="val">' + App.fmtCurrency(g[k].cost) + '</td>'
-      + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '-') + '</td></tr>').join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Department</th><th>Hours</th><th>Labor Cost</th><th>% of Labor</th>'
-      + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+      + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '-') + '</td></tr>').join('') || this.noRow(4);
+    return this.dataCard('<th>Department</th><th>Hours</th><th>Labor Cost</th><th>% of Labor</th>', trs);
   }
 };
