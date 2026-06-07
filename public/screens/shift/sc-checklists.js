@@ -143,8 +143,8 @@ S.ShiftChecklists = {
 
     const itemRows = items.map((it, idx) =>
       '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? '#1E2B34' : 'var(--b1)') + ';'
-      + 'border-radius:4px;background:' + (it.done ? '#1E2B34' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
+      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? '#485C6A' : 'var(--b1)') + ';'
+      + 'border-radius:4px;background:' + (it.done ? '#485C6A' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
       + (it.done ? '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5l2.5 2.5 5-5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
       + '</span>'
       + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
@@ -160,7 +160,7 @@ S.ShiftChecklists = {
       + '</div>'
       + '<div style="margin:8px 0 14px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;"><span>' + done + ' of ' + items.length + ' complete</span><span>' + pct + '%</span></div>'
-      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:#1E2B34;transition:width 0.2s;"></div></div></div>'
+      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:#485C6A;transition:width 0.2s;"></div></div></div>'
       + '<div id="cl-items">' + itemRows + '</div>'
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
       + '<div class="card-actions">'
@@ -274,12 +274,12 @@ S.ShiftChecklists = {
     if (!r) { this.renderMain(); return; }
     const itemRows = (r.items || []).map(it =>
       '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--b2);">'
-      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? '#1E2B34' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
+      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? '#485C6A' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</span>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-back">Back</button><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div>'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
       + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
@@ -288,7 +288,6 @@ S.ShiftChecklists = {
       + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
       + '</div></div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#cl-back')) { this.renderMain(); return; }
       if (ev.target.closest('#cl-print')) this.exportPDF(r);
     };
   },
