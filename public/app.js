@@ -3101,7 +3101,7 @@ const App = {
         'lc-payroll-export':     ['Payroll Export', 'Labor Control'],
         'lc-positions':          ['Add Positions', 'Labor Control'],
         'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
-        'lc-wage-settings':      ['Wage Policies', 'Labor Control'],
+        'lc-wage-settings':      ['Wage Policy', 'Labor Control'],
         'lc-tip-log':            ['Tip Log', 'Labor Control'],
         'lc-tip-pool':           ['Pool Calculator', 'Labor Control'],
         'lc-tip-history':        ['Tip History', 'Labor Control'],
