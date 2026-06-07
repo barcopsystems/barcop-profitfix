@@ -2698,7 +2698,11 @@ S.HubSettings = {
     // Per week, split each department's labor dollars across its staff, then
     // log five daily hour entries per person. cost sums back to ANCHOR labor.
     const lcActuals = [];
-    const lcAllocate = (staff, weights, deptDollars, baseAgo) => {
+    // Each department covers a realistic spread of dayparts: the bar skews to
+    // dinner and late night, the kitchen to lunch and dinner, the floor to the
+    // brunch/lunch/dinner stretch. Rotating by (person + day) gives each staffer
+    // a believable week instead of the same daypart five days running.
+    const lcAllocate = (staff, weights, deptDollars, baseAgo, dayparts) => {
       staff.forEach((st, i) => {
         const weekHours = (deptDollars * (weights[i] || 0)) / st.wage;
         for (let d = 0; d < 5; d++) {
@@ -2706,7 +2710,8 @@ S.HubSettings = {
           if (h <= 0) continue;
           lcActuals.push({
             id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name,
-            position_id:st.position_id, shift_type:'', hours:h, wage:st.wage,
+            position_id:st.position_id, shift_type:dayparts[(i + d) % dayparts.length],
+            hours:h, wage:st.wage,
             cost:+(h * st.wage).toFixed(2), notes:''
           });
         }
@@ -2714,9 +2719,9 @@ S.HubSettings = {
     };
     ANCHL.weeks.forEach(a => {
       const baseAgo = (12 - a.wk) * 7;
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo);
-      lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo);
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
     });
     App.laborData.lc_actuals   = lcActuals;
 
