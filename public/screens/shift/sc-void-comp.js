@@ -9,6 +9,8 @@
 
 S.ShiftVoidComp = {
   editId: null,
+  entryMode: 'manual',     // landing card: 'manual' = batch builder, 'import' = drop a POS export
+  _modalMode: 'manual',    // active-shift log pop-up: same two modes
   filterFrom: '',
   filterTo: '',
   filterType: '',
@@ -107,6 +109,7 @@ S.ShiftVoidComp = {
       { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away.'] },
       { h: 'The Reason carries the classification', p: ['On a comp, the reason tells Bar Cop whether it is a loss or a policy expense. Service Recovery, Customer Goodwill, Manager Comp, Regular / VIP, and Marketing / Promo are give-aways and feed Theft Risk. Staff Meal and Shift Drink are policy expense, tracked as cost lines in Books and Year-End, not theft. Pick honestly and the theft score stays real.'] },
       { h: 'Linking a tracked item (Units)', p: ['Most comps need no item. But if you give away a tracked inventory product, a bottle of wine off the shelf, a six-pack, pick it under Item and set how many Units you gave away. The Inventory Variance Report subtracts that known comp from usage so it does not read as shrinkage.'] },
+      { h: 'Import from a POS export', p: ['Switch to Import File and drop your POS voids/comps export, CSV or Excel. Map the columns once and Bar Cop remembers it. Amount is required; Void-or-Comp, Item, Server, Reason, and Date are matched if your export has them. Servers match your roster by name, a row whose type mentions "comp" lands as a Comp and everything else as a Void. Each row lands as its own record, so the list, edits, Variance, and Theft Risk all keep working. Fill anything missing by editing the row after import.'] },
       { h: 'Filter, Export, Worksheet', p: ['Filter by date, type, or server and the totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to tally voids and comps by hand during the rush.'] }
     ]);
   },
@@ -196,12 +199,6 @@ S.ShiftVoidComp = {
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
     const formCard = this.builderCard();
-    // Drag/drop POS import, under the form, collapses WITH the form's chevron
-    // (shared collapse group). Same setup as Labor Log Hours.
-    const importCard = '<div class="card form-card" data-collapse-group="sc-void-comp">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Import Voids / Comps</span>'
-      + App.helpButton('vc-imp-how') + '</div>'
-      + '<div id="vc-csv"></div><div id="vc-imp-result"></div></div>';
 
     let below;
     if (all.length === 0) {
@@ -242,16 +239,18 @@ S.ShiftVoidComp = {
       below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Void and Comp Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + formCard + importCard + below + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
     App.applyCollapsed(this.container);
     this.wireList();
-    this.mountImporter('vc-csv');
+    if (this.entryMode === 'import') this.mountImporter('vc-csv');
   },
 
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('#vc-how')) { this.showHowTo(); return; }
-      if (ev.target.closest('#vc-imp-how')) { this.showImportHelp(); return; }
+      if (ev.target.closest('.vc-imp-how')) { this.showHowTo(); return; }
+      const modeBtn = ev.target.closest('.vc-mode');
+      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#vc-export')) { App.exportPDF({ title: 'Void and Comp Log', root: this.container }); return; }
@@ -333,26 +332,42 @@ S.ShiftVoidComp = {
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-void-comp')) return;
     this.editId = null;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Voids / Comps</div>'
-      + this.builderInner(preset)
-      + '<div class="sh" style="margin:18px 0 8px;">Or import from a POS export</div>'
-      + '<div id="vc-csv-m"></div><div id="vc-imp-result-m"></div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
-      + '<button class="btn btn-ghost" id="vcb-cancel">Cancel</button>'
-      + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-    const modal = App.openModal(html, { id: 'vc-log-modal', maxWidth: 880, noClose: true });
-    if (!modal) return;
-    modal.addEventListener('change', ev => this.onLineChange(ev));
-    modal.addEventListener('click', ev => {
-      if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
-      const rm = ev.target.closest('.vcl-del');
-      if (rm) { this.removeLine(rm.closest('.vc-line')); return; }
-      if (ev.target.closest('#vcb-cancel')) { App.closeModal('vc-log-modal'); return; }
-      if (ev.target.closest('#vcb-save')) { this.saveBatch(() => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); }); return; }
-    });
-    this.mountImporter('vc-csv-m', () => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); });
+    this._modalMode = 'manual';
+    const done = () => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); };
+    // Re-render the pop-up in place on a mode flip. openModal replaces by id, so
+    // toggling swaps the body cleanly and re-wires the fresh overlay.
+    const mount = () => {
+      const body = this._modalMode === 'import'
+        ? '<div id="vc-csv-m"></div><div id="vc-imp-result-m"></div>'
+          + '<div class="card-actions"><button class="btn btn-ghost" id="vcb-cancel">Cancel</button></div>'
+        : this.builderInner(preset)
+          + '<div class="card-actions">'
+          + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
+          + '<button class="btn btn-ghost" id="vcb-cancel">Cancel</button>'
+          + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+          + '</div>';
+      const html = '<div class="card form-card" style="margin:0;">'
+        + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Log Voids / Comps</span>' + App.helpButton('vc-how') + '</div>'
+        + this.modeToggleHtml(this._modalMode, 'vc-mmode')
+        + body
+        + '</div>';
+      const modal = App.openModal(html, { id: 'vc-log-modal', maxWidth: 880, noClose: true });
+      if (!modal) return;
+      modal.addEventListener('change', ev => this.onLineChange(ev));
+      modal.addEventListener('click', ev => {
+        if (ev.target.closest('#vc-how')) { this.showHowTo(); return; }
+        if (ev.target.closest('.vc-imp-how')) { this.showHowTo(); return; }
+        const mb = ev.target.closest('.vc-mmode');
+        if (mb) { this._modalMode = mb.dataset.mode; mount(); return; }
+        if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
+        const rm = ev.target.closest('.vcl-del');
+        if (rm) { this.removeLine(rm.closest('.vc-line')); return; }
+        if (ev.target.closest('#vcb-cancel')) { App.closeModal('vc-log-modal'); return; }
+        if (ev.target.closest('#vcb-save')) { this.saveBatch(done); return; }
+      });
+      if (this._modalMode === 'import') this.mountImporter('vc-csv-m', done);
+    };
+    mount();
   },
 
   // Collect the form (prefix p) into a record body, or null after an error.
@@ -451,13 +466,31 @@ S.ShiftVoidComp = {
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vcb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
   },
 
+  // One card, two ways in: enter the shift's voids and comps by hand in the batch
+  // builder, or drop a POS export. A segmented toggle swaps the body so the
+  // operator picks a lane instead of two stacked boxes. Same pattern as Log Hours.
+  modeToggleHtml(activeMode, cls) {
+    const segBtn = (mode, label) => {
+      const on = activeMode === mode;
+      return '<button type="button" class="btn btn-sm ' + cls + '" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    return '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">'
+      + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
+  },
+
   builderCard() {
+    const body = this.entryMode === 'import'
+      ? '<div id="vc-csv"></div><div id="vc-imp-result"></div>'
+      : this.builderInner(null)
+        + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
+        + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))
       + '<div class="collapse-body">'
-      + this.builderInner(null)
-      + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
-      + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
+      + this.modeToggleHtml(this.entryMode, 'vc-mode')
+      + body
       + '</div></div>';
   },
 
@@ -576,6 +609,7 @@ S.ShiftVoidComp = {
     if (!el || typeof CSVMapper === 'undefined') return;
     const resultId = elId === 'vc-csv-m' ? 'vc-imp-result-m' : 'vc-imp-result';
     CSVMapper.mount(el, {
+      hint: 'Drop a POS voids/comps export: <span class="vc-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
       fields: [
         { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$'] },
         { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'transaction', 'kind'] },
@@ -622,14 +656,6 @@ S.ShiftVoidComp = {
     if (r2) r2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.'
       + (skipped ? ' <span style="color:var(--t3);font-weight:400;">' + skipped + ' row' + (skipped === 1 ? '' : 's') + ' skipped (no amount).</span>' : '') + '</div>';
   },
-  showImportHelp() {
-    App.showHelpModal('How Importing Voids / Comps Works', [
-      { p: ['Instead of keying every void and comp by hand, drop your POS voids/comps export here and map the columns once. Bar Cop reads each row into the log.'] },
-      { h: 'What it needs', p: ['Amount is required. Void-or-Comp, Item, Server, Reason, and Date are matched if your export has them; fill anything missing by editing the row after import. Servers are matched to your roster by name. A row whose Type mentions "comp" lands as a Comp, everything else as a Void.'] },
-      { h: 'After importing', p: ['Each row lands as its own record, exactly like the manual builder, so the list, edits, the Inventory Variance report, and Theft Risk all keep working. Review the imported rows and edit any that need a reason or a tracked item.'] }
-    ]);
-  },
-
   // Paper-at-bar workflow.
   printBlank() {
     App.printBlankSheet({
