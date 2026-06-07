@@ -63,18 +63,7 @@ S.LaborTipPool = {
     }
 
     const equal = this.method === 'equal';
-    const rowHtml = this.rows.map((r, i) =>
-      '<div class="tp-row" data-idx="' + i + '" style="display:flex;gap:10px;align-items:flex-end;'
-      + 'flex-wrap:wrap;padding:10px;border:1px solid var(--b1);border-radius:6px;margin-bottom:8px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
-      + '<select class="tp-staff">' + App.staffOptions(r.staff_id) + '</select></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Hours</label>'
-      + '<input type="number" class="tp-hours" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"'
-      + (equal ? ' disabled' : '') + '/></div>'
-      + '<div class="f" style="flex:1;min-width:130px;"><label>&nbsp;</label>'
-      + '<div class="tp-share" style="font-size:15px;font-weight:600;font-family:\'Barlow Condensed\';color:var(--t1);padding-bottom:6px;">-</div></div>'
-      + '<button class="btn btn-ghost btn-sm tp-remove" style="margin-bottom:6px;">Remove</button>'
-      + '</div>').join('');
+    const rowHtml = this.rows.map((r, i) => this.participantRowHtml(r, i, equal)).join('');
 
     const setupCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-pool', 'Tip Pool', App.helpButton('tp-how'))
@@ -92,8 +81,16 @@ S.LaborTipPool = {
       + '<button class="btn btn-ghost" id="tp-load" style="margin-bottom:2px;">Load from Tip Log</button></div>'
       + '</div></div></div>';
 
+    const rowsBlock = this.rows.length
+      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
+        + '<table class="ing-tbl"><thead><tr>'
+        + '<th style="min-width:200px;">Staff</th><th style="width:130px;">Hours</th>'
+        + '<th style="width:150px;">Tip Share</th><th style="width:100px;"></th>'
+        + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
+      : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Add one below or load from the Tip Log.</div>';
+
     const participantsCard = '<div class="card form-card" data-collapse-group="lc-tip-pool"><div class="card-title">Participants</div>'
-      + '<div id="tp-rows">' + (rowHtml || '<div style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Add staff below or load from the Tip Log.</div>') + '</div>'
+      + rowsBlock
       + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="tp-c-count">0</div></div>'
@@ -176,6 +173,19 @@ S.LaborTipPool = {
     };
     App.applyCollapsed(this.container);
     this.recalc();
+  },
+
+  // One participant = one batch-builder table row (same .ing-tbl style as the
+  // Void/Comp + Waste builders). Hours is disabled in Equal Split; Tip Share is
+  // the live computed cell. Class names match the collect()/recalc() selectors.
+  participantRowHtml(r, i, equal) {
+    r = r || {};
+    return '<tr class="tp-row" data-idx="' + i + '">'
+      + '<td><select class="form-input tp-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td><input class="form-input tp-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
+      + '<td><div class="tp-share" style="font-weight:600;color:var(--t1);">-</div></td>'
+      + '<td><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
+      + '</tr>';
   },
 
   onPoolInput() {
