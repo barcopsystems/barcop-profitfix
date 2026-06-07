@@ -1,17 +1,15 @@
 'use strict';
 
 /* ── Labor Control — Labor Reports (reads lc_actuals) ─────────────────────────
-   Labor analysis over a date range, connected-tab views: by staff and by
-   department, with tips context. Read-only. Same tabbed shell as Cash History /
-   Tip History: a plain .ch-tabs switcher over a stats card, a Filter heading
-   with Export, the controls-only filter card, then the data card. The From/To
-   filter is global to the report, so it persists across tab switches. */
+   Labor analysis over a date range: By Department and By Staff, with tips
+   context. Read-only. Both breakdowns are short aggregated tables, so they sit
+   on one page (no tabs): a stats card, a Filter heading with one Export that
+   covers both sections, the controls-only filter card, then the two data cards.
+   Salaried staff carry their fixed weekly salary across the range. */
 
 S.LaborReports = {
   filterFrom: '',
   filterTo: '',
-  tab: 'staff',
-  TABS: [['staff', 'By Staff'], ['dept', 'By Department']],
 
   actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
   tips()    { return ((App.laborData && App.laborData.lc_tips) || []); },
@@ -31,18 +29,13 @@ S.LaborReports = {
 
   showHowTo() {
     App.showHelpModal('How Labor Reports Work', [
-      { p: ['Labor Reports total your labor over a date range, two ways: by staff and by department. Set the range and switch tabs to see each view.'] },
-      { h: 'The Two Views', p: ['By Staff lists each person\'s hours, average wage, labor cost, and share of total labor, sorted by cost. By Department rolls the same up by department so you can see where the dollars go. Salaried staff carry their fixed weekly salary across the range; their logged hours are coverage only.'] },
-      { h: 'Export', p: ['Export PDF saves whichever tab you are on, so you can hand off just the staff view or just the department view.'] }
+      { p: ['Labor Reports total your labor over a date range, two ways on one page: by department and by staff. Set the range and both update together.'] },
+      { h: 'The Two Views', p: ['By Department rolls labor up by department so you can see where the dollars go. By Staff lists each person\'s hours, average wage, labor cost, and share of total labor, sorted by cost. Salaried staff carry their fixed weekly salary across the range; their logged hours are coverage only.'] },
+      { h: 'Export', p: ['Export PDF saves the whole report, both the department and staff breakdowns, in one file.'] }
     ]);
   },
 
   // ── shared markup helpers (mirror Cash History / Tip History) ───────────────
-  tabBar() {
-    return '<div class="ch-tabs no-print">'
-      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
-      + '</div>';
-  },
   statItem(label, val, cls) {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
   },
@@ -50,6 +43,9 @@ S.LaborReports = {
     return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
       + App.helpButton('lr-how') + '</div></div>';
+  },
+  sectionHeading(title) {
+    return '<div class="sh" style="margin:24px 0 10px;">' + esc(title) + '</div>';
   },
   dataCard(headers, rowsHtml) {
     return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -65,7 +61,7 @@ S.LaborReports = {
     if (this.actuals().length === 0) {
       App.setupCard(this.container, {
         title: 'Labor Reports',
-        lead: 'Labor Reports break your labor down by staff and by department over any date range, with tips context.',
+        lead: 'Labor Reports break your labor down by department and by staff over any date range, with tips context.',
         steps: [
           { title: 'Log some hours', desc: 'Hours you log in Log Hours feed this report. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
         ]
@@ -107,18 +103,18 @@ S.LaborReports = {
       + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + this.tabBar()
       + statsCard
       + filterHeading
       + filterCard
-      + this.tabBody(rows, totCost, salWeeks)
+      + this.sectionHeading('By Department')
+      + this.byDept(rows, totCost, salWeeks)
+      + this.sectionHeading('By Staff')
+      + this.byStaff(rows, totCost, salWeeks)
       + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#lr-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Reports', root: this.container }); return; }
-      const tab = ev.target.closest('.ch-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
       if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
     };
     const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => {
@@ -127,11 +123,6 @@ S.LaborReports = {
     });
     bind('lr-from', 'filterFrom');
     bind('lr-to', 'filterTo');
-  },
-
-  tabBody(rows, totCost, salWeeks) {
-    if (this.tab === 'dept') return this.byDept(rows, totCost, salWeeks);
-    return this.byStaff(rows, totCost, salWeeks);
   },
 
   byStaff(rows, totCost, salWeeks) {
