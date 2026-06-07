@@ -2,7 +2,10 @@
 
 /* ── Labor Control — Tip History (reads lc_tips) ──────────────────────────────
    Historical tip analysis over a date range, three connected-tab views: by
-   staff, by shift, and by week. Each tab exports its own PDF. */
+   staff, by shift, and by week. Read-only. Same tabbed shell as Cash History:
+   a plain .ch-tabs switcher over a stats card, a Filter heading with Export,
+   the controls-only filter card, then the data card. The From/To/Staff filter
+   is global to the report, so it persists across tab switches. */
 
 S.LaborTipHistory = {
   filterFrom: '',
@@ -55,8 +58,30 @@ S.LaborTipHistory = {
     App.showHelpModal('How Tip History Works', [
       { p: ['Tip History summarizes the tips you have logged over a date range, three ways: by staff, by shift, and by week. Set the range, and a staff member if you want just one person, then switch tabs to see each view.'] },
       { h: 'The Three Views', p: ['By Staff totals each person\'s cash, card, and average per entry. By Shift groups tips under the shift they were logged against and shows whether a pool split was saved for it. By Week rolls the range up week by week so you can watch the trend.'] },
-      { h: 'Export', p: ['Each tab has its own Export PDF, so you can hand someone just the view they need, like one server\'s totals for the month.'] }
+      { h: 'Export', p: ['Export PDF saves whichever tab you are on, so you can hand someone just the view they need, like one server\'s totals for the month.'] }
     ]);
+  },
+
+  // ── shared markup helpers (mirror Cash History) ─────────────────────────────
+  tabBar() {
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
+      + '</div>';
+  },
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+      + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
+      + App.helpButton('th-how') + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  noRow(cols, msg) {
+    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No tips match the filter.') + '</td></tr>';
   },
 
   renderReport() {
@@ -74,52 +99,40 @@ S.LaborTipHistory = {
     }
 
     const rows = this.tips().filter(t => this.inRange(t));
+    const cash = rows.reduce((t, x) => t + (x.cash_tips || 0), 0);
+    const card = rows.reduce((t, x) => t + (x.card_tips || 0), 0);
+    const total = cash + card;
 
-    let summaryHtml = '';
-    if (rows.length) {
-      const cash = rows.reduce((t, x) => t + (x.cash_tips || 0), 0);
-      const card = rows.reduce((t, x) => t + (x.card_tips || 0), 0);
-      const total = cash + card;
-      summaryHtml = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val">' + rows.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Tips</div><div class="calc-val good">' + App.fmtCurrency(total) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Cash</div><div class="calc-val">' + App.fmtCurrency(cash) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Card</div><div class="calc-val">' + App.fmtCurrency(card) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Avg / Entry</div><div class="calc-val">' + App.fmtCurrency(rows.length ? total / rows.length : 0) + '</div></div>'
-        + '</div>';
-    }
+    const statsCard = this.statsCard(
+      this.statItem('Entries', rows.length)
+      + this.statItem('Total Tips', App.fmtCurrency(total))
+      + this.statItem('Cash', App.fmtCurrency(cash))
+      + this.statItem('Card', App.fmtCurrency(card))
+      + this.statItem('Avg / Entry', App.fmtCurrency(rows.length ? total / rows.length : 0)));
 
-    const filterCard = '<div class="card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Date Range</span>'
-      + App.helpButton('th-how') + '</div>'
-      + '<div class="form-row no-print" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label>'
-      + '<input type="date" id="th-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label>'
-      + '<input type="date" id="th-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label>'
-      + '<select id="th-staff">' + this.staffFilterOptions() + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="th-clear" style="margin-bottom:2px;">Clear</button></div>'
-      + '</div>'
-      + summaryHtml
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Tips</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="th-export">Export PDF</button></div></div>';
+
+    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="th-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="th-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="th-staff">' + this.staffFilterOptions() + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="th-clear">Clear</button></div>'
+      + '</div></div>';
+
+    this.container.innerHTML = '<div class="screen">'
+      + this.tabBar()
+      + statsCard
+      + filterHeading
+      + filterCard
+      + this.tabBody(rows)
       + '</div>';
-
-    if (rows.length === 0) {
-      this.container.innerHTML = '<div class="screen">' + filterCard
-        + '<div class="card"><div class="empty"><div class="empty-title">No tips in this range</div>'
-        + '<div class="empty-sub">Adjust or clear the filters above.</div></div></div></div>';
-    } else {
-      this.container.innerHTML = '<div class="screen">' + filterCard
-        + App.reportTabBar(this.TABS, this.tab)
-        + App.reportPanel(this.TABS, this.tab, 'th-export', this.tabBody(rows)) + '</div>';
-    }
 
     this.container.onclick = ev => {
       if (ev.target.closest('#th-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#th-export')) { App.exportPDF({ title: 'Tip History', root: this.container }); return; }
-      const tab = ev.target.closest('.rpt-tab');
+      const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
       if (ev.target.closest('#th-clear')) { this.filterFrom = this.filterTo = this.filterStaff = ''; this.renderReport(); return; }
     };
@@ -158,10 +171,8 @@ S.LaborTipHistory = {
           + '<td>' + App.fmtCurrency(s.card) + '</td>'
           + '<td class="val">' + App.fmtCurrency(tot) + '</td>'
           + '<td>' + App.fmtCurrency(s.count ? tot / s.count : 0) + '</td></tr>';
-      }).join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Staff</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Avg / Entry</th>'
-      + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+      }).join('') || this.noRow(6);
+    return this.dataCard('<th>Staff</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Avg / Entry</th>', trs);
   },
 
   // Tip entries with a shift_id group under the matching shift. POOL column
@@ -169,8 +180,8 @@ S.LaborTipHistory = {
   byShift(rows) {
     const linked = rows.filter(t => t.shift_id);
     if (!linked.length) {
-      return '<div class="empty"><div class="empty-title">No shift-linked tips in this range</div>'
-        + '<div class="empty-sub">Tips logged against a specific shift show up here.</div></div>';
+      return this.dataCard('<th>Shift</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Pool</th>',
+        this.noRow(6, 'No shift-linked tips in this range. Tips logged against a specific shift show up here.'));
     }
     const g = {};
     linked.forEach(t => {
@@ -190,7 +201,7 @@ S.LaborTipHistory = {
         const x = g[k];
         const total = x.cash + x.card;
         const poolCell = x.pool_amount != null
-          ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">POOL ' + App.fmtCurrency(x.pool_amount) + '</span>'
+          ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--t2);">POOL ' + App.fmtCurrency(x.pool_amount) + '</span>'
           : '<span style="font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;">No pool saved</span>';
         return '<tr><td><div class="val">' + (x.date ? new Date(x.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-') + '</div>'
           + (x.shift_type ? '<div style="font-size:10px;color:var(--t3);">' + esc(x.shift_type) + '</div>' : '') + '</td>'
@@ -200,9 +211,7 @@ S.LaborTipHistory = {
           + '<td class="val">' + App.fmtCurrency(total) + '</td>'
           + '<td>' + poolCell + '</td></tr>';
       }).join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Shift</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Pool</th>'
-      + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+    return this.dataCard('<th>Shift</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Pool</th>', trs);
   },
 
   byWeek(rows) {
@@ -216,9 +225,7 @@ S.LaborTipHistory = {
     const trs = Object.keys(g).sort((a, b) => b.localeCompare(a)).map(wk =>
       '<tr><td><div class="val">Week of ' + this.fmtDate(wk) + '</div></td>'
       + '<td>' + g[wk].count + '</td>'
-      + '<td class="val">' + App.fmtCurrency(g[wk].total) + '</td></tr>').join('');
-    return '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Week</th><th>Entries</th><th>Total Tips</th>'
-      + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+      + '<td class="val">' + App.fmtCurrency(g[wk].total) + '</td></tr>').join('') || this.noRow(3);
+    return this.dataCard('<th>Week</th><th>Entries</th><th>Total Tips</th>', trs);
   }
 };
