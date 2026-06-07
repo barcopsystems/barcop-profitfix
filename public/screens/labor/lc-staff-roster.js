@@ -433,15 +433,15 @@ S.LaborStaffRoster = {
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (this.certEditId ? 'Edit Certification' : 'Add Certification') + '</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:190px;flex-shrink:0;"><label>Certification Type</label>'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Certification Type</label>'
           + '<select id="cert-type">' + typeOpts + '</select></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Cert Number <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Cert Number <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<input type="text" id="cert-number" value="' + esc(c?.cert_number || '') + '" placeholder="Optional"/></div>'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Issuer <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Issuer <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<input type="text" id="cert-issuer" value="' + esc(c?.issuer || '') + '" placeholder="State, school, etc."/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Issue Date</label>'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Issue Date</label>'
           + '<input type="date" id="cert-issued" value="' + esc(c?.issue_date || '') + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Expiration Date</label>'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Expiration Date</label>'
           + '<input type="date" id="cert-expires" value="' + esc(c?.expiration_date || '') + '"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
@@ -451,7 +451,7 @@ S.LaborStaffRoster = {
         + '<button class="btn btn-ghost" id="cert-cancel">Cancel</button>'
         + '<span id="cert-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'cert-modal', maxWidth: 820, noClose: true });
+    App.openModal(html, { id: 'cert-modal', maxWidth: 540, noClose: true });
     document.getElementById('cert-cancel')?.addEventListener('click', () => { this.certEditId = null; App.closeModal('cert-modal'); });
     document.getElementById('cert-save')?.addEventListener('click', () => this.saveCert(staffId));
   },
@@ -543,12 +543,12 @@ S.LaborStaffRoster = {
       '<option' + (n && n.category === c ? ' selected' : (!n && c === 'Coaching' ? ' selected' : '')) + '>' + esc(c) + '</option>').join('');
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (this.noteEditId ? 'Edit Note' : 'Add Coaching Note') + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Date</label>'
           + '<input type="date" id="note-date" value="' + esc(n?.date || today) + '"/></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label>'
+        + '<div class="f" style="flex:1 1 45%;min-width:150px;"><label>Category</label>'
           + '<select id="note-cat">' + catOpts + '</select></div>'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Manager</label>'
+        + '<div class="f" style="flex:1 1 100%;min-width:0;"><label>Manager</label>'
           + '<select id="note-mgr">' + App.staffOptions(n?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Note</label>'
@@ -558,7 +558,7 @@ S.LaborStaffRoster = {
         + '<button class="btn btn-ghost" id="note-cancel">Cancel</button>'
         + '<span id="note-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'note-modal', maxWidth: 720, noClose: true });
+    App.openModal(html, { id: 'note-modal', maxWidth: 540, noClose: true });
     document.getElementById('note-cancel')?.addEventListener('click', () => { this.noteEditId = null; App.closeModal('note-modal'); });
     document.getElementById('note-save')?.addEventListener('click', () => this.saveNote(staffId));
   },
