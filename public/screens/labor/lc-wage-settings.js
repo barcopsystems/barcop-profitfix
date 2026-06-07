@@ -22,8 +22,8 @@ S.LaborWageSettings = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Wage Policies Work', [
-      { p: ['Wage Policies holds the wage settings that drive Labor Control. Right now that is your state minimum wage, which powers the tip-credit check on Pay Periods.'] },
+    App.showHelpModal('How Wage Policy Works', [
+      { p: ['Wage Policy holds the wage settings that drive Labor Control. Right now that is your state minimum wage, which powers the tip-credit check on Pay Periods.'] },
       { h: 'The Tip Credit Check', p: ['When a tipped employee\'s base wage plus their tip share falls below the minimum you set here for a week, Bar Cop flags that row on the Pay Periods detail so you can make up the difference before payroll runs. Set it once and every screen reads from this one value.'] },
       { h: 'Verify For Your Jurisdiction', p: ['This is a planning and review aid, not legal or payroll advice. Minimum wage and tip-credit rules vary by state and city and change over time. Confirm the right figure for your location before relying on the check.'] }
     ]);
@@ -47,7 +47,7 @@ S.LaborWageSettings = {
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop uses this value for planning and payroll review only. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Minimum wage, tip credit, and tip-pool rules vary by federal, state, and local law, change over time, and some cities set their own rates. You and your payroll provider are responsible for verifying the correct wage and tip-credit requirements for your jurisdiction before processing payroll.</div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lws-save">Save Wage Policies</button>'
+      + '<button class="btn btn-primary" id="lws-save">Save Wage Policy</button>'
       + '<span id="lws-msg" style="font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
       + '</div>'
@@ -66,7 +66,7 @@ S.LaborWageSettings = {
     const msg = document.getElementById('lws-msg');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveLabor();
-    if (btn) { btn.disabled = false; btn.textContent = 'Save Wage Policies'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Wage Policy'; }
     if (msg) {
       msg.style.display = 'inline';
       msg.style.color = ok ? 'var(--gold)' : 'var(--red)';
