@@ -77,8 +77,12 @@ S.LaborWeeklySummary = {
     const we = this.addDays(ws, 6);
     const weekActuals = this.actuals().filter(a => a.date >= ws && a.date <= we);
     const actHours = weekActuals.reduce((t, a) => t + (a.hours || 0), 0);
+    // Salaried (exempt) staff carry a fixed weekly salary, but only attribute it to
+    // a week that actually ran (something was logged). An empty or future week stays
+    // at the real hourly total instead of showing a phantom salary accrual.
     const salWk = App.salariedCost(ws, we);
-    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total;
+    const hasActivity = weekActuals.length > 0;
+    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + (hasActivity ? salWk.total : 0);
 
     const sched = this.scheduleCovering(ws);
     const schedHours = sched ? (sched.total_hours || 0) : null;
@@ -89,35 +93,32 @@ S.LaborWeeklySummary = {
     const target = this.laborTarget();
 
     const hoursVar = schedHours != null ? actHours - schedHours : null;
-    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;flex-wrap:nowrap;gap:18px;overflow-x:auto;">'
-      + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Actual Labor Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val dim">'
+    const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val lg">' + actHours.toFixed(1) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Actual Labor Cost</div><div class="calc-val lg">' + App.fmtCurrency(actCost) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val lg dim">'
       + (schedHours != null ? schedHours.toFixed(1) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val '
+      + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val lg '
       + (hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good') + '">'
       + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor % (vs Forecast)</div><div class="calc-val '
+      + '<div class="calc-item"><div class="calc-label">Labor % (vs Forecast)</div><div class="calc-val lg '
       + (laborPct == null ? '' : laborPct > target ? 'warn' : 'good') + '">'
       + (laborPct != null ? App.fmtPct(laborPct) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH (vs Forecast)</div><div class="calc-val">'
+      + '<div class="calc-item"><div class="calc-label">RPLH (vs Forecast)</div><div class="calc-val lg">'
       + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</div></div>'
-      + '</div>';
+      + '</div></div>';
 
-    const dateCard = '<div class="card">'
+    const dateCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Weekly Summary</span>'
       + App.helpButton('ws-how') + '</div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Week Starting</label>'
+      + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
       + '<input type="date" id="ws-start" value="' + esc(ws) + '"/></div>'
-      + '<div style="display:flex;gap:6px;padding-bottom:2px;">'
-      + '<button class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&#8592;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&#8594;</button>'
-      + '</div>'
-      + '</div>'
-      + summary
-      + '</div>';
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
+      + '</div></div>';
 
     // By staff
     const byStaff = {};
@@ -129,21 +130,26 @@ S.LaborWeeklySummary = {
       byStaff[k].cost += (a.cost || 0);
     });
     // Salaried (exempt) staff carry a fixed weekly salary on top of any logged
-    // hours (which stay as coverage). Inject them even if no hours were logged.
-    ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
-      if (!App.isSalaried(st) || st.status === 'Inactive') return;
-      const annual = parseFloat(st.annual_salary);
-      if (!annual || annual <= 0) return;
-      if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '-', days: {}, hours: 0, cost: 0 };
-      byStaff[st.id].cost += annual / 52;
-    });
+    // hours (which stay as coverage). Inject them even if they logged no hours,
+    // but only on a week that actually ran, so an empty week stays clean.
+    if (hasActivity) {
+      ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
+        if (!App.isSalaried(st) || st.status === 'Inactive') return;
+        const annual = parseFloat(st.annual_salary);
+        if (!annual || annual <= 0) return;
+        if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '-', days: {}, hours: 0, cost: 0 };
+        byStaff[st.id].cost += annual / 52;
+      });
+    }
+    const staffHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">By Staff</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div></div>';
+
     let staffCard;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {
-      staffCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>By Staff</span>'
-        + '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div>'
-        + '<div style="font-size:13px;color:var(--t3);">No hours logged for this week.</div></div>';
+      staffCard = staffHeading
+        + '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this week.</div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = staffKeys.sort((a, b) => byStaff[b].cost - byStaff[a].cost).map(k => {
@@ -158,12 +164,10 @@ S.LaborWeeklySummary = {
           + '<td>' + Object.keys(s.days).length + '</td>'
           + '<td>' + s.hours.toFixed(1) + '</td>'
           + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
-          + '<td>' + editBtn + '</td></tr>';
+          + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      staffCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>By Staff</span>'
-        + '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      staffCard = staffHeading
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
@@ -174,19 +178,19 @@ S.LaborWeeklySummary = {
       const dStr = this.addDays(ws, i);
       const dayAct = weekActuals.filter(a => a.date === dStr);
       const h = dayAct.reduce((t, a) => t + (a.hours || 0), 0);
-      const c = dayAct.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(dStr, dStr).total;
+      const c = dayAct.reduce((t, a) => t + (a.cost || 0), 0)
+        + (dayAct.length ? App.salariedCost(dStr, dStr).total : 0);
       dayRows.push('<tr><td><div class="val">' + this.fmtDay(dStr) + '</div></td>'
         + '<td>' + dayAct.length + '</td>'
         + '<td>' + h.toFixed(1) + '</td>'
         + '<td class="val">' + App.fmtCurrency(c) + '</td></tr>');
     }
-    const dayCard = '<div class="card"><div class="card-title">By Day</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+    const dayCard = '<div class="sh" style="margin:24px 0 10px;">By Day</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Cost</th>'
       + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + staffCard + dayCard + '</div>'
-      + this.editModalHtml();
+    this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + staffCard + dayCard + '</div>';
 
     document.getElementById('ws-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ws-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly Summary', root: this.container }));
@@ -208,46 +212,39 @@ S.LaborWeeklySummary = {
     });
   },
 
-  // ── Inline Edit Modal (per-staff per-week list) ─────────────────────
-  editModalHtml() {
-    return '<div id="ws-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;padding:20px;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:560px;width:100%;">'
-      + '<div id="ws-em-title" style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;">Edit Hours</div>'
-      + '<div id="ws-em-body"></div>'
-      + '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">'
-        + '<button class="btn btn-ghost" id="ws-em-cancel">Cancel</button>'
-        + '<button class="btn btn-primary" id="ws-em-save">Save All</button>'
-      + '</div></div></div>';
-  },
-
+  // ── Hours edit pop-up (standard form-card modal; per-staff per-week list) ────
   openEditModal(key, weekActuals) {
     const recs = weekActuals.filter(a => (a.staff_id || a.name) === key && !a.locked);
     if (!recs.length) return;
-    const modal = document.getElementById('ws-edit-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    document.getElementById('ws-em-title').textContent = 'Edit Hours · ' + (recs[0].name || '');
-    const body = document.getElementById('ws-em-body');
-    body.innerHTML = recs.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r, i) =>
+    const sorted = recs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const bodyRows = sorted.map(r =>
       '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:10px;" data-id="' + r.id + '">'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Date</label>'
           + '<div style="font-size:12px;color:var(--t2);padding:8px 0;">' + esc(this.fmtDay(r.date)) + '</div></div>'
         + '<div class="f" style="width:100px;flex-shrink:0;"><label>Hours</label>'
           + '<input type="number" class="ws-em-hours" min="0" step="0.25" value="' + (r.hours != null ? r.hours : '') + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:140px;"><label>Notes</label>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>Notes</label>'
           + '<input type="text" class="ws-em-notes" value="' + esc(r.notes || '') + '" placeholder="Optional"/></div>'
       + '</div>'
     ).join('');
-    document.getElementById('ws-em-cancel').onclick = () => { modal.style.display = 'none'; };
-    document.getElementById('ws-em-save').onclick = async () => {
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Edit Hours' + (recs[0].name ? ' &middot; ' + esc(recs[0].name) : '') + '</div>'
+      + bodyRows
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="ws-em-save">Save All</button>'
+        + '<button class="btn btn-ghost" id="ws-em-cancel">Cancel</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'ws-edit-modal', maxWidth: 600, noClose: true });
+    document.getElementById('ws-em-cancel')?.addEventListener('click', () => App.closeModal('ws-edit-modal'));
+    document.getElementById('ws-em-save')?.addEventListener('click', async () => {
       const edits = [];
-      body.querySelectorAll('.form-row').forEach(row => {
+      document.querySelectorAll('#ws-edit-modal .form-row[data-id]').forEach(row => {
         const rec = this.actuals().find(a => a.id === row.dataset.id);
         if (rec) edits.push({ rec, hours: parseFloat(row.querySelector('.ws-em-hours')?.value), notes: row.querySelector('.ws-em-notes')?.value || '' });
       });
-      modal.style.display = 'none';
+      App.closeModal('ws-edit-modal');
       for (const e of edits) { await App.updateActual(e.rec, { hours: e.hours, notes: e.notes }); }
       this.draw();
-    };
+    });
   }
 };
