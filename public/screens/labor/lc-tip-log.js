@@ -384,7 +384,7 @@ S.LaborTipLog = {
     const x = this.tips().find(t => t.id === id);
     if (!x) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Tips</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tips</div>'
       + this.formBody(x, 'tle-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tle-save">Update</button>'
@@ -392,7 +392,7 @@ S.LaborTipLog = {
         + '<span id="tle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tle-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'tl-edit-modal', maxWidth: 900, noClose: true });
+    App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
     this.wireForm(x, 'tle-');
     document.getElementById('tle-save')?.addEventListener('click', () => this.save('tle-'));
     document.getElementById('tle-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); });

@@ -179,7 +179,7 @@ S.LaborDailyView = {
     const a = this.actuals().find(x => x.id === actualId);
     if (!a) return;
     const wage = a.wage != null ? a.wage : (App.wageForStaffOn ? App.wageForStaffOn(a.staff_id, a.date) : 0);
-    const html = '<div class="card form-card" style="margin:0;">'
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">Edit Hours' + (a.name ? ' &middot; ' + esc(a.name) : '') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Hours</label>'
@@ -193,7 +193,7 @@ S.LaborDailyView = {
         + '<button class="btn btn-ghost" id="dv-em-cancel">Cancel</button>'
         + '<span id="dv-em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'dv-edit-modal', maxWidth: 520, noClose: true });
+    App.openModal(html, { id: 'dv-edit-modal', maxWidth: 540, noClose: true });
 
     const hoursInp = document.getElementById('dv-em-hours');
     const notesInp = document.getElementById('dv-em-notes');

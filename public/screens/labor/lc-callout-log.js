@@ -159,7 +159,7 @@ S.LaborCalloutLog = {
     const c = this.callouts().find(x => x.id === id);
     if (!c) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Call-Out</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Call-Out</div>'
       + this.formCells(c, 'coe-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="coe-save">Update</button>'
@@ -167,7 +167,7 @@ S.LaborCalloutLog = {
       + '<span id="coe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="coe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'co-edit-modal', maxWidth: 900, noClose: true });
+    App.openModal(html, { id: 'co-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('coe-save')?.addEventListener('click', () => this.save('coe-'));
     document.getElementById('coe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('co-edit-modal'); });
     document.getElementById('coe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('co-edit-modal'); this.confirmDel(id); });

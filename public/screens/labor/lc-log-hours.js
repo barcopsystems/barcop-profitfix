@@ -241,7 +241,7 @@ S.LaborLogHours = {
       return;
     }
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Hours</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Hours</div>'
       + this.logFormCells(a, 'loe-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="loe-save">Update</button>'
@@ -249,7 +249,7 @@ S.LaborLogHours = {
       + '<span id="loe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="loe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'lo-edit-modal', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'lo-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('loe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('lo-edit-modal'); });
     document.getElementById('loe-save')?.addEventListener('click', () => this.save('loe-'));
     document.getElementById('loe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lo-edit-modal'); this.confirmDel(id); });
