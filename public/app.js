@@ -2687,6 +2687,20 @@ const App = {
     return false;
   },
 
+  // Persist many event rows of one kind in a SINGLE request (one round-trip
+  // instead of N). The caller is expected to have already updated the in-memory
+  // records in place — this only writes them. Used where a batch changes at once
+  // (close / reopen a pay period locks or unlocks a whole week of logged hours);
+  // turns a 5-10s per-row loop into one bulk upsert.
+  async putRecordsBulk(mod, kind, recs) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return false;
+    const list = (recs || []).filter(r => r && r.id != null);
+    if (!list.length) return true;
+    const res = await DB.putEventsBulk(store.table, kind, list);
+    return !(res && res.ok === false);
+  },
+
   async removeRecord(mod, kind, id) {
     const store = this.EVENT_STORES[mod];
     if (!store) return false;
