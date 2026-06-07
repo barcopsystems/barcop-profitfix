@@ -125,8 +125,11 @@ const CSVMapper = {
   _renderMapper(headers, rows, map, sig, container, opts) {
     const optsFor = sel => '<option value="">(skip)</option>'
       + headers.map(h => '<option value="' + esc(h) + '"' + (h === sel ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
-    let html = '<div class="divider"></div><div class="card" style="margin-top:14px;">'
-      + '<div class="card-title">Map Your Columns</div>'
+    // No card wrapper: the mapper sits directly on the canvas of whatever card it
+    // was mounted in, laying out like the manual entry form (a thin divider off
+    // the drop zone, a section heading, the field grid, then the action row).
+    let html = '<div class="divider"></div>'
+      + '<div class="sh" style="margin:0 0 12px;">Map Your Columns</div>'
       + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">Found <strong style="color:var(--w);">'
       + rows.length + ' rows</strong>. Match each field to a column from your file. '
       + 'Detected columns are pre-selected and this mapping is remembered for next time.</div>'
@@ -137,9 +140,9 @@ const CSVMapper = {
         + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] || '') + '</select></div>';
     });
     html += '</div><div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
-      + '<div class="card-actions"><button class="btn btn-primary csvm-go">'
+      + '<div style="display:flex;gap:8px;align-items:center;margin-top:18px;"><button class="btn btn-primary csvm-go">'
       + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button>'
-      + '<button type="button" class="btn btn-ghost csvm-cancel">Cancel</button></div></div>';
+      + '<button type="button" class="btn btn-ghost csvm-cancel">Cancel</button></div>';
     this._area(container).innerHTML = html;
 
     // Cancel discards this file and returns to the drop zone to pick another.
