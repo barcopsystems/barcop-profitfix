@@ -85,38 +85,39 @@ S.LaborDailyView = {
     }
 
     const hoursVar = schedHours != null ? actHours - schedHours : null;
-    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Headcount</div><div class="calc-val">' + dayActuals.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val">' + actHours.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Actual Cost</div><div class="calc-val">' + App.fmtCurrency(actCost) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val dim">'
+    const summary = '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:18px;">'
+      + '<div class="calc-item"><div class="calc-label">Headcount</div><div class="calc-val lg">' + dayActuals.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val lg">' + actHours.toFixed(1) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Actual Cost</div><div class="calc-val lg">' + App.fmtCurrency(actCost) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Scheduled Hours</div><div class="calc-val lg dim">'
       + (schedHours != null ? schedHours.toFixed(1) : '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val '
+      + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val lg '
       + (hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good') + '">'
       + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
       + '</div>';
 
-    const dateCard = '<div class="card">'
+    const dateCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Daily Snapshot</span>'
       + App.helpButton('dv-how') + '</div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
+      + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
-      + '<div style="display:flex;gap:6px;padding-bottom:2px;">'
-      + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&#8592;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&#8594;</button>'
-      + '</div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&lsaquo;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button></div></div>'
       + '</div>'
       + summary
       + '</div>';
 
+    const loggedHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Logged Hours</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div></div>';
+
     let actualsCard;
     if (dayActuals.length === 0) {
-      actualsCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Logged Hours</span>'
-        + '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div>'
-        + '<div style="font-size:13px;color:var(--t3);">No hours logged for this day. Log them in Log Hours.</div></div>';
+      actualsCard = loggedHeading
+        + '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this day. Log them in Log Hours.</div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a => {
@@ -134,12 +135,10 @@ S.LaborDailyView = {
         + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
         + '<td>' + wageCell + '</td>'
         + '<td class="val">' + costCell + '</td>'
-        + '<td>' + editBtn + '</td></tr>';
+        + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      actualsCard = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Logged Hours</span>'
-        + '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      actualsCard = loggedHeading
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
@@ -152,14 +151,13 @@ S.LaborDailyView = {
         + '<td>' + esc(s.end || '-') + '</td>'
         + '<td>' + (s.hours != null ? s.hours.toFixed(1) : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(s.cost || 0) + '</td></tr>').join('');
-      schedCard = '<div class="card"><div class="card-title">Scheduled This Day</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      schedCard = '<div class="sh" style="margin:24px 0 10px;">Scheduled This Day</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Start</th><th>End</th><th>Hours</th><th>Cost</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + actualsCard + schedCard + '</div>'
-      + this.editModalHtml();
+    this.container.innerHTML = '<div class="screen">' + dateCard + actualsCard + schedCard + '</div>';
     document.getElementById('dv-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily Snapshot', root: this.container }));
     document.getElementById('dv-date')?.addEventListener('change', e => {
@@ -175,50 +173,47 @@ S.LaborDailyView = {
     });
   },
 
-  // ── Inline Hours Edit Modal ────────────────────────────────────────────
-  editModalHtml() {
-    return '<div id="dv-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;padding:20px;">'
-      + '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:480px;width:100%;">'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;" id="dv-em-title">Edit Hours</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Hours</label>'
-          + '<input type="number" id="dv-em-hours" min="0" step="0.25"/></div>'
-        + '<div class="f" style="flex:1;min-width:160px;"><label>Notes</label>'
-          + '<input type="text" id="dv-em-notes" placeholder="Optional"/></div>'
-      + '</div>'
-      + '<div id="dv-em-cost" style="font-size:11px;color:var(--t3);margin-top:6px;"></div>'
-      + '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">'
-        + '<button class="btn btn-ghost" id="dv-em-cancel">Cancel</button>'
-        + '<button class="btn btn-primary" id="dv-em-save">Save</button>'
-      + '</div></div></div>';
-  },
-
+  // ── Hours edit pop-up (standard form-card modal) ───────────────────────────
   openEditModal(actualId) {
     const a = this.actuals().find(x => x.id === actualId);
     if (!a) return;
-    const modal = document.getElementById('dv-edit-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    document.getElementById('dv-em-title').textContent = 'Edit Hours · ' + (a.name || '');
+    const wage = a.wage != null ? a.wage : (App.wageForStaffOn ? App.wageForStaffOn(a.staff_id, a.date) : 0);
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Edit Hours' + (a.name ? ' &middot; ' + esc(a.name) : '') + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Hours</label>'
+          + '<input type="number" id="dv-em-hours" min="0" step="0.25" value="' + (a.hours != null ? a.hours : '') + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:180px;"><label>Notes</label>'
+          + '<textarea id="dv-em-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(a.notes || '') + '</textarea></div>'
+      + '</div>'
+      + '<div id="dv-em-cost" style="font-size:11px;color:var(--t3);margin-top:8px;"></div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="dv-em-save">Save</button>'
+        + '<button class="btn btn-ghost" id="dv-em-cancel">Cancel</button>'
+        + '<span id="dv-em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'dv-edit-modal', maxWidth: 520, noClose: true });
+
     const hoursInp = document.getElementById('dv-em-hours');
     const notesInp = document.getElementById('dv-em-notes');
     const costEl   = document.getElementById('dv-em-cost');
-    if (hoursInp) hoursInp.value = a.hours != null ? a.hours : '';
-    if (notesInp) notesInp.value = a.notes || '';
-    const wage = a.wage != null ? a.wage : (App.wageForStaffOn ? App.wageForStaffOn(a.staff_id, a.date) : 0);
     const updateCost = () => {
       const h = parseFloat(hoursInp?.value) || 0;
       if (costEl) costEl.textContent = wage > 0 ? 'Cost: ' + App.fmtCurrency(h * wage) + ' (' + App.fmtCurrency(wage) + '/hr)' : '';
     };
     updateCost();
     hoursInp?.addEventListener('input', updateCost);
-    document.getElementById('dv-em-cancel').onclick = () => { modal.style.display = 'none'; };
-    document.getElementById('dv-em-save').onclick = async () => {
+    document.getElementById('dv-em-cancel')?.addEventListener('click', () => App.closeModal('dv-edit-modal'));
+    document.getElementById('dv-em-save')?.addEventListener('click', async () => {
       const newHours = parseFloat(hoursInp?.value);
-      if (isNaN(newHours) || newHours < 0) return;
-      modal.style.display = 'none';
+      const err = document.getElementById('dv-em-err');
+      if (isNaN(newHours) || newHours < 0) {
+        if (err) { err.textContent = 'Enter the hours worked.'; err.style.display = 'inline'; }
+        return;
+      }
+      App.closeModal('dv-edit-modal');
       await App.updateActual(a, { hours: newHours, notes: notesInp?.value || '' });
       this.draw();
-    };
+    });
   }
 };
