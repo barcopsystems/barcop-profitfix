@@ -54,7 +54,7 @@ S.LaborPayrollExport = {
     }).join('');
 
     container.innerHTML = '<div class="screen">'
-      + '<div class="card" style="margin-bottom:18px;">'
+      + '<div class="card form-card" style="margin-bottom:18px;">'
         + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Payroll Export</span>'
         + App.helpButton('px-how') + '</div>'
@@ -109,8 +109,8 @@ S.LaborPayrollExport = {
       '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:220px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
       + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
     ).join('');
-    return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
+    return '<div class="card form-card">'
+      + '<div class="card-title">What\'s In the File</div>'
       + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
       + '</div>';
   },
