@@ -73,9 +73,12 @@ S.LaborDailyView = {
   draw() {
     const dayActuals = this.actuals().filter(a => a.date === this.date);
     const actHours = dayActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    // Salaried (exempt) staff accrue a fixed daily share of salary (weekly / 7)
-    // so the seven daily costs tie back to Weekly Summary's salaried total.
-    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(this.date, this.date).total;
+    // Salaried (exempt) staff accrue a fixed daily share of salary (weekly / 7),
+    // but only attribute it to days the operation actually ran (something was
+    // logged). On an empty or future day with nothing logged, Actual Cost stays
+    // at the real hourly total instead of showing a phantom salary accrual.
+    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0)
+      + (dayActuals.length ? App.salariedCost(this.date, this.date).total : 0);
 
     const sched = this.scheduledForDate(this.date);
     let schedHours = null, schedCost = null;
@@ -85,7 +88,7 @@ S.LaborDailyView = {
     }
 
     const hoursVar = schedHours != null ? actHours - schedHours : null;
-    const summary = '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:18px;">'
+    const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Headcount</div><div class="calc-val lg">' + dayActuals.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Hours</div><div class="calc-val lg">' + actHours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Actual Cost</div><div class="calc-val lg">' + App.fmtCurrency(actCost) + '</div></div>'
@@ -94,7 +97,7 @@ S.LaborDailyView = {
       + '<div class="calc-item"><div class="calc-label">Hours vs Scheduled</div><div class="calc-val lg '
       + (hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good') + '">'
       + (hoursVar != null ? (hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1) : '-') + '</div></div>'
-      + '</div>';
+      + '</div></div>';
 
     const dateCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -106,9 +109,7 @@ S.LaborDailyView = {
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
       + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&lsaquo;</button>'
       + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button></div></div>'
-      + '</div>'
-      + summary
-      + '</div>';
+      + '</div></div>';
 
     const loggedHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Logged Hours</div>'
@@ -157,7 +158,7 @@ S.LaborDailyView = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + actualsCard + schedCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + actualsCard + schedCard + '</div>';
     document.getElementById('dv-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily Snapshot', root: this.container }));
     document.getElementById('dv-date')?.addEventListener('change', e => {
@@ -184,7 +185,7 @@ S.LaborDailyView = {
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Hours</label>'
           + '<input type="number" id="dv-em-hours" min="0" step="0.25" value="' + (a.hours != null ? a.hours : '') + '"/></div>'
         + '<div class="f" style="flex:1;min-width:180px;"><label>Notes</label>'
-          + '<textarea id="dv-em-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(a.notes || '') + '</textarea></div>'
+          + '<input type="text" id="dv-em-notes" value="' + esc(a.notes || '') + '" placeholder="Optional"/></div>'
       + '</div>'
       + '<div id="dv-em-cost" style="font-size:11px;color:var(--t3);margin-top:8px;"></div>'
       + '<div class="card-actions">'
