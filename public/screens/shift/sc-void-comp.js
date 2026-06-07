@@ -196,6 +196,12 @@ S.ShiftVoidComp = {
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
     const formCard = this.builderCard();
+    // Drag/drop POS import, under the form, collapses WITH the form's chevron
+    // (shared collapse group). Same setup as Labor Log Hours.
+    const importCard = '<div class="card form-card" data-collapse-group="sc-void-comp">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Import Voids / Comps</span>'
+      + App.helpButton('vc-imp-how') + '</div>'
+      + '<div id="vc-csv"></div><div id="vc-imp-result"></div></div>';
 
     let below;
     if (all.length === 0) {
@@ -236,14 +242,16 @@ S.ShiftVoidComp = {
       below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Void and Comp Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + importCard + below + '</div>';
     App.applyCollapsed(this.container);
     this.wireList();
+    this.mountImporter('vc-csv');
   },
 
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('#vc-how')) { this.showHowTo(); return; }
+      if (ev.target.closest('#vc-imp-how')) { this.showImportHelp(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#vc-export')) { App.exportPDF({ title: 'Void and Comp Log', root: this.container }); return; }
@@ -327,6 +335,8 @@ S.ShiftVoidComp = {
     this.editId = null;
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Voids / Comps</div>'
       + this.builderInner(preset)
+      + '<div class="sh" style="margin:18px 0 8px;">Or import from a POS export</div>'
+      + '<div id="vc-csv-m"></div><div id="vc-imp-result-m"></div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
       + '<button class="btn btn-ghost" id="vcb-cancel">Cancel</button>'
@@ -342,6 +352,7 @@ S.ShiftVoidComp = {
       if (ev.target.closest('#vcb-cancel')) { App.closeModal('vc-log-modal'); return; }
       if (ev.target.closest('#vcb-save')) { this.saveBatch(() => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); }); return; }
     });
+    this.mountImporter('vc-csv-m', () => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); });
   },
 
   // Collect the form (prefix p) into a record body, or null after an error.
@@ -552,6 +563,71 @@ S.ShiftVoidComp = {
     if (!ok) return;
     await App.removeRecord('sc', 'void_comp', id);
     this.renderList();
+  },
+
+  // ── CSV import (drag-drop + column mapping, same setup as Labor Log Hours) ────
+  normDate(raw) {
+    if (!raw) return '';
+    const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
+    return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
+  },
+  mountImporter(elId, after) {
+    const el = document.getElementById(elId);
+    if (!el || typeof CSVMapper === 'undefined') return;
+    const resultId = elId === 'vc-csv-m' ? 'vc-imp-result-m' : 'vc-imp-result';
+    CSVMapper.mount(el, {
+      fields: [
+        { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$'] },
+        { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'transaction', 'kind'] },
+        { key: 'item',   label: 'Item',         required: false, match: ['item', 'item name', 'product', 'menu item', 'description'] },
+        { key: 'server', label: 'Server',       required: false, match: ['server', 'employee', 'name', 'staff', 'bartender', 'cashier'] },
+        { key: 'reason', label: 'Reason',       required: false, match: ['reason', 'comp reason', 'void reason', 'note'] },
+        { key: 'date',   label: 'Date',         required: false, match: ['date', 'business date', 'shift date'] }
+      ],
+      confirmLabel: 'Import',
+      onComplete: rows => this.importRows(rows, resultId, after)
+    });
+  },
+  async importRows(rows, resultId, after) {
+    const byName = {};
+    ((App.laborData && App.laborData.lc_staff) || []).forEach(s => { if (s && s.name) byName[String(s.name).trim().toLowerCase()] = s; });
+    const today = App.todayLocal();
+    const toAdd = []; let skipped = 0;
+    (rows || []).forEach(r => {
+      const amount = parseFloat(String(r.amount == null ? '' : r.amount).replace(/[^0-9.\-]/g, ''));
+      if (isNaN(amount) || amount < 0) { skipped++; return; }
+      const t = (r.type || '').trim().toLowerCase();
+      const type = (t.indexOf('comp') >= 0 || t === 'c') ? 'Comp' : 'Void';
+      const serverName = (r.server || '').trim();
+      const staff = serverName ? byName[serverName.toLowerCase()] : null;
+      toAdd.push({
+        id: App.uid(), date: this.normDate(r.date) || today, type, shift_type: '',
+        item: (r.item || '').trim(), amount,
+        product_id: '', product_name: '', menu_item_id: '', units: null,
+        staff_id: staff ? staff.id : '', server: staff ? staff.name : serverName,
+        authorized_by_id: '', authorized_by: '', check_number: '',
+        reason: (r.reason || '').trim(), notes: '', auth_threshold_override: false,
+        created_at: new Date().toISOString()
+      });
+    });
+    const setResult = html => { const r = resultId && document.getElementById(resultId); if (r) r.innerHTML = html; };
+    if (!toAdd.length) { setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">No rows imported. Every row was missing a valid amount.</div>'); return; }
+    const list = this.records();
+    let ok = true;
+    for (const rec of toAdd) { list.push(rec); ok = (await App.putRecord('sc', 'void_comp', rec)) && ok; }
+    if (!ok) { setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
+    if (typeof after === 'function') { after(); return; }   // popup: close + re-render the shift
+    this.renderList();
+    const r2 = document.getElementById('vc-imp-result');
+    if (r2) r2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.'
+      + (skipped ? ' <span style="color:var(--t3);font-weight:400;">' + skipped + ' row' + (skipped === 1 ? '' : 's') + ' skipped (no amount).</span>' : '') + '</div>';
+  },
+  showImportHelp() {
+    App.showHelpModal('How Importing Voids / Comps Works', [
+      { p: ['Instead of keying every void and comp by hand, drop your POS voids/comps export here and map the columns once. Bar Cop reads each row into the log.'] },
+      { h: 'What it needs', p: ['Amount is required. Void-or-Comp, Item, Server, Reason, and Date are matched if your export has them; fill anything missing by editing the row after import. Servers are matched to your roster by name. A row whose Type mentions "comp" lands as a Comp, everything else as a Void.'] },
+      { h: 'After importing', p: ['Each row lands as its own record, exactly like the manual builder, so the list, edits, the Inventory Variance report, and Theft Risk all keep working. Review the imported rows and edit any that need a reason or a tracked item.'] }
+    ]);
   },
 
   // Paper-at-bar workflow.
