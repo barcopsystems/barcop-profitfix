@@ -14,7 +14,7 @@
    overtime, classification, and tax compliance. */
 
 S.LaborPayrollExport = {
-  _ackGiven: false,    // worksheet-disclaimer acknowledgment, reset on each visit
+  _ackGiven: false,    // worksheet-disclaimer acknowledged this visit (covers both files)
   PP() { return S.LaborPayPeriods; },
 
   render(container, actions) {
@@ -81,24 +81,30 @@ S.LaborPayrollExport = {
     document.getElementById('px-csv')?.addEventListener('click', () => this._ackThenDownload('csv', document.getElementById('px-week')?.value));
   },
 
-  // Gate every export behind an acknowledgment of the worksheet disclaimer, so the
+  // Gate the export behind an acknowledgment of the worksheet disclaimer, so the
   // protection language is seen even when the operator only grabs the import CSV
-  // and never opens the formatted workbook. Once per visit to this screen.
-  async _ackThenDownload(fmt, weekStart) {
+  // and never opens the formatted workbook. Once per visit: the first download
+  // prompts and the acknowledgment covers both files, so grabbing the workbook
+  // and the CSV seconds apart is one click, not two. A fresh visit (next week)
+  // prompts again.
+  _ackThenDownload(fmt, weekStart) {
     if (!weekStart) return;
-    if (!this._ackGiven) {
-      const ok = await App.confirm({
-        title: 'Before You Export Payroll',
-        message: 'This file is a worksheet Bar Cop builds from what you log, not your official payroll, tax, or timekeeping record. Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running payroll.',
-        confirmText: 'I Understand, Continue',
-        cancelText: 'Cancel',
-        danger: false
-      });
-      if (!ok) return;
+    const proceed = () => { if (fmt === 'xlsx') this._downloadWorkbook(weekStart); else this._downloadCSV(weekStart); };
+    if (this._ackGiven) { proceed(); return; }
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Before You Export Payroll</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">This file is a worksheet Bar Cop builds from what you log, not your official payroll, tax, or timekeeping record. Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running payroll.</div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="px-ack-go">I Understand, Continue</button>'
+      + '<button class="btn btn-ghost" id="px-ack-cancel">Cancel</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'px-ack-modal', maxWidth: 540, noClose: true });
+    document.getElementById('px-ack-cancel')?.addEventListener('click', () => App.closeModal('px-ack-modal'));
+    document.getElementById('px-ack-go')?.addEventListener('click', () => {
+      App.closeModal('px-ack-modal');
       this._ackGiven = true;
-    }
-    if (fmt === 'xlsx') this._downloadWorkbook(weekStart);
-    else this._downloadCSV(weekStart);
+      proceed();
+    });
   },
 
   showHowTo() {
