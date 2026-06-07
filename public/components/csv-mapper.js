@@ -139,7 +139,17 @@ const CSVMapper = {
         + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
         + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] || '') + '</select></div>';
     });
-    html += '</div><div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
+    html += '</div>';
+    // First rows preview so the operator can confirm they mapped the right columns.
+    const previewRows = rows.slice(0, 3);
+    if (previewRows.length) {
+      html += '<div style="margin-top:18px;"><div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;margin-bottom:6px;">PREVIEW: FIRST ROWS FROM YOUR FILE</div>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>'
+        + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
+        + '</tbody></table></div></div>';
+    }
+    html += '<div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
       + '<div style="display:flex;gap:8px;align-items:center;margin-top:18px;"><button class="btn btn-primary csvm-go">'
       + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button>'
       + '<button type="button" class="btn btn-ghost csvm-cancel">Cancel</button></div>';
