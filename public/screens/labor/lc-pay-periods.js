@@ -357,9 +357,10 @@ S.LaborPayPeriods = {
     if (existing) Object.assign(existing, rec);
     else list.push(rec);
     const savedPeriod = existing || rec;
-    // Persist the period row plus every locked actual as its own event row.
+    // Persist the period row, then every locked actual in one bulk write (one
+    // round-trip instead of one per entry).
     await App.putRecord('lc', 'pay_period', savedPeriod);
-    for (const a of affected) { await App.putRecord('lc', 'actual', a); }
+    await App.putRecordsBulk('lc', 'actual', affected);
     this.detailWeekStart = weekStart;
     this.renderDetail(weekStart);
   },
@@ -382,9 +383,9 @@ S.LaborPayPeriods = {
       existing.status = 'Open';
       existing.reopened_at = new Date().toISOString();
     }
-    // Persist the reopened period plus every unlocked actual.
+    // Persist the reopened period, then every unlocked actual in one bulk write.
     if (existing) await App.putRecord('lc', 'pay_period', existing);
-    for (const a of affected) { await App.putRecord('lc', 'actual', a); }
+    await App.putRecordsBulk('lc', 'actual', affected);
     if (this.detailWeekStart) this.renderDetail(weekStart);
     else this.renderList();
   },
