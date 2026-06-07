@@ -154,38 +154,20 @@ S.LaborPayPeriods = {
     this.detailWeekStart = null;
     this.actions.innerHTML = '';
 
-    // Build the last 12 weeks ending with the current week
+    // Build the last 12 weeks ending with the current week, then split them into
+    // open (still working) and closed (locked) so the two never mix on one table.
     const today = App.todayLocal();
     const thisMon = this.mondayOf(today);
     const weeks = [];
-    for (let i = 0; i < 12; i++) {
-      weeks.push(this.addDays(thisMon, -7 * i));
-    }
+    for (let i = 0; i < 12; i++) weeks.push(this.addDays(thisMon, -7 * i));
 
-    const rows = weeks.map(ws => {
-      const agg = this.aggregateWeek(ws);
+    const openWeeks = [];
+    const closedWeeks = [];
+    weeks.forEach(ws => {
       const saved = this.periods().find(p => p.week_start === ws);
-      const isClosed = !!saved && saved.status === 'Closed';
-      const statusBadge = isClosed
-        ? '<span style="font-weight:700;letter-spacing:1px;color:var(--gold);">CLOSED</span>'
-        : '<span style="font-weight:700;letter-spacing:1px;color:var(--t3);">OPEN</span>';
-      const actions = isClosed
-        ? '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
-          + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll Export</button>'
-          + '<button class="btn btn-ghost btn-sm pp-reopen" data-ws="' + ws + '">Reopen</button>'
-        : '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
-          + '<button class="btn btn-ghost btn-sm pp-csv" data-ws="' + ws + '">Payroll Export</button>'
-          + (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm pp-close" data-ws="' + ws + '">Close &amp; Lock</button>' : '');
-      return '<tr>'
-        + '<td><div class="val">' + esc(this.fmtDateShort(ws)) + ' &ndash; ' + esc(this.fmtDateShort(agg.weekEnd)) + '</div></td>'
-        + '<td>' + statusBadge + '</td>'
-        + '<td>' + agg.totals.hours.toFixed(1) + '</td>'
-        + '<td class="' + (agg.totals.ot_hours > 0 ? 'neg' : '') + '">' + (agg.totals.ot_hours > 0 ? agg.totals.ot_hours.toFixed(1) : '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(agg.totals.gross) + '</td>'
-        + '<td>' + agg.totalCount + ' entr' + (agg.totalCount === 1 ? 'y' : 'ies') + '</td>'
-        + '<td><div class="row-actions">' + actions + '</div></td>'
-        + '</tr>';
-    }).join('');
+      if (saved && saved.status === 'Closed') closedWeeks.push({ ws, saved });
+      else openWeeks.push({ ws });
+    });
 
     const totals = weeks.reduce((t, ws) => {
       const a = this.aggregateWeek(ws).totals;
@@ -193,27 +175,72 @@ S.LaborPayPeriods = {
       return t;
     }, { hours: 0, gross: 0, ot_hours: 0 });
 
-    const summary = '<div class="calc" style="margin-top:14px;margin-bottom:16px;">'
-      + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Hours</div><div class="calc-val">' + totals.hours.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last 12 Weeks OT Hours</div><div class="calc-val ' + (totals.ot_hours > 0 ? 'warn' : '') + '">' + totals.ot_hours.toFixed(1) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Gross</div><div class="calc-val good">' + App.fmtCurrency(totals.gross) + '</div></div>'
-      + '</div>';
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card">'
+    const topCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Pay Periods</span>'
-      + App.helpButton('pp-how') + '</div>'
-      + summary
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Week</th><th>Status</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>'
-      + '</div>';
+      + '<span>Pay Periods</span>' + App.helpButton('pp-how') + '</div>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Hours</div><div class="calc-val lg">' + totals.hours.toFixed(1) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last 12 Weeks OT Hours</div><div class="calc-val lg ' + (totals.ot_hours > 0 ? 'warn' : '') + '">' + totals.ot_hours.toFixed(1) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Gross</div><div class="calc-val lg">' + App.fmtCurrency(totals.gross) + '</div></div>'
+      + '</div></div>';
+
+    // Open periods: View + Close & Lock. No Payroll Export button (reach it from
+    // the View screen or the Payroll Export screen), no Status column (the card
+    // heading carries the state).
+    const openRow = ({ ws }) => {
+      const agg = this.aggregateWeek(ws);
+      const actions = '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
+        + (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm pp-close" data-ws="' + ws + '">Close &amp; Lock</button>' : '');
+      return '<tr>'
+        + '<td><div class="val">' + esc(this.fmtDateShort(ws)) + ' &ndash; ' + esc(this.fmtDateShort(agg.weekEnd)) + '</div></td>'
+        + '<td>' + agg.totals.hours.toFixed(1) + '</td>'
+        + '<td class="' + (agg.totals.ot_hours > 0 ? 'neg' : '') + '">' + (agg.totals.ot_hours > 0 ? agg.totals.ot_hours.toFixed(1) : '-') + '</td>'
+        + '<td class="val">' + App.fmtCurrency(agg.totals.gross) + '</td>'
+        + '<td>' + agg.totalCount + ' entr' + (agg.totalCount === 1 ? 'y' : 'ies') + '</td>'
+        + '<td><div class="row-actions">' + actions + '</div></td>'
+        + '</tr>';
+    };
+    let openCard = '<div class="sh" style="margin:24px 0 10px;">Open Periods</div>';
+    if (openWeeks.length === 0) {
+      openCard += '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No open periods. Every week in range is closed and locked.</div>';
+    } else {
+      openCard += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
+        + '</tr></thead><tbody>' + openWeeks.map(openRow).join('') + '</tbody></table></div></div>';
+    }
+
+    // Closed periods drop to their own card below with the Reopen button, the way
+    // Back In Stock items split off the 86 List.
+    let closedCard = '';
+    if (closedWeeks.length > 0) {
+      const closedRow = ({ ws, saved }) => {
+        const agg = this.aggregateWeek(ws);
+        let closedOn = '-';
+        if (saved.closed_at) {
+          const d = new Date(saved.closed_at);
+          if (!isNaN(d.getTime())) closedOn = this.fmtDateShort(App.ymdLocal(d));
+        }
+        const actions = '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
+          + '<button class="btn btn-ghost btn-sm pp-reopen" data-ws="' + ws + '">Reopen</button>';
+        return '<tr>'
+          + '<td><div class="val">' + esc(this.fmtDateShort(ws)) + ' &ndash; ' + esc(this.fmtDateShort(agg.weekEnd)) + '</div></td>'
+          + '<td>' + agg.totals.hours.toFixed(1) + '</td>'
+          + '<td class="' + (agg.totals.ot_hours > 0 ? 'neg' : '') + '">' + (agg.totals.ot_hours > 0 ? agg.totals.ot_hours.toFixed(1) : '-') + '</td>'
+          + '<td class="val">' + App.fmtCurrency(agg.totals.gross) + '</td>'
+          + '<td>' + closedOn + '</td>'
+          + '<td><div class="row-actions">' + actions + '</div></td>'
+          + '</tr>';
+      };
+      closedCard = '<div class="sh" style="margin:24px 0 10px;">Closed Periods</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Closed</th><th></th>'
+        + '</tr></thead><tbody>' + closedWeeks.map(closedRow).join('') + '</tbody></table></div></div>';
+    }
+
+    this.container.innerHTML = '<div class="screen">' + topCard + openCard + closedCard + '</div>';
 
     document.getElementById('pp-how')?.addEventListener('click', () => this.showHowTo());
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { this.detailWeekStart = b.dataset.ws; this.renderDetail(b.dataset.ws); }));
-    this.container.querySelectorAll('.pp-csv').forEach(b => b.addEventListener('click', () => this.openPayrollExport(b.dataset.ws)));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));
   },
@@ -239,7 +266,7 @@ S.LaborPayPeriods = {
         ? (stateMinValid
             ? (below
                 ? '<span style="color:var(--red);font-weight:700;" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
-                : '<span style="color:var(--gold);font-weight:700;">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>')
+                : '<span style="color:var(--green);font-weight:700;">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>')
             : '<span style="color:var(--t3);font-weight:700;">Set State Min Wage</span>')
         : '<span style="color:var(--t4);font-size:11px;">Non-Tipped</span>';
       return '<tr>'
@@ -255,31 +282,40 @@ S.LaborPayPeriods = {
         + '</tr>';
     }).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No hours logged this period.</td></tr>';
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button></div>'
-      + '<div class="calc" style="margin-top:14px;margin-bottom:14px;">'
-        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + agg.totals.hours.toFixed(1) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val">' + App.fmtCurrency(agg.totals.cost) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">OT Pay</div><div class="calc-val ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Gross</div><div class="calc-val good">' + App.fmtCurrency(agg.totals.gross) + '</div></div>'
-      + '</div>'
-      + (belowMinCount > 0
-          ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:10px;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. Make up the difference before payroll runs.</div>'
-          : '')
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Open Payroll Export</button>'
-        + (isClosed
-            ? '<button class="btn btn-ghost" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
-            : (agg.totalCount > 0 ? '<button class="btn btn-primary" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : ''))
-      + '</div>'
+    const backBar = '<div class="no-print" style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="pp-back">&lsaquo; Back to Pay Periods</button></div>';
+
+    const periodCard = '<div class="card form-card">'
+      + '<div class="card-title">Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</div>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + agg.totals.hours.toFixed(1) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val lg ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.cost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">OT Pay</div><div class="calc-val lg ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Gross</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.gross) + '</div></div>'
       + '</div></div>';
 
+    const warnLine = belowMinCount > 0
+      ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. Make up the difference before payroll runs.</div>'
+      : '';
+
+    const breakdownHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Staff Breakdown</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button></div></div>';
+
+    const tableCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    const actionRow = '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">'
+      + '<button class="btn btn-primary" id="pp-csv-detail" data-ws="' + weekStart + '">Open Payroll Export</button>'
+      + (isClosed
+          ? '<button class="btn btn-ghost" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
+          : (agg.totalCount > 0 ? '<button class="btn btn-primary" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : ''))
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + backBar + periodCard + warnLine + breakdownHeading + tableCard + actionRow + '</div>';
+
+    document.getElementById('pp-back')?.addEventListener('click', () => this.renderList());
     document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Period', root: this.container }));
     document.getElementById('pp-csv-detail')?.addEventListener('click', () => this.openPayrollExport(weekStart));
     document.getElementById('pp-close-detail')?.addEventListener('click', () => this.closePeriod(weekStart));
