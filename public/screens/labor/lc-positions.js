@@ -3,11 +3,11 @@
 /* ── Labor Control — Positions (writes lc_positions) ──────────────────────────
    The job positions used to build schedules and log hours. Each position has a
    department, a default hourly wage, and whether it is tipped. Stored in
-   App.laborData (lc_data table, Rule 21) — saved via App.saveLabor(). */
+   App.laborData (lc_data table, Rule 21) — saved via App.saveLabor(). Inline add
+   form on the landing; editing a row opens it in a focused pop-up. */
 
 S.LaborPositions = {
   editId: null,
-  _pendingDelId: null,
   DEPARTMENTS: ['Bar', 'Front of House', 'Kitchen', 'Management', 'Other'],
 
   positions() {
@@ -23,22 +23,28 @@ S.LaborPositions = {
     this.renderList();
   },
 
-  // The four data cells (Name, Department, Default Wage, Type) shared by the
-  // inline add form and the edit form so the two never drift in layout.
-  formCells(p) {
+  // Full form body (Name, Department, Default Wage, Type, Notes) shared by the
+  // inline add form and the edit pop-up. p = element-id prefix ('lp-' inline,
+  // 'lpe-' pop-up) so the modal's inputs never collide with the inline form.
+  formBody(item, p) {
+    p = p || 'lp-';
     const deptOpts = this.DEPARTMENTS.map(d =>
-      '<option' + ((p ? p.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
-    const wageVal = (p && p.default_wage != null && p.default_wage !== '') ? p.default_wage : '';
-    return '<div class="f" style="width:200px;flex-shrink:0;"><label>Position Name</label>'
-      + '<input type="text" id="lp-name" value="' + esc(p?.name || '') + '" placeholder="e.g. Bartender"/></div>'
+      '<option' + ((item ? item.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
+    const wageVal = (item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '';
+    return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Position Name</label>'
+      + '<input type="text" id="' + p + 'name" value="' + esc(item?.name || '') + '" placeholder="e.g. Bartender"/></div>'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Department</label>'
-      + '<select id="lp-dept">' + deptOpts + '</select></div>'
+      + '<select id="' + p + 'dept">' + deptOpts + '</select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Default Wage</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lp-wage" min="0" step="0.01" '
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'wage" min="0" step="0.01" '
       + 'value="' + wageVal + '" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label>'
-      + '<select id="lp-tipped"><option value="no"' + (p && p.tipped ? '' : ' selected') + '>Non-Tipped</option>'
-      + '<option value="yes"' + (p && p.tipped ? ' selected' : '') + '>Tipped</option></select></div>';
+      + '<select id="' + p + 'tipped"><option value="no"' + (item && item.tipped ? '' : ' selected') + '>Non-Tipped</option>'
+      + '<option value="yes"' + (item && item.tipped ? ' selected' : '') + '>Tipped</option></select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(item?.notes || '') + '</textarea></div></div>';
   },
 
   renderList() {
@@ -49,92 +55,88 @@ S.LaborPositions = {
       return (a.name || '').localeCompare(b.name || '');
     });
 
-    // Inline add form, always at the top of the landing page.
-    const addForm = '<div class="card">'
+    const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-positions', 'Add Position', App.helpButton('lp-how'))
       + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.formCells(null) + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
-      + '<label>Notes</label><textarea id="lp-notes" rows="2" placeholder="Optional"></textarea></div></div>'
+      + this.formBody(null)
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lp-add">Add Position</button>'
+      + '<button class="btn btn-primary" id="lp-save">Add Position</button>'
       + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 
-    let listCard;
+    let below;
     if (list.length === 0) {
-      listCard = '<div class="card"><div class="card-title">Positions</div>'
-        + '<div style="font-size:13px;color:var(--t3);">No positions yet. Add your first one above. Positions drive '
-        + 'scheduling, hours, and labor cost.</div></div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No positions yet. Add your first one above. Positions drive scheduling, hours, and labor cost.</div>';
     } else {
       const rows = list.map(p => '<tr class="lp-row" data-id="' + p.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + esc(p.name || '-') + '</div></td>'
         + '<td>' + esc(p.department || '-') + '</td>'
         + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-') + '</td>'
         + '<td>' + (p.tipped
-            ? '<span style="color:var(--gold);font-weight:700;">Tipped</span>'
+            ? '<span style="color:var(--t1);font-weight:700;">Tipped</span>'
             : '<span style="color:var(--t3);font-weight:700;">Non-Tipped</span>') + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm lp-del" data-id="' + p.id + '">Delete</button>'
+        + (App.canEdit('lc-positions') ? '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>' : '')
+        + (App.canEdit('lc-positions') ? '<button class="btn btn-danger btn-sm lp-del" data-id="' + p.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      listCard = '<div class="card"><div class="card-title">Positions</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      below = '<div class="sh" style="margin-top:24px;">Positions</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Position</th><th>Department</th><th>Default Wage</th><th>Type</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + addForm + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#lp-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
-      if (ev.target.closest('#lp-add')) { this.editId = null; this.save(); return; }
+      if (ev.target.closest('#lp-save')) { this.editId = null; this.save('lp-'); return; }
       const edit = ev.target.closest('.lp-edit');
       const del = ev.target.closest('.lp-del');
       const row = ev.target.closest('.lp-row');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row)  this.showForm(row.dataset.id);
+      else if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); }
+      else if (row)  this.openEditModal(row.dataset.id);
     };
     App.applyCollapsed(this.container);
   },
 
-  // Edit form — same one-row layout as the inline add form, minus the How This
-  // Works button. Lives on its own page; Cancel returns to the list.
-  showForm(id) {
-    this.editId = id || null;
-    const p = id ? this.positions().find(x => x.id === id) : null;
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">' + (id ? 'Edit' : 'Add') + ' Position</div>'
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + this.formCells(p) + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
-      + '<label>Notes</label><textarea id="lp-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div></div>'
+  // Edit in a focused pop-up (own lpe- ids). Cancel closes it; Delete pushed right.
+  openEditModal(id) {
+    if (!App.canEdit('lc-positions')) return;
+    const item = this.positions().find(x => x.id === id);
+    if (!item) return;
+    this.editId = id;
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Position</div>'
+      + this.formBody(item, 'lpe-')
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lp-save">' + (id ? 'Update' : 'Save Position') + '</button>'
-      + '<button class="btn btn-ghost" id="lp-cancel">Cancel</button>'
-      + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    document.getElementById('lp-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('lp-save')?.addEventListener('click', () => this.save());
+      + '<button class="btn btn-primary" id="lpe-save">Update</button>'
+      + '<button class="btn btn-ghost" id="lpe-cancel">Cancel</button>'
+      + '<span id="lpe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<button class="btn btn-danger" id="lpe-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'lp-edit-modal', maxWidth: 760, noClose: true });
+    document.getElementById('lpe-save')?.addEventListener('click', () => this.save('lpe-'));
+    document.getElementById('lpe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); });
+    document.getElementById('lpe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); this.confirmDel(id); });
   },
 
-  async save() {
-    const err = document.getElementById('lp-err');
+  async save(p) {
+    p = p || 'lp-';
+    const isEdit = p === 'lpe-';
+    const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const name = document.getElementById('lp-name')?.value.trim();
+    const name = document.getElementById(p + 'name')?.value.trim();
     if (!name) { fail('Position name is required.'); return; }
-    const wage = parseFloat(document.getElementById('lp-wage')?.value);
+    const wage = parseFloat(document.getElementById(p + 'wage')?.value);
 
     const rec = {
       id:           this.editId || App.uid(),
       name,
-      department:   document.getElementById('lp-dept')?.value || 'Other',
+      department:   document.getElementById(p + 'dept')?.value || 'Other',
       default_wage: isNaN(wage) ? null : wage,
-      tipped:       document.getElementById('lp-tipped')?.value === 'yes',
-      notes:        document.getElementById('lp-notes')?.value.trim() || ''
+      tipped:       document.getElementById(p + 'tipped')?.value === 'yes',
+      notes:        document.getElementById(p + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
 
@@ -146,12 +148,16 @@ S.LaborPositions = {
       list.push(rec);
     }
 
+    const btn = document.getElementById(p + 'save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveLabor();
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_positions');
+      if (isEdit) App.closeModal('lp-edit-modal');
       this.renderList();
     } else {
+      if (btn) { btn.disabled = false; btn.textContent = isEdit ? 'Update' : 'Add Position'; }
       fail('Save failed. Try again.');
     }
   },
