@@ -14,7 +14,6 @@ S.LaborStaffRoster = {
   detailId: null,
   certEditId: null,
   noteEditId: null,
-  noteFilterCategory: '',
   entryMode: 'manual',     // landing card: type a profile vs import a staff file
 
   CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
@@ -358,7 +357,6 @@ S.LaborStaffRoster = {
     this.actions.innerHTML = '';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="no-print" style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="sr-back">&lsaquo; Back to Roster</button></div>'
       + this.renderProfileEditCard(s)
       + this.renderCertsCard(staffId)
       + this.renderNotesCard(staffId)
@@ -382,7 +380,6 @@ S.LaborStaffRoster = {
   wireUnified(staffId) {
     this.container.onclick = null;
     this.wirePayFields(true);
-    document.getElementById('sr-back')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
     document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
     document.getElementById('sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
     // Certifications
@@ -393,10 +390,6 @@ S.LaborStaffRoster = {
     document.getElementById('note-add')?.addEventListener('click', () => { this.noteEditId = null; this.openNoteModal(staffId); });
     this.container.querySelectorAll('.note-edit').forEach(b => b.addEventListener('click', () => { this.noteEditId = b.dataset.id; this.openNoteModal(staffId); }));
     this.container.querySelectorAll('.note-del').forEach(b => b.addEventListener('click', () => this.confirmDelNote(b.dataset.id, staffId)));
-    document.getElementById('note-filter')?.addEventListener('change', e => {
-      this.noteFilterCategory = e.target.value || '';
-      this.renderUnified(staffId);
-    });
   },
 
   // ── Certifications section ───────────────────────────────────────────
@@ -507,16 +500,11 @@ S.LaborStaffRoster = {
 
   // ── Coaching Log section ─────────────────────────────────────────────
   renderNotesCard(staffId) {
-    const all = this.notesForStaff(staffId);
-    const list = this.noteFilterCategory ? all.filter(n => n.category === this.noteFilterCategory) : all;
-    const filterOpts = '<option value="">All categories</option>'
-      + this.NOTE_CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (this.noteFilterCategory === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    const list = this.notesForStaff(staffId);
 
     let body;
-    if (all.length === 0) {
+    if (list.length === 0) {
       body = '<div style="font-size:12px;color:var(--t3);">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div>';
-    } else if (list.length === 0) {
-      body = '<div style="font-size:12px;color:var(--t3);">No notes match this category. Clear the filter to see everything.</div>';
     } else {
       body = list.map(n => {
         const catColor = n.category === 'Praise' ? 'var(--green)'
@@ -541,10 +529,6 @@ S.LaborStaffRoster = {
     }
 
     return '<div class="card form-card"><div class="card-title">Coaching Log</div>'
-      + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:200px;flex-shrink:0;margin-bottom:0;"><label>Filter by Category</label>'
-          + '<select id="note-filter">' + filterOpts + '</select></div>'
-      + '</div>'
       + body
       + '<div class="card-actions"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div>'
       + '</div>';
