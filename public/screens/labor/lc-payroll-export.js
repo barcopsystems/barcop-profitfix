@@ -93,7 +93,7 @@ S.LaborPayrollExport = {
     if (this._ackGiven) { proceed(); return; }
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Before You Export Payroll</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">This file is a worksheet Bar Cop builds from what you log, not your official payroll, tax, or timekeeping record. Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running payroll.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">This file is a worksheet Bar Cop builds from what you log, not your official payroll, tax, or timekeeping record. Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running&nbsp;payroll.</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="px-ack-go">I Understand, Continue</button>'
       + '<button class="btn btn-ghost" id="px-ack-cancel">Cancel</button>'
