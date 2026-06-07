@@ -14,10 +14,12 @@
    overtime, classification, and tax compliance. */
 
 S.LaborPayrollExport = {
+  _ackGiven: false,    // worksheet-disclaimer acknowledgment, reset on each visit
   PP() { return S.LaborPayPeriods; },
 
   render(container, actions) {
     this.container = container;
+    this._ackGiven = false;
     if (actions) actions.innerHTML = '';
     const pp = this.PP();
     if (pp.actuals().length === 0) {
@@ -75,8 +77,28 @@ S.LaborPayrollExport = {
       + '</div>';
 
     document.getElementById('px-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('px-xlsx')?.addEventListener('click', () => this._downloadWorkbook(document.getElementById('px-week')?.value));
-    document.getElementById('px-csv')?.addEventListener('click', () => this._downloadCSV(document.getElementById('px-week')?.value));
+    document.getElementById('px-xlsx')?.addEventListener('click', () => this._ackThenDownload('xlsx', document.getElementById('px-week')?.value));
+    document.getElementById('px-csv')?.addEventListener('click', () => this._ackThenDownload('csv', document.getElementById('px-week')?.value));
+  },
+
+  // Gate every export behind an acknowledgment of the worksheet disclaimer, so the
+  // protection language is seen even when the operator only grabs the import CSV
+  // and never opens the formatted workbook. Once per visit to this screen.
+  async _ackThenDownload(fmt, weekStart) {
+    if (!weekStart) return;
+    if (!this._ackGiven) {
+      const ok = await App.confirm({
+        title: 'Before You Export Payroll',
+        message: 'This file is a worksheet Bar Cop builds from what you log, not your official payroll, tax, or timekeeping record. Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running payroll.',
+        confirmText: 'I Understand, Continue',
+        cancelText: 'Cancel',
+        danger: false
+      });
+      if (!ok) return;
+      this._ackGiven = true;
+    }
+    if (fmt === 'xlsx') this._downloadWorkbook(weekStart);
+    else this._downloadCSV(weekStart);
   },
 
   showHowTo() {
@@ -157,7 +179,7 @@ S.LaborPayrollExport = {
 
   _fileBase(ws) {
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
-    return barName + ' - Payroll - ' + ws;
+    return barName + ' - Payroll Worksheet - ' + ws;
   },
 
   // ── Workbook (.xlsx) — formatted like Month-End Books ─────────────────────
@@ -236,7 +258,12 @@ S.LaborPayrollExport = {
   _pushFooter(aoa, merges, line, fullMerge) {
     aoa.push(line('')); // spacer
     aoa.push(line('Source: Labor Control hours and tip pools. Revenue and shifts from Shift Control.')); fullMerge(aoa.length - 1);
-    aoa.push(line('Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll record. Verify every figure before running payroll.')); fullMerge(aoa.length - 1);
+    // Split the payroll disclaimer across rows so each sentence fits the merged
+    // width and reads in full without widening a column. The worksheet caveat
+    // gets its own row so it is never clipped at the merge edge.
+    aoa.push(line('Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor.')); fullMerge(aoa.length - 1);
+    aoa.push(line('Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider.')); fullMerge(aoa.length - 1);
+    aoa.push(line('This is a worksheet, not your official payroll record. Verify every figure before running payroll.')); fullMerge(aoa.length - 1);
     App.deliverableFooter().disclaimerLines.forEach(l => { aoa.push(line(l)); fullMerge(aoa.length - 1); });
   },
 
