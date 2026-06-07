@@ -10,6 +10,7 @@
 
 S.LaborLogHours = {
   editId: null,
+  entryMode: 'manual',     // 'manual' = type a row, 'import' = drop a timeclock file
   filterFrom: '',
   filterTo: '',
   filterShift: '',
@@ -122,28 +123,28 @@ S.LaborLogHours = {
       return;
     }
 
-    // One header on the Log Hours card governs the whole entry section: its own
-    // form body plus the Import card below (tagged into the same group). Clicking
-    // anywhere on the header opens/closes both, so the operator can tuck the entry
-    // tools away in one click once they are mostly reviewing the list.
+    // One card, two ways in: type a row by hand, or drop a timeclock export. A
+    // segmented toggle swaps the body between the manual form and the file import
+    // so the operator picks a lane instead of staring at two separate boxes.
+    const segBtn = (mode, label) => {
+      const on = this.entryMode === mode;
+      return '<button type="button" class="btn btn-sm lo-mode" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    const modeBody = this.entryMode === 'import'
+      ? '<div id="lo-csv"></div><div id="lo-imp-result"></div>'
+      : this.logFormCells(null)
+        + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
+        + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '</div>';
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-log-hours', 'Log Hours', App.helpButton('lo-how'))
       + '<div class="collapse-body">'
-      + this.logFormCells(null)
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
-      + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    // Import card sits under the log form, so a new operator can drop a timeclock
-    // export instead of entering by hand. No explainer text here on purpose; the
-    // How it works button carries it. No own header toggle: it collapses with the
-    // form via the shared group key.
-    const importCard = '<div class="card form-card" data-collapse-group="lc-log-hours">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Import Hours</span>'
-      + App.helpButton('lo-imp-how') + '</div>'
-      + '<div id="lo-csv"></div><div id="lo-imp-result"></div></div>';
+      + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + modeBody
+      + '</div></div>';
 
     const all = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
@@ -197,10 +198,12 @@ S.LaborLogHours = {
       below = statsCard + filterHeading + this.filterCard() + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + addCard + importCard + below + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
-      if (ev.target.closest('#lo-imp-how')) { this.showImportHelp(); return; }
+      if (ev.target.closest('.lo-imp-how')) { this.showImportHelp(); return; }
+      const modeBtn = ev.target.closest('.lo-mode');
+      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
@@ -214,8 +217,8 @@ S.LaborLogHours = {
       else if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); }
       else if (row && App.canEdit('lc-log-hours')) this.openEditModal(row.dataset.id);
     };
-    this.wireForm('lo-');
-    this.mountImporter();
+    if (this.entryMode === 'import') this.mountImporter();
+    else this.wireForm('lo-');
     document.getElementById('lo-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-shift')?.addEventListener('change', e => { this.filterShift = e.target.value || ''; this.renderList(); });
@@ -380,6 +383,8 @@ S.LaborLogHours = {
     const el = document.getElementById('lo-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
+      hint: 'Drop a timeclock or POS export. <strong style="color:var(--w);">Staff Name, Date, and Hours</strong> are required; rows are matched to your roster by name and cost out at the wage in effect on each date. '
+        + '<span class="lo-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">See accepted columns</span>',
       fields: [
         { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff'] },
         { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date'] },
