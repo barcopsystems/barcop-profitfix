@@ -83,9 +83,9 @@ S.LaborTipPool = {
 
     const rowsBlock = this.rows.length
       ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
-        + '<table class="ing-tbl"><thead><tr>'
-        + '<th style="min-width:200px;">Staff</th><th style="width:130px;">Hours</th>'
-        + '<th style="width:150px;">Tip Share</th><th style="width:100px;"></th>'
+        + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:240px;">Staff</th><th style="width:120px;">Hours</th>'
+        + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
       : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Add one below or load from the Tip Log.</div>';
 
@@ -184,6 +184,7 @@ S.LaborTipPool = {
       + '<td><select class="form-input tp-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td><input class="form-input tp-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
       + '<td><div class="tp-share" style="font-weight:600;color:var(--t1);">-</div></td>'
+      + '<td></td>'
       + '<td><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
       + '</tr>';
   },
