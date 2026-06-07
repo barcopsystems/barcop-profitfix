@@ -201,7 +201,7 @@ S.LaborLogHours = {
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
-      if (ev.target.closest('.lo-imp-how')) { this.showImportHelp(); return; }
+      if (ev.target.closest('.lo-imp-how')) { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.lo-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
@@ -331,21 +331,10 @@ S.LaborLogHours = {
   showHowTo() {
     App.showHelpModal('How Logging Hours Works', [
       { p: ['This is where actual hours worked get recorded. Logged hours feed your weekly labor cost, prime cost, and revenue per labor hour across Profit and Revenue Recovery, so what you enter here drives the numbers everywhere else.'] },
-      { h: 'Logging An Entry', p: ['Fill the row at the top: date, staff member, shift, and hours worked, then Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary.'] },
-      { h: 'Importing From A Timeclock', p: ['Instead of entering by hand, drop a timeclock or POS export into the Import card below and map the columns once. Rows are matched to your roster by name. It is the fast way to get a whole week in at once.'] },
+      { h: 'Logging An Entry', p: ['Pick Enter Manually, then fill the row: date, staff member, shift, and hours worked, and Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary.'] },
+      { h: 'Importing From A Timeclock', p: ['Switch to Import File and drop a timeclock or POS export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name, Date, and Hours are required; Shift is optional. Your headers do not need to match exactly: Staff Name reads employee / name / staff, Date reads date / work date / shift date, Hours reads hours / total hours / hrs / worked.'] },
+      { h: 'Matching To Your Roster', p: ['Each imported row is matched to a staff member by name and costs out at the wage in effect on the date worked. A row that does not match anyone on the roster, or is missing hours, is skipped and reported so you can fix it.'] },
       { h: 'Closed Pay Periods', p: ['Once a pay period is closed in Pay Periods, its entries lock so the payroll handoff stays clean. Reopen the period there if you need to correct a locked entry.'] }
-    ]);
-  },
-
-  showImportHelp() {
-    App.showHelpModal('How Importing Hours Works', [
-      { p: ['Upload your timeclock or POS hours export as a CSV or Excel file. Bar Cop reads your column headers, matches them to the right fields, and lets you fix anything it guessed wrong before importing.'] },
-      { h: 'The Columns', p: ['Staff Name, Date, and Hours are required. Shift is optional. Your headers do not need to match exactly; these common names are recognized:',
-        'Staff Name: employee, employee name, name, staff',
-        'Date: date, work date, shift date',
-        'Hours: hours, total hours, hrs, worked',
-        'Shift: shift, shift type'] },
-      { h: 'Matching To Your Roster', p: ['Each row is matched to a staff member by name. A row that does not match anyone on the roster, or is missing hours, is skipped and reported so you can fix it. Each entry costs out at the wage in effect on the date worked, not today\'s rate.'] }
     ]);
   },
 
@@ -383,8 +372,7 @@ S.LaborLogHours = {
     const el = document.getElementById('lo-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
-      hint: 'Drop a timeclock or POS export. <strong style="color:var(--w);">Staff Name, Date, and Hours</strong> are required; rows are matched to your roster by name and cost out at the wage in effect on each date. '
-        + '<span class="lo-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">See accepted columns</span>',
+      hint: 'Drop a timeclock or POS export: <span class="lo-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
       fields: [
         { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff'] },
         { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date'] },
