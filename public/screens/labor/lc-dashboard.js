@@ -117,17 +117,24 @@ S.LaborDashboard = {
       + this.metricCard('Overtime Risk', '&mdash;', 'After you build a schedule')
       + this.metricCard('Active Staff', String(activeStaff), totalStaff + ' on the roster');
 
+    const hero = this.panelCard('This Week',
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No schedule built for this week yet. Build one to set a labor budget and project overtime, then log hours as the week runs.</div>'
+      + '<button class="btn btn-primary btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">Build Schedule</button></div>');
+
     const emptyBody = msg => '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
-    const alertsPanel = this.shPanel('Alerts', emptyBody('Overtime risk, uncovered call-outs, and expiring certifications surface here once you build a schedule and log hours.'));
-    const recentPanel = this.shPanel('Recent Hours', emptyBody('The hours you log show up here.')
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
-        + this.actionBtn('lc-log-hours', 'Log Hours')
-        + this.actionBtn('lc-staff-roster', 'Staff Roster') + '</div>');
+    const deptCard  = this.shPanel('Labor Cost by Department', emptyBody('Once you log hours, your labor cost splits by department here.'));
+    const hoursCard = this.shPanel('Hours This Week', emptyBody('Logged and scheduled hours project here against the ' + App.OT_THRESHOLD + '-hour overtime threshold.'));
+    const recent    = this.shPanel('Recent Hours', emptyBody('The hours you log land here, newest first.'));
+    const watchCard = this.shPanel('Labor Watch', emptyBody('Overtime risk, uncovered call-outs, and expiring certifications surface here once you build a schedule and log hours.'));
 
     this.container.innerHTML = '<div class="screen">'
       + startStrip
       + '<div class="metric-grid">' + cards + '</div>'
-      + this.row(alertsPanel, recentPanel)
+      + '<div style="margin-bottom:16px;">' + hero + '</div>'
+      + this.row(deptCard, hoursCard)
+      + this.row(recent, watchCard)
+      + this.quickActions()
       + '</div>';
   },
 
