@@ -310,7 +310,7 @@ S.ShiftVoidComp = {
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Void / Comp</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Void / Comp</div>'
       + this.formFields(r, 'vce-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vce-save">Update</button>'
@@ -318,7 +318,7 @@ S.ShiftVoidComp = {
       + '<span id="vce-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="vce-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 700, noClose: true });
+    App.openModal(html, { id: 'vc-edit-modal', maxWidth: 540, noClose: true });
     this.wireFormFields('vce-');
     document.getElementById('vce-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); });
     document.getElementById('vce-save')?.addEventListener('click', () => this.saveEdit(id));

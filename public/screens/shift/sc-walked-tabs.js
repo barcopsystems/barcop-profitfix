@@ -186,7 +186,7 @@ S.ShiftWalkedTabs = {
     const r = this.tabs().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Walked Tab</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Walked Tab</div>'
       + this.formFields(r, 'wte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wte-save">Update</button>'
@@ -194,7 +194,7 @@ S.ShiftWalkedTabs = {
       + '<span id="wte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="wte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'wt-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('wte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); });
     document.getElementById('wte-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('wte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); this.confirmDel(id); });

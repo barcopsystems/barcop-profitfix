@@ -362,7 +362,7 @@ S.ShiftWaste = {
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Waste / Spill</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Waste / Spill</div>'
       + this.editFields(r)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wle-save">Update</button>'
@@ -370,7 +370,7 @@ S.ShiftWaste = {
       + '<span id="wle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="wle-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'wl-edit-modal', maxWidth: 700, noClose: true });
+    App.openModal(html, { id: 'wl-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('wle-product')?.addEventListener('change', e => {
       const lbl = document.getElementById('wle-unit-label');
       if (lbl) lbl.textContent = this.unitLabel(this.productById(e.target.value));

@@ -234,7 +234,7 @@ S.ShiftMaintenance = {
     const r = this.records().find(x => x.id === id);
     if (!r) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Maintenance Issue</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Maintenance Issue</div>'
       + this.formFields(r, 'mte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="mte-save">Update</button>'
@@ -242,7 +242,7 @@ S.ShiftMaintenance = {
       + '<span id="mte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="mte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'mt-edit-modal', maxWidth: 760, noClose: true });
+    App.openModal(html, { id: 'mt-edit-modal', maxWidth: 540, noClose: true });
     this.wireResolvedAutofill('mte-');
     document.getElementById('mte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-edit-modal'); });
     document.getElementById('mte-save')?.addEventListener('click', () => this.saveEdit(id));
@@ -254,14 +254,14 @@ S.ShiftMaintenance = {
   openLogModal(onDone, preset) {
     if (!App.canEdit('sc-maintenance')) return;
     this.editId = null;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Maintenance Issue</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Log Maintenance Issue</div>'
       + this.formFields(preset || null, 'mte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="mte-save">Save</button>'
       + '<button class="btn btn-ghost" id="mte-cancel">Cancel</button>'
       + '<span id="mte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'mt-edit-modal', maxWidth: 760, noClose: true });
+    App.openModal(html, { id: 'mt-edit-modal', maxWidth: 540, noClose: true });
     this.wireResolvedAutofill('mte-');
     document.getElementById('mte-cancel')?.addEventListener('click', () => App.closeModal('mt-edit-modal'));
     document.getElementById('mte-save')?.addEventListener('click', () => this.saveLog(onDone));

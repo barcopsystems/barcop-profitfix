@@ -663,7 +663,7 @@ S.Shift86List = {
       ? '<div class="f" style="flex:1;min-width:200px;"><label>Item</label><input type="text" id="qe-item" value="' + esc(it.item || '') + '" style="height:44px;"/></div>'
       : '<div class="f" style="flex:1;min-width:200px;"><label>Item</label><div class="f-display" style="height:44px;display:flex;align-items:center;gap:8px;">' + esc(it.item || '') + (srcTxt || '') + '</div></div>';
 
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit 86 Item</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit 86 Item</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + itemField
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Category</label><select id="qe-cat" style="height:44px;">' + catOpts + '</select></div>'
@@ -679,7 +679,7 @@ S.Shift86List = {
       + '<span id="qe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="qe-del" style="margin-left:auto;">Delete</button></div></div>';
 
-    App.openModal(html, { id: 'ei-edit-modal', maxWidth: 600, noClose: true });
+    App.openModal(html, { id: 'ei-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('qe-cancel')?.addEventListener('click', () => App.closeModal('ei-edit-modal'));
     document.getElementById('qe-save')?.addEventListener('click', () => this.saveEdit(id, isCustom));
     document.getElementById('qe-del')?.addEventListener('click', () => { App.closeModal('ei-edit-modal'); this.confirmDel(id); });

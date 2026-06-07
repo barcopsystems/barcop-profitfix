@@ -140,14 +140,14 @@ S.ShiftDrawers = {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
     this.editId = id;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Drawer</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Drawer</div>'
       + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dre-save">Update</button>'
       + '<button class="btn btn-ghost" id="dre-cancel">Cancel</button>'
       + '<span id="dre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'dr-edit-modal', maxWidth: 640, noClose: true });
+    App.openModal(html, { id: 'dr-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('dre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('dr-edit-modal'); });
     document.getElementById('dre-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('dre-name')?.focus();
