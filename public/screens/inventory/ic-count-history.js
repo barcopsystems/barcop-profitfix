@@ -10,6 +10,8 @@ S.InventoryCountHistory = {
   compareId: null,
   countedByFilter: '',
   typeFilter: '',
+  filterFrom: '',
+  filterTo: '',
 
   counts() {
     return ((App.inventoryData && App.inventoryData.ic_counts) || []);
@@ -66,7 +68,9 @@ S.InventoryCountHistory = {
         return { c, variance, isLatest };
       }).reverse()
         .filter(r => (!this.countedByFilter || r.c.counted_by === this.countedByFilter)
-          && (!this.typeFilter || r.c.type === this.typeFilter));
+          && (!this.typeFilter || r.c.type === this.typeFilter)
+          && (!this.filterFrom || (r.c.date || '') >= this.filterFrom)
+          && (!this.filterTo || (r.c.date || '') <= this.filterTo));
 
       const latest = asc[asc.length - 1];
       const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
@@ -81,6 +85,8 @@ S.InventoryCountHistory = {
         + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div></div>';
 
       const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.filterFrom) + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:240px;flex-shrink:0;"><label>Counted By</label><select id="ch-filter">'
         + '<option value="">All staff</option>'
         + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
@@ -116,7 +122,7 @@ S.InventoryCountHistory = {
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts match the filters.</td></tr>') + '</tbody></table></div></div>'
-        + App.showOlderBar('ic', 'count', ordered, !!(this.countedByFilter || this.typeFilter));
+        + App.showOlderBar('ic', 'count', ordered, !!(this.countedByFilter || this.typeFilter || this.filterFrom || this.filterTo));
 
       html = statsCard + filterHeading + filterCard + listCard;
     }
@@ -125,7 +131,7 @@ S.InventoryCountHistory = {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#ch-list-export')) { this.exportList(); return; }
-      if (ev.target.closest('#ch-clear')) { this.countedByFilter = ''; this.typeFilter = ''; this.renderList(); return; }
+      if (ev.target.closest('#ch-clear')) { this.countedByFilter = ''; this.typeFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
       const how = ev.target.closest('#ch-how');
       const del = ev.target.closest('.ch-del');
       const view = ev.target.closest('.ch-view');
@@ -145,6 +151,8 @@ S.InventoryCountHistory = {
       this.typeFilter = e.target.value || '';
       this.renderList();
     });
+    document.getElementById('ch-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('ch-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderList(); });
   },
 
   // Export the COMPLETE count list to PDF (every count, not just the on-screen
