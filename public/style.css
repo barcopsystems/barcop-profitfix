@@ -461,7 +461,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-card .tbl tbody td{background:#0D181E;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
 /* Void/Comp + Waste + Tip Pool + Receive-Delivery batch-builder line rows use the data-row fill; header row stays. */
-.vc-line td,.wl-line td,.tp-row td,.rd-line td{background:#0D181E;}
+.vc-line td,.wl-line td,.tp-row td,.rd-line td,.os-line td{background:#0D181E;}
 /* A flagged delivery line tints gold across the data row AND its detail sub-row, down to the divider. */
 .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:var(--gold-tint);}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
