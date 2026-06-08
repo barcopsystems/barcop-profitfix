@@ -1103,6 +1103,25 @@ S.HubBooks = {
       byStaff[sid].wages += cost;
     });
 
+    // Salaried (exempt) management is paid a fixed weekly salary with no
+    // lc_actuals rows, so without this Total Wages Paid and Labor % of Revenue
+    // understate the real spend and disagree with Payroll and the Revenue
+    // dashboards for the same month. Accrued day-for-day across the month.
+    const _ms = new Date(monthKey + '-01T00:00:00');
+    const monthEnd = App.ymdLocal(new Date(_ms.getFullYear(), _ms.getMonth() + 1, 0));
+    const salWeeks = (Math.floor((new Date(monthEnd + 'T00:00:00').getTime() - _ms.getTime()) / 86400000) + 1) / 7;
+    staff.forEach(st => {
+      const wk = App.staffWeeklySalary(st);
+      if (!wk) return;
+      const cost = wk * salWeeks;
+      const pname = posName(st.position_id);
+      totalWages += cost;
+      if (!byPos[pname]) byPos[pname] = { hours: 0, wages: 0 };
+      byPos[pname].wages += cost;
+      if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '(unknown)', position: pname, hours: 0, wages: 0 };
+      byStaff[st.id].wages += cost;
+    });
+
     const totalRev = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
     const laborPct = totalRev > 0 ? (totalWages / totalRev) : null;
 
@@ -1161,7 +1180,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Labor Control log hours and call-out log. Revenue from Shift Control. Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
+      'Source: Labor Control logged hours plus salaried staff pay, and the call-out log. Revenue from Shift Control. Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
