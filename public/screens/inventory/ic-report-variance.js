@@ -272,7 +272,7 @@ S.InventoryVarianceReport = {
   statsCard(items) {
     return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
-      + App.helpButton('vr-how') + '</div></div>';
+      + '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button></div></div>';
   },
   dataCard(headers, rowsHtml, fixedColgroup) {
     return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"' + (fixedColgroup ? ' style="table-layout:fixed;width:100%;min-width:560px;"' : '') + '>'
@@ -304,12 +304,57 @@ S.InventoryVarianceReport = {
       return;
     }
 
-    // ── Import-first state ──────────────────────────────────────────────────
+    // Controls + Variance Standards stay at the top, in their original spots —
+    // before AND after import (Category only appears once a file is imported).
+    const period = this.currentPeriod();
+    const periodOpts = asc.slice(1).map((c, i) =>
+      '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
+      + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
+
+    let catCtl = '';
+    if (this.posRows) {
+      const avail = this.availableCats();
+      if (avail.length) {
+        const catOpts = '<option value="">All Categories</option>'
+          + avail.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+        catCtl = '<div class="f" style="width:200px;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>';
+      }
+    }
+    const controls = '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Variance Report</span>' + App.helpButton('vr-how') + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:260px;">'
+      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div>' + catCtl + '</div></div>';
+
+    let body;
     if (!this.posRows) {
-      const importCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      body = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Import POS Sales</span>' + App.helpButton('vr-import-how') + '</div>'
         + '<div id="vr-import"></div></div>';
-      this.container.innerHTML = '<div class="screen">' + importCard + '</div>';
+    } else {
+      const unmatched = this.unmatchedPos().length;
+      const recognized = this.posRows.length - unmatched;
+      const sr = this.salesRows();
+      const flagged = sr.filter(r => !r.mixedSizes && (r.varPct != null || r.unitVar != null)
+        && this.status(r.key, r.varPct, r.unitVar).label === 'Flag').length;
+      const netVar = sr.reduce((s, r) => s + ((!r.mixedSizes && r.salesVar != null) ? r.salesVar : 0), 0);
+      const statsCard = this.statsCard(
+        this.statItem('Recognized', recognized)
+        + this.statItem('Unmatched', unmatched, unmatched ? 'warn' : '')
+        + this.statItem('Flagged', flagged, flagged ? 'warn' : '')
+        + this.statItem('Sales Variance', App.fmtCurrency(netVar), netVar > 0 ? 'warn' : ''));
+      body = statsCard + this.matchSummary() + this.unmatchedCard()
+        + this.tabBar()
+        + (this.tab === 'usage' ? this.tabUsage() : this.tabSales());
+    }
+
+    this.container.innerHTML = '<div class="screen">' + controls + this.varianceStandardsCard() + body + '</div>';
+
+    document.getElementById('vr-how')?.addEventListener('click', () => this.showHowTo());
+    document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
+    document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
+    this.wireStandards();
+
+    if (!this.posRows) {
       document.getElementById('vr-import-how')?.addEventListener('click', () => this.showImportHelp());
       CSVMapper.mount(document.getElementById('vr-import'), {
         confirmLabel: 'Import POS Sales',
@@ -329,58 +374,9 @@ S.InventoryVarianceReport = {
           this.draw();
         }
       });
-      return;
+    } else {
+      this.wireBody();
     }
-
-    // ── Imported state ──────────────────────────────────────────────────────
-    const period = this.currentPeriod();
-    const periodOpts = asc.slice(1).map((c, i) =>
-      '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
-      + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
-
-    const avail = this.availableCats();
-    const catOpts = '<option value="">All Categories</option>'
-      + avail.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-
-    // Stats headline.
-    const unmatched = this.unmatchedPos().length;
-    const recognized = this.posRows.length - unmatched;
-    const sr = this.salesRows();
-    const flagged = sr.filter(r => !r.mixedSizes && (r.varPct != null || r.unitVar != null)
-      && this.status(r.key, r.varPct, r.unitVar).label === 'Flag').length;
-    const netVar = sr.reduce((s, r) => s + ((!r.mixedSizes && r.salesVar != null) ? r.salesVar : 0), 0);
-    const statsCard = this.statsCard(
-      this.statItem('Recognized', recognized)
-      + this.statItem('Unmatched', unmatched, unmatched ? 'warn' : '')
-      + this.statItem('Flagged', flagged, flagged ? 'warn' : '')
-      + this.statItem('Sales Variance', App.fmtCurrency(netVar), netVar > 0 ? 'warn' : ''));
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Variance</div>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button></div></div>';
-
-    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:260px;flex-shrink:0;"><label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div>'
-      + (avail.length ? '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>' : '')
-      + '</div></div>';
-
-    const body = this.tab === 'usage' ? this.tabUsage() : this.tabSales();
-
-    this.container.innerHTML = '<div class="screen">'
-      + this.tabBar()
-      + statsCard
-      + this.matchSummary()
-      + filterHeading
-      + filterCard
-      + body
-      + this.unmatchedCard()
-      + this.varianceStandardsCard()
-      + '</div>';
-
-    document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
-    document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
-    this.wireStandards();
-    this.wireBody();
   },
 
   matchSummary() {
@@ -460,7 +456,7 @@ S.InventoryVarianceReport = {
 
     if (this._unmatchedCollapsed == null) this._unmatchedCollapsed = un.length > 6;
     const collapsed = this._unmatchedCollapsed;
-    return '<div class="card form-card no-print" style="margin-top:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Unmatched POS Products (' + un.length + ') ' + tt('vr-unmatched') + '</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-unmatched-toggle">' + (collapsed ? 'Show' : 'Hide') + '</button></div>'
       + '<div id="vr-unmatched-body" style="' + (collapsed ? 'display:none;' : '') + '">' + rows + '</div></div>';
@@ -494,7 +490,6 @@ S.InventoryVarianceReport = {
       }));
     this.container.querySelectorAll('.ch-tab').forEach(btn =>
       btn.addEventListener('click', () => { this.tab = btn.dataset.tab; this.draw(); }));
-    document.getElementById('vr-how')?.addEventListener('click', () => this.showHowTo());
   },
 
   wireStandards() {
@@ -553,7 +548,7 @@ S.InventoryVarianceReport = {
         + '<div class="fw"><input class="suf vr-th" type="number" data-cat="' + esc(key) + '" data-key="' + field
         + '" min="0" step="' + step + '" value="' + this.thNum(t[key][field]) + '"/><span class="suf">' + suffix + '</span></div></div>';
     };
-    return '<div class="card form-card no-print" style="margin-top:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Variance Standards</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-th-reset">Reset to Defaults</button></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
