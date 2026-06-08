@@ -1296,7 +1296,7 @@ S.ShiftActiveShift = {
     const btn = document.getElementById('aw-pool-save');
     const status = document.getElementById('aw-pool-status');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'tip_pool', rec);
     if (btn) { btn.disabled = false; btn.textContent = 'Update Pool'; }
     if (ok) {
       if (status) { status.textContent = 'Pool saved for this shift.'; status.style.display = 'inline'; }
