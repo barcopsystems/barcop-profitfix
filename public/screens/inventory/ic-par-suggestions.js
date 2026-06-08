@@ -63,14 +63,6 @@ S.InventoryParSuggestions = {
     const txt = String(vendor.delivery_days).toLowerCase();
     return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].reduce((n, d) => n + (txt.includes(d) ? 1 : 0), 0);
   },
-  // Effective reorder cycle in DAYS for one product: 7 / its vendor's
-  // delivery-days-per-week, falling back to the global default when the vendor
-  // has no delivery days on file.
-  cycleDaysFor(product, settings) {
-    const perWeek = this.deliveryDaysPerWeek(this.vendorByName(product && product.vendor));
-    return perWeek >= 1 ? 7 / perWeek : (settings.cycle_days || 7);
-  },
-
   // ── Math ──────────────────────────────────────────────────────────────
   // Compute average weekly usage for one product over the last N weeks.
   // Pairs adjacent counts; usage_for_pair = start_total + purchases_between
@@ -115,25 +107,22 @@ S.InventoryParSuggestions = {
 
   computeSuggestion(product, settings, asOfDate) {
     const usage = this.weeklyUsageFor(product.id, settings.window_weeks, asOfDate);
-    if (!usage) return { weeks_analyzed: 0, avg_weekly: null, suggested: null, status: 'No data', reasoning: 'Need at least two counts for this product to suggest.' };
-    const cycleDays = this.cycleDaysFor(product, settings);
+    if (!usage) return { weeks_analyzed: 0, avg_weekly: null, suggested: null, status: 'No data' };
+    // Cycle from the product's vendor delivery cadence; default when none on file.
+    const perWeek = this.deliveryDaysPerWeek(this.vendorByName(product && product.vendor));
+    const cycleDays = perWeek >= 1 ? 7 / perWeek : (settings.cycle_days || 7);
+    const cycleSource = perWeek >= 1 ? 'vendor' : 'default';
     const cycleWeeks = cycleDays / 7;
     const buffer = (settings.buffer_pct || 0) / 100;
-    let suggested = usage.avg_weekly * cycleWeeks * (1 + buffer);
     // Round UP to a whole unit (cases for bottle beer, bottles, kegs, lbs).
     // Usage is already in the product's stock unit. Operators order in whole
     // units, so the ceiling errs on the side of not running out.
-    suggested = Math.ceil(suggested);
+    const suggested = Math.ceil(usage.avg_weekly * cycleWeeks * (1 + buffer));
     const current = Math.round(parseFloat(product.par_level) || 0);
     const delta = suggested - current;
     let status = 'No Change';
     if (delta !== 0) status = delta > 0 ? 'Increase' : 'Reduce';
-    const u = this.unitFor(product);
-    const cycTxt = (cycleDays % 1 === 0) ? cycleDays.toString() : cycleDays.toFixed(1);
-    const reasoning = 'About ' + usage.avg_weekly.toFixed(1) + (u ? ' ' + u : '') + ' a week used, covering a '
-      + cycTxt + '-day reorder cycle plus a ' + (settings.buffer_pct || 0) + '% buffer. Based on '
-      + usage.weeks_analyzed + ' week' + (usage.weeks_analyzed === 1 ? '' : 's') + ' of counts.';
-    return { ...usage, cycle_days: cycleDays, suggested, current, delta, status, reasoning };
+    return { ...usage, cycle_days: cycleDays, cycle_source: cycleSource, suggested, current, delta, status };
   },
 
   // Dollar value of holding `units` of a product at par (per stock unit cost).
@@ -164,7 +153,7 @@ S.InventoryParSuggestions = {
       { p: ['A par is the amount you want on hand for a product. Set it right and the Order Sheet keeps you stocked without tying up cash in dead inventory. Dynamic Pars reads your real usage from your counts and suggests a par for every product, so you are not guessing.'] },
       { h: 'How The Suggestion Is Built', p: ['Bar Cop averages how fast each product actually moved over your recent counts, covers one delivery cycle of that usage, then adds a safety buffer. The math: average weekly usage times your delivery cycle, plus the buffer.'] },
       { h: 'Delivery Cycle Comes From The Vendor', p: ['You buy liquor weekly but produce two or three times a week, so a single cycle for everything over-pars the things you get often. Bar Cop reads each product\'s cycle from its vendor\'s Delivery Days, so a vendor who delivers twice a week gives a tighter par than a weekly one. The Default Delivery Cycle under Settings is only used when a vendor has no delivery days on file.'] },
-      { h: 'What Each Row Tells You', p: ['Only products whose par is off from your real usage show up, so the list is a clean to-do. Each row shows current par, average weekly usage, the suggested par, whether to Increase or Reduce, the cash impact (a Reduce frees money off the shelf, an Increase costs a little more to stock), and how many weeks of counts back the number. Hover the suggested par for the full math.'] },
+      { h: 'What Each Row Tells You', p: ['Only products whose par is off from your real usage show up, so the list is a clean to-do. Each row shows current par, average weekly usage, the suggested par with the reorder cycle it used right under it, whether to Increase or Reduce, the cash impact (a Reduce frees money off the shelf, an Increase costs a little more to stock), and how many weeks of counts back the number under the product name. A cycle marked default means that product\'s vendor has no Delivery Days set yet, so add them on the vendor for a sharper number.'] },
       { h: 'Updating One At A Time', p: ['Weigh each suggestion on its own. A par set too low can run you out two weeks later, so this is a judgment call, not a blanket accept. When you agree, click Update Par and Bar Cop sets that product\'s par. It drops off the list once its par matches usage.'] },
       { h: 'Keeping A Par On Purpose', p: ['Carry extra of something by design? Click Keep and Bar Cop drops that suggestion from the list so it stops nagging. It only comes back if your usage on that product really shifts. You can always change a par by hand on Add Products.'] }
     ]);
@@ -244,13 +233,15 @@ S.InventoryParSuggestions = {
       const cashImpact = r.status === 'Reduce'
         ? '<span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(Math.max(0, -dollarDelta)) + ' freed</span>'
         : '<span style="color:var(--t3);">' + App.fmtCurrency(Math.max(0, dollarDelta)) + ' to stock</span>';
-      const conf = r.weeks_analyzed ? ' &middot; based on ' + r.weeks_analyzed + ' wk' + (r.weeks_analyzed === 1 ? '' : 's') : '';
+      const conf = esc(p.category || '') + (r.weeks_analyzed ? ' &middot; ' + r.weeks_analyzed + ' wk' + (r.weeks_analyzed === 1 ? '' : 's') + ' of counts' : '');
+      const cycTxt = (r.cycle_days % 1 === 0) ? r.cycle_days.toString() : r.cycle_days.toFixed(1);
+      const cycleLine = '<div style="font-size:10px;color:var(--t3);">' + cycTxt + '-day cycle' + (r.cycle_source === 'default' ? ' (default)' : '') + '</div>';
       return '<tr>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);">' + esc(p.category || '') + conf + '</div></td>'
+        + '<div style="font-size:10px;color:var(--t3);">' + conf + '</div></td>'
         + '<td>' + this.qtyAbbr(p, r.current) + '</td>'
         + '<td>' + this.qtyAbbr(p, r.avg_weekly) + '</td>'
-        + '<td title="' + esc(r.reasoning || '') + '">' + this.qtyAbbr(p, r.suggested) + '</td>'
+        + '<td>' + this.qtyAbbr(p, r.suggested) + cycleLine + '</td>'
         + '<td>' + statusText + '</td>'
         + '<td>' + cashImpact + '</td>'
         + '<td><div class="row-actions">'
