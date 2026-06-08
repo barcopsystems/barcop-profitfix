@@ -11,7 +11,6 @@
 
 S.InventoryEmpties = {
   editId: null,
-  _pendingDelId: null,
   filterFrom: '',
   filterTo: '',
   filterProductId: '',
@@ -73,44 +72,59 @@ S.InventoryEmpties = {
     }
 
     const all = this.empties();
-    const filtered = this.applyFilters(all);
-    filtered.sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
-
-    let listHtml = this.filterCard();
     if (all.length === 0) {
-      listHtml += '<div class="empty"><div class="empty-title">No empties logged yet</div>'
-        + '<div class="empty-sub">Track empty container disposition for compliance reporting and deposit redemption. Required in some states and cities by law.</div></div>';
-    } else if (filtered.length === 0) {
-      listHtml += '<div class="empty"><div class="empty-title">No empties match the filters</div>'
-        + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
-    } else {
-      const rows = filtered.slice(0, App.listLimit('ic', 'empty')).map(e => {
-        const dispBadge = e.disposition === 'Return for Deposit'
-          ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">' + esc(e.disposition) + '</span>'
-          : esc(e.disposition || '-');
-        const deposit = (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);
-        return '<tr class="em-row" data-id="' + e.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + this.fmtDate(e.date) + '</div></td>'
-          + '<td><div class="val">' + esc(e.product_name || '-') + '</div>'
-          + (e.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.category) + '</div>' : '') + '</td>'
-          + '<td>' + (e.quantity != null ? e.quantity : '-') + ' ' + esc(e.unit || '') + '</td>'
-          + '<td>' + dispBadge + '</td>'
-          + '<td>' + (deposit > 0 ? '<span style="color:var(--gold);">' + App.fmtCurrency(deposit) + '</span>' : '<span style="color:var(--t4);">-</span>') + '</td>'
-          + '<td>' + esc(e.performed_by || '-') + '</td>'
-          + '<td><div class="row-actions">'
-          + (App.canEdit('ic-empties') ? '<button class="btn btn-ghost btn-sm em-edit" data-id="' + e.id + '">Edit</button>' : '')
-          + (App.canEdit('ic-empties') ? '<button class="btn btn-danger btn-sm em-del" data-id="' + e.id + '">Delete</button>' : '')
-          + '</div></td></tr>';
-      }).join('');
-      listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Product</th><th>Quantity</th><th>Disposition</th><th>Deposit Value</th><th>By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('ic', 'empty', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterDisposition));
+      this.container.innerHTML = '<div class="screen">' + this.logFormCard()
+        + '<div style="font-size:13px;color:var(--t3);padding:14px 2px;">No empties logged yet. Use the form above to log the first one.</div></div>';
+      this.wireForm('em-');
+      return;
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
+    const filtered = this.applyFilters(all)
+      .sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
+
+    let depositOwed = 0, lastDate = '';
+    all.forEach(e => {
+      if (e.disposition === 'Return for Deposit') depositOwed += (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);
+      const d = e.date || e.created_at || '';
+      if (!lastDate || new Date(d).getTime() > new Date(lastDate).getTime()) lastDate = d;
+    });
+
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Deposit Owed</div><div class="calc-val lg">' + App.fmtCurrency(depositOwed) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
+      + '</div></div>';
+
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Empties</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="em-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="em-print-blank">Worksheet</button>'
+      + '</div></div>';
+
+    const rows = filtered.slice(0, App.listLimit('ic', 'empty')).map(e => {
+      const deposit = (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);
+      return '<tr class="em-row" data-id="' + e.id + '" style="cursor:pointer;">'
+        + '<td><div class="val">' + this.fmtDate(e.date) + '</div></td>'
+        + '<td><div class="val">' + esc(e.product_name || '-') + '</div>'
+        + (e.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.category) + '</div>' : '') + '</td>'
+        + '<td>' + (e.quantity != null ? e.quantity : '-') + ' ' + esc(e.unit || '') + '</td>'
+        + '<td>' + esc(e.disposition || '-') + '</td>'
+        + '<td>' + (deposit > 0 ? App.fmtCurrency(deposit) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td>' + esc(e.performed_by || '-') + '</td>'
+        + '<td><div class="row-actions">'
+        + (App.canEdit('ic-empties') ? '<button class="btn btn-ghost btn-sm em-edit" data-id="' + e.id + '">Edit</button>' : '')
+        + (App.canEdit('ic-empties') ? '<button class="btn btn-danger btn-sm em-del" data-id="' + e.id + '">Delete</button>' : '')
+        + '</div></td></tr>';
+    }).join('');
+    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Product</th><th>Quantity</th><th>Disposition</th><th>Deposit Value</th><th>By</th><th></th>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No empties match the filter.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'empty', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterDisposition));
+
+    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + statsCard + filterHeading + this.filterCard() + listCard + '</div>';
     this.wireList();
-    this.wireForm();
+    this.wireForm('em-');
   },
 
   showHowTo() {
@@ -123,22 +137,22 @@ S.InventoryEmpties = {
     ]);
   },
 
-  // The Log Empties form lives at the top of the landing page, always open.
+  // The Log Empties form lives at the top of the landing page (collapsible).
   logFormCard() {
-    return '<div class="card no-print">'
+    return '<div class="card form-card no-print">'
       + App.collapsibleCardTitle('ic-empties', 'Log Empties', App.helpButton('em-how'))
       + '<div class="collapse-body">'
-      + this.formRows(null)
+      + this.formRows(null, 'em-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="em-save">Log Empties</button>'
         + '<span id="em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
   },
 
-  // Shared single-row field layout for both the inline log form and the edit
-  // page. All data cells on one row; Notes below. Pass the record for edit, or
-  // null for a new log.
-  formRows(e) {
+  // Shared field layout for both the inline log form and the edit popup. `idp`
+  // prefixes every field id ('em-' inline, 'eme-' modal) so the popup never
+  // collides with the inline form behind it.
+  formRows(e, idp) {
     const v = val => (val != null && val !== '') ? val : '';
     const active = this.activeShift();
     const defaultMgrId = active ? (active.manager_id || '') : '';
@@ -149,37 +163,37 @@ S.InventoryEmpties = {
 
     return '<div class="form-row" style="gap:10px;flex-wrap:wrap;">'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label>'
-          + '<input type="date" id="em-date" value="' + esc(e?.date || App.todayLocal()) + '"/></div>'
+          + '<input type="date" id="' + idp + 'date" value="' + esc(e?.date || App.todayLocal()) + '"/></div>'
         + '<div class="f" style="flex:1.4;min-width:150px;"><label>Product</label>'
-          + '<select id="em-prod">' + this.productOptions(initialProdId) + '</select></div>'
+          + '<select id="' + idp + 'prod">' + this.productOptions(initialProdId) + '</select></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Qty ' + tt('em-qty') + '</label>'
-          + '<div class="fw"><input class="suf" type="number" id="em-qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/><span class="suf" id="em-qty-unit">' + (initialCat ? this.unitFor(initialCat) : 'bottles') + '</span></div></div>'
+          + '<div class="fw"><input class="suf" type="number" id="' + idp + 'qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/><span class="suf" id="' + idp + 'qty-unit">' + (initialCat ? this.unitFor(initialCat) : 'bottles') + '</span></div></div>'
         + '<div class="f" style="width:86px;flex-shrink:0;"><label>Deposit ' + tt('em-deposit') + '</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="em-deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
-        + '<div class="f" style="width:125px;flex-shrink:0;"><label>Disposition</label>'
-          + '<select id="em-disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Performed By</label>'
-          + '<select id="em-by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
+          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + idp + 'deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Disposition</label>'
+          + '<select id="' + idp + 'disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Performed By</label>'
+          + '<select id="' + idp + 'by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="em-notes" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>';
+        + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>';
   },
 
-  // Wire the always-open inline log form (How This Works, Save, product change).
-  wireForm() {
+  // Wire the always-open inline log form.
+  wireForm(idp) {
     document.getElementById('em-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('em-save')?.addEventListener('click', () => this.save());
-    this.wireProdChange();
+    document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
+    this.wireProdChange(idp);
     const head = this.container.querySelector('.card-collapse-head');
     if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
     App.applyCollapsed(this.container);
   },
 
   // Product change updates the Qty unit suffix to match the product category.
-  wireProdChange() {
-    document.getElementById('em-prod')?.addEventListener('change', ev => {
+  wireProdChange(idp) {
+    document.getElementById(idp + 'prod')?.addEventListener('change', ev => {
       const p = this.productById(ev.target.value);
-      const hint = document.getElementById('em-qty-unit');
+      const hint = document.getElementById(idp + 'qty-unit');
       if (hint) hint.textContent = p ? this.unitFor(p.category) : 'bottles';
     });
   },
@@ -190,18 +204,12 @@ S.InventoryEmpties = {
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
     const dispOpts = '<option value="">All</option>'
       + this.DISPOSITIONS.map(d => '<option value="' + esc(d) + '"' + (this.filterDisposition === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span>'
-      + '<div style="display:flex;gap:8px;">'
-        + '<button class="btn btn-ghost btn-sm" id="em-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="em-print-blank">Worksheet</button>'
-      + '</div></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+    return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="em-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="em-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:220px;flex-shrink:0;"><label>Product</label><select id="em-f-prod">' + prodOpts + '</select></div>'
         + '<div class="f" style="width:180px;flex-shrink:0;"><label>Disposition</label><select id="em-f-disp">' + dispOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="em-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="em-f-clear">Clear</button></div>'
       + '</div></div>';
   },
 
@@ -222,8 +230,8 @@ S.InventoryEmpties = {
       const edit = ev.target.closest('.em-edit');
       const del  = ev.target.closest('.em-del');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row && App.canEdit('ic-empties')) this.showForm(row.dataset.id);
+      else if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); }
+      else if (row && App.canEdit('ic-empties')) this.openEdit(row.dataset.id);
     };
     document.getElementById('em-export')?.addEventListener('click', () => App.exportPDF({ title: 'Empties Log', root: this.container }));
     document.getElementById('em-print-blank')?.addEventListener('click', () => this.printBlank());
@@ -237,7 +245,7 @@ S.InventoryEmpties = {
     });
   },
 
-  // ── Form ────────────────────────────────────────────────────────────
+  // ── Form options ────────────────────────────────────────────────────
   productOptions(selectedId) {
     const prods = this.barProducts();
     if (!prods.length) return '<option value="">No products set up</option>';
@@ -259,42 +267,47 @@ S.InventoryEmpties = {
   // else (liquor, wine, bottle beer) is by the bottle. No picker needed.
   unitFor(category) { return category === 'Draft Beer' ? 'kegs' : 'bottles'; },
 
-  // Edit page (own screen). Same single-row field layout as the inline log
-  // form; Cancel stays here because the operator navigated away to edit.
-  showForm(id) {
+  // ── Edit popup (standard modal) ───────────────────────────────────────
+  openEdit(id) {
     if (!App.canEdit('ic-empties')) return;
-    this.editId = id || null;
-    const e = id ? this.empties().find(x => x.id === id) : null;
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">Edit Empties Entry</div>'
-      + this.formRows(e)
+    const e = this.empties().find(x => x.id === id);
+    if (!e) return;
+    this.editId = id;
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Empties Entry</div>'
+      + this.formRows(e, 'eme-')
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="em-save">Update Entry</button>'
-        + '<button class="btn btn-ghost" id="em-cancel">Cancel</button>'
-        + '<span id="em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    document.getElementById('em-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('em-save')?.addEventListener('click', () => this.save());
-    this.wireProdChange();
+        + '<button class="btn btn-primary" id="eme-save">Update Entry</button>'
+        + '<button class="btn btn-ghost" id="eme-cancel">Cancel</button>'
+        + '<span id="eme-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '<button class="btn btn-danger" id="eme-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'em-edit-modal', maxWidth: 540, noClose: true });
+    document.getElementById('eme-save')?.addEventListener('click', () => this.save('eme-', 'em-edit-modal'));
+    document.getElementById('eme-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('em-edit-modal'); });
+    document.getElementById('eme-del')?.addEventListener('click', async () => {
+      if (!(await App.confirmDelete())) return;
+      await App.removeRecord('ic', 'empty', id);
+      this.editId = null;
+      App.closeModal('em-edit-modal');
+      this.renderList();
+    });
+    this.wireProdChange('eme-');
   },
 
-  async save() {
-    const err = document.getElementById('em-err');
+  async save(idp, modalId) {
+    const err = document.getElementById(idp + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('em-date')?.value;
+    const date = document.getElementById(idp + 'date')?.value;
     if (!date) { fail('Date is required.'); return; }
-    const productId = document.getElementById('em-prod')?.value;
+    const productId = document.getElementById(idp + 'prod')?.value;
     if (!productId) { fail('Pick a product.'); return; }
     const product = this.productById(productId);
     if (!product) { fail('Product not found.'); return; }
-    const quantity = parseFloat(document.getElementById('em-qty')?.value);
+    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
     if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
-    const disposition = document.getElementById('em-disp')?.value;
+    const disposition = document.getElementById(idp + 'disp')?.value;
     if (!disposition) { fail('Pick a disposition (Recycle, Return for Deposit, or Trash).'); return; }
-    const performedById = document.getElementById('em-by')?.value;
+    const performedById = document.getElementById(idp + 'by')?.value;
     if (!performedById) { fail('Pick who logged this.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
 
@@ -306,29 +319,29 @@ S.InventoryEmpties = {
       category:         product.category || '',
       quantity,
       unit:             this.unitFor(product.category),
-      deposit_amount:   parseFloat(document.getElementById('em-deposit')?.value) || 0,
+      deposit_amount:   parseFloat(document.getElementById(idp + 'deposit')?.value) || 0,
       disposition,
       performed_by_id:  performedById,
       performed_by:     performedBy,
-      notes:            document.getElementById('em-notes')?.value.trim() || ''
+      notes:            document.getElementById(idp + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
     else rec.updated_at = new Date().toISOString();
 
-    const list = this.empties();
     let saveRec = rec;
     if (this.editId) {
-      const ex = list.find(x => x.id === this.editId);
+      const ex = this.empties().find(x => x.id === this.editId);
       if (ex) saveRec = { ...ex, ...rec };
     }
-    const btn = document.getElementById('em-save');
+    const btn = document.getElementById(idp + 'save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'empty', saveRec);
     this.editId = null;
     if (ok) {
+      if (modalId) App.closeModal(modalId);
       this.renderList();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Log Empties'; }
+      if (btn) { btn.disabled = false; btn.textContent = modalId ? 'Update Entry' : 'Log Empties'; }
       fail('Save failed. Try again.');
     }
   },
