@@ -352,7 +352,7 @@ S.InventoryDashboard = {
     const moveBody = !base
       ? '<div style="font-size:12px;color:var(--t3);">Take a second count to see what is moving fast, slow, and not at all.</div>'
       : moveBlock('Fast Movers', fast.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'No usage recorded.', 'var(--gold)')
-        + moveBlock('Slow Movers', slow.map(m => moveLine(m, esc(App.qtyWithUnit(m.p, m.used)) + ' used')).join(''), 'Nothing crawling.', 'var(--steel)')
+        + moveBlock('Slow Movers', slow.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'Nothing crawling.', 'var(--steel)')
         + moveBlock('Dead Stock', dead.map(m => moveLine(m, App.fmtCurrency(m.tied) + ' tied')).join(''), 'Nothing stale. Every product moved.', 'var(--red)');
 
     // ── Since Last Count — directional readout, no bars ──
