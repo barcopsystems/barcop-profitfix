@@ -69,7 +69,9 @@ S.RevenueThisWeek = {
     let saved = null;
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) saved = JSON.parse(r); } catch (e) {}
     const weeks = App.data.revenue_weeks || [];
-    const lastWeek = weeks.length ? weeks[weeks.length - 1] : null;
+    // revenue_weeks load date-DESC, so the last array element is the OLDEST week.
+    // Pick the newest by date for the draft's default week number / period end.
+    const lastWeek = App.latestEvent ? App.latestEvent(weeks) : (weeks.length ? weeks[weeks.length - 1] : null);
     const periodEnd = (saved && saved.period_end) || (App.nextSunday ? App.nextSunday() : App.todayLocal());
     if (saved) {
       return {
