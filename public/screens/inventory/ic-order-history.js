@@ -199,6 +199,55 @@ S.InventoryOrderHistory = {
     Promise.resolve(App.exportPDF({ title: 'Order History', root: node })).finally(() => node.remove());
   },
 
+  // Build a single-order PDF that reads as a purchase order, from the order
+  // DATA (not a DOM-walk of a rendered screen) so it can be called from
+  // anywhere — the Order Sheet status card calls this too. One canonical
+  // order PDF; both doors come through here.
+  exportOrderPDF(order) {
+    if (!order) return;
+    const v = this.vendorByName(order.vendor);
+    const statusPlain = order.status === 'Received' ? 'Received'
+      : order.status === 'Submitted' ? 'Submitted' : 'Open';
+
+    const kv = (label, val) => '<div class="calc-item"><div class="calc-label">' + label
+      + '</div><div class="calc-val">' + val + '</div></div>';
+    const headerKV = [
+      kv('Vendor', esc(order.vendor || '-')),
+      (v && v.rep)            ? kv('Contact', esc(v.rep)) : '',
+      (v && v.account_number) ? kv('Account', esc(v.account_number)) : '',
+      (v && v.payment_terms)  ? kv('Terms', esc(v.payment_terms)) : '',
+      kv('Order Date', this.fmtDate(order.date)),
+      kv('Status', statusPlain)
+    ].filter(Boolean).join('');
+
+    const rows = (order.line_items || []).map(li => {
+      const isCase = li.display_unit === 'case';
+      return '<tr><td>' + esc(li.name || '') + '</td>'
+        + '<td>' + (li.qty || 0) + (isCase ? ' cases' : '') + '</td>'
+        + '<td>' + App.fmtCurrency(li.unit_cost || 0) + (isCase ? ' /case' : '') + '</td>'
+        + '<td>' + App.fmtCurrency(li.extended || 0) + '</td></tr>';
+    }).join('');
+
+    const node = document.createElement('div');
+    node.className = 'screen';
+    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
+    node.innerHTML = '<div class="card"><div class="card-title">Purchase Order</div>'
+      + '<div class="calc" style="margin-bottom:14px;">' + headerKV + '</div>'
+      + '<div class="sh">Order Items</div>'
+      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+      + '<th>Product</th><th>Qty</th><th>Unit Cost</th><th>Extended</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="calc" style="margin-top:14px;">' + kv('Order Total', App.fmtCurrency(order.total || 0)) + '</div>'
+      + '</div>';
+    document.body.appendChild(node);
+    Promise.resolve(App.exportPDF({
+      title: 'Purchase Order',
+      subtitle: order.vendor || '',
+      fileTag: 'PurchaseOrder_' + (order.vendor || 'Order'),
+      root: node
+    })).finally(() => node.remove());
+  },
+
   renderDetail(id) {
     const o = this.orders().find(x => x.id === id);
     if (!o) { this.renderList(); return; }
@@ -241,7 +290,7 @@ S.InventoryOrderHistory = {
       + '</div></div></div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#oh-export')) { App.exportPDF({ title: 'Order History', root: this.container }); return; }
+      if (ev.target.closest('#oh-export')) { this.exportOrderPDF(o); return; }
       if (ev.target.closest('#oh-submit')) { this.submitToVendor(id); return; }
       if (ev.target.closest('#oh-status')) { this.toggleStatus(id); return; }
       if (ev.target.closest('#oh-receive')) { App.navigate('ic-receive-delivery'); return; }
