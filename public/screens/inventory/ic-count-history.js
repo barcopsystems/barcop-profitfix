@@ -57,13 +57,6 @@ S.InventoryCountHistory = {
       return;
     } else {
       const counters = [...new Set(asc.map(c => c.counted_by).filter(Boolean))].sort();
-      const filter = '<div class="form-row" style="margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
-        + '<label>Filter by Counted By</label><select id="ch-filter">'
-        + '<option value="">All staff</option>'
-        + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
-        + '</select></div>'
-        + '<button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div>';
-
       const ordered = asc.map((c, i) => {
         const prior = i > 0 ? asc[i - 1] : null;
         const variance = prior ? (c.total_value || 0) - (prior.total_value || 0) : null;
@@ -71,14 +64,33 @@ S.InventoryCountHistory = {
         return { c, variance, isLatest };
       }).reverse()
         .filter(r => !this.countedByFilter || r.c.counted_by === this.countedByFilter);
+
+      const latest = asc[asc.length - 1];
+      const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+        + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Counts</div><div class="calc-val lg">' + asc.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Latest Value</div><div class="calc-val lg">' + App.fmtCurrency(latest.total_value || 0) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Last Count</div><div class="calc-val lg">' + this.fmtDate(latest.date) + '</div></div>'
+        + '</div>' + App.helpButton('ch-how') + '</div></div>';
+
+      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+        + '<div class="sh" style="margin:0;">Filter Counts</div>'
+        + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div></div>';
+
+      const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
+        + '<div class="f" style="width:280px;flex-shrink:0;"><label>Counted By</label><select id="ch-filter">'
+        + '<option value="">All staff</option>'
+        + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
+        + '</select></div></div></div>';
+
       const rows = ordered.slice(0, App.listLimit('ic', 'count')).map(r => {
         const c = r.c;
         const varCell = r.variance == null
           ? '<span style="color:var(--t4);">-</span>'
-          : (r.variance >= 0 ? '+' : '') + App.fmtCurrency(r.variance);
+          : (r.variance > 0 ? '+' : '') + App.fmtCurrency(r.variance);
         const status = r.isLatest
           ? '<span style="color:var(--gold);font-weight:700;">Latest</span>'
-          : '<span style="color:var(--steel);font-weight:600;">Past</span>';
+          : '<span style="color:var(--t3);font-weight:600;">Past</span>';
         return '<tr class="ch-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.type || '-') + '</td>'
@@ -91,15 +103,13 @@ S.InventoryCountHistory = {
           + (App.canEdit('ic-count-history') ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Count History</span>'
-        + App.helpButton('ch-how') + '</div>'
-        + filter
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);">No counts for this staff member.</td></tr>') + '</tbody></table></div>'
-        + App.showOlderBar('ic', 'count', ordered, !!this.countedByFilter) + '</div>';
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts for this staff member.</td></tr>') + '</tbody></table></div></div>'
+        + App.showOlderBar('ic', 'count', ordered, !!this.countedByFilter);
+
+      html = statsCard + filterHeading + filterCard + listCard;
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
@@ -188,15 +198,9 @@ S.InventoryCountHistory = {
     const itemRows = items.map(it => {
       const p = prodFor(it.product_id);
       const caseSize = it.case_size_at_count || (p && p.case_size) || 0;
-      const isCaseBeer = (it.category === 'Bottle Beer' || (p && p.category === 'Bottle Beer')) && caseSize > 0;
-      const totalCases = it.total || 0;
-      const whole = isCaseBeer ? (it.cases != null ? it.cases : Math.floor(totalCases)) : 0;
-      const loose = isCaseBeer ? (it.loose != null ? it.loose : Math.round((totalCases - Math.floor(totalCases)) * caseSize)) : 0;
-      const fullCol = isCaseBeer ? (whole + ' cases') : (it.fulls || 0);
-      const openCol = isCaseBeer ? (loose + ' loose') : (it.partial || 0).toFixed(1);
-      const totalCol = isCaseBeer
-        ? (totalCases.toFixed(2) + ' cases')
-        : (totalCases.toFixed(1) + (p ? ' ' + (App.productUnit(p) || '') : ''));
+      // Full / Open / Total via the shared App.countCols so this reads exactly
+      // the same as the Take Inventory review and every other inventory section.
+      const cols = App.countCols(p, { category: it.category, unit_type: it.unit_type, caseSize, fulls: it.fulls, partial: it.partial, total: it.total, cases: it.cases, loose: it.loose });
       const unitCostCol = it.unit_cost != null
         ? App.fmtCurrency(it.unit_cost)
         : '<span style="color:var(--t4);">-</span>';
@@ -204,9 +208,9 @@ S.InventoryCountHistory = {
         + '<td><div class="val">' + esc(it.name) + '</div>'
         + (it.notes ? '<div style="font-size:10px;color:var(--t3);">' + esc(it.notes) + '</div>' : '') + '</td>'
         + '<td>' + esc(it.category || '-') + '</td>'
-        + '<td>' + fullCol + '</td>'
-        + '<td>' + openCol + '</td>'
-        + '<td class="val">' + totalCol + '</td>'
+        + '<td>' + cols.full + '</td>'
+        + '<td>' + cols.open + '</td>'
+        + '<td class="val">' + cols.total + '</td>'
         + '<td>' + unitCostCol + '</td>'
         + '<td>' + (it.value != null ? App.fmtCurrency(it.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '</tr>';
@@ -230,46 +234,48 @@ S.InventoryCountHistory = {
       const older = new Date(compare.created_at || compare.date) < new Date(count.created_at || count.date);
       const cmpRows = Object.values(map).map(m => {
         const a = m.a || 0, b = m.b || 0, change = a - b;
-        const u = m.unit ? ' ' + m.unit : '';
+        const u = m.unit ? ' ' + App.unitAbbr(m.unit) : '';
         return '<tr><td><div class="val">' + esc(m.name) + '</div></td>'
           + '<td>' + esc(b.toFixed(1) + u) + '</td>'
           + '<td>' + esc(a.toFixed(1) + u) + '</td>'
           + '<td class="' + (change < 0 ? 'neg' : change > 0 ? 'pos' : '') + '">' + (change > 0 ? '+' : '') + esc(change.toFixed(1) + u) + '</td>'
           + '</tr>';
       }).join('');
-      bodyTable = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      bodyTable = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Product</th><th>' + esc(this.fmtDate(compare.date)) + '</th>'
         + '<th>' + esc(this.fmtDate(count.date)) + '</th><th>Change</th>'
-        + '</tr></thead><tbody>' + cmpRows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + cmpRows + '</tbody></table></div></div>';
       bodyNote = '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
         + (older
             ? 'A negative change is product used between the two counts. A positive change is product received.'
             : 'Comparing against a more recent count, a positive change means this count held more on hand.')
         + '</div>';
     } else {
-      bodyTable = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      bodyTable = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Product</th><th>Category</th><th>Full</th><th>Open</th><th>Total</th><th>Unit Cost</th><th>Value</th>'
-        + '</tr></thead><tbody>' + itemRows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + itemRows + '</tbody></table></div></div>';
     }
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div>'
-      + '<div class="calc" style="margin-bottom:0;">'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;">'
+      + '<div class="sh" style="margin:0;">' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ch-back">Back to History</button></div></div>'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + meta('Counted By', esc(count.counted_by || '-'))
       + meta('Products', count.item_count || items.length)
       + meta('Total Value', App.fmtCurrency(count.total_value || 0))
       + meta('Locations', esc((count.locations || []).join(', ') || '-'))
       + '</div></div>'
-      + '<div class="card"><div class="card-title">' + (compare ? 'Comparison' : 'Counted Items') + '</div>'
-      + '<div class="form-row" style="margin-bottom:14px;"><div class="f" style="width:280px;">'
-      + '<label>Side-by-Side Comparison</label><select id="ch-compare">' + cmpOpts + '</select></div></div>'
-      + bodyTable + bodyNote + '</div>'
+      + '<div class="card no-print"><div class="form-row" style="margin-bottom:0;"><div class="f" style="width:280px;margin-bottom:0;">'
+      + '<label>Side-by-Side Comparison</label><select id="ch-compare">' + cmpOpts + '</select></div></div></div>'
+      + '<div class="sh" style="margin:24px 0 10px;">' + (compare ? 'Comparison' : 'Counted Items') + '</div>'
+      + bodyTable + bodyNote
       + '</div>';
 
     this.container.onclick = null;
     document.getElementById('ch-export')?.addEventListener('click', () => App.exportPDF({ title: 'Count History', root: this.container }));
+    document.getElementById('ch-back')?.addEventListener('click', () => { this.viewId = null; this.compareId = null; this.renderList(); });
     document.getElementById('ch-compare')?.addEventListener('change', e => {
       this.compareId = e.target.value || null;
       this.renderDetail(id);
