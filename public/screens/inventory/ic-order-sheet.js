@@ -132,10 +132,14 @@ S.InventoryOrderSheet = {
 
     document.getElementById('os-how')?.addEventListener('click', () => this.showHowTo());
 
-    // Per-card input handler for the quantity field on existing lines.
+    // Per-card input handler for the quantity field on existing lines, plus the
+    // in-row product picker on blank Add Item rows.
     this.container.querySelectorAll('.os-vcard').forEach(card => {
       card.addEventListener('input', ev => {
         if (ev.target.classList.contains('os-qty')) this.recalcVendor(card);
+      });
+      card.addEventListener('change', ev => {
+        if (ev.target.classList.contains('os-prod')) this.onLineProductChange(ev.target);
       });
     });
 
@@ -153,19 +157,14 @@ S.InventoryOrderSheet = {
       const coCreate = ev.target.closest('.os-co-create');
       const coCancel = ev.target.closest('.os-co-cancel');
       const addItem = ev.target.closest('.os-add-item');
-      const pickAdd = ev.target.closest('.os-picker-add');
-      const pickCancel = ev.target.closest('.os-picker-cancel');
 
       if (rm) {
         const card = rm.closest('.os-vcard');
         rm.closest('.os-line').remove();
         this.recalcVendor(card);
-        this.refreshPicker(card);
         return;
       }
-      if (addItem) { this.openPicker(addItem.closest('.os-vcard')); return; }
-      if (pickAdd) { this.addPickedItem(pickAdd.closest('.os-vcard')); return; }
-      if (pickCancel) { this.closePicker(pickCancel.closest('.os-vcard')); return; }
+      if (addItem) { this.addBlankLine(addItem.closest('.os-vcard')); return; }
       if (coCreate) { this.createCustomOrder(); return; }
       if (coCancel) { this.closeCustomOrder(); return; }
       if (create) this.createOrder(create.dataset.vendor);
@@ -238,83 +237,70 @@ S.InventoryOrderSheet = {
     }
   },
 
-  // ── Picker open/close/add helpers (shared by suggested + custom cards) ───
-  openPicker(card) {
-    if (!card) return;
-    this.refreshPicker(card);
-    const picker = card.querySelector('.os-picker');
-    const btn = card.querySelector('.os-add-item');
-    if (picker) picker.style.display = '';
-    if (btn) btn.style.display = 'none';
-  },
-
-  closePicker(card) {
-    if (!card) return;
-    const picker = card.querySelector('.os-picker');
-    const btn = card.querySelector('.os-add-item');
-    if (picker) {
-      picker.style.display = 'none';
-      const sel = picker.querySelector('.os-picker-prod');
-      if (sel) sel.value = '';
-    }
-    if (btn) btn.style.display = '';
-  },
-
-  refreshPicker(card) {
+  // ── Add Item = a blank inline ing-tbl row (standard batch-builder pattern) ──
+  // Clicking "+ Add Item" drops an empty row whose Product cell is a select;
+  // picking a product fills On Hand / Par / Unit Cost / a suggested qty in place.
+  addBlankLine(card) {
     if (!card) return;
     const vendor = card.dataset.vendor || '';
     const existingIds = [...card.querySelectorAll('.os-line[data-product-id]')]
       .map(el => el.dataset.productId).filter(Boolean);
-
-    const mount = card.querySelector('.os-picker-mount');
-    if (mount) {
-      mount.innerHTML = this.addItemPickerHTML(vendor, existingIds);
-    } else {
-      const oldPicker = card.querySelector('.os-picker');
-      if (oldPicker) {
-        const wasVisible = oldPicker.style.display !== 'none';
-        const fresh = document.createElement('div');
-        fresh.innerHTML = this.addItemPickerHTML(vendor, existingIds);
-        const newPicker = fresh.firstChild;
-        if (wasVisible) newPicker.style.display = '';
-        oldPicker.replaceWith(newPicker);
-      }
-    }
+    const tbody = card.querySelector('.os-lines-tbody');
+    if (!tbody) return;
+    tbody.insertAdjacentHTML('beforeend', this.blankLineRowHTML(vendor, existingIds));
+    this.recalcVendor(card);
   },
 
-  addPickedItem(card) {
-    if (!card) return;
-    const picker = card.querySelector('.os-picker');
-    const sel = picker?.querySelector('.os-picker-prod');
-    const pid = sel?.value;
-    if (!pid) {
-      if (sel) {
-        sel.style.borderColor = 'var(--red)';
-        setTimeout(() => { sel.style.borderColor = ''; }, 1200);
-      }
+  // Operator picks a product in a blank row's select: fill the read-only cells,
+  // stash the cost/id on the qty input, and default the qty to bring it to par.
+  onLineProductChange(sel) {
+    const row = sel.closest('.os-line');
+    const card = sel.closest('.os-vcard');
+    if (!row) return;
+    const pid = sel.value;
+    const product = pid ? this.productById(pid) : null;
+    const qtyInp = row.querySelector('.os-qty');
+    const ohCell = row.querySelector('.os-onhand');
+    const parCell = row.querySelector('.os-par');
+    const ucCell = row.querySelector('.os-uc');
+    const unitSpan = row.querySelector('.os-unit');
+
+    if (!product) {
+      row.dataset.productId = '';
+      if (qtyInp) { qtyInp.dataset.productId = ''; qtyInp.dataset.cost = 0; }
+      if (ohCell) ohCell.textContent = '-';
+      if (parCell) parCell.textContent = '-';
+      if (ucCell) ucCell.textContent = App.fmtCurrency(0);
+      if (unitSpan) unitSpan.textContent = '';
+      if (card) this.recalcVendor(card);
       return;
     }
-    const product = this.productById(pid);
-    if (!product) return;
 
-    const qtyInp = picker?.querySelector('.os-picker-qty');
-    const qty = Math.max(1, parseFloat(qtyInp?.value) || 1);
+    const unitCost = product.unit_cost != null ? product.unit_cost : 0;
+    const unit = App.unitAbbr(App.productUnit(product));
 
     let onHand = null;
     const counts = this.countsAsc();
     if (counts.length) {
-      const latest = counts[counts.length - 1];
-      const it = (latest.items || []).find(i => i.product_id === pid);
+      const it = (counts[counts.length - 1].items || []).find(i => i.product_id === pid);
       if (it) onHand = it.total != null ? it.total : null;
     }
     const par = (product.par_level != null && product.par_level !== '') ? product.par_level : null;
-    const tbody = card.querySelector('.os-lines-tbody');
-    if (tbody) {
-      tbody.insertAdjacentHTML('beforeend', this.lineRowHTML(product, qty, onHand, par));
+
+    row.dataset.productId = product.id || '';
+    if (qtyInp) {
+      qtyInp.dataset.productId = product.id || '';
+      qtyInp.dataset.cost = unitCost;
+      if (!qtyInp.value || parseFloat(qtyInp.value) <= 0) {
+        qtyInp.value = (onHand != null && par != null && !isNaN(onHand) && !isNaN(par) && par > onHand)
+          ? Math.max(1, Math.ceil(par - onHand)) : 1;
+      }
     }
-    this.recalcVendor(card);
-    this.closePicker(card);
-    this.refreshPicker(card);
+    if (ohCell) ohCell.textContent = this.onHandText(product, onHand, unit);
+    if (parCell) parCell.textContent = this.parText(par, unit);
+    if (ucCell) ucCell.textContent = App.fmtCurrency(unitCost);
+    if (unitSpan) unitSpan.textContent = unit || '';
+    if (card) this.recalcVendor(card);
   },
 
   // ── Custom Order reset + create ──────────────────────────────────────────
@@ -342,9 +328,7 @@ S.InventoryOrderSheet = {
     if (!vendorName) { body.style.display = 'none'; return; }
     body.style.display = '';
     const tbody = panel.querySelector('.os-lines-tbody');
-    if (tbody) tbody.innerHTML = '';
-    this.refreshPicker(panel);
-    this.closePicker(panel);
+    if (tbody) tbody.innerHTML = this.blankLineRowHTML(vendorName, []);
     this.recalcVendor(panel);
   },
 
@@ -361,11 +345,12 @@ S.InventoryOrderSheet = {
     panel.querySelectorAll('.os-line').forEach(line => {
       const inp = line.querySelector('.os-qty');
       const qty = parseFloat(inp.value) || 0;
-      if (qty <= 0) return;
-      const name = line.querySelector('.val').textContent;
-      const cost = parseFloat(inp.dataset.cost) || 0;
       const productId = inp.dataset.productId || '';
+      if (qty <= 0 || !productId) return;
       const product = this.productById(productId);
+      const nameEl = line.querySelector('.val');
+      const name = product ? product.name : (nameEl ? nameEl.textContent : '');
+      const cost = parseFloat(inp.dataset.cost) || 0;
       const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
       lineItems.push({
         product_id: productId,
@@ -377,7 +362,7 @@ S.InventoryOrderSheet = {
         case_size: isCaseBeer ? product.case_size : null
       });
     });
-    if (lineItems.length === 0) { fail('Add at least one item with a quantity above zero.'); return; }
+    if (lineItems.length === 0) { fail('Add at least one item with a product and a quantity above zero.'); return; }
 
     const rec = {
       id:         App.uid(),
@@ -406,73 +391,76 @@ S.InventoryOrderSheet = {
 
   cssEsc(s) { return String(s).replace(/"/g, '&quot;'); },
 
-  // ── Line row builder (ing-tbl row, shared by suggested + custom + picker) ──
-  // For bottle beer with case_size, qty/unit cost are in CASES (par is already
-  // in cases). Quantities carry the abbreviated container unit (cs / btls).
-  lineRowHTML(product, qty, onHand, par) {
+  // On-hand cell text. Bottle beer reads in cases + loose bottles; everything
+  // else in its abbreviated container unit.
+  onHandText(product, onHand, unit) {
+    if (onHand == null || isNaN(onHand)) return '-';
     const isCaseBeer = (product.category === 'Bottle Beer') && product.case_size && product.case_size > 0;
-    const unitCost = product.unit_cost != null ? product.unit_cost : 0;
-    const unit = App.unitAbbr(App.productUnit(product));
-
-    let onHandTxt;
-    if (onHand == null || isNaN(onHand)) {
-      onHandTxt = '-';
-    } else if (isCaseBeer) {
+    if (isCaseBeer) {
       const totalBottles = Math.round(Number(onHand) * product.case_size);
       const cases = Math.floor(totalBottles / product.case_size);
       const loose = totalBottles % product.case_size;
-      onHandTxt = cases + ' cs' + (loose > 0 ? ' + ' + loose + ' btl' : '');
-    } else {
-      const n = Number(onHand);
-      onHandTxt = (n % 1 === 0 ? n.toString() : n.toFixed(1)) + (unit ? ' ' + unit : '');
+      return cases + ' cs' + (loose > 0 ? ' + ' + loose + ' btl' : '');
     }
-    const parTxt = (par != null && par !== '' && !isNaN(par)) ? (par + (unit ? ' ' + unit : '')) : '-';
+    const n = Number(onHand);
+    return (n % 1 === 0 ? n.toString() : n.toFixed(1)) + (unit ? ' ' + unit : '');
+  },
+  parText(par, unit) {
+    return (par != null && par !== '' && !isNaN(par)) ? (par + (unit ? ' ' + unit : '')) : '-';
+  },
 
+  // ── Line row builder (ing-tbl row for a known product: suggested + added) ──
+  // For bottle beer with case_size, qty/unit cost are in CASES (par is already
+  // in cases). Quantities carry the abbreviated container unit (cs / btls).
+  lineRowHTML(product, qty, onHand, par) {
+    const unitCost = product.unit_cost != null ? product.unit_cost : 0;
+    const unit = App.unitAbbr(App.productUnit(product));
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
       + '<td><div class="val">' + esc(product.name || '') + '</div>'
       + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '') + '</div></td>'
-      + '<td>' + onHandTxt + '</td>'
-      + '<td>' + parTxt + '</td>'
+      + '<td class="os-onhand">' + this.onHandText(product, onHand, unit) + '</td>'
+      + '<td class="os-par">' + this.parText(par, unit) + '</td>'
       + '<td><input type="number" class="os-qty" data-cost="' + unitCost + '" data-product-id="' + esc(product.id || '') + '" min="0" step="1" '
-      + 'value="' + qty + '" style="width:80px;"/>' + (unit ? ' <span style="font-size:10px;color:var(--t3);">' + unit + '</span>' : '') + '</td>'
-      + '<td>' + App.fmtCurrency(unitCost) + '</td>'
+      + 'value="' + qty + '" style="width:80px;"/>' + (unit ? ' <span class="os-unit" style="font-size:10px;color:var(--t3);">' + unit + '</span>' : '<span class="os-unit"></span>') + '</td>'
+      + '<td class="os-uc">' + App.fmtCurrency(unitCost) + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(qty * unitCost) + '</td>'
       + '<td><div class="row-actions"><button class="btn btn-danger btn-sm os-remove">Remove</button></div></td>'
       + '</tr>';
   },
 
-  // Inline product picker. Excludes products already on the card; filters to the
-  // card's vendor when one is set.
-  addItemPickerHTML(vendorName, existingProductIds) {
+  // Blank ing-tbl row whose Product cell is an in-row select (the standard Add
+  // Item). On Hand / Par / Unit Cost fill in via onLineProductChange on pick.
+  blankLineRowHTML(vendor, existingIds) {
+    return '<tr class="os-line" data-product-id="">'
+      + '<td><select class="form-input os-prod" style="width:100%;">' + this.productOptionsHTML(vendor, existingIds) + '</select></td>'
+      + '<td class="os-onhand">-</td>'
+      + '<td class="os-par">-</td>'
+      + '<td><input type="number" class="os-qty" data-cost="0" data-product-id="" min="0" step="1" value="" style="width:80px;"/> <span class="os-unit" style="font-size:10px;color:var(--t3);"></span></td>'
+      + '<td class="os-uc">' + App.fmtCurrency(0) + '</td>'
+      + '<td class="val os-ext">' + App.fmtCurrency(0) + '</td>'
+      + '<td><div class="row-actions"><button class="btn btn-danger btn-sm os-remove">Remove</button></div></td>'
+      + '</tr>';
+  },
+
+  // Grouped product <option>s. Excludes products already on the card; filters to
+  // the card's vendor when one is set (falls back to all products otherwise).
+  productOptionsHTML(vendorName, existingProductIds) {
     const allProducts = ((App.inventoryData && App.inventoryData.ic_products) || [])
       .filter(p => p && p.active !== false);
     const onlyVendor = allProducts.filter(p => (p.vendor || '') === vendorName);
     const pool = onlyVendor.length > 0 ? onlyVendor : allProducts;
-    const filtered = pool.filter(p => !existingProductIds.includes(p.id));
+    const filtered = pool.filter(p => !(existingProductIds || []).includes(p.id));
 
     const byCat = {};
     filtered.forEach(p => { const c = p.category || 'Other'; (byCat[c] = byCat[c] || []).push(p); });
     const cats = Object.keys(byCat).sort();
-    const opts = ['<option value="">Select a product...</option>']
+    return ['<option value="">Select a product...</option>']
       .concat(cats.map(c =>
         '<optgroup label="' + esc(c) + '">'
         + byCat[c].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
             .map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('')
         + '</optgroup>'
-      ));
-    return '<div class="os-picker" style="display:none;margin-top:12px;padding:12px 14px;background:var(--bg);border:1px solid var(--b1);border-radius:6px;">'
-      + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add Product</label>'
-          + '<select class="os-picker-prod">' + opts.join('') + '</select></div>'
-        + '<div class="f" style="width:90px;flex-shrink:0;margin-bottom:0;"><label>Qty</label>'
-          + '<input type="number" class="os-picker-qty" min="1" step="1" value="1"/></div>'
-        + '<button class="btn btn-primary os-picker-add">Add</button>'
-        + '<button class="btn btn-ghost os-picker-cancel">Cancel</button>'
-      + '</div>'
-      + (filtered.length === 0
-          ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Every product for this vendor is already on the order. Edit a quantity above to add more of one.</div>'
-          : '')
-      + '</div>';
+      )).join('');
   },
 
   // Count products on a card whose par looks off vs the dynamic-par suggestion.
@@ -494,7 +482,6 @@ S.InventoryOrderSheet = {
 
   vendorCard(vendor, lines) {
     const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)).join('');
-    const existingIds = lines.map(l => l.product.id || '').filter(Boolean);
     const parOff = this.parIssueCount(lines.map(l => l.product));
     const parNudge = parOff > 0
       ? '<div class="os-par-nudge" style="margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;max-width:540px;">'
@@ -507,7 +494,6 @@ S.InventoryOrderSheet = {
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
       + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
-      + this.addItemPickerHTML(vendor, existingIds)
       + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
@@ -536,7 +522,6 @@ S.InventoryOrderSheet = {
         + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
           + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
         + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
-        + '<div class="os-picker-mount"></div>'
         + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
         + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px;">'
           + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
@@ -578,11 +563,12 @@ S.InventoryOrderSheet = {
     card.querySelectorAll('.os-line').forEach(line => {
       const inp = line.querySelector('.os-qty');
       const qty = parseFloat(inp.value) || 0;
-      if (qty <= 0) return;
-      const name = line.querySelector('.val').textContent;
-      const cost = parseFloat(inp.dataset.cost) || 0;
       const productId = inp.dataset.productId || '';
+      if (qty <= 0 || !productId) return;
       const product = this.productById(productId);
+      const nameEl = line.querySelector('.val');
+      const name = product ? product.name : (nameEl ? nameEl.textContent : '');
+      const cost = parseFloat(inp.dataset.cost) || 0;
       const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
       lineItems.push({
         product_id: productId,
