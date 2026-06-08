@@ -6,6 +6,8 @@
 
 S.InventoryDeliveryHistory = {
   vendorFilter: '',
+  filterFrom: '',
+  filterTo: '',
 
   deliveries() {
     return ((App.inventoryData && App.inventoryData.ic_deliveries) || []);
@@ -40,7 +42,10 @@ S.InventoryDeliveryHistory = {
   renderList() {
     this.actions.innerHTML = '';
     const all = this.sorted();
-    const filtered = this.vendorFilter ? all.filter(d => d.vendor === this.vendorFilter) : all;
+    const filtered = all.filter(d =>
+      (!this.vendorFilter || d.vendor === this.vendorFilter)
+      && (!this.filterFrom || (d.date || '') >= this.filterFrom)
+      && (!this.filterTo || (d.date || '') <= this.filterTo));
 
     if (all.length === 0) {
       App.setupCard(this.container, {
@@ -71,6 +76,8 @@ S.InventoryDeliveryHistory = {
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dh-list-export">Export PDF</button></div></div>';
 
     const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="dh-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="dh-to" value="' + esc(this.filterTo) + '"/></div>'
       + '<div class="f" style="width:280px;flex-shrink:0;"><label>Vendor</label><select id="dh-filter">'
       + '<option value="">All vendors</option>'
       + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
@@ -102,13 +109,13 @@ S.InventoryDeliveryHistory = {
     const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
       + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No deliveries match the filter.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'delivery', filtered, !!this.vendorFilter);
+      + App.showOlderBar('ic', 'delivery', filtered, !!(this.vendorFilter || this.filterFrom || this.filterTo));
 
     this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#dh-list-export')) { this.exportList(); return; }
-      if (ev.target.closest('#dh-clear')) { this.vendorFilter = ''; this.renderList(); return; }
+      if (ev.target.closest('#dh-clear')) { this.vendorFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
       const how = ev.target.closest('#dh-how');
       const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');
@@ -122,6 +129,8 @@ S.InventoryDeliveryHistory = {
       this.vendorFilter = e.target.value || '';
       this.renderList();
     });
+    document.getElementById('dh-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('dh-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderList(); });
   },
 
   // Export the COMPLETE delivery list to PDF (every delivery, not just the
