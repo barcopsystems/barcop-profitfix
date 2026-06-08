@@ -483,24 +483,6 @@ S.InventoryTakeInventory = {
     return out;
   },
 
-  // Abbreviate a container unit for the review columns: cases -> cs, bottles ->
-  // btls, plus the common food units. Falls back to whatever unit is on file.
-  unitAbbr(unit) {
-    const u = (unit || '').toString().trim().toLowerCase();
-    const map = {
-      cases: 'cs', case: 'cs', cs: 'cs',
-      kegs: 'kegs', keg: 'kegs',
-      bottles: 'btls', bottle: 'btls', btls: 'btls', btl: 'btls',
-      each: 'ea', ea: 'ea', units: 'ea', unit: 'ea',
-      pounds: 'lbs', pound: 'lbs', lbs: 'lbs', lb: 'lbs',
-      ounces: 'oz', ounce: 'oz', oz: 'oz',
-      quarts: 'qt', quart: 'qt', qt: 'qt',
-      gallons: 'gal', gallon: 'gal', gal: 'gal',
-      liters: 'L', liter: 'L', l: 'L'
-    };
-    return map[u] || u;
-  },
-
   renderReview() {
     const rows = this.rows();
     const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0);
@@ -519,30 +501,18 @@ S.InventoryTakeInventory = {
       : '';
 
     const tbody = rows.map(r => {
-      // Each quantity carries its unit abbreviation (cs / btls / kegs / lbs / ea
-      // ...). Bottle beer counts full CASES, an open count of loose BOTTLES, and
-      // totals in cases; everything else is in its container unit.
-      const u = this.unitAbbr(App.productUnit(r.p));
-      let fullCol, openCol, totalCol;
-      if (r.isCaseBeer) {
-        fullCol  = (r.c.cases || 0) + ' ' + u;
-        openCol  = (r.c.loose || 0) + ' btls';
-        totalCol = r.total.toFixed(2) + ' ' + u;
-      } else {
-        const us = u ? ' ' + u : '';
-        fullCol  = (r.c.fulls || 0) + us;
-        openCol  = (r.c.value || 0).toFixed(1) + us;
-        totalCol = r.total.toFixed(1) + us;
-      }
+      // Full / Open / Total via the shared App.countCols so this reads exactly
+      // the same as Count History and every other inventory section.
+      const cols = App.countCols(r.p, { fulls: r.c.fulls, partial: r.c.value, total: r.total, cases: r.c.cases, loose: r.c.loose });
       const isUncounted = uncountedSet.has(r.p.id + '@@' + r.location);
       return '<tr>'
         + '<td><div class="val">' + esc(r.p.name)
         + (isUncounted ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">NOT COUNTED</span>' : '') + '</div>'
         + (r.p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.p.brand) + '</div>' : '') + '</td>'
         + '<td>' + esc(r.p.category || '-') + '</td>'
-        + '<td>' + fullCol + '</td>'
-        + '<td>' + openCol + '</td>'
-        + '<td class="val">' + totalCol + '</td>'
+        + '<td>' + cols.full + '</td>'
+        + '<td>' + cols.open + '</td>'
+        + '<td class="val">' + cols.total + '</td>'
         + '<td>' + (r.value != null ? App.fmtCurrency(r.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '</tr>';
     }).join('');
