@@ -3662,6 +3662,10 @@ const App = {
   // Bar Cop's visual language (no jarring native browser prompts). Returns
   // a Promise that resolves to true (confirmed) or false (cancelled).
   // Usage: if (!(await App.confirm({title, message, confirmText, danger}))) return;
+  // Put the bold question in `title` and the body in `message` so they render on
+  // two lines (question, then the warning below). NEVER cram body text into the
+  // title (e.g. titleHtml with an inline span) — that is the one-line look we
+  // standardized away from; every confirm/discard/delete box uses title+message.
   confirm(opts) {
     opts = opts || {};
     const title       = opts.title       || 'Are you sure?';
@@ -3698,7 +3702,8 @@ const App = {
   //    Always route a delete through this, never a bespoke confirm() or popup.
   confirmDelete(subject) {
     return this.confirm({
-      titleHtml: 'Delete ' + esc(subject || 'this') + '? <span style="font-weight:400;">Deleting this data is a permanent action and cannot be undone. Delete with caution.</span>',
+      title: 'Delete ' + (subject || 'this') + '?',
+      message: 'Deleting this data is a permanent action and cannot be undone. Delete with caution.',
       confirmText: 'Delete',
       cancelText: 'Cancel'
     });
