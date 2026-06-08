@@ -1,14 +1,21 @@
 'use strict';
 
 /* ── Inventory Control — Spot Check (writes ic_spot_checks) ───────────────────
-   Mobile-first per-shift theft check. Pick a few high-risk products, record the
-   on-hand count before and after a shift, and enter what the POS sold. The
-   screen computes the pour variance and its dollar value. ic_spot_checks feeds
-   Profit Recovery's Theft Risk and the Profit Audit's theft/controls section. */
+   A manager's per-shift theft check on a few high-risk bar products. It is a
+   two-moment job: count the targets at the START of the shift (pre), count them
+   again at the END (post), enter what the register rang, and Bar Cop shows
+   whether what left the bar matches what was sold. The in-progress check
+   auto-saves to this device so the pre-counts survive the whole shift and can be
+   finished at close. It is SCOPED TO ONE LOCATION/register: the products are
+   that bar's bottles and the POS sold must be that register's sales, or the
+   variance is meaningless. No tie to inventory counts beyond the product list.
+   ic_spot_checks feeds Profit Recovery's Theft Risk and the Profit Audit. */
 
 S.InventorySpotCheck = {
+  draft: null,
+  DRAFT_KEY: 'ic_spot_check_draft',
+  posMode: 'manual',     // 'manual' = type POS per line, 'import' = drop the register report
   _seq: 0,
-  _pendingDelId: null,
   CAT_ORDER: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
 
   products() {
@@ -41,16 +48,66 @@ S.InventorySpotCheck = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  ago(iso) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return 'recently';
+    const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return mins + ' min ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)  return hrs + ' hr ago';
+    return Math.floor(hrs / 24) + ' day(s) ago';
+  },
+
+  // ── Draft (auto-save so the pre-counts survive the shift) ───────────────────
+  loadDraft() {
+    try { const r = localStorage.getItem(this.DRAFT_KEY); return r ? JSON.parse(r) : null; }
+    catch (e) { return null; }
+  },
+  saveDraft() {
+    if (!this.draft) return;
+    try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {}
+  },
+  clearDraft() {
+    try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {}
+    this.draft = null;
+  },
+  // Read the whole on-screen check into a plain object (the same shape we save).
+  collectState() {
+    const lines = [...this.container.querySelectorAll('.sp-line')].map(line => {
+      const p = this.productById(line.dataset.pid);
+      if (!p) return null;
+      const lid = line.dataset.lid;
+      const added = parseFloat(line.querySelector('.sp-added')?.value);
+      const soldRaw = line.querySelector('.sp-sold')?.value;
+      return {
+        product_id: p.id,
+        pre:  this.spReadRaw('sp-pre-'  + lid, p),
+        post: this.spReadRaw('sp-post-' + lid, p),
+        added: isNaN(added) ? 0 : added,
+        sold:  (soldRaw == null || soldRaw === '') ? null : (parseFloat(soldRaw) || 0)
+      };
+    }).filter(Boolean);
+    return {
+      date:          document.getElementById('sp-date')?.value || '',
+      location:      document.getElementById('sp-loc')?.value || '',
+      shift:         document.getElementById('sp-shift')?.value || '',
+      checked_by_id: document.getElementById('sp-by')?.value || '',
+      lines
+    };
+  },
+  syncDraft() {
+    const state = this.collectState();
+    if (!state.lines.length && !state.location) { this.clearDraft(); return; }
+    const started = (this.draft && this.draft.started_at) || new Date().toISOString();
+    this.draft = state;
+    this.draft.started_at = started;
+    this.saveDraft();
+  },
 
   // ── Count input by product type (mirrors Take Inventory) ─────────────────
-  // Pourable (liquor/wine/draft/bottled mixer) uses the fill slider — a keg
-  // outline for draft; bottle beer uses cases + loose; food/dry goods use a
-  // plain number. slotId is unique per pre/post slot so both read back cleanly.
   _isCaseBeer(p) { return p.category === 'Bottle Beer' && p.case_size && p.case_size > 0; },
   _isPourable(p) { return !!(p.container_size_oz && p.pour_size_oz); },
-  // Units and wording specific to the product: liquor and wine restock in
-  // bottles and sell in pours, bottle beer restocks and sells in bottles, draft
-  // restocks by the keg and sells in pours.
   _restockUnit(p) { return p.category === 'Draft Beer' ? 'kegs' : 'btl'; },
   _posUnit(p)     { return this._isCaseBeer(p) ? 'btl' : 'pours'; },
   _posLabel(p)    { return this._isCaseBeer(p) ? 'POS Bottles Sold' : 'POS Pours Sold'; },
@@ -58,95 +115,126 @@ S.InventorySpotCheck = {
 
   showHowTo() {
     App.showHelpModal('How the Spot Check Works', [
-      { p: ['A spot check is a fast theft and overpour check on a few high-risk bar products for one shift. You count a product before and after the shift, tell Bar Cop what the POS rang, and it shows whether what left the bar matches what was sold.'] },
-      { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top-shelf liquor and your fast movers. Spot checks are bar only, so the picker holds liquor, wine, bottle beer, and draft.'] },
-      { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider.'] },
-      { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the POS rang for that product: pours for liquor, wine, and draft, bottles for bottle beer.'] },
+      { p: ['A spot check is a fast theft and overpour check on a few high-risk bar products for one shift. You count a product before and after the shift, tell Bar Cop what the register rang, and it shows whether what left the bar matches what was sold. It does not touch your inventory counts; it only borrows the product list.'] },
+      { h: 'One Bar At A Time', p: ['A spot check is scoped to one location and its register. Pick the bar you are checking; the product picker holds that bar\'s liquor, wine, bottle beer, and draft. The POS sold you enter or import must be that register\'s sales for the shift, not the whole venue, or the variance is meaningless.'] },
+      { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top shelf and your fast movers. Load Last Targets brings back the products from your last check at that bar so you are not re-picking every shift.'] },
+      { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider. Your check auto-saves to this device, so take the pre-counts at open and come back to finish at close.'] },
+      { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the register rang for each product, or drop that register\'s POS sales report and Bar Cop fills it in by matching product names.'] },
       { h: 'Reading The Result', p: ['Bar Cop works out what should have been sold from your counts and compares it to the POS. A gap flags red. A positive variance means more left the bar than was rung in, the classic sign of overpouring, give-aways, or theft.'] },
       { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. A flagged product can be sent straight to a Variance Investigation in Theft Risk with one click. Spot checks also feed your Theft Risk score and the Bar Cop Audit.'] }
     ]);
   },
-  spInputHTML(slotId, p) {
+
+  spInputHTML(slotId, p, vals) {
+    vals = vals || {};
     if (this._isCaseBeer(p)) {
       return '<div class="form-row" style="gap:10px;">'
-        + '<div class="f" style="width:104px;"><label>Cases</label><div class="fw"><input class="suf sp-cases" data-slot="' + slotId + '" type="number" min="0" step="1" value="0" style="height:42px;text-align:center;"/><span class="suf">cs</span></div></div>'
-        + '<div class="f" style="width:110px;"><label>Loose</label><div class="fw"><input class="suf sp-loose" data-slot="' + slotId + '" type="number" min="0" step="1" value="0" style="height:42px;text-align:center;"/><span class="suf">btl</span></div></div>'
+        + '<div class="f" style="width:104px;"><label>Cases</label><div class="fw"><input class="suf sp-cases" data-slot="' + slotId + '" type="number" min="0" step="1" value="' + (vals.cases || 0) + '" style="height:42px;text-align:center;"/><span class="suf">cs</span></div></div>'
+        + '<div class="f" style="width:110px;"><label>Loose</label><div class="fw"><input class="suf sp-loose" data-slot="' + slotId + '" type="number" min="0" step="1" value="' + (vals.loose || 0) + '" style="height:42px;text-align:center;"/><span class="suf">btl</span></div></div>'
         + '</div>';
     }
     if (this._isPourable(p)) {
-      return BottleSlider.html(slotId, { value: 0, fulls: 0, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') });
+      return BottleSlider.html(slotId, { value: vals.value || 0, fulls: vals.fulls || 0, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') });
     }
-    return '<div class="f" style="width:170px;"><label>Count</label><div class="fw"><input class="suf sp-num" data-slot="' + slotId + '" type="number" min="0" step="0.1" value="0" style="height:42px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div></div>';
+    return '<div class="f" style="width:170px;"><label>Count</label><div class="fw"><input class="suf sp-num" data-slot="' + slotId + '" type="number" min="0" step="0.1" value="' + (vals.value || 0) + '" style="height:42px;text-align:center;"/><span class="suf">' + esc(App.unitAbbr(App.productUnit(p)) || 'units') + '</span></div></div>';
   },
   spMount(slotId, p, onChange) {
     if (!this._isCaseBeer(p) && this._isPourable(p)) { BottleSlider.mount(slotId, onChange); return; }
     document.querySelectorAll('[data-slot="' + slotId + '"]').forEach(inp => inp.addEventListener('input', onChange));
   },
-  spRead(slotId, p) {
+  // Raw input values (for the draft + re-render): preserves the cases/loose or
+  // fulls/value split instead of collapsing to a single total.
+  spReadRaw(slotId, p) {
     if (this._isCaseBeer(p)) {
-      const cs = parseFloat(document.querySelector('.sp-cases[data-slot="' + slotId + '"]')?.value) || 0;
-      const loose = parseFloat(document.querySelector('.sp-loose[data-slot="' + slotId + '"]')?.value) || 0;
-      const total = cs * (p.case_size || 1) + loose;
-      return { fulls: total, value: 0, total };
+      return { cases: parseFloat(document.querySelector('.sp-cases[data-slot="' + slotId + '"]')?.value) || 0,
+               loose: parseFloat(document.querySelector('.sp-loose[data-slot="' + slotId + '"]')?.value) || 0 };
     }
     if (this._isPourable(p)) {
       const g = (BottleSlider.get ? BottleSlider.get(slotId) : null) || { fulls: 0, value: 0 };
-      return { fulls: g.fulls || 0, value: g.value || 0, total: (g.fulls || 0) + (g.value || 0) };
+      return { fulls: g.fulls || 0, value: g.value || 0 };
     }
-    const n = parseFloat(document.querySelector('.sp-num[data-slot="' + slotId + '"]')?.value) || 0;
-    return { fulls: n, value: 0, total: n };
+    return { value: parseFloat(document.querySelector('.sp-num[data-slot="' + slotId + '"]')?.value) || 0 };
+  },
+  // Container total for the variance math.
+  spRead(slotId, p) {
+    if (this._isCaseBeer(p)) {
+      const r = this.spReadRaw(slotId, p);
+      const total = r.cases * (p.case_size || 1) + r.loose;
+      return { fulls: total, value: 0, total };
+    }
+    if (this._isPourable(p)) {
+      const r = this.spReadRaw(slotId, p);
+      return { fulls: r.fulls, value: r.value, total: r.fulls + r.value };
+    }
+    const r = this.spReadRaw(slotId, p);
+    return { fulls: r.value, value: 0, total: r.value };
   },
 
   render(container, actions) {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    this.draft = this.loadDraft();
+    this.posMode = 'manual';
     this.renderMain();
   },
 
-  // Spot checks are a bar control, so the picker holds bar products only
-  // (liquor, wine, bottle beer, draft). Food and Misc are excluded.
-  productOptions() {
+  locationOptions(selected) {
     const bar = App.BAR_CATS;
-    const prods = this.products().filter(p => bar.includes(p.category));
+    const barProds = this.products().filter(p => bar.includes(p.category));
+    const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
+    const withBar = locs.filter(l => barProds.some(p => App.productLocations(p).includes(l.name)));
+    const list = withBar.length ? withBar : locs;
+    let h = '<option value="">Select location...</option>';
+    list.forEach(l => { h += '<option value="' + esc(l.name) + '"' + (selected === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>'; });
+    return h;
+  },
+  // Bar products, narrowed to the chosen location so the check stays scoped.
+  productOptions(location) {
+    const bar = App.BAR_CATS;
+    let prods = this.products().filter(p => bar.includes(p.category));
+    if (location) prods = prods.filter(p => App.productLocations(p).includes(location));
     const cats = bar.filter(c => prods.some(p => p.category === c));
     let h = '<option value="">Add a product to check...</option>';
     cats.forEach(cat => {
       h += '<optgroup label="' + esc(cat) + '">';
-      prods.filter(p => p.category === cat)
-        .forEach(p => { h += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; });
+      prods.filter(p => p.category === cat).forEach(p => { h += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; });
       h += '</optgroup>';
     });
     return h;
   },
+  // Product ids from the most recent saved check (at this location if given).
+  lastTargets(location) {
+    const list = [...this.checks()].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const last = location ? (list.find(c => c.location === location) || null) : (list[0] || null);
+    return last ? [...new Set((last.items || []).map(it => it.product_id).filter(Boolean))] : [];
+  },
 
-  lineHTML(lid, p) {
-    const pp = this.poursPer(p);
+  lineHTML(lid, p, ld) {
+    ld = ld || {};
     return '<div class="sp-line" data-lid="' + lid + '" data-pid="' + p.id + '" data-vd="0" '
-      + 'style="border:1px solid var(--b1);border-radius:6px;padding:16px;margin-bottom:12px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+      + 'style="border:1px solid var(--b2);border-radius:6px;padding:16px;margin-bottom:12px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
         + '<span style="flex:1;font-size:15px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
-        + '<span class="badge badge-dim">' + esc(p.category || '-') + '</span>'
+        + '<span style="font-size:11px;color:var(--t3);">' + esc(p.category || '-') + '</span>'
         + '<button type="button" class="btn btn-ghost btn-sm sp-remove">Remove</button>'
       + '</div>'
-      // Pre-shift count: open bottle (slider partial 0-1) + full bottles (integer)
       + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">'
         + '<div style="flex:1;min-width:220px;">'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Pre-Shift Count</div>'
-          + this.spInputHTML('sp-pre-' + lid, p)
+          + this.spInputHTML('sp-pre-' + lid, p, ld.pre)
         + '</div>'
         + '<div style="flex:1;min-width:220px;">'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Post-Shift Count</div>'
-          + this.spInputHTML('sp-post-' + lid, p)
+          + this.spInputHTML('sp-post-' + lid, p, ld.post)
         + '</div>'
       + '</div>'
-      // Mid-shift restock + POS pours sold inputs.
       + '<div class="form-row" style="gap:14px;margin-bottom:10px;">'
         + '<div class="f" style="width:170px;flex-shrink:0;"><label>Restocked Mid-Shift ' + tt(p.category === 'Draft Beer' ? 'sp-restock-keg' : 'sp-restock') + '</label>'
-          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._restockUnit(p) + '</span></div>'
+          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" value="' + (ld.added ? ld.added : '') + '" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._restockUnit(p) + '</span></div>'
         + '</div>'
         + '<div class="f" style="width:170px;flex-shrink:0;"><label>' + this._posLabel(p) + ' ' + tt(this._isCaseBeer(p) ? 'sp-pos-btl' : 'sp-pos-pours') + '</label>'
-          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._posUnit(p) + '</span></div>'
+          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" value="' + (ld.sold != null ? ld.sold : '') + '" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._posUnit(p) + '</span></div>'
         + '</div>'
       + '</div>'
       + '<div class="sp-result" style="font-size:12px;color:var(--t3);line-height:1.6;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;">'
@@ -160,7 +248,7 @@ S.InventorySpotCheck = {
     if (this.products().length === 0) {
       App.setupCard(this.container, {
         title: 'Set Up Spot Checks',
-        lead: 'A spot check is a fast theft check on a few high-risk bottles mid-shift. Add your products and you can run one in under a minute.',
+        lead: 'A spot check is a fast theft check on a few high-risk bottles for one shift. Add your products and you can run one in under a minute.',
         steps: [
           { title: 'Add your products', desc: 'A spot check runs against the bottles you stock, so add your products first.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 }
         ]
@@ -169,92 +257,198 @@ S.InventorySpotCheck = {
     }
 
     this._seq = 0;
-    const today = App.todayLocal();
+    const dft = this.draft || { lines: [] };
+    const resuming = !!(this.draft && this.draft.lines && this.draft.lines.length);
 
-    // Pre-fill from the active shift when one is running — that's the most
-    // common case for a mid-service spot check. Operator can still pick a
-    // different shift type and a different person before saving.
     const active = App.activeShift();
-    const defaultShift = active && active.shift_type ? active.shift_type : 'Dinner';
+    const defaultShift = dft.shift || (active && active.shift_type ? active.shift_type : 'Dinner');
     const shiftOpts = (App.SHIFT_TYPES || ['Brunch','Lunch','Dinner','Late Night','Full Day'])
       .map(t => '<option' + (t === defaultShift ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const setup = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+
+    const resumeBar = resuming
+      ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+        + '<div class="alert-text">A spot check started ' + this.ago(this.draft.started_at) + ' is in progress. Add the post-shift counts and POS sold to finish it.</div>'
+        + '<button class="btn btn-ghost btn-sm" id="sp-discard">Discard</button></div>'
+      : '';
+
+    const setup = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Spot Check</span>'
       + App.helpButton('sp-how') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location / Register</label>'
+      + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="sp-date" value="' + today + '" style="height:44px;"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label>'
+      + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
       + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
-      + '<select id="sp-by" style="height:44px;">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<select id="sp-by" style="height:44px;">' + App.staffOptions(dft.checked_by_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div></div>';
 
+    const lineHtmls = (dft.lines || []).map(ld => {
+      const p = this.productById(ld.product_id);
+      if (!p) return '';
+      const lid = ++this._seq;
+      ld._lid = lid;
+      return this.lineHTML(lid, p, ld);
+    }).join('');
+
+    const targets = this.lastTargets(dft.location);
+    const loadBtn = targets.length
+      ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
+      : '';
+
+    // POS sold: type on each line, or import that register's report to fill them.
+    const seg = (mode, label) => '<button type="button" class="btn btn-sm sp-posmode" data-mode="' + mode + '" style="'
+      + (this.posMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    const posPanel = this.posMode === 'import'
+      ? '<div id="sp-pos-csv"></div><div id="sp-pos-result"></div>'
+      : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Enter the POS pours or bottles sold on each product above, from this register\'s report for the shift.</div>';
+    const posCard = '<div class="sh" style="margin:24px 0 10px;">POS Sold</div>'
+      + '<div class="card no-print">'
+      + '<div style="display:inline-flex;gap:6px;margin-bottom:14px;">' + seg('manual', 'Enter Manually') + seg('import', 'Import POS Report') + '</div>'
+      + posPanel + '</div>';
+
     const productsCard = '<div class="card"><div class="card-title">Products Checked</div>'
-      + '<div id="sp-lines"></div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:0;"><div class="f" style="width:260px;flex-shrink:0;">'
-      + '<label>Add Product</label><select id="sp-add" style="height:44px;">' + this.productOptions() + '</select></div></div>'
-      + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val" id="sp-count">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val" id="sp-flagged">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val" id="sp-total">$0</div></div>'
+      + '<div id="sp-lines">' + lineHtmls + '</div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;"><div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;">'
+      + '<label>Add Product</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
+      + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:18px;">'
+      + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg" id="sp-count">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg" id="sp-flagged">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg" id="sp-total">$0</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
       + '<span id="sp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + setup + productsCard + this.historyCard() + '</div>';
+    this.container.innerHTML = '<div class="screen">' + resumeBar + setup + productsCard + posCard + this.historyCard() + '</div>';
+
+    // Mount sliders for any restored lines.
+    BottleSlider._inst = {};
+    (dft.lines || []).forEach(ld => {
+      const p = this.productById(ld.product_id);
+      if (!p || ld._lid == null) return;
+      this.spMount('sp-pre-'  + ld._lid, p, () => this.onLineChange(ld._lid));
+      this.spMount('sp-post-' + ld._lid, p, () => this.onLineChange(ld._lid));
+    });
+    this.container.querySelectorAll('.sp-line').forEach(line => this.recalcLine(line));
+    this.recalcTotal();
+    if (this.posMode === 'import') this.mountPosImporter();
 
     const lines = document.getElementById('sp-lines');
-    const onInput = ev => {
+    lines.addEventListener('input', ev => {
       const line = ev.target.closest('.sp-line');
-      if (line) { this.recalcLine(line); this.recalcTotal(); }
-    };
-    lines.addEventListener('input', onInput);
+      if (line) { this.recalcLine(line); this.recalcTotal(); this.syncDraft(); }
+    });
     lines.addEventListener('click', ev => {
       if (ev.target.closest('.sp-remove')) {
         ev.target.closest('.sp-line').remove();
         this.recalcTotal();
+        this.syncDraft();
       }
     });
     document.getElementById('sp-add')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
-      if (p) {
-        const lid = ++this._seq;
-        lines.insertAdjacentHTML('beforeend', this.lineHTML(lid, p));
-        const newLine = lines.querySelector('.sp-line[data-lid="' + lid + '"]');
-        // Mount the two BottleSliders for this line. Slider changes do not
-        // bubble as input events, so we recompute the line from the slider
-        // onChange callback directly.
-        this.spMount('sp-pre-'  + lid, p, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
-        this.spMount('sp-post-' + lid, p, () => { if (newLine) { this.recalcLine(newLine); this.recalcTotal(); } });
-        this.recalcLine(newLine);
-        this.recalcTotal();
-      }
+      if (p) this.addLine(p);
       e.target.value = '';
     });
+    document.getElementById('sp-load-targets')?.addEventListener('click', () => {
+      const have = new Set([...this.container.querySelectorAll('.sp-line')].map(l => l.dataset.pid));
+      this.lastTargets(document.getElementById('sp-loc')?.value || '').forEach(pid => {
+        if (have.has(pid)) return;
+        const p = this.productById(pid);
+        if (p) this.addLine(p);
+      });
+    });
+    document.getElementById('sp-loc')?.addEventListener('change', () => { this.syncDraft(); this.renderMain(); });
+    document.getElementById('sp-shift')?.addEventListener('change', () => this.syncDraft());
+    document.getElementById('sp-by')?.addEventListener('change', () => this.syncDraft());
     document.getElementById('sp-save')?.addEventListener('click', () => this.save());
+
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
-      const how = ev.target.closest('#sp-how');
+      if (ev.target.closest('#sp-how')) { this.showHowTo(); return; }
+      if (ev.target.closest('.sp-imp-how')) { this.showHowTo(); return; }
+      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
+      const posSeg = ev.target.closest('.sp-posmode');
+      if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
       const hrow = ev.target.closest('.sp-hrow');
       const hview = ev.target.closest('.sp-hview');
       const hdel = ev.target.closest('.sp-hdel');
-      if (how) { this.showHowTo(); return; }
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
       else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
     };
   },
 
+  addLine(p) {
+    const lines = document.getElementById('sp-lines');
+    if (!lines) return;
+    const lid = ++this._seq;
+    lines.insertAdjacentHTML('beforeend', this.lineHTML(lid, p));
+    const newLine = lines.querySelector('.sp-line[data-lid="' + lid + '"]');
+    this.spMount('sp-pre-'  + lid, p, () => this.onLineChange(lid));
+    this.spMount('sp-post-' + lid, p, () => this.onLineChange(lid));
+    this.recalcLine(newLine);
+    this.recalcTotal();
+    this.syncDraft();
+  },
+  onLineChange(lid) {
+    const line = this.container.querySelector('.sp-line[data-lid="' + lid + '"]');
+    if (line) this.recalcLine(line);
+    this.recalcTotal();
+    this.syncDraft();
+  },
+
+  // ── POS import (fills the per-line POS sold from this register's report) ────
+  mountPosImporter() {
+    const el = document.getElementById('sp-pos-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    const loc = document.getElementById('sp-loc')?.value || 'this register';
+    CSVMapper.mount(el, {
+      hint: 'Drop the POS <strong>sales</strong> report for <strong>' + esc(loc) + '</strong> for this shift &mdash; that register only, not the whole venue. '
+        + '<span class="sp-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      fields: [
+        { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description'] },
+        { key: 'sold',    label: 'Sold',    required: true, match: ['sold', 'pours', 'qty', 'quantity', 'units', 'count'] }
+      ],
+      confirmLabel: 'Fill POS Sold',
+      onComplete: rows => this.applyPosImport(rows)
+    });
+  },
+  applyPosImport(rows) {
+    const byName = {};
+    this.products().forEach(p => { byName[(p.name || '').trim().toLowerCase()] = p; });
+    let filled = 0;
+    const onScreen = {};
+    this.container.querySelectorAll('.sp-line').forEach(line => { onScreen[line.dataset.pid] = line; });
+    rows.forEach(r => {
+      const p = byName[(r.product || '').trim().toLowerCase()];
+      const sold = parseFloat(r.sold);
+      if (!p || isNaN(sold)) return;
+      const line = onScreen[p.id];
+      if (!line) return;
+      const inp = line.querySelector('.sp-sold');
+      if (inp) { inp.value = sold; this.recalcLine(line); filled++; }
+    });
+    this.recalcTotal();
+    this.syncDraft();
+    const res = document.getElementById('sp-pos-result');
+    if (res) {
+      res.innerHTML = filled > 0
+        ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.</div>'
+        : '<div style="font-size:13px;color:var(--red);margin-top:12px;">No products matched. Add the products to the check first, and make sure the names match.</div>';
+    }
+  },
+
   // compute one line; returns its variance dollars and supporting numbers
-  // Pre + Post counts come from BottleSliders (open + full split). Added is
-  // full bottles brought up from storage during the shift. Sold is from
-  // the operator's POS report for that shift.
   //   actual_pours_used = (pre_total + added - post_total) × pours_per_container
-  //   expected_pours    = pos_pours_sold
-  //   variance_pours    = actual - expected   (positive = overpoured/theft)
+  //   variance_pours    = actual - pos_sold   (positive = overpoured/theft)
   //   variance_dollars  = variance_pours × cost_per_pour
   lineCalc(line) {
     const p = this.productById(line.dataset.pid);
@@ -273,13 +467,10 @@ S.InventorySpotCheck = {
     const variance = sold != null ? actualPours - sold : null;
     const vd = variance != null ? variance * this.costPer(p) : null;
     return {
-      p,
-      preTotal, postTotal, added, sold,
+      p, preTotal, postTotal, added, sold,
       pre_value: pre.value, pre_fulls: pre.fulls,
       post_value: post.value, post_fulls: post.fulls,
-      used: usedContainers,
-      poured: actualPours,
-      variance, vd, pp
+      used: usedContainers, poured: actualPours, variance, vd, pp
     };
   },
 
@@ -287,8 +478,7 @@ S.InventorySpotCheck = {
     const r = this.lineCalc(line);
     const res = line.querySelector('.sp-result');
     if (!r) {
-      line.dataset.vd = '0';
-      line.dataset.flag = '0';
+      line.dataset.vd = '0'; line.dataset.flag = '0';
       if (res) res.innerHTML = 'Set the pre and post counts to start the variance calculation.';
       return;
     }
@@ -308,8 +498,6 @@ S.InventorySpotCheck = {
       if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + '.</span> Enter POS ' + sw + ' sold to see the variance.';
       return;
     }
-    // Flag when variance is meaningfully off (more than ~half a serving or $1
-    // either direction). Positive variance = more left the bar than was rung in.
     const flagged = Math.abs(r.variance) > 0.5 && Math.abs(r.vd) >= 1;
     line.dataset.flag = flagged ? '1' : '0';
     const cls = flagged ? 'var(--red)' : 'var(--gold)';
@@ -333,16 +521,18 @@ S.InventorySpotCheck = {
     const totEl = document.getElementById('sp-total');
     if (totEl) {
       totEl.textContent = (total > 0 ? '+' : '') + App.fmtCurrency(total);
-      totEl.className = 'calc-val' + (flagged ? ' warn' : '');
+      totEl.className = 'calc-val lg' + (flagged ? ' warn' : '');
     }
   },
 
   async save() {
-    if (!App.canEdit('ic-spot-check')) return;   // staff-permission guard
+    if (!App.canEdit('ic-spot-check')) return;
     const err = document.getElementById('sp-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('sp-date')?.value;
     if (!date) { fail('Date is required.'); return; }
+    const location = document.getElementById('sp-loc')?.value || '';
+    if (!location) { fail('Pick the location / register this check is for.'); return; }
 
     const lines = [...document.querySelectorAll('.sp-line')];
     if (lines.length === 0) { fail('Add at least one product to check.'); return; }
@@ -353,8 +543,6 @@ S.InventorySpotCheck = {
       const r = this.lineCalc(line);
       const p = this.productById(line.dataset.pid);
       if (!p) return;
-      // A line is valid for save when at least one count was set (either
-      // partial level or full bottles entered on pre or post).
       if (r && (r.preTotal > 0 || r.postTotal > 0)) valid = true;
       items.push({
         product_id:      p.id,
@@ -362,15 +550,12 @@ S.InventorySpotCheck = {
         category:        p.category || '',
         pours_per_container: this.poursPer(p),
         cost_per_pour:   this.costPer(p),
-        // Open-bottle partial level and full-bottle integer for pre + post.
         pre_value:       r ? r.pre_value : null,
         pre_fulls:       r ? r.pre_fulls : null,
         pre_total:       r ? r.preTotal : null,
         post_value:      r ? r.post_value : null,
         post_fulls:      r ? r.post_fulls : null,
         post_total:      r ? r.postTotal : null,
-        // Backward-compat fields for any downstream consumer that still
-        // expects flat pre/post numbers.
         pre:             r ? r.preTotal : null,
         post:            r ? r.postTotal : null,
         added:           r ? r.added : null,
@@ -387,6 +572,7 @@ S.InventorySpotCheck = {
     const rec = {
       id:           App.uid(),
       date,
+      location,
       shift:        document.getElementById('sp-shift')?.value || '',
       checked_by_id: document.getElementById('sp-by')?.value || '',
       checked_by:   (App.staffById(document.getElementById('sp-by')?.value) || {}).name || '',
@@ -401,6 +587,7 @@ S.InventorySpotCheck = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'spot_check', rec);
     if (ok) {
+      this.clearDraft();
       this.renderMain();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Spot Check'; }
@@ -416,6 +603,7 @@ S.InventorySpotCheck = {
       const vd = c.total_variance_dollar || 0;
       return '<tr class="sp-hrow" data-id="' + c.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
+        + '<td>' + esc(c.location || '-') + '</td>'
         + '<td>' + esc(c.shift || '-') + '</td>'
         + '<td>' + esc(c.checked_by || '-') + '</td>'
         + '<td>' + (c.product_count || 0) + '</td>'
@@ -426,11 +614,11 @@ S.InventorySpotCheck = {
         + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
-    return '<div class="card"><div class="card-title">Spot Check History</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + App.showOlderBar('ic', 'spot_check', list, false) + '</div>';
+    return '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Location</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'spot_check', list, false);
   },
 
   renderDetail(id) {
@@ -440,58 +628,57 @@ S.InventorySpotCheck = {
 
     const rows = (c.items || []).map(it => {
       const vd = it.variance_dollar;
-      // Flagged rows get an Investigate action that pre-fills a Variance
-      // Investigation in Theft Risk. Closes the orphan where the operator
-      // had to retype the product name after seeing the flag.
+      const p = this.productById(it.product_id);
+      const cu = (it.category === 'Bottle Beer') ? 'btls' : App.unitAbbr(App.productUnit(p || { category: it.category }));
+      const cus = cu ? ' ' + cu : '';
+      const sw = (it.category === 'Bottle Beer') ? 'btls' : 'pours';
       const action = (it.flagged && it.product_id)
         ? '<button class="btn btn-ghost btn-sm sp-investigate" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '">Investigate</button>'
         : '';
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
-        + '<td>' + (it.pre != null ? it.pre.toFixed(1) : '-') + '</td>'
-        + '<td>' + (it.post != null ? it.post.toFixed(1) : '-') + '</td>'
-        + '<td>' + (it.poured != null ? it.poured.toFixed(1) : '-') + '</td>'
-        + '<td>' + (it.pos_sold != null ? it.pos_sold.toFixed(1) : '-') + '</td>'
+        + '<td>' + (it.pre != null ? it.pre.toFixed(1) + cus : '-') + '</td>'
+        + '<td>' + (it.post != null ? it.post.toFixed(1) + cus : '-') + '</td>'
+        + '<td>' + (it.poured != null ? it.poured.toFixed(1) + ' ' + sw : '-') + '</td>'
+        + '<td>' + (it.pos_sold != null ? it.pos_sold.toFixed(1) + ' ' + sw : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
-        + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) : '-') + '</td>'
+        + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) + ' ' + sw : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
         + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-') + '</td>'
         + '<td>' + action + '</td></tr>';
     }).join('');
 
+    const meta = (label, val, cls) =>
+      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val ' + (cls || '') + '">' + val + '</div></div>';
+
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Spot Check &middot; ' + this.fmtDate(c.date) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button></div>'
-      + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Shift</div><div class="calc-val">' + esc(c.shift || '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Checked By</div><div class="calc-val">' + esc(c.checked_by || '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val ' + (c.flagged_count ? 'warn' : '') + '">' + (c.flagged_count || 0) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val ' + ((c.total_variance_dollar || 0) > 0 ? 'warn' : '') + '">'
-      + ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtCurrency(c.total_variance_dollar || 0) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + meta('Location', esc(c.location || '-'))
+      + meta('Shift', esc(c.shift || '-'))
+      + meta('Checked By', esc(c.checked_by || '-'))
+      + meta('Flagged', (c.flagged_count || 0), (c.flagged_count ? 'warn' : ''))
+      + meta('Total Variance', ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtCurrency(c.total_variance_dollar || 0), ((c.total_variance_dollar || 0) > 0 ? 'warn' : ''))
+      + '</div></div>'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Spot Check &middot; ' + this.fmtDate(c.date) + '</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" id="sp-back">Back to Spot Checks</button></div></div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
       + '<th>Variance</th><th>Variance $</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</div>';
+
     this.container.onclick = ev => {
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
+      if (ev.target.closest('#sp-back')) { this.renderMain(); return; }
       const inv = ev.target.closest('.sp-investigate');
-      if (inv) {
-        ev.stopPropagation();
-        this.openInvestigation(inv.dataset.pid, inv.dataset.name);
-      }
+      if (inv) { ev.stopPropagation(); this.openInvestigation(inv.dataset.pid, inv.dataset.name); }
     };
   },
 
-  // Spin up a Variance Investigation in theft-risk pre-filled with this
-  // product, then navigate the operator to it. Same shape as the dropdown
-  // path on theft-risk's investigationsCard, but the trigger is the
-  // flagged spot-check row instead of the manual dropdown.
   openInvestigation(productId, productName) {
     App.data.variance_investigations = App.data.variance_investigations || [];
-    // De-dupe — if an open investigation already exists for this product,
-    // jump to theft-risk instead of opening a second one.
     const existing = App.data.variance_investigations.find(i =>
       i.product_id === productId && i.status !== 'resolved');
     if (!existing) {
