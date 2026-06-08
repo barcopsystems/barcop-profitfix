@@ -81,8 +81,13 @@ S.LaborReports = {
       ? (Math.floor((new Date(rTo + 'T00:00:00').getTime() - new Date(rFrom + 'T00:00:00').getTime()) / 86400000) + 1) / 7
       : 0;
     const salRange = (rFrom && rTo) ? App.salariedCost(rFrom, rTo) : { total: 0, bar: 0, food: 0 };
+
+    // Weekly overtime premium (0.5x on hours over 40/week per non-salaried
+    // person) summed across the range, so Labor Cost here reconciles with the
+    // gross on Pay Periods and Payroll Export instead of showing straight-time.
+    const ot = this.otPremiums(rows);
     const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
-    const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total;
+    const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total;
     const totTips = tips.reduce((t, x) => t + (x.total_tips || 0), 0);
 
     const statsCard = this.statsCard(
@@ -107,9 +112,9 @@ S.LaborReports = {
       + filterHeading
       + filterCard
       + this.sectionHeading('By Department')
-      + this.byDept(rows, totCost, salWeeks)
+      + this.byDept(rows, totCost, salWeeks, ot.byDept)
       + this.sectionHeading('By Staff')
-      + this.byStaff(rows, totCost, salWeeks)
+      + this.byStaff(rows, totCost, salWeeks, ot.byStaff)
       + '</div>';
 
     this.container.onclick = ev => {
@@ -125,34 +130,67 @@ S.LaborReports = {
     bind('lr-to', 'filterTo');
   },
 
-  byStaff(rows, totCost, salWeeks) {
+  // Weekly OT premium per non-salaried staff (0.5x on hours over 40 in a
+  // Mon-Sun week), bucketed across the range and attributed to staff + dept so
+  // the Labor Cost columns match gross. Returns { total, byStaff, byDept }.
+  otPremiums(rows) {
+    const wk = {};  // staffKey|weekStart -> { sk, dept, hours, cost }
+    rows.forEach(a => {
+      if (App.isSalaried(a.staff_id)) return;
+      const sk = a.staff_id || a.name || '?';
+      const ws = App.weekStartFor ? App.weekStartFor(a.date) : (a.date || '');
+      const key = sk + '|' + ws;
+      if (!wk[key]) {
+        const pos = this.positionById(a.position_id);
+        wk[key] = { sk, dept: pos ? (pos.department || 'Other') : 'Unassigned', hours: 0, cost: 0 };
+      }
+      wk[key].hours += (a.hours || 0);
+      wk[key].cost  += (a.cost || 0);
+    });
+    const out = { total: 0, byStaff: {}, byDept: {} };
+    Object.values(wk).forEach(b => {
+      const otH = Math.max(0, b.hours - App.OT_THRESHOLD);
+      if (otH <= 0 || b.hours <= 0) return;
+      const prem = otH * (b.cost / b.hours) * 0.5;   // 0.5x on the effective base rate that week
+      out.total += prem;
+      out.byStaff[b.sk] = (out.byStaff[b.sk] || 0) + prem;
+      out.byDept[b.dept] = (out.byDept[b.dept] || 0) + prem;
+    });
+    return out;
+  },
+
+  byStaff(rows, totCost, salWeeks, otByStaff) {
+    otByStaff = otByStaff || {};
     const g = {};
     rows.forEach(a => {
       const k = a.staff_id || a.name || '?';
-      if (!g[k]) g[k] = { name: a.name || '-', hours: 0, cost: 0 };
+      if (!g[k]) g[k] = { name: a.name || '-', hours: 0, straight: 0 };
       g[k].hours += (a.hours || 0);
-      g[k].cost += (a.cost || 0);
+      g[k].straight += (a.cost || 0);
     });
     if (salWeeks > 0) {
       ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
         const wk = App.staffWeeklySalary(st);
         if (!wk) return;
-        if (!g[st.id]) g[st.id] = { name: st.name || '-', hours: 0, cost: 0 };
-        g[st.id].cost += wk * salWeeks;
+        if (!g[st.id]) g[st.id] = { name: st.name || '-', hours: 0, straight: 0 };
+        g[st.id].straight += wk * salWeeks;
       });
     }
-    const trs = Object.keys(g).sort((a, b) => g[b].cost - g[a].cost).map(k => {
+    // Labor Cost = straight-time + OT premium; Avg Wage stays the base rate.
+    const cost = k => g[k].straight + (otByStaff[k] || 0);
+    const trs = Object.keys(g).sort((a, b) => cost(b) - cost(a)).map(k => {
       const s = g[k];
       return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
         + '<td>' + s.hours.toFixed(1) + '</td>'
-        + '<td>' + App.fmtCurrency(s.hours > 0 ? s.cost / s.hours : 0) + '</td>'
-        + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
-        + '<td>' + (totCost > 0 ? App.fmtPct(s.cost / totCost * 100) : '-') + '</td></tr>';
+        + '<td>' + App.fmtCurrency(s.hours > 0 ? s.straight / s.hours : 0) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(cost(k)) + '</td>'
+        + '<td>' + (totCost > 0 ? App.fmtPct(cost(k) / totCost * 100) : '-') + '</td></tr>';
     }).join('') || this.noRow(5);
     return this.dataCard('<th>Staff</th><th>Hours</th><th>Avg Wage</th><th>Labor Cost</th><th>% of Labor</th>', trs);
   },
 
-  byDept(rows, totCost, salWeeks) {
+  byDept(rows, totCost, salWeeks, otByDept) {
+    otByDept = otByDept || {};
     const g = {};
     rows.forEach(a => {
       const pos = this.positionById(a.position_id);
@@ -171,6 +209,7 @@ S.LaborReports = {
         g[dept].cost += wk * salWeeks;
       });
     }
+    Object.keys(otByDept).forEach(d => { if (!g[d]) g[d] = { hours: 0, cost: 0 }; g[d].cost += otByDept[d]; });
     const trs = Object.keys(g).sort((a, b) => g[b].cost - g[a].cost).map(k =>
       '<tr><td><div class="val">' + esc(k) + '</div></td>'
       + '<td>' + g[k].hours.toFixed(1) + '</td>'

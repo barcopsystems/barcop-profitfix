@@ -294,7 +294,7 @@ S.LaborPayPeriods = {
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + agg.totals.hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val lg ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.cost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.regular_cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Pay</div><div class="calc-val lg ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Gross</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.gross) + '</div></div>'
       + '</div></div>';

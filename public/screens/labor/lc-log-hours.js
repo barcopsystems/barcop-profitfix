@@ -288,8 +288,11 @@ S.LaborLogHours = {
     const hours = parseFloat(document.getElementById(p + 'hours')?.value);
     if (isNaN(hours) || hours <= 0) { fail('Enter hours worked.'); return; }
 
-    // Resolve wage at the date the hours were worked (not today's wage)
-    const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0);
+    // Resolve wage at the date the hours were worked (not today's wage).
+    // Salaried (exempt) staff carry no hourly cost — pay is the fixed weekly
+    // salary added elsewhere, so logged hours are coverage only (wage/cost 0).
+    const sal = App.isSalaried(staff);
+    const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0));
     const rec = {
       id:          this.editId || App.uid(),
       date,
@@ -299,7 +302,7 @@ S.LaborLogHours = {
       shift_type:  document.getElementById(p + 'shift')?.value || '',
       hours,
       wage,
-      cost:        hours * wage,
+      cost:        sal ? 0 : hours * (wage || 0),
       notes:       document.getElementById(p + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
@@ -398,7 +401,8 @@ S.LaborLogHours = {
         return;
       }
       const recDate = this.normDate(r.date);
-      const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0);
+      const sal = App.isSalaried(staff);
+      const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0));
       toAdd.push({
         id:          App.uid(),
         date:        recDate,
@@ -408,7 +412,7 @@ S.LaborLogHours = {
         shift_type:  (r.shift || '').trim(),
         hours,
         wage,
-        cost:        hours * wage,
+        cost:        sal ? 0 : hours * (wage || 0),
         notes:       '',
         imported:    true,
         created_at:  new Date().toISOString()

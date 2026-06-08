@@ -262,7 +262,7 @@ S.LaborTipPool = {
       const s = shares[i];
       if (!s) return;
       const shareEl = el.querySelector('.tp-share');
-      if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share) : '-';
+      if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share, 2) : '-';
       alloc += s.share;
       totalHours += s.hours;
       if (s.staff_id) count++;
@@ -271,9 +271,9 @@ S.LaborTipPool = {
     const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
     set('tp-c-count', count);
     set('tp-c-hours', totalHours.toFixed(2).replace(/\.00$/, ''));
-    set('tp-c-alloc', App.fmtCurrency(alloc));
+    set('tp-c-alloc', App.fmtCurrency(alloc, 2));
     const rem = pool - alloc;
-    set('tp-c-rem', App.fmtCurrency(rem), Math.abs(rem) > 0.01 ? 'warn' : 'good');
+    set('tp-c-rem', App.fmtCurrency(rem, 2), Math.abs(rem) > 0.01 ? 'warn' : 'good');
   },
 
   async save() {
@@ -336,7 +336,7 @@ S.LaborTipPool = {
     const rows = list.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr class="tp-hrow" data-id="' + p.id + '" style="cursor:pointer;">'
       + '<td><div class="val">' + this.fmtDate(p.date) + '</div></td>'
       + '<td>' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</td>'
-      + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0) + '</td>'
+      + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</td>'
       + '<td>' + ((p.participants || []).length) + '</td>'
       + '<td><div class="row-actions">'
       + '<button class="btn btn-ghost btn-sm tp-hview" data-id="' + p.id + '">View</button>'
@@ -357,12 +357,12 @@ S.LaborTipPool = {
     const rows = (p.participants || []).map(pt => '<tr>'
       + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
       + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
-      + '<td class="val">' + App.fmtCurrency(pt.share || 0) + '</td></tr>').join('');
+      + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val lg">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val lg">' + App.fmtCurrency(p.pool_amount || 0) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val lg">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + (p.total_hours || 0) + '</div></div>'
       + '</div></div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'

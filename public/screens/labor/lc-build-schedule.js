@@ -97,6 +97,11 @@ S.LaborBuildSchedule = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
+    // A plain visit (sidebar/Build Schedule) is always a fresh week. Only an
+    // explicit Edit handoff from Schedule History resumes a posted schedule, so
+    // a stale editId never silently overwrites a previously posted week.
+    if (this._enterEdit) this._enterEdit = false;
+    else this.editId = null;
     this.draft = this.loadDraft();
     if (this.activeStaff().length === 0) {
       App.setupCard(this.container, {

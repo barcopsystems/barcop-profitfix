@@ -22,7 +22,9 @@ S.LaborDashboard = {
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
   weekAgo() {
-    const d = new Date(); d.setDate(d.getDate() - 7);
+    // Inclusive 7-day window: today and the 6 prior days (today - 6), so the
+    // "Last 7 Days" tiles cover 7 days, not 8, and salary accrues one week.
+    const d = new Date(); d.setDate(d.getDate() - 6);
     return App.ymdLocal(d);
   },
   mondayOf(d) {

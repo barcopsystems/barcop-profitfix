@@ -103,7 +103,7 @@ S.LaborScheduleHistory = {
   },
 
   editSchedule(id) {
-    if (S.LaborBuildSchedule) S.LaborBuildSchedule.editId = id;
+    if (S.LaborBuildSchedule) { S.LaborBuildSchedule.editId = id; S.LaborBuildSchedule._enterEdit = true; }
     App.navigate('lc-build-schedule');
   },
 
