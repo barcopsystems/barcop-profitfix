@@ -3280,7 +3280,10 @@ const App = {
 
   fmtCurrency(n, decimals) {
     if (isNaN(n) || n == null) return ' ';
-    const d = decimals !== undefined ? decimals : (Math.abs(n) < 10 ? 2 : 0);
+    // Currency always shows to the exact cent (accurate + honest). A caller can
+    // still force whole dollars with fmtCurrency(n, 0) for projections/estimates
+    // where cents would imply false precision.
+    const d = decimals !== undefined ? decimals : 2;
     return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
   },
 
