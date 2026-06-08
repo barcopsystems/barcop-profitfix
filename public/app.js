@@ -2036,6 +2036,36 @@ const App = {
     return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
   },
 
+  // ── Dismissible page intro ("tip") ──────────────────────────────────────────
+  // The cleaner replacement for per-card "How it works" buttons: ONE short,
+  // plain-English line at the top of a page saying what it is + the one move. A
+  // new operator (or a demo viewer) reads it; once they know the page they
+  // dismiss it and it is gone for good (remembered per page, per device), so a
+  // page you know stays dead clean. Deep help rides the optional "Learn more"
+  // link. introBar() returns '' once dismissed.
+  _tipsDismissed() {
+    try { return JSON.parse(localStorage.getItem('bc_tips_dismissed') || '[]'); } catch (e) { return []; }
+  },
+  isTipDismissed(id) { return this._tipsDismissed().indexOf(id) !== -1; },
+  dismissTip(id) {
+    const d = this._tipsDismissed();
+    if (d.indexOf(id) === -1) { d.push(id); try { localStorage.setItem('bc_tips_dismissed', JSON.stringify(d)); } catch (e) {} }
+  },
+  resetTips() { try { localStorage.removeItem('bc_tips_dismissed'); } catch (e) {} },
+  // `text` = one plain sentence (HTML allowed). `learnMore` = optional trailing
+  // link label (wire '.intro-learn'). Caller wires '.intro-dismiss' to
+  // App.dismissTip(id) then removes the bar. Returns '' if already dismissed.
+  introBar(id, text, learnMore) {
+    if (this.isTipDismissed(id)) return '';
+    const link = learnMore
+      ? ' <span class="intro-learn" style="color:var(--gold);cursor:pointer;text-decoration:underline;white-space:nowrap;">' + esc(learnMore) + '</span>'
+      : '';
+    return '<div class="intro-bar no-print" style="display:flex;align-items:flex-start;gap:12px;margin:0 0 16px;padding:2px;">'
+      + '<div style="flex:1;font-size:12.5px;color:var(--t3);line-height:1.55;">' + text + link + '</div>'
+      + '<button type="button" class="intro-dismiss" title="Dismiss" aria-label="Dismiss" style="flex-shrink:0;background:none;border:none;color:var(--t3);font-size:18px;line-height:1;cursor:pointer;padding:0 2px;">&times;</button>'
+      + '</div>';
+  },
+
   // A collapsible card header. The WHOLE header toggles the card open/closed; the
   // chevron is just a rotating visual indicator, so the operator does not have to
   // hit the tiny target. The help button on the right is excluded by the page's
