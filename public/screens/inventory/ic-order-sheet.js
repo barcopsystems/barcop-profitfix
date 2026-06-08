@@ -451,6 +451,9 @@ S.InventoryOrderSheet = {
     const pool = onlyVendor.length > 0 ? onlyVendor : allProducts;
     const filtered = pool.filter(p => !(existingProductIds || []).includes(p.id));
 
+    if (filtered.length === 0) {
+      return '<option value="">Every product for this vendor is already on the order</option>';
+    }
     const byCat = {};
     filtered.forEach(p => { const c = p.category || 'Other'; (byCat[c] = byCat[c] || []).push(p); });
     const cats = Object.keys(byCat).sort();
