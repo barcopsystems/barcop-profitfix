@@ -325,10 +325,10 @@ S.InventoryTakeInventory = {
       + cards
       + '<div class="card-actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn btn-ghost" id="ti-prev"' + (this.locStep === 0 ? ' disabled' : '') + '>&#8592; Previous</button>'
         + (isLast
-            ? '<button class="btn btn-primary" id="ti-review">Review Count &#8594;</button>'
-            : '<button class="btn btn-primary" id="ti-next">Next Location &#8594;</button>')
+            ? '<button class="btn btn-primary" id="ti-review">Review Count</button>'
+            : '<button class="btn btn-primary" id="ti-next">Next Location</button>')
+        + (this.locStep > 0 ? '<button class="btn btn-ghost" id="ti-prev">Previous</button>' : '')
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
@@ -488,7 +488,6 @@ S.InventoryTakeInventory = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="sh" style="margin:0 0 12px;">Review ' + esc(this.draft.type) + ' Count</div>'
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg">' + rows.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val lg">' + counted + '</div></div>'
@@ -498,9 +497,7 @@ S.InventoryTakeInventory = {
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Full</th><th>Open</th><th>Total</th><th>Value</th>'
       + '</tr></thead><tbody>' + tbody + '</tbody></table></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin:14px 0;">Products left untouched are recorded at zero. '
-      + 'Go back to adjust any product before submitting.</div>'
-      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px;">'
       + '<button class="btn btn-primary" id="ti-submit">Submit Count</button>'
       + '<button class="btn btn-ghost" id="ti-back-count">Back to Counting</button>'
       + '<span id="ti-sub-err" style="color:var(--red);font-size:12px;display:none;"></span>'
@@ -588,12 +585,9 @@ S.InventoryTakeInventory = {
       + '<div style="font-size:12px;color:var(--t3);">' + esc(record.type) + ' count &middot; ' + record.item_count
       + ' products &middot; ' + App.fmtCurrency(record.total_value) + ' total value</div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;text-align:center;margin-bottom:16px;">'
-      + 'Usage and variance against your previous count appear in Count History. '
-      + 'This count can also feed Profit Recovery COGS for the period.</div>'
       + '<div class="card-actions" style="justify-content:center;">'
-      + '<button class="btn btn-ghost" id="ti-again">Take Another Count</button>'
-      + '<button class="btn btn-primary" id="ti-history">View Count History</button>'
+      + '<button class="btn btn-primary" id="ti-again">Take Another Count</button>'
+      + '<button class="btn btn-ghost" id="ti-history">View Count History</button>'
       + '</div></div></div>';
     this.container.onclick = null;
     document.getElementById('ti-again')?.addEventListener('click', () => this.renderSetup());
