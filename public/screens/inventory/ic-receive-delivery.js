@@ -260,8 +260,11 @@ S.InventoryReceiveDelivery = {
       if (messages.length > 0) { flagRow.style.display = ''; flag.textContent = messages.join(' '); }
       else { flagRow.style.display = 'none'; flag.textContent = ''; }
     }
-    // Flagged lines highlight gold so they stand out down a long delivery.
-    line.style.background = messages.length > 0 ? 'var(--gold-tint)' : '';
+    // Flagged lines tint gold across the data row AND the detail sub-row so they
+    // stand out down a long delivery.
+    const flagged = messages.length > 0;
+    line.classList.toggle('rd-flagged', flagged);
+    if (flagRow) flagRow.classList.toggle('rd-flagged', flagged);
 
     // Show the Flag button when a real diff is detected AND the line has not
     // already been flagged. The "Logged" badge takes over once filed.
@@ -408,7 +411,7 @@ S.InventoryReceiveDelivery = {
     const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === suggestedType ? ' selected' : '') + '>' + t + '</option>').join('');
 
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">File Discrepancy</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Fill this with what was wrong, then file it. The claim goes to Profit Recovery &rsaquo; Vendor Discrepancies for credit follow-up. Adjust the numbers if needed.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Files a credit claim to Vendor Discrepancies for follow-up. Adjust if needed.</div>'
       + '<div class="form-row" style="gap:12px;">'
         + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="rd-disc-date" value="' + esc(date) + '"/></div>'
         + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><select id="rd-disc-vendor">' + this._vendorOptionsForModal(vendor) + '</select></div>'
