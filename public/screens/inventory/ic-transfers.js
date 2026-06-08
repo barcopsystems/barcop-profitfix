@@ -12,7 +12,6 @@
 
 S.InventoryTransfers = {
   editId: null,
-  _pendingDelId: null,
   filterFrom: '',
   filterTo: '',
   filterProductId: '',
@@ -83,41 +82,55 @@ S.InventoryTransfers = {
     }
 
     const all = this.transfers();
-    const filtered = this.applyFilters(all);
-    filtered.sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
-
-    let listHtml = this.filterCard();
     if (all.length === 0) {
-      listHtml += '<div class="empty"><div class="empty-title">No transfers logged yet</div>'
-        + '<div class="empty-sub">Log every movement of inventory between locations, stockroom to front bar, walk-in to kitchen line. It builds an audit trail and accountability record.</div></div>';
-    } else if (filtered.length === 0) {
-      listHtml += '<div class="empty"><div class="empty-title">No transfers match the filters</div>'
-        + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
-    } else {
-      const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
-        const p = this.productById(t.product_id);
-        return '<tr class="tr-row" data-id="' + t.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + this.fmtDateTime(t.date_time) + '</div></td>'
-          + '<td>' + esc(t.from_location || '-') + ' <span style="color:var(--t3);">→</span> ' + esc(t.to_location || '-') + '</td>'
-          + '<td><div class="val">' + esc(t.product_name || (p ? p.name : '-')) + '</div>'
-          + (t.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(t.category) + '</div>' : '') + '</td>'
-          + '<td>' + (t.quantity != null ? t.quantity : '-') + ' ' + esc(t.unit || '') + '</td>'
-          + '<td>' + esc(t.performed_by || '-') + '</td>'
-          + '<td>' + esc(t.witnessed_by || '-') + '</td>'
-          + '<td><div class="row-actions">'
-          + (App.canEdit('ic-transfers') ? '<button class="btn btn-ghost btn-sm tr-edit" data-id="' + t.id + '">Edit</button>' : '')
-          + (App.canEdit('ic-transfers') ? '<button class="btn btn-danger btn-sm tr-del" data-id="' + t.id + '">Delete</button>' : '')
-          + '</div></td></tr>';
-      }).join('');
-      listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>When</th><th>From → To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('ic', 'transfer', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterLocation));
+      this.container.innerHTML = '<div class="screen">' + this.logFormCard()
+        + '<div style="font-size:13px;color:var(--t3);padding:14px 2px;">No transfers logged yet. Use the form above to log the first one.</div></div>';
+      this.wireForm('tr-');
+      return;
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
+    const filtered = this.applyFilters(all)
+      .sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+    const lastDate = all.reduce((m, t) => {
+      const d = t.date_time || t.created_at || '';
+      return (!m || new Date(d).getTime() > new Date(m).getTime()) ? d : m;
+    }, '');
+
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Transfers</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Transfer</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
+      + '</div></div>';
+
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Transfers</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Worksheet</button>'
+      + '</div></div>';
+
+    const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
+      const p = this.productById(t.product_id);
+      return '<tr class="tr-row" data-id="' + t.id + '" style="cursor:pointer;">'
+        + '<td><div class="val">' + this.fmtDateTime(t.date_time) + '</div></td>'
+        + '<td>' + esc(t.from_location || '-') + ' <span style="color:var(--t3);">&rarr;</span> ' + esc(t.to_location || '-') + '</td>'
+        + '<td><div class="val">' + esc(t.product_name || (p ? p.name : '-')) + '</div>'
+        + (t.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(t.category) + '</div>' : '') + '</td>'
+        + '<td>' + (t.quantity != null ? t.quantity : '-') + ' ' + esc(t.unit || '') + '</td>'
+        + '<td>' + esc(t.performed_by || '-') + '</td>'
+        + '<td>' + esc(t.witnessed_by || '-') + '</td>'
+        + '<td><div class="row-actions">'
+        + (App.canEdit('ic-transfers') ? '<button class="btn btn-ghost btn-sm tr-edit" data-id="' + t.id + '">Edit</button>' : '')
+        + (App.canEdit('ic-transfers') ? '<button class="btn btn-danger btn-sm tr-del" data-id="' + t.id + '">Delete</button>' : '')
+        + '</div></td></tr>';
+    }).join('');
+    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>When</th><th>From &rarr; To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No transfers match the filter.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'transfer', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterLocation));
+
+    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + statsCard + filterHeading + this.filterCard() + listCard + '</div>';
     this.wireList();
-    this.wireForm();
+    this.wireForm('tr-');
   },
 
   showHowTo() {
@@ -130,22 +143,22 @@ S.InventoryTransfers = {
     ]);
   },
 
-  // The Log a Transfer form lives at the top of the landing page, always open.
+  // The Log a Transfer form lives at the top of the landing page (collapsible).
   logFormCard() {
-    return '<div class="card no-print">'
+    return '<div class="card form-card no-print">'
       + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer', App.helpButton('tr-how'))
       + '<div class="collapse-body">'
-      + this.formRows(null)
+      + this.formRows(null, 'tr-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tr-save">Log Transfer</button>'
         + '<span id="tr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
   },
 
-  // Shared two-row field layout for both the inline log form and the edit page.
-  // Row 1: Date/Time, Product, Quantity, Unit. Row 2: From, To, Performed By,
-  // Witnessed By. Notes below. Pass the record for edit, or null for a new log.
-  formRows(t) {
+  // Shared two-row field layout for both the inline log form and the edit popup.
+  // `idp` prefixes every field id ('tr-' inline, 'tre-' modal) so the popup never
+  // collides with the always-open inline form behind it.
+  formRows(t, idp) {
     const v = val => (val != null && val !== '') ? val : '';
     const active = this.activeShift();
     const defaultManagerId = active ? (active.manager_id || '') : '';
@@ -161,69 +174,63 @@ S.InventoryTransfers = {
 
     return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
         + '<div class="f" style="width:220px;flex-shrink:0;"><label>Date / Time</label>'
-          + '<input type="datetime-local" id="tr-when" value="' + esc((t?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
+          + '<input type="datetime-local" id="' + idp + 'when" value="' + esc((t?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
         + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label>'
-          + '<select id="tr-prod">' + this.productOptions(initialProdId) + '</select></div>'
+          + '<select id="' + idp + 'prod">' + this.productOptions(initialProdId) + '</select></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Quantity</label>'
-          + '<input type="number" id="tr-qty" min="0" step="0.5" value="' + v(t?.quantity) + '" placeholder="0"/></div>'
+          + '<input type="number" id="' + idp + 'qty" min="0" step="0.5" value="' + v(t?.quantity) + '" placeholder="0"/></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="tr-unit">' + this.unitOptions(initialCat, initialUnit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles')) + '</select></div>'
+          + '<select id="' + idp + 'unit">' + this.unitOptions(initialCat, initialUnit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles')) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
         + '<div class="f" style="flex:1;min-width:160px;"><label>From Location</label>'
-          + '<select id="tr-from">' + this.locationOptions(initialFrom) + '</select></div>'
+          + '<select id="' + idp + 'from">' + this.locationOptions(initialFrom) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:160px;"><label>To Location</label>'
-          + '<select id="tr-to">' + this.locationOptions(initialTo) + '</select></div>'
+          + '<select id="' + idp + 'to">' + this.locationOptions(initialTo) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:160px;"><label>Performed By</label>'
-          + '<select id="tr-by">' + App.staffOptions(t?.performed_by_id || defaultManagerId, { placeholder: 'Select staff...' }) + '</select></div>'
+          + '<select id="' + idp + 'by">' + App.staffOptions(t?.performed_by_id || defaultManagerId, { placeholder: 'Select staff...' }) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:160px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-          + '<select id="tr-witness">' + App.staffOptions(t?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
+          + '<select id="' + idp + 'witness">' + App.staffOptions(t?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
       + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="tr-notes" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>';
+        + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>';
   },
 
-  // Wire the always-open inline log form (How This Works, Save, product change).
-  wireForm() {
+  // Wire the always-open inline log form.
+  wireForm(idp) {
     document.getElementById('tr-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('tr-save')?.addEventListener('click', () => this.save());
-    this.wireProdChange();
+    document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
+    this.wireProdChange(idp);
     const head = this.container.querySelector('.card-collapse-head');
     if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
     App.applyCollapsed(this.container);
   },
 
   // Product change: re-pop unit options + default From to the product's primary.
-  wireProdChange() {
-    document.getElementById('tr-prod')?.addEventListener('change', e => {
+  wireProdChange(idp) {
+    document.getElementById(idp + 'prod')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
       if (!p) return;
-      const unitSel = document.getElementById('tr-unit');
+      const unitSel = document.getElementById(idp + 'unit');
       if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'units'));
-      const fromSel = document.getElementById('tr-from');
+      const fromSel = document.getElementById(idp + 'from');
       if (fromSel && !fromSel.value && p.primary_location) fromSel.value = p.primary_location;
     });
   },
 
-  // ── Filter card ─────────────────────────────────────────────────────
+  // ── Filter card (controls only; Export/Worksheet live on the heading row) ──
   filterCard() {
     const locOpts = '<option value="">All locations</option>'
       + this.locations().map(l => '<option value="' + esc(l.name) + '"' + (this.filterLocation === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
     const prodOpts = '<option value="">All products</option>'
       + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span>'
-      + '<div style="display:flex;gap:8px;">'
-        + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Worksheet</button>'
-      + '</div></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+    return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tr-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Product</label><select id="tr-f-prod">' + prodOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location (either side)</label><select id="tr-f-loc">' + locOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tr-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tr-f-clear">Clear</button></div>'
       + '</div></div>';
   },
 
@@ -245,8 +252,8 @@ S.InventoryTransfers = {
       const edit = ev.target.closest('.tr-edit');
       const del  = ev.target.closest('.tr-del');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row && App.canEdit('ic-transfers')) this.showForm(row.dataset.id);
+      else if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); }
+      else if (row && App.canEdit('ic-transfers')) this.openEdit(row.dataset.id);
     };
     document.getElementById('tr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Transfer Log', root: this.container }));
     document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
@@ -260,11 +267,10 @@ S.InventoryTransfers = {
     });
   },
 
-  // ── Form ────────────────────────────────────────────────────────────
+  // ── Form options ────────────────────────────────────────────────────
   productOptions(selectedId) {
     const prods = this.products();
     if (!prods.length) return '<option value="">No products set up</option>';
-    // Group by category for easier picking on big bars
     const cats = (S.InventoryProducts && S.InventoryProducts.CATEGORIES) || ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
     let h = '<option value="">Select product...</option>';
     cats.forEach(cat => {
@@ -285,8 +291,6 @@ S.InventoryTransfers = {
   },
 
   unitOptions(productCategory, selected) {
-    // Sensible default units per category. Operator can pick or default lands
-    // on the most common. For Bottle Beer / Draft Beer we allow Cases too.
     let opts = ['bottles', 'units'];
     if (productCategory === 'Bottle Beer') opts = ['cases', 'bottles'];
     else if (productCategory === 'Draft Beer') opts = ['kegs'];
@@ -294,49 +298,54 @@ S.InventoryTransfers = {
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   },
 
-  // Edit page (own screen). Same two-row field layout as the inline log form;
-  // Cancel stays here because the operator navigated away from the list to edit.
-  showForm(id) {
+  // ── Edit popup (standard modal) ───────────────────────────────────────
+  openEdit(id) {
     if (!App.canEdit('ic-transfers')) return;
-    this.editId = id || null;
-    const t = id ? this.transfers().find(x => x.id === id) : null;
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">Edit Transfer</div>'
-      + this.formRows(t)
+    const t = this.transfers().find(x => x.id === id);
+    if (!t) return;
+    this.editId = id;
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Transfer</div>'
+      + this.formRows(t, 'tre-')
       + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="tr-save">Update Transfer</button>'
-        + '<button class="btn btn-ghost" id="tr-cancel">Cancel</button>'
-        + '<span id="tr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    document.getElementById('tr-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('tr-save')?.addEventListener('click', () => this.save());
-    this.wireProdChange();
+        + '<button class="btn btn-primary" id="tre-save">Update Transfer</button>'
+        + '<button class="btn btn-ghost" id="tre-cancel">Cancel</button>'
+        + '<span id="tre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '<button class="btn btn-danger" id="tre-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'tr-edit-modal', maxWidth: 540, noClose: true });
+    document.getElementById('tre-save')?.addEventListener('click', () => this.save('tre-', 'tr-edit-modal'));
+    document.getElementById('tre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tr-edit-modal'); });
+    document.getElementById('tre-del')?.addEventListener('click', async () => {
+      if (!(await App.confirmDelete())) return;
+      await App.removeRecord('ic', 'transfer', id);
+      this.editId = null;
+      App.closeModal('tr-edit-modal');
+      this.renderList();
+    });
+    this.wireProdChange('tre-');
   },
 
-  async save() {
-    const err = document.getElementById('tr-err');
+  async save(idp, modalId) {
+    const err = document.getElementById(idp + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
-    const dateTime = document.getElementById('tr-when')?.value;
+    const dateTime = document.getElementById(idp + 'when')?.value;
     if (!dateTime) { fail('Date and time are required.'); return; }
-    const productId = document.getElementById('tr-prod')?.value;
+    const productId = document.getElementById(idp + 'prod')?.value;
     if (!productId) { fail('Pick a product.'); return; }
     const product = this.productById(productId);
     if (!product) { fail('Product not found.'); return; }
-    const quantity = parseFloat(document.getElementById('tr-qty')?.value);
+    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
     if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
-    const from = document.getElementById('tr-from')?.value;
-    const to   = document.getElementById('tr-to')?.value;
+    const from = document.getElementById(idp + 'from')?.value;
+    const to   = document.getElementById(idp + 'to')?.value;
     if (!from)       { fail('Pick a From location.'); return; }
     if (!to)         { fail('Pick a To location.'); return; }
     if (from === to) { fail('From and To must be different locations.'); return; }
-    const performedById = document.getElementById('tr-by')?.value;
+    const performedById = document.getElementById(idp + 'by')?.value;
     if (!performedById) { fail('Pick who performed the transfer.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
-    const witnessedById = document.getElementById('tr-witness')?.value || '';
+    const witnessedById = document.getElementById(idp + 'witness')?.value || '';
     const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
 
     const rec = {
@@ -348,31 +357,31 @@ S.InventoryTransfers = {
       product_name:     product.name,
       category:         product.category || '',
       quantity,
-      unit:             document.getElementById('tr-unit')?.value || '',
+      unit:             document.getElementById(idp + 'unit')?.value || '',
       performed_by_id:  performedById,
       performed_by:     performedBy,
       witnessed_by_id:  witnessedById,
       witnessed_by:     witnessedBy,
-      notes:            document.getElementById('tr-notes')?.value.trim() || ''
+      notes:            document.getElementById(idp + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
     else rec.updated_at = new Date().toISOString();
 
-    const list = this.transfers();
     let saveRec = rec;
     if (this.editId) {
-      const ex = list.find(x => x.id === this.editId);
+      const ex = this.transfers().find(x => x.id === this.editId);
       if (ex) saveRec = { ...ex, ...rec };
     }
 
-    const btn = document.getElementById('tr-save');
+    const btn = document.getElementById(idp + 'save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'transfer', saveRec);
     this.editId = null;
     if (ok) {
+      if (modalId) App.closeModal(modalId);
       this.renderList();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Log Transfer'; }
+      if (btn) { btn.disabled = false; btn.textContent = modalId ? 'Update Transfer' : 'Log Transfer'; }
       fail('Save failed. Try again.');
     }
   },
