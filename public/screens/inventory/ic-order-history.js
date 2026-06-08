@@ -286,15 +286,16 @@ S.InventoryOrderHistory = {
       : '';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;min-width:0;">'
       + meta('Vendor', esc(o.vendor || '-'))
       + meta('Order Date', this.fmtDate(o.date))
       + meta('Line Items', o.item_count || (o.line_items || []).length)
       + meta('Order Total', App.fmtCurrency(o.total || 0))
       + meta('Status', this.statusText(o.status))
       + '</div>'
-      + (actionBtns ? '<div class="card-actions">' + actionBtns + '</div>' : '')
-      + '</div>'
+      + actionBtns
+      + '</div></div>'
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">' + esc(o.vendor || 'Order') + ' &middot; ' + this.fmtDate(o.date) + '</div>'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="oh-export">Export PDF</button></div></div>'
