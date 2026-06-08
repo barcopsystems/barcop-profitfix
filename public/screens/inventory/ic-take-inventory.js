@@ -124,7 +124,7 @@ S.InventoryTakeInventory = {
     }
 
     this.container.innerHTML = '<div class="screen">' + resumeBar
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
       + App.helpButton('ti-how') + '</div>'
       + locPicker
@@ -152,30 +152,18 @@ S.InventoryTakeInventory = {
     document.getElementById('ti-start')?.addEventListener('click', () => this.startCount());
   },
 
-  // Discard the in-progress draft. Confirmation modal because losing count
-  // data part-way through is destructive — easy to recover from a manual
-  // back-out, hard to recover from an accidental discard.
-  confirmDiscardDraft() {
-    const m = document.createElement('div');
-    m.id = 'ti-discard-modal';
-    m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
-    m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:460px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
-      + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:12px;">Discard This Count?</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:20px;">Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.</div>'
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;">'
-        + '<button type="button" id="ti-disc-cancel" class="btn btn-ghost">Keep Counting</button>'
-        + '<button type="button" id="ti-disc-confirm" class="btn btn-danger">Discard</button>'
-      + '</div>'
-    + '</div>';
-    document.body.appendChild(m);
-    const close = () => m.remove();
-    m.addEventListener('click', ev => { if (ev.target === m) close(); });
-    document.getElementById('ti-disc-cancel').addEventListener('click', close);
-    document.getElementById('ti-disc-confirm').addEventListener('click', () => {
-      this.clearDraft();
-      close();
-      this.renderSetup();
+  // Discard the in-progress draft. Confirmation because losing count data
+  // part-way through is destructive. Standard App.confirm box (discard-draft is
+  // a non-delete prompt, so it uses confirm, not confirmDelete).
+  async confirmDiscardDraft() {
+    const ok = await App.confirm({
+      titleHtml: 'Discard this count? <span style="font-weight:400;">Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.</span>',
+      confirmText: 'Discard',
+      cancelText: 'Keep Counting'
     });
+    if (!ok) return;
+    this.clearDraft();
+    this.renderSetup();
   },
 
   startCount() {
@@ -324,22 +312,28 @@ S.InventoryTakeInventory = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div style="margin-bottom:14px;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
-      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">Location ' + (this.locStep + 1) + ' of ' + groups.length + '</span></div>'
-      + '<div style="font-size:11px;color:var(--t3);" id="ti-prog-txt">' + done + ' of ' + total + ' counted</div></div>'
+      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">Location ' + (this.locStep + 1) + ' of ' + groups.length
+      + ' &nbsp;|&nbsp; <span id="ti-prog-txt">' + done + ' of ' + total + ' counted</span></span></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Discard Count</button>'
+      + '</div></div>'
       + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;">'
       + '<div id="ti-prog-bar" style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
       + cards
       + '<div class="card-actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">'
-      + '<button class="btn btn-ghost" id="ti-prev"' + (this.locStep === 0 ? ' disabled' : '') + '>&#8592; Previous</button>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-ghost" id="ti-prev"' + (this.locStep === 0 ? ' disabled' : '') + '>&#8592; Previous</button>'
+        + (isLast
+            ? '<button class="btn btn-primary" id="ti-review">Review Count &#8594;</button>'
+            : '<button class="btn btn-primary" id="ti-next">Next Location &#8594;</button>')
+      + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
         + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Discard Count</button>'
       + '</div>'
-      + (isLast
-          ? '<button class="btn btn-primary" id="ti-review">Review Count &#8594;</button>'
-          : '<button class="btn btn-primary" id="ti-next">Next Location &#8594;</button>')
       + '</div></div>';
 
     BottleSlider._inst = {};
@@ -404,6 +398,9 @@ S.InventoryTakeInventory = {
     document.getElementById('ti-review')?.addEventListener('click', () => { this.draft._view = 'review'; this.saveDraft(); this.renderReview(); });
     document.getElementById('ti-exit')?.addEventListener('click', () => { this.saveDraft(); App.navigate('ic-product-setup'); });
     document.getElementById('ti-discard-count')?.addEventListener('click', () => this.confirmDiscardDraft());
+    // Top-right duplicates of the session actions, same handlers as the bottom.
+    document.getElementById('ti-exit-top')?.addEventListener('click', () => { this.saveDraft(); App.navigate('ic-product-setup'); });
+    document.getElementById('ti-discard-top')?.addEventListener('click', () => this.confirmDiscardDraft());
   },
 
   updateProgress() {
@@ -440,17 +437,45 @@ S.InventoryTakeInventory = {
     return out;
   },
 
+  // Abbreviate a container unit for the review columns: cases -> cs, bottles ->
+  // btls, plus the common food units. Falls back to whatever unit is on file.
+  unitAbbr(unit) {
+    const u = (unit || '').toString().trim().toLowerCase();
+    const map = {
+      cases: 'cs', case: 'cs', cs: 'cs',
+      kegs: 'kegs', keg: 'kegs',
+      bottles: 'btls', bottle: 'btls', btls: 'btls', btl: 'btls',
+      each: 'ea', ea: 'ea', units: 'ea', unit: 'ea',
+      pounds: 'lbs', pound: 'lbs', lbs: 'lbs', lb: 'lbs',
+      ounces: 'oz', ounce: 'oz', oz: 'oz',
+      quarts: 'qt', quart: 'qt', qt: 'qt',
+      gallons: 'gal', gallon: 'gal', gal: 'gal',
+      liters: 'L', liter: 'L', l: 'L'
+    };
+    return map[u] || u;
+  },
+
   renderReview() {
     const rows = this.rows();
     const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0);
     const counted = Object.keys(this.draft.counts).length;
 
     const tbody = rows.map(r => {
-      const fullCol = r.isCaseBeer ? (r.c.cases || 0) + ' cases' : (r.c.fulls || 0);
-      const openCol = r.isCaseBeer ? (r.c.loose || 0) + ' loose' : (r.c.value || 0).toFixed(1);
-      const totalCol = r.isCaseBeer
-        ? (r.total.toFixed(2) + ' cases (' + (r.c.cases || 0) + ' + ' + (r.c.loose || 0) + ' loose)')
-        : r.total.toFixed(1);
+      // Each quantity carries its unit abbreviation (cs / btls / kegs / lbs / ea
+      // ...). Bottle beer counts full CASES, an open count of loose BOTTLES, and
+      // totals in cases; everything else is in its container unit.
+      const u = this.unitAbbr(App.productUnit(r.p));
+      let fullCol, openCol, totalCol;
+      if (r.isCaseBeer) {
+        fullCol  = (r.c.cases || 0) + ' ' + u;
+        openCol  = (r.c.loose || 0) + ' btls';
+        totalCol = r.total.toFixed(2) + ' ' + u;
+      } else {
+        const us = u ? ' ' + u : '';
+        fullCol  = (r.c.fulls || 0) + us;
+        openCol  = (r.c.value || 0).toFixed(1) + us;
+        totalCol = r.total.toFixed(1) + us;
+      }
       return '<tr>'
         + '<td><div class="val">' + esc(r.p.name) + '</div>'
         + (r.p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.p.brand) + '</div>' : '') + '</td>'
@@ -463,22 +488,23 @@ S.InventoryTakeInventory = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title">Review ' + esc(this.draft.type) + ' Count</div>'
-      + '<div class="calc" style="margin-bottom:16px;">'
-      + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val">' + rows.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val">' + counted + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Inventory Value</div><div class="calc-val good">' + App.fmtCurrency(totalValue) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<div class="sh" style="margin:0 0 12px;">Review ' + esc(this.draft.type) + ' Count</div>'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg">' + rows.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val lg">' + counted + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Inventory Value</div><div class="calc-val lg good">' + App.fmtCurrency(totalValue) + '</div></div>'
+      + '</div></div>'
+      + '<div class="sh" style="margin:24px 0 10px;">Counted Products</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Full</th><th>Open</th><th>Total</th><th>Value</th>'
-      + '</tr></thead><tbody>' + tbody + '</tbody></table></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:12px;">Products left untouched are recorded at zero. '
+      + '</tr></thead><tbody>' + tbody + '</tbody></table></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin:14px 0;">Products left untouched are recorded at zero. '
       + 'Go back to adjust any product before submitting.</div>'
-      + '<div class="card-actions" style="justify-content:space-between;">'
-      + '<button class="btn btn-ghost" id="ti-back-count">&#8592; Back to Counting</button>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="ti-submit">Submit Count</button>'
+      + '<button class="btn btn-ghost" id="ti-back-count">Back to Counting</button>'
       + '<span id="ti-sub-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '</div></div></div>';
+      + '</div></div>';
 
     this.container.onclick = null;
     document.getElementById('ti-back-count')?.addEventListener('click', () => { this.draft._view = 'counting'; this.saveDraft(); this.renderCounting(); });
