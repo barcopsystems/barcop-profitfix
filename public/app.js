@@ -1952,17 +1952,12 @@ const App = {
   // page itself (see memory: how-this-works-pattern).
   // Page directions render as a right-side slide-in panel (not a centered modal):
   // it reads as "reference that slid in," dismisses with Close or a click off it,
-  // and never destroys anything. A "Full Help and FAQ" link at the bottom opens
-  // the whole manual. `opts.noFaq` suppresses that link for non-page help.
-  showHelpModal(title, sections, opts) {
-    opts = opts || {};
+  // and never destroys anything.
+  showHelpModal(title, sections) {
     const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
     const pp = t => '<p style="margin:0 0 10px;">' + t + '</p>';
     let body = '';
     (sections || []).forEach(s => { if (s.h) body += sh(s.h); (s.p || []).forEach(t => { body += pp(t); }); });
-    const faq = opts.noFaq ? '' :
-      '<div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--b2);">'
-      + '<span data-help-faq style="color:var(--gold);cursor:pointer;text-decoration:underline;font-size:12px;">Full Help &amp; FAQ</span></div>';
 
     const m = document.createElement('div');
     m.className = 'help-overlay';
@@ -1973,7 +1968,7 @@ const App = {
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
       + '<button class="btn btn-ghost btn-sm" data-help-close>Close</button></div>'
-      + '<div style="padding:20px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;flex:1;">' + body + faq + '</div>';
+      + '<div style="padding:20px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;flex:1;">' + body + '</div>';
     const close = () => {
       box.style.transform = 'translateX(100%)';
       m.style.opacity = '0';
@@ -1981,7 +1976,6 @@ const App = {
     };
     m.addEventListener('click', close);
     box.querySelector('[data-help-close]').addEventListener('click', close);
-    box.querySelector('[data-help-faq]')?.addEventListener('click', () => { close(); if (window.S && S.HubHelp) S.HubHelp.open(); });
     document.body.appendChild(m);
     document.body.appendChild(box);
     requestAnimationFrame(() => { m.style.opacity = '1'; box.style.transform = 'translateX(0)'; });
