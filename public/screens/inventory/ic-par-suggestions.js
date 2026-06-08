@@ -186,7 +186,7 @@ S.InventoryParSuggestions = {
           + '<input type="number" id="ps-window" min="2" max="26" step="1" value="' + settings.window_weeks + '"/></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Buffer (%) ' + tt('ic-par-buffer') + '</label>'
           + '<div class="fw"><input class="suf" type="number" id="ps-buffer" min="0" max="100" step="5" value="' + settings.buffer_pct + '"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:190px;flex-shrink:0;"><label>Default Delivery Cycle (days) ' + tt('ic-par-cycle') + '</label>'
+        + '<div class="f" style="width:190px;flex-shrink:0;"><label>Default Delivery Cycle ' + tt('ic-par-cycle') + '</label>'
           + '<input type="number" id="ps-cycle" min="1" max="30" step="1" value="' + settings.cycle_days + '"/></div>'
       + '</div></div>';
 
@@ -219,9 +219,9 @@ S.InventoryParSuggestions = {
       + stat('Added Stock', App.fmtCurrency(addedStock))
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Suggestions</div></div>';
+    const filterHeading = '<div class="no-print" style="margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Par Suggestions</div></div>';
     const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Filter by Category</label><select id="ps-cat">' + catOpts + '</select></div>'
+      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Category</label><select id="ps-cat">' + catOpts + '</select></div>'
       + '</div></div>';
 
     const trs = rows.map(r => {
