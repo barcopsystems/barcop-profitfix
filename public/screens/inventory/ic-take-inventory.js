@@ -198,7 +198,8 @@ S.InventoryTakeInventory = {
   // a non-delete prompt, so it uses confirm, not confirmDelete).
   async confirmDiscardDraft() {
     const ok = await App.confirm({
-      titleHtml: 'Discard this count? <span style="font-weight:400;">Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.</span>',
+      title: 'Discard this count?',
+      message: 'Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.',
       confirmText: 'Discard',
       cancelText: 'Keep Counting'
     });
