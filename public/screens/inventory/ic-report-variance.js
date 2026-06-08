@@ -48,10 +48,6 @@ S.InventoryVarianceReport = {
   },
   // The order the boxes show in the Variance Standards card.
   STD_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Misc', 'Food', 'By the Bottle'],
-  TT_BY_CAT: {
-    'Liquor': 'vr-std-liquor', 'Wine': 'vr-std-wine', 'Draft Beer': 'vr-std-draft',
-    'Misc': 'vr-std-misc', 'Food': 'vr-std-food', 'By the Bottle': 'vr-std-bottle'
-  },
 
   // Merge stored overrides over the defaults so a partial override still resolves
   // to a full standard set.
@@ -78,21 +74,11 @@ S.InventoryVarianceReport = {
   // The standard key a product is judged on.
   stdKey(p) { return this.isByBottle(p) ? 'By the Bottle' : ((p && p.category) || 'Liquor'); },
 
-  showImportHelp() {
-    App.showHelpModal('How the POS Import Works', [
-      { p: ['Variance compares what you used against what you sold, so it needs your POS sales. Export a product sales report from your POS and drop it on the box. Toast, Square, Aloha, Lightspeed, or any system that exports a spreadsheet works.'] },
-      { h: 'The File', p: ['A CSV or Excel file (.csv, .xlsx, .xls). The first row is your column headers, one product per row. This is the standard product or item sales report every POS can export.'] },
-      { h: 'The Columns', p: ['Bar Cop needs three things: the Product Name (required), the Quantity Sold, and the Sales Amount. Your headers do not need to match exactly. Common names like item, qty, units, net sales, and revenue are recognized for you.'] },
-      { h: 'The Mapping', p: ['After you drop the file, Bar Cop shows the columns it found and auto-matches them to Name, Quantity, and Sales. Fix any that are wrong, then import. It remembers your layout, so next month is one drop and done.'] },
-      { h: 'Names That Do Not Match', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once and Bar Cop remembers it for every future upload. Menu items like cocktails and plates explode through their recipe, so each ingredient gets its share of the variance.'] },
-      { h: 'Products Sold In More Than One Size', p: ['If a product sells in more than one size, a pint and a pitcher, a glass and a bottle, each size you set up on the product shows as its own choice in the Unmatched list. Map the pitcher line to the pitcher size and it draws the right ounces and counts the right revenue. A product sold across sizes shows its true blended pour cost on Sales Variance, and its single-price columns read "mixed sizes" because one standard price no longer applies.'] }
-    ]);
-  },
-
   showHowTo() {
     App.showHelpModal('How the Variance Report Works', [
       { p: ['Variance is the leak detector. It takes what your counts say you used and compares it to what your POS actually sold. The gap is product that left the bar without a matching sale: over-pour, theft, give-aways, or a count error.'] },
-      { h: 'Import Your POS Sales', p: ['Pick the count period up top, then upload a product sales report from your POS. Map the product name, quantity, and sales columns once and Bar Cop matches each row to your products and menu items.'] },
+      { h: 'Import Your POS Sales', p: ['Pick the count period up top, then upload a product sales report from your POS. Toast, Square, Aloha, Lightspeed, or any system that exports a spreadsheet works. A CSV or Excel file (.csv, .xlsx, .xls) with one product per row and a header row. Bar Cop needs the product name, the quantity sold, and the sales amount; common header names are auto-matched and it remembers your layout, so next month is one drop and done.'] },
+      { h: 'Map Anything Unmatched', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once and Bar Cop remembers it for every future upload. Cocktails and plates explode through their recipe so each ingredient gets its share. If a product sells in more than one size, a pint and a pitcher, each size you set up shows as its own choice, so map the pitcher line to the pitcher size and it draws the right ounces and revenue.'] },
       { h: 'Pick A Category', p: ['Use the Category picker to read one category at a time, or leave it on All Categories to see every category stacked. Each category reads in the unit you actually think in, so you are never staring at ounces of beer or ounces of lime juice.'] },
       { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS. So variance is unexplained loss, not legit give-aways you already tracked.'] },
       { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours made, and bottles used. Draft shows ounces and kegs. Bottle beer matches bottle for bottle, in bottles and cases. Mixers like lime juice and simple syrup read in quarts. Food reads per ingredient in its own unit, pounds, each, or dozen: what the dishes that sold should have drawn versus what the count says left. Cocktails and plates explode through their recipe so each ingredient gets its share.'] },
@@ -320,15 +306,20 @@ S.InventoryVarianceReport = {
         catCtl = '<div class="f" style="width:200px;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>';
       }
     }
-    const controls = '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Variance Report</span>' + App.helpButton('vr-how') + '</div>'
+    const controls = '<div class="card form-card no-print"><div class="card-title">Variance Report</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:260px;">'
       + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div>' + catCtl + '</div></div>';
 
+    // One dismissible intro line replaces the per-card "How it works" buttons;
+    // the deep walk-through rides the single "Learn more" link.
+    const introText = this.posRows
+      ? 'Flagged rows are where product walked out without a matching sale: over-pour, theft, or give-aways. Map any unmatched POS names below, then set what you will tolerate per category in Variance Standards.'
+      : 'Variance compares what your counts say you used against what your POS actually rang up. Drop a POS product-sales export below to start, and Bar Cop finds the gaps where product left without a sale.';
+    const intro = App.introBar('ic-report-variance', introText, 'Learn more');
+
     let body;
     if (!this.posRows) {
-      body = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Import POS Sales</span>' + App.helpButton('vr-import-how') + '</div>'
+      body = '<div class="card form-card"><div class="card-title">Import POS Sales</div>'
         + '<div id="vr-import"></div></div>';
     } else {
       const unmatched = this.unmatchedPos().length;
@@ -347,15 +338,18 @@ S.InventoryVarianceReport = {
         + (this.tab === 'usage' ? this.tabUsage() : this.tabSales());
     }
 
-    this.container.innerHTML = '<div class="screen">' + controls + this.varianceStandardsCard() + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + intro + controls + this.varianceStandardsCard() + body + '</div>';
 
-    document.getElementById('vr-how')?.addEventListener('click', () => this.showHowTo());
+    this.container.querySelector('.intro-learn')?.addEventListener('click', () => this.showHowTo());
+    this.container.querySelector('.intro-dismiss')?.addEventListener('click', () => {
+      App.dismissTip('ic-report-variance');
+      this.container.querySelector('.intro-bar')?.remove();
+    });
     document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
     document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
     this.wireStandards();
 
     if (!this.posRows) {
-      document.getElementById('vr-import-how')?.addEventListener('click', () => this.showImportHelp());
       CSVMapper.mount(document.getElementById('vr-import'), {
         confirmLabel: 'Import POS Sales',
         fields: [
@@ -457,7 +451,7 @@ S.InventoryVarianceReport = {
     if (this._unmatchedCollapsed == null) this._unmatchedCollapsed = un.length > 6;
     const collapsed = this._unmatchedCollapsed;
     return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Unmatched POS Products (' + un.length + ') ' + tt('vr-unmatched') + '</span>'
+      + '<span>Unmatched POS Products (' + un.length + ')</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-unmatched-toggle">' + (collapsed ? 'Show' : 'Hide') + '</button></div>'
       + '<div id="vr-unmatched-body" style="' + (collapsed ? 'display:none;' : '') + '">' + rows + '</div></div>';
   },
@@ -544,13 +538,14 @@ S.InventoryVarianceReport = {
       const suffix = isBottle ? 'btl' : '%';
       const step = isBottle ? '1' : '0.5';
       return '<div class="f" style="width:' + (isBottle ? 150 : 120) + 'px;flex-shrink:0;">'
-        + '<label>' + esc(key) + ' ' + tt(this.TT_BY_CAT[key]) + '</label>'
+        + '<label>' + esc(key) + '</label>'
         + '<div class="fw"><input class="suf vr-th" type="number" data-cat="' + esc(key) + '" data-key="' + field
         + '" min="0" step="' + step + '" value="' + this.thNum(t[key][field]) + '"/><span class="suf">' + suffix + '</span></div></div>';
     };
     return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Variance Standards</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-th-reset">Reset to Defaults</button></div>'
+      + '<div style="font-size:11.5px;color:var(--t3);line-height:1.5;margin-bottom:12px;">The variance you will tolerate per category before it flags. Below the number is OK, above it flags. By the Bottle flags the moment a single bottle is unaccounted.</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + this.STD_ORDER.map(k => box(k)).join('') + '</div></div>';
   },
