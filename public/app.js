@@ -1225,7 +1225,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings', 'sc-comp-settings', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-daily-view', 'lc-weekly-summary', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory']),
+  _CONVERTED: new Set(['sc-drawers', 'sc-active-shift', 'sc-cash-settings', 'sc-comp-settings', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-daily-view', 'lc-weekly-summary', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history']),
   _protoGlobalClick(g) {
     if (g === 'hub')   return this.showHub();
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
@@ -1551,6 +1551,52 @@ const App = {
     const txt = (num % 1 === 0) ? String(num) : num.toFixed(decimals == null ? 1 : decimals);
     const u = this.productUnit(p);
     return u ? (txt + ' ' + u) : txt;
+  },
+
+  // Abbreviated container unit for the count Full / Open / Total columns: cases
+  // -> cs, bottles -> btls, kegs -> kegs, plus the common food units. Falls back
+  // to whatever unit is on file. Single source so every inventory section reads
+  // identically.
+  unitAbbr(unit) {
+    const u = (unit || '').toString().trim().toLowerCase();
+    const map = {
+      cases: 'cs', case: 'cs', cs: 'cs',
+      kegs: 'kegs', keg: 'kegs',
+      bottles: 'btls', bottle: 'btls', btls: 'btls', btl: 'btls',
+      each: 'ea', ea: 'ea', units: 'ea', unit: 'ea',
+      pounds: 'lbs', pound: 'lbs', lbs: 'lbs', lb: 'lbs',
+      ounces: 'oz', ounce: 'oz', oz: 'oz',
+      quarts: 'qt', quart: 'qt', qt: 'qt',
+      gallons: 'gal', gallon: 'gal', gal: 'gal',
+      liters: 'L', liter: 'L', l: 'L'
+    };
+    return map[u] || u;
+  },
+
+  // The Full / Open / Total column strings for one counted product, formatted
+  // IDENTICALLY everywhere a count is listed (Take Inventory review, Count
+  // History detail, and any future inventory section — keep them all on this).
+  // Bottle beer counts full cases, an open count of loose bottles, and totals in
+  // cases; everything else is in its container unit, abbreviated. Pass the
+  // product (may be null — falls back to vals.category/unit_type) plus the raw
+  // count fields. Returns { full, open, total } display strings.
+  countCols(p, vals) {
+    vals = vals || {};
+    const total = vals.total || 0;
+    const caseSize = vals.caseSize != null ? vals.caseSize : ((p && p.case_size) || 0);
+    const isBeer = (((p && p.category) || vals.category) === 'Bottle Beer') && caseSize > 0;
+    if (isBeer) {
+      const cases = vals.cases != null ? vals.cases : Math.floor(total);
+      const loose = vals.loose != null ? vals.loose : Math.round((total - Math.floor(total)) * caseSize);
+      return { full: cases + ' cs', open: loose + ' btls', total: total.toFixed(2) + ' cs' };
+    }
+    const u = this.unitAbbr(this.productUnit(p || { category: vals.category, unit_type: vals.unit_type }));
+    const us = u ? ' ' + u : '';
+    return {
+      full:  (vals.fulls || 0) + us,
+      open:  (vals.partial || 0).toFixed(1) + us,
+      total: total.toFixed(1) + us
+    };
   },
 
   // Shared usage builder for the count-pair reports (Usage, Variance, Top
