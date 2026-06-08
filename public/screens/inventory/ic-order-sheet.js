@@ -3,7 +3,10 @@
 /* ── Inventory Control — Order Sheet (writes ic_orders) ───────────────────────
    Auto-generated from the latest count against par levels: every product below
    par is suggested for reorder, grouped by vendor. Quantities are editable.
-   Creating an order for a vendor saves an ic_orders record. */
+   Creating an order for a vendor saves an ic_orders record. The Order Status
+   card up top summarizes what is still to order, what is already ordered (with
+   Email to Vendor right there), and how old the count behind the suggestions
+   is. Build a custom off-cycle order at the bottom. */
 
 S.InventoryOrderSheet = {
   _created: null,
@@ -24,6 +27,10 @@ S.InventoryOrderSheet = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  scrollContentTop() {
+    const s = this.container && (this.container.closest('.content') || document.querySelector('.content'));
+    if (s) s.scrollTop = 0;
+  },
 
   render(container, actions) {
     this.container = container;
@@ -34,28 +41,23 @@ S.InventoryOrderSheet = {
 
   showHowTo() {
     App.showHelpModal('How the Order Sheet Works', [
-      { p: ['The Order Sheet turns your latest count into orders. Anything below par shows up under the vendor you buy it from, already filled to the quantity that brings you back to par. You can also build an order from scratch up top.'] },
-      { h: 'Suggested Orders', p: ['Each vendor card below lists their products that fell under par in your last count, with on-hand, par, and a suggested order quantity. Adjust any quantity, add a product the count missed with Add Item, then Create Order. Bottle beer is ordered by the case.'] },
-      { h: 'New Custom Order', p: ['Use the card up top to build an order off-cycle, like a party order or a one-time buy, without waiting on a count. Pick the vendor, add the products and quantities, then create it the same way.'] },
-      { h: 'One Order Per Vendor', p: ['Once you create an order for a vendor, that vendor drops off the suggested list and shows under Already Ordered, so you do not double-order. The order sits in Order History as Open until you receive it.'] },
+      { p: ['The Order Sheet turns your latest count into orders. Anything below par shows up under the vendor you buy it from, already filled to the quantity that brings you back to par. You can also build an order from scratch at the bottom.'] },
+      { h: 'The Order Status Card', p: ['Up top, Order Status shows what is still to order at a glance, what you have already ordered, and how old the count behind these suggestions is. Email an already-placed order straight to the vendor from here.'] },
+      { h: 'Suggested Orders', p: ['Each vendor card lists their products that fell under par in your last count, with on-hand, par, and a suggested order quantity. Adjust any quantity, add a product the count missed with Add Item, then Create Order. Bottle beer is ordered by the case.'] },
+      { h: 'Sending The Order', p: ['Once you create an order it moves to Already Ordered up top. Email to Vendor opens your email client with the order written out and addressed to the vendor on file, and marks it Submitted. The order also sits in Order History.'] },
+      { h: 'New Custom Order', p: ['Use the card at the bottom to build an order off-cycle, like a party order or a one-time buy, without waiting on a count. Pick the vendor, add the products and quantities, then create it the same way.'] },
       { h: 'Closing The Loop', p: ['When the delivery shows up, go to Receive Delivery and match it to the open order. The line items pre-fill, you confirm against the invoice, and Bar Cop marks the order Received.'] }
     ]);
   },
 
   // products below par in the latest count, grouped by vendor.
-  // On-hand is stored in container units for every category (cases for bottle
-  // beer, bottles for liquor/wine, kegs for draft). par_level is in the same
-  // unit, so the par comparison and the suggested order quantity need no
-  // conversion.
   belowParByVendor() {
     const asc = this.countsAsc();
     if (asc.length === 0) return null;
     const latest = asc[asc.length - 1];
     const onHand = {};
-    const onHandItem = {};
     (latest.items || []).forEach(it => {
       onHand[it.product_id] = (onHand[it.product_id] || 0) + (it.total || 0);
-      onHandItem[it.product_id] = it;
     });
 
     const groups = {};
@@ -79,14 +81,10 @@ S.InventoryOrderSheet = {
     return { latest, groups };
   },
 
-  // Returns the most recent order for a vendor that is still in flight
-  // (status is anything other than Received). Null if no open order exists.
-  // Used to suppress the vendor's card on the Order Sheet so the operator
-  // cannot accidentally place a duplicate order.
+  // Most recent in-flight order (status != Received) for a vendor, or null.
   openOrderForVendor(vendorName) {
     if (!vendorName) return null;
-    const orders = this.orders();
-    const open = orders.filter(o => o && o.vendor === vendorName && o.status !== 'Received');
+    const open = this.orders().filter(o => o && o.vendor === vendorName && o.status !== 'Received');
     if (open.length === 0) return null;
     return open.slice().sort((a, b) =>
       new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime()
@@ -109,10 +107,7 @@ S.InventoryOrderSheet = {
     }
 
     const allVendors = Object.keys(data.groups).sort();
-    // Split vendors into "needs ordering" vs "already has an open order"
-    // so we never render a Create Order button next to a vendor the operator
-    // already placed an order for. The hidden vendors get summarized in a
-    // compact notice that links to Order History.
+    // Split vendors into "needs ordering" vs "already has an open order".
     const visibleVendors = [];
     const hiddenVendors  = [];
     allVendors.forEach(v => {
@@ -120,35 +115,21 @@ S.InventoryOrderSheet = {
       else visibleVendors.push(v);
     });
 
-    const hiddenNotice = hiddenVendors.length === 0 ? '' :
-      '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:12px 16px;margin-bottom:16px;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Already Ordered</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
-      +   hiddenVendors.map(v => esc(v)).join(', ')
-      +   ' ' + (hiddenVendors.length === 1 ? 'has an open order.' : 'have open orders.')
-      +   ' <button class="btn btn-ghost btn-sm" id="os-go-history" style="margin-left:8px;">View in Order History</button>'
-      + '</div></div>';
-
     let body;
     if (visibleVendors.length === 0 && hiddenVendors.length === 0) {
-      body = '<div class="empty"><div class="empty-title">Everything is at par</div>'
+      body = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Order Status</span>' + App.helpButton('os-how') + '</div>'
+        + '<div class="empty" style="margin:0;"><div class="empty-title">Everything is at par</div>'
         + '<div class="empty-sub">No products in the ' + this.fmtDate(data.latest.date)
-        + ' count are below their par level. Nothing to order.</div></div>';
-    } else if (visibleVendors.length === 0) {
-      body = hiddenNotice
-        + '<div class="empty"><div class="empty-title">Everything below par is already on order</div>'
-        + '<div class="empty-sub">Every vendor with products below par from the '
-        + esc(this.fmtDate(data.latest.date))
-        + ' count has an open order in flight. Mark those received in Order History as deliveries arrive.</div></div>';
+        + ' count are below their par level. Nothing to order.</div></div>'
+        + this.countAgeNote(data.latest, false) + '</div>';
     } else {
-      body = hiddenNotice
+      body = this.statusCardHTML(visibleVendors, hiddenVendors, data)
         + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
     }
 
-    // The custom order card lives at the top of the screen, always open.
-    this.container.innerHTML = '<div class="screen">' + this.customOrderPanelHTML() + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + body + this.customOrderPanelHTML() + '</div>';
 
-    document.getElementById('os-go-history')?.addEventListener('click', () => App.navigate('ic-order-history'));
     document.getElementById('os-how')?.addEventListener('click', () => this.showHowTo());
 
     // Per-card input handler for the quantity field on existing lines.
@@ -162,9 +143,11 @@ S.InventoryOrderSheet = {
     this.container.querySelector('.os-co-vendor')?.addEventListener('change', (ev) => this.onCustomVendorChange(ev.target.value));
 
     this.container.onclick = ev => {
-      const parNudge = ev.target.closest('.os-par-nudge');
-      if (parNudge) { App.navigate('ic-par-suggestions'); return; }
-      const take    = ev.target.closest('#os-take');
+      if (ev.target.closest('.os-par-nudge')) { App.navigate('ic-par-suggestions'); return; }
+      if (ev.target.closest('#os-go-history')) { App.navigate('ic-order-history'); return; }
+      if (ev.target.closest('.os-take')) { App.navigate('ic-take-inventory'); return; }
+      const email = ev.target.closest('.os-email');
+      if (email) { this.emailOrder(email.dataset.id); return; }
       const rm      = ev.target.closest('.os-remove');
       const create  = ev.target.closest('.os-create');
       const coCreate = ev.target.closest('.os-co-create');
@@ -173,7 +156,6 @@ S.InventoryOrderSheet = {
       const pickAdd = ev.target.closest('.os-picker-add');
       const pickCancel = ev.target.closest('.os-picker-cancel');
 
-      if (take) { App.navigate('ic-take-inventory'); return; }
       if (rm) {
         const card = rm.closest('.os-vcard');
         rm.closest('.os-line').remove();
@@ -181,26 +163,11 @@ S.InventoryOrderSheet = {
         this.refreshPicker(card);
         return;
       }
-      if (addItem) {
-        this.openPicker(addItem.closest('.os-vcard'));
-        return;
-      }
-      if (pickAdd) {
-        this.addPickedItem(pickAdd.closest('.os-vcard'));
-        return;
-      }
-      if (pickCancel) {
-        this.closePicker(pickCancel.closest('.os-vcard'));
-        return;
-      }
-      if (coCreate) {
-        this.createCustomOrder();
-        return;
-      }
-      if (coCancel) {
-        this.closeCustomOrder();
-        return;
-      }
+      if (addItem) { this.openPicker(addItem.closest('.os-vcard')); return; }
+      if (pickAdd) { this.addPickedItem(pickAdd.closest('.os-vcard')); return; }
+      if (pickCancel) { this.closePicker(pickCancel.closest('.os-vcard')); return; }
+      if (coCreate) { this.createCustomOrder(); return; }
+      if (coCancel) { this.closeCustomOrder(); return; }
       if (create) this.createOrder(create.dataset.vendor);
     };
 
@@ -208,6 +175,67 @@ S.InventoryOrderSheet = {
       const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(v) + '"]');
       if (card) this.recalcVendor(card);
     });
+  },
+
+  // ── Combined Order Status card (still to order + already ordered + age) ──────
+  statusCardHTML(visibleVendors, hiddenVendors, data) {
+    let stillCount = 0, stillTotal = 0;
+    visibleVendors.forEach(v => (data.groups[v] || []).forEach(l => {
+      stillCount++; stillTotal += (l.suggested || 0) * (l.unit_cost || 0);
+    }));
+
+    const stillSection = '<div style="flex:1;min-width:220px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Still to Order</div>'
+      + (visibleVendors.length === 0
+          ? '<div style="font-size:13px;color:var(--t2);">Nothing left to order from this count.</div>'
+          : '<div style="font-size:13px;color:var(--t1);line-height:1.6;"><strong>' + visibleVendors.length + ' vendor' + (visibleVendors.length === 1 ? '' : 's') + '</strong> &middot; ' + stillCount + ' item' + (stillCount === 1 ? '' : 's') + ' &middot; <strong style="color:var(--gold);">' + App.fmtCurrency(stillTotal) + '</strong> to order</div>')
+      + '</div>';
+
+    const openOrders = hiddenVendors.map(v => this.openOrderForVendor(v)).filter(Boolean);
+    const orderedSection = openOrders.length === 0 ? '' :
+      '<div style="flex:1;min-width:280px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Already Ordered</div>'
+      + openOrders.map(o => '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--b2);">'
+          + '<div style="font-size:12px;color:var(--t1);min-width:0;">' + esc(o.vendor) + ' <span style="color:var(--t3);white-space:nowrap;">&middot; ' + App.fmtCurrency(o.total || 0) + ' &middot; ' + esc(o.status || 'Open') + '</span></div>'
+          + '<button class="btn btn-ghost btn-sm os-email" data-id="' + esc(o.id) + '" style="flex-shrink:0;">' + (o.status === 'Open' ? 'Email to Vendor' : 'Resend') + '</button>'
+        + '</div>').join('')
+      + '<div style="margin-top:8px;"><button class="btn btn-ghost btn-sm" id="os-go-history">View in Order History</button></div>'
+      + '</div>';
+
+    return '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Order Status</span>' + App.helpButton('os-how') + '</div>'
+      + '<div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">' + stillSection + orderedSection + '</div>'
+      + this.countAgeNote(data.latest, false)
+      + '</div>';
+  },
+
+  // "Based on your [date] count (X days ago)" — nudges a fresh count when stale.
+  countAgeNote(latest, standalone) {
+    if (!latest || !latest.date) return '';
+    const days = Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000);
+    const stale = days > 7;
+    const inner = 'Suggestions are based on your ' + this.fmtDate(latest.date) + ' count'
+      + (days > 0 ? ' (' + days + ' day' + (days === 1 ? '' : 's') + ' ago)' : ' (today)') + '.'
+      + (stale ? ' <span class="os-take" style="color:var(--gold);cursor:pointer;text-decoration:underline;">Take a fresh count</span> for accurate numbers.' : '');
+    if (standalone) {
+      return '<div style="font-size:11px;color:' + (stale ? 'var(--amber)' : 'var(--t3)') + ';margin-top:14px;">' + inner + '</div>';
+    }
+    return '<div style="font-size:11px;color:' + (stale ? 'var(--amber)' : 'var(--t3)') + ';margin-top:14px;border-top:1px solid var(--b2);padding-top:10px;">' + inner + '</div>';
+  },
+
+  // ── Email an already-placed order to the vendor (reuses Order History's body) ─
+  async emailOrder(orderId) {
+    const order = this.orders().find(o => o.id === orderId);
+    if (!order) return;
+    if (S.InventoryOrderHistory && S.InventoryOrderHistory.buildMailto) {
+      window.location.href = S.InventoryOrderHistory.buildMailto(order);
+    }
+    if (order.status === 'Open') {
+      order.status = 'Submitted';
+      order.submitted_at = new Date().toISOString();
+      await App.putRecord('ic', 'order', order);
+      this.renderMain();
+    }
   },
 
   // ── Picker open/close/add helpers (shared by suggested + custom cards) ───
@@ -232,17 +260,12 @@ S.InventoryOrderSheet = {
     if (btn) btn.style.display = '';
   },
 
-  // Rebuild the picker's product list each time it opens so a newly-added
-  // line is excluded from the choices. Also rebuilds after a Remove so a
-  // removed product can be re-added.
   refreshPicker(card) {
     if (!card) return;
     const vendor = card.dataset.vendor || '';
     const existingIds = [...card.querySelectorAll('.os-line[data-product-id]')]
       .map(el => el.dataset.productId).filter(Boolean);
 
-    // Custom card has the picker inside .os-picker-mount; suggested cards
-    // have the picker inline already. Replace either with a fresh build.
     const mount = card.querySelector('.os-picker-mount');
     if (mount) {
       mount.innerHTML = this.addItemPickerHTML(vendor, existingIds);
@@ -265,8 +288,6 @@ S.InventoryOrderSheet = {
     const sel = picker?.querySelector('.os-picker-prod');
     const pid = sel?.value;
     if (!pid) {
-      // Visual nudge — pulse the dropdown border so operator knows what's
-      // missing instead of silently doing nothing.
       if (sel) {
         sel.style.borderColor = 'var(--red)';
         setTimeout(() => { sel.style.borderColor = ''; }, 1200);
@@ -279,7 +300,6 @@ S.InventoryOrderSheet = {
     const qtyInp = picker?.querySelector('.os-picker-qty');
     const qty = Math.max(1, parseFloat(qtyInp?.value) || 1);
 
-    // Pull on-hand from latest count if present (informational only).
     let onHand = null;
     const counts = this.countsAsc();
     if (counts.length) {
@@ -298,8 +318,6 @@ S.InventoryOrderSheet = {
   },
 
   // ── Custom Order reset + create ──────────────────────────────────────────
-  // The custom order card is always open at the top. Cancel resets it back to
-  // the blank vendor-pick state in place rather than hiding it.
   closeCustomOrder() {
     const panel = this.container.querySelector('.os-custom');
     if (!panel) return;
@@ -321,14 +339,8 @@ S.InventoryOrderSheet = {
     panel.dataset.vendor = vendorName || '';
     const body = panel.querySelector('.os-co-body');
     if (!body) return;
-    if (!vendorName) {
-      body.style.display = 'none';
-      return;
-    }
+    if (!vendorName) { body.style.display = 'none'; return; }
     body.style.display = '';
-    // Clear any existing lines and reset the picker. closePicker resets the
-    // "+ Add Item" button visibility so changing vendor mid-picker does not
-    // leave the button hidden.
     const tbody = panel.querySelector('.os-lines-tbody');
     if (tbody) tbody.innerHTML = '';
     this.refreshPicker(panel);
@@ -385,6 +397,7 @@ S.InventoryOrderSheet = {
     if (ok) {
       this.closeCustomOrder();
       this.renderMain();
+      this.scrollContentTop();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
@@ -393,17 +406,13 @@ S.InventoryOrderSheet = {
 
   cssEsc(s) { return String(s).replace(/"/g, '&quot;'); },
 
-  // ── Line row builder ──────────────────────────────────────────────────────
-  // Shared by the suggested-from-count rows AND the "+ Add Item" picker so
-  // both flow types produce identical HTML and recalcVendor/createOrder work
-  // the same way for either. For bottle beer with case_size set, the qty
-  // and unit cost are in case units (par_level is already in cases). The
-  // on-hand display shows "X cases + Y loose" so the operator sees raw
-  // counts the way they look on the shelf.
+  // ── Line row builder (ing-tbl row, shared by suggested + custom + picker) ──
+  // For bottle beer with case_size, qty/unit cost are in CASES (par is already
+  // in cases). Quantities carry the abbreviated container unit (cs / btls).
   lineRowHTML(product, qty, onHand, par) {
     const isCaseBeer = (product.category === 'Bottle Beer') && product.case_size && product.case_size > 0;
     const unitCost = product.unit_cost != null ? product.unit_cost : 0;
-    const unit = App.productUnit(product);
+    const unit = App.unitAbbr(App.productUnit(product));
 
     let onHandTxt;
     if (onHand == null || isNaN(onHand)) {
@@ -412,14 +421,12 @@ S.InventoryOrderSheet = {
       const totalBottles = Math.round(Number(onHand) * product.case_size);
       const cases = Math.floor(totalBottles / product.case_size);
       const loose = totalBottles % product.case_size;
-      onHandTxt = cases + ' cases' + (loose > 0 ? ' + ' + loose + ' btl' : '');
+      onHandTxt = cases + ' cs' + (loose > 0 ? ' + ' + loose + ' btl' : '');
     } else {
       const n = Number(onHand);
       onHandTxt = (n % 1 === 0 ? n.toString() : n.toFixed(1)) + (unit ? ' ' + unit : '');
     }
-    const parTxt = (par != null && par !== '' && !isNaN(par))
-      ? (par + (unit ? ' ' + unit : ''))
-      : '-';
+    const parTxt = (par != null && par !== '' && !isNaN(par)) ? (par + (unit ? ' ' + unit : '')) : '-';
 
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
       + '<td><div class="val">' + esc(product.name || '') + '</div>'
@@ -430,15 +437,12 @@ S.InventoryOrderSheet = {
       + 'value="' + qty + '" style="width:80px;"/>' + (unit ? ' <span style="font-size:10px;color:var(--t3);">' + unit + '</span>' : '') + '</td>'
       + '<td>' + App.fmtCurrency(unitCost) + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(qty * unitCost) + '</td>'
-      + '<td><button class="btn btn-ghost btn-sm os-remove">Remove</button></td>'
+      + '<td><div class="row-actions"><button class="btn btn-danger btn-sm os-remove">Remove</button></div></td>'
       + '</tr>';
   },
 
-  // Build the inline product picker HTML. When the operator clicks "+ Add
-  // Item" the picker expands here. Excludes products already on the card.
-  // For vendor-bound cards (suggested + custom-with-vendor-picked), filters
-  // to that vendor's products. For a custom card with no vendor yet, the
-  // picker is hidden.
+  // Inline product picker. Excludes products already on the card; filters to the
+  // card's vendor when one is set.
   addItemPickerHTML(vendorName, existingProductIds) {
     const allProducts = ((App.inventoryData && App.inventoryData.ic_products) || [])
       .filter(p => p && p.active !== false);
@@ -446,13 +450,8 @@ S.InventoryOrderSheet = {
     const pool = onlyVendor.length > 0 ? onlyVendor : allProducts;
     const filtered = pool.filter(p => !existingProductIds.includes(p.id));
 
-    // Group by category
     const byCat = {};
-    filtered.forEach(p => {
-      const c = p.category || 'Other';
-      if (!byCat[c]) byCat[c] = [];
-      byCat[c].push(p);
-    });
+    filtered.forEach(p => { const c = p.category || 'Other'; (byCat[c] = byCat[c] || []).push(p); });
     const cats = Object.keys(byCat).sort();
     const opts = ['<option value="">Select a product...</option>']
       .concat(cats.map(c =>
@@ -461,14 +460,12 @@ S.InventoryOrderSheet = {
             .map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('')
         + '</optgroup>'
       ));
-    return '<div class="os-picker" style="display:none;margin-top:12px;padding:12px 14px;background:var(--bg);border:1px solid var(--b1);border-radius:4px;">'
+    return '<div class="os-picker" style="display:none;margin-top:12px;padding:12px 14px;background:var(--bg);border:1px solid var(--b1);border-radius:6px;">'
       + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="flex:1;min-width:220px;"><label>Add Product</label>'
-          + '<select class="os-picker-prod">' + opts.join('') + '</select>'
-        + '</div>'
-        + '<div class="f" style="width:90px;flex-shrink:0;"><label>Qty</label>'
-          + '<input type="number" class="os-picker-qty" min="1" step="1" value="1"/>'
-        + '</div>'
+        + '<div class="f" style="flex:1;min-width:220px;margin-bottom:0;"><label>Add Product</label>'
+          + '<select class="os-picker-prod">' + opts.join('') + '</select></div>'
+        + '<div class="f" style="width:90px;flex-shrink:0;margin-bottom:0;"><label>Qty</label>'
+          + '<input type="number" class="os-picker-qty" min="1" step="1" value="1"/></div>'
         + '<button class="btn btn-primary os-picker-add">Add</button>'
         + '<button class="btn btn-ghost os-picker-cancel">Cancel</button>'
       + '</div>'
@@ -478,10 +475,7 @@ S.InventoryOrderSheet = {
       + '</div>';
   },
 
-  // Count how many products on a card have a par meaningfully off versus the
-  // dynamic par suggestion (off by a whole unit AND at least 25% of current,
-  // the same threshold as the Dashboard nudge). Scopes the nudge to the
-  // products on that vendor card.
+  // Count products on a card whose par looks off vs the dynamic-par suggestion.
   parIssueCount(products) {
     const PS = S.InventoryParSuggestions;
     if (!PS || !PS.computeSuggestion || !PS.settings) return 0;
@@ -499,9 +493,7 @@ S.InventoryOrderSheet = {
   },
 
   vendorCard(vendor, lines) {
-    const rows = lines.map(l =>
-      this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)
-    ).join('');
+    const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)).join('');
     const existingIds = lines.map(l => l.product.id || '').filter(Boolean);
     const parOff = this.parIssueCount(lines.map(l => l.product));
     const parNudge = parOff > 0
@@ -510,16 +502,16 @@ S.InventoryOrderSheet = {
         + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>'
       : '';
 
-    return '<div class="card os-vcard" data-vendor="' + this.cssEsc(vendor) + '">'
+    return '<div class="card form-card os-vcard" data-vendor="' + this.cssEsc(vendor) + '">'
       + '<div class="card-title">' + esc(vendor) + '</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>On Hand</th><th>Par</th><th>Order Qty</th><th>Unit Cost</th><th>Extended</th><th></th>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
+      + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
       + this.addItemPickerHTML(vendor, existingIds)
       + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
-      + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val os-vcount">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val good os-vtotal">$0</div></div>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px;">'
+      + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
       + parNudge
       + '</div>'
       + '<div class="card-actions">'
@@ -528,34 +520,27 @@ S.InventoryOrderSheet = {
       + '</div></div>';
   },
 
-  // ── Custom Order panel (vendor-agnostic ad-hoc order) ─────────────────────
-  // Lets the operator build an order from scratch without depending on the
-  // latest count. Picks a vendor first, then uses the same "+ Add Item"
-  // picker to add products. Useful for party orders, special events, any
-  // ad-hoc need outside the routine count-driven cycle.
+  // ── Custom Order panel (vendor-agnostic ad-hoc order, at the bottom) ──────
   customOrderPanelHTML() {
     const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const opts = '<option value="">Select vendor...</option>'
       + vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
-    return '<div class="card os-vcard os-custom" data-vendor="">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>New Custom Order</span>'
-      + App.helpButton('os-how') + '</div>'
-      + '<div class="form-row" style="margin-bottom:12px;">'
-        + '<div class="f" style="width:280px;"><label>Vendor</label>'
-          + '<select class="os-co-vendor">' + opts + '</select>'
-        + '</div>'
+    return '<div class="sh" style="margin:24px 0 10px;">New Custom Order</div>'
+      + '<div class="card form-card os-vcard os-custom" data-vendor="">'
+      + '<div class="form-row" style="margin-bottom:0;">'
+        + '<div class="f" style="width:280px;margin-bottom:0;"><label>Vendor</label>'
+          + '<select class="os-co-vendor">' + opts + '</select></div>'
       + '</div>'
-      + '<div class="os-co-body" style="display:none;">'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-          + '<th>Product</th><th>On Hand</th><th>Par</th><th>Order Qty</th><th>Unit Cost</th><th>Extended</th><th></th>'
+      + '<div class="os-co-body" style="display:none;margin-top:12px;">'
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
+          + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
         + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
         + '<div class="os-picker-mount"></div>'
         + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
-        + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-          + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val os-vcount">0</div></div>'
-          + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val good os-vtotal">$0</div></div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px;">'
+          + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
         + '</div>'
         + '<div class="card-actions">'
           + '<button class="btn btn-primary os-co-create">Create Order</button>'
@@ -605,9 +590,6 @@ S.InventoryOrderSheet = {
         qty,
         unit_cost: cost,
         extended: qty * cost,
-        // Display unit and case size snapshot so Receive Delivery knows
-        // whether the ordered qty is in cases or single units, and so
-        // downstream variance math can convert to bottles when needed.
         display_unit: isCaseBeer ? 'case' : 'unit',
         case_size: isCaseBeer ? product.case_size : null
       });
@@ -631,6 +613,7 @@ S.InventoryOrderSheet = {
     if (ok) {
       this._created[vendor] = true;
       this.renderMain();
+      this.scrollContentTop();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
