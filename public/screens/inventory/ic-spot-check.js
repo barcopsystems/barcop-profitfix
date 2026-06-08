@@ -212,32 +212,31 @@ S.InventorySpotCheck = {
 
   lineHTML(lid, p, ld) {
     ld = ld || {};
-    return '<div class="sp-line" data-lid="' + lid + '" data-pid="' + p.id + '" data-vd="0" '
-      + 'style="border:1px solid var(--b2);border-radius:6px;padding:16px;margin-bottom:12px;">'
+    return '<div class="card sp-line" data-lid="' + lid + '" data-pid="' + p.id + '" data-vd="0" style="margin-bottom:12px;">'
       + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
         + '<span style="flex:1;font-size:15px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
         + '<span style="font-size:11px;color:var(--t3);">' + esc(p.category || '-') + '</span>'
         + '<button type="button" class="btn btn-ghost btn-sm sp-remove">Remove</button>'
       + '</div>'
-      + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">'
+      + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">'
         + '<div style="flex:1;min-width:220px;">'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Pre-Shift Count</div>'
-          + this.spInputHTML('sp-pre-' + lid, p, ld.pre)
+          + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;text-align:center;">Pre-Shift Count</div>'
+          + '<div style="display:flex;justify-content:center;">' + this.spInputHTML('sp-pre-' + lid, p, ld.pre) + '</div>'
         + '</div>'
         + '<div style="flex:1;min-width:220px;">'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Post-Shift Count</div>'
-          + this.spInputHTML('sp-post-' + lid, p, ld.post)
+          + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;text-align:center;">Post-Shift Count</div>'
+          + '<div style="display:flex;justify-content:center;">' + this.spInputHTML('sp-post-' + lid, p, ld.post) + '</div>'
         + '</div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:10px;">'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Restocked Mid-Shift ' + tt(p.category === 'Draft Beer' ? 'sp-restock-keg' : 'sp-restock') + '</label>'
-          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" value="' + (ld.added ? ld.added : '') + '" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._restockUnit(p) + '</span></div>'
+      + '<div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:22px;">'
+        + '<div class="f" style="width:170px;margin-bottom:0;"><label style="text-align:center;">Restocked Mid-Shift ' + tt(p.category === 'Draft Beer' ? 'sp-restock-keg' : 'sp-restock') + '</label>'
+          + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" value="' + (ld.added ? ld.added : '') + '" placeholder="0" style="height:42px;font-size:15px;text-align:center;"/><span class="suf">' + this._restockUnit(p) + '</span></div>'
         + '</div>'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>' + this._posLabel(p) + ' ' + tt(this._isCaseBeer(p) ? 'sp-pos-btl' : 'sp-pos-pours') + '</label>'
-          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" value="' + (ld.sold != null ? ld.sold : '') + '" placeholder="0" style="height:42px;font-size:15px;"/><span class="suf">' + this._posUnit(p) + '</span></div>'
+        + '<div class="f" style="width:170px;margin-bottom:0;"><label style="text-align:center;">' + this._posLabel(p) + ' ' + tt(this._isCaseBeer(p) ? 'sp-pos-btl' : 'sp-pos-pours') + '</label>'
+          + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" value="' + (ld.sold != null ? ld.sold : '') + '" placeholder="0" style="height:42px;font-size:15px;text-align:center;"/><span class="suf">' + this._posUnit(p) + '</span></div>'
         + '</div>'
       + '</div>'
-      + '<div class="sp-result" style="font-size:12px;color:var(--t3);line-height:1.6;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;">'
+      + '<div class="sp-result" style="font-size:12px;color:var(--t3);line-height:1.6;text-align:center;padding:10px 12px;margin-top:14px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;">'
       + 'Set the pre and post counts, then enter POS ' + this._servingWord(p) + ' sold, to see the variance.</div>'
       + '</div>';
   },
@@ -298,35 +297,38 @@ S.InventorySpotCheck = {
       ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
       : '';
 
-    // POS sold: type on each line, or import that register's report to fill them.
-    const seg = (mode, label) => '<button type="button" class="btn btn-sm sp-posmode" data-mode="' + mode + '" style="'
-      + (this.posMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-                               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    const posPanel = this.posMode === 'import'
-      ? '<div id="sp-pos-csv"></div><div id="sp-pos-result"></div>'
-      : '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Enter the POS pours or bottles sold on each product above, from this register\'s report for the shift.</div>';
-    const posCard = '<div class="sh" style="margin:24px 0 10px;">POS Sold</div>'
-      + '<div class="card no-print">'
-      + '<div style="display:inline-flex;gap:6px;margin-bottom:14px;">' + seg('manual', 'Enter Manually') + seg('import', 'Import POS Report') + '</div>'
-      + posPanel + '</div>';
-
-    const productsCard = '<div class="card"><div class="card-title">Products Checked</div>'
-      + '<div id="sp-lines">' + lineHtmls + '</div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;"><div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;">'
-      + '<label>Add Product</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
-      + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
-      + '</div>'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:18px;">'
+    // Stats + Add Product, above the product cards.
+    const statsAddCard = '<div class="card">'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg" id="sp-count">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg" id="sp-flagged">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg" id="sp-total">$0</div></div>'
       + '</div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
-      + '<span id="sp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<div class="divider"></div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
+      + '<div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;"><label>Add Product</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
+      + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
       + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + resumeBar + setup + productsCard + posCard + this.historyCard() + '</div>';
+    // POS sold: type on each line, or reveal the importer for this register's report.
+    const posToggle = '<button type="button" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
+    const posCard = '<div class="sh" style="margin:24px 0 10px;">POS Sold</div>'
+      + '<div class="card no-print">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS pours or bottles sold on each product above, from this register\'s report for the shift. Or import that register\'s report to fill them in.</div>'
+      + posToggle + '</div>'
+      + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
+      + '</div>';
+
+    const saveBar = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px;">'
+      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
+      + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span></div>';
+
+    this.container.innerHTML = '<div class="screen">' + resumeBar + setup
+      + '<div class="sh" style="margin:24px 0 10px;">Products Checked</div>'
+      + statsAddCard
+      + '<div id="sp-lines">' + lineHtmls + '</div>'
+      + posCard + saveBar + this.historyCard() + '</div>';
 
     // Mount sliders for any restored lines.
     BottleSlider._inst = {};
@@ -505,7 +507,7 @@ S.InventorySpotCheck = {
     const byTxt = r.variance === 0 ? '' : ' by ' + Math.abs(r.variance).toFixed(1) + ' ' + sw;
     if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + ' &middot; ' + r.sold.toFixed(0) + ' ' + sw + ' rung in.</span><br>'
       + '<span style="color:' + cls + ';font-weight:700;">' + direction + byTxt + ' &middot; '
-      + (r.vd > 0 ? '+' : '') + App.fmtCurrency(r.vd) + '</span>';
+      + (r.vd > 0 ? '+' : '') + App.fmtCurrency(r.vd, 2) + '</span>';
   },
 
   recalcTotal() {
@@ -520,7 +522,7 @@ S.InventorySpotCheck = {
     set('sp-flagged', flagged);
     const totEl = document.getElementById('sp-total');
     if (totEl) {
-      totEl.textContent = (total > 0 ? '+' : '') + App.fmtCurrency(total);
+      totEl.textContent = (total > 0 ? '+' : '') + App.fmtCurrency(total, 2);
       totEl.className = 'calc-val lg' + (flagged ? ' warn' : '');
     }
   },
@@ -608,7 +610,7 @@ S.InventorySpotCheck = {
         + '<td>' + esc(c.checked_by || '-') + '</td>'
         + '<td>' + (c.product_count || 0) + '</td>'
         + '<td class="' + (c.flagged_count ? 'neg' : '') + '">' + (c.flagged_count || 0) + '</td>'
-        + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd) + '</td>'
+        + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm sp-hview" data-id="' + c.id + '">View</button>'
         + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
@@ -644,7 +646,7 @@ S.InventorySpotCheck = {
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
         + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) + ' ' + sw : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
-        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-') + '</td>'
+        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) : '-') + '</td>'
         + '<td>' + action + '</td></tr>';
     }).join('');
 
@@ -657,12 +659,11 @@ S.InventorySpotCheck = {
       + meta('Shift', esc(c.shift || '-'))
       + meta('Checked By', esc(c.checked_by || '-'))
       + meta('Flagged', (c.flagged_count || 0), (c.flagged_count ? 'warn' : ''))
-      + meta('Total Variance', ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtCurrency(c.total_variance_dollar || 0), ((c.total_variance_dollar || 0) > 0 ? 'warn' : ''))
+      + meta('Total Variance', ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtCurrency(c.total_variance_dollar || 0, 2), ((c.total_variance_dollar || 0) > 0 ? 'warn' : ''))
       + '</div></div>'
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Spot Check &middot; ' + this.fmtDate(c.date) + '</div>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button>'
-      + '<button class="btn btn-ghost btn-sm" id="sp-back">Back to Spot Checks</button></div></div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button></div></div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
       + '<th>Variance</th><th>Variance $</th><th></th>'
@@ -671,7 +672,6 @@ S.InventorySpotCheck = {
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
-      if (ev.target.closest('#sp-back')) { this.renderMain(); return; }
       const inv = ev.target.closest('.sp-investigate');
       if (inv) { ev.stopPropagation(); this.openInvestigation(inv.dataset.pid, inv.dataset.name); }
     };
