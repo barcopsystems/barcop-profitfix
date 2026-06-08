@@ -274,10 +274,10 @@ S.InventorySpotCheck = {
       + '<span>Spot Check</span>'
       + App.helpButton('sp-how') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location / Register</label>'
-      + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location / Register</label>'
+      + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
       + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
@@ -320,9 +320,9 @@ S.InventorySpotCheck = {
       + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
       + '</div>';
 
-    const saveBar = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px;">'
-      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
-      + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span></div>';
+    const saveBar = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:flex-end;">'
+      + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button></div>';
 
     this.container.innerHTML = '<div class="screen">' + resumeBar + setup
       + '<div class="sh" style="margin:24px 0 10px;">Products Checked</div>'
@@ -413,7 +413,7 @@ S.InventorySpotCheck = {
     if (!el || typeof CSVMapper === 'undefined') return;
     const loc = document.getElementById('sp-loc')?.value || 'this register';
     CSVMapper.mount(el, {
-      hint: 'Drop the POS <strong>sales</strong> report for <strong>' + esc(loc) + '</strong> for this shift &mdash; that register only, not the whole venue. '
+      hint: 'Drop the POS <strong>sales</strong> report for <strong>' + esc(loc) + '</strong> for this shift. That register only, not the whole venue. '
         + '<span class="sp-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
       fields: [
         { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description'] },
