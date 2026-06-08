@@ -9,6 +9,7 @@
 S.InventoryTakeInventory = {
   draft: null,
   locStep: 0,
+  entryMode: 'manual',     // setup page: 'manual' = walk the count, 'import' = upload a count file
   DRAFT_KEY: 'ic_count_draft',
   get BAR_CATS() { return App.BAR_CATS; },         // single source on App
   get KITCHEN_CATS() { return App.KITCHEN_CATS; },
@@ -34,6 +35,14 @@ S.InventoryTakeInventory = {
   clearDraft() {
     try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {}
     this.draft = null;
+  },
+
+  // Reset the content scroll to the top. Each view re-renders in place, so
+  // without this, arriving from a bottom button (Review Count, Next Location,
+  // Submit) would leave the user scrolled to the bottom of the new page.
+  scrollTop() {
+    const s = this.container && (this.container.closest('.content') || document.querySelector('.content'));
+    if (s) s.scrollTop = 0;
   },
 
   ago(iso) {
@@ -62,13 +71,15 @@ S.InventoryTakeInventory = {
       { p: ['An inventory count is a snapshot of everything you have on hand right now, priced out so Bar Cop can tell you what you used, what to reorder, and where you are leaking. Count the same way every time and the numbers stay honest.'] },
       { h: 'What You Are Counting', p: ['Bar Cop walks you through your products one location at a time. Go shelf by shelf and enter what is physically there. Anything you do not touch is recorded as zero, so only skip a product if it is truly empty.'] },
       { h: 'Pick Your Locations', p: ['Most operators count one location at a time and come back for the rest later. Pick a single location for a quick section count, or pick several to run a full inventory in one session. You count and finalize each location\'s products together.'] },
+      { h: 'Count Manually Or Import', p: ['Count Manually walks you through your products by location with the fill slider and case inputs. Import File lets you drop a CSV or Excel count instead, matched to your products by name, then drops you on the review screen to confirm before anything is saved.'] },
       { h: 'How To Enter Each Product', p: [
         'Liquor, wine, and bottled mixers use the fill slider. Set the number of full bottles, then drag the slider to the level of the open bottle. Draft beer uses the same slider shaped like a keg.',
         'Bottle beer is counted by the case. Enter full cases and any loose bottles, and Bar Cop shows the running total in cases as you type.',
         'Food and dry goods use a plain number in the product\'s own unit, like pounds, cases, or each.'
       ] },
       { h: 'It Saves As You Go', p: ['Your count saves to this device automatically. If you close the tab or lose signal partway through, come back and pick up where you left off. Nothing is final until you submit.'] },
-      { h: 'Review And Submit', p: ['When you reach the end, Bar Cop shows a review of every product, its total, and its value. Go back and fix anything that looks off, then submit. Submitting writes a finalized count that you cannot change by accident.'] },
+      { h: 'Importing A Count', p: ['Your file needs a product name column and a count column, plus an optional location column. The count is the on-hand quantity in the product\'s container unit: bottles for liquor and wine, cases for bottle beer, kegs for draft, and the stock unit for food. Bar Cop matches products by name. Anything it cannot match is skipped and listed, and any product you did not include is flagged on the review screen so it is never silently recorded as zero.'] },
+      { h: 'Review And Submit', p: ['When you reach the end, Bar Cop shows a review of every product, its total, and its value, and flags anything you did not count. Go back and fix anything that looks off, then submit. Submitting writes a finalized count that you cannot change by accident.'] },
       { h: 'What The Count Feeds', p: ['Every finalized count powers your dashboard, the usage and variance reports, dynamic par suggestions, and your cost of goods. Two counts let Bar Cop measure what you used between them, so count on a regular schedule, like every week, to keep the numbers sharp.'] }
     ]);
   },
@@ -105,51 +116,179 @@ S.InventoryTakeInventory = {
 
     const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
 
-    let locPicker;
+    // Counted By is shared by both lanes.
+    const countedByRow = '<div class="form-row" style="gap:16px;margin-top:16px;">'
+      + '<div class="f w-md"><label>Counted By</label>'
+      + '<select id="ti-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div></div>';
+
+    // Segmented toggle: walk the count by hand, or drop a count file.
+    const segBtn = (mode, label) => {
+      const on = this.entryMode === mode;
+      return '<button type="button" class="btn btn-sm ti-mode" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+
+    let body, startAction = '';
     if (locs.length === 0) {
-      locPicker = '<div class="empty" style="margin:0;"><div class="empty-title">No locations set up yet</div>'
+      body = '<div class="empty" style="margin:0;"><div class="empty-title">No locations set up yet</div>'
         + '<div class="empty-sub">Add storage locations in the Locations screen first. Inventory counts are organized by location.</div>'
         + '<button class="btn btn-primary" id="ti-go-locs">Go to Locations</button></div>';
+    } else if (this.entryMode === 'import') {
+      body = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:4px;">Drop a count file with a product name and a count per row. Bar Cop matches your products by name and takes you to review before anything is saved.</div>'
+        + countedByRow
+        + '<div style="margin-top:16px;"><div id="ti-csv"></div><div id="ti-imp-result"></div></div>';
     } else {
-      const locCards = locs.map(l => {
+      const tiles = locs.map(l => {
         const productCount = this.products().filter(p => App.productLocations(p).includes(l.name)).length;
-        return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--b1);border-radius:6px;cursor:pointer;margin-bottom:8px;">'
-          + '<input type="checkbox" class="ti-loc" value="' + esc(l.name) + '" style="width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;"/>'
-          + '<div style="flex:1;">'
-            + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(l.name) + '</div>'
-            + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + productCount + ' product' + (productCount === 1 ? '' : 's') + ' assigned</div>'
-          + '</div></label>';
+        return '<button type="button" class="ti-loc-tile" data-loc="' + esc(l.name) + '" style="text-align:left;display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:8px;border:1px solid var(--b2);background:var(--input);cursor:pointer;transition:background .12s,border-color .12s;">'
+          + '<span class="ti-loc-ck" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;border:1px solid var(--t3);display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;">&#10003;</span>'
+          + '<span style="flex:1;min-width:0;">'
+            + '<span style="display:block;font-size:13px;font-weight:700;color:var(--t1);">' + esc(l.name) + '</span>'
+            + '<span style="display:block;font-size:11px;color:var(--t3);margin-top:1px;">' + productCount + ' product' + (productCount === 1 ? '' : 's') + '</span>'
+          + '</span></button>';
       }).join('');
-      locPicker = locCards;
+      const head = '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">'
+        + '<div style="font-size:11px;color:var(--t3);">Pick the locations to count.</div>'
+        + (locs.length > 1 ? '<button type="button" id="ti-selall" style="background:none;border:none;color:var(--gold);font-size:11px;cursor:pointer;">Select all</button>' : '')
+        + '</div>';
+      body = head + '<div class="ti-loc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">' + tiles + '</div>' + countedByRow;
+      startAction = '<div class="card-actions"><button class="btn btn-primary" id="ti-start">Start Count</button>'
+        + '<span id="ti-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + resumeBar
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
       + App.helpButton('ti-how') + '</div>'
-      + locPicker
-      + '<div class="form-row" style="gap:16px;margin-top:14px;">'
-      + '<div class="f w-md"><label>Counted By</label>'
-      + '<select id="ti-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
-      + '</div>'
-      + '<div class="card-actions">'
-      + (locs.length > 0 ? '<button class="btn btn-primary" id="ti-start">Start Count</button>' : '')
-      + '<span id="ti-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+      + (locs.length > 0 ? '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Count Manually') + segBtn('import', 'Import File') + '</div>' : '')
+      + body
+      + startAction
+      + '</div></div>';
 
-    this.container.onclick = null;
-    document.getElementById('ti-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('ti-go-locs')?.addEventListener('click', () => App.navigate('ic-locations'));
-    document.getElementById('ti-resume')?.addEventListener('click', () => {
-      this.draft = this.loadDraft();
-      if (this.draft) {
-        if (!this.draft._view) this.draft._view = 'counting';
-        this.locStep = this.draft._locStep || 0;
-        this.route();
+    this.container.onclick = ev => {
+      if (ev.target.closest('#ti-how'))     { this.showHowTo(); return; }
+      if (ev.target.closest('.ti-imp-how')) { this.showHowTo(); return; }
+      const modeBtn = ev.target.closest('.ti-mode');
+      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderSetup(); return; }
+      const tile = ev.target.closest('.ti-loc-tile');
+      if (tile) { this.toggleLocTile(tile); return; }
+      if (ev.target.closest('#ti-selall'))  { this.selectAllTiles(); return; }
+      if (ev.target.closest('#ti-go-locs')) { App.navigate('ic-locations'); return; }
+      if (ev.target.closest('#ti-discard')) { this.confirmDiscardDraft(); return; }
+      if (ev.target.closest('#ti-start'))   { this.startCount(); return; }
+      if (ev.target.closest('#ti-resume')) {
+        this.draft = this.loadDraft();
+        if (this.draft) {
+          if (!this.draft._view) this.draft._view = 'counting';
+          this.locStep = this.draft._locStep || 0;
+          this.route();
+        }
+        return;
       }
+    };
+    if (this.entryMode === 'import') this.mountImporter();
+    this.scrollTop();
+  },
+
+  // Toggle one location tile's selected look (gold-tint fill + checkmark).
+  toggleLocTile(tile) {
+    const on = !tile.classList.contains('selected');
+    tile.classList.toggle('selected', on);
+    tile.style.background = on ? 'var(--gold-tint)' : 'var(--input)';
+    tile.style.borderColor = on ? 'var(--gold-tint-bord)' : 'var(--b2)';
+    const ck = tile.querySelector('.ti-loc-ck');
+    if (ck) {
+      ck.style.color = on ? 'var(--bg)' : 'transparent';
+      ck.style.background = on ? 'var(--gold)' : 'transparent';
+      ck.style.borderColor = on ? 'var(--gold)' : 'var(--t3)';
+    }
+  },
+
+  // Select-all / clear-all toggle for the location tiles.
+  selectAllTiles() {
+    const tiles = [...this.container.querySelectorAll('.ti-loc-tile')];
+    const allOn = tiles.length > 0 && tiles.every(t => t.classList.contains('selected'));
+    tiles.forEach(t => { if (t.classList.contains('selected') === allOn) this.toggleLocTile(t); });
+    const btn = document.getElementById('ti-selall');
+    if (btn) btn.textContent = allOn ? 'Select all' : 'Clear all';
+  },
+
+  mountImporter() {
+    const el = document.getElementById('ti-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      hint: 'Drop a count export (CSV or Excel): <span class="ti-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      fields: [
+        { key: 'product',  label: 'Product',  required: true,  match: ['product', 'item', 'name', 'description'] },
+        { key: 'count',    label: 'Count',    required: true,  match: ['count', 'qty', 'quantity', 'on hand', 'onhand', 'on-hand', 'total'] },
+        { key: 'location', label: 'Location', required: false, match: ['location', 'area', 'storage'] }
+      ],
+      confirmLabel: 'Import',
+      onComplete: rows => this.importCount(rows)
     });
-    document.getElementById('ti-discard')?.addEventListener('click', () => this.confirmDiscardDraft());
-    document.getElementById('ti-start')?.addEventListener('click', () => this.startCount());
+  },
+
+  // Build a count draft from an imported file (product name + count per row) and
+  // jump to review. The count is the on-hand quantity in the product's container
+  // unit (bottles / cases / kegs / stock unit). Unmatched product names are
+  // skipped; any product in a counted location that was NOT in the file is
+  // flagged on review, never a silent zero.
+  importCount(rows) {
+    const byName = {};
+    this.products().forEach(p => { byName[(p.name || '').trim().toLowerCase()] = p; });
+    const counterId = document.getElementById('ti-by')?.value || '';
+    const counterName = (App.staffById(counterId) || {}).name || '';
+
+    const counts = {};
+    const locSet = new Set();
+    let matched = 0;
+    const skipped = [];
+    rows.forEach(r => {
+      const p = byName[(r.product || '').trim().toLowerCase()];
+      const qty = parseFloat(r.count);
+      if (!p || isNaN(qty)) { skipped.push(r.product || '(blank)'); return; }
+      const plocs = App.productLocations(p);
+      let loc = (r.location || '').trim();
+      if (!loc || !plocs.includes(loc)) loc = p.primary_location || plocs[0] || 'Unassigned';
+      locSet.add(loc);
+      const key = p.id + '@@' + loc;
+      if (App.isCaseBeer(p)) {
+        const cs = p.case_size || 0;
+        const cases = Math.floor(qty);
+        const loose = cs > 0 ? Math.round((qty - cases) * cs) : 0;
+        counts[key] = { cases, loose, notes: '' };
+      } else {
+        const fulls = Math.floor(qty);
+        const value = +(qty - fulls).toFixed(3);
+        counts[key] = { fulls, value, notes: '' };
+      }
+      matched++;
+    });
+
+    const result = document.getElementById('ti-imp-result');
+    if (matched === 0) {
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No rows imported. No product names matched your products, or the count column was blank.</div>';
+      return;
+    }
+    const allLocs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived).map(l => l.name);
+    const picked = [...locSet];
+    const isFull = picked.length === allLocs.length && allLocs.length > 0;
+    const type = isFull ? 'Full' : (picked.length === 1 ? picked[0] : 'Multi-Location');
+    this.draft = {
+      type,
+      custom_locations: picked,
+      counted_by_id: counterId,
+      counted_by: counterName,
+      counts,
+      started_at: new Date().toISOString(),
+      imported: true,
+      _view: 'review',
+      _locStep: 0
+    };
+    this.locStep = 0;
+    this.saveDraft();
+    this.renderReview();
   },
 
   // Discard the in-progress draft. Confirmation because losing count data
@@ -169,7 +308,7 @@ S.InventoryTakeInventory = {
   startCount() {
     const err = document.getElementById('ti-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const picked = [...this.container.querySelectorAll('.ti-loc:checked')].map(c => c.value);
+    const picked = [...this.container.querySelectorAll('.ti-loc-tile.selected')].map(t => t.dataset.loc);
     if (picked.length === 0) { fail('Pick at least one location to count.'); return; }
 
     // "type" is now derived: a single location uses the location name; more
@@ -277,7 +416,7 @@ S.InventoryTakeInventory = {
       const isPourable = !!(p.container_size_oz && p.pour_size_oz);
       let countInput;
       if (isCaseBeer) {
-        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin-bottom:14px;">'
+        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
             + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cases</label>'
               + '<div class="fw"><input class="suf ti-cases" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.cases != null ? c.cases : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">cases</span></div>'
             + '</div>'
@@ -291,27 +430,33 @@ S.InventoryTakeInventory = {
             + '</div>'
           + '</div>';
       } else if (isPourable) {
-        countInput = '<div style="display:flex;justify-content:center;margin-bottom:14px;">'
+        countInput = '<div style="display:flex;justify-content:center;margin:0;">'
           + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') })
           + '</div>';
       } else {
-        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin-bottom:14px;">'
+        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
           + '<div class="f" style="width:220px;flex-shrink:0;"><label>Count</label>'
             + '<div class="fw"><input class="suf ti-num" type="number" min="0" step="0.1" data-pid="' + p.id + '" value="' + (c.value != null ? c.value : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div>'
           + '</div></div>';
       }
-      return '<div class="card" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" style="margin-bottom:12px;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + esc(p.category || 'Uncategorized')
-        + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</div>'
+      // Compact card: one-line header (name + category), the input always
+      // visible, and Notes collapsed behind a "+ Note" toggle so 200 products
+      // are far less scrolling. Notes auto-expand when one already exists.
+      const hasNote = !!(c.notes && c.notes.trim());
+      return '<div class="card ti-pcard" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" style="margin-bottom:10px;padding:12px 14px;">'
+        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">'
+        + '<div style="min-width:0;"><span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
+        + '<span style="font-size:11px;color:var(--t3);margin-left:8px;">' + esc(p.category || 'Uncategorized') + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</span></div>'
+        + '<button type="button" class="ti-note-toggle" data-pid="' + p.id + '" style="flex-shrink:0;background:none;border:none;color:' + (hasNote ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;cursor:pointer;white-space:nowrap;">' + (hasNote ? 'Note' : '+ Note') + '</button>'
+        + '</div>'
         + countInput
-        + '<div class="f"><label>Notes</label><input type="text" class="ti-note" data-pid="' + p.id + '" '
-        + 'value="' + esc(c.notes || '') + '" placeholder="Optional"/></div>'
+        + '<div class="ti-note-wrap" data-pid="' + p.id + '" style="margin-top:10px;' + (hasNote ? '' : 'display:none;') + '">'
+        + '<input type="text" class="ti-note" data-pid="' + p.id + '" value="' + esc(c.notes || '') + '" placeholder="Optional note"/></div>'
         + '</div>';
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="margin-bottom:14px;">'
+      + '<div style="position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--b2);">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
       + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">Location ' + (this.locStep + 1) + ' of ' + groups.length
@@ -391,6 +536,16 @@ S.InventoryTakeInventory = {
         this.updateProgress();
       });
     });
+    // "+ Note" reveals the (otherwise collapsed) note input for a product.
+    this.container.querySelectorAll('.ti-note-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wrap = this.container.querySelector('.ti-note-wrap[data-pid="' + btn.dataset.pid + '"]');
+        if (!wrap) return;
+        const showing = wrap.style.display !== 'none';
+        wrap.style.display = showing ? 'none' : 'block';
+        if (!showing) { const inp = wrap.querySelector('.ti-note'); if (inp) inp.focus(); }
+      });
+    });
 
     this.container.onclick = null;
     document.getElementById('ti-prev')?.addEventListener('click', () => { this.locStep--; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
@@ -401,6 +556,7 @@ S.InventoryTakeInventory = {
     // Top-right duplicates of the session actions, same handlers as the bottom.
     document.getElementById('ti-exit-top')?.addEventListener('click', () => { this.saveDraft(); App.navigate('ic-product-setup'); });
     document.getElementById('ti-discard-top')?.addEventListener('click', () => this.confirmDiscardDraft());
+    this.scrollTop();
   },
 
   updateProgress() {
@@ -460,6 +616,18 @@ S.InventoryTakeInventory = {
     const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0);
     const counted = Object.keys(this.draft.counts).length;
 
+    // Silent-zero guardrail: any product with no entry submits as 0. Flag them
+    // so a skipped shelf is never recorded as empty by accident.
+    const uncountedSet = new Set(rows.filter(r => this.draft.counts[r.p.id + '@@' + r.location] == null)
+      .map(r => r.p.id + '@@' + r.location));
+    const uncounted = uncountedSet.size;
+    const warnBanner = uncounted > 0
+      ? '<div style="display:flex;align-items:flex-start;gap:10px;border:1px solid var(--amber);border-radius:6px;padding:11px 13px;margin-bottom:16px;">'
+        + '<span style="color:var(--amber);font-weight:800;font-size:14px;line-height:1.3;flex-shrink:0;">!</span>'
+        + '<div style="font-size:12px;color:var(--t1);line-height:1.5;"><strong>' + uncounted + ' of ' + rows.length + ' products were not counted.</strong> They will be submitted as 0. If a shelf was full, go Back to Counting and enter it. The uncounted products are tagged below.</div>'
+        + '</div>'
+      : '';
+
     const tbody = rows.map(r => {
       // Each quantity carries its unit abbreviation (cs / btls / kegs / lbs / ea
       // ...). Bottle beer counts full CASES, an open count of loose BOTTLES, and
@@ -476,8 +644,10 @@ S.InventoryTakeInventory = {
         openCol  = (r.c.value || 0).toFixed(1) + us;
         totalCol = r.total.toFixed(1) + us;
       }
+      const isUncounted = uncountedSet.has(r.p.id + '@@' + r.location);
       return '<tr>'
-        + '<td><div class="val">' + esc(r.p.name) + '</div>'
+        + '<td><div class="val">' + esc(r.p.name)
+        + (isUncounted ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">NOT COUNTED</span>' : '') + '</div>'
         + (r.p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.p.brand) + '</div>' : '') + '</td>'
         + '<td>' + esc(r.p.category || '-') + '</td>'
         + '<td>' + fullCol + '</td>'
@@ -488,6 +658,7 @@ S.InventoryTakeInventory = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
+      + warnBanner
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg">' + rows.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val lg">' + counted + '</div></div>'
@@ -506,6 +677,7 @@ S.InventoryTakeInventory = {
     this.container.onclick = null;
     document.getElementById('ti-back-count')?.addEventListener('click', () => { this.draft._view = 'counting'; this.saveDraft(); this.renderCounting(); });
     document.getElementById('ti-submit')?.addEventListener('click', () => this.submit());
+    this.scrollTop();
   },
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -592,5 +764,6 @@ S.InventoryTakeInventory = {
     this.container.onclick = null;
     document.getElementById('ti-again')?.addEventListener('click', () => this.renderSetup());
     document.getElementById('ti-history')?.addEventListener('click', () => App.navigate('ic-count-history'));
+    this.scrollTop();
   }
 };
