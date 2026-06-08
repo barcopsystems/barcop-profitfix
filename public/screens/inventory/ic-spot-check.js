@@ -297,12 +297,18 @@ S.InventorySpotCheck = {
       ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
       : '';
 
-    // Stats + Add Product, above the product cards.
+    // Stats + Save (top right) + Add Product, above the product cards.
     const statsAddCard = '<div class="card">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg" id="sp-count">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg" id="sp-flagged">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg" id="sp-total">$0</div></div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
+      + '</div>'
       + '</div>'
       + '<div class="divider"></div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
@@ -320,15 +326,11 @@ S.InventorySpotCheck = {
       + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
       + '</div>';
 
-    const saveBar = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:flex-end;">'
-      + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button></div>';
-
     this.container.innerHTML = '<div class="screen">' + resumeBar + setup
       + '<div class="sh" style="margin:24px 0 10px;">Products Checked</div>'
       + statsAddCard
       + '<div id="sp-lines">' + lineHtmls + '</div>'
-      + posCard + saveBar + this.historyCard() + '</div>';
+      + posCard + this.historyCard() + '</div>';
 
     // Mount sliders for any restored lines.
     BottleSlider._inst = {};
@@ -647,7 +649,7 @@ S.InventorySpotCheck = {
         + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) + ' ' + sw : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
         + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) : '-') + '</td>'
-        + '<td>' + action + '</td></tr>';
+        + '<td><div class="row-actions">' + action + '</div></td></tr>';
     }).join('');
 
     const meta = (label, val, cls) =>
