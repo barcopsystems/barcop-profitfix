@@ -2638,7 +2638,7 @@ const App = {
       kinds: {
         count: 'ic_counts', delivery: 'ic_deliveries', order: 'ic_orders',
         transfer: 'ic_transfers', empty: 'ic_empties', adjustment: 'ic_adjustments',
-        spot_check: 'ic_spot_checks'
+        spot_check: 'ic_spot_checks', variance_run: 'ic_variance_runs'
       }
     },
     sc: {
