@@ -8,6 +8,7 @@
 
 S.InventoryReceiveDelivery = {
   _seq: 0,
+  _pendingOrderId: null,   // set by Order History "Log the Delivery" to pre-load an order
   CAT_ORDER: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
 
   products() {
@@ -207,6 +208,25 @@ S.InventoryReceiveDelivery = {
 
     this.container.onclick = null;
     this.recalcTotal();
+
+    // Deep-link from Order History "Log the Delivery": pre-load this order so the
+    // operator lands on a ready-to-confirm form (vendor + order picked, every
+    // line filled in) instead of a blank one. Saving still runs the full price /
+    // short-count verification and auto-marks the order Received.
+    const pendingId = this._pendingOrderId;
+    this._pendingOrderId = null;
+    if (pendingId) {
+      const order = this.orders().find(o => o.id === pendingId);
+      const vSel = document.getElementById('rd-vendor');
+      if (order && vSel) {
+        vSel.value = order.vendor || '';
+        this.onVendorChange(vSel.value);
+        const oSel = document.getElementById('rd-order');
+        if (oSel) { oSel.value = order.id; this.onOrderPick(order.id); }
+        const sc = this.container.closest('.content') || document.querySelector('.content');
+        if (sc) sc.scrollTop = 0;
+      }
+    }
   },
 
   // Remove a line: drop its data row AND its flag sub-row; keep at least one.
