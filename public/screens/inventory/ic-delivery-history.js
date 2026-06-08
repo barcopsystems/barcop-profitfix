@@ -42,7 +42,6 @@ S.InventoryDeliveryHistory = {
     const all = this.sorted();
     const filtered = this.vendorFilter ? all.filter(d => d.vendor === this.vendorFilter) : all;
 
-    let html;
     if (all.length === 0) {
       App.setupCard(this.container, {
         title: 'Delivery History',
@@ -52,61 +51,72 @@ S.InventoryDeliveryHistory = {
         ]
       });
       return;
-    } else {
-      const vendors = [...new Set(all.map(d => d.vendor).filter(Boolean))].sort();
-      const filter = '<div class="form-row" style="margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
-        + '<label>Filter by Vendor</label><select id="dh-filter">'
-        + '<option value="">All vendors</option>'
-        + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
-        + '</select></div>'
-        + '<button class="btn btn-ghost btn-sm" id="dh-list-export">Export PDF</button></div>';
-
-      const rows = filtered.slice(0, App.listLimit('ic', 'delivery')).map(d => {
-        let disc;
-        if (d.has_discrepancy) {
-          const parts = [];
-          if (d.price_change_count) parts.push(d.price_change_count + ' Price Change' + (d.price_change_count === 1 ? '' : 's'));
-          if (d.short_count_count)  parts.push(d.short_count_count + ' Short Count' + (d.short_count_count === 1 ? '' : 's'));
-          disc = '<span style="color:var(--gold);font-weight:700;">' + (parts.join(' &middot; ') || 'Discrepancy') + '</span>';
-        } else {
-          disc = '<span style="color:var(--green);font-weight:600;">Clean</span>';
-        }
-        return '<tr class="dh-row" data-id="' + d.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
-          + '<td>' + esc(d.vendor || '-') + '</td>'
-          + '<td>' + esc(d.invoice_number || '-') + '</td>'
-          + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
-          + '<td class="val">' + App.fmtCurrency(d.total || 0) + '</td>'
-          + '<td>' + disc + '</td>'
-          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button>'
-          + (App.canEdit('ic-delivery-history') ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
-          + '</div></td></tr>';
-      }).join('');
-
-      html = '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Delivery History</span>'
-        + App.helpButton('dh-how') + '</div>'
-        + filter
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);">No deliveries for this vendor.</td></tr>') + '</tbody></table></div>'
-        + App.showOlderBar('ic', 'delivery', filtered, !!this.vendorFilter) + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + html + '</div>';
+    const vendors = [...new Set(all.map(d => d.vendor).filter(Boolean))].sort();
+    const totalReceived = all.reduce((s, d) => s + (d.total || 0), 0);
+    const flagged = all.filter(d => d.has_discrepancy).length;
+    const last = all[0];
+
+    const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+      + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Deliveries</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Received</div><div class="calc-val lg">' + App.fmtCurrency(totalReceived) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg">' + flagged + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Delivery</div><div class="calc-val lg">' + this.fmtDate(last.date) + '</div></div>'
+      + '</div>' + App.helpButton('dh-how') + '</div></div>';
+
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Deliveries</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dh-list-export">Export PDF</button></div></div>';
+
+    const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
+      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Vendor</label><select id="dh-filter">'
+      + '<option value="">All vendors</option>'
+      + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="dh-clear">Clear</button></div>'
+      + '</div></div>';
+
+    const rows = filtered.slice(0, App.listLimit('ic', 'delivery')).map(d => {
+      let disc;
+      if (d.has_discrepancy) {
+        const parts = [];
+        if (d.price_change_count) parts.push(d.price_change_count + ' Price Change' + (d.price_change_count === 1 ? '' : 's'));
+        if (d.short_count_count)  parts.push(d.short_count_count + ' Short Count' + (d.short_count_count === 1 ? '' : 's'));
+        disc = '<span style="color:var(--gold);font-weight:700;">' + (parts.join(' &middot; ') || 'Discrepancy') + '</span>';
+      } else {
+        disc = '<span style="color:var(--green);font-weight:600;">Clean</span>';
+      }
+      return '<tr class="dh-row" data-id="' + d.id + '" style="cursor:pointer;">'
+        + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
+        + '<td>' + esc(d.vendor || '-') + '</td>'
+        + '<td>' + esc(d.invoice_number || '-') + '</td>'
+        + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(d.total || 0) + '</td>'
+        + '<td>' + disc + '</td>'
+        + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button>'
+        + (App.canEdit('ic-delivery-history') ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
+        + '</div></td></tr>';
+    }).join('');
+    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No deliveries match the filter.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'delivery', filtered, !!this.vendorFilter);
+
+    this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#dh-list-export')) { this.exportList(); return; }
+      if (ev.target.closest('#dh-clear')) { this.vendorFilter = ''; this.renderList(); return; }
       const how = ev.target.closest('#dh-how');
       const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');
       const row = ev.target.closest('.dh-row');
-      const rec = ev.target.closest('#dh-receive');
       if (how)  { this.showHowTo(); return; }
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
       if (view) { this.renderDetail(view.dataset.id); return; }
       if (row)  { this.renderDetail(row.dataset.id); return; }
-      if (rec) App.navigate('ic-receive-delivery');
     };
     document.getElementById('dh-filter')?.addEventListener('change', e => {
       this.vendorFilter = e.target.value || '';
@@ -173,7 +183,8 @@ S.InventoryDeliveryHistory = {
     const itemRows = items.map(it => {
       const isCase = it.display_unit === 'case';
       const p = ((App.inventoryData && App.inventoryData.ic_products) || []).find(pr => pr.id === it.product_id);
-      const unitSuffix = isCase ? ' cases' : (p ? ' ' + (App.productUnit(p) || '') : '');
+      const ab = p ? App.unitAbbr(App.productUnit(p)) : '';
+      const unitSuffix = isCase ? ' cs' : (ab ? ' ' + ab : '');
       const priceSuffix = isCase ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '';
       const change = it.price_changed
         ? '<span style="color:var(--gold);font-weight:700;">was ' + App.fmtCurrency(it.prev_price) + '</span>'
@@ -192,19 +203,18 @@ S.InventoryDeliveryHistory = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="dh-export">Export PDF</button></div>'
-      + '<div class="calc" style="margin-bottom:' + (d.notes ? '14px' : '0') + ';">'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + meta('Invoice #', esc(d.invoice_number || '-'))
       + meta('Driver', esc(d.driver || '-'))
       + meta('Line Items', d.item_count || items.length)
       + meta('Delivery Total', App.fmtCurrency(d.total || 0))
       + '</div>'
-      + (d.notes ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;">' + esc(d.notes) + '</div>' : '')
+      + (d.notes ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:14px;">' + esc(d.notes) + '</div>' : '')
       + '</div>'
-      + '<div class="card"><div class="card-title">Line Items</div>'
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dh-export">Export PDF</button></div></div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Container</th><th>Qty</th><th>Unit Price</th><th>Price Change</th><th>Extended</th>'
       + '</tr></thead><tbody>' + itemRows + '</tbody></table></div></div>'
       + '</div>';
