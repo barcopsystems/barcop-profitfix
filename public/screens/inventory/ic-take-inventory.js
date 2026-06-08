@@ -9,7 +9,6 @@
 S.InventoryTakeInventory = {
   draft: null,
   locStep: 0,
-  entryMode: 'manual',     // setup page: 'manual' = walk the count, 'import' = upload a count file
   DRAFT_KEY: 'ic_count_draft',
   get BAR_CATS() { return App.BAR_CATS; },         // single source on App
   get KITCHEN_CATS() { return App.KITCHEN_CATS; },
@@ -71,14 +70,12 @@ S.InventoryTakeInventory = {
       { p: ['An inventory count is a snapshot of everything you have on hand right now, priced out so Bar Cop can tell you what you used, what to reorder, and where you are leaking. Count the same way every time and the numbers stay honest.'] },
       { h: 'What You Are Counting', p: ['Bar Cop walks you through your products one location at a time. Go shelf by shelf and enter what is physically there. Anything you do not touch is recorded as zero, so only skip a product if it is truly empty.'] },
       { h: 'Pick Your Locations', p: ['Most operators count one location at a time and come back for the rest later. Pick a single location for a quick section count, or pick several to run a full inventory in one session. You count and finalize each location\'s products together.'] },
-      { h: 'Count Manually Or Import', p: ['Count Manually walks you through your products by location with the fill slider and case inputs. Import File lets you drop a CSV or Excel count instead, matched to your products by name, then drops you on the review screen to confirm before anything is saved.'] },
       { h: 'How To Enter Each Product', p: [
         'Liquor, wine, and bottled mixers use the fill slider. Set the number of full bottles, then drag the slider to the level of the open bottle. Draft beer uses the same slider shaped like a keg.',
         'Bottle beer is counted by the case. Enter full cases and any loose bottles, and Bar Cop shows the running total in cases as you type.',
         'Food and dry goods use a plain number in the product\'s own unit, like pounds, cases, or each.'
       ] },
       { h: 'It Saves As You Go', p: ['Your count saves to this device automatically. If you close the tab or lose signal partway through, come back and pick up where you left off. Nothing is final until you submit.'] },
-      { h: 'Importing A Count', p: ['Your file needs a product name column and a count column, plus an optional location column. The count is the on-hand quantity in the product\'s container unit: bottles for liquor and wine, cases for bottle beer, kegs for draft, and the stock unit for food. Bar Cop matches products by name. Anything it cannot match is skipped and listed, and any product you did not include is flagged on the review screen so it is never silently recorded as zero.'] },
       { h: 'Review And Submit', p: ['When you reach the end, Bar Cop shows a review of every product, its total, and its value, and flags anything you did not count. Go back and fix anything that looks off, then submit. Submitting writes a finalized count that you cannot change by accident.'] },
       { h: 'What The Count Feeds', p: ['Every finalized count powers your dashboard, the usage and variance reports, dynamic par suggestions, and your cost of goods. Two counts let Bar Cop measure what you used between them, so count on a regular schedule, like every week, to keep the numbers sharp.'] }
     ]);
@@ -116,28 +113,15 @@ S.InventoryTakeInventory = {
 
     const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
 
-    // Counted By is shared by both lanes.
     const countedByRow = '<div class="form-row" style="gap:16px;margin-top:16px;">'
       + '<div class="f w-md"><label>Counted By</label>'
       + '<select id="ti-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div></div>';
-
-    // Segmented toggle: walk the count by hand, or drop a count file.
-    const segBtn = (mode, label) => {
-      const on = this.entryMode === mode;
-      return '<button type="button" class="btn btn-sm ti-mode" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    };
 
     let body, startAction = '';
     if (locs.length === 0) {
       body = '<div class="empty" style="margin:0;"><div class="empty-title">No locations set up yet</div>'
         + '<div class="empty-sub">Add storage locations in the Locations screen first. Inventory counts are organized by location.</div>'
         + '<button class="btn btn-primary" id="ti-go-locs">Go to Locations</button></div>';
-    } else if (this.entryMode === 'import') {
-      body = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:4px;">Drop a count file with a product name and a count per row. Bar Cop matches your products by name and takes you to review before anything is saved.</div>'
-        + countedByRow
-        + '<div style="margin-top:16px;"><div id="ti-csv"></div><div id="ti-imp-result"></div></div>';
     } else {
       const tiles = locs.map(l => {
         const productCount = this.products().filter(p => App.productLocations(p).includes(l.name)).length;
@@ -161,16 +145,12 @@ S.InventoryTakeInventory = {
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
       + App.helpButton('ti-how') + '</div>'
-      + (locs.length > 0 ? '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Count Manually') + segBtn('import', 'Import File') + '</div>' : '')
       + body
       + startAction
       + '</div></div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#ti-how'))     { this.showHowTo(); return; }
-      if (ev.target.closest('.ti-imp-how')) { this.showHowTo(); return; }
-      const modeBtn = ev.target.closest('.ti-mode');
-      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderSetup(); return; }
       const tile = ev.target.closest('.ti-loc-tile');
       if (tile) { this.toggleLocTile(tile); return; }
       if (ev.target.closest('#ti-selall'))  { this.selectAllTiles(); return; }
@@ -187,7 +167,6 @@ S.InventoryTakeInventory = {
         return;
       }
     };
-    if (this.entryMode === 'import') this.mountImporter();
     this.scrollTop();
   },
 
@@ -212,83 +191,6 @@ S.InventoryTakeInventory = {
     tiles.forEach(t => { if (t.classList.contains('selected') === allOn) this.toggleLocTile(t); });
     const btn = document.getElementById('ti-selall');
     if (btn) btn.textContent = allOn ? 'Select all' : 'Clear all';
-  },
-
-  mountImporter() {
-    const el = document.getElementById('ti-csv');
-    if (!el || typeof CSVMapper === 'undefined') return;
-    CSVMapper.mount(el, {
-      hint: 'Drop a count export (CSV or Excel): <span class="ti-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
-      fields: [
-        { key: 'product',  label: 'Product',  required: true,  match: ['product', 'item', 'name', 'description'] },
-        { key: 'count',    label: 'Count',    required: true,  match: ['count', 'qty', 'quantity', 'on hand', 'onhand', 'on-hand', 'total'] },
-        { key: 'location', label: 'Location', required: false, match: ['location', 'area', 'storage'] }
-      ],
-      confirmLabel: 'Import',
-      onComplete: rows => this.importCount(rows)
-    });
-  },
-
-  // Build a count draft from an imported file (product name + count per row) and
-  // jump to review. The count is the on-hand quantity in the product's container
-  // unit (bottles / cases / kegs / stock unit). Unmatched product names are
-  // skipped; any product in a counted location that was NOT in the file is
-  // flagged on review, never a silent zero.
-  importCount(rows) {
-    const byName = {};
-    this.products().forEach(p => { byName[(p.name || '').trim().toLowerCase()] = p; });
-    const counterId = document.getElementById('ti-by')?.value || '';
-    const counterName = (App.staffById(counterId) || {}).name || '';
-
-    const counts = {};
-    const locSet = new Set();
-    let matched = 0;
-    const skipped = [];
-    rows.forEach(r => {
-      const p = byName[(r.product || '').trim().toLowerCase()];
-      const qty = parseFloat(r.count);
-      if (!p || isNaN(qty)) { skipped.push(r.product || '(blank)'); return; }
-      const plocs = App.productLocations(p);
-      let loc = (r.location || '').trim();
-      if (!loc || !plocs.includes(loc)) loc = p.primary_location || plocs[0] || 'Unassigned';
-      locSet.add(loc);
-      const key = p.id + '@@' + loc;
-      if (App.isCaseBeer(p)) {
-        const cs = p.case_size || 0;
-        const cases = Math.floor(qty);
-        const loose = cs > 0 ? Math.round((qty - cases) * cs) : 0;
-        counts[key] = { cases, loose, notes: '' };
-      } else {
-        const fulls = Math.floor(qty);
-        const value = +(qty - fulls).toFixed(3);
-        counts[key] = { fulls, value, notes: '' };
-      }
-      matched++;
-    });
-
-    const result = document.getElementById('ti-imp-result');
-    if (matched === 0) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No rows imported. No product names matched your products, or the count column was blank.</div>';
-      return;
-    }
-    const allLocs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived).map(l => l.name);
-    const picked = [...locSet];
-    const isFull = picked.length === allLocs.length && allLocs.length > 0;
-    const type = isFull ? 'Full' : (picked.length === 1 ? picked[0] : 'Multi-Location');
-    this.draft = {
-      type,
-      custom_locations: picked,
-      counted_by_id: counterId,
-      counted_by: counterName,
-      counts,
-      started_at: new Date().toISOString(),
-      imported: true,
-      _view: 'review',
-      _locStep: 0
-    };
-    this.locStep = 0;
-    this.saveDraft();
-    this.renderReview();
   },
 
   // Discard the in-progress draft. Confirmation because losing count data
