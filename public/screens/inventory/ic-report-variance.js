@@ -310,13 +310,6 @@ S.InventoryVarianceReport = {
       + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:260px;">'
       + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div>' + catCtl + '</div></div>';
 
-    // One dismissible intro line replaces the per-card "How it works" buttons;
-    // the deep walk-through rides the single "Learn more" link.
-    const introText = this.posRows
-      ? 'Flagged rows are where product walked out without a matching sale: over-pour, theft, or give-aways. Map any unmatched POS names below, then set what you will tolerate per category in Variance Standards.'
-      : 'Variance compares what your counts say you used against what your POS actually rang up. Drop a POS product-sales export below to start, and Bar Cop finds the gaps where product left without a sale.';
-    const intro = App.introBar('ic-report-variance', introText, 'Learn more');
-
     let body;
     if (!this.posRows) {
       body = '<div class="card form-card"><div class="card-title">Import POS Sales</div>'
@@ -338,13 +331,8 @@ S.InventoryVarianceReport = {
         + (this.tab === 'usage' ? this.tabUsage() : this.tabSales());
     }
 
-    this.container.innerHTML = '<div class="screen">' + intro + controls + this.varianceStandardsCard() + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + controls + this.varianceStandardsCard() + body + '</div>';
 
-    this.container.querySelector('.intro-learn')?.addEventListener('click', () => this.showHowTo());
-    this.container.querySelector('.intro-dismiss')?.addEventListener('click', () => {
-      App.dismissTip('ic-report-variance');
-      this.container.querySelector('.intro-bar')?.remove();
-    });
     document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
     document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
     this.wireStandards();
@@ -545,7 +533,6 @@ S.InventoryVarianceReport = {
     return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Variance Standards</span>'
       + '<button class="btn btn-ghost btn-sm" id="vr-th-reset">Reset to Defaults</button></div>'
-      + '<div style="font-size:11.5px;color:var(--t3);line-height:1.5;margin-bottom:12px;">The variance you will tolerate per category before it flags. Below the number is OK, above it flags. By the Bottle flags the moment a single bottle is unaccounted.</div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
       + this.STD_ORDER.map(k => box(k)).join('') + '</div></div>';
   },
