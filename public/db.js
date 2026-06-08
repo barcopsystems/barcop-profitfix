@@ -254,7 +254,7 @@ const DB = {
     'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
     'lc-wage-settings':'manage-staff',
     'lc-callout-log':'call-out-log',
-    'lc-reports':'labor-reports','lc-weekly-summary':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports',
+    'lc-reports':'labor-reports','lc-weekly-summary':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports','lc-payroll-export':'labor-reports',
     'lc-dashboard':'labor-dashboard','lc-help':'_always',
     // Shift Control
     'sc-shift-history':'log-shift',
