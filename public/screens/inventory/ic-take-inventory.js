@@ -132,10 +132,7 @@ S.InventoryTakeInventory = {
             + '<span style="display:block;font-size:11px;color:var(--t3);margin-top:1px;">' + productCount + ' product' + (productCount === 1 ? '' : 's') + '</span>'
           + '</span></button>';
       }).join('');
-      const head = '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">'
-        + '<div style="font-size:11px;color:var(--t3);">Pick the locations to count.</div>'
-        + (locs.length > 1 ? '<button type="button" id="ti-selall" style="background:none;border:none;color:var(--gold);font-size:11px;cursor:pointer;">Select all</button>' : '')
-        + '</div>';
+      const head = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Pick the locations to count.</div>';
       body = head + '<div class="ti-loc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">' + tiles + '</div>' + countedByRow;
       startAction = '<div class="card-actions"><button class="btn btn-primary" id="ti-start">Start Count</button>'
         + '<span id="ti-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
@@ -153,7 +150,6 @@ S.InventoryTakeInventory = {
       if (ev.target.closest('#ti-how'))     { this.showHowTo(); return; }
       const tile = ev.target.closest('.ti-loc-tile');
       if (tile) { this.toggleLocTile(tile); return; }
-      if (ev.target.closest('#ti-selall'))  { this.selectAllTiles(); return; }
       if (ev.target.closest('#ti-go-locs')) { App.navigate('ic-locations'); return; }
       if (ev.target.closest('#ti-discard')) { this.confirmDiscardDraft(); return; }
       if (ev.target.closest('#ti-start'))   { this.startCount(); return; }
@@ -182,15 +178,6 @@ S.InventoryTakeInventory = {
       ck.style.background = on ? 'var(--gold)' : 'transparent';
       ck.style.borderColor = on ? 'var(--gold)' : 'var(--t3)';
     }
-  },
-
-  // Select-all / clear-all toggle for the location tiles.
-  selectAllTiles() {
-    const tiles = [...this.container.querySelectorAll('.ti-loc-tile')];
-    const allOn = tiles.length > 0 && tiles.every(t => t.classList.contains('selected'));
-    tiles.forEach(t => { if (t.classList.contains('selected') === allOn) this.toggleLocTile(t); });
-    const btn = document.getElementById('ti-selall');
-    if (btn) btn.textContent = allOn ? 'Select all' : 'Clear all';
   },
 
   // Discard the in-progress draft. Confirmation because losing count data
@@ -363,7 +350,7 @@ S.InventoryTakeInventory = {
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
       + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">Location ' + (this.locStep + 1) + ' of ' + groups.length
-      + ' &nbsp;|&nbsp; <span id="ti-prog-txt">' + done + ' of ' + total + ' counted</span></span></div>'
+      + ' &nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--gold);">' + done + ' of ' + total + '</span> counted</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
         + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Discard Count</button>'
@@ -467,7 +454,7 @@ S.InventoryTakeInventory = {
     const done = Object.keys(this.draft.counts).length;
     const txt = document.getElementById('ti-prog-txt');
     const bar = document.getElementById('ti-prog-bar');
-    if (txt) txt.textContent = done + ' of ' + total + ' counted';
+    if (txt) txt.textContent = done + ' of ' + total;
     if (bar) bar.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
   },
 
