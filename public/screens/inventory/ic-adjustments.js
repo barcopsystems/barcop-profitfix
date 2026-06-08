@@ -89,46 +89,66 @@ S.InventoryAdjustments = {
     }
 
     const all = this.adjustments();
-    const filtered = this.applyFilters(all);
-    filtered.sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
-
-    let listHtml = this.filterCard();
     if (all.length === 0) {
-      listHtml += '<div class="empty"><div class="empty-title">No adjustments logged yet</div>'
-        + '<div class="empty-sub">When you find damaged stock, confirm theft, expire product, or discover missing inventory, log it here. Counts stay clean, the loss gets attributed to a real cause, and the bookkeeper has a proper shrinkage trail.</div></div>';
-    } else if (filtered.length === 0) {
-      listHtml += '<div class="empty"><div class="empty-title">No adjustments match the filters</div>'
-        + '<div class="empty-sub">Adjust or clear the filters above.</div></div>';
-    } else {
-      const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
-        const dirText = r.direction === 'in'
-          ? '<span style="color:var(--gold);font-weight:600;">Found</span>'
-          : '<span style="color:var(--red);font-weight:600;">Loss</span>';
-        const valStr = r.direction === 'in'
-          ? '<span class="pos">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
-          : '<span class="neg">-' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>';
-        return '<tr class="adj-row" data-id="' + r.id + '" style="cursor:pointer;">'
-          + '<td><div class="val">' + this.fmtDateTime(r.date_time) + '</div></td>'
-          + '<td><div class="val">' + esc(r.product_name || '-') + '</div>'
-          + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
-          + '<td>' + (r.quantity != null ? r.quantity : '-') + ' ' + esc(r.unit || '') + '</td>'
-          + '<td>' + esc(r.reason || '-') + ' ' + dirText + '</td>'
-          + '<td class="val">' + valStr + '</td>'
-          + '<td>' + esc(r.performed_by || '-') + '</td>'
-          + '<td><div class="row-actions">'
-          + (App.canEdit('ic-adjustments') ? '<button class="btn btn-ghost btn-sm adj-edit" data-id="' + r.id + '">Edit</button>' : '')
-          + (App.canEdit('ic-adjustments') ? '<button class="btn btn-danger btn-sm adj-del" data-id="' + r.id + '">Delete</button>' : '')
-          + '</div></td></tr>';
-      }).join('');
-      listHtml += '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('ic', 'adjustment', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterReason));
+      this.container.innerHTML = '<div class="screen">' + this.logFormCard()
+        + '<div style="font-size:13px;color:var(--t3);padding:14px 2px;">No adjustments logged yet. Use the form above to log the first one.</div></div>';
+      this.wireForm('adj-');
+      return;
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + listHtml + '</div>';
+    const filtered = this.applyFilters(all)
+      .sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+
+    let totalLoss = 0, totalFound = 0, lastDate = '';
+    all.forEach(r => {
+      const val = Math.abs(r.value || 0);
+      if (r.direction === 'in') totalFound += val; else totalLoss += val;
+      const d = r.date_time || r.created_at || '';
+      if (!lastDate || new Date(d).getTime() > new Date(lastDate).getTime()) lastDate = d;
+    });
+
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Adjustments</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Loss</div><div class="calc-val lg" style="color:var(--red);">' + App.fmtCurrency(totalLoss) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Found</div><div class="calc-val lg" style="color:var(--green);">' + App.fmtCurrency(totalFound) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
+      + '</div></div>';
+
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Adjustments</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Worksheet</button>'
+      + '</div></div>';
+
+    const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
+      const dirText = r.direction === 'in'
+        ? '<span style="color:var(--green);font-weight:600;">Found</span>'
+        : '<span style="color:var(--red);font-weight:600;">Loss</span>';
+      const valStr = r.direction === 'in'
+        ? '<span style="color:var(--green);">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
+        : '<span style="color:var(--red);">-' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>';
+      return '<tr class="adj-row" data-id="' + r.id + '" style="cursor:pointer;">'
+        + '<td><div class="val">' + this.fmtDateTime(r.date_time) + '</div></td>'
+        + '<td><div class="val">' + esc(r.product_name || '-') + '</div>'
+        + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
+        + '<td>' + (r.quantity != null ? r.quantity : '-') + ' ' + esc(r.unit || '') + '</td>'
+        + '<td>' + esc(r.reason || '-') + ' ' + dirText + '</td>'
+        + '<td class="val">' + valStr + '</td>'
+        + '<td>' + esc(r.performed_by || '-') + '</td>'
+        + '<td><div class="row-actions">'
+        + (App.canEdit('ic-adjustments') ? '<button class="btn btn-ghost btn-sm adj-edit" data-id="' + r.id + '">Edit</button>' : '')
+        + (App.canEdit('ic-adjustments') ? '<button class="btn btn-danger btn-sm adj-del" data-id="' + r.id + '">Delete</button>' : '')
+        + '</div></td></tr>';
+    }).join('');
+    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No adjustments match the filter.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'adjustment', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterReason));
+
+    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + statsCard + filterHeading + this.filterCard() + listCard + '</div>';
     this.wireList();
-    this.wireForm();
+    this.wireForm('adj-');
   },
 
   showHowTo() {
@@ -141,23 +161,22 @@ S.InventoryAdjustments = {
     ]);
   },
 
-  // The Log an Adjustment form lives at the top of the landing page, always open.
+  // The Log an Adjustment form lives at the top of the landing page (collapsible).
   logFormCard() {
-    return '<div class="card no-print">'
+    return '<div class="card form-card no-print">'
       + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment', App.helpButton('adj-how'))
       + '<div class="collapse-body">'
-      + this.formRows(null)
+      + this.formRows(null, 'adj-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="adj-save">Log Adjustment</button>'
         + '<span id="adj-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
   },
 
-  // Shared two-row field layout for both the inline log form and the edit page.
-  // Row 1: Date/Time, Product, Quantity, Unit. Row 2: Reason, Direction,
-  // Performed By, Witnessed By. The Estimated Value / Unit Cost tile and Notes
-  // follow. Pass the record for edit, or null for a new log.
-  formRows(r) {
+  // Shared field layout for both the inline log form and the edit popup. `idp`
+  // prefixes every field id ('adj-' inline, 'adje-' modal) so the popup never
+  // collides with the inline form behind it.
+  formRows(r, idp) {
     const v = val => (val != null && val !== '') ? val : '';
     const initialProdId = r?.product_id || '';
     const initialCat = initialProdId ? (this.productById(initialProdId)?.category || '') : '';
@@ -169,62 +188,61 @@ S.InventoryAdjustments = {
 
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:210px;flex-shrink:0;"><label>Date / Time</label>'
-          + '<input type="datetime-local" id="adj-when" value="' + esc((r?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
+          + '<input type="datetime-local" id="' + idp + 'when" value="' + esc((r?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
         + '<div class="f" style="flex:1;min-width:180px;"><label>Product</label>'
-          + '<select id="adj-prod">' + this.productOptions(initialProdId) + '</select></div>'
+          + '<select id="' + idp + 'prod">' + this.productOptions(initialProdId) + '</select></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Quantity ' + tt('adj-qty') + '</label>'
-          + '<input type="number" id="adj-qty" min="0" step="0.5" value="' + v(r?.quantity) + '" placeholder="0"/></div>'
+          + '<input type="number" id="' + idp + 'qty" min="0" step="0.5" value="' + v(r?.quantity) + '" placeholder="0"/></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="adj-unit">' + this.unitOptions(initialCat, initialUnit) + '</select></div>'
+          + '<select id="' + idp + 'unit">' + this.unitOptions(initialCat, initialUnit) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label>'
-          + '<select id="adj-reason">' + reasonOpts + '</select></div>'
+          + '<select id="' + idp + 'reason">' + reasonOpts + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Direction</label>'
-          + '<select id="adj-dir">'
+          + '<select id="' + idp + 'dir">'
             + '<option value="out"' + (initialDir === 'out' ? ' selected' : '') + '>Loss (out)</option>'
             + '<option value="in"'  + (initialDir === 'in'  ? ' selected' : '') + '>Found (in)</option>'
           + '</select></div>'
         + '<div class="f" style="flex:1;min-width:170px;"><label>Performed By</label>'
-          + '<select id="adj-by">' + App.staffOptions(r?.performed_by_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
+          + '<select id="' + idp + 'by">' + App.staffOptions(r?.performed_by_id || App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:170px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-          + '<select id="adj-witness">' + App.staffOptions(r?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
+          + '<select id="' + idp + 'witness">' + App.staffOptions(r?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
-      + '<div class="calc" style="margin-top:6px;">'
-        + '<div class="calc-item"><div class="calc-label">Estimated Value</div><div class="calc-val" id="adj-c-value">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Unit Cost</div><div class="calc-val dim" id="adj-c-unitcost">-</div></div>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:10px;">'
+        + '<div class="calc-item"><div class="calc-label">Estimated Value</div><div class="calc-val" id="' + idp + 'c-value">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Unit Cost</div><div class="calc-val dim" id="' + idp + 'c-unitcost">-</div></div>'
       + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="adj-notes" rows="2" placeholder="Optional context. What happened, who was around, anything that helps next year\'s review.">' + esc(r?.notes || '') + '</textarea></div>';
+      + '<div class="f" style="margin-top:10px;margin-bottom:0;"><label>Notes</label>'
+        + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional context. What happened, who was around, anything that helps next year\'s review.">' + esc(r?.notes || '') + '</textarea></div>';
   },
 
-  // Wire the always-open inline log form (How This Works, Save, calc fields).
-  wireForm() {
+  // Wire the always-open inline log form.
+  wireForm(idp) {
     document.getElementById('adj-how')?.addEventListener('click', () => this.showHowTo());
-    document.getElementById('adj-save')?.addEventListener('click', () => this.save());
-    this.wireFormFields();
+    document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
+    this.wireFormFields(idp);
     const head = this.container.querySelector('.card-collapse-head');
     if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
     App.applyCollapsed(this.container);
   },
 
   // Reason → default direction, product → unit options, and live value recalc.
-  // Shared by the inline log form and the edit page.
-  wireFormFields() {
-    document.getElementById('adj-reason')?.addEventListener('change', e => {
-      const dirSel = document.getElementById('adj-dir');
+  wireFormFields(idp) {
+    document.getElementById(idp + 'reason')?.addEventListener('change', e => {
+      const dirSel = document.getElementById(idp + 'dir');
       if (dirSel) dirSel.value = this._dirFor(e.target.value);
-      this.recalc();
+      this.recalc(idp);
     });
-    document.getElementById('adj-prod')?.addEventListener('change', e => {
+    document.getElementById(idp + 'prod')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
-      const unitSel = document.getElementById('adj-unit');
+      const unitSel = document.getElementById(idp + 'unit');
       if (unitSel && p) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
-      this.recalc();
+      this.recalc(idp);
     });
-    ['adj-qty', 'adj-unit', 'adj-dir'].forEach(fid =>
-      document.getElementById(fid)?.addEventListener('input', () => this.recalc()));
-    this.recalc();
+    [idp + 'qty', idp + 'unit', idp + 'dir'].forEach(fid =>
+      document.getElementById(fid)?.addEventListener('input', () => this.recalc(idp)));
+    this.recalc(idp);
   },
 
   filterCard() {
@@ -233,18 +251,12 @@ S.InventoryAdjustments = {
     const prodOpts = '<option value="">All products</option>'
       + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
-    return '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Filter</span>'
-      + '<div style="display:flex;gap:8px;">'
-        + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Worksheet</button>'
-      + '</div></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
+    return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="adj-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="adj-f-to" value="' + esc(this.filterTo) + '"/></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Product</label><select id="adj-f-prod">' + prodOpts + '</select></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="adj-f-reason">' + reasonOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="adj-f-clear" style="margin-bottom:2px;">Clear</button></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="adj-f-clear">Clear</button></div>'
       + '</div></div>';
   },
 
@@ -266,8 +278,8 @@ S.InventoryAdjustments = {
       const edit = ev.target.closest('.adj-edit');
       const del  = ev.target.closest('.adj-del');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.showForm(edit.dataset.id); }
-      else if (row && App.canEdit('ic-adjustments')) this.showForm(row.dataset.id);
+      else if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); }
+      else if (row && App.canEdit('ic-adjustments')) this.openEdit(row.dataset.id);
     };
     document.getElementById('adj-export')?.addEventListener('click', () => App.exportPDF({ title: 'Adjustment Log', root: this.container }));
     document.getElementById('adj-print-blank')?.addEventListener('click', () => this.printBlank());
@@ -281,7 +293,7 @@ S.InventoryAdjustments = {
     });
   },
 
-  // ── Form ────────────────────────────────────────────────────────────
+  // ── Form options ────────────────────────────────────────────────────
   productOptions(selectedId) {
     const prods = this.products();
     if (!prods.length) return '<option value="">No products set up</option>';
@@ -307,44 +319,19 @@ S.InventoryAdjustments = {
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   },
 
-  // Edit page (own screen). Same two-row field layout as the inline log form;
-  // Cancel stays here because the operator navigated away to edit.
-  showForm(id) {
-    if (!App.canEdit('ic-adjustments')) return;
-    this.editId = id || null;
-    const r = id ? this.adjustments().find(x => x.id === id) : null;
-
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">Edit Adjustment</div>'
-      + this.formRows(r)
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="adj-save">Update Adjustment</button>'
-        + '<button class="btn btn-ghost" id="adj-cancel">Cancel</button>'
-        + '<span id="adj-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    this.container.onclick = null;
-    document.getElementById('adj-cancel')?.addEventListener('click', () => this.renderList());
-    document.getElementById('adj-save')?.addEventListener('click', () => this.save());
-    this.wireFormFields();
-  },
-
   // Live calc: estimated value = qty × per-unit cost. For Bottle Beer cases we
-  // expand to bottles before multiplying so the math matches the rest of IC.
-  recalc() {
-    const prodId = document.getElementById('adj-prod')?.value;
-    const product = this.productById(prodId);
-    const qty = parseFloat(document.getElementById('adj-qty')?.value) || 0;
-    const unit = document.getElementById('adj-unit')?.value || '';
+  // use the per-case cost; loose bottles use per-bottle.
+  recalc(idp) {
+    const product = this.productById(document.getElementById(idp + 'prod')?.value);
+    const qty = parseFloat(document.getElementById(idp + 'qty')?.value) || 0;
+    const unit = document.getElementById(idp + 'unit')?.value || '';
     const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
 
     if (!product || qty <= 0) {
-      set('adj-c-value', '-');
-      set('adj-c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
+      set(idp + 'c-value', '-');
+      set(idp + 'c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
       return;
     }
-    // Cost is shown per the chosen unit: per case when writing off cases, per
-    // bottle when writing off loose bottles, per container for everything else.
     let perUnitCost, unitLabel;
     if (product.category === 'Bottle Beer' && product.case_size) {
       if (unit === 'cases') { perUnitCost = App.unitCost(product) || 0; unitLabel = '/case'; }
@@ -353,30 +340,57 @@ S.InventoryAdjustments = {
       perUnitCost = App.unitCost(product) || 0; unitLabel = '/unit';
     }
     const value = qty * perUnitCost;
-    set('adj-c-value', value > 0 ? App.fmtCurrency(value) : '-');
-    set('adj-c-unitcost', perUnitCost > 0 ? App.fmtCurrency(perUnitCost) + unitLabel : '-', 'dim');
+    set(idp + 'c-value', value > 0 ? App.fmtCurrency(value) : '-');
+    set(idp + 'c-unitcost', perUnitCost > 0 ? App.fmtCurrency(perUnitCost) + unitLabel : '-', 'dim');
   },
 
-  async save() {
-    const err = document.getElementById('adj-err');
+  // ── Edit popup (standard modal) ───────────────────────────────────────
+  openEdit(id) {
+    if (!App.canEdit('ic-adjustments')) return;
+    const r = this.adjustments().find(x => x.id === id);
+    if (!r) return;
+    this.editId = id;
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Adjustment</div>'
+      + this.formRows(r, 'adje-')
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="adje-save">Update Adjustment</button>'
+        + '<button class="btn btn-ghost" id="adje-cancel">Cancel</button>'
+        + '<span id="adje-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '<button class="btn btn-danger" id="adje-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'adj-edit-modal', maxWidth: 540, noClose: true });
+    document.getElementById('adje-save')?.addEventListener('click', () => this.save('adje-', 'adj-edit-modal'));
+    document.getElementById('adje-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('adj-edit-modal'); });
+    document.getElementById('adje-del')?.addEventListener('click', async () => {
+      if (!(await App.confirmDelete())) return;
+      await App.removeRecord('ic', 'adjustment', id);
+      this.editId = null;
+      App.closeModal('adj-edit-modal');
+      this.renderList();
+    });
+    this.wireFormFields('adje-');
+  },
+
+  async save(idp, modalId) {
+    const err = document.getElementById(idp + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
-    const dateTime = document.getElementById('adj-when')?.value;
+    const dateTime = document.getElementById(idp + 'when')?.value;
     if (!dateTime) { fail('Date and time are required.'); return; }
-    const productId = document.getElementById('adj-prod')?.value;
+    const productId = document.getElementById(idp + 'prod')?.value;
     if (!productId) { fail('Pick a product.'); return; }
     const product = this.productById(productId);
     if (!product) { fail('Product not found.'); return; }
-    const quantity = parseFloat(document.getElementById('adj-qty')?.value);
+    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
     if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
-    const reason = document.getElementById('adj-reason')?.value;
+    const reason = document.getElementById(idp + 'reason')?.value;
     if (!reason) { fail('Pick a reason.'); return; }
-    const direction = document.getElementById('adj-dir')?.value || this._dirFor(reason);
-    const unit = document.getElementById('adj-unit')?.value || '';
-    const performedById = document.getElementById('adj-by')?.value;
+    const direction = document.getElementById(idp + 'dir')?.value || this._dirFor(reason);
+    const unit = document.getElementById(idp + 'unit')?.value || '';
+    const performedById = document.getElementById(idp + 'by')?.value;
     if (!performedById) { fail('Pick who logged the adjustment.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
-    const witnessedById = document.getElementById('adj-witness')?.value || '';
+    const witnessedById = document.getElementById(idp + 'witness')?.value || '';
     const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
 
     // Snapshot the per-unit cost (for the chosen unit) so the value stays honest
@@ -405,26 +419,26 @@ S.InventoryAdjustments = {
       performed_by:             performedBy,
       witnessed_by_id:          witnessedById,
       witnessed_by:             witnessedBy,
-      notes:                    document.getElementById('adj-notes')?.value.trim() || ''
+      notes:                    document.getElementById(idp + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
     else rec.updated_at = new Date().toISOString();
 
-    const list = this.adjustments();
     let saveRec = rec;
     if (this.editId) {
-      const ex = list.find(x => x.id === this.editId);
+      const ex = this.adjustments().find(x => x.id === this.editId);
       if (ex) saveRec = { ...ex, ...rec };
     }
 
-    const btn = document.getElementById('adj-save');
+    const btn = document.getElementById(idp + 'save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'adjustment', saveRec);
     this.editId = null;
     if (ok) {
+      if (modalId) App.closeModal(modalId);
       this.renderList();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Log Adjustment'; }
+      if (btn) { btn.disabled = false; btn.textContent = modalId ? 'Update Adjustment' : 'Log Adjustment'; }
       fail('Save failed. Try again.');
     }
   },
