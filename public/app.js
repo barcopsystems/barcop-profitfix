@@ -494,7 +494,7 @@ const App = {
     const tnSettings = document.getElementById('tn-settings');
     if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettings) S.HubSettings.open(); };
     const tnHelp = document.getElementById('tn-help');
-    if (tnHelp) tnHelp.onclick = () => { if (window.S && S.HubHelp) S.HubHelp.open(); };
+    if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
     // Mobile sidebar: hamburger button in the topbar opens the off-canvas
     // sidebar below the 768px breakpoint. Backdrop click closes it. Module
     // nav clicks also close it (wired in _renderNav). No-op on desktop where
@@ -1950,24 +1950,41 @@ const App = {
   // Reusable "How this works" modal. sections = [{ h:'Header', p:['para', ...] }].
   // A section with no h is intro paragraphs. Keeps step/explainer text off the
   // page itself (see memory: how-this-works-pattern).
-  showHelpModal(title, sections) {
+  // Page directions render as a right-side slide-in panel (not a centered modal):
+  // it reads as "reference that slid in," dismisses with Close or a click off it,
+  // and never destroys anything. A "Full Help and FAQ" link at the bottom opens
+  // the whole manual. `opts.noFaq` suppresses that link for non-page help.
+  showHelpModal(title, sections, opts) {
+    opts = opts || {};
     const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
     const pp = t => '<p style="margin:0 0 10px;">' + t + '</p>';
     let body = '';
     (sections || []).forEach(s => { if (s.h) body += sh(s.h); (s.p || []).forEach(t => { body += pp(t); }); });
+    const faq = opts.noFaq ? '' :
+      '<div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<span data-help-faq style="color:var(--gold);cursor:pointer;text-decoration:underline;font-size:12px;">Full Help &amp; FAQ</span></div>';
+
     const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.className = 'help-overlay';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
-    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
+    box.className = 'help-panel';
+    box.style.cssText = 'position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--surface);border-left:1px solid var(--b1);box-shadow:-10px 0 30px rgba(0,0,0,0.4);z-index:9001;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;';
+    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
       + '<button class="btn btn-ghost btn-sm" data-help-close>Close</button></div>'
-      + '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">' + body + '</div>';
-    m.appendChild(box);
-    const close = () => m.remove();
-    m.addEventListener('click', e => { if (e.target === m) close(); });
+      + '<div style="padding:20px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;flex:1;">' + body + faq + '</div>';
+    const close = () => {
+      box.style.transform = 'translateX(100%)';
+      m.style.opacity = '0';
+      setTimeout(() => { m.remove(); box.remove(); }, 230);
+    };
+    m.addEventListener('click', close);
     box.querySelector('[data-help-close]').addEventListener('click', close);
+    box.querySelector('[data-help-faq]')?.addEventListener('click', () => { close(); if (window.S && S.HubHelp) S.HubHelp.open(); });
     document.body.appendChild(m);
+    document.body.appendChild(box);
+    requestAnimationFrame(() => { m.style.opacity = '1'; box.style.transform = 'translateX(0)'; });
   },
 
   // Shared report chrome: connected "folder" tabs + the panel they open into.
@@ -2009,7 +2026,10 @@ const App = {
     container.innerHTML = '<div class="screen"><div class="card setup-card">'
       + '<div class="card-title">' + esc(opts.title || 'Get Started') + '</div>'
       + (opts.lead ? '<div class="setup-lead">' + esc(opts.lead) + '</div>' : '')
-      + rows + '</div></div>';
+      + rows
+      + '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t3);line-height:1.5;">'
+      + 'Need a hand? Tap the info <strong>i</strong> button at the top right for directions on this page, anytime.</div>'
+      + '</div></div>';
     container.onclick = ev => {
       const go = ev.target.closest('.setup-go');
       if (go && go.dataset.go) App.navigate(go.dataset.go);
@@ -2036,34 +2056,17 @@ const App = {
     return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
   },
 
-  // ── Dismissible page intro ("tip") ──────────────────────────────────────────
-  // The cleaner replacement for per-card "How it works" buttons: ONE short,
-  // plain-English line at the top of a page saying what it is + the one move. A
-  // new operator (or a demo viewer) reads it; once they know the page they
-  // dismiss it and it is gone for good (remembered per page, per device), so a
-  // page you know stays dead clean. Deep help rides the optional "Learn more"
-  // link. introBar() returns '' once dismissed.
-  _tipsDismissed() {
-    try { return JSON.parse(localStorage.getItem('bc_tips_dismissed') || '[]'); } catch (e) { return []; }
-  },
-  isTipDismissed(id) { return this._tipsDismissed().indexOf(id) !== -1; },
-  dismissTip(id) {
-    const d = this._tipsDismissed();
-    if (d.indexOf(id) === -1) { d.push(id); try { localStorage.setItem('bc_tips_dismissed', JSON.stringify(d)); } catch (e) {} }
-  },
-  resetTips() { try { localStorage.removeItem('bc_tips_dismissed'); } catch (e) {} },
-  // `text` = one plain sentence (HTML allowed). `learnMore` = optional trailing
-  // link label (wire '.intro-learn'). Caller wires '.intro-dismiss' to
-  // App.dismissTip(id) then removes the bar. Returns '' if already dismissed.
-  introBar(id, text, learnMore) {
-    if (this.isTipDismissed(id)) return '';
-    const link = learnMore
-      ? ' <span class="intro-learn" style="color:var(--gold);cursor:pointer;text-decoration:underline;white-space:nowrap;">' + esc(learnMore) + '</span>'
-      : '';
-    return '<div class="intro-bar no-print" style="display:flex;align-items:flex-start;gap:12px;margin:0 0 16px;padding:2px;">'
-      + '<div style="flex:1;font-size:12.5px;color:var(--t3);line-height:1.55;">' + text + link + '</div>'
-      + '<button type="button" class="intro-dismiss" title="Dismiss" aria-label="Dismiss" style="flex-shrink:0;background:none;border:none;color:var(--t3);font-size:18px;line-height:1;cursor:pointer;padding:0 2px;">&times;</button>'
-      + '</div>';
+  // ── Page directions (the nav "i" button) ────────────────────────────────────
+  // ONE universal help affordance lives in the top nav (next to Settings, always
+  // visible incl. mobile). It opens the CURRENT page's directions in a slide-in
+  // panel — no per-page help buttons, no tooltips cluttering the page. Reuses each
+  // screen's existing showHowTo() as the content; falls back to the full Help and
+  // FAQ when a screen has no directions of its own. _activeScreenObj is set on
+  // every navigation (see navigate()).
+  openPageHelp() {
+    const s = this._activeScreenObj;
+    if (s && typeof s.showHowTo === 'function') { s.showHowTo(); return; }
+    if (window.S && S.HubHelp) S.HubHelp.open();
   },
 
   // A collapsible card header. The WHOLE header toggles the card open/closed; the
@@ -2950,6 +2953,7 @@ const App = {
       return;
     }
     try {
+    this._activeScreenObj = null;   // set per module block below; drives the nav "i" page-help button
     this.updateNav(id);
     // Hide the old topbar title bar on pages converted to the un-box language
     // (they carry their own page header); un-converted pages keep it.
@@ -3005,7 +3009,7 @@ const App = {
       document.getElementById('topbar-title').textContent = title;
       document.getElementById('topbar-sub').textContent = sub;
       const screen = revScreens[id];
-      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
+      if (screen) { this._activeScreenObj = screen; screen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -3055,7 +3059,7 @@ const App = {
       document.getElementById('topbar-title').textContent = title;
       document.getElementById('topbar-sub').textContent = sub;
       const screen = trafficScreens[id];
-      if (screen) { screen.render(content, actions); this._exportBtn(id, actions); }
+      if (screen) { this._activeScreenObj = screen; screen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -3113,7 +3117,7 @@ const App = {
       document.getElementById('topbar-title').textContent = icTitle;
       document.getElementById('topbar-sub').textContent = icSub;
       const icScreen = icScreens[id];
-      if (icScreen) { icScreen.render(content, actions); this._exportBtn(id, actions); }
+      if (icScreen) { this._activeScreenObj = icScreen; icScreen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -3159,7 +3163,7 @@ const App = {
       document.getElementById('topbar-title').textContent = scTitle;
       document.getElementById('topbar-sub').textContent = scSub;
       const scScreen = scScreens[id];
-      if (scScreen) { scScreen.render(content, actions); this._exportBtn(id, actions); }
+      if (scScreen) { this._activeScreenObj = scScreen; scScreen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -3209,7 +3213,7 @@ const App = {
       document.getElementById('topbar-title').textContent = lcTitle;
       document.getElementById('topbar-sub').textContent = lcSub;
       const lcScreen = lcScreens[id];
-      if (lcScreen) { lcScreen.render(content, actions); this._exportBtn(id, actions); }
+      if (lcScreen) { this._activeScreenObj = lcScreen; lcScreen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
     }
@@ -3259,7 +3263,7 @@ const App = {
     document.getElementById('topbar-sub').textContent = sub;
 
     const screen = screens[id];
-    if (screen) screen.render(content, actions);
+    if (screen) { this._activeScreenObj = screen; screen.render(content, actions); }
     else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
     } finally {
       this._afterNavigate(id);
