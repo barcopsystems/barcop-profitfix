@@ -87,27 +87,23 @@ S.InventoryReceiveDelivery = {
     return h;
   },
 
+  // One line item = one table row, plus a hidden full-width sub-row that shows
+  // the discrepancy detail (price change / short count) only when the line is
+  // off. The row itself highlights gold when flagged. Matches the Void/Comp
+  // ing-tbl batch builder.
   lineHTML(lid) {
-    return '<div class="rd-line" data-lid="' + lid + '" data-ext="0" '
-      + 'style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:10px;">'
-      + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="flex:1.4;min-width:170px;"><label>Product</label>'
-      + '<select class="rd-prod">' + this.productOptions() + '</select></div>'
-      + '<div class="f" style="width:132px;flex-shrink:0;"><label>Qty Received ' + tt('rd-qty') + '</label>'
-      + '<input type="number" class="rd-qty" min="0" step="0.01" placeholder="0"/></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Unit Price ' + tt('rd-price') + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre rd-price" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:110px;flex-shrink:0;"><label>Extended</label>'
-      + '<div class="f-display rd-ext">$0</div></div>'
-      + '<button type="button" class="btn btn-ghost btn-sm rd-remove" style="margin-bottom:2px;">Remove</button>'
-      + '</div>'
-      // Discrepancy controls sit below the data row: the Flag button (or the
-      // Logged badge once filed) shows right above the line that spells out
-      // what is off, so the operator reads the prompt then the reason.
-      + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;margin-top:10px;border-color:var(--gold);color:var(--gold);">Flag Discrepancy</button>'
-      + '<span class="rd-flag-logged" style="display:none;margin-top:10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);">Discrepancy Logged</span>'
-      + '<div class="rd-flag" style="display:none;font-size:11px;font-weight:700;margin-top:8px;"></div>'
-      + '</div>';
+    return '<tr class="rd-line" data-lid="' + lid + '" data-ext="0">'
+      + '<td><select class="form-input rd-prod" style="width:100%;">' + this.productOptions() + '</select></td>'
+      + '<td><input class="form-input rd-qty" type="number" min="0" step="0.01" placeholder="0" style="width:100%;"/></td>'
+      + '<td><input class="form-input rd-price" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td class="rd-ext val" style="white-space:nowrap;">$0.00</td>'
+      + '<td><div class="row-actions">'
+        + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;border-color:var(--gold);color:var(--gold);white-space:nowrap;">Flag</button>'
+        + '<span class="rd-flag-logged" style="display:none;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);white-space:nowrap;">Logged</span>'
+        + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
+      + '</div></td>'
+      + '</tr>'
+      + '<tr class="rd-flag-row" data-lid="' + lid + '" style="display:none;"><td colspan="5" class="rd-flag" style="font-size:11px;font-weight:700;color:var(--gold);padding:0 12px 10px;border-top:0;"></td></tr>';
   },
 
   renderForm() {
@@ -128,8 +124,7 @@ S.InventoryReceiveDelivery = {
       + this.vendors().map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
     const today = App.todayLocal();
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    const detailsCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
       + App.helpButton('rd-how') + '</div>'
       + '<div class="form-row" style="gap:12px;">'
@@ -140,34 +135,40 @@ S.InventoryReceiveDelivery = {
       + '<div class="f" style="flex:1.2;min-width:150px;"><label>Received By</label>'
       + '<select id="rd-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
-      // Open Order picker. Hidden until a vendor with at least one open
-      // order is selected. Picking an order pre-fills the line items so the
-      // operator does not re-enter what they already ordered.
+      // Open Order picker. Hidden until a vendor with at least one open order is
+      // selected. Picking an order pre-fills the line items.
       + '<div class="form-row" style="gap:16px;" id="rd-order-row">'
         + '<div class="f" style="flex:1;min-width:280px;"><label>Open Order</label>'
           + '<select id="rd-order"><option value="">No open orders for this vendor</option></select>'
         + '</div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="rd-notes" rows="2" placeholder="Optional"></textarea></div></div>'
-      + '</div>'
-      + '<div class="card"><div class="card-title">Line Items</div>'
-      + '<div id="rd-lines">' + this.lineHTML(++this._seq) + '</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;">'
-        + '<button class="btn btn-ghost btn-sm" id="rd-add">+ Add Line Item</button>'
-      + '</div>'
-      + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val" id="rd-count">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Price Changes</div><div class="calc-val" id="rd-changes">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Short Counts</div><div class="calc-val" id="rd-shorts">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Delivery Total</div><div class="calc-val good" id="rd-total">$0</div></div>'
+      + '<textarea id="rd-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
+      + '</div>';
+
+    const linesCard = '<div class="card form-card"><div class="card-title">Line Items</div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
+      + '<table class="ing-tbl"><thead><tr>'
+      + '<th style="min-width:180px;">Product</th>'
+      + '<th style="width:130px;">Qty Received ' + tt('rd-qty') + '</th>'
+      + '<th style="width:140px;">Unit Price ' + tt('rd-price') + '</th>'
+      + '<th style="width:110px;">Extended</th>'
+      + '<th style="width:150px;"></th>'
+      + '</tr></thead><tbody id="rd-lines">' + this.lineHTML(++this._seq) + '</tbody></table></div>'
+      + '<button class="btn btn-ghost btn-sm" id="rd-add" type="button" style="margin-bottom:14px;">+ Add Line Item</button>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg" id="rd-count">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Price Changes</div><div class="calc-val lg" id="rd-changes">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Short Counts</div><div class="calc-val lg" id="rd-shorts">0</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Delivery Total</div><div class="calc-val lg" id="rd-total">$0.00</div></div>'
       + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
       + '<span id="rd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+      + '</div></div>';
 
-    // Hide the Open Order row until a vendor is picked.
+    this.container.innerHTML = '<div class="screen">' + detailsCard + linesCard + '</div>';
+
     const orderRow = document.getElementById('rd-order-row');
     if (orderRow) orderRow.style.display = 'none';
 
@@ -193,10 +194,9 @@ S.InventoryReceiveDelivery = {
     lines.addEventListener('input', onInput);
     lines.addEventListener('change', onInput);
     lines.addEventListener('click', ev => {
-      if (ev.target.closest('.rd-remove')) {
-        ev.target.closest('.rd-line').remove();
-        this.recalcTotal();
-      }
+      if (ev.target.closest('.rd-remove')) { this.removeLine(ev.target.closest('.rd-line')); return; }
+      const flagBtn = ev.target.closest('.rd-flag-btn');
+      if (flagBtn) this.openDiscrepancyModal(flagBtn.closest('.rd-line'));
     });
 
     document.getElementById('rd-add')?.addEventListener('click', () => {
@@ -204,17 +204,26 @@ S.InventoryReceiveDelivery = {
       this.recalcTotal();
     });
     document.getElementById('rd-save')?.addEventListener('click', () => this.save());
-    // Flag a line for discrepancy: opens an inline modal pre-filled with the
-    // line's ordered/delivered/agreed/invoiced data.
-    document.getElementById('rd-lines')?.addEventListener('click', (ev) => {
-      const flagBtn = ev.target.closest('.rd-flag-btn');
-      if (flagBtn) this.openDiscrepancyModal(flagBtn.closest('.rd-line'));
-    });
 
     this.container.onclick = null;
+    this.recalcTotal();
+  },
+
+  // Remove a line: drop its data row AND its flag sub-row; keep at least one.
+  removeLine(line) {
+    if (!line) return;
+    const lid = line.dataset.lid;
+    line.remove();
+    this.container.querySelector('.rd-flag-row[data-lid="' + lid + '"]')?.remove();
+    const lines = document.getElementById('rd-lines');
+    if (lines && this.container.querySelectorAll('.rd-line').length === 0) {
+      lines.insertAdjacentHTML('beforeend', this.lineHTML(++this._seq));
+    }
+    this.recalcTotal();
   },
 
   recalcLine(line) {
+    const lid   = line.dataset.lid;
     const qty   = parseFloat(line.querySelector('.rd-qty').value) || 0;
     const price = parseFloat(line.querySelector('.rd-price').value);
     const ext   = qty * (isNaN(price) ? 0 : price);
@@ -226,7 +235,8 @@ S.InventoryReceiveDelivery = {
     // cost-per-case. The Qty Received and Unit Price tooltips spell that out.
     const isCaseBeer = p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
 
-    const flag = line.querySelector('.rd-flag');
+    const flagRow = this.container.querySelector('.rd-flag-row[data-lid="' + lid + '"]');
+    const flag    = flagRow ? flagRow.querySelector('.rd-flag') : null;
     const flagBtn = line.querySelector('.rd-flag-btn');
     const messages = [];
     let hasPriceChange = false;
@@ -246,18 +256,15 @@ S.InventoryReceiveDelivery = {
     } else {
       line.dataset.shortCount = '';
     }
-    if (messages.length > 0) {
-      flag.style.display = '';
-      flag.style.color = 'var(--gold)';
-      flag.textContent = messages.join(' ');
-    } else {
-      flag.style.display = 'none';
-      flag.textContent = '';
+    if (flagRow && flag) {
+      if (messages.length > 0) { flagRow.style.display = ''; flag.textContent = messages.join(' '); }
+      else { flagRow.style.display = 'none'; flag.textContent = ''; }
     }
+    // Flagged lines highlight gold so they stand out down a long delivery.
+    line.style.background = messages.length > 0 ? 'var(--gold-tint)' : '';
 
-    // Show the Flag Discrepancy button when a real diff is detected, AND
-    // the line has not already been flagged. The "Discrepancy Logged" badge
-    // takes over once filed.
+    // Show the Flag button when a real diff is detected AND the line has not
+    // already been flagged. The "Logged" badge takes over once filed.
     const alreadyLogged = line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged';
     if (flagBtn) {
       flagBtn.style.display = (!alreadyLogged && (hasPriceChange || hasShortCount)) ? '' : 'none';
@@ -265,20 +272,16 @@ S.InventoryReceiveDelivery = {
   },
 
   recalcTotal() {
-    const lines = [...document.querySelectorAll('.rd-line')];
+    const lines = [...this.container.querySelectorAll('.rd-line')];
     let total = 0, count = 0, changes = 0, shorts = 0;
     lines.forEach(line => {
-      const ext = parseFloat(line.dataset.ext) || 0;
-      total += ext;
+      total += parseFloat(line.dataset.ext) || 0;
       const prod = line.querySelector('.rd-prod').value;
       const qty = parseFloat(line.querySelector('.rd-qty').value) || 0;
       if (prod && qty > 0) count++;
-      // Price-change vs short-count: distinguish by checking the data flag.
-      if (line.querySelector('.rd-flag').style.display !== 'none') {
-        const p = this.productById(prod);
-        const price = parseFloat(line.querySelector('.rd-price').value);
-        if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) changes++;
-      }
+      const p = this.productById(prod);
+      const price = parseFloat(line.querySelector('.rd-price').value);
+      if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) changes++;
       if (line.dataset.shortCount === '1') shorts++;
     });
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -404,47 +407,35 @@ S.InventoryReceiveDelivery = {
     const TYPES = ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'];
     const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === suggestedType ? ' selected' : '') + '>' + t + '</option>').join('');
 
-    const m = document.createElement('div');
-    m.id = 'rd-discrepancy-modal';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:620px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">File Discrepancy</div>'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="rd-disc-close">Close</button>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">File Discrepancy</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Fill this with what was wrong, then file it. The claim goes to Profit Recovery &rsaquo; Vendor Discrepancies for credit follow-up. Adjust the numbers if needed.</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="rd-disc-date" value="' + esc(date) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><select id="rd-disc-vendor">' + this._vendorOptionsForModal(vendor) + '</select></div>'
+        + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="rd-disc-ref" value="' + esc(invoice) + '"/></div>'
       + '</div>'
-      + '<div style="padding:20px 22px 24px;overflow-y:auto;">'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Fill this with what was wrong, then save. The discrepancy goes to Profit Recovery > Vendor Discrepancies for credit recovery follow-up. You can adjust the numbers if needed.</div>'
-        + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="rd-disc-date" value="' + esc(date) + '"/></div>'
-          + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><select id="rd-disc-vendor">' + this._vendorOptionsForModal(vendor) + '</select></div>'
-          + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="rd-disc-ref" value="' + esc(invoice) + '"/></div>'
-        + '</div>'
-        + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="flex:1;min-width:220px;"><label>Product</label><input type="text" id="rd-disc-product" value="' + esc(productName) + '"/></div>'
-          + '<div class="f" style="width:180px;"><label>Type</label><select id="rd-disc-type">' + typeOpts + '</select></div>'
-        + '</div>'
-        + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="width:100px;"><label>Units</label><input type="number" id="rd-disc-units" step="1" value="' + (hasShortCount ? (orderedQty - qty) : qty) + '"/></div>'
-          + '<div class="f" style="width:130px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
-          + '<div class="f" style="width:130px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-invoiced" step="0.01" value="' + (!isNaN(invoicedPrice) ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
-          + '<div class="f" style="width:150px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
-        + '</div>'
-        + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="flex:1;min-width:260px;"><label>Notes</label><input type="text" id="rd-disc-notes" placeholder="What was wrong, and who you contacted"/></div>'
-        + '</div>'
-        + '<div id="rd-disc-err" style="color:var(--red);font-size:12px;margin-bottom:10px;display:none;"></div>'
-        + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">'
-          + '<button type="button" id="rd-disc-cancel" class="btn btn-ghost">Cancel</button>'
-          + '<button type="button" id="rd-disc-file" class="btn btn-primary">File Discrepancy</button>'
-        + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="flex:1;min-width:220px;"><label>Product</label><input type="text" id="rd-disc-product" value="' + esc(productName) + '"/></div>'
+        + '<div class="f" style="width:180px;"><label>Type</label><select id="rd-disc-type">' + typeOpts + '</select></div>'
       + '</div>'
-    + '</div>';
-    document.body.appendChild(m);
-    const close = () => m.remove();
-    m.addEventListener('click', ev => { if (ev.target === m) close(); });
-    document.getElementById('rd-disc-close').addEventListener('click', close);
-    document.getElementById('rd-disc-cancel').addEventListener('click', close);
-    document.getElementById('rd-disc-file').addEventListener('click', () => this.saveDiscrepancy(line, close));
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:100px;"><label>Units</label><input type="number" id="rd-disc-units" step="1" value="' + (hasShortCount ? (orderedQty - qty) : qty) + '"/></div>'
+        + '<div class="f" style="width:130px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="width:130px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-invoiced" step="0.01" value="' + (!isNaN(invoicedPrice) ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="width:150px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:100%;"><label>Notes</label><input type="text" id="rd-disc-notes" placeholder="What was wrong, and who you contacted"/></div>'
+      + '</div>'
+      + '<div id="rd-disc-err" style="color:var(--red);font-size:12px;margin-bottom:6px;display:none;"></div>'
+      + '<div class="card-actions">'
+        + '<button type="button" id="rd-disc-file" class="btn btn-primary">File Discrepancy</button>'
+        + '<button type="button" id="rd-disc-cancel" class="btn btn-ghost">Cancel</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'rd-disc-modal', maxWidth: 640, noClose: true });
+    const close = () => App.closeModal('rd-disc-modal');
+    document.getElementById('rd-disc-cancel')?.addEventListener('click', close);
+    document.getElementById('rd-disc-file')?.addEventListener('click', () => this.saveDiscrepancy(line, close));
   },
 
   async saveDiscrepancy(line, closeFn) {
@@ -515,7 +506,7 @@ S.InventoryReceiveDelivery = {
       const prevPrice = p.unit_cost != null ? p.unit_cost : null;
       const unitPrice = isNaN(price) ? prevPrice : price;
       const changed = prevPrice != null && unitPrice != null && Math.abs(unitPrice - prevPrice) > 0.001;
-      if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice, prevPrice }); }
+      if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice, prevPrice, qty, alreadyFlagged: (line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged') }); }
       // Short count: ordered_qty came from the matched order (data attribute);
       // a delivered qty under the ordered qty flags this line for the
       // Vendor Discrepancy auto-fill in Phase 4.
@@ -552,10 +543,14 @@ S.InventoryReceiveDelivery = {
     // committing the new price to the product master. Unchecked changes stay
     // on the delivery record only.
     let appliedUpdates = productUpdates;
+    let disputedUpdates = [];
     if (productUpdates.length > 0) {
-      const selectedSet = await this._confirmPriceChanges(productUpdates);
-      if (selectedSet === null) return;  // operator cancelled the save
-      appliedUpdates = productUpdates.filter((_, i) => selectedSet.has(i));
+      const choice = await this._confirmPriceChanges(productUpdates);
+      if (choice === null) return;  // operator cancelled the save
+      appliedUpdates  = productUpdates.filter((_, i) => choice.apply.has(i));
+      // Disputed price changes auto-file a vendor discrepancy claim below
+      // (skip lines the operator already filed by hand during entry).
+      disputedUpdates = productUpdates.filter((u, i) => choice.dispute.has(i) && !u.alreadyFlagged);
     }
 
     const matchedOrderId = document.getElementById('rd-order')?.value || '';
@@ -630,16 +625,51 @@ S.InventoryReceiveDelivery = {
     const ok = okDel && okCfg && okOrd;
     if (ok) {
       App.markSetupDone('gs_ic_delivery');
-      this.renderDone(record);
+      const filed = await this._autoFileDisputes(disputedUpdates, { vendor, date: record.date, invoice: record.invoice_number });
+      this.renderDone(record, filed);
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Delivery'; }
       fail('Save failed. Try again.');
     }
   },
 
-  renderDone(record) {
+  // File a vendor discrepancy claim for each DISPUTED price change (the ones the
+  // operator chose not to accept as the new cost) so "dispute" actually files
+  // the claim in one step. Lands in Profit Recovery > Vendor Discrepancies.
+  async _autoFileDisputes(disputed, ctx) {
+    let filed = 0;
+    for (const u of (disputed || [])) {
+      const overcharge = Math.max(0, (u.newPrice - u.prevPrice) * (u.qty || 0));
+      const rec = {
+        id:             App.uid(),
+        date:           ctx.date,
+        vendor:         ctx.vendor,
+        reference:      ctx.invoice || '',
+        type:           'Price Overcharge',
+        sku:            u.product.name,
+        units:          u.qty || 0,
+        agreed_price:   u.prevPrice != null ? u.prevPrice : 0,
+        invoiced_price: u.newPrice != null ? u.newPrice : 0,
+        overcharge,
+        notes:          'Auto-filed from the delivery: price disputed, not accepted as the new cost.',
+        status:         'Open',
+        source:         'receive-delivery',
+        created_at:     new Date().toISOString()
+      };
+      const okR = await App.putRecord('core', 'vendor_discrepancy', rec);
+      if (okR) filed++;
+    }
+    return filed;
+  },
+
+  renderDone(record, disputesFiled) {
     const applied = record.price_change_applied_count || 0;
     const total   = record.price_change_count || 0;
+    const disputeLine = disputesFiled > 0
+      ? '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:8px;">'
+        + disputesFiled + ' disputed price change' + (disputesFiled === 1 ? '' : 's')
+        + ' filed as a vendor discrepancy &middot; follow up in Profit Recovery</div>'
+      : '';
     let priceLine = '';
     if (applied > 0) {
       priceLine = '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:8px;">'
@@ -658,7 +688,7 @@ S.InventoryReceiveDelivery = {
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">Delivery Recorded</div>'
       + '<div style="font-size:12px;color:var(--t3);">' + esc(record.vendor) + ' &middot; ' + record.item_count
       + ' line item' + (record.item_count === 1 ? '' : 's') + ' &middot; ' + App.fmtCurrency(record.total) + '</div>'
-      + priceLine
+      + priceLine + disputeLine
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;">'
       + '<button class="btn btn-ghost" id="rd-again">Receive Another</button>'
@@ -669,16 +699,12 @@ S.InventoryReceiveDelivery = {
     document.getElementById('rd-history')?.addEventListener('click', () => App.navigate('ic-delivery-history'));
   },
 
-  // Promise-based confirmation: returns null if operator cancelled, or a Set
-  // of indexes the operator confirmed to apply to the product master. The
-  // delivery itself still saves with the original per-line price either way;
-  // this only controls whether the new price becomes the new master cost.
+  // Promise-based: resolves null if cancelled, else { apply:Set, dispute:Set }
+  // of line indexes. Apply = make it the new master cost. Dispute = file a
+  // vendor discrepancy claim (auto-filed on save). Independent per line, so a
+  // disputed overcharge is "don't apply + file claim" in one screen.
   _confirmPriceChanges(updates) {
     return new Promise(resolve => {
-      const m = document.createElement('div');
-      m.id = 'rdp-modal';
-      m.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:rgba(0,0,0,0.65);';
-
       const rows = updates.map((u, i) => {
         const isCase = (u.product.category === 'Bottle Beer') && u.product.case_size && u.product.case_size > 0;
         const unit = isCase ? '/case' : '';
@@ -687,46 +713,32 @@ S.InventoryReceiveDelivery = {
         const color = up ? 'var(--red)' : 'var(--gold)';
         const delta = Math.abs(u.newPrice - u.prevPrice);
         const pct = u.prevPrice > 0 ? Math.round(delta / u.prevPrice * 100) : 0;
-        return '<label style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
-          + '<input type="checkbox" class="rdp-chk" data-idx="' + i + '" checked style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
-          + '<div style="flex:1;">'
+        const chk = (cls, label, checked) => '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;">'
+          + '<input type="checkbox" class="' + cls + '" data-idx="' + i + '"' + (checked ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;"/>' + label + '</label>';
+        return '<div style="padding:12px 0;border-bottom:1px solid var(--b2);">'
+          + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
             + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(u.product.name) + '</div>'
-            + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">'
-              + App.fmtCurrency(u.prevPrice) + unit + ' &rarr; '
-              + '<span style="color:' + color + ';font-weight:700;">' + App.fmtCurrency(u.newPrice) + unit + ' ' + arrow + ' ' + pct + '%</span>'
-            + '</div>'
+            + '<div style="font-size:11px;color:var(--t3);">' + App.fmtCurrency(u.prevPrice) + unit + ' &rarr; <span style="color:' + color + ';font-weight:700;">' + App.fmtCurrency(u.newPrice) + unit + ' ' + arrow + ' ' + pct + '%</span></div>'
           + '</div>'
-        + '</label>';
+          + '<div style="display:flex;gap:18px;margin-top:8px;">' + chk('rdp-apply', 'Apply as new cost', true) + chk('rdp-dispute', 'Dispute (file claim)', false) + '</div>'
+        + '</div>';
       }).join('');
 
-      m.innerHTML = '<div style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:520px;width:100%;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.55);">'
-        + '<div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:10px;">Update Product Master Costs?</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">'
-          + 'Bar Cop spotted ' + updates.length + ' price change' + (updates.length === 1 ? '' : 's') + ' on this delivery. '
-          + 'Apply the ones that should become the new cost from here on. Uncheck anything you plan to dispute, and file a discrepancy on those lines after saving.'
-        + '</div>'
-        + '<div style="max-height:320px;overflow-y:auto;margin-bottom:18px;">' + rows + '</div>'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
-          + '<div style="display:flex;gap:10px;">'
-            + '<button type="button" class="btn btn-ghost btn-sm" id="rdp-all">Check All</button>'
-            + '<button type="button" class="btn btn-ghost btn-sm" id="rdp-none">Uncheck All</button>'
-          + '</div>'
-          + '<div style="display:flex;gap:10px;">'
-            + '<button type="button" id="rdp-cancel" class="btn btn-ghost">Back to Edit</button>'
-            + '<button type="button" id="rdp-confirm" class="btn btn-primary">Save Delivery</button>'
-          + '</div>'
-        + '</div>'
-      + '</div>';
-
-      document.body.appendChild(m);
-      const close = result => { m.remove(); resolve(result); };
-      const setAll = val => { m.querySelectorAll('.rdp-chk').forEach(c => { c.checked = val; }); };
-      document.getElementById('rdp-all')?.addEventListener('click', () => setAll(true));
-      document.getElementById('rdp-none')?.addEventListener('click', () => setAll(false));
-      document.getElementById('rdp-cancel').addEventListener('click', () => close(null));
-      document.getElementById('rdp-confirm').addEventListener('click', () => {
-        const checked = [...m.querySelectorAll('.rdp-chk:checked')].map(c => parseInt(c.dataset.idx, 10));
-        close(new Set(checked));
+      const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Price Changes on This Delivery</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:6px;">Bar Cop spotted ' + updates.length + ' price change' + (updates.length === 1 ? '' : 's') + '. For each, keep <strong>Apply</strong> to make it your new cost, and check <strong>Dispute</strong> to file a vendor discrepancy claim for the overcharge.</div>'
+        + '<div style="max-height:48vh;overflow-y:auto;">' + rows + '</div>'
+        + '<div class="card-actions">'
+        + '<button type="button" id="rdp-confirm" class="btn btn-primary">Save Delivery</button>'
+        + '<button type="button" id="rdp-cancel" class="btn btn-ghost">Back to Edit</button>'
+        + '</div></div>';
+      App.openModal(html, { id: 'rdp-modal', maxWidth: 560, noClose: true });
+      const collect = cls => new Set([...document.querySelectorAll('.' + cls + ':checked')].map(c => parseInt(c.dataset.idx, 10)));
+      document.getElementById('rdp-cancel')?.addEventListener('click', () => { App.closeModal('rdp-modal'); resolve(null); });
+      document.getElementById('rdp-confirm')?.addEventListener('click', () => {
+        const apply = collect('rdp-apply');
+        const dispute = collect('rdp-dispute');
+        App.closeModal('rdp-modal');
+        resolve({ apply, dispute });
       });
     });
   }
