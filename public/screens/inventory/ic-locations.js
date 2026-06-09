@@ -96,26 +96,40 @@ S.InventoryLocations = {
   // ── Shared: category tabs + checklist + bulk controls ──────────────────────
   catTabsHTML(activeCat, countFn, cats) {
     cats = cats || ['All', ...this.presentCats()];
-    return '<div class="rpt-tabs">'
+    return '<div class="ch-tabs">'
       + cats.map(c => {
           const on = c === activeCat;
           const n = countFn(c);
-          return '<button class="rpt-tab' + (on ? ' on' : '') + '" data-cat="' + esc(c) + '">'
+          return '<button class="ch-tab' + (on ? ' on' : '') + '" data-cat="' + esc(c) + '">'
             + esc(c) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
         }).join('')
       + '</div>';
   },
+  // A flat checklist on the form canvas (no nested card). Name + brand + size so a
+  // row is identifiable, with the category right-aligned.
   checklistPanelHTML(prods, checkedSet, cbClass, emptyMsg) {
     if (!prods.length) {
-      return '<div class="rpt-panel" style="font-size:12px;color:var(--t4);">' + emptyMsg + '</div>';
+      return '<div style="font-size:12px;color:var(--t4);padding:8px 0;">' + emptyMsg + '</div>';
     }
-    return '<div class="rpt-panel" style="padding:0;overflow:hidden;">'
-      + '<div style="max-height:280px;overflow:auto;">'
-      + prods.map(p => '<label style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
+    return '<div style="max-height:280px;overflow:auto;border-top:1px solid var(--b1);">'
+      + prods.map(p => '<label style="display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
           + '<input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:15px;height:15px;"/>'
-          + '<span style="flex:1;">' + esc(p.name) + '</span>'
-          + '<span style="font-size:10px;color:var(--t3);">' + esc(p.category || '') + '</span></label>').join('')
-      + '</div></div>';
+          + '<span style="flex:1;min-width:0;">' + esc(p.name)
+            + (p.brand ? ' <span style="color:var(--t3);">' + esc(p.brand) + '</span>' : '') + '</span>'
+          + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(this.sizeLabel(p)) + '</span>'
+          + '<span style="font-size:10px;color:var(--t3);min-width:78px;text-align:right;">' + esc(p.category || '') + '</span></label>').join('')
+      + '</div>';
+  },
+
+  // Human size for a product, matching the Products list: container-size label for
+  // pourables/beer, unit type for food/misc.
+  sizeLabel(p) {
+    if (!p) return '-';
+    if (p.category === 'Food' || p.category === 'Misc') return p.unit_type || '-';
+    const SIZES = (window.S && S.InventoryProducts && S.InventoryProducts.SIZES) || [];
+    const sz = SIZES.find(s => s.oz === p.container_size_oz);
+    if (sz) return sz.l;
+    return p.container_size_oz != null ? p.container_size_oz + ' oz' : '-';
   },
 
   // Per-context handles so the bulk helpers (select-all / clear / copy-from) work
@@ -285,7 +299,7 @@ S.InventoryLocations = {
 
   wireList() {
     this.container.onclick = ev => {
-      const tab = ev.target.closest('.rpt-tab');
+      const tab = ev.target.closest('.ch-tab');
       if (tab) {
         this.newCat = tab.dataset.cat;
         const el = document.getElementById('il-new-filter');
@@ -377,7 +391,6 @@ S.InventoryLocations = {
       + '</div>'
       + '<div class="card-actions" style="align-items:center;">'
         + '<button class="btn btn-primary" id="il-save">Update Name</button>'
-        + '<button class="btn btn-ghost" id="il-cancel">Back to Locations</button>'
         + '<span id="il-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
@@ -385,14 +398,16 @@ S.InventoryLocations = {
       + (assigned.length ? '<div style="font-size:11px;color:var(--t3);margin:0 0 10px;">Drag the &#x2630; handle to set the order Take Inventory counts these in.</div>' : '');
     const arrangeCard = assigned.length
       ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th></th>'
+          + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th style="text-align:right;"></th>'
           + '</tr></thead><tbody id="il-arrange-body">'
           + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
               + DragReorder.handleCellHTML()
               + '<td style="color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
               + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
               + '<td>' + esc(p.category || '-') + '</td>'
-              + '<td><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
+              + '<td>' + esc(this.sizeLabel(p)) + '</td>'
+              + '<td>' + esc(p.vendor || '-') + '</td>'
+              + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
               + '</tr>').join('')
           + '</tbody></table></div></div>'
       : '<div style="font-size:12px;color:var(--t3);margin-bottom:4px;">No products here yet. Check products below to add them.</div>';
@@ -428,7 +443,7 @@ S.InventoryLocations = {
 
   wireEdit(l) {
     this.container.onclick = ev => {
-      const tab = ev.target.closest('.rpt-tab');
+      const tab = ev.target.closest('.ch-tab');
       if (tab) {
         this.editCat = tab.dataset.cat;
         const el = document.getElementById('il-edit-filter');
@@ -437,7 +452,6 @@ S.InventoryLocations = {
       }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
       const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx(cl.dataset.ctx); return; }
-      if (ev.target.closest('#il-cancel'))      { this.editId = null; this.renderList(); return; }
       if (ev.target.closest('#il-save'))        { this.saveLocationEdit(l.id); return; }
       if (ev.target.closest('#il-add-checked')) { this.addCheckedProducts(l.name); return; }
       const rm = ev.target.closest('.il-remove'); if (rm) { this.removeProduct(l.name, rm.dataset.id); return; }
@@ -555,7 +569,7 @@ S.InventoryLocations = {
     const m = document.getElementById('il-triage');
     if (!m) return;
     m.onclick = ev => {
-      const tab = ev.target.closest('.rpt-tab');
+      const tab = ev.target.closest('.ch-tab');
       if (tab) { this.triageCat = tab.dataset.cat; const el = document.getElementById('il-triage-filter'); if (el) el.innerHTML = this.triageFilterHTML(); return; }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx('triage'); return; }
       const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx('triage'); return; }
