@@ -24,6 +24,17 @@ S.InventoryVendors = {
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   vendorProducts(name) { return this.products().filter(p => p.vendor === name); },
 
+  // Human size for a product (container-size label for pourables/beer, unit type
+  // for food/misc), matching the Products list.
+  sizeLabel(p) {
+    if (!p) return '-';
+    if (p.category === 'Food' || p.category === 'Misc') return p.unit_type || '-';
+    const SIZES = (window.S && S.InventoryProducts && S.InventoryProducts.SIZES) || [];
+    const sz = SIZES.find(s => s.oz === p.container_size_oz);
+    if (sz) return sz.l;
+    return p.container_size_oz != null ? p.container_size_oz + ' oz' : '-';
+  },
+
   // ── Entry ────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
@@ -74,7 +85,7 @@ S.InventoryVendors = {
         const n = this.vendorProducts(v.name).length;
         return '<tr>'
           + '<td><button class="iv-open" data-id="' + v.id + '" '
-          + 'style="padding:0;border:none;background:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer;">'
+          + 'style="padding:0;border:none;background:none;color:var(--t1);font-weight:700;font-size:13px;cursor:pointer;">'
           + esc(v.name) + '</button></td>'
           + '<td>' + esc(v.rep || '-') + '</td>'
           + '<td>' + esc(v.phone || '-') + '</td>'
@@ -163,10 +174,13 @@ S.InventoryVendors = {
         + 'Set the Primary Vendor field on a product in the Products screen.</div>';
     }
     return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Category</th><th>Unit Cost</th>'
+      + '<th>Product</th><th>Category</th><th>Size</th><th>Par</th><th>Unit Cost</th>'
       + '</tr></thead><tbody>'
-      + prods.map(p => '<tr><td><div class="val">' + esc(p.name) + '</div></td>'
+      + prods.map(p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
+          + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
           + '<td>' + esc(p.category || '-') + '</td>'
+          + '<td>' + esc(this.sizeLabel(p)) + '</td>'
+          + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
           + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>').join('')
       + '</tbody></table></div></div>';
   },
