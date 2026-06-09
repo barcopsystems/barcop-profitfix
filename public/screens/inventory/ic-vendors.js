@@ -7,8 +7,8 @@
 
    Landing-form pattern: the add form (all vendor fields on one row + notes, one
    Save) lives on the landing above the vendor list. Editing a vendor opens its
-   own page — the same form, plus the Products-from-this-Vendor and Recent Price
-   Changes cards. Cancel exits to landing. */
+   own page (not a popup — it lists the products + recent price changes for the
+   vendor). Return to the list via the sidebar. */
 
 S.InventoryVendors = {
   editId: null,
@@ -56,7 +56,7 @@ S.InventoryVendors = {
       + '<div class="f" style="flex:1 1 100px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
       + '</div>'
       + '<div class="form-row" style="margin-top:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="iv-notes" rows="2" placeholder="Optional">' + esc(v?.notes || '') + '</textarea></div></div>';
+      + '<textarea id="iv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(v?.notes || '') + '</textarea></div></div>';
   },
 
   // ── Landing: add form on top, vendor list below ────────────────────────────
@@ -85,8 +85,8 @@ S.InventoryVendors = {
           + '<button class="btn btn-ghost btn-sm iv-del" data-id="' + v.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      listSection = '<div class="card" style="margin-top:18px;"><div class="card-title">Your Vendors</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listSection = '<div class="sh" style="margin-top:24px;">Your Vendors</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Vendor</th><th>Rep</th><th>Phone</th><th>Terms</th><th>Products</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
@@ -96,29 +96,25 @@ S.InventoryVendors = {
   },
 
   addFormCard() {
-    return '<div class="card">'
-      + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor', App.helpButton('iv-how'))
+    return '<div class="card form-card">'
+      + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
       + '<div class="collapse-body">'
       + this.formFieldsHTML(null)
-      + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
+      + '<div class="card-actions" style="align-items:center;">'
         + '<button class="btn btn-primary" id="iv-save">Save Vendor</button>'
-        + '<button class="btn btn-ghost" id="iv-clear">Clear</button>'
         + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
   },
 
   wireList() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#iv-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       const save = ev.target.closest('#iv-save');
-      const clr  = ev.target.closest('#iv-clear');
       const open = ev.target.closest('.iv-open');
       const edit = ev.target.closest('.iv-edit');
       const del  = ev.target.closest('.iv-del');
       if (save)      this.saveVendor();
-      else if (clr)  this.renderList();
       else if (open) this.openEdit(open.dataset.id);
       else if (edit) this.openEdit(edit.dataset.id);
       else if (del)  this.confirmDel(del.dataset.id);
@@ -139,40 +135,41 @@ S.InventoryVendors = {
       + this.renderPriceHistoryCard(prods)
       + '</div>';
     this.wireEdit();
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
   },
 
   editCard(v) {
-    return '<div class="card">'
-      + '<div class="card-title">Editing ' + esc(v.name) + '</div>'
+    return '<div class="card form-card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Editing ' + esc(v.name) + '</span>'
+        + '<span style="display:flex;align-items:center;gap:10px;">'
+          + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;text-transform:none;letter-spacing:0;font-weight:400;"></span>'
+          + '<button class="btn btn-primary btn-sm" id="iv-save">Update Vendor</button>'
+        + '</span>'
+      + '</div>'
       + this.formFieldsHTML(v)
-      + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
-        + '<button class="btn btn-primary" id="iv-save">Update Vendor</button>'
-        + '<button class="btn btn-ghost" id="iv-cancel">Cancel</button>'
-        + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div>';
   },
 
   wireEdit() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#iv-cancel')) { this.editId = null; this.renderList(); return; }
-      if (ev.target.closest('#iv-save'))   { this.saveVendor(); return; }
+      if (ev.target.closest('#iv-save')) { this.saveVendor(); return; }
     };
-    document.getElementById('iv-name')?.focus();
   },
 
   renderProductsCard(prods) {
-    return '<div class="card"><div class="card-title">Products from this Vendor</div>'
-      + (prods.length === 0
-          ? '<div style="font-size:12px;color:var(--t3);">No products are linked to this vendor yet. '
-            + 'Set the Primary Vendor field on a product in the Products screen.</div>'
-          : '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-            + '<th>Product</th><th>Category</th><th>Unit Cost</th>'
-            + '</tr></thead><tbody>'
-            + prods.map(p => '<tr><td><div class="val">' + esc(p.name) + '</div></td>'
-                + '<td>' + esc(p.category || '-') + '</td>'
-                + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>').join('')
-            + '</tbody></table></div>')
-      + '</div>';
+    const heading = '<div class="sh" style="margin-top:24px;">Products from this Vendor</div>';
+    if (prods.length === 0) {
+      return heading + '<div style="font-size:12px;color:var(--t3);">No products are linked to this vendor yet. '
+        + 'Set the Primary Vendor field on a product in the Products screen.</div>';
+    }
+    return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Product</th><th>Category</th><th>Unit Cost</th>'
+      + '</tr></thead><tbody>'
+      + prods.map(p => '<tr><td><div class="val">' + esc(p.name) + '</div></td>'
+          + '<td>' + esc(p.category || '-') + '</td>'
+          + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>').join('')
+      + '</tbody></table></div></div>';
   },
 
   renderPriceHistoryCard(prods) {
@@ -196,7 +193,7 @@ S.InventoryVendors = {
       if (oldC == null || newC == null) return '-';
       const delta = newC - oldC;
       const pct = oldC > 0 ? (delta / oldC) * 100 : 0;
-      const sign = delta >= 0 ? '+' : '';
+      const sign = delta > 0 ? '+' : '';
       const cls = delta > 0 ? 'neg' : delta < 0 ? 'pos' : '';
       return '<span class="' + cls + '">' + sign + App.fmtCurrency(delta) + ' (' + sign + pct.toFixed(1) + '%)</span>';
     };
@@ -206,24 +203,24 @@ S.InventoryVendors = {
       return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
-    return '<div class="card"><div class="card-title">Recent Price Changes</div>'
-      + (recent.length === 0
-        ? '<div style="font-size:12px;color:var(--t3);">No price changes recorded yet for this vendor. '
-          + 'Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</div>'
-        : '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-          + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
-          + '</tr></thead><tbody>'
-          + recent.map(r => '<tr>'
-            + '<td>' + fmtDate(r.date) + '</td>'
-            + '<td><div class="val">' + esc(r.product) + '</div>'
-            + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
-            + '<td>' + (r.old_cost != null ? App.fmtCurrency(r.old_cost) : '-') + '</td>'
-            + '<td>' + (r.new_cost != null ? App.fmtCurrency(r.new_cost) : '-') + '</td>'
-            + '<td class="val">' + fmtDelta(r.old_cost, r.new_cost) + '</td>'
-            + '</tr>').join('')
-          + '</tbody></table></div>'
-          + '<div style="font-size:10px;color:var(--t3);margin-top:8px;">Same data feeds Profit Recovery Vendor Watch and the Vendor Scorecard.</div>')
-      + '</div>';
+    const heading = '<div class="sh" style="margin-top:24px;">Recent Price Changes</div>';
+    if (recent.length === 0) {
+      return heading + '<div style="font-size:12px;color:var(--t3);">No price changes recorded yet for this vendor. '
+        + 'Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</div>';
+    }
+    return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
+      + '</tr></thead><tbody>'
+      + recent.map(r => '<tr>'
+        + '<td>' + fmtDate(r.date) + '</td>'
+        + '<td><div class="val">' + esc(r.product) + '</div>'
+        + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
+        + '<td>' + (r.old_cost != null ? App.fmtCurrency(r.old_cost) : '-') + '</td>'
+        + '<td>' + (r.new_cost != null ? App.fmtCurrency(r.new_cost) : '-') + '</td>'
+        + '<td class="val">' + fmtDelta(r.old_cost, r.new_cost) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table></div></div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:8px;">Same data feeds Profit Recovery Vendor Watch and the Vendor Scorecard.</div>';
   },
 
   async saveVendor() {
