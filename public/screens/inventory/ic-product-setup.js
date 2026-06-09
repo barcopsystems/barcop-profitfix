@@ -468,10 +468,9 @@ S.InventoryProducts = {
     const v = (val) => val != null && val !== '' ? val : '';
     const isActive = p ? p.active !== false : true;
 
-    // ── Header: title left (white), Active toggle right (edit mode) ────────
-    const titleHTML = this.editId
-      ? '<div style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;text-align:left;">Editing ' + esc(cat) + ' Product</div>'
-      : '<div style="font-size:15px;font-weight:800;color:var(--w);letter-spacing:0.5px;text-transform:uppercase;text-align:left;">New ' + esc(spec.title) + ' Product</div>';
+    // ── Header: standard form-card title; the Active toggle sits across from
+    // the title on the right (edit mode only). ─────────────────────────────────
+    const titleText = this.editId ? 'Editing ' + esc(cat) + ' Product' : 'New ' + esc(spec.title) + ' Product';
 
     const statusHTML = this.editId
       ? '<div style="display:flex;align-items:center;gap:10px;">'
@@ -488,8 +487,8 @@ S.InventoryProducts = {
       + '</div>'
       : '';
 
-    const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:14px;">'
-      + titleHTML
+    const header = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
+      + '<span>' + titleText + '</span>'
       + statusHTML
     + '</div>';
 
@@ -497,15 +496,15 @@ S.InventoryProducts = {
     // Auto-fit grid: fits all five on one row on wide screens and wraps/stacks
     // cleanly on narrow screens instead of overflowing the form container.
     const row1 = '<div class="form-grid" style="align-items:start;">'
-      + '<div class="f"><label>Product Name ' + tt('ic-product-name') + '</label>'
+      + '<div class="f"><label>Product Name</label>'
       + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
-      + '<div class="f"><label>Brand ' + tt('ic-brand') + '</label>'
+      + '<div class="f"><label>Brand</label>'
       + '<input type="text" id="ip-brand" value="' + esc(p?.brand || '') + '" placeholder="' + esc(this._brandPlaceholder(cat)) + '"/></div>'
-      + '<div class="f"><label>Sub-Category ' + tt('ic-subcategory') + '</label>'
+      + '<div class="f"><label>Sub-Category</label>'
       + '<input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>'
-      + '<div class="f"><label>Primary Vendor ' + tt('ic-primary-vendor') + '</label>'
+      + '<div class="f"><label>Primary Vendor</label>'
       + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
-      + '<div class="f"><label>Primary Location ' + tt('ic-primary-location') + '</label>'
+      + '<div class="f"><label>Primary Location</label>'
       + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
     + '</div>';
 
@@ -516,19 +515,19 @@ S.InventoryProducts = {
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
       const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
       row2 = '<div class="form-row" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + ' ' + tt(spec.sizeTT) + '</label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + ' ' + tt(spec.pourTT || 'std-pour') + '</label>'
+        + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + '</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz) + '" step="0.25" placeholder="e.g. ' + spec.defaultPour + '"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>' + 'Menu Price' + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>' + 'Menu Price' + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-reorder-point') + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
       + '</div>';
     } else if (spec.showCaseSize) {
@@ -536,19 +535,19 @@ S.InventoryProducts = {
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
       const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
       row2 = '<div class="form-row" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + ' ' + tt(spec.sizeTT) + '</label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Case Size ' + tt('ic-case-size') + '</label>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Case Size</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + 'Menu Price' + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + 'Menu Price' + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-reorder-point') + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
       + '</div>';
     } else if (spec.showUnitType) {
@@ -556,15 +555,15 @@ S.InventoryProducts = {
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
       row2 = '<div class="form-row" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type ' + tt('ic-unit-type') + '</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
         + '<div class="f" id="ip-uw" style="width:140px;flex-shrink:0;' + (isCustomUnit ? '' : 'display:none;') + '"><label>Custom Unit</label>'
         + '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-reorder-point') + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
       + '</div>';
     }
@@ -575,25 +574,23 @@ S.InventoryProducts = {
     let calcStrip = '';
     if (spec.showCalcStrip) {
       const slot1Label = spec.calc1Label || (spec.showCaseSize ? 'Btls / Case' : 'Pours / Container');
-      const slot1TT    = spec.showCaseSize ? 'ic-bottles-per-case' : 'ic-pours-container';
       const slot2Label = spec.calc2Label || (spec.showCaseSize ? 'Cost / Btl' : 'Cost / Pour');
-      const slot2TT    = spec.showCaseSize ? 'ic-cost-per-bottle-calc' : 'cost-pour';
       calcStrip = '<div class="calc" style="margin-top:18px;">'
-        + '<div class="calc-item"><div class="calc-label">' + esc(slot1Label) + ' ' + tt(slot1TT) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">' + esc(slot2Label) + ' ' + tt(slot2TT) + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Pour Cost % ' + tt('pour-cost-pct') + '</div><div class="calc-val" id="ip-pct">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">' + esc(slot1Label) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">' + esc(slot2Label) + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Pour Cost %</div><div class="calc-val" id="ip-pct">-</div></div>'
       + '</div>';
     }
 
     // ── Notes ─────────────────────────────────────────────────────────────
     const notes = '<div class="form-row" style="gap:14px;margin-top:14px;">'
-      + '<div class="f" style="width:100%;"><label>Notes ' + tt('ic-notes') + '</label>'
-      + '<textarea id="ip-notes" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div>'
+      + '<div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="ip-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div>'
     + '</div>';
 
     const servingBlock = spec.showServingSizes ? this.servingSizesBlockHTML(p, spec) : '';
 
-    const formCard = '<div class="card">'
+    const formCard = '<div class="card form-card">'
       + header
       + row1
       + row2
@@ -800,8 +797,8 @@ S.InventoryProducts = {
     const sizes = Array.isArray(p?.serving_sizes) ? p.serving_sizes : [];
     const rows = sizes.map((s, i) => this.servingRowHTML(s, i)).join('');
     return '<div style="margin-top:18px;border-top:1px solid var(--b2);padding-top:14px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
-        + '<label style="margin:0;">Other Sizes Sold ' + tt(spec.servingTT || 'ic-serving-sizes') + '</label>'
+      + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">'
+        + '<label style="margin:0;">Other Sizes Sold</label>'
         + '<button type="button" class="btn btn-ghost btn-sm" id="vss-add">+ Add a size</button>'
       + '</div>'
       + '<div id="vss-list">' + rows + '</div></div>';
