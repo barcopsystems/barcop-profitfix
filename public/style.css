@@ -35,7 +35,7 @@
   --t4:        rgba(255,255,255,0.22);
   --b1:        rgba(255,255,255,0.15);
   --b2:        rgba(255,255,255,0.06);
-  --b-edge:    #283A46;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
+  --b-edge:    #16252E;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
 
   --r:  4px;
   --r2: 3px;
