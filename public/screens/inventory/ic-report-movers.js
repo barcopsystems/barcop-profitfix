@@ -4,19 +4,19 @@
    Velocity: fast and slow movers ranked by DOLLARS (so a cheap high-volume item
    and a pricey low-volume one compare fairly), trend versus the prior period,
    and usage spend by vendor. The only home for rankings — on-hand value lives in
-   the Stock Report, raw consumption in the Usage Report. */
+   the Stock Report, raw consumption in the Usage Report.
+
+   Tabbed shell mirrors Labor Tip History: a .ch-tabs switcher over a stats
+   card, a Filter heading with Export, the controls-only filter card, then the
+   data card. Help lives on the nav "i" (see [[help-model]]); showHowTo is its
+   content. */
 
 S.InventoryMoversReport = {
   tab: 'fast',
   endCountId: null,
   catFilter: '',
 
-  TABS: [
-    ['fast','Fast Movers','rpt-m-fast'],
-    ['slow','Slow Movers','rpt-m-slow'],
-    ['trend','Trend vs Prior','rpt-m-trend'],
-    ['vendor','Vendor Spend','rpt-m-vendor']
-  ],
+  TABS: [['fast', 'Fast Movers'], ['slow', 'Slow Movers'], ['trend', 'Trend vs Prior'], ['vendor', 'Vendor Spend']],
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
@@ -27,6 +27,13 @@ S.InventoryMoversReport = {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  },
+  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs).
+  qtyU(p, n) {
+    if (n == null || isNaN(n)) return '-';
+    const u = p ? App.unitAbbr(App.productUnit(p)) : '';
+    const num = (Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1);
+    return u ? (num + ' ' + u) : num;
   },
 
   // "Used" floored at zero, in each product's container unit. usageCost drives
@@ -63,6 +70,26 @@ S.InventoryMoversReport = {
     ]);
   },
 
+  // ── shared markup helpers (mirror Tip History) ──────────────────────────────
+  tabBar() {
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
+      + '</div>';
+  },
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  note(text) {
+    return '<div class="card"><div style="font-size:12px;color:var(--t3);padding:8px 0;">' + esc(text) + '</div></div>';
+  },
+
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -88,32 +115,37 @@ S.InventoryMoversReport = {
     const cur = pairs[idx];
     const prior = idx > 0 ? pairs[idx - 1] : null;
 
+    const allRows = this.computeForPair(cur.startC, cur.endC);
+    const fRows = this.byCat(allRows);
+    const moved = fRows.filter(r => r.usageCost > 0);
+    const totalCost = moved.reduce((s, r) => s + r.usageCost, 0);
+    const vendors = new Set(moved.map(r => (r.product && r.product.vendor) || 'Unassigned')).size;
+    const statsCard = this.statsCard(
+      this.statItem('Usage Cost', App.fmtCurrency(totalCost))
+      + this.statItem('Products Moved', moved.length)
+      + this.statItem('Vendors', vendors));
+
     const periodOpts = pairs.map((p, i) =>
       '<option value="' + p.endC.id + '"' + (i === idx ? ' selected' : '') + '>'
       + this.fmtDate(p.startC.date) + ' &rarr; ' + this.fmtDate(p.endC.date) + '</option>').reverse().join('');
-    const allRows = this.computeForPair(cur.startC, cur.endC);
     const cats = [...new Set(allRows.map(r => r.category).filter(Boolean))].sort();
     const catOpts = '<option value="">All categories</option>'
       + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
 
-    const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Movement Report</span>'
-      + App.helpButton('mv-how') + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:260px;"><label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div>'
-      + '<div class="f" style="width:180px;"><label>Category</label><select id="mv-cat">' + catOpts + '</select></div>'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Movement</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mv-export">Export PDF</button></div></div>';
+    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
+      + '<div class="f" style="width:230px;flex-shrink:0;"><label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div>'
+      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Category</label><select id="mv-cat">' + catOpts + '</select></div>'
       + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + controls
-      + App.reportTabBar(this.TABS, this.tab)
-      + App.reportPanel(this.TABS, this.tab, 'mv-export', this.body(cur, prior)) + '</div>';
+    this.container.innerHTML = '<div class="screen">'
+      + this.tabBar() + statsCard + filterHeading + filterCard + this.body(cur, prior) + '</div>';
 
     this.container.onclick = ev => {
-      const how = ev.target.closest('#mv-how');
-      const exp = ev.target.closest('#mv-export');
-      const tab = ev.target.closest('.rpt-tab');
-      if (how) { this.showHowTo(); return; }
-      if (exp) { App.exportPDF({ title: 'Movement Report', root: this.container }); return; }
+      if (ev.target.closest('#mv-export')) { App.exportPDF({ title: 'Movement Report', root: this.container }); return; }
+      const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('mv-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
@@ -129,11 +161,12 @@ S.InventoryMoversReport = {
   },
 
   tabRank(rows, desc) {
-    // Only products that actually moved (real dollar usage). A product with
-    // zero usage is dead stock, not a slow mover — see the Stock Report.
+    const headers = '<th>Product</th><th>Usage Cost</th><th>Units Used</th>';
+    // Only products that actually moved (real dollar usage). Zero usage is dead
+    // stock, not a slow mover — see the Stock Report.
     const ranked = [...rows].filter(r => r.usageCost != null && r.usageCost > 0)
       .sort((a, b) => desc ? b.usageCost - a.usageCost : a.usageCost - b.usageCost).slice(0, 10);
-    if (!ranked.length) return this.emptyBody();
+    if (!ranked.length) return this.dataCard(headers, '<tr><td colspan="3" style="color:var(--t3);padding:12px 8px;">No products moved in this period and filter. Both counts must include the same products.</td></tr>');
     const max = Math.max(...ranked.map(r => Math.abs(r.usageCost)), 1);
     const body = ranked.map(r => {
       const pct = Math.min(100, Math.abs(r.usageCost) / max * 100);
@@ -143,14 +176,13 @@ S.InventoryMoversReport = {
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
         + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div>'
         + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + App.fmtCurrency(r.usageCost) + '</span></div></td>'
-        + '<td>' + esc(App.qtyWithUnit(r.product, r.used)) + '</td></tr>';
+        + '<td>' + this.qtyU(r.product, r.used) + '</td></tr>';
     }).join('');
-    return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Usage Cost</th><th>Units Used</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    return this.dataCard(headers, body);
   },
 
   tabVendor(rows) {
+    const headers = '<th>Vendor</th><th>Products</th><th></th><th>Usage Cost</th><th>% of Total</th>';
     const byVendor = {};
     rows.forEach(r => {
       const v = (r.product && r.product.vendor) || 'Unassigned';
@@ -159,7 +191,7 @@ S.InventoryMoversReport = {
     });
     const list = Object.keys(byVendor).map(v => ({ vendor: v, ...byVendor[v] }))
       .filter(x => x.cost > 0).sort((a, b) => b.cost - a.cost);
-    if (!list.length) return this.emptyBody();
+    if (!list.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No usage cost to attribute in this period and filter.</td></tr>');
     const total = list.reduce((s, x) => s + x.cost, 0);
     const max = list[0].cost || 1;
     const body = list.map(x => {
@@ -172,18 +204,11 @@ S.InventoryMoversReport = {
         + '<td class="val">' + App.fmtCurrency(x.cost) + '</td>'
         + '<td>' + (total ? (x.cost / total * 100).toFixed(1) : '0.0') + '%</td></tr>';
     }).join('');
-    return '<div class="calc" style="margin-bottom:14px;"><div class="calc-item">'
-      + '<div class="calc-label">Total Usage Cost</div><div class="calc-val good">' + App.fmtCurrency(total) + '</div></div></div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Vendor</th><th>Products</th><th>Spend</th><th>Usage Cost</th><th>% of Total</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    return this.dataCard(headers, body);
   },
 
   tabTrend(curRows, prior) {
-    if (!prior) {
-      return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-        + 'Trend needs a prior count period. Submit a third count to compare two periods.</div>';
-    }
+    if (!prior) return this.note('Trend needs a prior count period. Submit a third count to compare two periods.');
     const priorRows = this.byCat(this.computeForPair(prior.startC, prior.endC));
     const priorMap = {};
     priorRows.forEach(r => priorMap[r.pid] = r.used);
@@ -191,27 +216,22 @@ S.InventoryMoversReport = {
       const prev = priorMap[r.pid];
       const change = prev != null ? r.used - prev : null;
       const changePct = prev ? change / prev * 100 : null;
-      return { name: r.name, category: r.category, unit: App.productUnit(r.product), prev: prev != null ? prev : null, cur: r.used, change, changePct };
+      return { name: r.name, unit: App.unitAbbr(App.productUnit(r.product)), prev: prev != null ? prev : null, cur: r.used, change, changePct };
     }).sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
-    if (!rows.length) return this.emptyBody();
+    const headers = '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>';
+    if (!rows.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No products moved in this period and filter.</td></tr>');
+    // Direction shown by an arrow + sign; usage going up or down is an observation
+    // to read, not inherently good or bad, so the value stays neutral (no color).
     const body = rows.map(r => {
       const arrow = r.change == null ? '' : r.change > 0.05 ? '&#9650; ' : r.change < -0.05 ? '&#9660; ' : '';
-      const cls = r.change == null ? '' : r.change > 0.05 ? 'pos' : r.change < -0.05 ? 'neg' : '';
       const u = r.unit ? ' ' + r.unit : '';
       return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + (r.prev != null ? esc(r.prev.toFixed(1) + u) : '<span style="color:var(--t4);">new</span>') + '</td>'
         + '<td>' + esc(r.cur.toFixed(1) + u) + '</td>'
-        + '<td class="' + cls + '">' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
-        + '<td class="' + cls + '">' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
+        + '<td>' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
+        + '<td>' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
         + '</tr>';
     }).join('');
-    return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  emptyBody() {
-    return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-      + 'No products moved in this period and filter. Both counts must include the same products.</div>';
+    return this.dataCard(headers, body);
   }
 };
