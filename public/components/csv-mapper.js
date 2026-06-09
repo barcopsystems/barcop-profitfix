@@ -22,7 +22,8 @@ const CSVMapper = {
       + '<div class="csvm-drop" style="border:1.5px dashed var(--b1);border-radius:8px;padding:40px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--input);">'
         + '<div style="pointer-events:none;">'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + (opts.dropTitle ? esc(opts.dropTitle) : 'Drop your file here') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
+        + (opts.dropSub ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:12px;">' + opts.dropSub + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--t3);margin-top:' + (opts.dropSub ? '12px' : '5px') + ';">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
         + '</div></div>'
       + '<input type="file" class="csvm-file" accept=".csv,.xlsx,.xls" style="display:none;"/>'
       + '<div class="csvm-area"></div>';
