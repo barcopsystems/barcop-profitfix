@@ -140,20 +140,19 @@ S.InventoryVendors = {
 
   editCard(v) {
     return '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Editing ' + esc(v.name) + '</span>'
-        + '<span style="display:flex;align-items:center;gap:10px;">'
-          + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;text-transform:none;letter-spacing:0;font-weight:400;"></span>'
-          + '<button class="btn btn-primary btn-sm" id="iv-save">Update Vendor</button>'
-        + '</span>'
-      + '</div>'
+      + '<div class="card-title">Editing ' + esc(v.name) + '</div>'
       + this.formFieldsHTML(v)
-      + '</div>';
+      + '<div class="card-actions" style="align-items:center;">'
+        + '<button class="btn btn-primary" id="iv-save">Update Vendor</button>'
+        + '<button class="btn btn-ghost" id="iv-cancel">Cancel</button>'
+        + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
   },
 
   wireEdit() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#iv-save')) { this.saveVendor(); return; }
+      if (ev.target.closest('#iv-cancel')) { this.editId = null; this.renderList(); return; }
+      if (ev.target.closest('#iv-save'))   { this.saveVendor(); return; }
     };
   },
 
