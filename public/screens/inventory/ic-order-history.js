@@ -296,11 +296,10 @@ S.InventoryOrderHistory = {
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">' + esc(o.vendor || 'Order') + ' &middot; ' + this.fmtDate(o.date) + '</div>'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="oh-export">Export PDF</button></div></div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"' + (actionBtns ? ' style="margin-bottom:0;"' : '') + '><table class="tbl"><thead><tr>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Qty</th><th>Unit Cost</th><th>Extended</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + (actionBtns ? '<div style="margin-top:18px;">' + actionBtns + '</div>' : '')
-      + '</div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + (actionBtns ? '<div style="margin-top:16px;">' + actionBtns + '</div>' : '')
       + '</div>';
 
     this.container.onclick = ev => {
