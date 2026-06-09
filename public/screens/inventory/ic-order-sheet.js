@@ -125,7 +125,10 @@ S.InventoryOrderSheet = {
         + this.countAgeNote(data.latest, false) + '</div>';
     } else {
       statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data);
-      vendorHtml = visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
+      vendorHtml = visibleVendors.length
+        ? '<div class="sh" style="margin:24px 0 10px;">Suggested Orders</div>'
+          + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('')
+        : '';
     }
 
     // Custom Order card sits right below Order Status, above the suggested vendor cards.
