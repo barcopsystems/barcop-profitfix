@@ -122,7 +122,7 @@ S.InventoryEmpties = {
       + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No empties match the filter.</td></tr>') + '</tbody></table></div></div>'
       + App.showOlderBar('ic', 'empty', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterDisposition));
 
-    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + statsCard + filterHeading + this.filterCard() + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + filterHeading + this.filterCard() + listCard + '</div>';
     this.wireList();
     this.wireForm('em-');
   },
@@ -144,10 +144,11 @@ S.InventoryEmpties = {
       + App.collapsibleCardTitle('ic-empties', 'Log Empties')
       + '<div class="collapse-body">'
       + this.formRows(null, 'em-')
-      + '<div class="card-actions">'
+      + '</div></div>'
+      + '<div class="no-print" data-collapse-group="ic-empties" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="em-save">Log Empties</button>'
-        + '<span id="em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+        + '<span id="em-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
   },
 
   // Shared field layout for both the inline log form and the edit popup. `idp`
@@ -199,9 +200,17 @@ S.InventoryEmpties = {
   },
 
   filterCard() {
+    // Only list products that actually appear in the logged empties, not the
+    // whole catalog — prefer the live name, fall back to the stored one.
+    const loggedProds = new Map();
+    this.empties().forEach(e => {
+      if (!e.product_id || loggedProds.has(e.product_id)) return;
+      const p = this.productById(e.product_id);
+      loggedProds.set(e.product_id, (p && p.name) || e.product_name || 'Unknown product');
+    });
     const prodOpts = '<option value="">All products</option>'
-      + this.barProducts().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
+      + [...loggedProds.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+          .map(([id, name]) => '<option value="' + id + '"' + (this.filterProductId === id ? ' selected' : '') + '>' + esc(name) + '</option>').join('');
     const dispOpts = '<option value="">All</option>'
       + this.DISPOSITIONS.map(d => '<option value="' + esc(d) + '"' + (this.filterDisposition === d ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
     return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
