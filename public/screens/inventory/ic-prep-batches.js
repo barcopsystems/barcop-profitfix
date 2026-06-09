@@ -10,14 +10,23 @@
    serving_size + unit, computed servings_per_batch, ingredient list (products
    only), and computed total_cost + cost_per_serving.
 
-   The Menu Items recipe editor (Revenue Recovery) picks ingredients from
-   both Products AND Prep Batches. When a recipe uses a batch, its
-   cost_per_serving × quantity rolls into the menu item's effective cost. */
+   Landing = an inline Add-a-Batch form (header fields + the ing-tbl ingredient
+   builder, styled like the Void/Comp + Waste logs) over the batch list. Edit
+   opens the same form in a POP-UP. Both the inline form and the pop-up use the
+   same field ids, so every form lookup is scoped to the active form root
+   (this._scope) to avoid collisions. */
 
 S.PrepBatches = {
   editId: null,
   rows: [],
   _saving: false,
+  _scope: null,           // the active form root (this.container or the edit modal)
+  _editingIncomplete: false,
+
+  // Scoped DOM lookups so the inline add form and the edit pop-up (same ids)
+  // never collide. Falls back to document if no scope is set.
+  _el(id)  { return (this._scope || document).querySelector('#' + id); },
+  _els(sel){ return (this._scope || document).querySelectorAll(sel); },
 
   YUNITS: [
     { l: 'oz',      oz: 1 },
@@ -137,39 +146,40 @@ S.PrepBatches = {
     if (!this.rows.length) this.rows = [{ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }];
   },
 
-  // The add/edit form card. b = the batch being edited (null for the add form).
-  // All header fields live on one row; the number cells carry tooltips.
-  formCard(b) {
-    const id = this.editId;
+  // The form body (header fields + ingredient builder + live cost), shared by the
+  // inline add card and the edit pop-up. b = the batch being edited (null = add).
+  formBodyHTML(b) {
     const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
-    const title = id ? 'Editing ' + esc(b?.name || 'Batch') : 'Add a Prep Batch';
-    return '<div class="card">'
-      + (id
-          ? '<div class="card-title">' + title + '</div>'
-          : App.collapsibleCardTitle('ic-prep-batches', title, App.helpButton('pb-how')))
-      + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
+    return '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="width:175px;flex-shrink:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
         + '<div class="f" style="width:135px;flex-shrink:0;"><label>Category</label>'
           + '<select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Yield ' + tt('pb-yield') + '</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Serving Size ' + tt('pb-serving') + '</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Serving Size</label>'
           + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Servings Per Batch ' + tt('pb-spb') + '</label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Servings Per Batch</label>'
           + '<div class="f-display" id="pb-spb">-</div></div>'
       + '</div>'
       + '<div class="sh" style="margin-top:4px;">Ingredients</div>'
       + '<div id="pb-ings" style="margin-bottom:12px;"></div>'
-      + '<button class="btn btn-ghost btn-sm" id="pb-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
-      + '<div class="calc" style="margin-bottom:0;">'
+      + '<button class="btn btn-ghost btn-sm" id="pb-add-ing" type="button" style="margin-bottom:14px;">+ Add Ingredient</button>'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="pb-tc">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="pb-cps">-</div></div>'
-      + '</div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="pb-save">' + (id ? 'Update Batch' : 'Save Batch') + '</button>'
-        + '<button class="btn btn-ghost" id="pb-cancel">' + (id ? 'Cancel' : 'Clear') + '</button>'
+      + '</div>';
+  },
+
+  // Inline add card (collapsible) on the landing.
+  addFormCard() {
+    return '<div class="card form-card">'
+      + App.collapsibleCardTitle('ic-prep-batches', 'Add a Prep Batch')
+      + '<div class="collapse-body">'
+      + this.formBodyHTML(null)
+      + '<div class="card-actions" style="align-items:center;">'
+        + '<button class="btn btn-primary" id="pb-save">Save Batch</button>'
+        + '<button class="btn btn-ghost" id="pb-cancel">Clear</button>'
         + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
   },
@@ -220,53 +230,64 @@ S.PrepBatches = {
           + '<button class="btn btn-ghost btn-sm pb-edit" data-id="' + b.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm pb-del" data-id="' + b.id + '">Delete</button>'
         + '</div></td></tr>').join('');
-      listSection = '<div class="card" style="margin-top:18px;"><div class="card-title">Prep Batches</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      listSection = '<div class="sh" style="margin-top:24px;">Prep Batches</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Batch</th><th>Category</th><th>Yield</th><th>Servings</th><th>Total Cost</th><th>Cost / Serving</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.formCard(null) + listSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>';
+    this._scope = this.container;
     this.renderRows();
     this.calc();
-    this._wire();
+    this._wireForm(this.container);
+    App.applyCollapsed(this.container);
   },
 
-  // ── Form ─────────────────────────────────────────────────────────────────
-  // Edit opens on its own page (form only, no list, no Back button — the
-  // sidebar handles getting back). The add form lives on the landing.
-  showForm(id) {
-    this.editId = id || null;
-    const b = id ? this.byId(id) : null;
+  // ── Edit pop-up (same form, in a modal) ─────────────────────────────────────
+  openEditModal(id) {
+    const b = this.byId(id);
+    if (!b) { this.renderList(); return; }
+    this.editId = id;
     // Field-missing highlights fire ONLY when editing an incomplete batch.
     this._editingIncomplete = !!(b && this.missingFields(b).size > 0);
     this.initRows(b);
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen">' + this.formCard(b) + '</div>';
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Editing ' + esc(b.name || 'Batch') + '</div>'
+      + this.formBodyHTML(b)
+      + '<div class="card-actions" style="align-items:center;">'
+        + '<button class="btn btn-primary" id="pb-save">Update Batch</button>'
+        + '<button class="btn btn-ghost" id="pb-cancel">Cancel</button>'
+        + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 820 });
+    this._scope = overlay;
     this.renderRows();
     this.calc();
-    this._wire();
-    if (this.editId) this.applyMissingFieldHighlights();
+    this._wireForm(overlay);
+    if (this._editingIncomplete) this.applyMissingFieldHighlights();
   },
 
-  cancelForm() { this.editId = null; this.renderList(); },
+  closeEdit() { this.editId = null; App.closeModal('pb-edit-modal'); this.renderList(); },
 
-  // Shared wiring for the form (add on landing OR edit page) plus the list's
-  // Edit/Delete buttons. Uses on* assignment so handlers never stack across
-  // re-renders.
-  _wire() {
-    this.container.onclick = ev => {
-      if (ev.target.closest('#pb-how'))     { this.showHowTo(); return; }
+  // Shared form wiring. Bound to a root (this.container for the inline form, the
+  // modal overlay for the edit pop-up). Each handler stamps this._scope = root so
+  // every form lookup hits the right copy. The list Edit/Delete checks are inert
+  // inside the modal (no list there).
+  _wireForm(root) {
+    root.onclick = ev => {
+      this._scope = root;
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#pb-save'))    { this.saveBatch(); return; }
-      if (ev.target.closest('#pb-cancel'))  { this.cancelForm(); return; }
+      if (ev.target.closest('#pb-cancel'))  { if (root === this.container) this.renderList(); else this.closeEdit(); return; }
       if (ev.target.closest('#pb-add-ing')) { this.addRow(); return; }
       const rm = ev.target.closest('.pb-rm-ing'); if (rm) { this.removeRow(parseInt(rm.dataset.i)); return; }
-      const ed = ev.target.closest('.pb-edit'); if (ed) { this.showForm(ed.dataset.id); return; }
+      const ed = ev.target.closest('.pb-edit'); if (ed) { this.openEditModal(ed.dataset.id); return; }
       const dl = ev.target.closest('.pb-del'); if (dl) { this.deleteBatch(dl.dataset.id); return; }
     };
-    this.container.onchange = ev => {
+    root.onchange = ev => {
+      this._scope = root;
       if (ev.target.classList.contains('pb-ing-prod')) { this.onProdChange(ev.target); return; }
       if (['pb-yield', 'pb-yield-unit', 'pb-serv', 'pb-serv-unit'].includes(ev.target.id)) { this.calc(); return; }
       if (ev.target.id === 'pb-cat') {
@@ -288,12 +309,12 @@ S.PrepBatches = {
       }
       if (ev.target.id === 'pb-name') this.refreshFieldMissing();
     };
-    this.container.oninput = ev => {
+    root.oninput = ev => {
+      this._scope = root;
       if (ev.target.classList.contains('pb-ing-qty')) this.calc();
       if (['pb-yield', 'pb-serv'].includes(ev.target.id)) this.calc();
       if (ev.target.id === 'pb-name') this.refreshFieldMissing();
     };
-    App.applyCollapsed(this.container);
   },
 
   // Required = name + category. Ingredient list is operationally needed but
@@ -304,15 +325,13 @@ S.PrepBatches = {
     if (!b?.category) out.add('pb-cat');
     return out;
   },
-  // Field-missing highlights only fire when EDITING an incomplete batch.
-  // Add-new flow + edit-of-complete flow both stay clean.
   applyMissingFieldHighlights() {
     if (!this._editingIncomplete) return;
     const b = this.byId(this.editId);
     if (!b) return;
     const missing = this.missingFields(b);
     missing.forEach(id => {
-      const el = document.getElementById(id);
+      const el = this._el(id);
       if (!el) return;
       const wrap = el.closest('.f');
       if (wrap) wrap.classList.add('field-missing');
@@ -321,12 +340,12 @@ S.PrepBatches = {
   refreshFieldMissing() {
     if (!this._editingIncomplete) return;
     const synthetic = {
-      name:     document.getElementById('pb-name')?.value.trim() || '',
-      category: document.getElementById('pb-cat')?.value || ''
+      name:     this._el('pb-name')?.value.trim() || '',
+      category: this._el('pb-cat')?.value || ''
     };
     const missing = this.missingFields(synthetic);
     ['pb-name', 'pb-cat'].forEach(id => {
-      const el = document.getElementById(id);
+      const el = this._el(id);
       if (!el) return;
       const wrap = el.closest('.f');
       if (!wrap) return;
@@ -335,25 +354,29 @@ S.PrepBatches = {
     });
   },
 
+  // Ingredient builder — the ing-tbl line table, styled like the Void/Comp and
+  // Waste logs (each line a .pb-line row with the data-row fill).
   renderRows() {
-    const area = document.getElementById('pb-ings');
+    const area = this._el('pb-ings');
     if (!area) return;
-    const currentCat = document.getElementById('pb-cat')?.value || '';
+    const currentCat = this._el('pb-cat')?.value || '';
     const mode = this.modeForBatchCategory(currentCat);
     area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<table class="ing-tbl"><thead><tr><th>Ingredient</th><th>Qty ' + tt('pb-ing-qty') + '</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
-      + '<tbody>' + this.rows.map((ing, idx) => {
+      + '<table class="ing-tbl"><thead><tr>'
+      + '<th style="min-width:200px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
+      + '<th style="width:100px;">Unit Cost</th><th style="width:100px;">Line Cost</th><th style="width:90px;"></th>'
+      + '</tr></thead><tbody>' + this.rows.map((ing, idx) => {
         const prod = ing.product_id ? this.prodById(ing.product_id) : null;
         const unit = this.unitLabel(prod);
         const cost = this.unitCost(prod);
         const costD = cost > 0 ? App.fmtCurrency(cost) : (prod ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
         const lineD = ing.total_cost > 0 ? App.fmtCurrency(ing.total_cost) : '-';
-        return '<tr><td style="min-width:200px;"><select class="form-input pb-ing-prod" data-i="' + idx + '" style="width:100%;">' + this.prodOpts(ing.product_id, mode) + '</select></td>'
-          + '<td style="width:90px;"><input class="form-input pb-ing-qty" type="number" data-i="' + idx + '" value="' + (ing.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
-          + '<td style="width:80px;color:var(--t2);font-size:12px;">' + unit + '</td>'
-          + '<td style="width:100px;font-size:12px;">' + costD + '</td>'
-          + '<td style="width:100px;" class="val" id="pb-lc-' + idx + '">' + lineD + '</td>'
-          + '<td><button class="btn btn-danger btn-sm pb-rm-ing" data-i="' + idx + '">Delete</button></td></tr>';
+        return '<tr class="pb-line"><td><select class="form-input pb-ing-prod" data-i="' + idx + '" style="width:100%;">' + this.prodOpts(ing.product_id, mode) + '</select></td>'
+          + '<td><input class="form-input pb-ing-qty" type="number" data-i="' + idx + '" value="' + (ing.quantity || '') + '" min="0" step="0.25" style="width:100%;"/></td>'
+          + '<td style="color:var(--t2);font-size:12px;">' + unit + '</td>'
+          + '<td style="font-size:12px;">' + costD + '</td>'
+          + '<td class="val" id="pb-lc-' + idx + '">' + lineD + '</td>'
+          + '<td><button class="btn btn-danger btn-sm pb-rm-ing" type="button" data-i="' + idx + '">Delete</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   },
 
@@ -367,24 +390,29 @@ S.PrepBatches = {
     this.calc();
   },
   addRow() { this.rows.push({ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }); this.renderRows(); },
-  removeRow(idx) { this.rows.splice(idx, 1); this.renderRows(); this.calc(); },
+  removeRow(idx) {
+    if (this.rows.length <= 1) this.rows = [{ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }];
+    else this.rows.splice(idx, 1);
+    this.renderRows();
+    this.calc();
+  },
 
   calc() {
-    document.querySelectorAll('.pb-ing-qty').forEach(el => {
+    this._els('.pb-ing-qty').forEach(el => {
       const idx = parseInt(el.dataset.i);
       if (!this.rows[idx]) return;
       const qty = parseFloat(el.value) || 0;
       this.rows[idx].quantity = qty;
       this.rows[idx].total_cost = qty * (this.rows[idx].cost_per_unit || 0);
-      const le = document.getElementById('pb-lc-' + idx);
+      const le = this._el('pb-lc-' + idx);
       if (le) le.textContent = this.rows[idx].total_cost > 0 ? App.fmtCurrency(this.rows[idx].total_cost) : '-';
     });
-    const by = parseFloat(document.getElementById('pb-yield')?.value) || 0;
-    const bu = document.getElementById('pb-yield-unit')?.value || 'oz';
-    const ss = parseFloat(document.getElementById('pb-serv')?.value) || 0;
-    const su = document.getElementById('pb-serv-unit')?.value || 'oz';
+    const by = parseFloat(this._el('pb-yield')?.value) || 0;
+    const bu = this._el('pb-yield-unit')?.value || 'oz';
+    const ss = parseFloat(this._el('pb-serv')?.value) || 0;
+    const su = this._el('pb-serv-unit')?.value || 'oz';
     const out = this.computeRows(this.rows, by, bu, ss, su);
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    const set = (id, val) => { const el = this._el(id); if (el) el.textContent = val; };
     set('pb-spb', out.servings_per_batch != null ? out.servings_per_batch.toFixed(1) + ' servings' : '-');
     set('pb-tc', out.total_cost > 0 ? App.fmtCurrency(out.total_cost) : '-');
     set('pb-cps', out.cost_per_serving > 0 ? App.fmtCurrency(out.cost_per_serving) : '-');
@@ -395,11 +423,11 @@ S.PrepBatches = {
     this._saving = true;
     setTimeout(() => { this._saving = false; }, 1000);
 
-    const name = document.getElementById('pb-name')?.value.trim();
-    const err = document.getElementById('pb-err');
+    const name = this._el('pb-name')?.value.trim();
+    const err = this._el('pb-err');
     if (!name) { if (err) { err.textContent = 'Batch name required.'; err.style.display = 'inline'; } return; }
 
-    document.querySelectorAll('.pb-ing-qty').forEach(el => {
+    this._els('.pb-ing-qty').forEach(el => {
       const idx = parseInt(el.dataset.i);
       if (this.rows[idx]) {
         this.rows[idx].quantity = parseFloat(el.value) || 0;
@@ -407,16 +435,16 @@ S.PrepBatches = {
       }
     });
 
-    const by = parseFloat(document.getElementById('pb-yield')?.value) || 0;
-    const bu = document.getElementById('pb-yield-unit')?.value || 'oz';
-    const ss = parseFloat(document.getElementById('pb-serv')?.value) || 0;
-    const su = document.getElementById('pb-serv-unit')?.value || 'oz';
+    const by = parseFloat(this._el('pb-yield')?.value) || 0;
+    const bu = this._el('pb-yield-unit')?.value || 'oz';
+    const ss = parseFloat(this._el('pb-serv')?.value) || 0;
+    const su = this._el('pb-serv-unit')?.value || 'oz';
     const out = this.computeRows(this.rows, by, bu, ss, su);
 
     const rec = {
       id: this.editId || App.uid(),
       name,
-      category: document.getElementById('pb-cat')?.value || '',
+      category: this._el('pb-cat')?.value || '',
       batch_yield: by, batch_yield_unit: bu,
       serving_size: ss, serving_size_unit: su,
       ingredients: this.rows.filter(r => r.product_id && r.quantity > 0).map(r => ({ product_id: r.product_id, quantity: r.quantity })),
@@ -435,6 +463,7 @@ S.PrepBatches = {
     }
     await App.saveInventory();
     this.editId = null;
+    App.closeModal('pb-edit-modal');
     this.renderList();
   },
 
