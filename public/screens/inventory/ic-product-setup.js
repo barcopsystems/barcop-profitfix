@@ -281,6 +281,18 @@ S.InventoryProducts = {
     this.renderLanding();
   },
 
+  // Page directions for the nav "i" (see [[help-model]]). The per-category import
+  // help (showImportHelp) stays where it is — it's contextual to the upload flow.
+  showHowTo() {
+    App.showHelpModal('How Add Products Works', [
+      { p: ['Add Products is your master product list. Everything Bar Cop costs, counts, orders, and reports reads from here, so a complete product list is the best hour of setup you can put into the app.'] },
+      { h: 'Start With A Category', p: ['Pick one of the six category cards on top. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
+      { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. Bottle beer needs the bottle size and case size. A product missing a required field shows as Incomplete in red until you finish it.'] },
+      { h: 'Other Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Sizes Sold with its own price and Bar Cop shows that size its own pour cost.'] },
+      { h: 'Uploading A List', p: ['Each category card has an Upload option. Drop a CSV or Excel file for that category, match your columns to the fields, and import the whole list at once. Only the product name is required; everything else is optional and can be filled in after.'] }
+    ]);
+  },
+
   // ── Landing: six category cards on top, filterable list below ────────────
   renderLanding() {
     const all = this.products();
@@ -334,7 +346,7 @@ S.InventoryProducts = {
           : '<span style="color:var(--t4);">-</span>';
         return '<tr style="' + dim + '">'
           + '<td><div class="val" style="' + (!complete ? 'color:var(--red);' : '') + '">' + esc(p.name)
-          + (p.active === false ? ' <span class="badge badge-dim">Inactive</span>' : '') + '</div>'
+          + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
           + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
           + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
           + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
@@ -360,17 +372,17 @@ S.InventoryProducts = {
       const costCol = 'Cost Per';
 
       body = alertBar
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Product</th><th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
         + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
     // When an upload is active, the lower area becomes the in-place import
     // panel (drop zone -> column mapper) instead of the product list. The list
     // sits in an .rpt-panel so the active category tab connects into it cleanly
     // (same connected look as the report tabs) and the header row gets padding.
-    const lower = this._import ? this.importPanelHTML() : (tabs + '<div class="rpt-panel">' + body + '</div>');
+    const lower = this._import ? this.importPanelHTML() : (tabs + body);
     this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>';
     this.wireLanding();
   },
@@ -378,11 +390,11 @@ S.InventoryProducts = {
   // Category filter tabs, styled to match the report tab bar (.rpt-tabs).
   catTabs() {
     const all = this.products();
-    return '<div class="rpt-tabs">'
+    return '<div class="ch-tabs no-print">'
       + this.CATEGORIES.map(c => {
           const n = all.filter(p => (p.category || '') === c).length;
           const on = c === this.activeCat;
-          return '<button class="rpt-tab' + (on ? ' on' : '') + '" data-cat="' + esc(c) + '">'
+          return '<button class="ch-tab' + (on ? ' on' : '') + '" data-cat="' + esc(c) + '">'
             + esc(c) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
         }).join('')
       + '</div>';
@@ -392,7 +404,7 @@ S.InventoryProducts = {
     this.container.onclick = ev => {
       const addLink = ev.target.closest('.ip-card-add');
       const impLink = ev.target.closest('.ip-card-imp');
-      const tab     = ev.target.closest('.rpt-tab');
+      const tab     = ev.target.closest('.ch-tab');
       const edit    = ev.target.closest('.ip-edit');
       const del     = ev.target.closest('.ip-del');
 
@@ -512,7 +524,7 @@ S.InventoryProducts = {
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + ' ' + tt(spec.pourTT || 'std-pour') + '</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pour" value="' + v(p?.pour_size_oz) + '" step="0.25" placeholder="e.g. ' + spec.defaultPour + '"/><span class="suf">oz</span></div></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>' + esc(spec.priceLabel || 'Menu Price') + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>' + 'Menu Price' + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
@@ -532,7 +544,7 @@ S.InventoryProducts = {
         + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + ' ' + tt(spec.costTT) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.priceLabel || 'Menu Price') + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + 'Menu Price' + ' ' + tt(spec.priceTT || 'menu-price') + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span> ' + tt('ic-par-level') + '</label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
@@ -1093,8 +1105,9 @@ S.InventoryProducts = {
     }
     return '<div class="card">' + header
       + '<div class="ip-drop" style="border:1px dashed var(--b1);border-radius:8px;padding:46px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;">'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your file here</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your ' + esc(cat) + ' product file here</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:12px;">Needs a product name column; cost, size, price and par are optional.</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:12px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
       + '</div>'
       + '<input type="file" id="ip-imp-input" accept=".csv,.xlsx,.xls" style="display:none;"/>'
       + '<div style="margin-top:14px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'
