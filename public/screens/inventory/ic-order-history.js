@@ -173,8 +173,8 @@ S.InventoryOrderHistory = {
       const view = ev.target.closest('.oh-view');
       const del = ev.target.closest('.oh-del');
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
-      if (view)       { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
-      if (row)        { this.renderDetail(row.dataset.id); return; }
+      if (view)       { ev.stopPropagation(); const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
+      if (row)        { const id = row.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
     };
     document.getElementById('oh-filter')?.addEventListener('change', e => {
       this.vendorFilter = e.target.value || '';
