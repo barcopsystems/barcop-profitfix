@@ -8,6 +8,16 @@
    with a day-one Get Started state until hours are logged. */
 
 S.LaborDashboard = {
+  showHowTo() {
+    App.showHelpModal('How the Labor Dashboard Works', [
+      { p: ['This is the Labor landing screen. It reads the last seven days of logged hours, the current schedule, and your roster so you can see where labor stands without opening four different screens. Every number comes from hours you actually logged and the schedule you built. Until you log hours, the screen shows this same layout in placeholder form with a Get Started strip.'] },
+      { h: 'The Four Tiles Up Top', p: ['Labor Cost, Last 7 Days is what your team cost to run, with salaried managers folded in at their weekly rate. Labor Hours, Last 7 Days is the hours behind that cost. Overtime Risk counts the staff projected to cross the ' + App.OT_THRESHOLD + '-hour line this week, from hours already worked plus what is still scheduled. Active Staff is who is working versus the full roster. A bartender already at 34 hours by Thursday with two shifts left is exactly what Overtime Risk is there to catch before it costs you time and a half.'] },
+      { h: 'This Week', p: ['The wide band compares what you scheduled against what you have actually logged so far this week, in hours and dollars, against your labor target. Use it any day Monday through Sunday to see whether the week is tracking to plan or drifting over, while you still have time to cut or move a shift.'] },
+      { h: 'The Four Panels', p: ['Labor Cost by Department splits the spend across Bar, Kitchen, Front of House, and Management, so you can see which side ran hot. Hours This Week projects each person toward the overtime line. Recent Hours is the latest logged shifts, newest first. Labor Watch is the leaks panel: overtime risk, uncovered call-outs, and certifications expiring inside 30 days. A bartender whose TABC lapses next week is a shift you cannot legally cover, and this is where it shows up first. Tap any line to jump to the fix.'] },
+      { h: 'Quick Actions And Day One', p: ['The buttons jump to the jobs you run most: Build Schedule, Log Hours, Staff Roster, and Labor Reports. Before you have logged any hours, the dashboard shows this same layout with a Get Started strip that walks you through positions, the roster, the schedule, and the first hours log. Once hours land, the panels fill with real numbers.'] }
+    ]);
+  },
+
   actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
   schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
   staff()     { return ((App.laborData && App.laborData.lc_staff) || []); },
