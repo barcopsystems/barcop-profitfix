@@ -145,8 +145,8 @@ S.InventoryCountHistory = {
       const row = ev.target.closest('.ch-row');
       const take = ev.target.closest('#ch-take');
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
-      if (view) { this.renderDetail(view.dataset.id); return; }
-      if (row)  { this.renderDetail(row.dataset.id); return; }
+      if (view) { const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
+      if (row)  { const id = row.dataset.id;  App.pushView(() => this.renderDetail(id)); return; }
       if (take) App.navigate('ic-take-inventory');
     };
     document.getElementById('ch-filter')?.addEventListener('change', e => {
