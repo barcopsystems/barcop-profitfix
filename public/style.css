@@ -464,6 +464,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
 .data-card .tbl tbody td{background:#0D181E;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
+/* Row being dragged (opt-in via DragReorder dragClass:'dr-dragging') = gold-tint fill + gold border so the moving row stays clearly highlighted until dropped. */
+.dr-dragging td{background:var(--gold-tint)!important;box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord);}
+.dr-dragging td:first-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset 1px 0 0 0 var(--gold-tint-bord);}
+.dr-dragging td:last-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset -1px 0 0 0 var(--gold-tint-bord);}
 /* Void/Comp + Waste + Tip Pool + Receive-Delivery batch-builder line rows use the data-row fill; header row stays. */
 .vc-line td,.wl-line td,.tp-row td,.rd-line td,.os-line td{background:#0D181E;}
 /* A flagged delivery line tints gold across the data row AND its detail sub-row, down to the divider. */
