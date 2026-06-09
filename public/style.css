@@ -344,6 +344,8 @@ select:-webkit-autofill{
 .f.field-missing input,
 .f.field-missing select,
 .f.field-missing textarea{border-color:var(--red);}
+/* Spot Check product card flagged as missing its pre/post counts on a save attempt. */
+.sp-line.sp-missing{border-color:var(--red)!important;}
 .f input[type=number]{-moz-appearance:textfield;}
 .f input[type=number]::-webkit-inner-spin-button,
 .f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
