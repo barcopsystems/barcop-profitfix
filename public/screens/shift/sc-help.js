@@ -12,6 +12,14 @@ S.ShiftHelp = {
   tab: 0,
   query: '',
 
+  showHowTo() {
+    App.showHelpModal('Shift Help and FAQ', [
+      { p: ['This page is the full Help and FAQ for Shift Control: opening and closing the floor, cash control and reconciliation, the operations logs (voids, comps, walked tabs, 86 list, maintenance), checklists, the reports, and how Shift feeds the rest of Bar Cop.'] },
+      { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "drawer" or "comp" lands you on the right answer fast.'] },
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Shift Control carries its own directions. Open the screen you have a question about, like Active Shift or Cash Control, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+    ]);
+  },
+
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does Shift Control do?',
