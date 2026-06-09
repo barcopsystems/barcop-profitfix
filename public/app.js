@@ -315,6 +315,7 @@ const App = {
       }
     });
     this._wireSyncLifecycle();
+    this._initFloatNav();
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
       await this.startDemo();
       return;
@@ -1302,6 +1303,58 @@ const App = {
     if (this._navigationLock) return;
     try { history.pushState({ screen: loc.screen, module: loc.module, mode: loc.mode }, ''); }
     catch (e) { /* ignore history failures */ }
+  },
+
+  // ── Floating nav: back (within a screen's view pages, any depth) + back-to-top ──
+  // navigate() resets this stack to the screen's landing. A screen enters a
+  // sub-view (a detail/history page rendered in place) via App.pushView(fn);
+  // the floating back button (goBack) returns one level, the landing being the
+  // base. No per-page back buttons, no layout impact.
+  _viewStack: [],
+  _viewCur: null,
+  pushView(fn) {
+    if (typeof fn !== 'function') return;
+    if (!this._viewStack) this._viewStack = [];
+    this._viewStack.push(this._viewCur || (() => {}));
+    this._viewCur = fn;
+    fn();
+    this._updateFloatNav();
+    const c = this._activeContentEl();
+    if (c) c.scrollTop = 0;
+  },
+  goBack() {
+    if (!this._viewStack || !this._viewStack.length) return;
+    this._viewCur = this._viewStack.pop();
+    if (typeof this._viewCur === 'function') this._viewCur();
+    this._updateFloatNav();
+  },
+  _updateFloatNav() {
+    const back = document.getElementById('fn-back');
+    if (back) back.classList.toggle('show', !!(this._viewStack && this._viewStack.length));
+  },
+  _activeContentEl() {
+    if (this._scrollEl && this._scrollEl.offsetParent !== null) return this._scrollEl;
+    return [...document.querySelectorAll('.content')].find(el => el.offsetParent !== null)
+      || document.querySelector('.content');
+  },
+  _initFloatNav() {
+    const back = document.getElementById('fn-back');
+    const up = document.getElementById('fn-up');
+    if (back) back.addEventListener('click', () => this.goBack());
+    if (up) up.addEventListener('click', () => {
+      const el = this._activeContentEl();
+      if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' });
+      else if (el) el.scrollTop = 0;
+    });
+    // Capture phase so a scroll on whichever .content is active is caught.
+    document.addEventListener('scroll', (e) => {
+      const el = e.target;
+      if (el && el.classList && el.classList.contains('content')) {
+        this._scrollEl = el;
+        const u = document.getElementById('fn-up');
+        if (u) u.classList.toggle('show', el.scrollTop > 400);
+      }
+    }, true);
   },
 
   _updateBackLink() {
@@ -2954,6 +3007,11 @@ const App = {
       S.HubGettingStarted.open();
       return;
     }
+    // Landing on a screen is the base of its in-screen view history (floating back).
+    this._currentScreenId = id;
+    this._viewStack = [];
+    this._viewCur = () => this.navigate(id);
+    this._updateFloatNav();
     try {
     this._activeScreenObj = null;   // set per module block below; drives the nav "i" page-help button
     this.updateNav(id);
