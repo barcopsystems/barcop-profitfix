@@ -107,6 +107,11 @@ S.InventoryVarianceReport = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
+  fmtLong(str) {
+    if (!str) return '';
+    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  },
 
   // ── Usage for the selected period ─────────────────────────────────────────
   currentPeriod() {
@@ -363,13 +368,21 @@ S.InventoryVarianceReport = {
 
     this.container.innerHTML = '<div class="screen">' + back + controls + this.varianceStandardsCard() + importBlock + '</div>';
 
-    document.getElementById('vr-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
+    // Changing the period invalidates any already-dropped file (a file belongs to
+    // one date range), so clear it and return to the dropzone for the new period.
+    document.getElementById('vr-period')?.addEventListener('change', e => {
+      this.endCountId = e.target.value;
+      this.posRows = null;
+      this._unmatchedCollapsed = null;
+      this.draw();
+    });
     document.getElementById('vr-back')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); this.scrollTop(); } });
     this.wireStandards();
 
     if (!this.posRows) {
       CSVMapper.mount(document.getElementById('vr-import'), {
         confirmLabel: 'Import POS Sales',
+        dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' – ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         fields: [
           { key: 'name',  label: 'Product Name',   required: true,  match: ['product', 'item', 'name', 'description', 'menu item'] },
           { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['qty', 'quantity', 'sold', 'units', 'count'] },
@@ -585,8 +598,8 @@ S.InventoryVarianceReport = {
   // ── History tab (variance trend across saved periods) ───────────────────────
   tabHistory() {
     const runs = this.runsSorted();
-    const headers = '<th>Period</th><th>Items</th><th>Sales Variance</th><th>Run</th>';
-    if (!runs.length) return this.dataCard(headers, '<tr><td colspan="4" style="color:var(--t3);padding:14px 8px;">No saved variance runs yet. Run a report and it lands here.</td></tr>');
+    const headers = '<th>Period</th><th>Items</th><th>Sales Variance</th><th>Run</th><th></th>';
+    if (!runs.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:14px 8px;">No saved variance runs yet. Run a report and it lands here.</td></tr>');
     const body = runs.map(r => {
       const sv = r.total_sales_variance;
       const cls = sv > 0 ? 'neg' : (sv < 0 ? 'pos' : '');
@@ -594,7 +607,8 @@ S.InventoryVarianceReport = {
         + '<td><div class="val">' + this.fmtDate(r.start_date) + ' &rarr; ' + this.fmtDate(r.end_date) + '</div></td>'
         + '<td>' + (r.item_count != null ? r.item_count : '-') + '</td>'
         + '<td class="' + cls + '">' + (sv != null ? App.fmtCurrency(sv) : '-') + '</td>'
-        + '<td style="color:var(--t3);font-size:11px;">' + this.fmtDate((r.run_at || '').slice(0, 10)) + '</td></tr>';
+        + '<td style="color:var(--t3);font-size:11px;">' + this.fmtDate((r.run_at || '').slice(0, 10)) + '</td>'
+        + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm vr-hist-view" data-id="' + esc(r.id) + '">View</button></div></td></tr>';
     }).join('');
     return this.dataCard(headers, body);
   },
