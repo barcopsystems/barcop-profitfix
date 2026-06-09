@@ -521,10 +521,11 @@ S.InventoryOrderSheet = {
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
       + parNudge
       + '</div></div>'
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div class="os-create-row" data-vendor="' + this.cssEsc(vendor) + '" style="margin:16px 0 32px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary os-create" data-vendor="' + this.cssEsc(vendor) + '">Create Order</button>'
-      + '<span class="os-verr" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '<span class="os-verr" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
   },
 
   // ── Custom Order panel (vendor-agnostic ad-hoc order, at the bottom) ──────
@@ -578,7 +579,8 @@ S.InventoryOrderSheet = {
   async createOrder(vendor) {
     const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
     if (!card) return;
-    const err = card.querySelector('.os-verr');
+    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.cssEsc(vendor) + '"]');
+    const err = actions ? actions.querySelector('.os-verr') : null;
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
     const lineItems = [];
@@ -615,7 +617,7 @@ S.InventoryOrderSheet = {
       created_at: new Date().toISOString()
     };
 
-    const btn = card.querySelector('.os-create');
+    const btn = actions ? actions.querySelector('.os-create') : null;
     if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
     const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
