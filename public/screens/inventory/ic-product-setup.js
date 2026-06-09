@@ -303,7 +303,7 @@ S.InventoryProducts = {
         ? '<div style="font-size:10px;color:var(--t4);margin-top:6px;">' + incomplete + ' incomplete</div>'
         : '';
       return '<div class="ip-card" data-cat="' + esc(c) + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:22px 18px 20px;text-align:center;">'
+        + 'style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:22px 18px 20px;text-align:center;">'
         + '<div style="font-size:17px;font-weight:800;color:var(--t1);letter-spacing:0.3px;margin-bottom:4px;">' + esc(c) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + '</div>'
         + incText
