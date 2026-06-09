@@ -179,14 +179,15 @@ S.InventorySpotCheck = {
     this.renderMain();
   },
 
+  // Optional. Sourced from the registers set up in Shift Control (each drawer
+  // carries a location), so a spot check can tag the bar/register it was run at
+  // without offering storage rooms like a walk-in. Blank is fine; the variance
+  // math does not need it.
   locationOptions(selected) {
-    const bar = App.BAR_CATS;
-    const barProds = this.products().filter(p => bar.includes(p.category));
-    const locs = ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
-    const withBar = locs.filter(l => barProds.some(p => App.productLocations(p).includes(l.name)));
-    const list = withBar.length ? withBar : locs;
-    let h = '<option value="">Select location...</option>';
-    list.forEach(l => { h += '<option value="' + esc(l.name) + '"' + (selected === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>'; });
+    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => !d.archived);
+    const list = [...new Set(drawers.map(d => (d.location || '').trim()).filter(Boolean))].sort();
+    let h = '<option value="">Optional</option>';
+    list.forEach(name => { h += '<option value="' + esc(name) + '"' + (selected === name ? ' selected' : '') + '>' + esc(name) + '</option>'; });
     return h;
   },
   // Bar products, narrowed to the chosen location so the check stays scoped.
@@ -279,13 +280,12 @@ S.InventorySpotCheck = {
     // divider, then Add Products + Load Last.
     const setup = '<div class="card form-card">'
       + App.collapsibleCardTitle('sp-setup', 'Spot Check',
-          '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-          + '<button class="btn btn-primary btn-sm" id="sp-save">Save Spot Check</button>')
+          '<button class="btn btn-primary btn-sm" id="sp-save">Save Spot Check</button>')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
         + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location / Register</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Register (optional)</label>'
         + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
         + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
@@ -323,10 +323,11 @@ S.InventorySpotCheck = {
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + setup + posCard
-      + '<div class="sh" style="margin:24px 0 10px;">Products to spot check</div>'
+      + '<div class="sh" id="sp-products-title" style="margin:24px 0 10px;display:none;">Products to spot check</div>'
       + '<div id="sp-lines">' + lineHtmls + '</div>'
       + this.historyCard() + '</div>';
     App.applyCollapsed(this.container);
+    this.updateProductsTitle();
 
     // Mount sliders for any restored lines.
     BottleSlider._inst = {};
@@ -343,20 +344,23 @@ S.InventorySpotCheck = {
     const lines = document.getElementById('sp-lines');
     lines.addEventListener('input', ev => {
       const line = ev.target.closest('.sp-line');
-      if (line) { this.recalcLine(line); this.recalcTotal(); this.syncDraft(); }
+      if (line) { line.classList.remove('sp-missing'); this.recalcLine(line); this.recalcTotal(); this.syncDraft(); }
     });
     lines.addEventListener('click', ev => {
       if (ev.target.closest('.sp-remove')) {
         ev.target.closest('.sp-line').remove();
         this.recalcTotal();
         this.syncDraft();
+        this.updateProductsTitle();
       }
     });
     document.getElementById('sp-add')?.addEventListener('change', e => {
+      e.target.closest('.f')?.classList.remove('field-missing');
       const p = this.productById(e.target.value);
       if (p) this.addLine(p);
       e.target.value = '';
     });
+    document.getElementById('sp-date')?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('field-missing'));
     document.getElementById('sp-load-targets')?.addEventListener('click', () => {
       const have = new Set([...this.container.querySelectorAll('.sp-line')].map(l => l.dataset.pid));
       this.lastTargets(document.getElementById('sp-loc')?.value || '').forEach(pid => {
@@ -397,6 +401,28 @@ S.InventorySpotCheck = {
     this.recalcLine(newLine);
     this.recalcTotal();
     this.syncDraft();
+    this.updateProductsTitle();
+  },
+
+  // The "Products to spot check" heading shows only once a product is on the check.
+  updateProductsTitle() {
+    const t = document.getElementById('sp-products-title');
+    const lines = document.getElementById('sp-lines');
+    if (t && lines) t.style.display = lines.children.length ? '' : 'none';
+  },
+  // Clear the red required-field highlights.
+  clearMissing() {
+    this.container.querySelectorAll('.f.field-missing').forEach(f => f.classList.remove('field-missing'));
+    this.container.querySelectorAll('.sp-line.sp-missing').forEach(l => l.classList.remove('sp-missing'));
+  },
+  // Make sure the Spot Check card is open so a flagged cell inside it is visible.
+  expandSetup() {
+    const head = this.container.querySelector('.card-collapse-head[data-collapse-key="sp-setup"]');
+    const card = head ? head.closest('.card') : null;
+    if (card && card.classList.contains('collapsed')) {
+      card.classList.remove('collapsed');
+      try { localStorage.removeItem('barcop_collapse_sp-setup'); } catch (e) {}
+    }
   },
   onLineChange(lid) {
     const line = this.container.querySelector('.sp-line[data-lid="' + lid + '"]');
@@ -527,15 +553,16 @@ S.InventorySpotCheck = {
 
   async save() {
     if (!App.canEdit('ic-spot-check')) return;
-    const err = document.getElementById('sp-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    // No warning text. A missing required field turns its cell border red, the
+    // same as the Add Product form. Register is optional.
+    this.clearMissing();
+    const mark = id => { document.getElementById(id)?.closest('.f')?.classList.add('field-missing'); };
     const date = document.getElementById('sp-date')?.value;
-    if (!date) { fail('Date is required.'); return; }
+    if (!date) { this.expandSetup(); mark('sp-date'); return; }
     const location = document.getElementById('sp-loc')?.value || '';
-    if (!location) { fail('Pick the location / register this check is for.'); return; }
 
     const lines = [...document.querySelectorAll('.sp-line')];
-    if (lines.length === 0) { fail('Add at least one product to check.'); return; }
+    if (lines.length === 0) { this.expandSetup(); mark('sp-add'); return; }
 
     const items = [];
     let valid = false;
@@ -567,7 +594,7 @@ S.InventorySpotCheck = {
         flagged:         line.dataset.flag === '1'
       });
     });
-    if (!valid) { fail('Set pre and post counts for at least one product.'); return; }
+    if (!valid) { lines.forEach(l => l.classList.add('sp-missing')); return; }
 
     const rec = {
       id:           App.uid(),
@@ -590,8 +617,7 @@ S.InventorySpotCheck = {
       this.clearDraft();
       this.renderMain();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Spot Check'; }
-      fail('Save failed. Try again.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Try Again'; }
     }
   },
 
