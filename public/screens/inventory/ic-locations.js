@@ -24,7 +24,9 @@ S.InventoryLocations = {
   newCat: 'All',
   newChecked: null,    // Set<pid> checked in the add form (persists across tabs)
   editCat: 'All',
-  editChecked: null,   // Set<pid> checked in the edit "Add Products" box
+  editChecked: null,   // Set<pid> checked in the edit Add/Delete Products picker
+  editMode: 'arrange', // edit screen middle section: 'arrange' or 'products'
+  _nameDraft: null,    // typed location name on the edit screen, kept across re-renders
   triageCat: 'All',
   triageChecked: null, // Set<pid> checked in the "needs a location" triage modal
   _triageDest: '',     // destination location name picked in the triage modal
@@ -140,13 +142,11 @@ S.InventoryLocations = {
   _bulkCtx(ctx) {
     const activeProds = this.products().filter(p => p.active !== false);
     if (ctx === 'edit') {
-      const l = this.locationById(this.editId); const name = l ? l.name : '';
-      const assigned = new Set(this.products().filter(p => App.productLocations(p).includes(name)).map(p => p.id));
       return {
         set: this.editChecked, cat: this.editCat,
-        eligible: new Set(activeProds.filter(p => !assigned.has(p.id)).map(p => p.id)),
-        inCat: () => this.catProducts(this.editCat).filter(p => !assigned.has(p.id)),
-        rerender: () => { const el = document.getElementById('il-edit-filter'); if (el) el.innerHTML = this.editAddFilterHTML(name); },
+        eligible: new Set(activeProds.map(p => p.id)),
+        inCat: () => this.catProducts(this.editCat),
+        rerender: () => { const el = document.getElementById('il-edit-filter'); if (el) el.innerHTML = this.editProductsHTML(); },
         count: () => this.updateEditCount()
       };
     }
@@ -308,15 +308,17 @@ S.InventoryLocations = {
 
   // The product selection list as a standard data-row table (checkbox + product
   // info). Standalone section, so a full .data-card is fine here.
-  productSelectTable(prods, checkedSet) {
+  productSelectTable(prods, checkedSet, cbClass, rowClass) {
+    cbClass = cbClass || 'il-cb';
+    rowClass = rowClass || 'il-prow';
     if (!prods.length) {
       return '<div style="font-size:12px;color:var(--t4);padding:10px 2px;">No matching products yet. Add products on the Products screen first, then assign them here.</div>';
     }
     return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th style="width:40px;"></th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
       + '</tr></thead><tbody>'
-      + prods.map(p => '<tr class="il-prow" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
-          + '<td><input type="checkbox" class="il-cb" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/></td>'
+      + prods.map(p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
+          + '<td><input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/></td>'
           + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
           + '<td>' + esc(p.category || '-') + '</td>'
           + '<td>' + esc(this.sizeLabel(p)) + '</td>'
@@ -414,13 +416,20 @@ S.InventoryLocations = {
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; } fail('Save failed. Try again.'); }
   },
 
-  // ── Edit page (own page; name + products; Back exits to landing) ────────────
+  // ── Edit page (own page; one Update Location button saves name + products) ──
+  // Fresh entry from the list: reset mode, name draft, and the checked set.
   openEdit(id) {
+    this.editMode = 'arrange';
+    this.editCat = 'All';
+    this.editChecked = new Set();
+    this._nameDraft = null;
+    this._renderEdit(id);
+  },
+  // Re-render the edit screen in its CURRENT mode (keeps the name draft + mode).
+  _renderEdit(id) {
     const l = this.locationById(id);
     if (!l) { this.renderList(); return; }
     this.editId = id;
-    this.editCat = 'All';
-    this.editChecked = new Set();
     this.actions.innerHTML = '';
     this.container.innerHTML = '<div class="screen">' + this.editCard(l) + '</div>';
     this.wireEdit(l);
@@ -429,55 +438,64 @@ S.InventoryLocations = {
 
   editCard(l) {
     const assigned = this.sortedProductsForLocation(l.name);
+    const products = this.editMode === 'products';
+    const nameVal = this._nameDraft != null ? this._nameDraft : l.name;
+
+    const cnt = products ? this.editChecked.size : assigned.length;
+    const cntWord = products ? 'selected' : 'added';
+    const linkLabel = products ? '- Hide products' : '+ Add/Delete Products';
 
     const nameCard = '<div class="card form-card">'
-      + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(l.name) + '"/></div>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Editing ' + esc(l.name) + '</span>'
+        + '<span style="display:flex;align-items:center;gap:10px;">'
+          + '<span id="il-err" style="color:var(--red);font-size:12px;display:none;text-transform:none;letter-spacing:0;font-weight:400;"></span>'
+          + '<button class="btn btn-primary btn-sm" id="il-update-loc">Update Location</button>'
+        + '</span>'
       + '</div>'
-      + '<div class="card-actions" style="align-items:center;">'
-        + '<button class="btn btn-primary" id="il-save">Update Name</button>'
-        + '<span id="il-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<div class="f" style="max-width:300px;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:16px;">'
+        + '<span class="il-editprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
+        + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + cnt + ' product' + (cnt === 1 ? '' : 's') + ' ' + cntWord + '</span>'
       + '</div></div>';
 
-    const arrangeHeading = '<div class="sh" style="margin-top:24px;">Products In This Location</div>'
-      + (assigned.length ? '<div style="font-size:11px;color:var(--t3);margin:0 0 10px;">Drag the &#x2630; handle to set the order Take Inventory counts these in.</div>' : '');
-    const arrangeCard = assigned.length
-      ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th style="text-align:right;"></th>'
-          + '</tr></thead><tbody id="il-arrange-body">'
-          + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
-              + DragReorder.handleCellHTML()
-              + '<td style="color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
-              + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-              + '<td>' + esc(p.category || '-') + '</td>'
-              + '<td>' + esc(this.sizeLabel(p)) + '</td>'
-              + '<td>' + esc(p.vendor || '-') + '</td>'
-              + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
-              + '</tr>').join('')
-          + '</tbody></table></div></div>'
-      : '<div style="font-size:12px;color:var(--t3);margin-bottom:4px;">No products here yet. Check products below to add them.</div>';
+    let middle;
+    if (products) {
+      // The same product menu/list as the landing, all current products pre-checked.
+      middle = '<div style="margin-top:18px;"><div id="il-edit-filter">' + this.editProductsHTML() + '</div></div>';
+    } else {
+      const arrangeHeading = '<div class="no-print" style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:24px 0 10px;">'
+        + '<div class="sh" style="margin:0;">Products In This Location</div>'
+        + (assigned.length ? '<span style="font-size:10px;color:var(--t3);">Drag the handle to set the order Take Inventory counts these in.</span>' : '')
+        + '</div>';
+      const arrangeCard = assigned.length
+        ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+            + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th style="text-align:right;"></th>'
+            + '</tr></thead><tbody id="il-arrange-body">'
+            + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
+                + DragReorder.handleCellHTML()
+                + '<td style="color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
+                + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
+                + '<td>' + esc(p.category || '-') + '</td>'
+                + '<td>' + esc(this.sizeLabel(p)) + '</td>'
+                + '<td>' + esc(p.vendor || '-') + '</td>'
+                + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
+                + '</tr>').join('')
+            + '</tbody></table></div></div>'
+        : '<div style="font-size:12px;color:var(--t3);margin-bottom:4px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</div>';
+      middle = arrangeHeading + arrangeCard;
+    }
 
-    const addCard = '<div class="card form-card" style="margin-top:18px;">'
-      + '<div class="card-title">Add Products</div>'
-      + '<div id="il-edit-filter">' + this.editAddFilterHTML(l.name) + '</div>'
-      + '<div class="card-actions" style="align-items:center;">'
-        + '<button class="btn btn-primary" id="il-add-checked">+ Add checked products</button>'
-        + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
-      + '</div></div>';
-
-    return nameCard + arrangeHeading + arrangeCard + addCard;
+    return nameCard + middle;
   },
 
-  // The add box on the edit page: same tabs + checklist + bulk helpers, scoped to
-  // products not already in this location.
-  editAddFilterHTML(locName) {
-    const assignedIds = new Set(this.products().filter(p => App.productLocations(p).includes(locName)).map(p => p.id));
-    const avail = c => this.catProducts(c).filter(p => !assignedIds.has(p.id));
-    return this.catTabsHTML(this.editCat, c => avail(c).length)
+  // The edit screen's Add/Delete picker: every active product (category-tabbed),
+  // with the products currently in this location pre-checked.
+  editProductsHTML() {
+    const prods = this.catProducts(this.editCat);
+    return this.catTabsHTML(this.editCat, c => this.catProducts(c).length)
       + this.bulkControlsHTML('edit')
-      + this.checklistPanelHTML(avail(this.editCat), this.editChecked, 'il-add-cb',
-          'Every matching product is already in this location.');
+      + this.productSelectTable(prods, this.editChecked, 'il-edit-cb', 'il-eprow');
   },
 
   updateEditCount() {
@@ -493,69 +511,103 @@ S.InventoryLocations = {
       if (tab) {
         this.editCat = tab.dataset.cat;
         const el = document.getElementById('il-edit-filter');
-        if (el) el.innerHTML = this.editAddFilterHTML(l.name);
+        if (el) el.innerHTML = this.editProductsHTML();
+        return;
+      }
+      if (ev.target.closest('.il-editprod-link')) {
+        this._nameDraft = document.getElementById('il-name')?.value ?? l.name;
+        if (this.editMode === 'products') {
+          this.editMode = 'arrange';        // hide (cancel, no save)
+        } else {
+          this.editMode = 'products';       // open with current products pre-checked
+          this.editCat = 'All';
+          this.editChecked = new Set(this.sortedProductsForLocation(l.name).map(p => p.id));
+        }
+        this._renderEdit(l.id);
         return;
       }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
       const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx(cl.dataset.ctx); return; }
-      if (ev.target.closest('#il-save'))        { this.saveLocationEdit(l.id); return; }
-      if (ev.target.closest('#il-add-checked')) { this.addCheckedProducts(l.name); return; }
+      if (ev.target.closest('#il-update-loc')) { this.updateLocation(l.id); return; }
+      const eprow = ev.target.closest('.il-eprow');
+      if (eprow && !ev.target.closest('input')) {
+        const cb = eprow.querySelector('.il-edit-cb');
+        if (cb) { cb.checked = !cb.checked; this._toggleEdit(cb.value, cb.checked); }
+        return;
+      }
       const rm = ev.target.closest('.il-remove'); if (rm) { this.removeProduct(l.name, rm.dataset.id); return; }
     };
     this.container.onchange = ev => {
       if (ev.target.classList && ev.target.classList.contains('il-copyfrom')) {
         const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
       }
-      if (ev.target.classList && ev.target.classList.contains('il-add-cb')) {
-        if (ev.target.checked) this.editChecked.add(ev.target.value);
-        else this.editChecked.delete(ev.target.value);
-        this.updateEditCount();
+      if (ev.target.classList && ev.target.classList.contains('il-edit-cb')) {
+        this._toggleEdit(ev.target.value, ev.target.checked);
       }
     };
-    document.getElementById('il-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') this.saveLocationEdit(l.id); });
+    document.getElementById('il-name')?.addEventListener('input', e => { this._nameDraft = e.target.value; });
+    document.getElementById('il-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') this.updateLocation(l.id); });
     const ab = document.getElementById('il-arrange-body');
-    if (ab) DragReorder.wire({ container: ab, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', onCommit: ids => this._persistProductOrder(l.name, ids) });
+    if (ab) DragReorder.wire({ container: ab, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', dragClass: 'dr-dragging', onCommit: ids => this._persistProductOrder(l.name, ids) });
   },
 
-  async saveLocationEdit(id) {
+  _toggleEdit(id, on) {
+    if (on) this.editChecked.add(id); else this.editChecked.delete(id);
+    this.updateEditCount();
+  },
+
+  // One button: saves the name AND (in products mode) reconciles the location's
+  // products to whatever is checked, then returns to the arrange view.
+  async updateLocation(id) {
     const name = document.getElementById('il-name')?.value.trim();
     const err  = document.getElementById('il-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     if (!name) { fail('Location name required.'); return; }
     if (this.locations().some(l => l.id !== id && l.name.toLowerCase() === name.toLowerCase())) { fail('That name already exists.'); return; }
     const l = this.locationById(id);
-    if (l) {
-      const old = l.name;
-      l.name = name;
-      if (old !== name) {
-        this.products().forEach(p => {
-          if (p.primary_location === old)   p.primary_location = name;
-          if (p.secondary_location === old) p.secondary_location = name;
-          if (Array.isArray(p.locations))   p.locations = p.locations.map(x => x === old ? name : x);
-          if (p.location_sequences && p.location_sequences[old] != null) {
-            p.location_sequences[name] = p.location_sequences[old];
-            delete p.location_sequences[old];
-          }
-        });
-      }
+    if (!l) { this.renderList(); return; }
+    const old = l.name;
+    l.name = name;
+    if (old !== name) {
+      this.products().forEach(p => {
+        if (p.primary_location === old)   p.primary_location = name;
+        if (p.secondary_location === old) p.secondary_location = name;
+        if (Array.isArray(p.locations))   p.locations = p.locations.map(x => x === old ? name : x);
+        if (p.location_sequences && p.location_sequences[old] != null) {
+          p.location_sequences[name] = p.location_sequences[old];
+          delete p.location_sequences[old];
+        }
+      });
     }
-    await App.saveInventory();
-    App.markSetupDone('gs_ic_locations');
-    this.openEdit(id);
-  },
-
-  async addCheckedProducts(locName) {
-    const checked = this.editChecked;
-    if (!checked || !checked.size) return;
-    this.products().forEach(p => {
-      if (!checked.has(p.id)) return;
-      const set = new Set(App.productLocations(p)); set.add(locName);
-      p.locations = [...set];
-      if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
-    });
-    this.editChecked = new Set();
-    await App.saveInventory();
-    this.openEdit(this.editId);
+    if (this.editMode === 'products') {
+      const want = this.editChecked;
+      this.products().forEach(p => {
+        const has = App.productLocations(p).includes(name);
+        const wanted = want.has(p.id);
+        if (wanted && !has) {
+          const set = new Set(App.productLocations(p)); set.add(name);
+          p.locations = [...set];
+          if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
+        } else if (!wanted && has) {
+          p.locations = App.productLocations(p).filter(x => x !== name);
+          if (p.primary_location === name) p.primary_location = p.locations[0] || '';
+          if (p.location_sequences) delete p.location_sequences[name];
+        }
+      });
+    }
+    const btn = document.getElementById('il-update-loc');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.saveInventory();
+    if (ok) {
+      App.markSetupDone('gs_ic_locations');
+      this.editMode = 'arrange';
+      this.editChecked = new Set();
+      this._nameDraft = null;
+      this._renderEdit(id);
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Update Location'; }
+      fail('Save failed. Try again.');
+    }
   },
 
   async removeProduct(locName, pid) {
@@ -565,7 +617,7 @@ S.InventoryLocations = {
     if (p.primary_location === locName) p.primary_location = p.locations[0] || '';
     if (p.location_sequences) delete p.location_sequences[locName];
     await App.saveInventory();
-    this.openEdit(this.editId);
+    this._renderEdit(this.editId);
   },
 
   // ── Triage: place products that are not in any location yet ─────────────────
@@ -699,6 +751,6 @@ S.InventoryLocations = {
       p.location_sequences[locationName] = i + 1;
     });
     await App.saveInventory();
-    this.openEdit(this.editId);
+    this._renderEdit(this.editId);
   }
 };
