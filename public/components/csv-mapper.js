@@ -8,6 +8,7 @@
    CSVMapper.mount(containerEl, {
      fields:       [{ key, label, required, match:[keywords] }],
      hint:         'optional help line (HTML allowed)',
+     dropTitle:    'optional dropzone prompt (plain text; default "Drop your file here")',
      confirmLabel: 'Import',
      onComplete:   rows => {}      // rows: [{ <key>: value, ... }] one per data row
    }); */
@@ -20,7 +21,7 @@ const CSVMapper = {
       (opts.hint ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + opts.hint + '</div>' : '')
       + '<div class="csvm-drop" style="border:1.5px dashed var(--b1);border-radius:8px;padding:40px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--input);">'
         + '<div style="pointer-events:none;">'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your file here</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + (opts.dropTitle ? esc(opts.dropTitle) : 'Drop your file here') + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
         + '</div></div>'
       + '<input type="file" class="csvm-file" accept=".csv,.xlsx,.xls" style="display:none;"/>'
