@@ -8,13 +8,16 @@
    another location here never overwrites an existing primary. Stored in
    App.inventoryData.
 
-   Landing-form pattern: the add form (name + a category-filtered product
-   checklist, one Save) lives on the landing above the locations list. Category
-   tabs filter the checklist so a bottle-beer cooler gets built without scrolling
-   past liquor; checks accumulate across tabs and a running count shows the total.
-   A location's "Holds" is derived from the categories of the products assigned to
-   it. Editing a location opens its own page — name plus the product list with
-   drag-to-order and the same category-filtered add box. Cancel exits to landing. */
+   Landing: a top stats strip (locations / products placed / need a location), a
+   triage strip + modal for products not yet in any location, the collapsible
+   add-a-location form (collapsed once locations exist so the list leads), and
+   the locations list. Building a location uses a category-filtered product
+   checklist with bulk helpers — Select all in a category, or Copy the whole
+   product list from another location — so a bar or cooler gets built in a couple
+   taps instead of one box at a time. Saving a new location drops straight into
+   its arrange page so building and ordering are one flow. Editing a location is
+   its own page: name, the products in it with drag-to-order (the count order),
+   and the same checklist to add more. */
 
 S.InventoryLocations = {
   editId: null,
@@ -22,6 +25,11 @@ S.InventoryLocations = {
   newChecked: null,    // Set<pid> checked in the add form (persists across tabs)
   editCat: 'All',
   editChecked: null,   // Set<pid> checked in the edit "Add Products" box
+  triageCat: 'All',
+  triageChecked: null, // Set<pid> checked in the "needs a location" triage modal
+  _triageDest: '',     // destination location name picked in the triage modal
+  addOpen: false,      // is the add-a-location form expanded
+  _addToggled: false,  // has the operator explicitly toggled the add form this session
   DEFAULTS: ['Front Bar', 'Back Bar', 'Walk-In Cooler', 'Dry Storage', 'Office Storage'],
 
   locations() {
@@ -32,6 +40,15 @@ S.InventoryLocations = {
   locationById(id) { return this.locations().find(l => l.id === id); },
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   productCount(name) { return this.products().filter(p => App.productLocations(p).includes(name)).length; },
+
+  // Active products not yet placed in any location — they will not be counted.
+  unplacedProducts() {
+    return this.products().filter(p => p.active !== false && App.productLocations(p).length === 0);
+  },
+  // Active products that live in at least one location.
+  placedCount() {
+    return this.products().filter(p => p.active !== false && App.productLocations(p).length > 0).length;
+  },
 
   // Categories that have at least one active product, in canonical order.
   presentCats() {
@@ -69,15 +86,16 @@ S.InventoryLocations = {
   showHowTo() {
     App.showHelpModal('How Locations Work', [
       { p: ['Locations are the places you keep product: your bars, coolers, and storerooms. Set them up here, then assign which products live in each one. Take Inventory walks you through one location at a time, counting the products you put there in the order you arrange them.'] },
-      { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. Your checks carry across the tabs and the running count shows how many you have picked. Save and it is ready to count.'] },
+      { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. To build a bar or cooler fast, hit Select all in a category, or Copy from another location to pull its whole product list in one move. Your checks carry across the tabs and the running count shows how many you have picked. Save and you drop right into arranging it.'] },
       { h: 'Arrange For Counting', p: ['Open a location to add or pull products and drag them into the order they sit on the shelf or rail. Counting follows that order, so the count sheet matches the way you actually walk the room. Reorder the locations themselves on the main list to set which one you count first.'] },
-      { h: 'A Product Can Live In Several Places', p: ['Stock the same product in more than one location and it shows up at each during a count. The first location you put it in becomes its home for ordering, which is the Primary Location the Add Product form fills in. A product not yet placed anywhere is flagged "Needs a location" on the Products screen, because it will not be counted until it has one.'] }
+      { h: 'Products That Need A Location', p: ['A product not yet placed anywhere is flagged at the top of this screen as Need a Location, because it will not be counted until it has one. Tap Assign Products, pick where they live, and check them off. This is the quick way to place a batch you just imported.'] },
+      { h: 'A Product Can Live In Several Places', p: ['Stock the same product in more than one location and it shows up at each during a count. The first location you put it in becomes its home for ordering, which is the Primary Location the Add Product form fills in.'] }
     ]);
   },
 
-  // ── Shared: category tabs + checklist panel ────────────────────────────────
-  catTabsHTML(activeCat, countFn) {
-    const cats = ['All', ...this.presentCats()];
+  // ── Shared: category tabs + checklist + bulk controls ──────────────────────
+  catTabsHTML(activeCat, countFn, cats) {
+    cats = cats || ['All', ...this.presentCats()];
     return '<div class="rpt-tabs">'
       + cats.map(c => {
           const on = c === activeCat;
@@ -100,7 +118,70 @@ S.InventoryLocations = {
       + '</div></div>';
   },
 
-  // ── Landing: add form on top, locations list below ─────────────────────────
+  // Per-context handles so the bulk helpers (select-all / clear / copy-from) work
+  // identically on the add form, the edit add-box, and the triage modal.
+  _bulkCtx(ctx) {
+    const activeProds = this.products().filter(p => p.active !== false);
+    if (ctx === 'edit') {
+      const l = this.locationById(this.editId); const name = l ? l.name : '';
+      const assigned = new Set(this.products().filter(p => App.productLocations(p).includes(name)).map(p => p.id));
+      return {
+        set: this.editChecked, cat: this.editCat,
+        eligible: new Set(activeProds.filter(p => !assigned.has(p.id)).map(p => p.id)),
+        inCat: () => this.catProducts(this.editCat).filter(p => !assigned.has(p.id)),
+        rerender: () => { const el = document.getElementById('il-edit-filter'); if (el) el.innerHTML = this.editAddFilterHTML(name); },
+        count: () => this.updateEditCount()
+      };
+    }
+    if (ctx === 'triage') {
+      const unplaced = this.unplacedProducts();
+      return {
+        set: this.triageChecked, cat: this.triageCat,
+        eligible: new Set(unplaced.map(p => p.id)),
+        inCat: () => this.triageCat === 'All' ? unplaced : unplaced.filter(p => p.category === this.triageCat),
+        rerender: () => { const el = document.getElementById('il-triage-filter'); if (el) el.innerHTML = this.triageFilterHTML(); },
+        count: () => this.updateTriageCount()
+      };
+    }
+    return {
+      set: this.newChecked, cat: this.newCat,
+      eligible: new Set(activeProds.map(p => p.id)),
+      inCat: () => this.catProducts(this.newCat),
+      rerender: () => { const el = document.getElementById('il-new-filter'); if (el) el.innerHTML = this.newFilterHTML(); },
+      count: () => this.updateNewCount()
+    };
+  },
+  bulkControlsHTML(ctx) {
+    const c = this._bulkCtx(ctx);
+    const n = c.inCat().length;
+    const label = c.cat === 'All' ? 'Select all' : 'Select all in ' + esc(c.cat);
+    let copy = '';
+    if (ctx !== 'triage') {
+      const others = this.locations().filter(l => !l.archived && this.productCount(l.name) > 0 && !(ctx === 'edit' && l.id === this.editId));
+      if (others.length) {
+        copy = '<span style="color:var(--t4);font-size:11px;">or</span>'
+          + '<select class="il-copyfrom" data-ctx="' + ctx + '" style="height:30px;padding:0 8px;font-size:12px;max-width:230px;">'
+          + '<option value="">Copy from a location...</option>'
+          + others.map(l => '<option value="' + esc(l.name) + '">' + esc(l.name) + ' (' + this.productCount(l.name) + ')</option>').join('')
+          + '</select>';
+      }
+    }
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;">'
+      + '<button type="button" class="btn btn-ghost btn-sm il-selall" data-ctx="' + ctx + '"' + (n ? '' : ' disabled') + '>' + label + ' (' + n + ')</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm il-clearsel" data-ctx="' + ctx + '">Clear selection</button>'
+      + copy
+      + '</div>';
+  },
+  selectAllCtx(ctx) { const c = this._bulkCtx(ctx); c.inCat().forEach(p => c.set.add(p.id)); c.rerender(); c.count(); },
+  clearSelCtx(ctx)  { const c = this._bulkCtx(ctx); c.set.clear(); c.rerender(); c.count(); },
+  copyFromCtx(ctx, locName) {
+    if (!locName) return;
+    const c = this._bulkCtx(ctx);
+    this.products().forEach(p => { if (App.productLocations(p).includes(locName) && c.eligible.has(p.id)) c.set.add(p.id); });
+    c.rerender(); c.count();
+  },
+
+  // ── Landing: stats + triage + add form + locations list ────────────────────
   renderList() {
     this.actions.innerHTML = '';
     this.editId = null;
@@ -109,6 +190,25 @@ S.InventoryLocations = {
     const locs = this.locations();
     const active = locs.filter(l => !l.archived);
     const archived = locs.filter(l => l.archived);
+    if (!this._addToggled) this.addOpen = !active.length;
+
+    const unplaced = this.unplacedProducts().length;
+
+    const statsCard = active.length
+      ? '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+          + '<div class="calc-item"><div class="calc-label">Locations</div><div class="calc-val lg">' + active.length + '</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Products Placed</div><div class="calc-val lg">' + this.placedCount() + '</div></div>'
+          + '<div class="calc-item"><div class="calc-label">Need a Location</div><div class="calc-val lg' + (unplaced ? ' warn' : '') + '">' + unplaced + '</div></div>'
+        + '</div></div>'
+      : '';
+
+    const triageStrip = (active.length && unplaced)
+      ? '<div class="card" style="margin-top:14px;border:1px solid var(--amber);background:rgba(154,93,52,0.08);">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+          + '<div style="font-size:13px;color:var(--t1);"><strong>' + unplaced + ' product' + (unplaced === 1 ? '' : 's') + ' ' + (unplaced === 1 ? 'is' : 'are') + ' not in any location yet.</strong> They will not be counted until you place them.</div>'
+          + '<button class="btn btn-primary btn-sm" id="il-triage-open">Assign Products</button>'
+        + '</div></div>'
+      : '';
 
     let listSection;
     if (!locs.length) {
@@ -127,30 +227,32 @@ S.InventoryLocations = {
           + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      listSection = '<div class="card" style="margin-top:18px;"><div class="card-title">Your Locations</div>'
-        + (active.length
-            ? '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Drag the &#x2630; handle to set the order operators count locations in.</div>'
-              + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-              + '<th style="width:32px;"></th><th>Location</th><th>Holds</th><th>Products</th><th></th>'
-              + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div>'
-            : '<div style="font-size:12px;color:var(--t3);">No active locations.</div>')
-        + (archived.length
-            ? '<div class="sh" style="margin:20px 0 8px;">Deleted</div>'
-              + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Restore any of these to bring them back. Product assignments are preserved.</div>'
-              + archived.map(l => '<div style="display:flex;align-items:center;justify-content:space-between;opacity:0.7;font-size:12px;padding:6px 0;border-bottom:1px solid var(--b1);">'
-                  + '<span>' + esc(l.name) + ' &middot; ' + this.productCount(l.name) + ' products</span>'
-                  + '<button class="btn btn-ghost btn-sm il-unarchive" data-id="' + l.id + '">Restore</button></div>').join('')
-            : '')
-        + '</div>';
+
+      const listHeading = '<div class="sh" style="margin-top:24px;">Your Locations</div>'
+        + (active.length ? '<div style="font-size:11px;color:var(--t3);margin:0 0 10px;">Drag the &#x2630; handle to set the order operators count locations in.</div>' : '');
+      const listCard = active.length
+        ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+            + '<th style="width:32px;"></th><th>Location</th><th>Holds</th><th>Products</th><th></th>'
+            + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div></div>'
+        : '<div style="font-size:12px;color:var(--t3);">No active locations.</div>';
+      const archivedSection = archived.length
+        ? '<div class="sh" style="margin:24px 0 8px;">Deleted</div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Restore any of these to bring them back. Product assignments are preserved.</div>'
+          + archived.map(l => '<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--b1);">'
+              + '<span style="color:var(--t2);">' + esc(l.name) + ' &middot; ' + this.productCount(l.name) + ' products</span>'
+              + '<button class="btn btn-ghost btn-sm il-unarchive" data-id="' + l.id + '">Restore</button></div>').join('')
+        : '';
+      listSection = listHeading + listCard + archivedSection;
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + triageStrip + this.addFormCard() + listSection + '</div>';
     this.wireList();
   },
 
   addFormCard() {
-    return '<div class="card">'
-      + App.collapsibleCardTitle('ic-locations', 'Add a Location', App.helpButton('il-how'))
+    const collapsed = this.addOpen ? '' : ' collapsed';
+    return '<div class="card form-card' + collapsed + '" style="margin-top:14px;">'
+      + App.collapsibleCardTitle('ic-locations', 'Add a Location')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label>'
@@ -158,7 +260,7 @@ S.InventoryLocations = {
       + '</div>'
       + '<div class="sh" style="margin-top:4px;margin-bottom:8px;">Products Stored Here</div>'
       + '<div id="il-new-filter">' + this.newFilterHTML() + '</div>'
-      + '<div class="card-actions" style="margin-top:14px;align-items:center;">'
+      + '<div class="card-actions" style="align-items:center;">'
         + '<button class="btn btn-primary" id="il-new-save">Save Location</button>'
         + '<button class="btn btn-ghost" id="il-new-clear">Clear</button>'
         + '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
@@ -169,6 +271,7 @@ S.InventoryLocations = {
   newFilterHTML() {
     const prods = this.catProducts(this.newCat);
     return this.catTabsHTML(this.newCat, c => this.catProducts(c).length)
+      + this.bulkControlsHTML('new')
       + this.checklistPanelHTML(prods, this.newChecked, 'il-cb',
           'No matching products yet. Add products on the Products screen first, then assign them here.');
   },
@@ -189,9 +292,11 @@ S.InventoryLocations = {
         if (el) el.innerHTML = this.newFilterHTML();
         return;
       }
-      if (ev.target.closest('#il-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
-      if (head) { App.toggleCollapse(head); return; }
+      if (head) { this._addToggled = true; this.addOpen = !this.addOpen; const card = head.closest('.card'); if (card) card.classList.toggle('collapsed', !this.addOpen); return; }
+      const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
+      const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx(cl.dataset.ctx); return; }
+      if (ev.target.closest('#il-triage-open')) { this.openTriage(); return; }
       const save = ev.target.closest('#il-new-save');
       const clr  = ev.target.closest('#il-new-clear');
       const open = ev.target.closest('.il-open');
@@ -209,6 +314,9 @@ S.InventoryLocations = {
     };
     // Checkbox toggles accumulate into the running set so checks survive tab swaps.
     this.container.onchange = ev => {
+      if (ev.target.classList && ev.target.classList.contains('il-copyfrom')) {
+        const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
+      }
       if (ev.target.classList && ev.target.classList.contains('il-cb')) {
         if (ev.target.checked) this.newChecked.add(ev.target.value);
         else this.newChecked.delete(ev.target.value);
@@ -217,7 +325,6 @@ S.InventoryLocations = {
     };
     const body = document.getElementById('il-loc-body');
     if (body) DragReorder.wire({ container: body, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', onCommit: ids => this._persistLocationOrder(ids) });
-    App.applyCollapsed(this.container);
   },
 
   async saveNewLocation() {
@@ -227,7 +334,8 @@ S.InventoryLocations = {
     if (!name) { fail('Enter a location name.'); return; }
     if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) { fail('A location with that name already exists.'); return; }
 
-    this.locations().push({ id: App.uid(), name, archived: false });
+    const id = App.uid();
+    this.locations().push({ id, name, archived: false });
     // Assign every checked product (across all category tabs) to the new location.
     const checked = this.newChecked;
     if (checked && checked.size) {
@@ -241,11 +349,12 @@ S.InventoryLocations = {
     const btn = document.getElementById('il-new-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveInventory();
-    if (ok) { App.markSetupDone('gs_ic_locations'); this.renderList(); }
+    // Drop straight into the new location's arrange page (build → order in one flow).
+    if (ok) { App.markSetupDone('gs_ic_locations'); this.openEdit(id); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; } fail('Save failed. Try again.'); }
   },
 
-  // ── Edit page (own page; name + products; Cancel exits to landing) ──────────
+  // ── Edit page (own page; name + products; Back exits to landing) ────────────
   openEdit(id) {
     const l = this.locationById(id);
     if (!l) { this.renderList(); return; }
@@ -255,52 +364,57 @@ S.InventoryLocations = {
     this.actions.innerHTML = '';
     this.container.innerHTML = '<div class="screen">' + this.editCard(l) + '</div>';
     this.wireEdit(l);
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
   },
 
   editCard(l) {
     const assigned = this.sortedProductsForLocation(l.name);
 
-    const assignedTbl = assigned.length
-      ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Drag the &#x2630; handle to set the order Take Inventory counts these in.</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th></th>'
-        + '</tr></thead><tbody id="il-arrange-body">'
-        + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
-            + DragReorder.handleCellHTML()
-            + '<td style="color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
-            + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-            + '<td>' + esc(p.category || '-') + '</td>'
-            + '<td><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
-            + '</tr>').join('')
-        + '</tbody></table></div>'
+    const nameCard = '<div class="card form-card">'
+      + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
+        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(l.name) + '"/></div>'
+      + '</div>'
+      + '<div class="card-actions" style="align-items:center;">'
+        + '<button class="btn btn-primary" id="il-save">Update Name</button>'
+        + '<button class="btn btn-ghost" id="il-cancel">Back to Locations</button>'
+        + '<span id="il-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+
+    const arrangeHeading = '<div class="sh" style="margin-top:24px;">Products In This Location</div>'
+      + (assigned.length ? '<div style="font-size:11px;color:var(--t3);margin:0 0 10px;">Drag the &#x2630; handle to set the order Take Inventory counts these in.</div>' : '');
+    const arrangeCard = assigned.length
+      ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th></th>'
+          + '</tr></thead><tbody id="il-arrange-body">'
+          + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
+              + DragReorder.handleCellHTML()
+              + '<td style="color:var(--t4);font-size:11px;">' + (i + 1) + '</td>'
+              + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
+              + '<td>' + esc(p.category || '-') + '</td>'
+              + '<td><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
+              + '</tr>').join('')
+          + '</tbody></table></div></div>'
       : '<div style="font-size:12px;color:var(--t3);margin-bottom:4px;">No products here yet. Check products below to add them.</div>';
 
-    return '<div class="card">'
-      + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(l.name) + '"/></div>'
-        + '<div style="flex:1;min-width:10px;"></div>'
-        + '<button class="btn btn-primary" id="il-save">Update Name</button>'
-        + '<button class="btn btn-ghost" id="il-cancel">Cancel</button>'
-        + '<span id="il-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '</div>'
-      + '<div class="sh" style="margin-top:4px;">Products In This Location</div>'
-      + assignedTbl
-      + '<div class="sh" style="margin:18px 0 8px;">Add Products</div>'
+    const addCard = '<div class="card form-card" style="margin-top:18px;">'
+      + '<div class="card-title">Add Products</div>'
       + '<div id="il-edit-filter">' + this.editAddFilterHTML(l.name) + '</div>'
-      + '<div class="card-actions" style="margin-top:12px;align-items:center;">'
-        + '<button class="btn btn-primary btn-sm" id="il-add-checked">+ Add checked products</button>'
+      + '<div class="card-actions" style="align-items:center;">'
+        + '<button class="btn btn-primary" id="il-add-checked">+ Add checked products</button>'
         + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
-      + '</div>'
-      + '</div>';
+      + '</div></div>';
+
+    return nameCard + arrangeHeading + arrangeCard + addCard;
   },
 
-  // The add box on the edit page: same tabs + checklist, scoped to products not
-  // already in this location.
+  // The add box on the edit page: same tabs + checklist + bulk helpers, scoped to
+  // products not already in this location.
   editAddFilterHTML(locName) {
     const assignedIds = new Set(this.products().filter(p => App.productLocations(p).includes(locName)).map(p => p.id));
     const avail = c => this.catProducts(c).filter(p => !assignedIds.has(p.id));
     return this.catTabsHTML(this.editCat, c => avail(c).length)
+      + this.bulkControlsHTML('edit')
       + this.checklistPanelHTML(avail(this.editCat), this.editChecked, 'il-add-cb',
           'Every matching product is already in this location.');
   },
@@ -321,12 +435,17 @@ S.InventoryLocations = {
         if (el) el.innerHTML = this.editAddFilterHTML(l.name);
         return;
       }
+      const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
+      const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx(cl.dataset.ctx); return; }
       if (ev.target.closest('#il-cancel'))      { this.editId = null; this.renderList(); return; }
       if (ev.target.closest('#il-save'))        { this.saveLocationEdit(l.id); return; }
       if (ev.target.closest('#il-add-checked')) { this.addCheckedProducts(l.name); return; }
       const rm = ev.target.closest('.il-remove'); if (rm) { this.removeProduct(l.name, rm.dataset.id); return; }
     };
     this.container.onchange = ev => {
+      if (ev.target.classList && ev.target.classList.contains('il-copyfrom')) {
+        const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
+      }
       if (ev.target.classList && ev.target.classList.contains('il-add-cb')) {
         if (ev.target.checked) this.editChecked.add(ev.target.value);
         else this.editChecked.delete(ev.target.value);
@@ -387,6 +506,93 @@ S.InventoryLocations = {
     if (p.location_sequences) delete p.location_sequences[locName];
     await App.saveInventory();
     this.openEdit(this.editId);
+  },
+
+  // ── Triage: place products that are not in any location yet ─────────────────
+  openTriage() {
+    this.triageCat = 'All';
+    this.triageChecked = new Set();
+    const firstLoc = this.locations().find(l => !l.archived);
+    this._triageDest = firstLoc ? firstLoc.name : '';
+    App.openModal(this.triageModalHTML(), { id: 'il-triage', maxWidth: 600 });
+    this.wireTriage();
+  },
+
+  triageModalHTML() {
+    const destOpts = this.locations().filter(l => !l.archived)
+      .map(l => '<option value="' + esc(l.name) + '"' + (l.name === this._triageDest ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
+    return '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Assign Products to a Location</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">These products are not in any location yet, so they will not be counted. Pick where they live, check them off, and assign. Repeat for other spots.</div>'
+      + '<div class="form-row" style="align-items:flex-end;gap:14px;margin-bottom:6px;">'
+        + '<div class="f" style="width:260px;"><label>Add checked products to</label><select id="il-triage-dest">' + destOpts + '</select></div>'
+      + '</div>'
+      + '<div id="il-triage-filter">' + this.triageFilterHTML() + '</div>'
+      + '<div class="card-actions" style="align-items:center;">'
+        + '<button class="btn btn-primary" id="il-triage-assign">Assign to Location</button>'
+        + '<button class="btn btn-ghost" id="il-triage-close">Close</button>'
+        + '<span id="il-triage-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
+      + '</div></div>';
+  },
+
+  triageFilterHTML() {
+    const unplaced = this.unplacedProducts();
+    const cats = ['All', ...App.IC_CATEGORIES.filter(cat => unplaced.some(p => p.category === cat))];
+    const inCat = this.triageCat === 'All' ? unplaced : unplaced.filter(p => p.category === this.triageCat);
+    return this.catTabsHTML(this.triageCat, c => c === 'All' ? unplaced.length : unplaced.filter(p => p.category === c).length, cats)
+      + this.bulkControlsHTML('triage')
+      + this.checklistPanelHTML(inCat, this.triageChecked, 'il-tri-cb', 'No products need a location.');
+  },
+
+  updateTriageCount() {
+    const el = document.getElementById('il-triage-count');
+    if (!el) return;
+    const n = this.triageChecked.size;
+    el.textContent = n + ' product' + (n === 1 ? '' : 's') + ' selected';
+  },
+
+  wireTriage() {
+    const m = document.getElementById('il-triage');
+    if (!m) return;
+    m.onclick = ev => {
+      const tab = ev.target.closest('.rpt-tab');
+      if (tab) { this.triageCat = tab.dataset.cat; const el = document.getElementById('il-triage-filter'); if (el) el.innerHTML = this.triageFilterHTML(); return; }
+      const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx('triage'); return; }
+      const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx('triage'); return; }
+      if (ev.target.closest('#il-triage-assign')) { this.assignTriage(); return; }
+      if (ev.target.closest('#il-triage-close'))  { App.closeModal('il-triage'); this.renderList(); return; }
+    };
+    m.onchange = ev => {
+      if (ev.target.id === 'il-triage-dest') { this._triageDest = ev.target.value; return; }
+      if (ev.target.classList && ev.target.classList.contains('il-tri-cb')) {
+        if (ev.target.checked) this.triageChecked.add(ev.target.value);
+        else this.triageChecked.delete(ev.target.value);
+        this.updateTriageCount();
+      }
+    };
+  },
+
+  async assignTriage() {
+    const locName = this._triageDest;
+    const checked = this.triageChecked;
+    if (!locName || !checked || !checked.size) return;
+    this.products().forEach(p => {
+      if (!checked.has(p.id)) return;
+      const set = new Set(App.productLocations(p)); set.add(locName);
+      p.locations = [...set];
+      if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
+    });
+    this.triageChecked = new Set();
+    await App.saveInventory();
+    App.markSetupDone('gs_ic_locations');
+    if (this.unplacedProducts().length) {
+      const el = document.getElementById('il-triage-filter');
+      if (el) el.innerHTML = this.triageFilterHTML();
+      this.updateTriageCount();
+    } else {
+      App.closeModal('il-triage');
+      this.renderList();
+    }
   },
 
   // ── Delete / archive / defaults ────────────────────────────────────────────
