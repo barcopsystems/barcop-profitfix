@@ -347,7 +347,7 @@ S.InventoryVarianceReport = {
       + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
 
     const viewSaved = this.runs().length
-      ? '<div style="align-self:flex-end;padding-bottom:9px;"><span id="vr-view-saved" style="color:var(--gold);cursor:pointer;text-decoration:underline;font-size:12px;">or view saved reports</span></div>'
+      ? '<div style="align-self:flex-end;padding-bottom:9px;font-size:12px;color:var(--t3);">or <span id="vr-view-saved" style="color:var(--gold);cursor:pointer;text-decoration:underline;">view saved reports</span></div>'
       : '';
     const controls = '<div class="card form-card no-print"><div class="card-title">Variance Report</div>'
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
@@ -557,7 +557,7 @@ S.InventoryVarianceReport = {
     const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Filter Variance</div>'
       + '<div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vr-new">New Report</button>'
+      + '<button class="btn btn-primary btn-sm" id="vr-new">Run New Report</button>'
       + '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button></div></div>';
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:240px;flex-shrink:0;"><label>Period</label><select id="vr-run">' + runOpts + '</select></div>'
@@ -691,6 +691,7 @@ S.InventoryVarianceReport = {
         poursMade: u.poursMade, containersUsed: u.used,
         containerSizeOz: parseFloat(p.container_size_oz) || 0,
         caseSize: parseFloat(p.case_size) || 0,
+        unitType: p.unit_type || '',
         byBottle: this.isByBottle(p)
       });
     });
@@ -699,13 +700,14 @@ S.InventoryVarianceReport = {
 
   n(v, d) { return (v == null || isNaN(v)) ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d); },
   recipeTag(r) { return r.fromMenu ? ' <span style="font-size:8px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : ''; },
+  // Product column wide enough that "FROM RECIPE" stays on the name's row; Status
+  // stays narrow; every data column in between shares the rest equally so the
+  // spacing is even (no cramped Oz Var / Var % at the end).
   usageColgroup(n) {
     const cols = [];
     for (let i = 0; i < n; i++) {
-      if (i === 0) cols.push('<col style="width:200px;"/>');
-      else if (i === n - 3) cols.push('<col style="width:92px;"/>');
-      else if (i === n - 2) cols.push('<col style="width:78px;"/>');
-      else if (i === n - 1) cols.push('<col style="width:62px;"/>');
+      if (i === 0) cols.push('<col style="width:260px;"/>');
+      else if (i === n - 1) cols.push('<col style="width:74px;"/>');
       else cols.push('<col/>');
     }
     return '<colgroup>' + cols.join('') + '</colgroup>';
@@ -748,11 +750,11 @@ S.InventoryVarianceReport = {
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
         + '<td>' + this.n(r.ouncesSold) + '</td>' + '<td>' + this.n(r.ouncesUsed) + '</td>'
-        + '<td>' + this.n(r.containersUsed, 2) + '</td>' + '<td>' + this.n(ounceVar) + '</td>'
-        + '<td>' + this.pct(varPct) + '</td>'
+        + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed, 2) + '</td>'
+        + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Kegs', 'Oz Var', 'Var %', 'Status'], body);
+    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', 'Status'], body);
   },
   usageTableBottleBeer(rows) {
     const body = rows.map(r => {
@@ -795,9 +797,10 @@ S.InventoryVarianceReport = {
       const countedUse = r.containersUsed;
       const useVar = countedUse != null ? countedUse - recipeUse : null;
       const varPct = (useVar != null && countedUse) ? useVar / countedUse * 100 : null;
+      const unit = r.unitType || this.foodUnit(r.name);
       return '<tr>'
         + '<td><div class="val">' + esc(this.foodName(r.name)) + '</div></td>'
-        + '<td>' + esc(this.foodUnit(r.name)) + '</td>'
+        + '<td>' + esc(unit) + '</td>'
         + '<td>' + this.n(recipeUse, 2) + '</td>' + '<td>' + this.n(countedUse, 2) + '</td>'
         + '<td>' + this.n(useVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (varPct != null ? this.badge('Food', varPct) : '-') + '</td></tr>';
