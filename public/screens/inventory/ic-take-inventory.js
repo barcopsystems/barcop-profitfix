@@ -106,7 +106,7 @@ S.InventoryTakeInventory = {
       ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div class="alert-text">A ' + esc(saved.type) + ' count started ' + this.ago(saved.started_at) + ' is in progress.</div>'
         + '<div style="display:flex;gap:8px;">'
-          + '<button class="btn btn-primary btn-sm" id="ti-resume">Resume Count</button>'
+          + '<button class="btn btn-ghost btn-sm" id="ti-resume" style="color:var(--red);">Resume Count</button>'
           + '<button class="btn btn-ghost btn-sm" id="ti-discard">Discard</button>'
         + '</div></div>'
       : '';
@@ -352,7 +352,7 @@ S.InventoryTakeInventory = {
       + ' &nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--gold);">' + done + ' of ' + total + '</span> counted</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
-        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Discard Count</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Discard</button>'
       + '</div></div>'
       + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;">'
       + '<div id="ti-prog-bar" style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
@@ -366,7 +366,7 @@ S.InventoryTakeInventory = {
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
-        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Discard Count</button>'
+        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Discard</button>'
       + '</div>'
       + '</div></div>';
 
@@ -440,10 +440,10 @@ S.InventoryTakeInventory = {
     document.getElementById('ti-prev')?.addEventListener('click', () => { this.locStep--; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
     document.getElementById('ti-next')?.addEventListener('click', () => { this.locStep++; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
     document.getElementById('ti-review')?.addEventListener('click', () => { this.draft._view = 'review'; this.saveDraft(); this.renderReview(); });
-    document.getElementById('ti-exit')?.addEventListener('click', () => { this.saveDraft(); App.navigate('ic-product-setup'); });
+    document.getElementById('ti-exit')?.addEventListener('click', () => { this.saveDraft(); this.draft = null; this.renderSetup(); this.scrollTop(); });
     document.getElementById('ti-discard-count')?.addEventListener('click', () => this.confirmDiscardDraft());
     // Top-right duplicates of the session actions, same handlers as the bottom.
-    document.getElementById('ti-exit-top')?.addEventListener('click', () => { this.saveDraft(); App.navigate('ic-product-setup'); });
+    document.getElementById('ti-exit-top')?.addEventListener('click', () => { this.saveDraft(); this.draft = null; this.renderSetup(); this.scrollTop(); });
     document.getElementById('ti-discard-top')?.addEventListener('click', () => this.confirmDiscardDraft());
     this.scrollTop();
   },
