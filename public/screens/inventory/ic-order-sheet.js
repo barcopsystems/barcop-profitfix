@@ -10,6 +10,8 @@
 
 S.InventoryOrderSheet = {
   _created: null,
+  _editVendor: null,   // vendor whose placed order is pulled back for editing
+  _menuCloser: null,   // active outside-click closer for an open ⋯ menu
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
@@ -36,6 +38,8 @@ S.InventoryOrderSheet = {
     this.container = container;
     this.actions = actions;
     this._created = this._created || {};
+    this._editVendor = null;   // fresh entry starts clean (not mid-edit)
+    if (this._menuCloser) { document.removeEventListener('click', this._menuCloser, true); this._menuCloser = null; }
     this.renderMain();
   },
 
@@ -107,16 +111,27 @@ S.InventoryOrderSheet = {
     }
 
     const allVendors = Object.keys(data.groups).sort();
+
+    // A vendor pulled back for editing shows as an editable card up top, seeded
+    // from the placed order — not under Already Ordered while it is being edited.
+    const editOrder = this._editVendor ? this.openOrderForVendor(this._editVendor) : null;
+    if (this._editVendor && !editOrder) this._editVendor = null;
+
     // Split vendors into "needs ordering" vs "already has an open order".
     const visibleVendors = [];
     const hiddenVendors  = [];
     allVendors.forEach(v => {
+      if (v === this._editVendor) return;            // handled as the edit card below
       if (this.openOrderForVendor(v)) hiddenVendors.push(v);
       else visibleVendors.push(v);
     });
 
+    const editHtml = editOrder
+      ? '<div class="sh" style="margin:24px 0 10px;">Editing Order</div>' + this.editVendorCardHTML(editOrder)
+      : '';
+
     let statusHtml, vendorHtml = '';
-    if (visibleVendors.length === 0 && hiddenVendors.length === 0) {
+    if (visibleVendors.length === 0 && hiddenVendors.length === 0 && !editOrder) {
       statusHtml = '<div class="card form-card"><div class="card-title">'
         + '<span>Order Status</span></div>'
         + '<div class="empty" style="margin:0;"><div class="empty-title">Everything is at par</div>'
@@ -125,10 +140,10 @@ S.InventoryOrderSheet = {
         + this.countAgeNote(data.latest, false) + '</div>';
     } else {
       statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data);
-      vendorHtml = visibleVendors.length
+      vendorHtml = editHtml + (visibleVendors.length
         ? '<div class="sh" style="margin:24px 0 10px;">Suggested Orders</div>'
           + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('')
-        : '';
+        : '');
     }
 
     // Custom Order card sits right below Order Status, above the suggested vendor cards.
@@ -149,6 +164,12 @@ S.InventoryOrderSheet = {
     this.container.querySelector('.os-co-vendor')?.addEventListener('change', (ev) => this.onCustomVendorChange(ev.target.value));
 
     this.container.onclick = ev => {
+      const more = ev.target.closest('.os-omore');
+      if (more) { ev.stopPropagation(); this.toggleMenu(more.dataset.id); return; }
+      // Any other click (including a menu item) closes the open ⋯ menu. The item
+      // handlers below still fire — closest() resolves on the hidden node.
+      this.closeAllMenus();
+
       if (ev.target.closest('.os-par-nudge')) { App.navigate('ic-par-suggestions'); return; }
       if (ev.target.closest('#os-go-history')) { App.navigate('ic-order-history'); return; }
       if (ev.target.closest('.os-take')) { App.navigate('ic-take-inventory'); return; }
@@ -156,6 +177,13 @@ S.InventoryOrderSheet = {
       if (email) { this.emailOrder(email.dataset.id); return; }
       const pdf = ev.target.closest('.os-pdf');
       if (pdf) { this.exportOrderPdf(pdf.dataset.id); return; }
+      const editOrder = ev.target.closest('.os-edit');
+      if (editOrder) { this.startEditOrder(editOrder.dataset.id); return; }
+      const cancelOrder = ev.target.closest('.os-cancel');
+      if (cancelOrder) { this.cancelOrder(cancelOrder.dataset.id); return; }
+      const update = ev.target.closest('.os-update');
+      if (update) { this.updateOrder(update.dataset.vendor); return; }
+      if (ev.target.closest('.os-editcancel')) { this.cancelEditOrder(); return; }
       const rm      = ev.target.closest('.os-remove');
       const create  = ev.target.closest('.os-create');
       const coCreate = ev.target.closest('.os-co-create');
@@ -174,10 +202,7 @@ S.InventoryOrderSheet = {
       if (create) this.createOrder(create.dataset.vendor);
     };
 
-    visibleVendors.forEach(v => {
-      const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(v) + '"]');
-      if (card) this.recalcVendor(card);
-    });
+    this.container.querySelectorAll('.os-vcard').forEach(card => this.recalcVendor(card));
   },
 
   // ── Combined Order Status card (still to order + already ordered + age) ──────
@@ -200,9 +225,14 @@ S.InventoryOrderSheet = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Already Ordered</div>'
       + openOrders.map(o => '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--b2);">'
           + '<div style="font-size:12px;color:var(--t1);min-width:0;">' + esc(o.vendor) + ' <span style="color:var(--t3);white-space:nowrap;">&middot; ' + App.fmtCurrency(o.total || 0) + ' &middot; ' + esc(o.status || 'Open') + '</span></div>'
-          + '<div style="display:flex;gap:8px;flex-shrink:0;">'
+          + '<div style="display:flex;gap:8px;flex-shrink:0;position:relative;align-items:center;">'
             + '<button class="btn btn-ghost btn-sm os-email" data-id="' + esc(o.id) + '">' + (o.status === 'Open' ? 'Email to Vendor' : 'Resend') + '</button>'
-            + '<button class="btn btn-ghost btn-sm os-pdf" data-id="' + esc(o.id) + '">Export PDF</button>'
+            + '<button class="btn btn-ghost btn-sm os-omore" data-id="' + esc(o.id) + '" aria-label="More actions" style="letter-spacing:2px;padding-left:10px;padding-right:10px;">&middot;&middot;&middot;</button>'
+            + '<div class="os-omenu" data-id="' + esc(o.id) + '" style="display:none;">'
+              + '<button class="om-item os-pdf" data-id="' + esc(o.id) + '">Export PDF</button>'
+              + '<button class="om-item os-edit" data-id="' + esc(o.id) + '">Edit Order</button>'
+              + '<button class="om-item danger os-cancel" data-id="' + esc(o.id) + '">Cancel Order</button>'
+            + '</div>'
           + '</div>'
         + '</div>').join('')
       + '<div style="margin-top:8px;"><button class="btn btn-ghost btn-sm" id="os-go-history">View in Order History</button></div>'
@@ -510,15 +540,50 @@ S.InventoryOrderSheet = {
 
   vendorCard(vendor, lines) {
     const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)).join('');
-    const parOff = this.parIssueCount(lines.map(l => l.product));
+    return this.vendorCardShell(vendor, rows, lines.map(l => l.product), { mode: 'create' });
+  },
+
+  // Re-open a placed order as an editable card, seeded from the order's own line
+  // items (current on-hand / par shown alongside). Saving writes back to the
+  // SAME order. This is "pull it back to the Order Sheet to tweak it".
+  editVendorCardHTML(order) {
+    const data = this.belowParByVendor();
+    const onHandMap = {};
+    if (data && data.latest) (data.latest.items || []).forEach(it => {
+      onHandMap[it.product_id] = (onHandMap[it.product_id] || 0) + (it.total || 0);
+    });
+    const products = [];
+    const rows = (order.line_items || []).map(li => {
+      let p = this.productById(li.product_id);
+      if (!p) p = { id: li.product_id || '', name: li.name || 'Unknown product', unit_cost: li.unit_cost || 0, category: '' };
+      products.push(p);
+      const oh = (li.product_id != null && (li.product_id in onHandMap)) ? onHandMap[li.product_id] : null;
+      const par = (p.par_level != null && p.par_level !== '') ? p.par_level : null;
+      return this.lineRowHTML(p, li.qty != null ? li.qty : 0, oh, par);
+    }).join('');
+    return this.vendorCardShell(order.vendor || '', rows, products, { mode: 'edit', orderId: order.id });
+  },
+
+  // Shared card body for a fresh suggested order AND an order pulled back to
+  // edit. The primary button + error sit in a row BELOW the card.
+  vendorCardShell(vendor, rows, products, opts) {
+    const isEdit = opts && opts.mode === 'edit';
+    const parOff = this.parIssueCount(products || []);
     const parNudge = parOff > 0
       ? '<div class="os-par-nudge" style="margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;max-width:540px;">'
         + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--gold);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> look off versus your real usage. Tuning them sharpens these reorder numbers.</span>'
         + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>'
       : '';
+    const title = isEdit
+      ? esc(vendor) + ' <span style="font-size:11px;font-weight:600;color:var(--t3);">&middot; editing placed order</span>'
+      : esc(vendor);
+    const actionBtns = isEdit
+      ? '<button class="btn btn-primary os-update" data-vendor="' + this.cssEsc(vendor) + '" data-order-id="' + esc(opts.orderId) + '">Update Order</button>'
+        + '<button class="btn btn-ghost os-editcancel">Cancel</button>'
+      : '<button class="btn btn-primary os-create" data-vendor="' + this.cssEsc(vendor) + '">Create Order</button>';
 
-    return '<div class="card form-card os-vcard" data-vendor="' + this.cssEsc(vendor) + '">'
-      + '<div class="card-title">' + esc(vendor) + '</div>'
+    return '<div class="card form-card os-vcard" data-vendor="' + this.cssEsc(vendor) + '"' + (isEdit ? ' data-order-id="' + esc(opts.orderId) + '"' : '') + '>'
+      + '<div class="card-title">' + title + '</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
       + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
@@ -531,7 +596,7 @@ S.InventoryOrderSheet = {
       + '</div></div>'
       + '</div>'
       + '<div class="os-create-row" data-vendor="' + this.cssEsc(vendor) + '" style="margin:16px 0 32px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary os-create" data-vendor="' + this.cssEsc(vendor) + '">Create Order</button>'
+      + actionBtns
       + '<span class="os-verr" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
   },
@@ -591,27 +656,7 @@ S.InventoryOrderSheet = {
     const err = actions ? actions.querySelector('.os-verr') : null;
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
-    const lineItems = [];
-    card.querySelectorAll('.os-line').forEach(line => {
-      const inp = line.querySelector('.os-qty');
-      const qty = parseFloat(inp.value) || 0;
-      const productId = inp.dataset.productId || '';
-      if (qty <= 0 || !productId) return;
-      const product = this.productById(productId);
-      const nameEl = line.querySelector('.val');
-      const name = product ? product.name : (nameEl ? nameEl.textContent : '');
-      const cost = parseFloat(inp.dataset.cost) || 0;
-      const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
-      lineItems.push({
-        product_id: productId,
-        name,
-        qty,
-        unit_cost: cost,
-        extended: qty * cost,
-        display_unit: isCaseBeer ? 'case' : 'unit',
-        case_size: isCaseBeer ? product.case_size : null
-      });
-    });
+    const lineItems = this.collectLines(card);
     if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
 
     const rec = {
@@ -636,5 +681,116 @@ S.InventoryOrderSheet = {
       if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
     }
+  },
+
+  // ── Collect line items from a vendor / edit card's ing-tbl rows ────────────
+  collectLines(card) {
+    const lineItems = [];
+    card.querySelectorAll('.os-line').forEach(line => {
+      const inp = line.querySelector('.os-qty');
+      const qty = parseFloat(inp.value) || 0;
+      const productId = inp.dataset.productId || '';
+      if (qty <= 0 || !productId) return;
+      const product = this.productById(productId);
+      const nameEl = line.querySelector('.val');
+      const name = product ? product.name : (nameEl ? nameEl.textContent : '');
+      const cost = parseFloat(inp.dataset.cost) || 0;
+      const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
+      lineItems.push({
+        product_id: productId,
+        name,
+        qty,
+        unit_cost: cost,
+        extended: qty * cost,
+        display_unit: isCaseBeer ? 'case' : 'unit',
+        case_size: isCaseBeer ? product.case_size : null
+      });
+    });
+    return lineItems;
+  },
+
+  // ── ⋯ overflow menu on an Already Ordered row ─────────────────────────────
+  toggleMenu(id) {
+    const menu = this.container.querySelector('.os-omenu[data-id="' + id + '"]');
+    if (!menu) return;
+    const open = menu.style.display === 'block';
+    this.closeAllMenus();
+    if (!open) {
+      menu.style.display = 'block';
+      const closer = (e) => {
+        if (e.target.closest('.os-omenu') || e.target.closest('.os-omore')) return;
+        this.closeAllMenus();
+      };
+      this._menuCloser = closer;
+      setTimeout(() => document.addEventListener('click', closer, true), 0);
+    }
+  },
+  closeAllMenus() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.os-omenu').forEach(m => { m.style.display = 'none'; });
+    if (this._menuCloser) { document.removeEventListener('click', this._menuCloser, true); this._menuCloser = null; }
+  },
+
+  // ── Edit a placed order: pull it back onto the Order Sheet as an editable card
+  startEditOrder(id) {
+    this.closeAllMenus();
+    const order = this.orders().find(o => o.id === id);
+    if (!order) return;
+    this._editVendor = order.vendor;
+    this.renderMain();
+    this.scrollContentTop();
+  },
+  cancelEditOrder() {
+    this._editVendor = null;
+    this.renderMain();
+  },
+  async updateOrder(vendor) {
+    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
+    if (!card) return;
+    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.cssEsc(vendor) + '"]');
+    const err = actions ? actions.querySelector('.os-verr') : null;
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const order = this.orders().find(o => o.id === card.dataset.orderId);
+    if (!order) { fail('Could not find that order.'); return; }
+
+    const lineItems = this.collectLines(card);
+    if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
+
+    order.line_items = lineItems;
+    order.item_count = lineItems.length;
+    order.total = lineItems.reduce((t, i) => t + i.extended, 0);
+    order.updated_at = new Date().toISOString();
+
+    const btn = actions ? actions.querySelector('.os-update') : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('ic', 'order', order);
+    if (ok) {
+      this._editVendor = null;
+      this.renderMain();
+      this.scrollContentTop();
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Update Order'; }
+      fail('Could not update the order. Try again.');
+    }
+  },
+
+  // ── Cancel a placed order: remove it; the vendor returns to the Order Sheet ─
+  async cancelOrder(id) {
+    this.closeAllMenus();
+    const order = this.orders().find(o => o.id === id);
+    if (!order) return;
+    const ok = await App.confirm({
+      title: 'Cancel this order?',
+      message: 'This removes the ' + (order.vendor || '') + ' order'
+        + (order.total ? ' for ' + App.fmtCurrency(order.total) : '')
+        + '. Those items return to your Order Sheet so you can reorder. This cannot be undone.',
+      confirmText: 'Cancel Order',
+      cancelText: 'Keep Order',
+      danger: true
+    });
+    if (!ok) return;
+    if (this._editVendor === order.vendor) this._editVendor = null;
+    await App.removeRecord('ic', 'order', id);
+    this.renderMain();
   }
 };
