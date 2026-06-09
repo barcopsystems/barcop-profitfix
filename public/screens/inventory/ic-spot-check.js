@@ -412,7 +412,7 @@ S.InventorySpotCheck = {
       if (collHead) { App.toggleCollapse(collHead); return; }
       if (ev.target.closest('#sp-resume')) { this.container.querySelector('.alert-bar')?.remove(); return; }
       if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
-      if (ev.target.closest('#sp-history')) { this.renderHistory(); return; }
+      if (ev.target.closest('#sp-history')) { App.pushView(() => this.renderHistory()); return; }
       const posSeg = ev.target.closest('.sp-posmode');
       if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
     };
@@ -432,12 +432,11 @@ S.InventorySpotCheck = {
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg">' + (totalVar > 0 ? '+' : '') + App.fmtCurrency(totalVar, 2) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (all.length ? this.fmtDate(all[0].date) : '-') + '</div></div>'
       + '</div></div>';
-    const backRow = '<div class="no-print" style="margin-top:18px;"><button class="btn btn-ghost btn-sm" id="sp-back">Back to Spot Check</button></div>';
 
     if (all.length === 0) {
       this.container.innerHTML = '<div class="screen">' + statsCard
         + '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div>'
-        + '<div style="font-size:12px;color:var(--t3);">No spot checks saved yet.</div>' + backRow + '</div>';
+        + '<div style="font-size:12px;color:var(--t3);">No spot checks saved yet.</div></div>';
       this.wireHistory();
       return;
     }
@@ -486,7 +485,7 @@ S.InventorySpotCheck = {
       + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No spot checks match the filters.</td></tr>') + '</tbody></table></div></div>'
       + App.showOlderBar('ic', 'spot_check', filtered, !!(this.filterFrom || this.filterTo || this.locFilter || this.byFilter));
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + backRow + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + '</div>';
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
     this.wireHistory();
   },
@@ -497,7 +496,6 @@ S.InventorySpotCheck = {
     document.getElementById('sp-loc-filter')?.addEventListener('change', e => { this.locFilter = e.target.value || ''; this.renderHistory(); });
     document.getElementById('sp-by-filter')?.addEventListener('change', e => { this.byFilter = e.target.value || ''; this.renderHistory(); });
     this.container.onclick = ev => {
-      if (ev.target.closest('#sp-back')) { this.renderMain(); return; }
       if (ev.target.closest('#sp-clear')) { this.filterFrom = ''; this.filterTo = ''; this.locFilter = ''; this.byFilter = ''; this.renderHistory(); return; }
       if (ev.target.closest('#sp-list-export')) { App.exportPDF({ title: 'Spot Check History', root: this.container }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderHistory()); return; }
@@ -505,8 +503,8 @@ S.InventorySpotCheck = {
       const hview = ev.target.closest('.sp-hview');
       const hrow = ev.target.closest('.sp-hrow');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
-      else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
-      else if (hrow) this.renderDetail(hrow.dataset.id);
+      else if (hview) { ev.stopPropagation(); const id = hview.dataset.id; App.pushView(() => this.renderDetail(id)); }
+      else if (hrow) { const id = hrow.dataset.id; App.pushView(() => this.renderDetail(id)); }
     };
   },
 
@@ -792,11 +790,9 @@ S.InventorySpotCheck = {
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
       + '<th>Variance</th><th>Variance $</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-      + '<div class="no-print" style="margin-top:18px;"><button class="btn btn-ghost btn-sm" id="sp-back-hist">Back to History</button></div>'
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#sp-back-hist')) { this.renderHistory(); return; }
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
       const inv = ev.target.closest('.sp-investigate');
       if (inv) { ev.stopPropagation(); this.openInvestigation(inv.dataset.pid, inv.dataset.name); }
