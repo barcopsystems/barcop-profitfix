@@ -106,7 +106,7 @@ S.InventoryTakeInventory = {
       ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div class="alert-text">A ' + esc(saved.type) + ' count started ' + this.ago(saved.started_at) + ' is in progress.</div>'
         + '<div style="display:flex;gap:8px;">'
-          + '<button class="btn btn-ghost btn-sm" id="ti-resume" style="color:var(--red);">Resume Count</button>'
+          + '<button class="btn btn-ghost btn-sm" id="ti-resume">Resume Count</button>'
           + '<button class="btn btn-ghost btn-sm" id="ti-discard">Discard</button>'
         + '</div></div>'
       : '';
