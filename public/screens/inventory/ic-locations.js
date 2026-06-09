@@ -443,7 +443,7 @@ S.InventoryLocations = {
 
     const cnt = products ? this.editChecked.size : assigned.length;
     const cntWord = products ? 'selected' : 'added';
-    const linkLabel = products ? '- Hide products' : '+ Add/Delete Products';
+    const linkLabel = products ? 'Save Product Changes' : '+ Add/Delete Products';
 
     const nameCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -517,13 +517,13 @@ S.InventoryLocations = {
       if (ev.target.closest('.il-editprod-link')) {
         this._nameDraft = document.getElementById('il-name')?.value ?? l.name;
         if (this.editMode === 'products') {
-          this.editMode = 'arrange';        // hide (cancel, no save)
+          this.saveProducts(l.id);          // commit the add/deletes, return to arrange
         } else {
           this.editMode = 'products';       // open with current products pre-checked
           this.editCat = 'All';
           this.editChecked = new Set(this.sortedProductsForLocation(l.name).map(p => p.id));
+          this._renderEdit(l.id);
         }
-        this._renderEdit(l.id);
         return;
       }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
@@ -556,6 +556,38 @@ S.InventoryLocations = {
     this.updateEditCount();
   },
 
+  // Make the location's product set equal `want` (a Set of product ids): add the
+  // checked ones that are not in it, drop the unchecked ones that are.
+  _reconcileProducts(name, want) {
+    this.products().forEach(p => {
+      const has = App.productLocations(p).includes(name);
+      const wanted = want.has(p.id);
+      if (wanted && !has) {
+        const set = new Set(App.productLocations(p)); set.add(name);
+        p.locations = [...set];
+        if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
+      } else if (!wanted && has) {
+        p.locations = App.productLocations(p).filter(x => x !== name);
+        if (p.primary_location === name) p.primary_location = p.locations[0] || '';
+        if (p.location_sequences) delete p.location_sequences[name];
+      }
+    });
+  },
+
+  // Save Product Changes link: commit the add/deletes immediately and return to
+  // the arrange view. Product changes persist even if the operator never clicks
+  // Update Location.
+  async saveProducts(id) {
+    const l = this.locationById(id);
+    if (!l) { this.renderList(); return; }
+    this._reconcileProducts(l.name, this.editChecked);
+    await App.saveInventory();
+    App.markSetupDone('gs_ic_locations');
+    this.editMode = 'arrange';
+    this.editChecked = new Set();
+    this._renderEdit(id);
+  },
+
   // One button: saves the name AND (in products mode) reconciles the location's
   // products to whatever is checked, then returns to the arrange view.
   async updateLocation(id) {
@@ -579,22 +611,7 @@ S.InventoryLocations = {
         }
       });
     }
-    if (this.editMode === 'products') {
-      const want = this.editChecked;
-      this.products().forEach(p => {
-        const has = App.productLocations(p).includes(name);
-        const wanted = want.has(p.id);
-        if (wanted && !has) {
-          const set = new Set(App.productLocations(p)); set.add(name);
-          p.locations = [...set];
-          if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
-        } else if (!wanted && has) {
-          p.locations = App.productLocations(p).filter(x => x !== name);
-          if (p.primary_location === name) p.primary_location = p.locations[0] || '';
-          if (p.location_sequences) delete p.location_sequences[name];
-        }
-      });
-    }
+    if (this.editMode === 'products') this._reconcileProducts(name, this.editChecked);
     const btn = document.getElementById('il-update-loc');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveInventory();
