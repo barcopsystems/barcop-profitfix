@@ -582,6 +582,7 @@ S.InventoryVarianceReport = {
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:240px;flex-shrink:0;"><label>Period</label><select id="vr-run">' + runOpts + '</select></div>'
       + (avail.length ? '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>' : '')
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vr-clear">Clear</button></div>'
       + '</div></div>';
 
     let html;
@@ -598,6 +599,7 @@ S.InventoryVarianceReport = {
     document.getElementById('vr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Variance Report' + (periodLabel ? ' ' + periodLabel : ''), root: this.container }));
     document.getElementById('vr-run')?.addEventListener('change', e => { const r = this.runs().find(x => x.id === e.target.value); if (r) { this.loadRun(r); this.draw(); } });
     document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
+    document.getElementById('vr-clear')?.addEventListener('click', () => { this.catFilter = ''; this.draw(); });
     this.container.querySelectorAll('.vr-hist-row').forEach(row => row.addEventListener('click', () => {
       const r = this.runs().find(x => x.id === row.dataset.id);
       if (r) { this.loadRun(r); this.tab = 'sales'; this.draw(); this.scrollTop(); }
