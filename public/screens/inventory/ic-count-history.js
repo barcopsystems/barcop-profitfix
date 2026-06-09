@@ -88,8 +88,7 @@ S.InventoryCountHistory = {
         + '<div class="calc-item"><div class="calc-label">Last Count</div><div class="calc-val lg">' + this.fmtDate(latest.date) + '</div></div>'
         + '</div></div></div>';
 
-      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Filter Counts</div>'
+      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
         + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div></div>';
 
       const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'

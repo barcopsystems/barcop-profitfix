@@ -95,8 +95,7 @@ S.InventoryEmpties = {
       + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Empties</div>'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;">'
         + '<button class="btn btn-ghost btn-sm" id="em-export">Export PDF</button>'
         + '<button class="btn btn-ghost btn-sm" id="em-print-blank">Worksheet</button>'

@@ -218,8 +218,7 @@ S.InventoryParSuggestions = {
       + stat('Added Stock', App.fmtCurrency(addedStock))
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Par Suggestions</div>'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ps-export">Export PDF</button></div></div>';
     const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
       + '<div class="f" style="width:280px;flex-shrink:0;"><label>Category</label><select id="ps-cat">' + catOpts + '</select></div>'
