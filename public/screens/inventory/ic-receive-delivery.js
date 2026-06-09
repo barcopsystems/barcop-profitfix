@@ -62,12 +62,12 @@ S.InventoryReceiveDelivery = {
 
   showHowTo() {
     App.showHelpModal('How Receiving a Delivery Works', [
-      { p: ['Receiving a delivery logs what actually showed up against what you ordered and what you got charged. Match it to your invoice line by line, flag anything that is off, and Bar Cop keeps your costs current and your vendor honest.'] },
-      { h: 'Start With The Vendor', p: ['Pick the vendor up top, then set the date and who took the delivery in. Invoice number and driver are optional, but worth keeping for your records and any credit claim down the road.'] },
-      { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, pick it from Open Order and every line pre-fills with what you ordered. Bar Cop sets the order Received when you save, so it drops off your Order Sheet. No order on file means a walk-in delivery, so add the lines by hand.'] },
-      { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master. Bottle beer is received by the case, so the qty is cases and the price is per case. Everything else is in its own container unit.'] },
-      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop flags the line and gives you a Flag Discrepancy button. Filing it opens a pre-filled claim that lands in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
-      { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases and leave the ones you plan to dispute. Saved deliveries feed your on-hand stock, your usage and variance reports, and Vendor Watch.'] }
+      { p: ['Receiving a delivery logs what actually showed up against what you ordered and what you got charged. Match it to your invoice line by line, flag anything that is off, and Bar Cop keeps your costs current and your vendor honest. Do it the moment the driver is still on the dock, while you can still hand back a case or get a signature on a short count.'] },
+      { h: 'Start With The Vendor', p: ['Pick the vendor up top, then set the date and who took the delivery in. Invoice number and driver are optional, but worth keeping for your records and any credit claim down the road. When you select Republic National, Bar Cop checks for any open orders you placed with them and offers them in the Open Order picker.'] },
+      { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, pick it from Open Order and every line pre-fills with what you ordered. That also arms the short-count check, since Bar Cop now knows what was supposed to show up. Bar Cop sets the order Received when you save, so it drops off your Order Sheet. No order on file means a walk-in delivery, so add the lines by hand.'] },
+      { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master, so you are really just confirming it still matches. Bottle beer is received by the case, so the qty is cases and the price is per case. A delivery of Modelo Especial is entered as 4 cases at the per-case price, not 96 bottles. Everything else is in its own container unit: liquor and wine by the bottle, draft by the keg.'] },
+      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop flags the line in gold and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. Filing it lands the claim in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
+      { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases so your pour costs stay honest, and check Dispute on the ones you are not eating, which files the vendor discrepancy claim in the same step. Saved deliveries feed your on-hand stock, your usage and variance reports, and Vendor Watch.'] }
     ]);
   },
 
@@ -127,7 +127,7 @@ S.InventoryReceiveDelivery = {
 
     const detailsCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
-      + App.helpButton('rd-how') + '</div>'
+      + '</div>'
       + '<div class="form-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
       + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
@@ -151,8 +151,8 @@ S.InventoryReceiveDelivery = {
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
       + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:280px;">Product</th>'
-      + '<th style="width:130px;">Qty Received ' + tt('rd-qty') + '</th>'
-      + '<th style="width:140px;">Unit Price ' + tt('rd-price') + '</th>'
+      + '<th style="width:130px;">Qty Received</th>'
+      + '<th style="width:140px;">Unit Price</th>'
       + '<th style="width:110px;">Extended</th>'
       + '<th></th>'
       + '</tr></thead><tbody id="rd-lines">' + this.lineHTML(++this._seq) + '</tbody></table></div>'
@@ -173,7 +173,6 @@ S.InventoryReceiveDelivery = {
     const orderRow = document.getElementById('rd-order-row');
     if (orderRow) orderRow.style.display = 'none';
 
-    document.getElementById('rd-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('rd-vendor')?.addEventListener('change', (ev) => this.onVendorChange(ev.target.value));
     document.getElementById('rd-order')?.addEventListener('change', (ev) => this.onOrderPick(ev.target.value));
 
@@ -252,7 +251,7 @@ S.InventoryReceiveDelivery = {
 
     const p = this.productById(line.querySelector('.rd-prod').value);
     // For bottle beer with case_size, qty is in cases and unit_cost is
-    // cost-per-case. The Qty Received and Unit Price tooltips spell that out.
+    // cost-per-case.
     const isCaseBeer = p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
 
     const flagRow = this.container.querySelector('.rd-flag-row[data-lid="' + lid + '"]');

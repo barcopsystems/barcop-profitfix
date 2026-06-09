@@ -133,7 +133,7 @@ S.InventoryOrderHistory = {
       + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val lg">' + openOrders.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Open Value</div><div class="calc-val lg">' + App.fmtCurrency(openValue) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last Order</div><div class="calc-val lg">' + this.fmtDate(last.date) + '</div></div>'
-      + '</div>' + App.helpButton('oh-how') + '</div></div>';
+      + '</div></div></div>';
 
     const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Filter Orders</div>'
@@ -169,11 +169,9 @@ S.InventoryOrderHistory = {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#oh-list-export')) { this.exportList(); return; }
       if (ev.target.closest('#oh-clear')) { this.vendorFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
-      const how = ev.target.closest('#oh-how');
       const row = ev.target.closest('.oh-row');
       const view = ev.target.closest('.oh-view');
       const del = ev.target.closest('.oh-del');
-      if (how)        { this.showHowTo(); return; }
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
       if (view)       { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
       if (row)        { this.renderDetail(row.dataset.id); return; }

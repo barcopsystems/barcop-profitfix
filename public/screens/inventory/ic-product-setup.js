@@ -281,15 +281,17 @@ S.InventoryProducts = {
     this.renderLanding();
   },
 
-  // Page directions for the nav "i" (see [[help-model]]). The per-category import
-  // help (showImportHelp) stays where it is — it's contextual to the upload flow.
+  // Page directions for the nav "i" (see [[help-model]]). Covers single entry
+  // AND the per-category CSV / Excel upload flow.
   showHowTo() {
     App.showHelpModal('How Add Products Works', [
-      { p: ['Add Products is your master product list. Everything Bar Cop costs, counts, orders, and reports reads from here, so a complete product list is the best hour of setup you can put into the app.'] },
-      { h: 'Start With A Category', p: ['Pick one of the six category cards on top. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
-      { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. Bottle beer needs the bottle size and case size. A product missing a required field shows as Incomplete in red until you finish it.'] },
-      { h: 'Other Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Sizes Sold with its own price and Bar Cop shows that size its own pour cost.'] },
-      { h: 'Uploading A List', p: ['Each category card has an Upload option. Drop a CSV or Excel file for that category, match your columns to the fields, and import the whole list at once. Only the product name is required; everything else is optional and can be filled in after.'] }
+      { p: ['Add Products is your master product list. Everything Bar Cop costs, counts, orders, and reports reads from here, so a complete product list is the best hour of setup you can put into Bar Cop. Get it right once and every count sheet, order, and pour cost downstream is right too.'] },
+      { h: 'Start With A Category', p: ['Pick one of the six category cards on top: Liquor, Wine, Bottle Beer, Draft Beer, Food, Misc. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
+      { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. For example, a 750ml bottle of well vodka at 25.4 oz, poured at 1.5 oz, gives you about 17 pours per bottle. Bottle beer needs the bottle size and case size. A product missing a required field shows as Incomplete in red until you finish it.'] },
+      { h: 'Bottle Beer Is By The Case', p: ['Bottle beer is bought, costed, and counted by the case, the same way liquor is the bottle and draft is the keg. Enter the cost per case and the case size, say 24 for a case of Modelo, and Bar Cop works out the per-bottle cost for the menu side on its own. You never track loose bottles as the unit; the case is the unit.'] },
+      { h: 'Other Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
+      { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
+      { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] }
     ]);
   },
 
@@ -418,7 +420,6 @@ S.InventoryProducts = {
     // In-place import panel (drop zone -> column mapper, same spot). Wired only
     // while an upload is active for a category.
     if (this._import) {
-      document.getElementById('ip-imp-how')?.addEventListener('click', () => this.showImportHelp(this._import.cat));
       document.getElementById('ip-imp-cancel')?.addEventListener('click', () => { this._import = null; this.renderLanding(); });
       if (this._import.stage === 'mapper') {
         document.getElementById('ip-imp-run')?.addEventListener('click', () => this.runImport());
@@ -1095,7 +1096,6 @@ S.InventoryProducts = {
     const spec = this.FORM_SPEC[cat] || {};
     const header = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
       + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
-      + App.helpButton('ip-imp-how')
       + '</div>';
     if (this._import.stage === 'mapper') {
       return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>';
@@ -1142,18 +1142,6 @@ S.InventoryProducts = {
       + '<div class="card-actions"><button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button>'
       + '<button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
     return html;
-  },
-
-  showImportHelp(cat) {
-    const spec = this.FORM_SPEC[cat] || {};
-    const title = spec.title || cat;
-    const fieldLines = this.importFieldsForCategory(cat).map(f =>
-      f.label + (f.required ? ' (required)' : '') + ': ' + f.aliases.slice(0, 4).join(', '));
-    App.showHelpModal('How Importing ' + title + ' Works', [
-      { p: ['Bring in a whole ' + title + ' list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row.'] },
-      { h: 'The Columns', p: ['Only Product Name is required. Everything else is optional and can be filled in after import. Your headers do not need to match exactly; these common names are recognized for you:'].concat(fieldLines) },
-      { h: 'The Mapping', p: ['After you drop the file, this box shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a ' + title + ' product; rows missing required data show as Incomplete to finish later.'] }
-    ]);
   },
 
   async runImport() {

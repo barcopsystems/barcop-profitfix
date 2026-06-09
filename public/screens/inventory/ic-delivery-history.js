@@ -31,11 +31,18 @@ S.InventoryDeliveryHistory = {
 
   showHowTo() {
     App.showHelpModal('How Delivery History Works', [
-      { p: ['Delivery History is the record of every delivery you have received. Each row is one delivery, with its total, whether anything came in off, and a full line-item breakdown you can open.'] },
-      { h: 'Reading The List', p: ['Each row shows the date, vendor, invoice number, line item count, and total. The Discrepancy column flags any delivery where a price changed or a count came up short, so you can see at a glance which ones need follow-up. Clean means everything matched.'] },
-      { h: 'Filter By Vendor', p: ['Use the vendor filter to pull up just one distributor. Handy when you are reviewing a single vendor\'s pricing or chasing a credit on their account.'] },
-      { h: 'The Detail View', p: ['Open any delivery with View to see every line: product, container, quantity received, unit price, any price change against your old cost, and the extended total. Bottle beer shows in cases.'] },
-      { h: 'Export', p: ['Use Export PDF to save a clean PDF of any delivery for your records, your accountant, or a credit claim with the vendor.'] }
+      { p: ['Delivery History is the record of every delivery you have received. Each row is one delivery, with its total, whether anything came in off, and a full line-item breakdown you can open. This is your paper trail for what you actually bought, what you paid, and where a vendor tried to slip something past you.'] },
+      { h: 'Reading The List', p: [
+        'Each row shows the date, vendor, invoice number, line item count, and total. The Discrepancy column is the one to watch. It flags any delivery where a price changed against your old cost or a count came up short on the truck.',
+        'Clean means every line matched your expected price and the full quantity showed up. Anything else gets tagged so you can see at a glance which deliveries need a follow-up call before you pay the invoice.'
+      ] },
+      { h: 'Why The Discrepancy Flag Matters', p: ['Distributors raise prices quietly. A nickel a bottle on your well vodka does not jump off an invoice, but across a year and every case you buy it adds up to real money. When Republic National bumps the price on a line, Delivery History catches it and shows you the old price next to the new one so you can decide to eat it, push back, or switch brands. That is the whole point of recording deliveries instead of just stacking invoices in a drawer.'] },
+      { h: 'Filter By Vendor', p: ['Use the vendor filter to pull up just one distributor. Handy when you are reviewing a single vendor\'s pricing over the last few months or chasing a credit on their account. Pull up Republic National before your rep visits and you walk into that meeting knowing exactly what they have been charging you.'] },
+      { h: 'The Detail View', p: [
+        'Open any delivery with View to see every line: product, container, quantity received, unit price, any price change against your old cost, and the extended total. Bottle beer shows in cases, so a delivery of Modelo reads in cases the way you order it and pay for it, not loose bottles.',
+        'If a line shows a price change, the old price is right there next to what you just paid. If a count came up short, that line tells you what you were billed for versus what hit the floor, which is your starting point for a credit.'
+      ] },
+      { h: 'Export', p: ['Use Export PDF to save a clean PDF of any delivery for your records, your accountant at month end, or a credit claim you are filing with the vendor. When you are disputing a short count, a printed line-item record with the invoice number on it ends the argument fast.'] }
     ]);
   },
 
@@ -69,7 +76,7 @@ S.InventoryDeliveryHistory = {
       + '<div class="calc-item"><div class="calc-label">Total Received</div><div class="calc-val lg">' + App.fmtCurrency(totalReceived) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg">' + flagged + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last Delivery</div><div class="calc-val lg">' + this.fmtDate(last.date) + '</div></div>'
-      + '</div>' + App.helpButton('dh-how') + '</div></div>';
+      + '</div></div></div>';
 
     const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Filter Deliveries</div>'
@@ -116,11 +123,9 @@ S.InventoryDeliveryHistory = {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#dh-list-export')) { this.exportList(); return; }
       if (ev.target.closest('#dh-clear')) { this.vendorFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
-      const how = ev.target.closest('#dh-how');
       const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');
       const row = ev.target.closest('.dh-row');
-      if (how)  { this.showHowTo(); return; }
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
       if (view) { this.renderDetail(view.dataset.id); return; }
       if (row)  { this.renderDetail(row.dataset.id); return; }

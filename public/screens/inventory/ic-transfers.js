@@ -135,18 +135,20 @@ S.InventoryTransfers = {
 
   showHowTo() {
     App.showHelpModal('How the Transfer Log Works', [
-      { p: ['The Transfer Log records every time product moves from one of your locations to another, like stockroom to the front bar or walk-in to the kitchen line. It is an accountability trail, so you always know who moved what and where it went.'] },
-      { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Add a witness when two people should sign off on a high-value move. Notes are optional.'] },
-      { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations.'] },
+      { p: ['The Transfer Log records every time product moves from one of your locations to another, like stockroom to the front bar or walk-in to the kitchen line. It is an accountability trail, so you always know who moved what and where it went. When a bottle goes missing from the front bar, the first question is whether it ever left the back. This log answers it.'] },
+      { h: 'When You Run Multiple Locations', p: ['The Transfer Log earns its keep the moment your stock lives in more than one place. At The Anchor the well liquor is counted at the front bar and the service bar separately, with the backup cases in the stockroom. If a manager grabs three bottles of house tequila off the stockroom shelf and walks them to the service bar on a busy Friday, that move gets logged here so each location count still ties out.'] },
+      { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Pick the right unit too. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move. Notes are optional but worth a line when the move is out of the ordinary.'] },
+      { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have in the building. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations, so logging one never throws off your numbers.'] },
+      { h: 'A Real Example', p: ['Say the front bar runs dry on Tito\'s in the middle of dinner service and your bartender pulls a fresh case from the stockroom. Log it: product Tito\'s, quantity one case if you moved it by the case or the loose bottle count if you broke one out, from Stockroom, to Front Bar, performed by whoever grabbed it. Now when you count the front bar at close and the stockroom on Sunday, both reconcile and nobody is left wondering where the vodka went.'] },
       { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the filters to pull up a date range, a single product, or one location. Edit or delete any entry if you need to fix a mistake.'] },
-      { h: 'Worksheet', p: ['The Worksheet button gives you a clean PDF grid to print and carry on the floor during a shift. Jot down moves as they happen, then enter them here after close.'] }
+      { h: 'Worksheet', p: ['The Worksheet button gives you a clean PDF grid to print and carry on the floor during a shift. Jot down moves as they happen, then enter them here after close. That beats trying to remember at the end of the night.'] }
     ]);
   },
 
   // The Log a Transfer form lives at the top of the landing page (collapsible).
   logFormCard() {
     return '<div class="card form-card no-print">'
-      + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer', App.helpButton('tr-how'))
+      + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer')
       + '<div class="collapse-body">'
       + this.formRows(null, 'tr-')
       + '<div class="card-actions">'
@@ -198,7 +200,6 @@ S.InventoryTransfers = {
 
   // Wire the always-open inline log form.
   wireForm(idp) {
-    document.getElementById('tr-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
     this.wireProdChange(idp);
     const head = this.container.querySelector('.card-collapse-head');

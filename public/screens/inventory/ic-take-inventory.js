@@ -141,13 +141,12 @@ S.InventoryTakeInventory = {
     this.container.innerHTML = '<div class="screen">' + resumeBar
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
-      + App.helpButton('ti-how') + '</div>'
+      + '</div>'
       + body
       + startAction
       + '</div></div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#ti-how'))     { this.showHowTo(); return; }
       const tile = ev.target.closest('.ti-loc-tile');
       if (tile) { this.toggleLocTile(tile); return; }
       if (ev.target.closest('#ti-go-locs')) { App.navigate('ic-locations'); return; }

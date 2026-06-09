@@ -129,10 +129,11 @@ S.InventoryEmpties = {
 
   showHowTo() {
     App.showHelpModal('How the Empties Log Works', [
-      { p: ['The Empties Log records empty containers as you clear them, like spent kegs, bottles, and cans. Some states and cities require a container log by law, and it is how you track deposit money you can claim back.'] },
-      { h: 'Logging Empties', p: ['Set the date, pick the product, enter how many containers and the unit, then choose what happened to them: Recycle, Return for Deposit, or Trash. Add the deposit per container when there is money on them, and name who logged it.'] },
-      { h: 'Deposits And Compliance', p: ['When you mark containers Return for Deposit and set a deposit amount, Bar Cop tracks the money owed back to you. The log doubles as your compliance record if an inspector ever asks for one.'] },
-      { h: 'It Does Not Change Your Counts', p: ['Logging an empty does not touch your inventory totals, usage, or variance. The product was already used. This log is purely about where the empty container went.'] },
+      { p: ['The Empties Log records empty containers as you clear them, like spent kegs, bottles, and cans. Some states and cities require a container log by law, and it is how you track deposit money you can claim back. That deposit money adds up over a year and most operators leave it on the table because nobody is counting it.'] },
+      { h: 'Logging Empties', p: ['Set the date, pick the product, enter how many containers, then choose what happened to them. Recycle, Return for Deposit, or Trash. The unit follows the product. Draft is by the keg, everything else is by the bottle. Add the deposit per container when there is money on them, and name who logged it.'] },
+      { h: 'Deposits And Compliance', p: ['When you mark containers Return for Deposit and set a deposit amount, Bar Cop multiplies it by the quantity and tracks the money owed back to you. The log doubles as your compliance record if an inspector ever asks for one, so you are covered on both fronts from a single entry.'] },
+      { h: 'A Real Example', p: ['Saturday night The Anchor goes through two cases of Modelo, twenty four cans each, and a half keg of a local lager. The next morning your barback clears the empties. Log the Modelo cans as forty eight bottles, Return for Deposit, ten cents each, which Bar Cop books as four dollars and eighty cents owed back. Log the keg as one keg, Return for Deposit at the distributor keg deposit. Come the next Republic National delivery you hand back the empties and collect, with the log to prove what is owed.'] },
+      { h: 'It Does Not Change Your Counts', p: ['Logging an empty does not touch your inventory totals, usage, or variance. The product was already used and counted when it poured. This log is purely about where the empty container went.'] },
       { h: 'Filtering And History', p: ['Every entry drops into the list below. Filter by date range, product, or disposition, and edit or delete any entry to fix a mistake. The Worksheet button gives you a clean PDF grid to print and fill on the floor, then enter after close.'] }
     ]);
   },
@@ -140,7 +141,7 @@ S.InventoryEmpties = {
   // The Log Empties form lives at the top of the landing page (collapsible).
   logFormCard() {
     return '<div class="card form-card no-print">'
-      + App.collapsibleCardTitle('ic-empties', 'Log Empties', App.helpButton('em-how'))
+      + App.collapsibleCardTitle('ic-empties', 'Log Empties')
       + '<div class="collapse-body">'
       + this.formRows(null, 'em-')
       + '<div class="card-actions">'
@@ -166,9 +167,9 @@ S.InventoryEmpties = {
           + '<input type="date" id="' + idp + 'date" value="' + esc(e?.date || App.todayLocal()) + '"/></div>'
         + '<div class="f" style="flex:1.4;min-width:150px;"><label>Product</label>'
           + '<select id="' + idp + 'prod">' + this.productOptions(initialProdId) + '</select></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Qty ' + tt('em-qty') + '</label>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Qty</label>'
           + '<div class="fw"><input class="suf" type="number" id="' + idp + 'qty" min="0" step="1" value="' + v(e?.quantity) + '" placeholder="0"/><span class="suf" id="' + idp + 'qty-unit">' + (initialCat ? this.unitFor(initialCat) : 'bottles') + '</span></div></div>'
-        + '<div class="f" style="width:86px;flex-shrink:0;"><label>Deposit ' + tt('em-deposit') + '</label>'
+        + '<div class="f" style="width:86px;flex-shrink:0;"><label>Deposit</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + idp + 'deposit" min="0" step="0.01" value="' + v(e?.deposit_amount) + '" placeholder="0.05"/></div></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Disposition</label>'
           + '<select id="' + idp + 'disp"><option value="">Select...</option>' + dispOpts + '</select></div>'
@@ -181,7 +182,6 @@ S.InventoryEmpties = {
 
   // Wire the always-open inline log form.
   wireForm(idp) {
-    document.getElementById('em-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
     this.wireProdChange(idp);
     const head = this.container.querySelector('.card-collapse-head');

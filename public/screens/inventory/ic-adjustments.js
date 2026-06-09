@@ -153,18 +153,19 @@ S.InventoryAdjustments = {
 
   showHowTo() {
     App.showHelpModal('How the Adjustment Log Works', [
-      { p: ['An adjustment documents stock that left or came back into inventory outside of a normal sale, like product damaged in storage, theft you confirmed, product that expired, or stock you found that was never counted. It keeps your counts clean while attributing the loss to a real cause.'] },
-      { h: 'Logging An Adjustment', p: ['Set the date and time, pick the reason, and confirm the direction: Loss for product that left, Found for stock that came back. Pick the product, the quantity, and the unit. Bar Cop estimates the dollar value from the product cost as you go.'] },
-      { h: 'Reasons And Direction', p: ['Damage, Theft, and Expiration default to a Loss. Found defaults to an increase. Other lets you set the direction yourself.'] },
-      { h: 'It Does Not Touch Your Counts', p: ['Logging an adjustment does not change your last count or auto-subtract from variance. The Variance Report surfaces adjustments separately so you can see real shrinkage versus a documented cause. Your bookkeeper gets a clean shrinkage trail.'] },
-      { h: 'Filtering And History', p: ['Every adjustment drops into the list below. Filter by date range, product, or reason, and edit or delete any entry to fix a mistake.'] }
+      { p: ['An adjustment documents stock that left or came back into inventory outside of a normal sale, like product damaged in storage, theft you confirmed, product that expired, or stock you found that was never counted. It keeps your counts clean while attributing the loss to a real cause. Without it, every broken bottle and dumped keg shows up as mystery shrinkage and looks like theft.'] },
+      { h: 'Logging An Adjustment', p: ['Set the date and time, pick the reason, and confirm the direction. Loss for product that left, Found for stock that came back. Pick the product, the quantity, and the unit. Draft is by the keg, bottle beer by the case, liquor and wine by the bottle. Bar Cop estimates the dollar value from the product cost as you go, so you see what the loss actually cost you in real money before you save it.'] },
+      { h: 'Reasons And Direction', p: ['Damage, Theft, and Expiration default to a Loss. Found defaults to an increase. Other lets you set the direction yourself. Use the right reason, because a write-off labeled Theft feeds your Theft Risk picture while one labeled Damage does not. Honest reasons keep that signal clean.'] },
+      { h: 'A Real Example', p: ['A barback at The Anchor drops a full bottle of Hennessy on the way to the well and it shatters. Log it: reason Damage, direction Loss, product Hennessy, quantity one bottle. Bar Cop prices it off your cost, say a 750ml bottle that runs you about thirty dollars, and books a thirty dollar documented loss. Now when you run variance for the period, that thirty dollars is accounted for and does not get mistaken for product walking out the door.'] },
+      { h: 'It Does Not Touch Your Counts', p: ['Logging an adjustment does not change your last count or auto-subtract from variance. The Variance Report surfaces adjustments separately so you can see real shrinkage versus a documented cause. Your bookkeeper gets a clean shrinkage trail they can stand behind at tax time.'] },
+      { h: 'Filtering And History', p: ['Every adjustment drops into the list below. Filter by date range, product, or reason, and edit or delete any entry to fix a mistake. The Worksheet button prints a clean grid you can carry into the storeroom during a damage or expiration walk-through, then enter the rows here after.'] }
     ]);
   },
 
   // The Log an Adjustment form lives at the top of the landing page (collapsible).
   logFormCard() {
     return '<div class="card form-card no-print">'
-      + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment', App.helpButton('adj-how'))
+      + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment')
       + '<div class="collapse-body">'
       + this.formRows(null, 'adj-')
       + '<div class="card-actions">'
@@ -191,7 +192,7 @@ S.InventoryAdjustments = {
           + '<input type="datetime-local" id="' + idp + 'when" value="' + esc((r?.date_time || this.nowDateTime()).slice(0, 16)) + '"/></div>'
         + '<div class="f" style="flex:1;min-width:180px;"><label>Product</label>'
           + '<select id="' + idp + 'prod">' + this.productOptions(initialProdId) + '</select></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Quantity ' + tt('adj-qty') + '</label>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Quantity</label>'
           + '<input type="number" id="' + idp + 'qty" min="0" step="0.5" value="' + v(r?.quantity) + '" placeholder="0"/></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Unit</label>'
           + '<select id="' + idp + 'unit">' + this.unitOptions(initialCat, initialUnit) + '</select></div>'
@@ -219,7 +220,6 @@ S.InventoryAdjustments = {
 
   // Wire the always-open inline log form.
   wireForm(idp) {
-    document.getElementById('adj-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
     this.wireFormFields(idp);
     const head = this.container.querySelector('.card-collapse-head');

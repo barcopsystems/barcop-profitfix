@@ -71,10 +71,11 @@ S.InventoryUsageReport = {
 
   showHowTo() {
     App.showHelpModal('How the Usage Report Works', [
-      { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you: starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts.'] },
-      { h: 'Pick A Period', p: ['Use Count Period to choose which two counts to measure between. Filter by Category or Location to narrow it down. Everything on the page recomputes for what you pick.'] },
-      { h: 'The Three Views', p: ['Usage Data is the per-product breakdown with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category. Usage History shows usage cost and theoretical profit for every period so you can watch the trend.'] },
-      { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling. The Variance Report compares it against your real POS sales to find the leaks.'] }
+      { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you. Starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts. Every product is measured in its own stock unit, so liquor and wine show up in bottles, draft in kegs, and bottle beer in cases.'] },
+      { h: 'The Math, Spelled Out', p: ['Take a single product across one period. You counted forty bottles of Tito\'s at the front bar to start. A Republic National delivery brought in two cases, so twenty four bottles in. At the next count you had eighteen bottles left. Usage is forty plus twenty four minus eighteen, which is forty six bottles poured through. Bar Cop runs that for every product and every period off your counts and deliveries.'] },
+      { h: 'Pick A Period', p: ['Use Count Period to choose which two counts to measure between. Filter by Category or Location to narrow it down. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
+      { h: 'The Three Views', p: ['Usage Data is the per-product breakdown with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
+      { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling, the best case if every ounce sold and nothing got spilled, comped, or over-poured. The Variance Report compares it against your real POS sales to find the leaks. A 750ml bottle of Tito\'s poured at a 1.5 oz spec is about seventeen pours, so forty six bottles is your theoretical pour count times your well price. That is the number reality gets measured against.'] }
     ]);
   },
 
@@ -90,7 +91,7 @@ S.InventoryUsageReport = {
   statsCard(items) {
     return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
-      + App.helpButton('ur-how') + '</div></div>';
+      + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
     return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -166,7 +167,6 @@ S.InventoryUsageReport = {
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#ur-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#ur-export')) { App.exportPDF({ title: 'Usage Report', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }

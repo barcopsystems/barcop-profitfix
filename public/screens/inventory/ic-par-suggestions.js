@@ -177,16 +177,15 @@ S.InventoryParSuggestions = {
     const catOpts = '<option value="">All categories</option>'
       + cats.map(c => '<option value="' + esc(c) + '"' + (this.filterCategory === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
 
-    // Settings card (top card -> carries the help button).
-    const settingsCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Dynamic Pars Settings</span>'
-      + App.helpButton('ps-how') + '</div>'
+    // Settings card (top card).
+    const settingsCard = '<div class="card form-card"><div class="card-title">'
+      + '<span>Dynamic Pars Settings</span></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Window (weeks) ' + tt('ic-par-window') + '</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Window (weeks)</label>'
           + '<input type="number" id="ps-window" min="2" max="26" step="1" value="' + settings.window_weeks + '"/></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Buffer (%) ' + tt('ic-par-buffer') + '</label>'
+        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Buffer (%)</label>'
           + '<div class="fw"><input class="suf" type="number" id="ps-buffer" min="0" max="100" step="5" value="' + settings.buffer_pct + '"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:190px;flex-shrink:0;"><label>Default Delivery Cycle ' + tt('ic-par-cycle') + '</label>'
+        + '<div class="f" style="width:190px;flex-shrink:0;"><label>Default Delivery Cycle</label>'
           + '<input type="number" id="ps-cycle" min="1" max="30" step="1" value="' + settings.cycle_days + '"/></div>'
       + '</div></div>';
 
@@ -270,7 +269,6 @@ S.InventoryParSuggestions = {
       await App.saveInventory();
       this.draw();
     };
-    document.getElementById('ps-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ps-window')?.addEventListener('change', e => onChange(e.target.value, 'window_weeks'));
     document.getElementById('ps-buffer')?.addEventListener('change', e => onChange(e.target.value, 'buffer_pct'));
     document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(e.target.value, 'cycle_days'));

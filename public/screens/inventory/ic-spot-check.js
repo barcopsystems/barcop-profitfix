@@ -229,10 +229,10 @@ S.InventorySpotCheck = {
         + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:22px;">'
-        + '<div class="f" style="width:170px;margin-bottom:0;"><label style="text-align:center;">Restocked Mid-Shift ' + tt(p.category === 'Draft Beer' ? 'sp-restock-keg' : 'sp-restock') + '</label>'
+        + '<div class="f" style="width:170px;margin-bottom:0;"><label style="text-align:center;">Restocked Mid-Shift</label>'
           + '<div class="fw"><input class="suf sp-added" type="number" min="0" step="1" value="' + (ld.added ? ld.added : '') + '" placeholder="0" style="height:42px;font-size:15px;text-align:center;"/><span class="suf">' + this._restockUnit(p) + '</span></div>'
         + '</div>'
-        + '<div class="f" style="width:170px;margin-bottom:0;"><label style="text-align:center;">' + this._posLabel(p) + ' ' + tt(this._isCaseBeer(p) ? 'sp-pos-btl' : 'sp-pos-pours') + '</label>'
+        + '<div class="f" style="width:170px;margin-bottom:0;"><label style="text-align:center;">' + this._posLabel(p) + '</label>'
           + '<div class="fw"><input class="suf sp-sold" type="number" min="0" step="1" value="' + (ld.sold != null ? ld.sold : '') + '" placeholder="0" style="height:42px;font-size:15px;text-align:center;"/><span class="suf">' + this._posUnit(p) + '</span></div>'
         + '</div>'
       + '</div>'
@@ -272,7 +272,7 @@ S.InventorySpotCheck = {
 
     const setup = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Spot Check</span>'
-      + App.helpButton('sp-how') + '</div>'
+      + '</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
@@ -376,7 +376,6 @@ S.InventorySpotCheck = {
 
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
-      if (ev.target.closest('#sp-how')) { this.showHowTo(); return; }
       if (ev.target.closest('.sp-imp-how')) { this.showHowTo(); return; }
       if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
       const posSeg = ev.target.closest('.sp-posmode');

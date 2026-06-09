@@ -28,11 +28,19 @@ S.InventoryCountHistory = {
 
   showHowTo() {
     App.showHelpModal('How Count History Works', [
-      { p: ['Count History is the record of every inventory count you have finalized. Each row is one count, with its value, how it moved versus the count before it, and a full breakdown you can open.'] },
-      { h: 'Reading The List', p: ['Total Value is what your stock was worth at that count. Variance vs Prior is the change in value from the count before it, so you can watch your inventory rise or fall over time. The newest count is tagged Latest.'] },
-      { h: 'The Detail View', p: ['Open any count with View to see every product, what you counted, its unit cost, and its value. Bottle beer shows in cases, liquor and wine in bottles, draft in kegs, and food in its own unit.'] },
-      { h: 'Comparing Two Counts', p: ['Inside a count, pick another count from the Side-by-Side Comparison menu and the table switches to show what changed product by product. A drop is product you used, a rise is product you received.'] },
-      { h: 'Export', p: ['Use Export PDF to save a clean PDF of any count for your accountant, your insurance file, or a new manager.'] }
+      { p: ['Count History is the record of every inventory count you have finalized. Each row is one count, with its value, how it moved versus the count before it, and a full breakdown you can open. This is where you come to prove what your stock was worth on any given day and to see how it is trending week over week.'] },
+      { h: 'Reading The List', p: [
+        'Total Value is what your stock was worth at that count, priced out at your unit cost. Variance vs Prior is the change in value from the count before it. A positive number means you were holding more on hand than the last time you counted, usually right after a big delivery. A negative number means you drew the shelves down, which is normal heading into a busy weekend.',
+        'The newest count is tagged Latest. That is the one your dashboard, usage reports, and reorder list are reading from, so keep it current.'
+      ] },
+      { h: 'Watch The Trend, Not One Row', p: ['One count is a photo. The list is the movie. If The Anchor counts every Sunday night and the total value climbs steadily while sales are flat, cash is piling up on the shelves and you are over-ordering. If it drops faster than your sales can explain, that is the first place a leak shows up. Count on the same day and the same way every week so the trend means something.'] },
+      { h: 'The Detail View', p: ['Open any count with View to see every product, what you counted, its unit cost, and its value. Bottle beer shows in cases, liquor and wine in bottles, draft in kegs, and food in its own unit. Any note your counter left on a product rides along under the name, so if someone flagged a cracked case of Modelo or a half keg that read low, you see it here.'] },
+      { h: 'Comparing Two Counts', p: [
+        'Inside a count, pick another count from the Side-by-Side Comparison menu and the table switches to show what changed product by product. A drop is product you used between the two counts. A rise is product you received.',
+        'Say you compare last Sunday to this Sunday and a 750ml of your house bourbon shows a drop of four bottles. At 1.5 oz a pour that is roughly 67 pours that should match what the register rang. If the bottles moved but the sales did not, that gap is the conversation you need to have.'
+      ] },
+      { h: 'Deleting A Count', p: ['Deleting a count is behind the edit permission for a reason. A finalized count feeds your cost of goods, usage, and variance, so pulling one out moves all of those numbers. Only delete a count that was entered wrong and cannot be trusted. If a single product was off, it is cleaner to recount than to throw out the whole record.'] },
+      { h: 'Export', p: ['Use Export PDF to save a clean PDF of any count for your accountant at month end, your insurance file, or a new manager who needs to see where the stock stands.'] }
     ]);
   },
 
@@ -78,7 +86,7 @@ S.InventoryCountHistory = {
         + '<div class="calc-item"><div class="calc-label">Counts</div><div class="calc-val lg">' + asc.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Latest Value</div><div class="calc-val lg">' + App.fmtCurrency(latest.total_value || 0) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Last Count</div><div class="calc-val lg">' + this.fmtDate(latest.date) + '</div></div>'
-        + '</div>' + App.helpButton('ch-how') + '</div></div>';
+        + '</div></div></div>';
 
       const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
         + '<div class="sh" style="margin:0;">Filter Counts</div>'
@@ -132,12 +140,10 @@ S.InventoryCountHistory = {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       if (ev.target.closest('#ch-list-export')) { this.exportList(); return; }
       if (ev.target.closest('#ch-clear')) { this.countedByFilter = ''; this.typeFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
-      const how = ev.target.closest('#ch-how');
       const del = ev.target.closest('.ch-del');
       const view = ev.target.closest('.ch-view');
       const row = ev.target.closest('.ch-row');
       const take = ev.target.closest('#ch-take');
-      if (how)  { this.showHowTo(); return; }
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
       if (view) { this.renderDetail(view.dataset.id); return; }
       if (row)  { this.renderDetail(row.dataset.id); return; }

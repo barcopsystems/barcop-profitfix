@@ -117,8 +117,8 @@ S.InventoryOrderSheet = {
 
     let body;
     if (visibleVendors.length === 0 && hiddenVendors.length === 0) {
-      body = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Order Status</span>' + App.helpButton('os-how') + '</div>'
+      body = '<div class="card form-card"><div class="card-title">'
+        + '<span>Order Status</span></div>'
         + '<div class="empty" style="margin:0;"><div class="empty-title">Everything is at par</div>'
         + '<div class="empty-sub">No products in the ' + this.fmtDate(data.latest.date)
         + ' count are below their par level. Nothing to order.</div></div>'
@@ -129,8 +129,6 @@ S.InventoryOrderSheet = {
     }
 
     this.container.innerHTML = '<div class="screen">' + body + this.customOrderPanelHTML() + '</div>';
-
-    document.getElementById('os-how')?.addEventListener('click', () => this.showHowTo());
 
     // Per-card input handler for the quantity field on existing lines, plus the
     // in-row product picker on blank Add Item rows.
@@ -206,8 +204,8 @@ S.InventoryOrderSheet = {
       + '<div style="margin-top:8px;"><button class="btn btn-ghost btn-sm" id="os-go-history">View in Order History</button></div>'
       + '</div>';
 
-    return '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Order Status</span>' + App.helpButton('os-how') + '</div>'
+    return '<div class="card form-card"><div class="card-title">'
+      + '<span>Order Status</span></div>'
       + '<div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">' + stillSection + orderedSection + '</div>'
       + this.countAgeNote(data.latest, false)
       + '</div>';
