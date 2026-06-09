@@ -101,12 +101,10 @@ S.InventoryTransfers = {
       + '<div class="calc-item"><div class="calc-label">Last Transfer</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Transfers</div>'
-      + '<div style="display:flex;gap:8px;">'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
         + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
         + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Worksheet</button>'
-      + '</div></div>';
+      + '</div>';
 
     const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
       const p = this.productById(t.product_id);
