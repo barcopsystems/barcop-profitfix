@@ -178,7 +178,7 @@ S.InventoryLocations = {
       if (others.length) {
         copy = '<span style="color:var(--t4);font-size:11px;">or</span>'
           + '<select class="il-copyfrom" data-ctx="' + ctx + '" style="height:30px;padding:0 8px;font-size:12px;max-width:230px;">'
-          + '<option value="">Copy from a location...</option>'
+          + '<option value="">Copy a Location</option>'
           + others.map(l => '<option value="' + esc(l.name) + '">' + esc(l.name) + ' (' + this.productCount(l.name) + ')</option>').join('')
           + '</select>';
       }
@@ -267,27 +267,32 @@ S.InventoryLocations = {
   // data list, then Save Location / Clear.
   pickerSection() {
     if (!this.pickerOpen) return '';
-    const n = this.newChecked.size;
-    return '<div style="margin-top:8px;"><div id="il-new-filter">' + this.newFilterHTML() + '</div>'
-      + '<div class="form-row" style="margin-top:14px;align-items:center;gap:10px;flex-wrap:wrap;">'
-        + '<button class="btn btn-primary" id="il-new-save">Save Location</button>'
-        + '<button class="btn btn-ghost" id="il-new-clear">Clear</button>'
-        + '<span id="il-new-count" style="font-size:12px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>'
-        + '<span id="il-new-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '</div></div>';
+    return '<div style="margin-top:8px;"><div id="il-new-filter">' + this.newFilterHTML() + '</div></div>';
   },
 
   addFormCard() {
     const linkLabel = this.pickerOpen ? '- Hide products' : '+ Add products to location';
+    const n = this.newChecked.size;
+    const counter = this.pickerOpen
+      ? '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:6px;">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>'
+      : '';
     return '<div class="card form-card" style="margin-top:14px;">'
-      + '<div class="card-title">Add a Location</div>'
-      + '<div class="f" style="max-width:300px;">'
-        + '<label style="display:flex;align-items:center;gap:8px;"><span class="setup-num">1</span> Name Location</label>'
-        + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"/>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Add a Location</span>'
+        + '<span style="display:flex;align-items:center;gap:10px;">'
+          + '<span id="il-new-err" style="color:var(--red);font-size:12px;display:none;text-transform:none;letter-spacing:0;font-weight:400;"></span>'
+          + '<button class="btn btn-primary btn-sm" id="il-new-save">Save Location</button>'
+        + '</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:flex-start;gap:8px;">'
+        + '<span class="setup-num">1</span>'
+        + '<div class="f" style="max-width:300px;flex:1;margin:0;"><label>Name Location</label>'
+          + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"/></div>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:18px;">'
         + '<span class="setup-num">2</span>'
         + '<span class="il-addprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
+        + counter
       + '</div></div>';
   },
 
@@ -354,14 +359,12 @@ S.InventoryLocations = {
         return;
       }
       const save = ev.target.closest('#il-new-save');
-      const clr  = ev.target.closest('#il-new-clear');
       const open = ev.target.closest('.il-open');
       const edit = ev.target.closest('.il-edit');
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
       const addD = ev.target.closest('#il-add-defaults');
       if (save)      this.saveNewLocation();
-      else if (clr)  { this._newName = ''; this.newChecked = new Set(); this.pickerOpen = false; this.renderList(); }
       else if (open) this.openEdit(open.dataset.id);
       else if (edit) this.openEdit(edit.dataset.id);
       else if (arch) this.confirmDelete(arch.dataset.id);
