@@ -311,7 +311,7 @@ S.InventorySpotCheck = {
         + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
         + '<select id="sp-by" style="height:44px;">' + App.staffOptions(dft.checked_by_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Flag at %</label>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Variance Flag</label>'
         + '<div class="fw"><input class="suf" type="number" id="sp-flagpct" min="0" step="0.5" value="' + this._flagPct + '" style="height:44px;"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div class="divider"></div>'
