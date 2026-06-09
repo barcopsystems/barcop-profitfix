@@ -178,7 +178,7 @@ S.InventoryLocations = {
       if (others.length) {
         copy = '<span style="color:var(--t4);font-size:11px;">or</span>'
           + '<select class="il-copyfrom" data-ctx="' + ctx + '" style="height:30px;padding:0 8px;font-size:12px;max-width:230px;">'
-          + '<option value="">Copy a Location</option>'
+          + '<option value="">Copy Location</option>'
           + others.map(l => '<option value="' + esc(l.name) + '">' + esc(l.name) + ' (' + this.productCount(l.name) + ')</option>').join('')
           + '</select>';
       }
@@ -271,11 +271,14 @@ S.InventoryLocations = {
   },
 
   addFormCard() {
-    const linkLabel = this.pickerOpen ? '- Hide products' : '+ Add products to location';
+    const linkLabel = this.pickerOpen ? '- Hide products' : '+ Add products';
     const n = this.newChecked.size;
-    const counter = this.pickerOpen
-      ? '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:6px;">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>'
-      : '';
+    let counter = '';
+    if (this.pickerOpen) {
+      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:6px;">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>';
+    } else if (n > 0) {
+      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:6px;">' + n + ' product' + (n === 1 ? '' : 's') + ' added</span>';
+    }
     return '<div class="card form-card" style="margin-top:14px;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Add a Location</span>'
