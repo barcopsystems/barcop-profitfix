@@ -22,7 +22,9 @@
    row.dataset.id and passes the list back to onCommit in DOM order. */
 
 const DragReorder = {
-  HANDLE_GLYPH: '&#x2630;',
+  // Grip dots (2 x 3). Replaces the old hamburger glyph everywhere. fill uses
+  // currentColor so it inherits the handle cell's color (var(--t3)).
+  HANDLE_GLYPH: '<svg width="11" height="16" viewBox="0 0 11 16" fill="currentColor" aria-hidden="true" style="display:inline-block;vertical-align:middle;"><circle cx="3.5" cy="3.5" r="1.4"/><circle cx="7.5" cy="3.5" r="1.4"/><circle cx="3.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="3.5" cy="12.5" r="1.4"/><circle cx="7.5" cy="12.5" r="1.4"/></svg>',
 
   handleCellHTML() {
     return '<td class="dr-handle" style="width:32px;text-align:center;cursor:grab;color:var(--t3);font-size:16px;touch-action:none;user-select:none;" title="Drag to reorder">' + this.HANDLE_GLYPH + '</td>';
@@ -33,7 +35,11 @@ const DragReorder = {
   },
 
   wire(opts) {
-    const { container, rowSelector, handleSelector, onCommit } = opts || {};
+    // dragClass (optional): a CSS class added to the row while it is being
+    // dragged (for a custom highlight). When omitted, the default faint-dim is
+    // used. Lets one caller (Inventory) show a gold highlight while another
+    // (Shift templates) keeps the plain look.
+    const { container, rowSelector, handleSelector, onCommit, dragClass } = opts || {};
     if (!container || !rowSelector || !handleSelector || typeof onCommit !== 'function') return;
     const handles = container.querySelectorAll(handleSelector);
     if (!handles.length) return;
@@ -75,8 +81,8 @@ const DragReorder = {
         activeHandle = handle;
         lastY = ev.clientY;
         try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
-        row.style.opacity = '0.45';
-        row.style.background = 'var(--surface)';
+        if (dragClass) { row.classList.add(dragClass); }
+        else { row.style.opacity = '0.45'; row.style.background = 'var(--surface)'; }
         handle.style.cursor = 'grabbing';
         document.body.style.cursor = 'grabbing';
         autoScrollTimer = requestAnimationFrame(tickScroll);
@@ -101,8 +107,8 @@ const DragReorder = {
 
       const finish = (commit) => {
         if (!dragRow) return;
-        dragRow.style.opacity = '';
-        dragRow.style.background = '';
+        if (dragClass) { dragRow.classList.remove(dragClass); }
+        else { dragRow.style.opacity = ''; dragRow.style.background = ''; }
         if (activeHandle) activeHandle.style.cursor = 'grab';
         document.body.style.cursor = '';
         stopScroll();
