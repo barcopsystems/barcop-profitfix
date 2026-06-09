@@ -132,12 +132,12 @@ S.InventoryMoversReport = {
     const catOpts = '<option value="">All categories</option>'
       + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Movement</div>'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mv-export">Export PDF</button></div></div>';
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:230px;flex-shrink:0;"><label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div>'
       + '<div class="f" style="width:180px;flex-shrink:0;"><label>Category</label><select id="mv-cat">' + catOpts + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mv-clear">Clear</button></div>'
       + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
@@ -150,6 +150,7 @@ S.InventoryMoversReport = {
     };
     document.getElementById('mv-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
     document.getElementById('mv-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
+    document.getElementById('mv-clear')?.addEventListener('click', () => { this.catFilter = ''; this.draw(); });
   },
 
   body(cur, prior) {
