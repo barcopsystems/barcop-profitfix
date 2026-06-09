@@ -1705,8 +1705,16 @@ const App = {
     // legacy free-text value shows "(not on roster)".
     if (selectedId && !pool.some(s => s.id === selectedId) && !pool.some(s => s.name === selectedId)) {
       const off = roster.find(s => s.id === selectedId || s.name === selectedId);
-      const label = off ? (off.name + (off.status === 'Inactive' ? ' (inactive)' : '')) : (selectedId + ' (not on roster)');
-      h += '<option value="' + esc(off ? off.id : selectedId) + '" selected>' + esc(label) + '</option>';
+      // A generated id (lowercase base36 with a digit, no spaces) that resolves
+      // to nobody is an orphan — a stale draft value or a removed staff link.
+      // Drop it so the picker shows the placeholder, never a raw id like
+      // "mq6z6dgi6nvu". A genuine legacy free-text name is still preserved.
+      const looksLikeOrphanId = /[0-9]/.test(selectedId) && !/\s/.test(selectedId) && selectedId === selectedId.toLowerCase();
+      if (off) {
+        h += '<option value="' + esc(off.id) + '" selected>' + esc(off.name + (off.status === 'Inactive' ? ' (inactive)' : '')) + '</option>';
+      } else if (!looksLikeOrphanId) {
+        h += '<option value="' + esc(selectedId) + '" selected>' + esc(selectedId + ' (not on roster)') + '</option>';
+      }
     }
 
     return h;
