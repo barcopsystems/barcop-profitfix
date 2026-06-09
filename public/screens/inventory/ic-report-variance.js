@@ -346,14 +346,13 @@ S.InventoryVarianceReport = {
       '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
       + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
 
-    const back = this.runs().length
-      ? '<div class="no-print" style="margin-bottom:12px;"><span id="vr-back" style="color:var(--gold);cursor:pointer;font-size:12px;">&larr; Back to saved reports</span></div>'
+    const viewSaved = this.runs().length
+      ? '<div style="align-self:flex-end;padding-bottom:9px;"><span id="vr-view-saved" style="color:var(--gold);cursor:pointer;text-decoration:underline;font-size:12px;">or view saved reports</span></div>'
       : '';
-
     const controls = '<div class="card form-card no-print"><div class="card-title">Variance Report</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.5;margin-bottom:14px;">Pick the count period and set your standards, then upload the POS sales for that exact date range.</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;">'
-      + '<label>Count Period</label><select id="vr-period">' + periodOpts + '</select></div></div></div>';
+      + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
+      + '<label>Select Count Period</label><select id="vr-period">' + periodOpts + '</select></div>'
+      + viewSaved + '</div></div>';
 
     let importBlock;
     if (!this.posRows) {
@@ -366,7 +365,7 @@ S.InventoryVarianceReport = {
         + '</div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + back + controls + this.varianceStandardsCard() + importBlock + '</div>';
+    this.container.innerHTML = '<div class="screen">' + controls + this.varianceStandardsCard() + importBlock + '</div>';
 
     // Changing the period invalidates any already-dropped file (a file belongs to
     // one date range), so clear it and return to the dropzone for the new period.
@@ -376,13 +375,14 @@ S.InventoryVarianceReport = {
       this._unmatchedCollapsed = null;
       this.draw();
     });
-    document.getElementById('vr-back')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); this.scrollTop(); } });
+    document.getElementById('vr-view-saved')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); this.scrollTop(); } });
     this.wireStandards();
 
     if (!this.posRows) {
       CSVMapper.mount(document.getElementById('vr-import'), {
         confirmLabel: 'Import POS Sales',
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' – ' + this.fmtLong(period.endC.date) + ' POS sales file here',
+        dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
         fields: [
           { key: 'name',  label: 'Product Name',   required: true,  match: ['product', 'item', 'name', 'description', 'menu item'] },
           { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['qty', 'quantity', 'sold', 'units', 'count'] },
@@ -469,22 +469,11 @@ S.InventoryVarianceReport = {
       + '<div class="f" style="width:260px;"><select class="vr-map" data-pos="' + esc(pr.name.toLowerCase().trim()) + '">'
       + skip + this._bestMatchGroup(pr.name, cands) + full + '</select></div></div>').join('');
 
-    if (this._unmatchedCollapsed == null) this._unmatchedCollapsed = un.length > 6;
-    const collapsed = this._unmatchedCollapsed;
-    return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Unmatched POS Products (' + un.length + ')</span>'
-      + '<button class="btn btn-ghost btn-sm" id="vr-unmatched-toggle">' + (collapsed ? 'Show' : 'Hide') + '</button></div>'
-      + '<div id="vr-unmatched-body" style="' + (collapsed ? 'display:none;' : '') + '">' + rows + '</div></div>';
+    return '<div class="card form-card no-print"><div class="card-title">Unmatched POS Products (' + un.length + ')</div>'
+      + '<div>' + rows + '</div></div>';
   },
 
   wireSetupMapping() {
-    document.getElementById('vr-unmatched-toggle')?.addEventListener('click', () => {
-      this._unmatchedCollapsed = !this._unmatchedCollapsed;
-      const body = document.getElementById('vr-unmatched-body');
-      const btn = document.getElementById('vr-unmatched-toggle');
-      if (body) body.style.display = this._unmatchedCollapsed ? 'none' : '';
-      if (btn) btn.textContent = this._unmatchedCollapsed ? 'Show' : 'Hide';
-    });
     document.getElementById('vr-clearmap')?.addEventListener('click', async () => {
       if (App.inventoryData) App.inventoryData.variance_pos_map = {};
       this.manualMap = {};
@@ -534,11 +523,11 @@ S.InventoryVarianceReport = {
         + '<div class="fw"><input class="suf vr-th" type="number" data-cat="' + esc(key) + '" data-key="' + field
         + '" min="0" step="' + step + '" value="' + this.thNum(t[key][field]) + '"/><span class="suf">' + suffix + '</span></div></div>';
     };
-    return '<div class="card form-card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Variance Standards</span>'
-      + '<button class="btn btn-ghost btn-sm" id="vr-th-reset">Reset to Defaults</button></div>'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-      + this.STD_ORDER.map(k => box(k)).join('') + '</div></div>';
+    return '<div class="card form-card no-print"><div class="card-title">Set Variance Standards</div>'
+      + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
+      + this.STD_ORDER.map(k => box(k)).join('')
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vr-th-reset">Reset</button></div>'
+      + '</div></div>';
   },
 
   // ── REPORT (read-only results) ──────────────────────────────────────────────
@@ -709,7 +698,7 @@ S.InventoryVarianceReport = {
   },
 
   n(v, d) { return (v == null || isNaN(v)) ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d); },
-  recipeTag(r) { return r.fromMenu ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : ''; },
+  recipeTag(r) { return r.fromMenu ? ' <span style="font-size:8px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : ''; },
   usageColgroup(n) {
     const cols = [];
     for (let i = 0; i < n; i++) {
