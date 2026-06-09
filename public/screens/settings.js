@@ -379,7 +379,7 @@ S.HubSettings = {
         const actualPours = (cnt?.units_used||0) * p.pours_per_bottle;
         const theo = Math.round(actualPours * (0.95 + Math.random()*0.08));
         const varU = +(actualPours - theo).toFixed(1);
-        return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':'Over: Investigate' };
+        return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':(varU>0?'Over: Investigate':'Under: Investigate') };
       });
       return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:new Date().toISOString(),
         bar:{ revenue:a.bar_rev, cogs:a.bar_cogs, labor:a.bar_labor, cost_pct:a.bar_pour_pct,
@@ -1830,12 +1830,18 @@ S.HubSettings = {
       p.reorder_point = Math.max(1, Math.round(p.par_level * 0.4));
     });
 
-    // Spot checks — feed the Theft Risk pour-variance signal.
-    const icSpotItem = (p, pre, post, sold, flagged) => {
+    // Spot checks — feed the Theft Risk pour-variance signal. flagged is COMPUTED
+    // exactly like the live app (Variance Flag: off by more than the percent of
+    // POS sold, either direction, past a 1-pour floor) so the demo never shows
+    // anything different from what a real check produces. Default tolerance 5%.
+    const SPOT_FLAG_PCT = 5;
+    const icSpotItem = (p, pre, post, sold) => {
       const ppc = p.pours_per_container || 1, cpp = p.cost_per_pour || 0;
       const used = +(pre - post).toFixed(2);
       const poured = +(used * ppc).toFixed(1);
       const varP = +(poured - sold).toFixed(1);
+      const pct = sold > 0 ? Math.abs(varP) / sold * 100 : (Math.abs(varP) > 0 ? 100 : 0);
+      const flagged = Math.abs(varP) > 1 && pct >= SPOT_FLAG_PCT;
       return { product_id:p.id, name:p.name, category:p.category,
         pours_per_container:ppc, cost_per_pour:cpp, pre:pre, post:post,
         pos_sold:sold, used_containers:used, poured:poured,
@@ -1843,28 +1849,32 @@ S.HubSettings = {
     };
     const mkSpot = (daysAgo, items) => ({
       id:uid(), date:dateStr(daysAgo), shift:'PM', checked_by:'Maria G.',
-      items:items, product_count:items.length,
+      items:items, flag_pct:SPOT_FLAG_PCT, product_count:items.length,
       flagged_count:items.filter(i => i.flagged).length,
       total_variance_dollar:+items.reduce((t, i) => t + (i.variance_dollar || 0), 0).toFixed(2),
       created_at:daysAgoISO(daysAgo)
     });
+    // Liquor at ~16.9 pours per 25.4 oz bottle (1.5 oz pour). Numbers are tuned to
+    // a real, consistent mix: mostly clean, a recurring Tito's overpour that gets
+    // cleaned up by the latest check, one Bulleit short-pour (under), and a new
+    // Espolon overpour. flagged is computed, so both directions show in the demo.
     App.inventoryData.ic_spot_checks = [
       mkSpot(26, [
-        icSpotItem(icProducts[0], 4,   1.0, 44, true),
-        icSpotItem(icProducts[2], 3,   0.7, 33, true),
-        icSpotItem(icProducts[1], 3,   1.1, 40, false),
+        icSpotItem(icProducts[0], 4,   1.0, 45),   // Tito's: poured 50.8 vs 45 → +5.8 over, flag
+        icSpotItem(icProducts[2], 3,   0.7, 39),   // Bulleit: 38.9 vs 39 → clean
+        icSpotItem(icProducts[1], 3,   1.1, 32),   // Espolon: 32.2 vs 32 → clean
       ]),
       mkSpot(19, [
-        icSpotItem(icProducts[0], 4,   1.2, 48, false),
-        icSpotItem(icProducts[4], 3,   0.9, 32, false),
+        icSpotItem(icProducts[0], 4,   1.2, 42),   // Tito's: 47.4 vs 42 → +5.4 over, flag
+        icSpotItem(icProducts[3], 2.5, 1.0, 26),   // Hendrick's: 25.4 vs 26 → clean
       ]),
       mkSpot(12, [
-        icSpotItem(icProducts[0], 4,   1.3, 52, false),
-        icSpotItem(icProducts[2], 3,   1.0, 39, false),
+        icSpotItem(icProducts[0], 4,   0.9, 47),   // Tito's: 52.5 vs 47 → +5.5 over, flag
+        icSpotItem(icProducts[2], 3,   1.0, 38),   // Bulleit: 33.9 vs 38 → -4.1 under (short pour), flag
       ]),
       mkSpot(4, [
-        icSpotItem(icProducts[0], 4,   1.4, 56, false),
-        icSpotItem(icProducts[3], 2.5, 0.8, 38, false),
+        icSpotItem(icProducts[0], 4,   1.0, 51),   // Tito's: 50.8 vs 51 → clean (overpour fixed)
+        icSpotItem(icProducts[1], 3.5, 1.0, 38),   // Espolon: 42.3 vs 38 → +4.3 over, flag
       ]),
     ];
 
